@@ -402,7 +402,7 @@ services:
     profiles: [infra, backend, full]
 
   localstack:          # SQS, SNS, S3, Kinesis, Firehose, Secrets Manager, KMS, SES, EventBridge Scheduler
-    image: localstack/localstack:4@sha256:3ebc37595918b8accb852f8048fef2aff047d465167edd655528065b07bc364a   # pinned by digest (IR373)
+    image: localstack/localstack:2026.9.1@sha256:0c644ede65c2d0c95737e09a39007828bd381bdb07ca8200c6bf17d66a4ed191   # pinned by digest (IR373)
     environment:
       SERVICES: sqs,sns,s3,kinesis,firehose,secretsmanager,kms,ses,scheduler,events
       AWS_DEFAULT_REGION: ap-southeast-5
