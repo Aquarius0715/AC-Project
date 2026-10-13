@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.293.0 / Created: 2026-09-14 / Updated: 2026-10-14 / Status: Draft for review / Language: English
+Version: 0.294.0 / Created: 2026-09-14 / Updated: 2026-10-14 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.294.0 (2026-10-14): Notification e-mails carry a Date header and an RFC 2047 encoded subject (IR424).
 0.293.0 (2026-10-14): Security review — an invitation is e-mailed at most every 5 minutes per invite (IR423).
 0.292.0 (2026-10-14): Review fixes — a contractor cannot disable or remove a technician who holds an assigned job (IR421); an accepted client user's e-mail stays, for HQ too (IR422).
 0.291.0 (2026-10-14): Review fixes — the services start after Keycloak answers and refetch unknown token keys within 10 s (IR419); HQ changing a membership keeps an account its contractor or owner disabled closed (IR420); e-mails to ended memberships are suppressed and the mail worker locks its rows (IR418).

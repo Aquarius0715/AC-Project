@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/mail"
 	"net/smtp"
 	"strings"
@@ -34,8 +35,11 @@ func (s SMTP) Send(_ context.Context, to, subject, body string) (string, error) 
 		return "", fmt.Errorf("mail: line break in a header")
 	}
 	id := uuid.NewString() + "@ac-project.local"
-	msg := "From: " + s.From + "\r\nTo: " + to + "\r\nSubject: " + subject + "\r\nMessage-ID: <" + id + ">\r\nMIME-Version: 1.0\r\n" +
-		"Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n" + strings.ReplaceAll(body, "\n", "\r\n")
+	// RFC 5322 needs a Date; a subject with non-ASCII text (a customer's or unit's name) is RFC 2047 encoded, as headers
+	// are ASCII; the body's line ends become CRLF once
+	msg := "From: " + s.From + "\r\nTo: " + to + "\r\nSubject: " + mime.QEncoding.Encode("UTF-8", subject) + "\r\nDate: " + time.Now().UTC().Format(time.RFC1123Z) +
+		"\r\nMessage-ID: <" + id + ">\r\nMIME-Version: 1.0\r\n" +
+		"Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n" + strings.ReplaceAll(strings.ReplaceAll(body, "\r\n", "\n"), "\n", "\r\n")
 	from, err := mail.ParseAddress(s.From) // the envelope takes the bare address ("Name <a@b>" → a@b)
 	if err != nil {
 		return "", fmt.Errorf("mail: sender %q: %w", s.From, err)

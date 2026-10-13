@@ -6506,3 +6506,10 @@ Found in review (security, rate limits): Resend invite queued a new invitation e
 1. `clientUsers.resendInvite` and `partnerUsers.resendInvite` lock the invite and refuse a resend sooner than 5 minutes after the last invitation e-mail (the invite itself counts): RATE_LIMITED `errors.invite_recently_sent` with `retryAfterSeconds`. Nothing is queued then.
 2. The web says when the invite can be sent again ("The invitation was e-mailed a moment ago — send it again in n min", English and Malay).
 3. Tests: `TestClientUsers`, `TestPartnerUsers`, `TestInviteMail` (an immediate resend is refused with 300 s; after 5 minutes it is queued), `actionMessage.test.ts`.
+
+## IR424 Notification e-mails carry a Date and an encoded subject — 2026-10-14
+
+Found in review: the SMTP sender wrote no `Date` header, which RFC 5322 requires (providers and filters treat such mail as malformed), and put a subject with non-ASCII text (a customer's or unit's name) into the header as raw UTF-8.
+
+1. `notify.SMTP.Send` adds `Date` (UTC, the send time) and encodes the subject per RFC 2047 when it is not plain ASCII (`=?UTF-8?q?…?=`); the body's line ends become CRLF once, also when the text already has CRLF.
+2. Test: `TestSMTPSends` (Date present, `Hello 陈` encoded, no doubled CR).

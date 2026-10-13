@@ -39,7 +39,7 @@ func TestSMTPRefusesHeaderBreaks(t *testing.T) {
 }
 
 // TestSMTPSends: a message reaches an SMTP server with the bare sender address in the envelope and the display name
-// in the From header.
+// in the From header, a Date, the non-ASCII subject RFC 2047 encoded and CRLF line ends in the body.
 func TestSMTPSends(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -94,11 +94,12 @@ func TestSMTPSends(t *testing.T) {
 		}
 	}()
 	s := SMTP{Addr: ln.Addr().String(), From: "AC Project <no-reply@ac-project.local>"}
-	if _, err := s.Send(context.Background(), "tan@example.com", "Hello", "Body line"); err != nil {
+	if _, err := s.Send(context.Background(), "tan@example.com", "Hello 陈", "Body line\r\nsecond"); err != nil {
 		t.Fatal(err)
 	}
 	m := <-got
-	if !strings.HasPrefix(m, "<no-reply@ac-project.local>") || !strings.Contains(m, "From: AC Project <no-reply@ac-project.local>") || !strings.Contains(m, "Subject: Hello") || !strings.Contains(m, "Body line") {
+	if !strings.HasPrefix(m, "<no-reply@ac-project.local>") || !strings.Contains(m, "From: AC Project <no-reply@ac-project.local>") || !strings.Contains(m, "Subject: =?UTF-8?q?Hello_=E9=99=88?=\r\n") ||
+		!strings.Contains(m, "\r\nDate: ") || !strings.Contains(m, "Body line\r\nsecond") || strings.Contains(m, "\r\r\n") {
 		t.Errorf("received: %q", m)
 	}
 }
