@@ -2,7 +2,7 @@
 // (IR418; Mailpit in development). --role=scheduler ticks the clock-driven transitions every second, with the
 // modules' jobs (IR54 schedule automations): with --domain=<domain> only that domain's (IR195; the domain's database
 // role, other domains asked through their internal queries), without it every domain on an all-domain role
-// (single-process development).
+// (single-process development). --role=outbox keeps the platform tables to their retention every hour (IR428).
 package main
 
 import (
@@ -17,6 +17,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 	"github.com/pradita/ac-project/service/api/internal/scheduler"
 	"github.com/pradita/ac-project/service/api/internal/server"
@@ -33,6 +34,10 @@ func main() {
 	}
 	if *role == "notification" {
 		runMail(ctx)
+		return
+	}
+	if *role == "outbox" {
+		runHousekeeping(ctx)
 		return
 	}
 	if *role != "scheduler" {
@@ -110,4 +115,34 @@ func envOr(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// runHousekeeping deletes, every hour, the outbox events every subscriber has applied, the records of events no
+// longer in the outbox and the expired idempotency keys (events.Housekeep, IR428). It runs on the all-domain role so
+// it knows every consumer's subscriptions; the outbox relay to SNS joins this role later.
+func runHousekeeping(ctx context.Context) {
+	logger := logging.New(os.Stdout, "outbox")
+	cfg, err := server.ConfigFromEnv(logger, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	srv, err := server.New(ctx, cfg, auth.StaticVerifier{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer srv.DB.Close()
+	t := time.NewTicker(time.Hour)
+	defer t.Stop()
+	for {
+		if s, err := events.Housekeep(ctx, srv.DB, srv.Registry.Clock(), srv.Consumers); err != nil {
+			log.Printf("housekeeping: %v", err)
+		} else {
+			log.Printf("housekeeping: removed %d outbox events, %d processed-event records, %d failure records, %d idempotency keys", s.Outbox, s.Processed, s.Failures, s.IdempotencyKeys)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
 }

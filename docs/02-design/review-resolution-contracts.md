@@ -6596,3 +6596,11 @@ Found in review: the outbox consumers (IR183) stop at the first failing event to
 1. `platform.event_failures` (consumer, event, attempts, last error, last attempt, `dead_at`) records each failed attempt. The consumer retries the event 1, 2, 4 and 8 minutes after the attempt before (the events after it wait, so the order holds) and, after the fifth failure, dead-letters it: `dead_at` is set, the event is recorded as processed for that consumer, the log names it, and the events after it are applied.
 2. A dead-lettered event is replayed by deleting its rows for that consumer from `platform.processed_events` and `platform.event_failures` once the cause is fixed.
 3. Tests: `TestConsumerOrderDedupAndRetry` (the retry waits a minute), `TestConsumerDeadLetters` (five attempts at 0, 1, 2, 4 and 8 minutes, then skipped and recorded).
+
+## IR428 The platform tables are kept to their retention — 2026-10-14
+
+Found in review: database design §6 sets the retention of the outbox (7 days), the idempotency keys (24 hours) and the processed-event records (14 days), but nothing deleted any of them; the tables grew without bound, and the `outbox` worker role only idled.
+
+1. `worker --role=outbox` runs `events.Housekeep` every hour on the business clock: it deletes outbox events older than 7 days that every consumer subscribing to their type has applied or dead-lettered (an event a consumer still needs stays), the processed-event records of events no longer in the outbox once they are 14 days old (so nothing is delivered twice), the failure records of such events (IR427), and the expired idempotency keys tenant by tenant (row-level security). Each run logs what it removed.
+2. The two-year cleanup of `notify.notifications` / `deliveries` stays planned.
+3. Test: `TestHousekeep`.
