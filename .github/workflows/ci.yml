@@ -26,8 +26,8 @@ jobs:
     runs-on: ubuntu-24.04
     defaults: { run: { working-directory: service/api } }
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with: { go-version-file: service/api/go.mod, cache-dependency-path: service/api/go.sum }
       - name: gofmt
         run: |
@@ -57,8 +57,8 @@ jobs:
     env:
       PG_ADMIN_URL: postgres://postgres:local@localhost:5432/postgres?sslmode=disable
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with: { go-version-file: service/api/go.mod, cache-dependency-path: service/api/go.sum }
       - name: test database
         working-directory: service/api
@@ -82,8 +82,8 @@ jobs:
     env:
       PG_ADMIN_URL: postgres://postgres:local@localhost:5432/postgres?sslmode=disable
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with: { go-version-file: service/api/go.mod, cache-dependency-path: service/api/go.sum }
       - name: test database
         working-directory: service/api
@@ -99,8 +99,8 @@ jobs:
     runs-on: ubuntu-24.04
     defaults: { run: { working-directory: service/web } }
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: 22, cache: npm, cache-dependency-path: service/web/package-lock.json }
       - run: npm ci
       - run: npm run lint
@@ -110,8 +110,8 @@ jobs:
     runs-on: ubuntu-24.04
     defaults: { run: { working-directory: service/web } }
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: 22, cache: npm, cache-dependency-path: service/web/package-lock.json }
       - run: npm ci
       - run: npm run typecheck
@@ -121,8 +121,8 @@ jobs:
     runs-on: ubuntu-24.04
     defaults: { run: { working-directory: service/web } }
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: 22, cache: npm, cache-dependency-path: service/web/package-lock.json }
       - run: npm ci
       - run: npm test
@@ -131,10 +131,10 @@ jobs:
     name: Design document validators
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with: { python-version: "3.12" }
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: 22 }
       - name: TypeScript for the contract check
         run: npm install --no-save --prefix "$RUNNER_TEMP/ts" typescript@5.9.3
