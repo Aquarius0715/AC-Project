@@ -378,7 +378,7 @@ services:
 
   # ------------------------------------------------------------------ local stand-ins for AWS services
   postgres:            # Aurora PostgreSQL 16
-    image: postgres:16
+    image: postgres:16@sha256:65b16a8b326e0cfbdf33fa7e783f2a0cb352a61448616ccccfd616ef42aa0f65   # pinned by digest (IR373)
     environment:
       POSTGRES_DB: ac
       POSTGRES_PASSWORD: local
@@ -392,7 +392,7 @@ services:
     profiles: [infra, schema, backend, full]
 
   valkey:              # ElastiCache (sessions, idempotency fast path, rate limits)
-    image: valkey/valkey:8
+    image: valkey/valkey:8@sha256:640c5e62cea04b6d6f2084232651d0cc70362d31f4f805e7be94dbed6855e8f2   # pinned by digest (IR373)
     user: "999:999"                # the image's valkey user, not root (security loop, IR414)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -402,7 +402,7 @@ services:
     profiles: [infra, backend, full]
 
   localstack:          # SQS, SNS, S3, Kinesis, Firehose, Secrets Manager, KMS, SES, EventBridge Scheduler
-    image: localstack/localstack:4
+    image: localstack/localstack:4@sha256:3ebc37595918b8accb852f8048fef2aff047d465167edd655528065b07bc364a   # pinned by digest (IR373)
     environment:
       SERVICES: sqs,sns,s3,kinesis,firehose,secretsmanager,kms,ses,scheduler,events
       AWS_DEFAULT_REGION: ap-southeast-5
@@ -413,7 +413,7 @@ services:
     profiles: [infra, backend, full]
 
   mosquitto:           # AWS IoT Core stand-in (MQTT 3.1.1/5); mutual TLS is verified in staging against IoT Core
-    image: eclipse-mosquitto:2
+    image: eclipse-mosquitto:2@sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408   # pinned by digest (IR373)
     user: "1883:1883"              # the image's mosquitto user, not root (security loop, IR414)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -435,7 +435,7 @@ services:
     profiles: [infra, backend, full]
 
   keycloak:            # Amazon Cognito stand-in (OIDC, TOTP); realm "ac" with clients ac-web and ac-admin-web
-    image: quay.io/keycloak/keycloak:26.0
+    image: quay.io/keycloak/keycloak:26.0@sha256:09a381c715ab0b111835b70f2905955274843a219c6f27efb348e4d9f4086858   # pinned by digest (IR373)
     command: ["start-dev", "--import-realm", "--http-port=8080"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
@@ -468,7 +468,7 @@ services:
     profiles: [stripe]
 
   weather-mock:        # weather source stand-in (WireMock)
-    image: wiremock/wiremock:3.9.1
+    image: wiremock/wiremock:3.9.1@sha256:8fe02bc3f9b63deb1454d41750dbaf081adf4b3e8c74fd8e31f790bee5647b88   # pinned by digest (IR373)
     user: "1000:1000"              # not root (security loop, IR414)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
