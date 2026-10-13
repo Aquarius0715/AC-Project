@@ -192,10 +192,14 @@ func TestClientUserMembershipSync(t *testing.T) {
 	if until, _ := access(); until != nil {
 		t.Errorf("membership after activating: %v", until)
 	}
-	if code, m := write(s, &hq, "clientUsers.remove", `{"id":"`+user+`","reason":"left the company"}`, 2); code != 409 || m["messageKey"] != "error.versionConflict" {
+	// the same address in capitals is no change: the stored spelling stays
+	if code, m := write(s, &hq, "clientUsers.save", `{"id":"`+user+`","customerId":"`+cust+`","email":"`+strings.ToUpper(email)+`","clientRole":"member","reason":"admin change"}`, 3); code != 200 || data(m)["email"] != email {
+		t.Fatalf("same e-mail in capitals: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "clientUsers.remove", `{"id":"`+user+`","reason":"left the company"}`, 3); code != 409 || m["messageKey"] != "error.versionConflict" {
 		t.Errorf("remove on a stale version: %d %v", code, m)
 	}
-	if code, m := write(s, &hq, "clientUsers.remove", `{"id":"`+user+`","reason":"left the company"}`, 3); code != 200 || data(m)["deleted"] != true {
+	if code, m := write(s, &hq, "clientUsers.remove", `{"id":"`+user+`","reason":"left the company"}`, 4); code != 200 || data(m)["deleted"] != true {
 		t.Fatalf("remove: %d %v", code, m)
 	}
 	if until, _ := access(); until == nil || !until.Equal(clock) {

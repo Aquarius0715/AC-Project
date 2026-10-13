@@ -283,8 +283,11 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 		return x, apperr.E(apperr.Conflict, "errors.own_account")
 	}
 	// an accepted user's e-mail is the sign-in identity's, where the e-mails go: it stays, for HQ too (IR422)
-	if x.Status != "invited" && !strings.EqualFold(in.Email, x.Email) {
-		return x, apperr.Fields(map[string]string{"email": "error.immutable"})
+	if x.Status != "invited" {
+		if !strings.EqualFold(in.Email, x.Email) {
+			return x, apperr.Fields(map[string]string{"email": "error.immutable"})
+		}
+		in.Email = x.Email // the same address in other letter case keeps the stored spelling
 	}
 	if x.CustomerID != in.CustomerID {
 		return x, apperr.Fields(map[string]string{"customerId": "error.immutable"})
