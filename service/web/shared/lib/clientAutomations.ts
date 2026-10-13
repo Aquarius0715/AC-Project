@@ -274,19 +274,36 @@ export type Caps = {
   control: boolean; modeControl: boolean; fanControl: boolean; temperature: { min: number; max: number; step: number } | null; modes: ("cool" | "dry" | "fan")[]; fanLevels: ("low" | "mid" | "high")[];
   ventilation?: boolean; ventilationLevels?: ("low" | "mid" | "high")[];
 };
+/** One kind of setting an action changes (power, temperature, mode, fan, ventilation) and its values. */
+export type ActionGroup = { id: "power" | "temp" | "mode" | "fan" | "vent"; group: string; options: { key: string; label: string; short: string }[] };
 /** The actions a unit takes (DD-C05 “within unit capabilities”, the API's rule): the AC settings with control, and
- * ventilation on a model with a fresh-air function (IR314). */
-export function actionOptions(c: Caps | null, t: T = en): { group: string; options: { key: string; label: string }[] }[] {
+ * ventilation on a model with a fresh-air function (IR314). Grouped by the setting they change: the editor picks the
+ * setting first, then its value (`short` is the value alone, `label` the whole action). */
+export function actionOptions(c: Caps | null, t: T = en): ActionGroup[] {
   if (!c) return [];
-  const temps: { key: string; label: string }[] = [];
-  if (c.control && c.temperature) for (let x = c.temperature.min; x <= c.temperature.max; x += c.temperature.step || 1) temps.push({ key: `temp:${x}`, label: t("Set temperature {celsius}°C", { celsius: x }) });
-  return [
-    ...(c.control ? [{ group: t("Power"), options: [{ key: "power:on", label: t("Power ON") }, { key: "power:off", label: t("Power OFF") }] }] : []),
-    ...(temps.length ? [{ group: t("Temperature"), options: temps }] : []),
-    ...(c.control && c.modeControl && c.modes.length ? [{ group: t("Mode"), options: c.modes.map((m) => ({ key: `mode:${m}`, label: actionLabel({ kind: "set_mode", mode: m }, t) })) }] : []),
-    ...(c.control && c.fanControl && c.fanLevels.length ? [{ group: t("Fan"), options: c.fanLevels.map((f) => ({ key: `fan:${f}`, label: actionLabel({ kind: "set_fan", fanLevel: f }, t) })) }] : []),
-    ...(c.ventilation && c.ventilationLevels?.length ? [{ group: t("Ventilation"), options: c.ventilationLevels.map((l) => ({ key: `vent:${l}`, label: actionLabel({ kind: "ventilate", level: l }, t) })) }] : []),
-  ];
+  const temps: ActionGroup["options"] = [];
+  if (c.control && c.temperature) for (let x = c.temperature.min; x <= c.temperature.max; x += c.temperature.step || 1) temps.push({ key: `temp:${x}`, label: t("Set temperature {celsius}°C", { celsius: x }), short: `${x}°C` });
+  const out: ActionGroup[] = [];
+  if (c.control) out.push({ id: "power", group: t("Power"), options: [{ key: "power:on", label: t("Power ON"), short: t("ON") }, { key: "power:off", label: t("Power OFF"), short: t("OFF") }] });
+  if (temps.length) out.push({ id: "temp", group: t("Temperature"), options: temps });
+  if (c.control && c.modeControl && c.modes.length) out.push({ id: "mode", group: t("Mode"), options: c.modes.map((m) => ({ key: `mode:${m}`, label: actionLabel({ kind: "set_mode", mode: m }, t), short: t(modeWord[m] ?? m) })) });
+  if (c.control && c.fanControl && c.fanLevels.length) out.push({ id: "fan", group: t("Fan"), options: c.fanLevels.map((f) => ({ key: `fan:${f}`, label: actionLabel({ kind: "set_fan", fanLevel: f }, t), short: t(fanWord[f] ?? f) })) });
+  if (c.ventilation && c.ventilationLevels?.length) out.push({ id: "vent", group: t("Ventilation"), options: c.ventilationLevels.map((l) => ({ key: `vent:${l}`, label: actionLabel({ kind: "ventilate", level: l }, t), short: t(fanWord[l] ?? l) })) });
+  return out;
+}
+
+/** The setting an action key changes (`temp:24` → temp). */
+export function actionGroupOf(key: string): string {
+  return key.split(":")[0];
+}
+
+/** The action to start from when the setting is switched to `id`: 24 °C for temperature when the AC offers it (else the
+ * middle of its range), otherwise the first value. Empty when the AC has no such setting. */
+export function firstAction(groups: ActionGroup[], id: string): string {
+  const g = groups.find((x) => x.id === id);
+  if (!g || g.options.length === 0) return "";
+  if (id === "temp") return (g.options.find((o) => o.key === "temp:24") ?? g.options[Math.floor(g.options.length / 2)]).key;
+  return g.options[0].key;
 }
 
 /** The editor summary (Figma 03b/03e right panel). */

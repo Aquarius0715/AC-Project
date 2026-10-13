@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionLabel, actionOptions, apiErrors, consentCard, draftErrors, draftOf, eventTest, ruleCard, runClock, runText, saveInput, scheduleTest, summaryText, weekdaysText, whenText, type ApiAutomation, type Caps,
+  actionGroupOf, actionLabel, actionOptions, apiErrors, consentCard, firstAction, draftErrors, draftOf, eventTest, ruleCard, runClock, runText, saveInput, scheduleTest, summaryText, weekdaysText, whenText, type ApiAutomation, type Caps,
 } from "@ac/web/lib/clientAutomations";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
@@ -43,6 +43,10 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
     expect(apiErrors({ "draft.endsNextDay": "errors.over_24_hours", name: "error.length" }, ms)).toEqual({ endsNextDay: "Paling lama 24 jam", name: "1–120 aksara" });
     const opts = actionOptions({ control: true, modeControl: true, fanControl: false, temperature: { min: 24, max: 25, step: 1 }, modes: ["cool"], fanLevels: [] }, ms);
     expect(opts.map((g) => [g.group, g.options.map((o) => o.label)])).toEqual([["Kuasa", ["Kuasa HIDUP", "Kuasa MATI"]], ["Suhu", ["Tetapkan suhu 24°C", "Tetapkan suhu 25°C"]], ["Mod", ["Mod Sejuk"]]]);
+    // the editor picks the setting, then its value: ids, the short value words, and where a switch starts
+    expect(opts.map((g) => [g.id, g.options.map((o) => o.short)])).toEqual([["power", ["HIDUP", "MATI"]], ["temp", ["24°C", "25°C"]], ["mode", ["Sejuk"]]]);
+    expect([actionGroupOf("temp:25"), actionGroupOf("power:on"), firstAction(opts, "temp"), firstAction(opts, "power"), firstAction(opts, "mode"), firstAction(opts, "fan")])
+      .toEqual(["temp", "power", "temp:24", "power:on", "mode:cool", ""]);
     // the schedule test: a Monday start, its end, and the first day not selected (Saturday)
     const runs = [{ automationId: null, phase: "schedule_start" as const, at: "2026-09-18T10:00:00Z", action: { kind: "set_power" as const, power: true } }, { automationId: null, phase: "schedule_end" as const, at: "2026-09-18T14:00:00Z", action: { kind: "set_power" as const, power: false } }];
     expect(scheduleTest(runs, d, "Bedroom AC", MS).map((r) => [r.title, r.detail])).toEqual([
@@ -61,7 +65,7 @@ describe("ventilation in a customer rule (DD-C05 “within unit capabilities”,
   const fresh: Caps = { control: true, modeControl: false, fanControl: false, temperature: null, modes: [], fanLevels: [], ventilation: true, ventilationLevels: ["low", "high"] };
   it("offers ventilation on a model with a fresh-air function, and the AC settings only with control", () => {
     expect(actionOptions(fresh).map((g) => g.group)).toEqual(["Power", "Ventilation"]);
-    expect(actionOptions(fresh)[1].options).toEqual([{ key: "vent:low", label: "Ventilate low" }, { key: "vent:high", label: "Ventilate high" }]);
+    expect(actionOptions(fresh)[1].options).toEqual([{ key: "vent:low", label: "Ventilate low", short: "Low" }, { key: "vent:high", label: "Ventilate high", short: "High" }]);
     expect(actionOptions({ ...fresh, control: false }).map((g) => g.group)).toEqual(["Ventilation"]);
     expect(actionOptions({ ...fresh, ventilation: false }).map((g) => g.group)).toEqual(["Power"]);
   });

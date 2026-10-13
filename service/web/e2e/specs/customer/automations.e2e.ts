@@ -33,6 +33,15 @@ test("a schedule previews its next runs, is saved off and deleted", async ({ pag
   const runs = page.getByText("Next runs", { exact: true }).locator("..");
   await expect(runs).toContainText(/\d{2}:\d{2} MYT · 22:00 MYT/);
   await expect(page.getByText("Off on save")).toBeVisible();
+  // the action in two parts: the setting on the left, its value on the right (a list for temperature, buttons otherwise)
+  const start = page.getByRole("combobox", { name: /^Start action .* — setting$/ });
+  await start.selectOption({ label: "Temperature" });
+  const startValue = page.getByRole("combobox", { name: /^Start action .* — value$/ });
+  await expect(startValue).toHaveValue("temp:24");
+  await startValue.selectOption({ label: "22°C" });
+  await page.getByRole("combobox", { name: /^End action .* — setting$/ }).selectOption({ label: "Power" });
+  await page.getByRole("button", { name: "OFF", exact: true }).click();
+  await expect(page.getByRole("button", { name: "OFF", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Save automation" }).click();
   leftover = name;
   await expect(page.getByText("Automation saved").first()).toBeVisible();

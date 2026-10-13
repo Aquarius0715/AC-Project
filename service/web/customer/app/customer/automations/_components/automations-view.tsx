@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Badge, Banner, Btn, Card, cx, EmptyState, Field, Input, Modal, Page, PageHead, Select, Toggle, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, cx, EmptyState, Field, Input, Modal, Page, PageHead, Select, Toggle, Plain } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import { useOp } from "@ac/web/lib/useOp";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import {
-  actionLabel, actionOf, actionOptions, apiErrors, compares, compareText, dayLong, dayShort, draftErrors, draftOf, eventTest, extraChoices, extraLabel, fitExtras, newDraft, newExtra, runClock, runText,
+  actionGroupOf, actionLabel, actionOf, actionOptions, apiErrors, compares, compareText, dayLong, dayShort, draftErrors, draftOf, eventTest, extraChoices, extraLabel, firstAction, fitExtras, newDraft, newExtra, runClock, runText,
   saveInput, scheduleDraft, scheduleTest, summaryNote, summaryText, testFact, triggerInfo, triggers,
   type ApiAutomation, type ApiOccurrence, type Caps, type Draft, type ExtraDraft, type RuleCard, type TestRow,
 } from "@ac/web/lib/clientAutomations";
@@ -167,14 +167,30 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
       setTest([eventTest(r.decision ?? undefined, rule.id, new Map(live.rules.map((x) => [x.id, x.name])), ac?.name ?? t("the AC"), actionOf(draft.action), r.at, i18n)]));
   };
   const eventTestHint = sched ? null : draft.trigger === "routine" ? t("A routine runs at its usual time — try it with Demo controls") : dirty ? t("Save first — the test runs your saved automations for this AC") : null;
-  const actionSelect = (label: string, key: "startAction" | "endAction" | "action", hint?: string) => (
-    <Field label={label} hint={hint} error={errors[key] ?? (shown ? unsupported(draft[key]) : undefined)}>
-      <Select value={draft[key]} onChange={(e) => set({ [key]: e.target.value } as Partial<Draft>)}>
-        {!supported(draft[key]) && <option value={draft[key]}>{t("{action} (not supported)", { action: actionLabel(actionOf(draft[key]), t) })}</option>}
-        {options.map((g) => <optgroup key={g.group} label={g.group}>{g.options.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>)}
-      </Select>
-    </Field>
-  );
+  // the action in two parts: the setting on the left (power, temperature, mode, fan, ventilation), its value on the right
+  const actionSelect = (label: string, key: "startAction" | "endAction" | "action", hint?: string) => {
+    const value = draft[key];
+    const group = options.find((g) => g.id === actionGroupOf(value));
+    const pick = (v: string) => set({ [key]: v } as Partial<Draft>);
+    return (
+      <Field label={label} hint={hint} error={errors[key] ?? (shown ? unsupported(value) : undefined)}>
+        <div className="grid grid-cols-[minmax(120px,170px)_minmax(0,1fr)] items-start gap-2">
+          <Select aria-label={t("{label} — setting", { label })} value={group?.id ?? ""} onChange={(e) => pick(firstAction(options, e.target.value))}>
+            {!group && <option value="">{supported(value) ? t("Choose a setting") : t("{action} (not supported)", { action: actionLabel(actionOf(value), t) })}</option>}
+            {options.map((g) => <option key={g.id} value={g.id}>{g.group}</option>)}
+          </Select>
+          {group && (group.id === "temp" ? (
+            <Select aria-label={t("{label} — value", { label })} value={value} onChange={(e) => pick(e.target.value)}>
+              {!supported(value) && <option value={value}>{t("{action} (not supported)", { action: actionLabel(actionOf(value), t) })}</option>}
+              {group.options.map((o) => <option key={o.key} value={o.key}>{o.short}</option>)}
+            </Select>
+          ) : (
+            <Choice options={group.options.map((o) => ({ id: o.key, label: o.short }))} value={value} onChange={pick} />
+          ))}
+        </div>
+      </Field>
+    );
+  };
   const step = (n: number, title: string, sub?: string) => <div className="flex items-start gap-2"><span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white">{n}</span><div><div className="text-[15px] font-bold">{title}</div>{sub && <div className="text-xs text-muted-foreground">{sub}</div>}</div></div>;
   return (
     <Page>
