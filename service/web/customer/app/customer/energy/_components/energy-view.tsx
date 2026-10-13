@@ -106,11 +106,11 @@ export function EnergyView({ live }: { live: EnergyLive }) {
           {s.warnings.length > 0 && <div className="mt-3"><Banner tone="warn">{s.warnings.join(" · ")}</Banner></div>}
           <details className="mt-3 text-[12px]"><summary className="cursor-pointer font-semibold text-muted-foreground">{t("Calculation conditions")}</summary><div className="mt-2"><SummaryList items={s.conditions} /></div></details>
         </Card>
-        <Card title={t("Carbon impact")} sub={t("Same period & units as above · {factor}", { factor: r.factor ?? t("emission factor missing") })} action={<LinkBtn size="sm" href={`/customer/energy/offsets?${live.query}`}><Icon name="info" />{t("Learn about offsets")}</LinkBtn>}>
+        <Card title={t("Carbon impact")} sub={t("Same period & units as above · {factor}", { factor: r.factor ?? t("emission factor missing") })} action={<LinkBtn size="sm" href={`/customer/energy/offsets?${live.query}`}>{t("Offset these emissions")}<Icon name="arrowRight" /></LinkBtn>}>
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
             <div><div className="text-xs text-muted-foreground">{t("Estimated emissions")}</div><div className="text-2xl font-bold">{s.emissions}</div><div className="text-[11px] text-muted-foreground">{r.kWh === null ? t("no valid readings") : t("{kWh} kWh actual × factor", { kWh: one(r.kWh) })}</div></div>
             <div><div className="text-xs text-muted-foreground">{t("Estimated savings vs baseline")}</div><div className={`text-2xl font-bold ${s.comparable ? (s.increase ? "text-warn" : "text-ok") : "text-muted-foreground"}`}>{s.savedEmissions}</div><div className="text-[11px] text-muted-foreground">{s.comparable ? `${s.baseline} → ${s.actual}` : t("needs a comparable baseline")}</div></div>
-            <div><div className="text-xs text-muted-foreground">{t("Offsets")} <Badge tone="muted">{t("Optional")}</Badge></div><div className="text-[13px]">{t("Demo requests only — see records on the Offsets page")}</div></div>
+            <div><div className="text-xs text-muted-foreground">{t("Offsets")} <Badge tone="muted">{t("Optional")}</Badge></div><div className="text-[13px]">{t("Get a demo quote and request an offset for these emissions — demo only")}</div></div>
           </div>
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Estimates only. Savings are not a tradable balance and are not converted into carbon credits.")}</p>
         </Card>

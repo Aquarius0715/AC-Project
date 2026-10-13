@@ -6168,7 +6168,7 @@ IR393 converted the shell and the shared parts. This part converts the glyphs th
 
 The customer app's screens kept 104 glyphs, in both the API views and the browser demo's views. All of them now draw Lucide icons through `Icon`.
 
-1. **Buttons and links.** Refresh, Retry, Export (download), Rename (edit), Resend invite (send), Accept this time (check), Delete, Test / Simulate, Learn about offsets (info), and the toggles for "What is a carbon offset?" and the payment reminders (chevrons).
+1. **Buttons and links.** Refresh, Retry, Export (download), Rename (edit), Resend invite (send), Accept this time (check), Delete, Test / Simulate, Offset these emissions (arrow right, after the text: it opens the Carbon offsets page to quote and request an offset, not a help page), and the toggles for "What is a carbon offset?" and the payment reminders (chevrons).
 2. **Trees and rows.**
    - The properties tree draws home, chevrons and "unassigned".
    - Units show the units icon.
