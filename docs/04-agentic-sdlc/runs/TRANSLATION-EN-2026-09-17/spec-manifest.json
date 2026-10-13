@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "4a9d40897cec748ccb4bfc83370b8ddb460490fd12ee3d4549ea537ae90ba66c",
+  "spec_baseline_id": "fd0961dc989743c4b903bfe80659da86c1e0fa5c5d95597e202992d0944ee100",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -110,7 +110,7 @@
     },
     {
       "path": "02-design/backend-go-design.md",
-      "sha256": "47c4ca1ad93b8870120081faa5b273f366d685ca8b3ee9763aca6763a6a96511"
+      "sha256": "75990421f7c54592f255453e773c693d5211d60ecfc6821f3ebd0c6efb8daaf2"
     },
     {
       "path": "02-design/client.md",
