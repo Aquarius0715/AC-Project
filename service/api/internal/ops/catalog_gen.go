@@ -244,6 +244,7 @@ var FilterKinds = map[string]FilterKind{
 	"organizationId":     {},
 	"origin":             {},
 	"overdueOnly":        {Kind: KindBool},
+	"partnerRole":        {},
 	"period":             {},
 	"powerState":         {},
 	"propertyId":         {},
