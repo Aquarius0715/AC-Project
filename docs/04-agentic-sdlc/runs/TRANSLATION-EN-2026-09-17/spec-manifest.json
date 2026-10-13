@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "2b2112df4aaa32a173b10114b752c6a5646a4f69bcb3c6302456e0baf4d804b3",
+  "spec_baseline_id": "2ea6fa824d3ba887a722f58b4c05dc70f7fe5a58c5c6eeb07b7d9a59e81cc477",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -114,7 +114,7 @@
     },
     {
       "path": "02-design/client.md",
-      "sha256": "ae0ce993989f9896439fbd72d1e192f09febe51cf7a4fe531fffa9f82c45022e"
+      "sha256": "b5a14d5e81a4d90152f068a871865e371dac49d4894806d49146685cb2c198aa"
     },
     {
       "path": "02-design/common.md",

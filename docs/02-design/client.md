@@ -166,13 +166,13 @@ Scope: FR-C04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 | startLocal / endLocal | HH:mm/required | Cannot be equal | Time range |
 | endsNextDay | boolean/required | Default: false | Overnight |
 | timezone | IANA string/required | Default: display setting; valid zone | Execution timezone |
-| startAction / endAction | UnitAction/required | Supported by capabilities | Start/end actions |
+| startAction / endAction | UnitAction/required | Supported by capabilities; chosen in two parts — the setting (power, temperature, mode, fan, ventilation: only those the AC supports) and its value (a temperature list in the model's range and step, buttons otherwise); a saved action the AC no longer supports shows “(not supported)” | Start/end actions, each in its own box headed by its time |
 | enabled | boolean/required | New: false; save may use true if explicitly switched ON in confirmation | Intent to enable |
 | onlyIf | ExtraCondition array/optional | 0–3, distinct types: occupancy / weather (a weekday condition is the schedule's own weekdays) (IR215) | Extra conditions, all must hold (Figma 03b “Only if …”) |
 
 **Steps**
 
-1. Enter weekdays, operating hours, and settings. Check upcoming runs. Save or disable, and use the demo clock to check start/end events.
+1. Enter weekdays, operating hours, and settings. Check upcoming runs. Save or disable, and use the demo clock to check start/end events. The list cards show the actions as rows: “Start 18:00 · Set temperature 25°C” and “End 22:00 · Power OFF” (an event rule has one “Then” row); on a phone the setting and its value stack.
 2. Apply the following business rules to both reads and actions.
    - Weekdays refer to the start day.
    - Treat an end time at or before start as next day only with the overnight flag.
