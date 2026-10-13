@@ -80,7 +80,7 @@ func notificationMail(templateKey string, params map[string]any, role string, ap
 	if !ok {
 		format = "Notification: %s"
 	}
-	subject := fmt.Sprintf(format, name)
+	subject := oneLine(fmt.Sprintf(format, name))
 	var b strings.Builder
 	b.WriteString(subject)
 	for _, k := range []string{"status", "reason", "message"} {
@@ -101,10 +101,15 @@ func inviteMail(params map[string]any, apps Apps) (string, string) {
 	if org == "" {
 		org = "AC Project"
 	}
-	subject := "You are invited to " + org + " on AC Project"
+	subject := oneLine("You are invited to " + org + " on AC Project")
 	body := fmt.Sprintf("Hello,\n\nYou have been invited to %s on AC Project as %s.\nSign in here: %s/login\n\nYour account is opened when HQ creates it for this e-mail address; until then the invitation stays pending.",
 		org, role, apps.of(app))
 	return subject, body + footer
+}
+
+// oneLine keeps a subject on one line: a name with a line break (a unit or organization name) must not fail the send.
+func oneLine(s string) string {
+	return strings.Join(strings.Fields(strings.NewReplacer("\r", " ", "\n", " ").Replace(s)), " ")
 }
 
 // maxAttempts is how often a failed e-mail is tried before it stays failed.

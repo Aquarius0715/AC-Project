@@ -16,6 +16,9 @@ func TestMailTexts(t *testing.T) {
 	if subject != "Alert: Bedroom AC" || !strings.Contains(body, "Status: open") || !strings.Contains(body, "http://c/notifications") {
 		t.Errorf("notification: %q %q", subject, body)
 	}
+	if s, _ := notificationMail("alert", map[string]any{"targetName": "Bed\r\nroom AC"}, "client", apps); s != "Alert: Bed room AC" { // a name with a line break
+		t.Errorf("subject on one line: %q", s)
+	}
 	if s, _ := notificationMail("unknown", nil, "admin", apps); s != "Notification: unknown" {
 		t.Errorf("unknown template: %q", s)
 	}
