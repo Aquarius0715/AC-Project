@@ -78,8 +78,8 @@ test("the customer screens in Malay keep IDs and units and use the display time 
   await page.goto("/customer/users");
   await expect(main.getByRole("heading", { name: "Pengguna", level: 1 })).toBeVisible();
   await expect(main.getByRole("columnheader", { name: "Peranan" })).toBeVisible();
-  await page.getByRole("button", { name: "Jemput ahli" }).click(); // opened and cancelled: nothing is invited
-  await expect(dialog.getByRole("heading", { name: "Jemput ahli" })).toBeVisible();
+  await page.getByRole("button", { name: "Jemput pengguna" }).click(); // opened and cancelled: nothing is invited
+  await expect(dialog.getByRole("heading", { name: /^Jemput pengguna/ })).toBeVisible();
   await dialog.getByRole("button", { name: "Batal" }).click();
   await expect(dialog).toBeHidden();
   await page.goto(href!);

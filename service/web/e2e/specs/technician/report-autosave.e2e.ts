@@ -22,7 +22,13 @@ test("the report autosaves once, 20 s after the last edit", async ({ browser }) 
     const start = main.getByRole("button", { name: /^Start job/ });
     if (await start.count()) {
       await start.first().click();
-      await page.getByRole("dialog", { name: "Check in at site" }).getByRole("button", { name: "Check in & start" }).click();
+      const checkIn = page.getByRole("dialog", { name: "Check in at site" });
+      // the demo location service and the camera scan fill these a moment after the dialog opens: checking in before
+      // that is refused (a fast CI runner did)
+      await expect(checkIn.getByLabel("Distance to the site (m)")).toHaveValue(/\d/);
+      await expect(checkIn.getByLabel("Scanned unit QR")).not.toHaveValue("");
+      await checkIn.getByRole("button", { name: "Check in & start" }).click();
+      await expect(page.getByText("Checked in — the job has started").first()).toBeVisible();
     }
     const result = main.locator("select").first();
     await expect(result).toBeVisible({ timeout: 30_000 });
