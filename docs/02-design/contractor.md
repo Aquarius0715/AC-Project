@@ -381,7 +381,7 @@ Scope: FR-P11 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **Steps**
 
-1. `partnerUsers.list` (status filter in the URL) shows name, e-mail, role, status, access until and last sign-in; the caller's row is marked “You” and has no actions.
+1. `partnerUsers.list` (status filter in the URL) shows name, e-mail, role, status, access until and last sign-in; the caller's row is marked “You” and has no actions; an active account whose access end has passed (business clock) reads “Access ended” and can only be removed.
 2. + Invite user opens a centered dialog (e-mail, role Contractor/Technician) → `partnerUsers.save` without id → the list refetches and an invitation preview is shown.
 3. On an invite: Resend invite (`partnerUsers.resendInvite`, preview only), Edit invite (e-mail, role, reason → `partnerUsers.save` with id and version), Remove (reason → `partnerUsers.remove`).
 4. On an account: Disable / Enable (reason → `partnerUsers.save` with status) and Remove (reason → `partnerUsers.remove`).

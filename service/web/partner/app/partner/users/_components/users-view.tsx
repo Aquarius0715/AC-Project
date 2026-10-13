@@ -84,7 +84,7 @@ export function UsersView({ data, ops, onStatus }: { data: UsersData | null; ops
           <DataTable rows={data.rows} rowKey={(u) => u.id} cols={[
             { key: "u", label: t("User"), render: (u) => <div><b>{u.name ?? u.email}{u.you ? ` ${t("(you)")}` : ""}</b><div className="text-xs text-muted-foreground">{u.sub}</div></div> },
             { key: "r", label: t("Role"), render: (u) => <Badge tone={u.role === "contractor" ? "primary" : "muted"}>{t(roleLabel[u.role])}</Badge> },
-            { key: "s", label: t("Status"), render: (u) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{t(statusLabel[u.status])}</Badge> },
+            { key: "s", label: t("Status"), render: (u) => <Badge tone={u.ended ? "muted" : u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{u.ended ? t("Access ended") : t(statusLabel[u.status])}</Badge> },
             { key: "x", label: t("Access until"), render: (u) => u.access, hideBelow: "md" },
             { key: "l", label: t("Last sign-in"), render: (u) => u.lastSignIn, hideBelow: "sm" },
             { key: "a", label: t("Actions"), render: (u) => {

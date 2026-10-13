@@ -26,6 +26,12 @@ describe("partnerUserRows (FR-P11)", () => {
     expect(rows[0].lastContractor).toBe(true);
     expect(rows[0].actions.disable || rows[0].actions.remove).toBe(false);
   });
+  it("reads an active account whose access end has passed as ended: no disable, only remove", () => {
+    const [r] = partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-10-02T00:00:00Z"));
+    expect(r.ended).toBe(true);
+    expect(r.actions).toEqual({ resend: false, edit: false, disable: false, enable: false, remove: true });
+    expect(partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-09-15T00:00:00Z"))[0].ended).toBe(false);
+  });
   it("enables a disabled account; an invite has no access end yet", () => {
     const [d, i] = partnerUserRows([user({ id: "d", displayName: "A", status: "disabled", membershipId: "m" }), user({ id: "i", displayName: "B" })], null);
     expect(d.actions.enable).toBe(true);

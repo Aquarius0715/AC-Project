@@ -5702,4 +5702,5 @@ export const ms: Record<string, string> = {
   "The invite is withdrawn.": "Jemputan ditarik balik.",
   "Their access ends now and they leave your company's user list.": "Akses mereka tamat sekarang dan mereka keluar daripada senarai pengguna syarikat anda.",
   "e.g. on leave until October": "cth. bercuti hingga Oktober",
+  "Access ended": "Akses tamat",
 };

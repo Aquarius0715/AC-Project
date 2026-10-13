@@ -26,6 +26,6 @@ export function UsersDemo() {
   const t = useT();
   const users = usePartnerUsersDemo();
   const [status, setStatus] = useState<PartnerStatus | null>(null);
-  const rows = partnerUserRows(users, DEMO_SELF, undefined).filter((r) => !status || r.status === status);
+  const rows = partnerUserRows(users, DEMO_SELF, undefined, new Date("2026-09-15T00:00:00Z")).filter((r) => !status || r.status === status);
   return <UsersView data={{ company: "contractor-a", status, rows, all: users.map((u) => ({ id: u.id, email: u.email })) }} ops={ops} onStatus={setStatus} />;
 }

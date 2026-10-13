@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "a7518231c39de0b3a5507ffe8bb96e591a555f3689dd5dffef89664a9d26fe3b",
+  "spec_baseline_id": "ad15b0a4a0b8d48325055137908aabf317431b0001f78c2e9f278fe2ce95b728",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -126,7 +126,7 @@
     },
     {
       "path": "02-design/contractor.md",
-      "sha256": "60374cc65931e09fe51fd48aa46f4fbacac5c38e948f38c0e1e621ebf3beb92f"
+      "sha256": "23c95944819a471e6ce2e29a12dd2ce9a7d8e32db9c43cf02ccaf0e90660c152"
     },
     {
       "path": "02-design/database-design.md",

@@ -3,7 +3,7 @@
 // (actions.ts). A technician session gets the shared Page unavailable view (FORBIDDEN). Texts and times in the user's
 // display language and time zone (IR267). The Phase 1A demo keeps a local store (partnerUsersDemo).
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreIdentity, corePrincipal, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreIdentity, coreNow, corePrincipal, CoreError } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { partnerUserRows, statusFilter, type ApiPartnerUser } from "@ac/web/lib/partnerUsers";
 import { UsersDemo } from "./_components/users-demo";
@@ -14,11 +14,11 @@ export default async function PartnerUsersPage({ searchParams }: PageProps<"/par
   if (!apiMode()) return <UsersDemo />;
   const sp = await searchParams;
   const status = statusFilter(Array.isArray(sp.status) ? sp.status[0] : sp.status);
-  const [all, me, display, identity] = await Promise.all([
+  const [all, me, display, identity, now] = await Promise.all([
     coreAll<ApiPartnerUser>("partnerUsers.list").catch((e) => { if (e instanceof CoreError && e.error.code === "FORBIDDEN") return null; throw e; }),
-    corePrincipal(), coreDisplay(), coreIdentity(),
+    corePrincipal(), coreDisplay(), coreIdentity(), coreNow(),
   ]);
   if (!all) return <UsersLive live={null} />;
-  const rows = partnerUserRows(all, me.membershipId, i18nOf(display));
+  const rows = partnerUserRows(all, me.membershipId, i18nOf(display), now);
   return <UsersLive live={{ company: identity.organizationName, status, rows: status ? rows.filter((r) => r.status === status) : rows, all: all.map((u) => ({ id: u.id, email: u.email })) }} />;
 }

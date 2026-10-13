@@ -14,7 +14,7 @@ export type ApiPartnerUser = {
 export type RowActions = { resend: boolean; edit: boolean; disable: boolean; enable: boolean; remove: boolean };
 export type PartnerUserRow = {
   id: string; version: number; email: string; name: string | null; role: PartnerRole; status: PartnerStatus; sub: string; access: string; lastSignIn: string;
-  you: boolean; lastContractor: boolean; actions: RowActions;
+  you: boolean; lastContractor: boolean; ended: boolean; actions: RowActions;
 };
 
 export const PARTNER_ROLES: PartnerRole[] = ["contractor", "technician"];
@@ -22,22 +22,24 @@ export const roleLabel: Record<PartnerRole, string> = { contractor: "Contractor"
 export const statusLabel: Record<PartnerStatus, string> = { invited: "Invite pending", active: "Active", disabled: "Disabled" };
 export const PARTNER_STATUSES: PartnerStatus[] = ["active", "invited", "disabled"];
 
-/** The rows by name (an invite by its e-mail), the caller's own account marked and without actions. */
-export function partnerUserRows(us: ApiPartnerUser[], self: string | null, i: I18n = EN): PartnerUserRow[] {
+/** The rows by name (an invite by its e-mail), the caller's own account marked and without actions. An active account
+ * whose access end has passed by `now` (the business clock) reads as ended: nothing to disable, only remove. */
+export function partnerUserRows(us: ApiPartnerUser[], self: string | null, i: I18n = EN, now?: Date): PartnerUserRow[] {
   const { t } = i;
   const contractors = us.filter((u) => u.partnerRole === "contractor" && u.status === "active").length;
   return [...us].sort((a, b) => (a.displayName ?? a.email).localeCompare(b.displayName ?? b.email)).map((u) => {
     const you = !!self && u.membershipId === self;
     const lastContractor = u.partnerRole === "contractor" && u.status === "active" && contractors === 1;
     const invited = u.status === "invited";
+    const ended = u.status === "active" && !!now && !!u.accessUntil && Date.parse(u.accessUntil) <= now.getTime();
     return {
-      id: u.id, version: u.version, email: u.email, name: u.displayName, role: u.partnerRole, status: u.status, you, lastContractor,
+      id: u.id, version: u.version, email: u.email, name: u.displayName, role: u.partnerRole, status: u.status, you, lastContractor, ended,
       sub: u.displayName ? u.email : t("invited {date}", { date: showDate(u.invitedAt, i.display) }),
       access: u.accessUntil ? showDate(u.accessUntil, i.display) : invited ? "—" : t("No end date"),
       lastSignIn: u.lastSignInAt ? showTime(u.lastSignInAt, i.display) : "—",
       actions: you
         ? { resend: false, edit: false, disable: false, enable: false, remove: false }
-        : { resend: invited, edit: invited, disable: u.status === "active" && !lastContractor, enable: u.status === "disabled", remove: !lastContractor },
+        : { resend: invited, edit: invited, disable: u.status === "active" && !lastContractor && !ended, enable: u.status === "disabled", remove: !lastContractor },
     };
   });
 }
