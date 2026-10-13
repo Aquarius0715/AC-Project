@@ -1680,7 +1680,6 @@ export const ms: Record<string, string> = {
   "Users of {customer}": "Pengguna {customer}",
   "Invitation preview created for {email} — nothing is sent in the demo": "Pratonton jemputan dicipta untuk {email} — tiada apa-apa dihantar dalam demo",
   "Send invite": "Hantar jemputan",
-  "Owners can invite members only. Ask HQ to make someone an owner.": "Pemilik hanya boleh menjemput ahli. Minta HQ menjadikan seseorang pemilik.",
 
   // route states and the failed Server Action toast (components/RouteStates, lib/actionMessage)
   "Loading {what}…": "Memuatkan {what}…",
