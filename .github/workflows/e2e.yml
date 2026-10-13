@@ -1,0 +1,63 @@
+# End-to-end tests of the four web apps against the whole compose stack (IR252): the stack is built and started with
+# a fresh demo seed, then Playwright runs every spec. Separate from ci.yml because it takes the longest; it runs in
+# parallel with it on every push to main, on pull requests and by hand.
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright (compose stack)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: local settings (random broker keys, never secrets)
+        run: |
+          cp .env.local.example .env.local
+          for key in MQTT_DEVICE_SIM_KEY MQTT_IOT_BRIDGE_KEY; do
+            sed -i "s/^$key=.*/$key=$(openssl rand -hex 24)/" .env.local
+          done
+          sh docker/mosquitto/passwd.sh
+      - name: build and start the stack
+        run: docker compose --env-file .env.local --profile full up -d --build
+      - name: wait for the apps and the identity provider
+        run: |
+          for url in http://localhost:8081/realms/ac/.well-known/openid-configuration http://localhost:3000/login http://localhost:3001/login http://localhost:3002/login http://localhost:3003/login; do
+            for i in $(seq 1 120); do
+              if [ "$(curl -s -o /dev/null -w '%{http_code}' "$url")" = 200 ]; then echo "ready: $url"; break; fi
+              [ "$i" = 120 ] && { echo "not ready: $url"; docker compose --env-file .env.local --profile full ps; exit 1; }
+              sleep 5
+            done
+          done
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: service/web/package-lock.json }
+      - name: Playwright
+        working-directory: service/web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run e2e
+      - name: stack logs on failure
+        if: failure()
+        run: docker compose --env-file .env.local --profile full logs --no-color --tail 200 > compose-logs.txt
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-report
+          path: |
+            service/web/e2e/playwright-report
+            service/web/e2e/test-results
+            compose-logs.txt
+          retention-days: 7

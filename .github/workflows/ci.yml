@@ -1,0 +1,141 @@
+# Lint and tests of the whole repository on every push and pull request. Each check is its own job, so they run in
+# parallel: Go lint (format, vet, generated files and the API description), the Go suite (unit + integration on one
+# server), the integration suite against the split services, web lint, web typecheck, web unit tests, and the design
+# document validators. The end-to-end suite needs the whole compose stack and runs in e2e.yml.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOTOOLCHAIN: auto
+
+jobs:
+  go-lint:
+    name: Go lint (gofmt, vet, generated files, Swagger)
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: service/api } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: service/api/go.mod, cache-dependency-path: service/api/go.sum }
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then echo "not gofmt-formatted:"; echo "$out"; exit 1; fi
+      - name: go vet
+        run: go vet ./...
+      - name: generated files are current (catalog, routes, contracts, Swagger)
+        run: |
+          go run ./cmd/gen/ops
+          make swagger
+          git diff --exit-code -- . ../web/shared/lib ../../docs/02-design/api
+
+  go-test:
+    name: Go tests (unit + integration)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: local }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PG_ADMIN_URL: postgres://postgres:local@localhost:5432/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: service/api/go.mod, cache-dependency-path: service/api/go.sum }
+      - name: test database
+        working-directory: service/api
+        run: |
+          command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+          make testdb
+      - name: go test
+        working-directory: service/api
+        run: go test -count=1 -timeout 30m ./...
+
+  go-test-cluster:
+    name: Go integration tests (split services)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: local }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PG_ADMIN_URL: postgres://postgres:local@localhost:5432/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: service/api/go.mod, cache-dependency-path: service/api/go.sum }
+      - name: test database
+        working-directory: service/api
+        run: |
+          command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+          make testdb-cluster
+      - name: go test (cluster)
+        working-directory: service/api
+        run: AC_TEST_DB=ac_test_cluster AC_TEST_CLUSTER=1 go test -count=1 -timeout 30m ./test/...
+
+  web-lint:
+    name: Web lint (ESLint)
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: service/web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: service/web/package-lock.json }
+      - run: npm ci
+      - run: npm run lint
+
+  web-typecheck:
+    name: Web typecheck
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: service/web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: service/web/package-lock.json }
+      - run: npm ci
+      - run: npm run typecheck
+
+  web-test:
+    name: Web unit tests (Vitest)
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: service/web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: service/web/package-lock.json }
+      - run: npm ci
+      - run: npm test
+
+  docs:
+    name: Design document validators
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: TypeScript for the contract check
+        run: npm install --no-save --prefix "$RUNNER_TEMP/ts" typescript@5.9.3
+      - name: validate_documents.py
+        run: python3 docs/tools/validate_documents.py --tsc "$RUNNER_TEMP/ts/node_modules/typescript/lib/tsc.js"
+      - name: check_review_regressions.py
+        run: python3 docs/tools/check_review_regressions.py
