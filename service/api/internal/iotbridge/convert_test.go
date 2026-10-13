@@ -86,3 +86,26 @@ func TestUnknownSensorSkipsOnlyThatReading(t *testing.T) {
 		t.Errorf("%d triggers, want the two known readings", len(out))
 	}
 }
+
+// TestCommandTriggerMapsTheAcknowledgement: applied is command_ack, unsupported is command_fail, and an expired
+// acknowledgement is not forwarded at all.
+func TestCommandTriggerMapsTheAcknowledgement(t *testing.T) {
+	cmd := "9f67089f-44c9-5231-ba20-03d3b9a1be53"
+	ack := func(result string) devicesim.Ack {
+		return devicesim.Ack{DeviceID: DeviceID("device-online-rto").String(), CommandID: cmd, Result: result}
+	}
+	tr, ok, err := CommandTrigger(ack("applied"), received)
+	if err != nil || !ok || tr.EventType != "command_ack" || tr.CommandID == nil || tr.CommandID.String() != cmd || tr.Measurement != nil {
+		t.Fatalf("applied: %+v ok=%v err=%v", tr, ok, err)
+	}
+	tr, ok, _ = CommandTrigger(ack("unsupported"), received)
+	if !ok || tr.EventType != "command_fail" {
+		t.Errorf("unsupported: %+v ok=%v", tr, ok)
+	}
+	if _, ok, _ := CommandTrigger(ack("expired"), received); ok {
+		t.Error("an expired acknowledgement is forwarded")
+	}
+	if _, _, err := CommandTrigger(devicesim.Ack{CommandID: "not-a-uuid", Result: "applied"}, received); err == nil {
+		t.Error("a command ID that is not a UUID is accepted")
+	}
+}

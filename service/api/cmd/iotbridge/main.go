@@ -72,6 +72,29 @@ func main() {
 	if tok.Wait() && tok.Error() != nil {
 		log.Fatalf("subscribe: %v", tok.Error())
 	}
+	// t/<tenantId>/d/<deviceId>/cmd/ack: a module's answer to a command the API sent (QoS 1)
+	ackTok := client.Subscribe("t/+/d/+/cmd/ack", 1, func(_ mqtt.Client, msg mqtt.Message) {
+		var a devicesim.Ack
+		if err := json.Unmarshal(msg.Payload(), &a); err != nil {
+			log.Printf("ack on %s: %v", msg.Topic(), err)
+			return
+		}
+		tr, ok, err := iotbridge.CommandTrigger(a, time.Now().Add(clock.offset()))
+		if err != nil {
+			log.Printf("ack from %s: %v", a.DeviceID, err)
+			return
+		}
+		if !ok {
+			log.Printf("ack %s: %s, not forwarded (the backend decides a late acknowledgement)", a.CommandID, a.Result)
+			return
+		}
+		if err := send(httpc, endpoint, tr); err != nil {
+			log.Printf("trigger %s: %v", tr.EventID, err)
+		}
+	})
+	if ackTok.Wait() && ackTok.Error() != nil {
+		log.Fatalf("subscribe acks: %v", ackTok.Error())
+	}
 	log.Printf("iot-bridge: %s → %s", *broker, endpoint)
 	<-ctx.Done()
 	log.Print("iot-bridge: stopping")

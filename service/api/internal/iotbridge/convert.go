@@ -60,11 +60,12 @@ func DeviceID(fixtureDevice string) uuid.UUID { return seed.ID(fixtureDevice) }
 
 // Trigger is the body of POST /v1/demo/trigger for one telemetry reading.
 type Trigger struct {
-	ScenarioID  string      `json:"scenarioId"`
-	EventID     uuid.UUID   `json:"eventId"`
-	OccurredAt  time.Time   `json:"occurredAt"`
-	EventType   string      `json:"eventType"`
-	Measurement Measurement `json:"measurement"`
+	ScenarioID  string       `json:"scenarioId"`
+	EventID     uuid.UUID    `json:"eventId"`
+	OccurredAt  time.Time    `json:"occurredAt"`
+	EventType   string       `json:"eventType"`
+	CommandID   *uuid.UUID   `json:"commandId,omitempty"`
+	Measurement *Measurement `json:"measurement,omitempty"`
 }
 
 // Measurement is the RawMeasurement the trigger carries.
@@ -114,7 +115,7 @@ func (r *Resolver) Triggers(b devicesim.Batch, received time.Time) ([]Trigger, e
 			EventID:    event,
 			OccurredAt: m.ObservedAt,
 			EventType:  "telemetry",
-			Measurement: Measurement{
+			Measurement: &Measurement{
 				UnitID: t.unit, SensorID: sensor, Metric: m.Metric, Value: &v, Unit: m.Unit,
 				ObservedAt: m.ObservedAt, ReceivedAt: received.UTC(), Origin: "measured", Quality: "valid",
 				Sequence: &seq, EventID: event,
@@ -122,4 +123,30 @@ func (r *Resolver) Triggers(b devicesim.Batch, received time.Time) ([]Trigger, e
 		})
 	}
 	return out, first
+}
+
+// CommandTrigger turns a module's acknowledgement into the demo trigger for the command it answers: applied is
+// command_ack, unsupported is command_fail (the device rejected it). An expired acknowledgement is not forwarded: the
+// backend decides a late acknowledgement by its own clock (common design §5), so the bridge does not change the command.
+func CommandTrigger(a devicesim.Ack, received time.Time) (Trigger, bool, error) {
+	cmd, err := uuid.Parse(a.CommandID)
+	if err != nil {
+		return Trigger{}, false, fmt.Errorf("command %q: %w", a.CommandID, err)
+	}
+	var kind string
+	switch a.Result {
+	case "applied":
+		kind = "command_ack"
+	case "unsupported":
+		kind = "command_fail"
+	default:
+		return Trigger{}, false, nil
+	}
+	return Trigger{
+		ScenarioID: Scenario,
+		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/%s/%s", a.DeviceID, a.CommandID, kind))),
+		OccurredAt: received.UTC(),
+		EventType:  kind,
+		CommandID:  &cmd,
+	}, true, nil
 }
