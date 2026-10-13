@@ -25,7 +25,7 @@ type Dialog =
 
 /** Users (FR-P11): the contractor's company accounts and invites, with the actions each row allows; one dialog at a
  * time (invite, edit invite, disable, enable, remove), each change after the invite with a reason. */
-export function UsersView({ data, ops, onStatus }: { data: UsersData | null; ops: UsersOps; onStatus: (s: PartnerStatus | null) => void }) {
+export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersData | null; ops: UsersOps; onStatus: (s: PartnerStatus | null) => void; sends?: boolean }) {
   const t = useT();
   const [pending, run] = useAction();
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -55,7 +55,7 @@ export function UsersView({ data, ops, onStatus }: { data: UsersData | null; ops
     setTried(true);
     if (!dialog || emailErr || reasonErr) return;
     const who = dialog.kind === "invite" ? email.trim() : dialog.row.name ?? dialog.row.email;
-    if (dialog.kind === "invite") run(() => ops.invite(email, role), t("Invitation preview created for {email} — nothing is sent in the demo", { email: who }), close);
+    if (dialog.kind === "invite") run(() => ops.invite(email, role), sends ? t("Invitation e-mail queued for {email}", { email: who }) : t("Invitation preview created for {email} — nothing is sent in the demo", { email: who }), close);
     else if (dialog.kind === "edit") run(() => ops.edit(dialog.row, email, role, reason), t("Invite changed for {email}", { email: email.trim() }), close);
     else if (dialog.kind === "remove") run(() => ops.remove(dialog.row, reason), t("{name} removed", { name: who }), close);
     else run(() => ops.setStatus(dialog.row, dialog.kind === "disable" ? "disabled" : "active", reason), t(dialog.kind === "disable" ? "{name} disabled — they can no longer sign in" : "{name} enabled again", { name: who }), close);
@@ -92,7 +92,7 @@ export function UsersView({ data, ops, onStatus }: { data: UsersData | null; ops
               if (!a.resend && !a.edit && !a.disable && !a.enable && !a.remove) return <span className="text-xs text-muted-foreground">{u.you ? t("Your account") : u.lastContractor ? t("Last active contractor") : "—"}</span>;
               return (
                 <div className="flex flex-wrap gap-1">
-                  {a.resend && <Btn size="sm" variant="ghost" disabled={pending} onClick={() => run(() => ops.resend(u), t("Invitation preview re-created for {email} — nothing is sent in the demo", { email: u.email }))}><Icon name="send" />{t("Resend invite")}</Btn>}
+                  {a.resend && <Btn size="sm" variant="ghost" disabled={pending} onClick={() => run(() => ops.resend(u), sends ? t("Invitation e-mail queued again for {email}", { email: u.email }) : t("Invitation preview re-created for {email} — nothing is sent in the demo", { email: u.email }))}><Icon name="send" />{t("Resend invite")}</Btn>}
                   {a.edit && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "edit", row: u })}><Icon name="edit" />{t("Edit")}</Btn>}
                   {a.disable && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "disable", row: u })}>{t("Disable")}</Btn>}
                   {a.enable && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "enable", row: u })}>{t("Enable")}</Btn>}
@@ -104,7 +104,7 @@ export function UsersView({ data, ops, onStatus }: { data: UsersData | null; ops
         )}
       </Card>
       <Banner>{t("HQ sets permissions, qualifications and access periods in Access & roles. An accepted account keeps its e-mail and role — to change them, remove it and invite again. You can’t change your own account, and your company always keeps one active contractor.")}</Banner>
-      <p className="text-[11px] text-muted-foreground">{t("Invites are previews only in the demo — no e-mail is sent (FR-P11, IR416).")}</p>
+      <p className="text-[11px] text-muted-foreground">{sends ? t("Invitation e-mails are sent by the notification service (IR418); in development they arrive in the local Mailpit inbox.") : t("Invites are previews only in the demo — no e-mail is sent (FR-P11, IR416).")}</p>
       <Modal open={!!dialog} onClose={close} title={title} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant={dialog?.kind === "remove" || dialog?.kind === "disable" ? "danger" : "primary"} disabled={pending} onClick={submit}>{action}</Btn></>}>
         {(dialog?.kind === "invite" || dialog?.kind === "edit") && <>
           <Field label={t("Email")} error={tried ? emailErr : undefined}><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="lim.tech@example.com" /></Field>

@@ -1,4 +1,5 @@
-// Command worker runs background roles. --role=scheduler ticks the clock-driven transitions every second, with the
+// Command worker runs background roles. --role=notification sends the pending e-mails through SMTP every few seconds
+// (IR418; Mailpit in development). --role=scheduler ticks the clock-driven transitions every second, with the
 // modules' jobs (IR54 schedule automations): with --domain=<domain> only that domain's (IR195; the domain's database
 // role, other domains asked through their internal queries), without it every domain on an all-domain role
 // (single-process development).
@@ -14,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 	"github.com/pradita/ac-project/service/api/internal/scheduler"
@@ -28,6 +30,10 @@ func main() {
 	defer stop()
 	if os.Getenv("DATABASE_URL") == "" {
 		log.Fatal("DATABASE_URL is required")
+	}
+	if *role == "notification" {
+		runMail(ctx)
+		return
 	}
 	if *role != "scheduler" {
 		log.Printf("worker role %q has no jobs yet; idling", *role)
@@ -58,4 +64,50 @@ func main() {
 	}
 	defer srv.DB.Close()
 	scheduler.RunDomains(ctx, srv.DB, time.Second, srv.Registry.Clock, log.Printf, domains, srv.Registry)
+}
+
+// runMail sends the pending e-mails of every tenant every five seconds (IR418). Without MAIL_SMTP_ADDR it idles:
+// e-mails stay previews, as before.
+func runMail(ctx context.Context) {
+	addr := os.Getenv("MAIL_SMTP_ADDR")
+	if addr == "" {
+		log.Print("notification worker: MAIL_SMTP_ADDR is not set; e-mails stay previews")
+		<-ctx.Done()
+		return
+	}
+	logger := logging.New(os.Stdout, "notification")
+	cfg, err := server.ConfigFromEnv(logger, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	srv, err := server.New(ctx, cfg, auth.StaticVerifier{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer srv.DB.Close()
+	sender := notify.SMTP{Addr: addr, From: envOr("MAIL_FROM", "AC Project <no-reply@ac-project.local>")}
+	apps := notify.Apps{Customer: envOr("APP_URL_CUSTOMER", "http://localhost:3000"), Partner: envOr("APP_URL_PARTNER", "http://localhost:3001"),
+		Technician: envOr("APP_URL_TECHNICIAN", "http://localhost:3002"), Admin: envOr("APP_URL_ADMIN", "http://localhost:3003")}
+	log.Printf("notification worker: sending e-mails through %s", addr)
+	t := time.NewTicker(5 * time.Second)
+	defer t.Stop()
+	for {
+		if n, err := notify.DeliverAll(ctx, srv.DB, sender, apps, srv.Registry.Clock(), 50); err != nil {
+			log.Printf("notification worker: %v", err)
+		} else if n > 0 {
+			log.Printf("notification worker: %d e-mail(s) sent", n)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
 }

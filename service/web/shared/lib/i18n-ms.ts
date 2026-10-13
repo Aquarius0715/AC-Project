@@ -1681,7 +1681,6 @@ export const ms: Record<string, string> = {
   "Invitation preview created for {email} — nothing is sent in the demo": "Pratonton jemputan dicipta untuk {email} — tiada apa-apa dihantar dalam demo",
   "Send invite": "Hantar jemputan",
   "Owners can invite members only. Ask HQ to make someone an owner.": "Pemilik hanya boleh menjemput ahli. Minta HQ menjadikan seseorang pemilik.",
-  "They get an invitation to sign in to the customer app and see only your properties and units. Demo: an invitation preview is shown — nothing is sent. The invite stays “pending” until they sign in.": "Mereka menerima jemputan untuk log masuk ke aplikasi pelanggan dan hanya melihat premis dan unit anda. Demo: pratonton jemputan dipaparkan — tiada apa-apa dihantar. Jemputan kekal “belum diterima” sehingga mereka log masuk.",
 
   // route states and the failed Server Action toast (components/RouteStates, lib/actionMessage)
   "Loading {what}…": "Memuatkan {what}…",
@@ -5702,7 +5701,6 @@ export const ms: Record<string, string> = {
   "People who can sign in to this customer app. As an owner you invite users, change their role and access, and remove them.": "Orang yang boleh log masuk ke aplikasi pelanggan ini. Sebagai pemilik, anda menjemput pengguna, mengubah peranan dan akses mereka, dan mengalih keluar mereka.",
   "Last active owner": "Pemilik aktif terakhir",
   "Your customer always keeps one active owner, and you can’t change your own account. An accepted user keeps their e-mail. For a password reset, contact HQ. Only owners see this page.": "Pelanggan anda sentiasa mengekalkan seorang pemilik aktif, dan anda tidak boleh mengubah akaun anda sendiri. Pengguna yang diterima mengekalkan e-mel mereka. Untuk set semula kata laluan, hubungi ibu pejabat. Hanya pemilik melihat halaman ini.",
-  "Invites are previews only in the demo — no e-mail is sent (FR-C19, IR417).": "Jemputan hanya pratonton dalam demo — tiada e-mel dihantar (FR-C19, IR417).",
   "Owners manage users and everything members can do; members use the app.": "Pemilik mengurus pengguna dan semua yang boleh dilakukan ahli; ahli menggunakan aplikasi.",
   "Their access ends now. You can enable them again later.": "Akses mereka tamat sekarang. Anda boleh mendayakan mereka semula kemudian.",
   "Their access ends now and they leave your user list.": "Akses mereka tamat sekarang dan mereka keluar daripada senarai pengguna anda.",
@@ -5713,4 +5711,8 @@ export const ms: Record<string, string> = {
   "Make member": "Jadikan ahli",
   "{name} is now an owner": "{name} kini pemilik",
   "{name} is now a member": "{name} kini ahli",
+  "Invitation e-mail queued for {email}": "E-mel jemputan dibariskan untuk {email}",
+  "Invitation e-mail queued again for {email}": "E-mel jemputan dibariskan semula untuk {email}",
+  "Invitation e-mails are sent by the notification service (IR418); in development they arrive in the local Mailpit inbox.": "E-mel jemputan dihantar oleh perkhidmatan pemberitahuan (IR418); dalam pembangunan ia tiba di peti masuk Mailpit tempatan.",
+  "They get an invitation to sign in to the customer app and see only your properties and units. The invite stays “pending” until their account is opened.": "Mereka menerima jemputan untuk log masuk ke aplikasi pelanggan dan hanya melihat hartanah dan unit anda. Jemputan kekal “belum selesai” sehingga akaun mereka dibuka.",
 };

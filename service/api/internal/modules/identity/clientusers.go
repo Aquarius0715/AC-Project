@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
@@ -264,6 +265,9 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, 'invited', $5, $6, $5, $5, $5)`, id, in.CustomerID, in.Email, in.ClientRole, c.Now, c.Principal.MembershipID); err != nil {
 			return ClientUser{}, err
 		}
+		if err := queueClientInvite(ctx, c, in.CustomerID, in.Email, in.ClientRole); err != nil {
+			return ClientUser{}, err
+		}
 		v := 1
 		c.Audit(ops.AuditEntry{Action: "clientUsers.save", TargetKind: "client_user", TargetID: id.String(), NextVersion: &v, Reason: "invite"})
 		return loadClientUser(ctx, c, id, false)
@@ -419,7 +423,8 @@ func (in *ResendInput) Validate() map[string]string {
 	return nil
 }
 
-// InvitePreview is the NotificationPreview returned by resendInvite (IR111: preview only, nothing saved or sent).
+// InvitePreview is the NotificationPreview returned by resendInvite: the invitation e-mail is queued for the
+// notification worker (IR418; before, a preview only, IR111).
 type InvitePreview struct {
 	ID                     uuid.UUID         `json:"id"`
 	TenantID               uuid.UUID         `json:"tenantId"`
@@ -440,26 +445,27 @@ type InvitePreview struct {
 	ReadAt                 *time.Time        `json:"readAt"`
 }
 
-// @Summary		clientUsers.resendInvite (read)
+// @Summary		clientUsers.resendInvite (write)
 // @ID				clientUsers.resendInvite
 // @Description	Authorization: client:self-customer:owner | admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Validation: D01; input constraints in the corresponding DD; queues the invitation e-mail (IR418)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A17, DD-C19
 // @Tags			clientUsers
 // @Accept			json
 // @Produce		json
-// @Param			id		path		string		true	"input field id"
-// @Param			request	body		ResendInput	true	"input; the path parameters come from the route"
-// @Success		200		{object}	ops.Envelope{data=InvitePreview}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			id				path		string		true	"input field id"
+// @Param			request			body		ResendInput	true	"input; the path parameters come from the route"
+// @Success		200				{object}	ops.Envelope{data=InvitePreview}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/client-users/{id}/resend-invite [post]
 func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (InvitePreview, error) {
@@ -473,9 +479,25 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 	if x.Status != "invited" {
 		return InvitePreview{}, apperr.E(apperr.Conflict, "errors.invite_not_pending")
 	}
+	if err := queueClientInvite(ctx, c, x.CustomerID, x.Email, x.ClientRole); err != nil {
+		return InvitePreview{}, err
+	}
+	if _, err := c.Tx.Exec(ctx, `UPDATE identity.client_users SET last_invite_sent_at = $2 WHERE id = $1`, x.ID, c.Now); err != nil {
+		return InvitePreview{}, err
+	}
+	c.Audit(ops.AuditEntry{Action: "clientUsers.resendInvite", TargetKind: "client_user", TargetID: x.ID.String(), Reason: "invite e-mail queued"})
 	return InvitePreview{ID: uuid.New(), TenantID: x.TenantID, Version: 1, CreatedAt: c.Now, UpdatedAt: c.Now, Type: "invite", Target: map[string]string{"kind": "client_user", "id": x.ID.String()},
 		TemplateKey: "invite", Params: map[string]any{"targetName": x.Email, "at": c.Now, "status": "invited", "reason": nil, "amountMinor": nil, "currency": nil, "method": nil, "message": nil},
-		Channel: "email", DeliveryState: "preview", Severity: "normal", OccurredAt: c.Now}, nil
+		Channel: "email", DeliveryState: "queued", Severity: "normal", OccurredAt: c.Now}, nil
+}
+
+// queueClientInvite queues the invitation e-mail to the customer's app (IR418).
+func queueClientInvite(ctx context.Context, c *ops.Call, customer uuid.UUID, email, role string) error {
+	var org string
+	if err := c.Tx.QueryRow(ctx, `SELECT o.name FROM notify.ref_customers cu JOIN identity.organizations o ON o.id = cu.organization_id WHERE cu.id = $1`, customer).Scan(&org); err != nil {
+		return err
+	}
+	return notify.QueueInvite(ctx, c.Tx, email, org, role, "customer")
 }
 
 // RegisterClientUsers binds clientUsers.*.

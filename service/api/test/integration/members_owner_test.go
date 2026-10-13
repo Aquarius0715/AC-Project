@@ -36,7 +36,7 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 		write    bool
 	}{
 		{"clientUsers.list", `{"limit":10}`, 0, false},
-		{"clientUsers.resendInvite", `{"id":"` + clientUser + `"}`, 0, false},
+		{"clientUsers.resendInvite", `{"id":"` + clientUser + `"}`, 0, true},
 		{"clientUsers.save", `{"customerId":"` + custA + `","email":"member.invite@example.com","clientRole":"member"}`, 0, true},
 		{"policies.setDefaultRule", `{"policyId":"` + defaultPolicyID(t) + `","ruleKey":"ventilation_co2","customerId":"` + custA + `","enabled":false,"reason":"quiet"}`, 97, true},
 		{"filterCare.saveSettings", `{"thresholdHours":100,"fallbackDays":14,"recipients":"all_users","channels":["inApp","email"]}`, 0, true},

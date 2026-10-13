@@ -66,14 +66,14 @@ func TestClientUsers(t *testing.T) {
 	if _, m := post(s, &customerA, "clientUsers.list", `{"limit":100}`); len(items(m)) == 0 || items(m)[0]["customerId"] != seed.ID("cust-a").String() {
 		t.Error("client list scoped to own customer")
 	}
-	// resend: preview only
-	if code, m := post(s, &customerB, "clientUsers.resendInvite", `{"id":"`+id+`"}`); code != 200 || data(m)["deliveryState"] != "preview" || data(m)["templateKey"] != "invite" {
+	// resend: the invitation e-mail is queued again (IR418)
+	if code, m := write(s, &customerB, "clientUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 200 || data(m)["deliveryState"] != "queued" || data(m)["templateKey"] != "invite" {
 		t.Fatalf("resend: %d %v", code, m)
 	}
-	if code, _ := post(s, &customerB, "clientUsers.resendInvite", `{"id":"`+owner["id"].(string)+`"}`); code != 409 {
+	if code, _ := write(s, &customerB, "clientUsers.resendInvite", `{"id":"`+owner["id"].(string)+`"}`, 0); code != 409 {
 		t.Error("resend to an active user")
 	}
-	if code, _ := post(s, &customerA, "clientUsers.resendInvite", `{"id":"`+id+`"}`); code != 404 {
+	if code, _ := write(s, &customerA, "clientUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 404 {
 		t.Error("resend another customer's invite")
 	}
 	// updates are HQ only; the last active owner is protected

@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
@@ -258,6 +259,9 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, 'invited', $5, $6, $5, $5, $5)`, id, c.Principal.OrgID, in.Email, in.PartnerRole, c.Now, c.Principal.MembershipID); err != nil {
 			return PartnerUser{}, err
 		}
+		if err := queuePartnerInvite(ctx, c, in.Email, in.PartnerRole); err != nil {
+			return PartnerUser{}, err
+		}
 		v := 1
 		c.Audit(ops.AuditEntry{Action: "partnerUsers.save", TargetKind: "partner_user", TargetID: id.String(), NextVersion: &v, Reason: "invite"})
 		return loadPartnerUser(ctx, c, id, false)
@@ -400,28 +404,29 @@ func (in *PartnerResendInput) Validate() map[string]string {
 	return nil
 }
 
-// partnerUsersResend previews the invite email again (IR111: preview only, nothing saved or sent).
+// partnerUsersResend queues the invitation e-mail again (IR418).
 //
-//	@Summary		partnerUsers.resendInvite (read)
+//	@Summary		partnerUsers.resendInvite (write)
 //	@ID				partnerUsers.resendInvite
 //	@Description	Authorization: contractor:own-company
-//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; pending invites only (CONFLICT)
-//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Validation: D01; input constraints in the corresponding DD; queues the invitation e-mail (IR418); pending invites only (CONFLICT)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-P11
 //	@Tags			partnerUsers
 //	@Accept			json
 //	@Produce		json
-//	@Param			id		path		string				true	"input field id"
-//	@Param			request	body		PartnerResendInput	true	"input; the path parameters come from the route"
-//	@Success		200		{object}	ops.Envelope{data=InvitePreview}
-//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Param			Idempotency-Key	header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			id				path		string				true	"input field id"
+//	@Param			request			body		PartnerResendInput	true	"input; the path parameters come from the route"
+//	@Success		200				{object}	ops.Envelope{data=InvitePreview}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/partner-users/{id}/resend-invite [post]
 func partnerUsersResend(ctx context.Context, c *ops.Call, in *PartnerResendInput) (InvitePreview, error) {
@@ -432,9 +437,30 @@ func partnerUsersResend(ctx context.Context, c *ops.Call, in *PartnerResendInput
 	if x.Status != "invited" {
 		return InvitePreview{}, apperr.E(apperr.Conflict, "errors.invite_not_pending")
 	}
+	if err := queuePartnerInvite(ctx, c, x.Email, x.PartnerRole); err != nil {
+		return InvitePreview{}, err
+	}
+	if _, err := c.Tx.Exec(ctx, `UPDATE identity.partner_users SET last_invite_sent_at = $2 WHERE id = $1`, x.ID, c.Now); err != nil {
+		return InvitePreview{}, err
+	}
+	c.Audit(ops.AuditEntry{Action: "partnerUsers.resendInvite", TargetKind: "partner_user", TargetID: x.ID.String(), Reason: "invite e-mail queued"})
 	return InvitePreview{ID: uuid.New(), TenantID: x.TenantID, Version: 1, CreatedAt: c.Now, UpdatedAt: c.Now, Type: "invite", Target: map[string]string{"kind": "partner_user", "id": x.ID.String()},
 		TemplateKey: "invite", Params: map[string]any{"targetName": x.Email, "at": c.Now, "status": "invited", "reason": nil, "amountMinor": nil, "currency": nil, "method": nil, "message": nil},
-		Channel: "email", DeliveryState: "preview", Severity: "normal", OccurredAt: c.Now}, nil
+		Channel: "email", DeliveryState: "queued", Severity: "normal", OccurredAt: c.Now}, nil
+}
+
+// queuePartnerInvite queues the invitation e-mail to the partner app (IR418); a technician's account opens the
+// technician app, which HQ creates with the membership.
+func queuePartnerInvite(ctx context.Context, c *ops.Call, email, role string) error {
+	var org string
+	if err := c.Tx.QueryRow(ctx, `SELECT name FROM identity.organizations WHERE id = $1`, c.Principal.OrgID).Scan(&org); err != nil {
+		return err
+	}
+	app := "partner"
+	if role == "technician" {
+		app = "technician"
+	}
+	return notify.QueueInvite(ctx, c.Tx, email, org, role, app)
 }
 
 // RegisterPartnerUsers binds partnerUsers.*.

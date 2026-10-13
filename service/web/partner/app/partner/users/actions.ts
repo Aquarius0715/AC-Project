@@ -34,7 +34,7 @@ export async function setPartnerUserStatus(id: string, version: number, email: s
 export async function removePartnerUser(id: string, version: number, reason: string) {
   return run(() => coreOp("partnerUsers.remove", { id, reason: reason.trim() }, { write: true, expectedVersion: version }).then(() => null));
 }
-/** Builds the invite preview again; nothing is sent in the demo. */
+/** Queues the invitation e-mail again (IR418). */
 export async function resendPartnerInvite(id: string) {
-  return run(() => coreOp("partnerUsers.resendInvite", { id }).then(() => null));
+  return run(() => coreOp("partnerUsers.resendInvite", { id }, { write: true }).then(() => null));
 }

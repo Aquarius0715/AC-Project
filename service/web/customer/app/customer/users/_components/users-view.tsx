@@ -46,7 +46,7 @@ export function UsersView({ live }: { live: { customerId: string; customer: stri
   const submit = () => {
     setTried(true);
     if (!dialog || emailErr || reasonErr) return;
-    if (dialog.kind === "invite") return run(() => inviteUser(live.customerId, email, role), t("Invitation preview created for {email} — nothing is sent in the demo", { email: email.trim() }), close);
+    if (dialog.kind === "invite") return run(() => inviteUser(live.customerId, email, role), t("Invitation e-mail queued for {email}", { email: email.trim() }), close);
     const r = dialog.row;
     if (dialog.kind === "remove") return run(() => removeUser(r.id, r.version, reason), t("{name} removed", { name: name(r) }), close);
     if (dialog.kind === "edit") return run(() => updateUser(r.id, r.version, live.customerId, email, role, null, reason), t("Invite changed for {email}", { email: email.trim() }), close);
@@ -71,7 +71,7 @@ export function UsersView({ live }: { live: { customerId: string; customer: stri
             const invited = u.status === "invited";
             return (
               <div className="flex flex-wrap gap-1">
-                {invited && <Btn size="sm" variant="ghost" disabled={pending} onClick={() => run(() => resendInvite(u.id), t("Invitation preview re-created for {email} — nothing is sent in the demo", { email: u.email }))}><Icon name="send" />{t("Resend invite")}</Btn>}
+                {invited && <Btn size="sm" variant="ghost" disabled={pending} onClick={() => run(() => resendInvite(u.id), t("Invitation e-mail queued again for {email}", { email: u.email }))}><Icon name="send" />{t("Resend invite")}</Btn>}
                 {invited && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "edit", row: u })}><Icon name="edit" />{t("Edit")}</Btn>}
                 {!invited && !u.lastOwner && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "role", row: u })}>{t(u.role === "owner" ? "Make member" : "Make owner")}</Btn>}
                 {u.status === "active" && !u.lastOwner && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "disable", row: u })}>{t("Disable")}</Btn>}
@@ -84,7 +84,7 @@ export function UsersView({ live }: { live: { customerId: string; customer: stri
         ]} />
       </Card>
       <Banner>{t("Your customer always keeps one active owner, and you can’t change your own account. An accepted user keeps their e-mail. For a password reset, contact HQ. Only owners see this page.")}</Banner>
-      <p className="text-[11px] text-muted-foreground">{t("Invites are previews only in the demo — no e-mail is sent (FR-C19, IR417).")}</p>
+      <p className="text-[11px] text-muted-foreground">{t("Invitation e-mails are sent by the notification service (IR418); in development they arrive in the local Mailpit inbox.")}</p>
       <Modal open={!!dialog} onClose={close} title={title} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant={dialog?.kind === "remove" || dialog?.kind === "disable" ? "danger" : "primary"} disabled={pending} onClick={submit}>{action}</Btn></>}>
         {withEmail && <Field label={t("Email")} error={tried ? emailErr : undefined}><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="lim.ka@example.com" /></Field>}
         {(withEmail || dialog?.kind === "role") && (
@@ -95,7 +95,7 @@ export function UsersView({ live }: { live: { customerId: string; customer: stri
             </Select>
           </Field>
         )}
-        {dialog?.kind === "invite" && <Banner>{t("They get an invitation to sign in to the customer app and see only your properties and units. Demo: an invitation preview is shown — nothing is sent. The invite stays “pending” until they sign in.")}</Banner>}
+        {dialog?.kind === "invite" && <Banner>{t("They get an invitation to sign in to the customer app and see only your properties and units. The invite stays “pending” until their account is opened.")}</Banner>}
         {dialog?.kind === "disable" && <Banner tone="warn">{t("Their access ends now. You can enable them again later.")}</Banner>}
         {dialog?.kind === "remove" && <Banner tone="warn">{dialog.row.status === "invited" ? t("The invite is withdrawn.") : t("Their access ends now and they leave your user list.")}</Banner>}
         {dialog && dialog.kind !== "invite" && <Field label={t("Reason")} error={tried ? reasonErr : undefined}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("e.g. moved to another team")} /></Field>}

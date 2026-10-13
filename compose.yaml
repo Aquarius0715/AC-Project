@@ -323,7 +323,17 @@ services:
   worker-telemetry:    { <<: *worker, command: ["/app/worker", "--role=telemetry"] }
   worker-rollup:       { <<: *worker, command: ["/app/worker", "--role=rollup"] }
   worker-automation:   { <<: *worker, command: ["/app/worker", "--role=automation"] }
-  worker-notification: { <<: *worker, command: ["/app/worker", "--role=notification"] }
+  worker-notification:   # sends the e-mail notifications and invitations through Mailpit (IR418)
+    <<: *worker
+    command: ["/app/worker", "--role=notification"]
+    environment:
+      DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
+      DEMO_OPS: "1"
+      MAIL_SMTP_ADDR: mailpit:1025
+      MAIL_FROM: AC Project <no-reply@ac-project.local>
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      mailpit: { condition: service_started }
   worker-importexport: { <<: *worker, command: ["/app/worker", "--role=importexport"] }
 
   # IoT demo (profile iot): simulated modules publish telemetry and heartbeats, and answer commands, on the broker; the
@@ -409,6 +419,18 @@ services:
     ports: ["127.0.0.1:1883:1883"]   # this machine only: not reachable from other devices on the network (IR373)
     volumes: [./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro, ./docker/mosquitto/passwd:/mosquitto/config/passwd:ro]
     networks: [data]
+    profiles: [infra, backend, full]
+
+  mailpit:             # Amazon SES stand-in for development: catches every e-mail (SMTP 1025) and shows it at
+                       # http://localhost:8025; nothing leaves the machine (IR418)
+    image: axllent/mailpit:v1.21.8@sha256:81370195cd4a0eab9604d17c2617a7525b0486f9365555253b6c5376c6350f1a   # pinned (IR373)
+    user: "1000:1000"              # not root (security loop, IR414)
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      MP_MAX_MESSAGES: "2000"
+    ports: ["127.0.0.1:8025:8025"]   # the web inbox, this machine only (IR373)
+    networks: [app]
     profiles: [infra, backend, full]
 
   keycloak:            # Amazon Cognito stand-in (OIDC, TOTP); realm "ac" with clients ac-web and ac-admin-web

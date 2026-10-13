@@ -15,5 +15,5 @@ const ops: UsersOps = {
 /** Users (FR-P11) in API mode: the Server Actions, and the status filter in the URL (`?status=`). */
 export function UsersLive({ live }: { live: UsersData | null }) {
   const patch = useUrlPatch();
-  return <UsersView data={live} ops={ops} onStatus={(s) => patch({ status: s })} />;
+  return <UsersView data={live} ops={ops} onStatus={(s) => patch({ status: s })} sends />;
 }

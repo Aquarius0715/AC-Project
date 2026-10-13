@@ -9,6 +9,7 @@
   "otpPolicyDigits": 6,
   "otpPolicyPeriod": 30,
   "bruteForceProtected": true,
+  "smtpServer": { "host": "mailpit", "port": "1025", "from": "no-reply@ac-project.local", "fromDisplayName": "AC Project (demo)" },
   "permanentLockout": false,
   "failureFactor": 10,
   "waitIncrementSeconds": 60,

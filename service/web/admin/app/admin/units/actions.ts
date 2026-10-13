@@ -104,9 +104,9 @@ export async function removeClientUser(id: string, version: number, reason: stri
 export async function signOutEverywhere(membershipId: string, reason: string) {
   return run(() => coreOp("members.revokeSessions", { membershipId, reason: reason.trim() }, write()).then(() => null));
 }
-/** clientUsers.resendInvite only builds the invite preview again (nothing is sent, IR144). */
+/** clientUsers.resendInvite queues the invitation e-mail again (IR418). */
 export async function resendInvite(id: string) {
-  return run(() => coreOp("clientUsers.resendInvite", { id }).then(() => null));
+  return run(() => coreOp("clientUsers.resendInvite", { id }, { write: true }).then(() => null));
 }
 /** auth.previewPasswordReset answers the same generic preview for every address (IR145). */
 export async function previewPasswordReset(email: string) {

@@ -3595,7 +3595,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self-customer:owner | admin:asset.write\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A17, DD-C19",
+                "description": "Authorization: client:self-customer:owner | admin:asset.write\nValidation: D01; input constraints in the corresponding DD; queues the invitation e-mail (IR418)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A17, DD-C19",
                 "consumes": [
                     "application/json"
                 ],
@@ -3605,9 +3605,16 @@
                 "tags": [
                     "clientUsers"
                 ],
-                "summary": "clientUsers.resendInvite (read)",
+                "summary": "clientUsers.resendInvite (write)",
                 "operationId": "clientUsers.resendInvite",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "input field id",
@@ -18701,7 +18708,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: contractor:own-company\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; pending invites only (CONFLICT)\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P11",
+                "description": "Authorization: contractor:own-company\nValidation: D01; input constraints in the corresponding DD; queues the invitation e-mail (IR418); pending invites only (CONFLICT)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-P11",
                 "consumes": [
                     "application/json"
                 ],
@@ -18711,9 +18718,16 @@
                 "tags": [
                     "partnerUsers"
                 ],
-                "summary": "partnerUsers.resendInvite (read)",
+                "summary": "partnerUsers.resendInvite (write)",
                 "operationId": "partnerUsers.resendInvite",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "input field id",

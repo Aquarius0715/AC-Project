@@ -140,7 +140,7 @@ export type FireResult = {eventId:ID;results:(Omit<Decision,'decision'> & {decis
 export type Channel = 'inApp'|'email'|'whatsapp';
 export type FilterCareChannel = Exclude<Channel,'whatsapp'>; // filter-care reminders go in-app and by e-mail (IR134 item 4)
 export type Target = {kind:'unit'|'job'|'invoice'|'restriction'|'device'|'inquiry'|'client_user'|'partner_user'|'certificate';id:ID};
-export type Notification = Entity & {sourceAlertId:ID|null;type:NotificationType;recipientMembershipId:ID;scopeVersionAtCreation:number;target:Target;templateKey:'alert'|'quality'|'schedule_change'|'report_return'|'completion'|'payment'|'payment_reminder'|'restriction'|'inquiry'|'job_update'|'device_operation'|'invite'|'certificate_expiry'|'warranty_expiring';params:{targetName:string;at:Instant;status:string;reason:string|null;amountMinor:number|null;currency:Currency|null;method:PaymentMethod|null;message:string|null};channel:Channel;deliveryState:'preview'|'simulated'|'failed';severity:Severity;occurredAt:Instant;readAt:Instant|null};
+export type Notification = Entity & {sourceAlertId:ID|null;type:NotificationType;recipientMembershipId:ID;scopeVersionAtCreation:number;target:Target;templateKey:'alert'|'quality'|'schedule_change'|'report_return'|'completion'|'payment'|'payment_reminder'|'restriction'|'inquiry'|'job_update'|'device_operation'|'invite'|'certificate_expiry'|'warranty_expiring';params:{targetName:string;at:Instant;status:string;reason:string|null;amountMinor:number|null;currency:Currency|null;method:PaymentMethod|null;message:string|null};channel:Channel;deliveryState:'preview'|'simulated'|'queued'|'failed';severity:Severity;occurredAt:Instant;readAt:Instant|null};
 export type NotificationPreview = Notification;
 export type NotificationsMarked = {markedIds:ID[];skippedIds:ID[]};
 export type AuditView = Entity & {actorId:ID;actorName:string|null;actorRoleAtTime:Role|'system';action:string;targetRef:{kind:string;id:ID};previousVersion:number|null;nextVersion:number|null;occurredAt:Instant;correlationId:ID;result:'success'|'denied'|'failed'|'pending';maskedBefore:Record<string,string|null>;maskedAfter:Record<string,string|null>;reason:string|null};
@@ -406,11 +406,11 @@ export type OperationContracts = {
   'clientUsers.list': {input:Query;result:Page<ClientUser>;mode:'read'};
   'clientUsers.save': {input:{id?:ID;customerId:ID;email:string;clientRole:ClientRole;status?:'active'|'disabled';reason?:string};result:ClientUser;mode:'write'};
   'clientUsers.remove': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
-  'clientUsers.resendInvite': {input:{id:ID};result:NotificationPreview;mode:'read'};
+  'clientUsers.resendInvite': {input:{id:ID};result:NotificationPreview;mode:'write'};
   'partnerUsers.list': {input:Query;result:Page<PartnerUser>;mode:'read'};
   'partnerUsers.save': {input:{id?:ID;email:string;partnerRole:PartnerRole;status?:'active'|'disabled';reason?:string};result:PartnerUser;mode:'write'};
   'partnerUsers.remove': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
-  'partnerUsers.resendInvite': {input:{id:ID};result:NotificationPreview;mode:'read'};
+  'partnerUsers.resendInvite': {input:{id:ID};result:NotificationPreview;mode:'write'};
   'units.importPreview': {input:{customerId:ID;fileName:string;csvText:string;mapping:Record<string,string>};result:ImportPreview;mode:'read'};
   'units.importCommit': {input:{previewId:ID;customerId:ID};result:UnitImport;mode:'write'};
   'units.importUndo': {input:{importId:ID;reason:string};result:UnitImport;mode:'write'};

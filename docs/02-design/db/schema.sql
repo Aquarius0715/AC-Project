@@ -1748,6 +1748,21 @@ CREATE TABLE notify.deliveries (
   UNIQUE (notification_id, channel)
 );
 
+CREATE TABLE notify.outbound_mail (            -- e-mails to an address that is not yet a membership: invites (IR418)
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id           uuid NOT NULL,
+  kind                text NOT NULL CHECK (kind IN ('invite')),
+  to_email            citext NOT NULL,
+  params              jsonb NOT NULL,     -- {organization, role, app}: rendered when sent
+  state               text NOT NULL DEFAULT 'queued' CHECK (state IN ('queued','sent','failed')),
+  attempts            int NOT NULL DEFAULT 0,
+  provider_message_id text,
+  failure_reason      text,
+  created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
+  sent_at             timestamptz
+);
+CREATE INDEX outbound_mail_queued ON notify.outbound_mail (tenant_id, created_at) WHERE state = 'queued';
+
 CREATE TABLE notify.templates (
   key        text NOT NULL,
   channel    text NOT NULL CHECK (channel IN ('inApp','email','whatsapp')),

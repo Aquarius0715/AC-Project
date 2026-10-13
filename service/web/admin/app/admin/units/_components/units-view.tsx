@@ -660,7 +660,7 @@ function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive;
   const canWrite = live.canWrite;
   const act = (u: ClientUserRow, a: string) => {
     if (a === "role" || a === "status" || a === "remove" || a === "signout") setChange({ u, kind: a });
-    if (a === "resend") run(() => resendInvite(u.id), t("Invitation preview re-created for {email} — nothing is sent in the demo", { email: u.email }));
+    if (a === "resend") run(() => resendInvite(u.id), t("Invitation e-mail queued again for {email}", { email: u.email }));
     if (a === "reset") run(() => previewPasswordReset(u.email), t("Password reset preview created — the same generic message for every address"));
   };
   return (

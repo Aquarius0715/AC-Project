@@ -651,7 +651,7 @@ Scope: FR-C19 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 1. `clientUsers.list` (customerId = own customer) shows name, e-mail, role, status, and last sign-in; the owner's own row is marked “(you)” and has no actions.
 2. + Invite user opens a centered dialog (e-mail, role Member/Owner) → `clientUsers.save` without id → the list refetches and an invitation preview is shown.
-3. On an invite: Resend invite (`clientUsers.resendInvite`, preview only), Edit (e-mail, role, reason → `clientUsers.save` with id and version), Remove (reason → `clientUsers.remove`).
+3. On an invite: Resend invite (`clientUsers.resendInvite`, queues the invitation e-mail again, IR418), Edit (e-mail, role, reason → `clientUsers.save` with id and version), Remove (reason → `clientUsers.remove`).
 4. On an accepted user: Change role, Disable / Enable (reason → `clientUsers.save` with clientRole / status) and Remove (reason → `clientUsers.remove`).
 
 **Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept, 11c). The own account → CONFLICT `errors.own_account`; demoting, disabling or removing the last active owner → CONFLICT `errors.last_owner`; a stale version → CONFLICT, the list refetches. Member sessions have no sidebar item; the direct URL shows Page unavailable (FORBIDDEN). Password resets stay with HQ (DD-A17).

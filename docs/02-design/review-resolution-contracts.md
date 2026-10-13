@@ -6452,3 +6452,17 @@ The user asked that the customer app can manage its users (DEC-77). Until now an
 3. **Screens.** Customer Users (`/customer/users`, SCR-C19): Invite user (Member/Owner), Edit, Change role, Disable / Enable and Remove dialogs, each change with a reason; the own row has no actions. Figma Client 11d (Change role / Disable) and 11e (Remove).
 4. **Tests.** `TestClientUsersByOwner`, `TestClientInviteAccepted`, and a foreign-target case for `clientUsers.remove` in `idor_test.go`.
 
+## IR418 E-mails are sent: Mailpit in development (DEC-78) — 2026-10-13
+
+The user chose to send the e-mails for real, starting with a local mail catcher (option A, DEC-78). Before, invitations and e-mail notifications were previews only (IR111, FR-X05).
+
+1. **Sender.** `worker-notification` (`/app/worker --role=notification`) sends every five seconds, per tenant (row-level security):
+   - the e-mail notifications (`channel = email`) that have no sent delivery: the subject from the template and its target, the details and a link to the recipient's app; each attempt is recorded in `notify.deliveries`;
+   - the queued rows of the new `notify.outbound_mail` (invitations to addresses that are not memberships yet).
+   - A failure is retried up to five times, with its reason. An address or subject with a line break is refused before SMTP (no header injection).
+   - Without `MAIL_SMTP_ADDR` the worker idles and nothing changes.
+2. **Development.** `mailpit` (`axllent/mailpit:v1.21.8`, pinned by digest, not root) catches every e-mail on SMTP 1025 and shows it at http://localhost:8025; nothing leaves the machine. Keycloak's realm uses it as its SMTP server too. Production sends through Amazon SES with the same worker (adapter planned with the AWS target).
+3. **Invitations.** `clientUsers.save` / `partnerUsers.save` (invite) queue the invitation e-mail. `clientUsers.resendInvite` and `partnerUsers.resendInvite` become writes (idempotency key, audit): they queue it again, record `last_invite_sent_at`, and answer the NotificationPreview with `deliveryState: 'queued'` (a new value of the union). A technician's invitation links to the technician app, a contractor's to the partner app, a client user's to the customer app.
+4. **Web.** In API mode the toasts say “Invitation e-mail queued for …”, and the pages say where the e-mails go; the Phase 1A demo keeps its previews.
+5. **Tests.** `TestInviteMail` (queueing, a failing sender left for retry with its reason, a working one recorded as sent), `TestMailTexts`, `TestSMTPRefusesHeaderBreaks`; the resend tests call writes.
+

@@ -14,6 +14,7 @@ certificates.requestTraining,all,certificate,certificates.list,required,none,D01
 certificates.submit,all,none,certificates.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 certificates.verify,all,certificate,certificates.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 clientUsers.remove,all,client_user,clientUsers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+clientUsers.resendInvite,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 clientUsers.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 clientUsers.save,id present,client_user,clientUsers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 commands.create,all,none,units.get,omit,expectedUnitVersion=UnitDetail.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
@@ -97,6 +98,7 @@ offsets.simulate,event=retry,offset record,offsets.list,required,none,D01; versi
 organizations.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 organizations.save,id present,organizations,organizations.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 partnerUsers.remove,all,partner_user,partnerUsers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+partnerUsers.resendInvite,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 partnerUsers.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 partnerUsers.save,id present,partner_user,partnerUsers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 payments.confirm,all,payment,invoices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

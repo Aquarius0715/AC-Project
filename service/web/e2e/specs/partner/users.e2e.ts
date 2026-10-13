@@ -1,5 +1,5 @@
-// Partner Users (FR-P11, IR416): contractor-a invites a technician, resends and edits the invite, removes it, and
-// disables and enables its technician again; its own row has no actions.
+// Partner Users (FR-P11, IR416, IR418): contractor-a invites a technician (both invitation e-mails reach Mailpit),
+// resends and edits the invite, removes it, and disables and enables its technician again; its own row has no actions.
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 
 test("a contractor invites, edits and removes a user, and disables and enables its technician", async ({ page, app }) => {
@@ -14,10 +14,15 @@ test("a contractor invites, edits and removes a user, and disables and enables i
   await dialog.getByLabel("Email").fill(email);
   await dialog.getByRole("combobox", { name: "Role" }).selectOption("technician");
   await dialog.getByRole("button", { name: "Send invite" }).click();
-  await expect(page.getByText(`Invitation preview created for ${email}`).first()).toBeVisible();
+  await expect(page.getByText(`Invitation e-mail queued for ${email}`).first()).toBeVisible();
   await expect(row(email)).toContainText("Invite pending");
   await row(email).getByRole("button", { name: "Resend invite" }).click();
-  await expect(page.getByText(`Invitation preview re-created for ${email}`).first()).toBeVisible();
+  await expect(page.getByText(`Invitation e-mail queued again for ${email}`).first()).toBeVisible();
+  // the notification worker sends both to the local Mailpit inbox (IR418); skipped on a stack without Mailpit
+  const search = `http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`;
+  if ((await fetch(search).catch(() => null))?.ok) {
+    await expect.poll(async () => ((await (await fetch(search)).json()) as { messages_count: number }).messages_count, { timeout: 30_000 }).toBe(2);
+  }
 
   // a pending invite's role can change, with a reason
   await row(email).getByRole("button", { name: "Edit" }).click();

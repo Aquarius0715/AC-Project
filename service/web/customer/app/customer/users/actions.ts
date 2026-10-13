@@ -29,7 +29,7 @@ export async function updateUser(id: string, version: number, customerId: string
 export async function removeUser(id: string, version: number, reason: string) {
   return run(() => coreOp("clientUsers.remove", { id, reason: reason.trim() }, { write: true, expectedVersion: version }).then(() => null));
 }
-/** Builds the invite preview again; nothing is sent in the demo. */
+/** Queues the invitation e-mail again (IR418). */
 export async function resendInvite(id: string) {
-  return run(() => coreOp("clientUsers.resendInvite", { id }).then(() => null));
+  return run(() => coreOp("clientUsers.resendInvite", { id }, { write: true }).then(() => null));
 }

@@ -448,7 +448,7 @@ Design: [DD-A16](../02-design/admin.md#dd-a16-details). Assess parent AT-A16 usi
 |---|---|---|
 | AT-A17-N | hq-operator, customer-a (Tan Wei owner, Mei Tan member). When: invite guest@example.com as Member | ① ClientUser status=invited, invitedBy=hq-operator ② Listed as “Invite pending” |
 | AT-A17-E | ① Invite tan.wei@example.com again ② Disable Tan Wei (only owner) ③ Remove with empty reason | ① VALIDATION ② CONFLICT ③ VALIDATION |
-| AT-A17-B | ① Promote Mei Tan to Owner, then disable Tan Wei ② Resend invite | ① Both succeed ② Notification preview only, no real sending |
+| AT-A17-B | ① Promote Mei Tan to Owner, then disable Tan Wei ② Resend invite | ① Both succeed ② The invitation e-mail is queued and sent by the notification worker (IR418; the local Mailpit inbox in development) |
 
 Design: [DD-A17](../02-design/admin.md#dd-a17-details). Assess parent AT-A17 using all N/E/B cases in traceability.
 

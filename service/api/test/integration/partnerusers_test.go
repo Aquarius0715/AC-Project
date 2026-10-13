@@ -1,12 +1,15 @@
 package integration
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -77,14 +80,14 @@ func TestPartnerUsers(t *testing.T) {
 	if code, m := post(s, &contrA, "partnerUsers.list", `{"filters":{"partnerRole":"owner"}}`); code != 422 || fields(m) != "filters=error.invalid" {
 		t.Errorf("bad role filter: %d %s", code, fields(m))
 	}
-	// resend: preview only, pending invites of the own company
-	if code, m := post(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+id+`"}`); code != 200 || data(m)["deliveryState"] != "preview" || data(m)["target"].(map[string]any)["kind"] != "partner_user" {
+	// resend: the invitation e-mail is queued again (IR418), pending invites of the own company
+	if code, m := write(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 200 || data(m)["deliveryState"] != "queued" || data(m)["target"].(map[string]any)["kind"] != "partner_user" {
 		t.Fatalf("resend: %d %v", code, m)
 	}
-	if code, _ := post(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+tech["id"].(string)+`"}`); code != 409 {
+	if code, _ := write(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+tech["id"].(string)+`"}`, 0); code != 409 {
 		t.Error("resend to an active account")
 	}
-	if code, _ := post(s, &contrB, "partnerUsers.resendInvite", `{"id":"`+id+`"}`); code != 404 {
+	if code, _ := write(s, &contrB, "partnerUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 404 {
 		t.Error("resend another company's invite")
 	}
 	// a pending invite: email and role can change, its status cannot
@@ -234,9 +237,7 @@ func TestPartnerUserInputs(t *testing.T) {
 		"reason on an invite": {"partnerUsers.save", `{"email":"x-` + uuid.NewString()[:8] + `@example.com","partnerRole":"technician","reason":"why"}`, "reason=error.notAllowed"},
 	} {
 		code, m := write(s, &contrA, c.op, c.body, 1)
-		if c.op == "partnerUsers.resendInvite" {
-			code, m = post(s, &contrA, c.op, c.body)
-		} else if c.op == "partnerUsers.save" {
+		if c.op == "partnerUsers.resendInvite" || c.op == "partnerUsers.save" {
 			code, m = write(s, &contrA, c.op, c.body, 0)
 		}
 		refusal(t, name, code, m, c.want)
@@ -259,4 +260,68 @@ func TestPartnerUserInputs(t *testing.T) {
 	if !until.Equal(clock) {
 		t.Errorf("membership after removal: %v, want %v", until, clock)
 	}
+}
+
+// TestInviteMail (IR418): an invite and a resend queue an invitation e-mail to the invited address, and the
+// notification worker's Deliver sends the queued mail and records it as sent.
+func TestInviteMail(t *testing.T) {
+	s := server(t)
+	email := "mail-" + uuid.NewString()[:8] + "@example.com"
+	code, m := write(s, &contrA, "partnerUsers.save", `{"email":"`+email+`","partnerRole":"technician"}`, 0)
+	if code != 200 {
+		t.Fatalf("invite: %d %v", code, m)
+	}
+	if code, _ := write(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+data(m)["id"].(string)+`"}`, 0); code != 200 {
+		t.Fatal("resend")
+	}
+	var queued int
+	var params string
+	ownerScan(t, `SELECT count(*), max(params::text) FROM notify.outbound_mail WHERE to_email = $1 AND state = 'queued'`, []any{email}, &queued, &params)
+	if queued != 2 || !strings.Contains(params, `"app": "technician"`) || !strings.Contains(params, `"role": "technician"`) {
+		t.Fatalf("queued mail: %d %s", queued, params)
+	}
+	// the worker's delivery: the queued mail goes to the sender and is recorded as sent; a failing sender leaves it for
+	// a retry with the reason
+	failing := &fakeMail{err: errors.New("smtp down")}
+	if _, err := notify.DeliverAll(context.Background(), s.DB, failing, notify.Apps{Technician: "http://tech"}, clock, 500); err != nil {
+		t.Fatal(err)
+	}
+	var state, reason string
+	ownerScan(t, `SELECT state, COALESCE(failure_reason, '') FROM notify.outbound_mail WHERE to_email = $1 ORDER BY created_at LIMIT 1`, []any{email}, &state, &reason)
+	if state != "failed" || reason != "smtp down" {
+		t.Errorf("after a failing send: %s %s", state, reason)
+	}
+	sender := &fakeMail{}
+	if _, err := notify.DeliverAll(context.Background(), s.DB, sender, notify.Apps{Technician: "http://tech"}, clock, 500); err != nil {
+		t.Fatal(err)
+	}
+	mine := 0
+	for _, m := range sender.sent {
+		if m.to == email {
+			mine++
+			if !strings.Contains(m.subject, "Demo Contractor A") || !strings.Contains(m.body, "http://tech/login") {
+				t.Errorf("invite mail: %+v", m)
+			}
+		}
+	}
+	ownerScan(t, `SELECT count(*) FROM notify.outbound_mail WHERE to_email = $1 AND state = 'sent' AND provider_message_id IS NOT NULL`, []any{email}, &queued)
+	if mine != 2 || queued != 2 {
+		t.Errorf("sent %d, recorded %d", mine, queued)
+	}
+}
+
+type sentMail struct{ to, subject, body string }
+
+// fakeMail records what the worker sends, or fails every send with err.
+type fakeMail struct {
+	err  error
+	sent []sentMail
+}
+
+func (f *fakeMail) Send(_ context.Context, to, subject, body string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	f.sent = append(f.sent, sentMail{to, subject, body})
+	return uuid.NewString(), nil
 }
