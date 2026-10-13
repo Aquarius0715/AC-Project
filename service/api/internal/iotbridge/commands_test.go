@@ -44,3 +44,11 @@ func TestCommandTopicOfTheDevice(t *testing.T) {
 		t.Errorf("topic %q, want %q", got, want)
 	}
 }
+
+// TestCommandMessageRefusesBadActions: an action that is not JSON is refused with the command named.
+func TestCommandMessageRefusesBadActions(t *testing.T) {
+	w := Waiting{ID: uuid.New(), Action: json.RawMessage(`{"kind":`)}
+	if _, err := CommandMessage(w); err == nil {
+		t.Error("an action that is not JSON is accepted")
+	}
+}

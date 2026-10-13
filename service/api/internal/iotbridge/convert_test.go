@@ -118,3 +118,11 @@ func TestCommandTriggerMapsTheAcknowledgement(t *testing.T) {
 		t.Error("a command ID that is not a UUID is accepted")
 	}
 }
+
+// TestBadDeviceIDIsRefused: a device ID in the message that is not a UUID converts to nothing.
+func TestBadDeviceIDIsRefused(t *testing.T) {
+	out, err := NewResolver(Links).Triggers(devicesim.Batch{DeviceID: "not-a-uuid"}, received)
+	if err == nil || len(out) != 0 {
+		t.Fatalf("bad device ID: %d triggers, err %v", len(out), err)
+	}
+}

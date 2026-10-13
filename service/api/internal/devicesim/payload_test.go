@@ -137,3 +137,34 @@ func TestAcknowledgeAppliesAndExpires(t *testing.T) {
 		t.Error("a malformed command is accepted")
 	}
 }
+
+// TestCommandAndAckTopics: a module hears its commands on cmd and answers on cmd/ack, both in its own tenant.
+func TestCommandAndAckTopics(t *testing.T) {
+	m := NewModule(tenant, device, "v1", 1)
+	if got, want := m.CommandTopic(), "t/"+tenant+"/d/"+device+"/cmd"; got != want {
+		t.Errorf("command topic %q, want %q", got, want)
+	}
+	if got, want := m.AckTopic(), "t/"+tenant+"/d/"+device+"/cmd/ack"; got != want {
+		t.Errorf("ack topic %q, want %q", got, want)
+	}
+}
+
+// TestAcknowledgeRefusesMalformedAndKeepsUnknownKinds: a command that is not JSON is an error and changes nothing; a
+// command of an unknown kind is answered unsupported with the setpoint unchanged.
+func TestAcknowledgeRefusesMalformedAndKeepsUnknownKinds(t *testing.T) {
+	m := NewModule(tenant, device, "v1", 1)
+	if _, err := m.Acknowledge([]byte(`{"commandId":`), time.Now()); err == nil {
+		t.Error("a malformed command is accepted")
+	}
+	raw, err := m.Acknowledge([]byte(`{"commandId":"c9","kind":"reboot","expiresAt":"2030-01-01T00:00:00Z"}`), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var a map[string]any
+	if err := json.Unmarshal(raw, &a); err != nil {
+		t.Fatal(err)
+	}
+	if a["result"] != "unsupported" || a["observed"].(map[string]any)["setpointCelsius"] != 24.0 {
+		t.Errorf("unknown kind: %v", a)
+	}
+}
