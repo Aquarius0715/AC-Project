@@ -122,9 +122,20 @@ export function runClock(iso: string, tz = KL, i: I18n = EN): string {
 }
 const reasonText: Record<string, string> = { consent_revoked: "consent revoked", capability_changed: "capability changed", unit_archived: "unit archived" };
 
+/** One “Then” row of a card: a schedule has its start and its end, each at its own time; an event rule has one action. */
+export type RuleStep = { key: "start" | "end" | "action"; label: string; time: string | null; action: string };
+/** The “Then” rows of a rule, in the display language. */
+export function ruleSteps(a: ApiAutomation, t: T = en): RuleStep[] {
+  if (a.kind !== "schedule") return [{ key: "action", label: t("Then"), time: null, action: actionLabel(a.action, t) }];
+  return [
+    { key: "start", label: t("Start"), time: a.startLocal, action: actionLabel(a.startAction, t) },
+    { key: "end", label: t("End"), time: a.endsNextDay ? t("{time} next day", { time: a.endLocal }) : a.endLocal, action: actionLabel(a.endAction, t) },
+  ];
+}
+
 /** One rule card of the list. */
 export type RuleCard = {
-  id: string; version: number; name: string; trigger: Trigger; when: string; then: string; place: string; enabled: boolean;
+  id: string; version: number; name: string; trigger: Trigger; when: string; then: string; steps: RuleStep[]; place: string; enabled: boolean;
   status: { text: string; tone: "ok" | "warn" | "muted" }; note: string | null; skipped: string | null; toggle: { allowed: boolean; hint: string | null };
 };
 /** One rule card in the display language (IR260); a rule's own times stay in its time zone. */
@@ -142,7 +153,7 @@ export function ruleCard(a: ApiAutomation, unit: { name: string; path: string; p
   const skipped = !note && a.lastRun?.outcome === "skipped" ? t("Last evaluation skipped {when} — {reason}", { when: runText(a.lastRun.at, a.timezone, i), reason: decisionText[a.lastRun.reason ?? ""] ? t(decisionText[a.lastRun.reason ?? ""]) : a.lastRun.reason ?? t("no reason recorded") }) : null;
   const needsConsent = trigger === "location" && !consentGranted;
   return {
-    id: a.id, version: a.version, name: a.name, trigger, when: whenText(a, place, t), then: thenText(a, t), enabled: a.enabled, status, note, skipped,
+    id: a.id, version: a.version, name: a.name, trigger, when: whenText(a, place, t), then: thenText(a, t), steps: ruleSteps(a, t), enabled: a.enabled, status, note, skipped,
     place: `${where}${a.enabled && nextStart ? t(" · next run {when}", { when: runText(nextStart, a.timezone, i) }) : ""}`,
     toggle: { allowed: !(needsConsent && !a.enabled) && !!unit, hint: needsConsent && !a.enabled ? t("Grant location consent first") : unit ? null : t("The AC is no longer available") },
   };

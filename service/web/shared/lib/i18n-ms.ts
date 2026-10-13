@@ -5703,4 +5703,5 @@ export const ms: Record<string, string> = {
   "Their access ends now and they leave your company's user list.": "Akses mereka tamat sekarang dan mereka keluar daripada senarai pengguna syarikat anda.",
   "e.g. on leave until October": "cth. bercuti hingga Oktober",
   "Access ended": "Akses tamat",
+  "{time} next day": "{time} hari berikutnya",
 };
