@@ -2,7 +2,7 @@
 # AC Project Core API services (IR180): one image per business-domain service or the gateway, from one Go module.
 # Build with --build-arg SERVICE=gateway | identity-api | equipment-api | maintenance-api | billing-api | energy-api;
 # context service/api/.
-ARG GO_VERSION=1.26
+ARG GO_VERSION=1.26.9
 
 FROM golang:${GO_VERSION}-bookworm AS build
 ARG SERVICE
@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     && CGO_ENABLED=0 go build -trimpath -o /app/iotbridge ./cmd/iotbridge \
     && CGO_ENABLED=0 go build -trimpath -o /app/mockhistory ./cmd/mockhistory
 
-FROM gcr.io/distroless/static-debian12:nonroot AS runtime
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS runtime
 COPY --from=build /out/server /app/server
 # the local blob store (BLOB_DIR) of development: owned by nonroot so a named volume mounted here is writable
 COPY --from=build --chown=65532:65532 /out/blobs /var/lib/ac/blobs

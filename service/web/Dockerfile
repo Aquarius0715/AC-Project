@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # AC Project web apps (Next.js App Router): one image per entry point, built from the npm workspace in service/
 # (IR178). Build with --build-arg APP=customer | partner | technician | admin; context service/web/.
-ARG NODE_VERSION=22
+ARG NODE_VERSION=22.23.3
 
 FROM node:${NODE_VERSION}-bookworm-slim AS deps
 WORKDIR /src
