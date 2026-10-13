@@ -3,10 +3,12 @@
 # parallel with it on every push to main, on pull requests and by hand.
 name: E2E
 
-on:
+on:   # not for documentation-only changes: ci.yml validates those
   push:
     branches: [main]
+    paths-ignore: ["docs/**", "**/*.md"]
   pull_request:
+    paths-ignore: ["docs/**", "**/*.md"]
   workflow_dispatch:
 
 permissions:
