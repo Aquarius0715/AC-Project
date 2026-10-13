@@ -6481,7 +6481,7 @@ The first end-to-end run on GitHub Actions bounced every customer page back to t
 Found in review: when HQ changed the end of a membership in Access & roles (`members.save`), the account its contractor (IR416) or customer owner (IR417) had disabled could sign in again, while its user list still said Disabled.
 
 1. While the linked partner or client user is disabled, `members.save` keeps the membership closed at its current end. A later end that HQ enters is kept on the contractor account (`identity.partner_users.access_until`) and comes back when the contractor enables the account; HQ ending the membership earlier still applies at once.
-2. Test: `TestDisabledAccountStaysClosed`.
+2. Tests: `TestDisabledAccountStaysClosed` (contractor account), `TestDisabledClientStaysClosed` (client user).
 
 ## IR421 A technician with an assigned job cannot be disabled or removed by the contractor — 2026-10-14
 

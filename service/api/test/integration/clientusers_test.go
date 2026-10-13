@@ -281,3 +281,34 @@ func TestClientInviteAccepted(t *testing.T) {
 		t.Errorf("accepted invite: %s %s", status, membership)
 	}
 }
+
+// TestDisabledClientStaysClosed (IR420): HQ changing the membership of a client user that is disabled keeps the
+// membership closed.
+func TestDisabledClientStaysClosed(t *testing.T) {
+	s := server(t)
+	user := newUser(t)
+	cust := seed.ID("cust-b").String()
+	from := clock.Add(-time.Hour).Format(time.RFC3339)
+	code, m := write(s, &hq, "members.save", `{"userId":"`+user+`","organizationId":"`+seed.ID("org-customer-b").String()+`","role":"client","permissions":[],"scopes":[],"validFrom":"`+from+`","validUntil":null,"reason":"onboarding"}`, 0)
+	if code != 200 {
+		t.Fatalf("members.save: %d %v", code, m)
+	}
+	membership := data(m)["id"].(string)
+	var id string
+	var v int
+	ownerScan(t, `SELECT id::text, version FROM identity.client_users WHERE membership_id = $1`, []any{membership}, &id, &v)
+	if code, m := write(s, &customerB, "clientUsers.save", `{"id":"`+id+`","customerId":"`+cust+`","email":"`+user+`@ac.local","clientRole":"member","status":"disabled","reason":"left"}`, v); code != 200 {
+		t.Fatalf("disable: %d %v", code, m)
+	}
+	var mv int
+	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &mv)
+	later := clock.Add(90 * 24 * time.Hour).Format(time.RFC3339)
+	if code, m := write(s, &hq, "members.save", `{"id":"`+membership+`","userId":"`+user+`","organizationId":"`+seed.ID("org-customer-b").String()+`","role":"client","permissions":[],"scopes":[],"validFrom":"`+from+`","validUntil":"`+later+`","reason":"contract"}`, mv); code != 200 {
+		t.Fatalf("HQ change: %d %v", code, m)
+	}
+	var end time.Time
+	ownerScan(t, `SELECT valid_until FROM identity.memberships WHERE id = $1`, []any{membership}, &end)
+	if !end.Equal(clock) {
+		t.Errorf("disabled client user's membership after HQ's change: %v, want still closed at %v", end, clock)
+	}
+}
