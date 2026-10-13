@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 )
 
 // Event is one outbox row.
@@ -201,13 +202,16 @@ func (c *Consumer) apply(ctx context.Context, e Event) (bool, error) {
 	return done, err
 }
 
-// Run polls until ctx ends.
+// Run polls until ctx ends. A failure that repeats is logged once a minute, and the recovery once (IR429).
 func (c *Consumer) Run(ctx context.Context, every time.Duration) {
 	t := time.NewTicker(every)
 	defer t.Stop()
+	rep := &logging.Repeats{Logf: c.Logf}
 	for {
 		if n, err := c.Drain(ctx); err != nil && c.Logf != nil {
-			c.Logf("consumer %s: %v (applied %d)", c.Name, err, n)
+			rep.Failed(fmt.Sprintf("consumer %s: %v (applied %d)", c.Name, err, n))
+		} else if err == nil && c.Logf != nil {
+			rep.OK("consumer " + c.Name)
 		}
 		select {
 		case <-ctx.Done():

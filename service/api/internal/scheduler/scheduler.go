@@ -12,6 +12,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
+	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -193,11 +195,15 @@ func Run(ctx context.Context, m *db.TxManager, interval time.Duration, clock fun
 func RunDomains(ctx context.Context, m *db.TxManager, interval time.Duration, clock func() time.Time, logf func(string, ...any), domains []string, reg *ops.Registry) {
 	t := time.NewTicker(interval)
 	defer t.Stop()
+	rep := &logging.Repeats{Logf: logf} // a failure that repeats every second is logged once a minute (IR429)
 	for {
 		if r, err := TryTickDomains(ctx, m, clock(), domains, reg); err != nil {
-			logf("worker tick failed: %v", err)
-		} else if r.changes() > 0 {
-			logf("worker tick: %+v", r)
+			rep.Failed(fmt.Sprintf("worker tick failed: %v", err))
+		} else {
+			rep.OK("worker tick")
+			if r.changes() > 0 {
+				logf("worker tick: %+v", r)
+			}
 		}
 		select {
 		case <-ctx.Done():

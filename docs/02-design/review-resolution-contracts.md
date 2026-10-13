@@ -6604,3 +6604,10 @@ Found in review: database design §6 sets the retention of the outbox (7 days), 
 1. `worker --role=outbox` runs `events.Housekeep` every hour on the business clock: it deletes outbox events older than 7 days that every consumer subscribing to their type has applied or dead-lettered (an event a consumer still needs stays), the processed-event records of events no longer in the outbox once they are 14 days old (so nothing is delivered twice), the failure records of such events (IR427), and the expired idempotency keys tenant by tenant (row-level security). Each run logs what it removed.
 2. The same run deletes, tenant by tenant, the notifications older than two years with their deliveries, and the outbound e-mails created before then that are no longer queued (`notify.SweepAll`).
 3. Tests: `TestHousekeep`, `TestNotificationMail` (an old notification goes with its delivery, a recent one stays).
+
+## IR429 A repeating failure of a polling loop is logged once a minute — 2026-10-14
+
+Found in review: while the database is away, the scheduler (every second) and each event consumer (every 250 ms) logged one line per poll, a flood that hides everything else in the logs.
+
+1. `logging.Repeats` logs a failure once, then the same failure at most once a minute with how often it recurred, a different failure at once, and the first success after a failure as a recovery. The scheduler loop and `events.Consumer.Run` use it; the dead-letter lines (IR427) stay one per event.
+2. Test: `TestRepeats`.
