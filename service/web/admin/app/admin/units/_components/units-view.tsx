@@ -666,7 +666,7 @@ function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive;
   return (
     <Card title={t("Client users of {name}", { name: c.row.name })} sub={t("People who sign in to the customer app. They only ever see {name}’s properties and units.", { name: c.row.name })}
       action={canWrite && <Btn size="sm" variant="primary" onClick={() => setInvite(true)}><Icon name="add" /> {t("Invite user")}</Btn>}>
-      {c.users.length === 0 ? <EmptyState title={t("No client users yet")}>{t("Invite the customer’s owner first; the owner can then invite members from the customer app.")}</EmptyState> : (
+      {c.users.length === 0 ? <EmptyState title={t("No client users yet")}>{t("Invite the customer’s owner first; the owner can then invite and manage users from the customer app.")}</EmptyState> : (
         <DataTable rows={c.users} rowKey={(u) => u.id} cols={[
           { key: "u", label: t("User"), render: (u) => <><b>{u.name ?? u.email}</b><div className="text-xs text-muted-foreground">{u.sub}</div></> },
           { key: "r", label: t("Role"), render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{t(u.role === "owner" ? "Owner" : "Member")}</Badge> },
@@ -685,7 +685,7 @@ function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive;
           ) },
         ]} />
       )}
-      <p className="mt-2 text-[11px] text-muted-foreground">{t("Client users have no permission editor — the owner can also invite members from the customer app (Users). HQ, contractor and technician accounts are managed in Access & roles. The last active owner cannot be demoted, disabled or removed.")}</p>
+      <p className="mt-2 text-[11px] text-muted-foreground">{t("Client users have no permission editor — the customer's owners also manage them from the customer app (Users: invite, roles, access, remove). Contractors manage their own staff in the partner app; HQ sets permissions and access periods in Access & roles. The last active owner cannot be demoted, disabled or removed.")}</p>
       {invite && <InviteModal c={c} pending={pending} onClose={() => setInvite(false)} onSave={(email, role) => run(() => inviteClientUser(c.row.id, email, role), t("Invitation preview created for {email}", { email: email.trim() }), () => setInvite(false))} />}
       {change && <ClientUserModal change={change} pending={pending} onClose={() => setChange(null)} onSave={(role, reason) => {
         const { u, kind } = change;
