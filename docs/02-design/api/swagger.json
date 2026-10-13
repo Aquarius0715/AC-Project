@@ -34799,6 +34799,23 @@
                 }
             }
         },
+        "server.ReportedState": {
+            "type": "object",
+            "properties": {
+                "celsius": {
+                    "type": "number"
+                },
+                "fanLevel": {
+                    "type": "string"
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "power": {
+                    "type": "boolean"
+                }
+            }
+        },
         "server.TriggerInput": {
             "type": "object",
             "properties": {
@@ -34891,6 +34908,14 @@
                 },
                 "severity": {
                     "type": "string"
+                },
+                "state": {
+                    "description": "state: the device reports its air conditioner's settings with each heartbeat (deviceId, state)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/server.ReportedState"
+                        }
+                    ]
                 },
                 "unitId": {
                     "type": "string"
