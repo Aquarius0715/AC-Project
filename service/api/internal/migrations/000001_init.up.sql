@@ -1759,6 +1759,7 @@ CREATE TABLE notify.outbound_mail (            -- e-mails to an address that is 
   provider_message_id text,
   failure_reason      text,
   created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
+  last_attempt_at     timestamptz,        -- a failed e-mail is retried 1, 2, 4 and 8 minutes after it (IR425)
   sent_at             timestamptz
 );
 CREATE INDEX outbound_mail_queued ON notify.outbound_mail (tenant_id, created_at) WHERE state = 'queued';

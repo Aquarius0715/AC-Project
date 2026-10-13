@@ -119,9 +119,13 @@ func oneLine(s string) string {
 // maxAttempts is how often a failed e-mail is tried before it stays failed.
 const maxAttempts = 5
 
+// retryDue is the SQL condition for a failed e-mail whose next attempt is due at $3 (now): 1, 2, 4 and 8 minutes after
+// the attempts before (IR425), so an SMTP outage of a quarter of an hour loses nothing; the worker runs every 5 s.
+const retryDue = `%[1]s.attempts < $1 AND %[1]s.%[2]s <= $3::timestamptz - interval '1 minute' * power(2, %[1]s.attempts - 1)`
+
 // Deliver sends the tenant's pending e-mails in tx (the tenant is set on the transaction): the e-mail notifications
 // without a sent delivery, and the queued outbound mail (invites). Each attempt is recorded; a failure is retried on
-// the next run up to maxAttempts. It answers how many were sent.
+// a growing pause (retryDue) up to maxAttempts. It answers how many were sent.
 func Deliver(ctx context.Context, tx pgx.Tx, s Sender, apps Apps, now time.Time, limit int) (int, error) {
 	sent := 0
 	type pending struct {
@@ -134,7 +138,7 @@ func Deliver(ctx context.Context, tx pgx.Tx, s Sender, apps Apps, now time.Time,
 	rows, err := tx.Query(ctx, `SELECT n.id, u.email::text, n.template_key, m.role, n.params, COALESCE(d.attempts, 0), m.valid_until IS NOT NULL AND m.valid_until <= $3
 		FROM notify.notifications n JOIN identity.memberships m ON m.id = n.recipient_membership_id JOIN identity.users u ON u.id = m.user_id
 		LEFT JOIN notify.deliveries d ON d.notification_id = n.id AND d.channel = 'email'
-		WHERE n.channel = 'email' AND (d.id IS NULL OR (d.state = 'failed' AND d.attempts < $1))
+		WHERE n.channel = 'email' AND (d.id IS NULL OR (d.state = 'failed' AND `+fmt.Sprintf(retryDue, "d", "updated_at")+`))
 		ORDER BY n.occurred_at LIMIT $2
 		FOR UPDATE OF n SKIP LOCKED`, maxAttempts, limit, now) // a second worker takes other rows: no e-mail is sent twice
 	if err != nil {
@@ -178,9 +182,9 @@ func Deliver(ctx context.Context, tx pgx.Tx, s Sender, apps Apps, now time.Time,
 			return sent, err
 		}
 	}
-	rows, err = tx.Query(ctx, `SELECT id, to_email::text, kind, params, attempts FROM notify.outbound_mail
-		WHERE state = 'queued' OR (state = 'failed' AND attempts < $1) ORDER BY created_at LIMIT $2
-		FOR UPDATE SKIP LOCKED`, maxAttempts, limit)
+	rows, err = tx.Query(ctx, `SELECT id, to_email::text, kind, params, attempts FROM notify.outbound_mail o
+		WHERE state = 'queued' OR (state = 'failed' AND `+fmt.Sprintf(retryDue, "o", "last_attempt_at")+`) ORDER BY created_at LIMIT $2
+		FOR UPDATE SKIP LOCKED`, maxAttempts, limit, now)
 	if err != nil {
 		return sent, err
 	}
@@ -203,13 +207,13 @@ func Deliver(ctx context.Context, tx pgx.Tx, s Sender, apps Apps, now time.Time,
 		subject, body := inviteMail(params, apps)
 		msgID, err := s.Send(ctx, p.to, subject, body)
 		if err != nil {
-			if _, err := tx.Exec(ctx, `UPDATE notify.outbound_mail SET state = 'failed', attempts = attempts + 1, failure_reason = $2 WHERE id = $1`, p.id, err.Error()); err != nil {
+			if _, err := tx.Exec(ctx, `UPDATE notify.outbound_mail SET state = 'failed', attempts = attempts + 1, failure_reason = $2, last_attempt_at = $3 WHERE id = $1`, p.id, err.Error(), now); err != nil {
 				return sent, err
 			}
 			continue
 		}
 		sent++
-		if _, err := tx.Exec(ctx, `UPDATE notify.outbound_mail SET state = 'sent', attempts = attempts + 1, provider_message_id = $2, failure_reason = NULL, sent_at = $3 WHERE id = $1`,
+		if _, err := tx.Exec(ctx, `UPDATE notify.outbound_mail SET state = 'sent', attempts = attempts + 1, provider_message_id = $2, failure_reason = NULL, sent_at = $3, last_attempt_at = $3 WHERE id = $1`,
 			p.id, msgID, now); err != nil {
 			return sent, err
 		}

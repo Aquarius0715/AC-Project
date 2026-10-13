@@ -6513,3 +6513,10 @@ Found in review: the SMTP sender wrote no `Date` header, which RFC 5322 requires
 
 1. `notify.SMTP.Send` adds `Date` (UTC, the send time) and encodes the subject per RFC 2047 when it is not plain ASCII (`=?UTF-8?q?…?=`); the body's line ends become CRLF once, also when the text already has CRLF.
 2. Test: `TestSMTPSends` (Date present, `Hello 陈` encoded, no doubled CR).
+
+## IR425 A failed e-mail is retried after a growing pause — 2026-10-14
+
+Found in review: the notification worker runs every 5 seconds and retried a failed e-mail on every run, so its five attempts were spent within about 25 seconds; a short SMTP or provider outage lost the e-mails for good.
+
+1. A failed e-mail notification (`notify.deliveries`, from `updated_at`) or invitation (`notify.outbound_mail`, new column `last_attempt_at`) is retried 1, 2, 4 and 8 minutes after the attempt before, at most five attempts in all: an outage of about a quarter of an hour loses nothing.
+2. Test: `TestInviteMail` (a failed invitation is not retried after 59 s, and is sent at 1 minute).

@@ -304,7 +304,7 @@ func TestInviteMail(t *testing.T) {
 		t.Fatalf("queued mail: %d %s", queued, params)
 	}
 	// the worker's delivery: the queued mail goes to the sender and is recorded as sent; a failing sender leaves it for
-	// a retry with the reason
+	// a later retry with the reason
 	failing := &fakeMail{err: errors.New("smtp down")}
 	if _, err := notify.DeliverAll(context.Background(), s.DB, failing, notify.Apps{Technician: "http://tech"}, clock, 500); err != nil {
 		t.Fatal(err)
@@ -314,8 +314,17 @@ func TestInviteMail(t *testing.T) {
 	if state != "failed" || reason != "smtp down" {
 		t.Errorf("after a failing send: %s %s", state, reason)
 	}
+	// the retry waits a minute after the failed attempt (IR425): nothing goes out at once
 	sender := &fakeMail{}
-	if _, err := notify.DeliverAll(context.Background(), s.DB, sender, notify.Apps{Technician: "http://tech"}, clock, 500); err != nil {
+	if _, err := notify.DeliverAll(context.Background(), s.DB, sender, notify.Apps{Technician: "http://tech"}, clock.Add(59*time.Second), 500); err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range sender.sent {
+		if m.to == email {
+			t.Fatalf("retried before the pause: %+v", m)
+		}
+	}
+	if _, err := notify.DeliverAll(context.Background(), s.DB, sender, notify.Apps{Technician: "http://tech"}, clock.Add(time.Minute), 500); err != nil {
 		t.Fatal(err)
 	}
 	mine := 0
