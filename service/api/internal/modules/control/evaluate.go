@@ -583,7 +583,7 @@ func (m Automations) automationCommand(ctx context.Context, c *ops.Call, unit uu
 	}
 	var id uuid.UUID
 	err = c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, status, delivery, requested_at, sent_at, expires_at,
-		correlation_id, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'automation', $4, 'sent', 'sent', $5, $5, $6, $7, $5, $5) RETURNING id`,
+		correlation_id, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'automation', $4, 'requested', 'not_sent', $5, NULL, $6, $7, $5, $5) RETURNING id`,
 		unit, dev, win.owner, []byte(win.action), c.Now, c.Now.Add(CommandTTL), c.CorrelationID).Scan(&id)
 	if err == nil {
 		c.Emit(ops.Event{AggregateType: "command", AggregateID: id, Type: "CommandRequested", Payload: map[string]any{"unitId": unit, "source": "automation", "ruleId": win.id}})

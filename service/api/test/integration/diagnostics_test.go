@@ -21,6 +21,10 @@ func ackCommand(t *testing.T, id string, at time.Time) bool {
 	}
 	defer conn.Close(ctx)
 	keepObserved(t, id)
+	// the gateway sends a requested command and reports it sent (command_sent) before the device answers
+	if _, err := conn.Exec(ctx, `UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2 WHERE id = $1 AND status = 'requested'`, uuid.MustParse(id), at.Add(-time.Second)); err != nil {
+		t.Fatal(err)
+	}
 	var ok bool
 	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error { ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id), at); return err }); err != nil {
 		t.Fatal(err)

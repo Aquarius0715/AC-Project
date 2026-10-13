@@ -161,8 +161,8 @@ func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run
 	runID := uuid.New()
 	var cmd uuid.UUID
 	if err := c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, diagnostic_run_id, job_id, reason, status, delivery,
-		requested_at, sent_at, expires_at, correlation_id, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'diagnostic', $4, $5, $6, $7, 'sent', 'sent',
-		$8, $8, $9, $10, $8, $8) RETURNING id`, in.UnitID, dev, c.Principal.MembershipID, []byte(in.StartAction), runID, in.JobID, in.Reason, c.Now, c.Now.Add(CommandTTL), c.CorrelationID).Scan(&cmd); err != nil {
+		requested_at, sent_at, expires_at, correlation_id, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'diagnostic', $4, $5, $6, $7, 'requested', 'not_sent',
+		$8, NULL, $9, $10, $8, $8) RETURNING id`, in.UnitID, dev, c.Principal.MembershipID, []byte(in.StartAction), runID, in.JobID, in.Reason, c.Now, c.Now.Add(CommandTTL), c.CorrelationID).Scan(&cmd); err != nil {
 		return Run{}, err
 	}
 	x, err := scanRun(c.Tx.QueryRow(ctx, `INSERT INTO control.diagnostic_runs AS r (id, tenant_id, job_id, unit_id, actor_membership_id, start_action, end_action, duration_minutes, reason, state,
@@ -380,7 +380,7 @@ func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
 		} else {
 			var id uuid.UUID
 			if err := c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, diagnostic_run_id, job_id, reason, status, delivery,
-				requested_at, sent_at, expires_at, correlation_id, created_at, updated_at) VALUES ($1, $2, $3, $4, 'diagnostic', $5, $6, $7, $8, 'sent', 'sent', $9, $9, $10, $11, $9, $9) RETURNING id`,
+				requested_at, sent_at, expires_at, correlation_id, created_at, updated_at) VALUES ($1, $2, $3, $4, 'diagnostic', $5, $6, $7, $8, 'requested', 'not_sent', $9, NULL, $10, $11, $9, $9) RETURNING id`,
 				x.TenantID, x.UnitID, dev, x.ActorMembershipID, []byte(x.EndAction), x.ID, x.JobID, x.Reason, c.Now, c.Now.Add(CommandTTL), "tick-"+c.Now.Format(time.RFC3339)).Scan(&id); err != nil {
 				return n, err
 			}
