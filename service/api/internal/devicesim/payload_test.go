@@ -111,7 +111,7 @@ func TestAcknowledgeAppliesAndExpires(t *testing.T) {
 	m := NewModule(tenant, device, "v1", 1)
 	now := time.Date(2026, 10, 13, 2, 0, 0, 0, time.UTC)
 	ack := func(cmd string, at time.Time) map[string]any {
-		raw, err := m.Acknowledge([]byte(cmd), at)
+		raw, _, err := m.Acknowledge([]byte(cmd), at)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -133,7 +133,7 @@ func TestAcknowledgeAppliesAndExpires(t *testing.T) {
 	if a["result"] != "unsupported" {
 		t.Fatalf("unsupported: %v", a)
 	}
-	if _, err := m.Acknowledge([]byte(`not json`), now); err == nil {
+	if _, _, err := m.Acknowledge([]byte(`not json`), now); err == nil {
 		t.Error("a malformed command is accepted")
 	}
 }
@@ -153,10 +153,10 @@ func TestCommandAndAckTopics(t *testing.T) {
 // command of an unknown kind is answered unsupported with the setpoint unchanged.
 func TestAcknowledgeRefusesMalformedAndKeepsUnknownKinds(t *testing.T) {
 	m := NewModule(tenant, device, "v1", 1)
-	if _, err := m.Acknowledge([]byte(`{"commandId":`), time.Now()); err == nil {
+	if _, _, err := m.Acknowledge([]byte(`{"commandId":`), time.Now()); err == nil {
 		t.Error("a malformed command is accepted")
 	}
-	raw, err := m.Acknowledge([]byte(`{"commandId":"c9","kind":"reboot","expiresAt":"2030-01-01T00:00:00Z"}`), time.Now())
+	raw, _, err := m.Acknowledge([]byte(`{"commandId":"c9","kind":"reboot","expiresAt":"2030-01-01T00:00:00Z"}`), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

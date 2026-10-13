@@ -21,8 +21,10 @@ type Waiting struct {
 }
 
 // CommandMessage is the message the module receives on its command topic. The action is the unit action the API
-// stored (for example {"kind":"set_temperature","celsius":26}); the module applies a set-temperature change.
-func CommandMessage(w Waiting) (devicesim.Command, error) {
+// stored (for example {"kind":"set_temperature","celsius":26}); the module applies a set-temperature change. The API
+// keeps the expiry on its scenario clock and the module runs on real time, so the expiry is moved by the clock offset
+// (scenario minus real): the module then decides "in time" and "late" on its own clock.
+func CommandMessage(w Waiting, offset time.Duration) (devicesim.Command, error) {
 	var a struct {
 		Kind    string   `json:"kind"`
 		Celsius *float64 `json:"celsius"`
@@ -33,7 +35,7 @@ func CommandMessage(w Waiting) (devicesim.Command, error) {
 	if a.Kind == "" {
 		return devicesim.Command{}, fmt.Errorf("command %s has no action kind", w.ID)
 	}
-	return devicesim.Command{CommandID: w.ID.String(), Kind: a.Kind, Setpoint: a.Celsius, ExpiresAt: w.ExpiresAt.UTC()}, nil
+	return devicesim.Command{CommandID: w.ID.String(), Kind: a.Kind, Setpoint: a.Celsius, ExpiresAt: w.ExpiresAt.Add(-offset).UTC()}, nil
 }
 
 // SentTrigger reports a command sent to its device: the demo trigger command_sent moves it requested → sent.

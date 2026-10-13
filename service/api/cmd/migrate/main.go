@@ -18,6 +18,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/devicesim"
 	"github.com/pradita/ac-project/service/api/internal/migrate"
 	"github.com/pradita/ac-project/service/api/internal/migrations"
 	"github.com/pradita/ac-project/service/api/internal/seed"
@@ -99,19 +100,37 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 		return nil
 	}
 	done, err := migrate.Seeded(ctx, conn)
-	if err != nil || done {
-		if done {
-			log.Printf("migrate: fixture already loaded")
-		}
+	if err != nil {
 		return err
 	}
 	f, err := seed.Load(path)
 	if err != nil {
 		return err
 	}
-	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error { return seed.Apply(ctx, tx, f) }); err != nil {
+	if done {
+		log.Printf("migrate: fixture already loaded")
+	} else {
+		if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error { return seed.Apply(ctx, tx, f) }); err != nil {
+			return err
+		}
+		log.Printf("migrate: seeded %d actors, %d units", len(f.Actors), len(f.DemoSeed.Units))
+	}
+	// SEED_MOCK_FLEET=1 (development only): one air conditioner and IoT module per state pattern, on the fixture's clock
+	if os.Getenv("SEED_MOCK_FLEET") != "1" {
+		return nil
+	}
+	fleet, err := devicesim.MockFleet()
+	if err != nil {
 		return err
 	}
-	log.Printf("migrate: seeded %d actors, %d units", len(f.Actors), len(f.DemoSeed.Units))
+	var n int
+	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+		var err error
+		n, err = seed.ApplyFleet(ctx, tx, fleet, f.SeedCreatedAt)
+		return err
+	}); err != nil {
+		return err
+	}
+	log.Printf("migrate: mock fleet of %d units ready", n)
 	return nil
 }

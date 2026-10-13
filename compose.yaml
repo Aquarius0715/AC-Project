@@ -205,6 +205,7 @@ services:
       DATABASE_URL: postgres://postgres:local@postgres:5432/ac?sslmode=disable
       APP_LOGIN_PASSWORD: local                         # local only: ac_app_login IN ROLE ac_app
       SEED_FIXTURE: /fixture/fixture-contract.json     # local only: skipped when identity.users has rows
+      SEED_MOCK_FLEET: "1"                             # local only: one air conditioner and IoT module per state pattern (internal/devicesim/fleet.json)
     volumes: [./docs/04-agentic-sdlc/fixture-contract.json:/fixture/fixture-contract.json:ro]
     read_only: true
     cap_drop: [ALL]             # IR373

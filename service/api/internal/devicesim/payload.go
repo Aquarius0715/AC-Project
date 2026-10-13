@@ -30,7 +30,7 @@ var Sensors = []Sensor{
 type Measurement struct {
 	SensorID   string    `json:"sensorId"`
 	Metric     string    `json:"metric"`
-	Value      float64   `json:"value"`
+	Value      *float64  `json:"value"` // nil: the sensor gave no value (the API stores it missing)
 	Unit       string    `json:"unit"`
 	ObservedAt time.Time `json:"observedAt"`
 	Sequence   int64     `json:"sequence"`
@@ -57,11 +57,21 @@ type Module struct {
 	rng      *rand.Rand
 	sequence int64
 	setpoint float64
+	// behaviour of the pattern the module plays (mock fleet); empty is normal readings and applied commands
+	telemetry, commands string
+	powerOff            bool
 }
 
 // NewModule starts a module with its own random source, so each device drifts independently.
 func NewModule(tenantID, deviceID, firmware string, seed uint64) *Module {
 	return &Module{TenantID: tenantID, DeviceID: deviceID, Firmware: firmware, rng: rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)), setpoint: 24}
+}
+
+// Behave makes the module play a pattern of the mock fleet: how it reports (Telemetry), how it answers commands
+// (Commands), and whether its air conditioner draws no power (switched off or power signal off).
+func (m *Module) Behave(telemetry, commands string, powerOff bool) *Module {
+	m.telemetry, m.commands, m.powerOff = telemetry, commands, powerOff
+	return m
 }
 
 // Topic is the MQTT topic of one message kind of a device (backend-architecture §9).
@@ -75,14 +85,36 @@ func (m *Module) HeartbeatTopic() string { return Topic(m.TenantID, m.DeviceID, 
 
 // Telemetry takes one reading of every sensor at the given time and returns it as a batch; each reading gets the
 // next sequence number, so the backend can keep them in order and drop duplicates.
+//
+// The pattern changes the readings: silent sends nothing (nil), unit_mismatch reports the temperature in kelvin,
+// out_of_range reports an impossible temperature, missing reports no values, invalid_time stamps the readings an
+// hour ahead; a module whose air conditioner draws no power reports 0 kW.
 func (m *Module) Telemetry(at time.Time) ([]byte, error) {
+	if m.telemetry == "silent" {
+		return nil, nil
+	}
+	observed := at.UTC()
+	if m.telemetry == "invalid_time" {
+		observed = observed.Add(time.Hour)
+	}
 	b := Batch{DeviceID: m.DeviceID, Measurements: make([]Measurement, 0, len(Sensors))}
 	for _, s := range Sensors {
 		m.sequence++
-		v := s.Base + (m.rng.Float64()*2-1)*s.Swing
-		b.Measurements = append(b.Measurements, Measurement{
-			SensorID: s.ID, Metric: s.Metric, Value: math.Round(v*100) / 100, Unit: s.Unit, ObservedAt: at.UTC(), Sequence: m.sequence,
-		})
+		v := math.Round((s.Base+(m.rng.Float64()*2-1)*s.Swing)*100) / 100
+		unit := s.Unit
+		switch {
+		case s.Metric == "power" && m.powerOff:
+			v = 0
+		case s.Metric == "temperature" && m.telemetry == "unit_mismatch":
+			unit = "K"
+		case s.Metric == "temperature" && m.telemetry == "out_of_range":
+			v = 250
+		}
+		x := Measurement{SensorID: s.ID, Metric: s.Metric, Value: &v, Unit: unit, ObservedAt: observed, Sequence: m.sequence}
+		if m.telemetry == "missing" {
+			x.Value = nil
+		}
+		b.Measurements = append(b.Measurements, x)
 	}
 	return json.Marshal(b)
 }
@@ -120,21 +152,31 @@ type Observed struct {
 func (m *Module) CommandTopic() string { return Topic(m.TenantID, m.DeviceID, "cmd") }
 func (m *Module) AckTopic() string     { return Topic(m.TenantID, m.DeviceID, "cmd/ack") }
 
-// Acknowledge applies a command to the module and returns the acknowledgement. A command the module has already
-// passed its expiry for is not applied; the acknowledgement says so, and the module keeps its state.
-func (m *Module) Acknowledge(raw []byte, at time.Time) ([]byte, error) {
+// Acknowledge applies a command to the module and returns the acknowledgement and when to send it. A command the module
+// has already passed its expiry for is not applied; the acknowledgement says so, and the module keeps its state.
+//
+// The pattern changes the answer: reject answers unsupported without applying, ignore sends nothing (nil), late
+// applies the command but sends the answer two seconds after the command expired.
+func (m *Module) Acknowledge(raw []byte, at time.Time) ([]byte, time.Time, error) {
 	var c Command
 	if err := json.Unmarshal(raw, &c); err != nil {
-		return nil, fmt.Errorf("command: %w", err)
+		return nil, at, fmt.Errorf("command: %w", err)
 	}
-	result := "applied"
+	if m.commands == "ignore" {
+		return nil, at, nil
+	}
+	result, sendAt := "applied", at
 	switch {
 	case !at.Before(c.ExpiresAt):
 		result = "expired"
-	case c.Kind == "set_temperature" && c.Setpoint != nil:
-		m.setpoint = *c.Setpoint
-	case c.Kind != "set_temperature":
+	case m.commands == "reject" || c.Kind != "set_temperature":
 		result = "unsupported"
+	case c.Setpoint != nil:
+		m.setpoint = *c.Setpoint
 	}
-	return json.Marshal(Ack{DeviceID: m.DeviceID, CommandID: c.CommandID, ReceivedAt: at.UTC(), Result: result, Observed: Observed{SetpointCelsius: m.setpoint}})
+	if m.commands == "late" && result == "applied" {
+		sendAt = c.ExpiresAt.Add(2 * time.Second)
+	}
+	raw, err := json.Marshal(Ack{DeviceID: m.DeviceID, CommandID: c.CommandID, ReceivedAt: at.UTC(), Result: result, Observed: Observed{SetpointCelsius: m.setpoint}})
+	return raw, sendAt, err
 }

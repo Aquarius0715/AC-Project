@@ -18,7 +18,7 @@ func batch(device string, seqs ...int64) devicesim.Batch {
 	for i, s := range seqs {
 		name := []string{"temperature", "power"}[i%2]
 		v := 24.5
-		b.Measurements = append(b.Measurements, devicesim.Measurement{SensorID: name, Metric: name, Value: v, Unit: "°C", ObservedAt: at, Sequence: s})
+		b.Measurements = append(b.Measurements, devicesim.Measurement{SensorID: name, Metric: name, Value: &v, Unit: "°C", ObservedAt: at, Sequence: s})
 	}
 	return b
 }
@@ -86,7 +86,7 @@ func TestUnknownDeviceIsRefused(t *testing.T) {
 // batch still convert.
 func TestUnknownSensorSkipsOnlyThatReading(t *testing.T) {
 	b := batch("device-offline-rto", 1, 2)
-	b.Measurements = append(b.Measurements, devicesim.Measurement{SensorID: "humidity", Metric: "humidity", Value: 50, Unit: "%", ObservedAt: at, Sequence: 3})
+	b.Measurements = append(b.Measurements, devicesim.Measurement{SensorID: "humidity", Metric: "humidity", Value: ptr(50), Unit: "%", ObservedAt: at, Sequence: 3})
 	out, err := NewResolver(Links).Triggers(b, received)
 	if err == nil {
 		t.Error("an unknown sensor is not reported")
@@ -124,5 +124,31 @@ func TestBadDeviceIDIsRefused(t *testing.T) {
 	out, err := NewResolver(Links).Triggers(devicesim.Batch{DeviceID: "not-a-uuid"}, received)
 	if err == nil || len(out) != 0 {
 		t.Fatalf("bad device ID: %d triggers, err %v", len(out), err)
+	}
+}
+
+func ptr(v float64) *float64 { return &v }
+
+// TestFleetLinksResolve: a mock fleet module's reading converts onto its own unit and sensor, and a unit without a
+// module has no link.
+func TestFleetLinksResolve(t *testing.T) {
+	f, err := devicesim.MockFleet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	links := FleetLinks(f)
+	if len(links) != 18 {
+		t.Fatalf("%d fleet links, want one per pattern with a module (18)", len(links))
+	}
+	r := NewResolver(append(append([]Link{}, Links...), links...))
+	out, err := r.Triggers(batch("device-mock-tamper", 1, 2), received)
+	if err != nil || len(out) != 2 {
+		t.Fatalf("fleet reading: %d triggers, err %v", len(out), err)
+	}
+	if out[0].Measurement.UnitID != seed.ID("unit-mock-tamper") || out[0].Measurement.SensorID != seed.ID("sensor-mock-tamper-temperature") {
+		t.Errorf("fleet IDs %v %v", out[0].Measurement.UnitID, out[0].Measurement.SensorID)
+	}
+	if _, err := r.Triggers(batch("device-mock-no-module", 1), received); err == nil {
+		t.Error("a unit without a module has a link")
 	}
 }

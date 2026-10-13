@@ -37,7 +37,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	resolver := iotbridge.NewResolver(iotbridge.Links)
+	fleet, err := devicesim.MockFleet()
+	if err != nil {
+		log.Fatal(err)
+	}
+	resolver := iotbridge.NewResolver(append(append([]iotbridge.Link{}, iotbridge.Links...), iotbridge.FleetLinks(fleet)...))
 	httpc := &http.Client{Timeout: 10 * time.Second}
 	endpoint := *api + "/v1/demo/trigger"
 	clock := &demoClock{api: *api, c: httpc}
@@ -62,7 +66,8 @@ func main() {
 			log.Printf("telemetry on %s: %v", msg.Topic(), err)
 			return
 		}
-		off := clock.offset()
+		// stamp a little in the past: the offset is an estimate, and the API refuses a reading received after its clock
+		off := clock.offset() - clockMargin
 		for i := range b.Measurements {
 			b.Measurements[i].ObservedAt = b.Measurements[i].ObservedAt.Add(off)
 		}
@@ -207,6 +212,10 @@ func (d *demoClock) keepRefreshing(ctx context.Context) {
 	}
 }
 
+// clockMargin absorbs the error of the scenario-clock estimate: readings are stamped this much earlier, both their
+// observed and their received time, so the order of the two is kept.
+const clockMargin = 2 * time.Second
+
 // internalToken is the service token of the internal queries (INTERNAL_API_TOKEN, the same as the Core API's).
 func internalToken() string { return os.Getenv("INTERNAL_API_TOKEN") }
 
@@ -262,7 +271,7 @@ func fetchWaiting(c *http.Client, api, token, tenant string) ([]iotbridge.Waitin
 // sendCommand publishes one requested command to its device, then reports it sent. The report comes only after the
 // publish succeeded, so a command is never reported sent without leaving the bridge.
 func sendCommand(mc mqtt.Client, httpc *http.Client, endpoint, tenant string, w iotbridge.Waiting, off time.Duration) error {
-	cmd, err := iotbridge.CommandMessage(w)
+	cmd, err := iotbridge.CommandMessage(w, off) // the expiry on the module's clock
 	if err != nil {
 		return err
 	}

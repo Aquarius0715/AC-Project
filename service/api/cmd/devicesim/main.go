@@ -29,6 +29,7 @@ func main() {
 	firmware := flag.String("firmware", "v1", "firmware version the modules report")
 	interval := flag.Duration("telemetry-interval", time.Minute, "time between telemetry batches (design: every minute)")
 	beat := flag.Duration("heartbeat-interval", time.Minute, "time between heartbeats (design: every 60 seconds)")
+	withFleet := flag.Bool("fleet", true, "also run the mock fleet (internal/devicesim/fleet.json): one module per state pattern")
 	flag.Parse()
 	if *names == "" {
 		log.Fatal("--devices must name at least one device")
@@ -46,22 +47,48 @@ func main() {
 	defer client.Disconnect(500)
 
 	var modules []*devicesim.Module
+	beats := map[*devicesim.Module]bool{} // modules that send heartbeats (a module that is not online sends none)
 	for _, name := range strings.Split(*names, ",") {
 		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
 		}
 		id := seed.ID(name).String()
-		modules = append(modules, devicesim.NewModule(*tenant, id, *firmware, seedOf(id)))
+		m := devicesim.NewModule(*tenant, id, *firmware, seedOf(id))
+		modules = append(modules, m)
+		beats[m] = true
+	}
+	if *withFleet {
+		fleet, err := devicesim.MockFleet()
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, p := range fleet.Patterns {
+			if p.NoDevice {
+				continue
+			}
+			id := seed.ID(devicesim.DeviceName(p)).String()
+			powerOff := p.PowerSignal == "off" || (p.State.Power != nil && !*p.State.Power)
+			m := devicesim.NewModule(*tenant, id, fleet.FirmwareOf(p), seedOf(id)).Behave(p.Telemetry, p.Commands, powerOff)
+			modules = append(modules, m)
+			beats[m] = p.Connection == "online"
+		}
 	}
 	log.Printf("devicesim: %d modules on %s", len(modules), *broker)
 	// each module hears its own command topic and answers on the acknowledgement topic (QoS 1, as the design says)
 	for _, m := range modules {
 		m := m
 		tok := client.Subscribe(m.CommandTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
-			raw, err := m.Acknowledge(msg.Payload(), time.Now())
+			raw, sendAt, err := m.Acknowledge(msg.Payload(), time.Now())
 			if err != nil {
 				log.Printf("command %s: %v", m.DeviceID, err)
+				return
+			}
+			if raw == nil { // the pattern never answers
+				return
+			}
+			if wait := time.Until(sendAt); wait > 0 { // the pattern answers after the command expired
+				time.AfterFunc(wait, func() { publish(client, m.AckTopic(), raw) })
 				return
 			}
 			publish(client, m.AckTopic(), raw)
@@ -87,10 +114,16 @@ func main() {
 					log.Printf("telemetry %s: %v", m.DeviceID, err)
 					continue
 				}
+				if raw == nil { // a silent pattern reports nothing
+					continue
+				}
 				publish(client, m.TelemetryTopic(), raw)
 			}
 		case now := <-heartbeat.C:
 			for _, m := range modules {
+				if !beats[m] {
+					continue
+				}
 				raw, err := m.Beat(now)
 				if err != nil {
 					log.Printf("heartbeat %s: %v", m.DeviceID, err)

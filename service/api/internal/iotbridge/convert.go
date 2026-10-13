@@ -107,7 +107,6 @@ func (r *Resolver) Triggers(b devicesim.Batch, received time.Time) ([]Trigger, e
 			}
 			continue
 		}
-		v := m.Value
 		// the event ID is the reading itself (device, sensor, observed time): a simulator restart restarts its sequence, so the
 		// sequence cannot tell readings apart; a redelivered reading has the same time and so the same event
 		event := uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/%s/%s", b.DeviceID, m.SensorID, m.ObservedAt.UTC().Format(time.RFC3339Nano))))
@@ -117,7 +116,7 @@ func (r *Resolver) Triggers(b devicesim.Batch, received time.Time) ([]Trigger, e
 			OccurredAt: m.ObservedAt,
 			EventType:  "telemetry",
 			Measurement: &Measurement{
-				UnitID: t.unit, SensorID: sensor, Metric: m.Metric, Value: &v, Unit: m.Unit,
+				UnitID: t.unit, SensorID: sensor, Metric: m.Metric, Value: m.Value, Unit: m.Unit, // nil: the API stores the reading missing
 				ObservedAt: m.ObservedAt, ReceivedAt: received.UTC(), Origin: "measured", Quality: "valid",
 				EventID: event, // no sequence: the API numbers the reading after the latest (IR77)
 			},
@@ -150,4 +149,21 @@ func CommandTrigger(a devicesim.Ack, received time.Time) (Trigger, bool, error) 
 		EventType:  kind,
 		CommandID:  &cmd,
 	}, true, nil
+}
+
+// FleetLinks are the mock fleet's modules (internal/devicesim/fleet.json): each pattern with a module reports its
+// temperature and power sensors on its own unit.
+func FleetLinks(f devicesim.Fleet) []Link {
+	var out []Link
+	for _, p := range f.Patterns {
+		if p.NoDevice {
+			continue
+		}
+		sensors := map[string]string{}
+		for _, s := range devicesim.Sensors {
+			sensors[s.ID] = devicesim.SensorName(p, s)
+		}
+		out = append(out, Link{Device: devicesim.DeviceName(p), Unit: devicesim.UnitName(p), Sensors: sensors})
+	}
+	return out
 }
