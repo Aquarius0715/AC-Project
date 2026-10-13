@@ -202,7 +202,7 @@ For normal customer/diagnostic Commands, reject conflicting new requests while t
 | device.fault / operation_failed | Notify assigned technician and HQ; give customer only necessary summary | Do not assume a fault cause or theft without checking |
 | inquiry.received / answered | Notify customer and authorized HQ handler | Do not send real email or WhatsApp messages |
 
-The table summarizes visibility. IR95 is authoritative for whether to generate notifications, templateKey, channel, and recipient Membership selection. In-app notifications store translation keys and params and render in the selected language. Email/WhatsApp are preview or simulated, never actual delivery records. Notifications carry a target reference ID and snapshot scope at notification time. Recheck current permissions when navigating from a notification.
+The table summarizes visibility. IR95 is authoritative for whether to generate notifications, templateKey, channel, and recipient Membership selection. In-app notifications store translation keys and params and render in the selected language. Email/WhatsApp are preview or simulated, never actual delivery records, in the Phase 1A demo; in API mode the notification worker sends e-mails and records them in `notify.deliveries` (IR418), and WhatsApp stays a preview. Notifications carry a target reference ID and snapshot scope at notification time. Recheck current permissions when navigating from a notification.
 
 ## DDC-05 Frontend Boundary Completion Criteria
 

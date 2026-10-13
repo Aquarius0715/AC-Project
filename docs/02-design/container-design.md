@@ -161,7 +161,7 @@ The resource names, created locally by that script, are the ones the production 
 | Dead-letter queues | `<name>-dlq.fifo` for each queue, after 5 receives | Replays reuse the event ID (backend architecture §8) |
 | Kinesis stream | `ac-telemetry` | Device telemetry from the IoT rules (2 shards locally) |
 | S3 buckets | `ac-files`, `ac-reports`, `ac-telemetry-archive`, `ac-audit-export` | Uploads (OPEN-CT-02), generated reports and exports, raw measurement history in Parquet, the monthly audit export with Object Lock (backend architecture §3a, §7) |
-| SES identity | `no-reply@ac.local` | The sender of e-mail previews; production verifies the real domain |
+| SES identity | `no-reply@ac.local` (LocalStack) | Kept for the planned SES adapter; the e-mails the stack sends today go over SMTP to Mailpit from `MAIL_FROM` (`no-reply@ac-project.local`, IR418). Production verifies the real domain |
 | Secret | `ac/local/stripe` | The Stripe test key; production keeps one secret per environment in Secrets Manager |
 
 Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`, LocalStack `SERVICES` / `AWS_DEFAULT_REGION`) exist only in compose. Local values come from compose and an optional git-ignored `.env.local` (`.env.local.example`).

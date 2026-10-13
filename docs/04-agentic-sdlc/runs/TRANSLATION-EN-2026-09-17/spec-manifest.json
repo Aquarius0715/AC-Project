@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "fd0961dc989743c4b903bfe80659da86c1e0fa5c5d95597e202992d0944ee100",
+  "spec_baseline_id": "8ee4cc67574e014cd764dba05c0396a7b7d71185385117227bdd42fffdcc4dc1",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -122,7 +122,7 @@
     },
     {
       "path": "02-design/container-design.md",
-      "sha256": "17e23905e09a0680837e2a528f92de7d46f8ef4edbdad1f4ed26f7306920574e"
+      "sha256": "8df16fa2479b8b9fa30a458ed06b91d5a4a6d4d8e34d1356f9259c9b68e6a8c1"
     },
     {
       "path": "02-design/contractor.md",
@@ -138,7 +138,7 @@
     },
     {
       "path": "02-design/implementation-contracts.md",
-      "sha256": "89404e0c1a54ef0d06ec7bd6c2e1d8fd66f856152d4c85625826853041fd6772"
+      "sha256": "0dfb9a53bff02b8a57e803e7c04b6c5a83beb4cdb27d8a9aa3279cf590cc5a94"
     },
     {
       "path": "02-design/network-architecture.md",
