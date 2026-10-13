@@ -48,7 +48,9 @@ jobs:
         run: |
           npm ci
           npx playwright install --with-deps chromium
-          npm run e2e
+          # github: each failure becomes an annotation (readable on the run without the logs); stop early when the
+          # stack is broken instead of timing out spec after spec
+          npm run e2e -- --reporter=github,list --max-failures=10
       - name: stack logs on failure
         if: failure()
         run: docker compose --env-file .env.local --profile full logs --no-color --tail 200 > compose-logs.txt
