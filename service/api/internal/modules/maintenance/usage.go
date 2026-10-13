@@ -20,7 +20,15 @@ const (
 	QueryClaimableJobs = "maintenance.claimableJobs"
 	QueryUnitActive    = "maintenance.unitActive"
 	QueryOrgActive     = "maintenance.orgActive"
+	// QueryTechnicianBooked answers whether a technician membership holds an active assignment whose access has not
+	// ended: the contractor cannot disable or remove that account (IR421). Asked by identity by name.
+	QueryTechnicianBooked = "maintenance.technicianBooked"
 )
+
+// MembershipInput names a membership.
+type MembershipInput struct {
+	MembershipID uuid.UUID `json:"membershipId"`
+}
 
 // UnitInput names a unit.
 type UnitInput struct {
@@ -63,6 +71,14 @@ func registerUsage(r *ops.Registry) {
 	ops.RegisterQuery(r, ops.DomainMaintenance, QueryClaimableJobs, claimableJobs)
 	ops.RegisterQuery(r, ops.DomainMaintenance, QueryUnitActive, unitActive)
 	ops.RegisterQuery(r, ops.DomainMaintenance, QueryOrgActive, orgActive)
+	ops.RegisterQuery(r, ops.DomainMaintenance, QueryTechnicianBooked, technicianBooked)
+}
+
+func technicianBooked(ctx context.Context, c *ops.Call, in *MembershipInput) (bool, error) {
+	var b bool
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.assignments WHERE technician_membership_id = $1 AND status = 'active' AND valid_until > $2)`,
+		in.MembershipID, c.Now).Scan(&b)
+	return b, err
 }
 
 func unitInUse(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {

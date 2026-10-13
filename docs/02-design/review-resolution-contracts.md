@@ -6483,3 +6483,11 @@ Found in review: when HQ changed the end of a membership in Access & roles (`mem
 1. While the linked partner or client user is disabled, `members.save` keeps the membership closed at its current end. A later end that HQ enters is kept on the contractor account (`identity.partner_users.access_until`) and comes back when the contractor enables the account; HQ ending the membership earlier still applies at once.
 2. Test: `TestDisabledAccountStaysClosed`.
 
+## IR421 A technician with an assigned job cannot be disabled or removed by the contractor — 2026-10-14
+
+Found in review: a contractor could disable or remove a technician who still held an active assignment; the technician lost access at once and the job was left assigned to an account that could no longer open it.
+
+1. `partnerUsers.save` (status disabled) and `partnerUsers.remove` ask the maintenance service (internal query `maintenance.technicianBooked`) whether the technician's membership holds an active assignment whose access has not ended; if so they answer CONFLICT `errors.technician_booked`: reassign the job first (Schedule & assignments).
+2. The web says what to do for the user management refusals (own account, last owner, last contractor, access ended, booked technician, pending invite), in English and Malay, instead of a humanized key.
+3. Tests: `TestPartnerUserAccess` (booked seed technician refused; disable and enable on a technician without assignments), `actionMessage.test.ts`, and the partner Users E2E.
+

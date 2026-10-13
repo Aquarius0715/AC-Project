@@ -192,11 +192,20 @@ func otherActiveContractor(ctx context.Context, c *ops.Call, org, except uuid.UU
 	return ok, err
 }
 
-// notSelfOrLast refuses a change to the caller's own account, and one that would leave the company without an active
-// contractor.
+// notSelfOrLast refuses a change to the caller's own account, one that would leave the company without an active
+// contractor, and closing a technician who still holds an active assignment (IR421: reassign the job first).
 func notSelfOrLast(ctx context.Context, c *ops.Call, x PartnerUser) error {
 	if x.MembershipID != nil && *x.MembershipID == c.Principal.MembershipID {
 		return apperr.E(apperr.Conflict, "errors.own_account")
+	}
+	if x.PartnerRole == "technician" && x.Status == "active" && x.MembershipID != nil {
+		booked, err := ops.Query[bool](ctx, c, "maintenance.technicianBooked", map[string]any{"membershipId": *x.MembershipID})
+		if err != nil {
+			return err
+		}
+		if booked {
+			return apperr.E(apperr.Conflict, "errors.technician_booked")
+		}
 	}
 	if x.PartnerRole == "contractor" && x.Status == "active" {
 		ok, err := otherActiveContractor(ctx, c, x.OrganizationID, x.ID)

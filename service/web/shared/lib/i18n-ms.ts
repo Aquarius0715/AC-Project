@@ -5715,4 +5715,11 @@ export const ms: Record<string, string> = {
   "Invitation e-mail queued again for {email}": "E-mel jemputan dibariskan semula untuk {email}",
   "Invitation e-mails are sent by the notification service (IR418); in development they arrive in the local Mailpit inbox.": "E-mel jemputan dihantar oleh perkhidmatan pemberitahuan (IR418); dalam pembangunan ia tiba di peti masuk Mailpit tempatan.",
   "They get an invitation to sign in to the customer app and see only your properties and units. The invite stays “pending” until their account is opened.": "Mereka menerima jemputan untuk log masuk ke aplikasi pelanggan dan hanya melihat hartanah dan unit anda. Jemputan kekal “belum selesai” sehingga akaun mereka dibuka.",
+  "You can’t change or remove your own account": "Anda tidak boleh mengubah atau mengalih keluar akaun anda sendiri",
+  "The last active owner can’t be demoted, disabled or removed": "Pemilik aktif terakhir tidak boleh diturunkan, dinyahdayakan atau dialih keluar",
+  "Your company keeps one active contractor — this one can’t be disabled or removed": "Syarikat anda mengekalkan seorang kontraktor aktif — yang ini tidak boleh dinyahdayakan atau dialih keluar",
+  "This account’s access period has ended — ask HQ to extend it first": "Tempoh akses akaun ini telah tamat — minta ibu pejabat melanjutkannya dahulu",
+  "This technician still has an assigned job — reassign it first": "Juruteknik ini masih mempunyai kerja yang ditugaskan — tugaskan semula dahulu",
+  "The invite is still pending — it becomes active when the account is opened": "Jemputan masih belum selesai — ia menjadi aktif apabila akaun dibuka",
+  "Only a pending invite can be sent again": "Hanya jemputan yang belum selesai boleh dihantar semula",
 };

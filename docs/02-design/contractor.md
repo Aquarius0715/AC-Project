@@ -386,7 +386,7 @@ Scope: FR-P11 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 3. On an invite: Resend invite (`partnerUsers.resendInvite`, queues the invitation e-mail again, IR418), Edit invite (e-mail, role, reason → `partnerUsers.save` with id and version), Remove (reason → `partnerUsers.remove`).
 4. On an account: Disable / Enable (reason → `partnerUsers.save` with status) and Remove (reason → `partnerUsers.remove`).
 
-**Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept). The own account → CONFLICT `errors.own_account`; the last active contractor → CONFLICT `errors.last_contractor`; enabling after the access end → CONFLICT `errors.access_expired`; a stale version → CONFLICT, the list refetches. Technician sessions have no Users item; the direct URL shows Page unavailable (FORBIDDEN).
+**Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept). The own account → CONFLICT `errors.own_account`; the last active contractor → CONFLICT `errors.last_contractor`; a technician with an active assignment → CONFLICT `errors.technician_booked` (reassign first, IR421); enabling after the access end → CONFLICT `errors.access_expired`; a stale version → CONFLICT, the list refetches. Technician sessions have no Users item; the direct URL shows Page unavailable (FORBIDDEN).
 
 **Verification**: Check the traceability entries under AT-P11 (N/E/B).
 

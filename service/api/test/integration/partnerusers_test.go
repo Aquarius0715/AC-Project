@@ -138,7 +138,24 @@ func TestPartnerUsers(t *testing.T) {
 // contractor.
 func TestPartnerUserAccess(t *testing.T) {
 	s := server(t)
-	membership := seed.ID("tech-external-a")
+	// the seed technician holds an active assignment: closing that account is refused (IR421)
+	var booked string
+	var bv int
+	ownerScan(t, `SELECT id::text, version FROM identity.partner_users WHERE membership_id = $1`, []any{seed.ID("tech-external-a")}, &booked, &bv)
+	if code, m := write(s, &contrA, "partnerUsers.save", `{"id":"`+booked+`","email":"tech-external-a@ac.local","partnerRole":"technician","status":"disabled","reason":"on leave"}`, bv); code != 409 || m["messageKey"] != "errors.technician_booked" {
+		t.Errorf("disable a booked technician: %d %v", code, m)
+	}
+	if code, m := write(s, &contrA, "partnerUsers.remove", `{"id":"`+booked+`","reason":"left"}`, bv); code != 409 || m["messageKey"] != "errors.technician_booked" {
+		t.Errorf("remove a booked technician: %d %v", code, m)
+	}
+	// a technician without assignments
+	user := newUser(t)
+	code, m := write(s, &hq, "members.save", `{"userId":"`+user+`","organizationId":"`+seed.ID("org-contractor-a").String()+`","role":"technician","employment":"external",
+		"permissions":[],"scopes":[],"validFrom":"`+clock.Add(-time.Hour).Format(time.RFC3339)+`","validUntil":"`+clock.Add(30*24*time.Hour).Format(time.RFC3339)+`","reason":"contract"}`, 0)
+	if code != 200 {
+		t.Fatalf("members.save: %d %v", code, m)
+	}
+	membership := uuid.MustParse(data(m)["id"].(string))
 	var until time.Time
 	ownerScan(t, `SELECT valid_until FROM identity.memberships WHERE id = $1`, []any{membership}, &until)
 	t.Cleanup(func() {
@@ -157,7 +174,7 @@ func TestPartnerUserAccess(t *testing.T) {
 	if code, m := save(email, "contractor", "active", v); code != 422 || fields(m) != "partnerRole=error.immutable" {
 		t.Errorf("change an accepted role: %d %s", code, fields(m))
 	}
-	code, m := save(email, "technician", "disabled", v)
+	code, m = save(email, "technician", "disabled", v)
 	if code != 200 || data(m)["status"] != "disabled" || data(m)["accessUntil"] != until.UTC().Format(time.RFC3339) {
 		t.Fatalf("disable: %d %v", code, m)
 	}
