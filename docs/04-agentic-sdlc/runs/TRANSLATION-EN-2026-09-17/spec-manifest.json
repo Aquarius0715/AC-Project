@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "874d43568b2711cedf2a12840b9195744f004f00c7659d8bfef4ee89eb5e06c4",
+  "spec_baseline_id": "34c6d0ff23fddc18a3b47e27386c11e964272949d5b5567a042b64ebf34ea61e",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "844f01a6568821d6229553f4630767b536fa747b482557f05f2f2784fd29608e"
+      "sha256": "168b1523fc97ffad3887b217cf28730318462d68ffe1686a878ccf6e5433929d"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -286,7 +286,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "001b1f38615e7b9437884e986a5c739d7c43850360a7ce3bbf479c7542da4a66"
+      "sha256": "fdea07e78df0b01a776a7d19979dd19def2158775b951a16a1acc1bd779304f5"
     },
     {
       "path": "tools/check_review_regressions.py",
