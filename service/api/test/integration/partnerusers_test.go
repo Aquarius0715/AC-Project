@@ -368,3 +368,50 @@ func TestNotificationMail(t *testing.T) {
 		t.Errorf("sent %d alert e-mails, want 1", mail)
 	}
 }
+
+// TestDisabledAccountStaysClosed (IR420): HQ extending the membership of an account its contractor disabled does not
+// reopen it; the new end is kept and comes back when the contractor enables the account.
+func TestDisabledAccountStaysClosed(t *testing.T) {
+	s := server(t)
+	user := newUser(t)
+	from, until, later := clock.Add(-time.Hour).Format(time.RFC3339), clock.Add(30*24*time.Hour), clock.Add(60*24*time.Hour)
+	body := func(id string, end time.Time) string {
+		idPart := ""
+		if id != "" {
+			idPart = `"id":"` + id + `",`
+		}
+		return `{` + idPart + `"userId":"` + user + `","organizationId":"` + seed.ID("org-contractor-a").String() + `","role":"technician","employment":"external",
+			"permissions":[],"scopes":[],"validFrom":"` + from + `","validUntil":"` + end.Format(time.RFC3339) + `","reason":"contract"}`
+	}
+	code, m := write(s, &hq, "members.save", body("", until), 0)
+	if code != 200 {
+		t.Fatalf("members.save: %d %v", code, m)
+	}
+	membership := data(m)["id"].(string)
+	var account string
+	var v int
+	ownerScan(t, `SELECT id::text, version FROM identity.partner_users WHERE membership_id = $1`, []any{membership}, &account, &v)
+	status := func(st string, v int) {
+		t.Helper()
+		if code, m := write(s, &contrA, "partnerUsers.save", `{"id":"`+account+`","email":"`+user+`@ac.local","partnerRole":"technician","status":"`+st+`","reason":"leave"}`, v); code != 200 {
+			t.Fatalf("%s: %d %v", st, code, m)
+		}
+	}
+	status("disabled", v)
+	var mv int
+	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &mv)
+	if code, m := write(s, &hq, "members.save", body(membership, later), mv); code != 200 { // HQ extends the contract
+		t.Fatalf("extend: %d %v", code, m)
+	}
+	var end time.Time
+	ownerScan(t, `SELECT valid_until FROM identity.memberships WHERE id = $1`, []any{membership}, &end)
+	if !end.Equal(clock) {
+		t.Errorf("membership of a disabled account after HQ's change: %v, want still closed at %v", end, clock)
+	}
+	ownerScan(t, `SELECT version FROM identity.partner_users WHERE id = $1`, []any{account}, &v)
+	status("active", v)
+	ownerScan(t, `SELECT valid_until FROM identity.memberships WHERE id = $1`, []any{membership}, &end)
+	if !end.Equal(later.Truncate(time.Second)) {
+		t.Errorf("membership after enabling: %v, want HQ's end %v", end, later)
+	}
+}

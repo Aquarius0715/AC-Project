@@ -6475,3 +6475,10 @@ The first end-to-end run on GitHub Actions bounced every customer page back to t
 2. **Key refresh.** A token signed with a key the service has not loaded makes it fetch the keys again at most every 10 seconds (the library default was 5 minutes), and the keys are refreshed every 15 minutes. A recreated identity provider with new keys no longer needs a restart of the services.
 3. **Verified.** Locally, Keycloak and the services were recreated together and the failing specs passed at once; the E2E workflow runs the same order.
 
+## IR420 HQ's membership change keeps a disabled account closed — 2026-10-14
+
+Found in review: when HQ changed the end of a membership in Access & roles (`members.save`), the account its contractor (IR416) or customer owner (IR417) had disabled could sign in again, while its user list still said Disabled.
+
+1. While the linked partner or client user is disabled, `members.save` keeps the membership closed at its current end. A later end that HQ enters is kept on the contractor account (`identity.partner_users.access_until`) and comes back when the contractor enables the account; HQ ending the membership earlier still applies at once.
+2. Test: `TestDisabledAccountStaysClosed`.
+

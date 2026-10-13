@@ -496,8 +496,22 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				return Member{}, apperr.E(apperr.Conflict, "errors.last_identity_admin")
 			}
 		}
+		// an account its company or customer disabled (IR416, IR417) stays closed: the membership keeps its end, and a
+		// contractor account keeps HQ's new end for when it is enabled again (IR420)
+		until := in.ValidUntil
+		var disabled bool
+		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE membership_id = $1 AND status = 'disabled')
+			OR EXISTS (SELECT 1 FROM identity.client_users WHERE membership_id = $1 AND status = 'disabled')`, x.ID).Scan(&disabled); err != nil {
+			return Member{}, err
+		}
+		if disabled && x.ValidUntil != nil && (until == nil || until.After(*x.ValidUntil)) {
+			if _, err := c.Tx.Exec(ctx, `UPDATE identity.partner_users SET access_until = $2, version = version + 1, updated_at = $3 WHERE membership_id = $1`, x.ID, until, c.Now); err != nil {
+				return Member{}, err
+			}
+			until = x.ValidUntil
+		}
 		if _, err := c.Tx.Exec(ctx, `UPDATE identity.memberships SET employment = $2, valid_from = $3, valid_until = $4, version = version + 1, updated_at = $5 WHERE id = $1`,
-			x.ID, in.Employment, in.ValidFrom, in.ValidUntil, c.Now); err != nil {
+			x.ID, in.Employment, in.ValidFrom, until, c.Now); err != nil {
 			return Member{}, err
 		}
 		id, prev = x.ID, c.ExpectedVersion
