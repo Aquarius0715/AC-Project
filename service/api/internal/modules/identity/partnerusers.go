@@ -225,7 +225,7 @@ func notSelfOrLast(ctx context.Context, c *ops.Call, x PartnerUser) error {
 //	@Summary		partnerUsers.save (write)
 //	@ID				partnerUsers.save
 //	@Description	Authorization: contractor:own-company
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; email unique per company; email and role fixed once accepted; not the caller's own account and not the last active contractor (CONFLICT)
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; email unique per company; email and role fixed once accepted; not the caller's own account; not the last active contractor; not a technician with an active assignment (CONFLICT; IR421)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-P11
 //	@Tags			partnerUsers
@@ -355,7 +355,7 @@ func (in *PartnerRemoveInput) Validate() map[string]string {
 //	@Summary		partnerUsers.remove (write)
 //	@ID				partnerUsers.remove
 //	@Description	Authorization: contractor:own-company
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; reason 1–1000; not the caller's own account and not the last active contractor (CONFLICT)
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; reason 1–1000; not the caller's own account; not the last active contractor; not a technician with an active assignment (CONFLICT; IR421)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-P11
 //	@Tags			partnerUsers

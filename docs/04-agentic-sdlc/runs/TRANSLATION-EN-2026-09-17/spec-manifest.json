@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "735c24a5fed40929b964f163235ca7e5592d644e382b2173e54383c6640a6bea",
+  "spec_baseline_id": "5bbd2c185b5b25ca40d9e8a9a951d7053acea53ead1af172731d4b4e6b623cd7",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -102,7 +102,7 @@
     },
     {
       "path": "02-design/api/swagger.json",
-      "sha256": "ccff80b21cd1f9e0ef906728c3f6dd06ccc43050a54781472e1d0c01281beba7"
+      "sha256": "6fb917fe149947185ea974ddb541b5f6a304b8a9ecca84cf99a986129ee166d5"
     },
     {
       "path": "02-design/backend-architecture.md",
@@ -146,7 +146,7 @@
     },
     {
       "path": "02-design/operation-catalog.csv",
-      "sha256": "12d1ccd5594cb21ce25e76f396620af4ac45d4c53702d08b2f5df27a5e947cf5"
+      "sha256": "86a74511db2994844c2efd6232eaa1f54c229015b87a4d7d46444c45e0847e64"
     },
     {
       "path": "02-design/operation-persistence-map.csv",
