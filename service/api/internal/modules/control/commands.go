@@ -80,7 +80,6 @@ type Command struct {
 	FailureCode       *string         `json:"failureCode"`
 	CorrelationID     string          `json:"correlationId"`
 	Source            string          `json:"source"` // ui | voice | automation | restriction | diagnostic | group (IR216)
-	orgID             uuid.UUID
 }
 
 const commandCols = `id, tenant_id, version, created_at, updated_at, unit_id, actor_membership_id, action, diagnostic_run_id, job_id, reason, status, delivery,

@@ -28,7 +28,7 @@ func ownerConn(t *testing.T) *pgx.Conn {
 }
 
 func TestIDDeterministic(t *testing.T) {
-	if ID("unit-online-rto") != ID("unit-online-rto") || ID("a") == ID("b") || ID("x").Version() != 5 {
+	if a, b := ID("unit-online-rto"), ID("unit-online-rto"); a != b || ID("a") == ID("b") || ID("x").Version() != 5 { // the same name maps to the same ID
 		t.Fatal("UUIDv5 mapping")
 	}
 }

@@ -26,7 +26,9 @@ func TestUnitsImport(t *testing.T) {
 		t.Fatalf("property: %d %v", code, m)
 	}
 	propID := data(m)["id"].(string)
-	_, m = write(s, &hq, "spaces.save", `{"propertyId":"`+propID+`","parentSpaceId":null,"kind":"floor","name":"1F"}`, 0)
+	if code, m := write(s, &hq, "spaces.save", `{"propertyId":"`+propID+`","parentSpaceId":null,"kind":"floor","name":"1F"}`, 0); code != 200 {
+		t.Fatalf("floor: %d %v", code, m)
+	}
 	// a device bound to some unit, so its serial is an error row
 	serial := "IMP-" + uuid.NewString()[:8]
 	dev := uuid.NewString()
@@ -111,6 +113,9 @@ func TestUnitsImport(t *testing.T) {
 		t.Fatalf("wrong customer: %d", code)
 	}
 	code, m = post(s, &hq, "units.importPreview", body)
+	if code != 200 {
+		t.Fatalf("preview again: %d %v", code, m)
+	}
 	previewID = data(m)["previewId"].(string)
 	code, m = write(s, &hq, "units.importCommit", `{"previewId":"`+previewID+`","customerId":"`+cust+`"}`, 0)
 	if code != 200 {

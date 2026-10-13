@@ -893,7 +893,6 @@ func (in *ScorecardInput) Validate() map[string]string {
 
 type tally struct {
 	respN, respOK, arrN, arrOK, ftfN, ftfOK, stars, rated, overdue, jobs int
-	missResp, missArr, missFtf                                           float64
 }
 
 func (t *tally) metrics() Metrics {

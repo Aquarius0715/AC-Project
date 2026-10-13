@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useT } from "@ac/web/components/I18n";
 import { partnerUserRows, type PartnerStatus } from "@ac/web/lib/partnerUsers";
 import { DEMO_SELF, partnerUserDemo, usePartnerUsersDemo } from "@ac/web/lib/partnerUsersDemo";
 import { UsersView, type UsersOps } from "./users-view";
@@ -23,7 +22,6 @@ const ops: UsersOps = {
 
 /** Phase 1A demo of Users (FR-P11): contractor-a's accounts in the tab's store, the same rules as the API. */
 export function UsersDemo() {
-  const t = useT();
   const users = usePartnerUsersDemo();
   const [status, setStatus] = useState<PartnerStatus | null>(null);
   const rows = partnerUserRows(users, DEMO_SELF, undefined, new Date("2026-09-15T00:00:00Z")).filter((r) => !status || r.status === status);

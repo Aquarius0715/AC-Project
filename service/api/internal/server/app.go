@@ -285,7 +285,7 @@ func (u unitCaps) UnitCaps(ctx context.Context, c *ops.Call, unit uuid.UUID) (co
 type restrictionTargets struct{ am *assets.Module }
 
 func (t restrictionTargets) RestrictionTarget(ctx context.Context, c *ops.Call, unit uuid.UUID) (restrictions.UnitCaps, bool, error) {
-	ct, ok, err := controlTargets{t.am}.Target(ctx, c, unit)
+	ct, ok, err := controlTargets(t).Target(ctx, c, unit)
 	if err != nil || !ok {
 		return restrictions.UnitCaps{}, false, err
 	}

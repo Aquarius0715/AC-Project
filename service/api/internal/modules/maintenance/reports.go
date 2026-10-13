@@ -164,7 +164,6 @@ type Report struct {
 	AcceptedAt         *time.Time          `json:"acceptedAt"`
 	ReviewHistory      []Review            `json:"reviewHistory"`
 	State              string              `json:"-"`
-	attachmentIDs      []uuid.UUID
 }
 
 // Reports is the work-report operation set (IR126).

@@ -60,7 +60,7 @@ func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
 	if err := d.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	want := scenario.Sub(time.Now())
+	want := time.Until(scenario)
 	if diff := d.offset() - want; diff > time.Minute || diff < -time.Minute {
 		t.Errorf("offset %v, want about %v", d.offset(), want)
 	}

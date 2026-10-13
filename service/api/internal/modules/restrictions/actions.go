@@ -425,7 +425,9 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 				if !delivered {
 					return nil, apperr.E(apperr.Conflict, "errors.unit_busy")
 				}
-				err = set(`release_state = 'requested', release_command_ids = release_command_ids || $4::uuid`, cmd)
+				if err := set(`release_state = 'requested', release_command_ids = release_command_ids || $4::uuid`, cmd); err != nil { // was assigned and dropped (staticcheck SA4006)
+					return nil, err
+				}
 			}
 		default:
 			return nil, apperr.E(apperr.Conflict, "errors.observation_mismatch")

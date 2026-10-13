@@ -130,15 +130,6 @@ func (cl splitCluster) consumers() []*events.Consumer {
 	return out
 }
 
-// drain applies pending events in every service until nothing is left (chains cross services).
-func (cl splitCluster) drain(t *testing.T) {
-	t.Helper()
-	f := &apiserver.Server{Consumers: cl.consumers()}
-	if err := f.DrainEvents(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // clusterFacade is the suite's server in cluster mode: the gateway in front of the cluster for the /v1 routes, the
 // all-domain server for health checks, its database for worker paths (scheduler ticks, device callbacks) and the
 // cluster's consumers for drainEvents.

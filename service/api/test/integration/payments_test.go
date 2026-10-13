@@ -196,6 +196,9 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		t.Error("reference reuse")
 	}
 	code, m = write(s, &customerB, "payments.simulate", `{"event":"initiate","invoiceId":"`+inv2+`","method":"demo_credit_card","demoConfirmed":true}`, 1)
+	if code != 200 {
+		t.Fatalf("initiate: %d %v", code, m)
+	}
 	pay := data(m)["id"].(string)
 	confirm := func(v int) (int, map[string]any) {
 		return write(s, &hq, "payments.confirm", `{"paymentId":"`+pay+`","paymentReference":"HQ-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"checked"}`, v)
