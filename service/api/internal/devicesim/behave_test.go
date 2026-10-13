@@ -125,3 +125,30 @@ func TestHeartbeatReportsTheState(t *testing.T) {
 		t.Error("a module that does not report sends a state")
 	}
 }
+
+// TestKeptSetpoint: the setpoint a command applied survives a restart through the kept state, and the reported state
+// follows it; a kept setpoint outside 16–30 °C or a broken message is refused.
+func TestKeptSetpoint(t *testing.T) {
+	celsius, power := 24.0, true
+	m := NewModule("t", "d", "v1", 1).Reports(&power, &celsius, nil, nil)
+	if _, _, err := m.Acknowledge([]byte(`{"commandId":"c1","kind":"set_temperature","setpointCelsius":27,"expiresAt":"2099-01-01T00:00:00Z"}`), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	kept, err := m.Keep()
+	if err != nil || string(kept) != `{"setpointCelsius":27}` {
+		t.Fatalf("keep: %s %v", kept, err)
+	}
+	c2 := 24.0
+	again := NewModule("t", "d", "v1", 1).Reports(&power, &c2, nil, nil)
+	if err := again.Restore(kept); err != nil || again.setpoint != 27 || *again.state.Celsius != 27 {
+		t.Fatalf("restore: %v %v", err, again.setpoint)
+	}
+	if again.KeptTopic() != "t/t/d/d/sim/kept" {
+		t.Errorf("topic %s", again.KeptTopic())
+	}
+	for _, bad := range []string{`{"setpointCelsius":45}`, `not json`} {
+		if err := again.Restore([]byte(bad)); err == nil || again.setpoint != 27 {
+			t.Errorf("restore %s: %v %v", bad, err, again.setpoint)
+		}
+	}
+}

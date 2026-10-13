@@ -233,3 +233,33 @@ func (m *Module) Acknowledge(raw []byte, at time.Time) ([]byte, time.Time, error
 	raw, err := json.Marshal(Ack{DeviceID: m.DeviceID, CommandID: c.CommandID, ReceivedAt: at.UTC(), Result: result, Observed: Observed{SetpointCelsius: m.setpoint}})
 	return raw, sendAt, err
 }
+
+// Kept is what a module keeps across a simulator restart: the setpoint its last applied command set. The simulator
+// stores it as a retained message on the module's own kept topic (the bridge does not listen there) and reads it back
+// when it starts, so a restart does not put the air conditioner back to its pattern's first setpoint.
+type Kept struct {
+	SetpointCelsius float64 `json:"setpointCelsius"`
+}
+
+// KeptTopic is the retained topic of the module's kept state.
+func (m *Module) KeptTopic() string { return Topic(m.TenantID, m.DeviceID, "sim/kept") }
+
+// Keep returns the module's kept state.
+func (m *Module) Keep() ([]byte, error) { return json.Marshal(Kept{SetpointCelsius: m.setpoint}) }
+
+// Restore applies a kept state read back from the broker; a setpoint outside 16–30 °C is ignored.
+func (m *Module) Restore(raw []byte) error {
+	var k Kept
+	if err := json.Unmarshal(raw, &k); err != nil {
+		return fmt.Errorf("kept state: %w", err)
+	}
+	if k.SetpointCelsius < 16 || k.SetpointCelsius > 30 {
+		return fmt.Errorf("kept setpoint %v out of range", k.SetpointCelsius)
+	}
+	m.setpoint = k.SetpointCelsius
+	if m.state != nil {
+		sp := m.setpoint
+		m.state.Celsius = &sp
+	}
+	return nil
+}

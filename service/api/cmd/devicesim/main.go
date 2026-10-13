@@ -76,6 +76,19 @@ func main() {
 		}
 	}
 	log.Printf("devicesim: %d modules on %s", len(modules), *broker)
+	// each module first reads back its kept state (a retained message; none on the first run), so a restart keeps the
+	// setpoint its last command set
+	for _, m := range modules {
+		m := m
+		tok := client.Subscribe(m.KeptTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
+			if err := m.Restore(msg.Payload()); err != nil {
+				log.Printf("kept %s: %v", m.DeviceID, err)
+			}
+		})
+		if tok.Wait() && tok.Error() != nil {
+			log.Fatalf("subscribe %s: %v", m.KeptTopic(), tok.Error())
+		}
+	}
 	// each module hears its own command topic and answers on the acknowledgement topic (QoS 1, as the design says)
 	for _, m := range modules {
 		m := m
@@ -84,6 +97,11 @@ func main() {
 			if err != nil {
 				log.Printf("command %s: %v", m.DeviceID, err)
 				return
+			}
+			if kept, err := m.Keep(); err == nil { // retained, so the next start reads it back
+				if tok := client.Publish(m.KeptTopic(), 1, true, kept); tok.Wait() && tok.Error() != nil {
+					log.Printf("publish %s: %v", m.KeptTopic(), tok.Error())
+				}
 			}
 			if raw == nil { // the pattern never answers
 				return
