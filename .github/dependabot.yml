@@ -9,6 +9,11 @@ updates:
   - package-ecosystem: docker-compose
     directory: /
     schedule: { interval: weekly }
+    ignore:
+      # the calendar-versioned LocalStack images (2026.x) need an account auth token and exit at start without one
+      # (E2E of the 4 → 2026.9.1 proposal): the stack stays on the free 4.x line
+      - dependency-name: localstack/localstack
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directories: [/service/api/build, /service/web]
     schedule: { interval: weekly }
