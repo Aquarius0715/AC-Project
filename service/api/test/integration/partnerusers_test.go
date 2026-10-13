@@ -220,3 +220,43 @@ func TestPartnerInviteAccepted(t *testing.T) {
 		t.Fatalf("accepted invite: %v", m)
 	}
 }
+
+// TestPartnerUserInputs: the inputs of partnerUsers.remove and resendInvite name their field, an invite takes no reason,
+// a removal needs the current version, and removing an account ends its membership now.
+func TestPartnerUserInputs(t *testing.T) {
+	s := server(t)
+	for name, c := range map[string]struct {
+		op, body, want string
+	}{
+		"remove without id":   {"partnerUsers.remove", `{"id":"00000000-0000-0000-0000-000000000000","reason":"x"}`, "id=error.required"},
+		"remove long reason":  {"partnerUsers.remove", `{"id":"` + uuid.NewString() + `","reason":"` + strings.Repeat("x", 1001) + `"}`, "reason=error.length"},
+		"resend without id":   {"partnerUsers.resendInvite", `{"id":"00000000-0000-0000-0000-000000000000"}`, "id=error.required"},
+		"reason on an invite": {"partnerUsers.save", `{"email":"x-` + uuid.NewString()[:8] + `@example.com","partnerRole":"technician","reason":"why"}`, "reason=error.notAllowed"},
+	} {
+		code, m := write(s, &contrA, c.op, c.body, 1)
+		if c.op == "partnerUsers.resendInvite" {
+			code, m = post(s, &contrA, c.op, c.body)
+		} else if c.op == "partnerUsers.save" {
+			code, m = write(s, &contrA, c.op, c.body, 0)
+		}
+		refusal(t, name, code, m, c.want)
+	}
+	// an account of the company (a membership of its own), removed: the membership ends now
+	user := newUser(t)
+	membership, id := uuid.NewString(), uuid.NewString()
+	owner(t, `INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from, valid_until)
+		VALUES ($1, $2, $3, $4, 'technician', 'external', $5, $6)`, membership, seed.ID("tenant-a"), user, seed.ID("org-contractor-a"), clock.Add(-time.Hour), clock.Add(30*24*time.Hour))
+	owner(t, `INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, partner_role, status, invited_at, invited_by_membership_id)
+		VALUES ($1, $2, $3, $4, $5, 'technician', 'active', $6, $7)`, id, seed.ID("tenant-a"), seed.ID("org-contractor-a"), membership, user+"@ac.local", clock, seed.ID("contractor-a"))
+	if code, m := write(s, &contrA, "partnerUsers.remove", `{"id":"`+id+`","reason":"left the company"}`, 2); code != 409 || m["messageKey"] != "error.versionConflict" {
+		t.Errorf("remove on a stale version: %d %v", code, m)
+	}
+	if code, m := write(s, &contrA, "partnerUsers.remove", `{"id":"`+id+`","reason":"left the company"}`, 1); code != 200 || data(m)["deleted"] != true {
+		t.Fatalf("remove: %d %v", code, m)
+	}
+	var until time.Time
+	ownerScan(t, `SELECT valid_until FROM identity.memberships WHERE id = $1`, []any{membership}, &until)
+	if !until.Equal(clock) {
+		t.Errorf("membership after removal: %v, want %v", until, clock)
+	}
+}
