@@ -6422,6 +6422,66 @@ Toasts, tables and charts now come from established libraries, through their sha
    - The E2E smoke crawl and the keyboard spec caught Sonner's empty `<style>` element as a refusal on every page, before its hash was in the list.
 7. **Checks.** CHECKS_PLACEHOLDER
 
+## IR404 shadcn/ui, phase 5a: the shared components use the shadcn controls — 2026-10-12
+
+Recorded afterwards (the change is in commit 907b457; this log lacked the entry).
+
+1. The header buttons, the Assistant, the QR chips, the notifications list and the evidence checkbox use the shadcn Button and Checkbox and the Input and Select facades (DEC-75).
+2. `controls.test.ts` lists every raw button, input, select and textarea left in a screen, per file. The list is exact: a new raw element fails the test, and a converted one must leave the list.
+
+## IR405 shadcn/ui, phase 5b: every screen control is a shadcn component — 2026-10-12
+
+Recorded afterwards (commit d3169ea).
+
+1. `Plain` (components/ui.tsx) is the shadcn Button with its base look reset, so a raw button's text and layout come from the screen's classes; the screens' 96 buttons use it. Checkboxes are the shadcn Checkbox, selects the Select facade, text and file inputs the Input facade; the Assistant's radio cards are a RadioGroup.
+2. `controls.test.ts` has an empty baseline: any raw button, input, select or textarea in a screen fails it.
+
+## IR406 Go toolchain go1.25.13 (superseded by IR408) — 2026-10-12
+
+Recorded afterwards (commit 7695c77; security loop). A scan with the older local Go 1.25.0 listed 20 standard-library advisories that the code reaches (net/http, crypto/tls, html/template); go.mod named go1.25.13, so the local build matched the patched images, and `make vuln` (govulncheck v1.9.0, IR364) reported none. IR408 moved to Go 1.26.
+
+## IR407 Responses are not sniffed or cached, carry one request ID, and do not name the framework — 2026-10-12
+
+Recorded afterwards (commits d311bf3 and 43fe2e5; security loop).
+
+1. The gateway sets `X-Content-Type-Options: nosniff` and `Cache-Control: no-store` on every response and drops the upstream's copies; the reverse proxy no longer adds a second `X-Request-Id`. The gateway test counts the header values, so a duplicate fails it.
+2. The four Next.js apps send no `X-Powered-By` header (`poweredByHeader: false`).
+
+## IR408 Go 1.26 for the API and its images — 2026-10-12
+
+Recorded afterwards (commit 1916cbc; security loop). docker scout found 2 critical and 8 high standard-library findings in Go 1.25.14 that are fixed only in 1.26.9; go.mod and the three Dockerfiles use Go 1.26 (since pinned to 1.26.9 exactly), and every Go image scanned with no findings afterwards. Supersedes IR406.
+
+## IR409 The web runtime on the official Node image, not root — 2026-10-12
+
+Recorded afterwards (commit 58e8658; security loop). The distroless nodejs22 runtime shipped Node 22.22.0 with 1 critical and 11 high findings fixed in 22.23.x. The runtime is `node:22-bookworm-slim` (Node 22.23.3, since pinned exactly): the server runs as the image's `node` user, npm, npx and corepack are removed and the Debian packages are upgraded. The remaining base OS findings had no Debian fix at the time.
+
+## IR410 The web apps' ports answer on this machine only — 2026-10-12
+
+Recorded afterwards (commit c04e61d; security loop). Ports 3000–3003 were published on all interfaces and answered from the LAN with the demo accounts; they are bound to 127.0.0.1 like the gateway and the infrastructure (IR373). No container publishes on all interfaces.
+
+## IR411 Valkey requires a password — 2026-10-12
+
+Recorded afterwards (commit 9e536d1; security loop). The session store (sealed session records) and the rate-limit counters were open to any local process. Valkey runs with `--requirepass` and both URLs carry the password (`VALKEY_PASSWORD` overrides the local value); an unauthenticated PING gets NOAUTH.
+
+## IR412 Keycloak password policy: at least 12 characters — 2026-10-12
+
+Recorded afterwards (commit 0499ddf; security loop). The realm had no password policy and the demo accounts shared a 10-character password. The realm requires `length(12)` and `notUsername` (brute-force protection on, registration off), and the shared local demo password has 16 characters. Production: Cognito must carry the same minimum of 12 (to be set with the Cognito adapter).
+
+## IR413 The MQTT broker refuses anonymous clients — 2026-10-12
+
+Recorded afterwards (commit 4db1e68; security loop). The local broker (the IoT Core stand-in) accepted anonymous publishes. `allow_anonymous` is false and a password file holds hashes only (the IoT bridge and device simulator users came later, from `.env.local`); the port stays on 127.0.0.1. Production uses mutual TLS on IoT Core.
+
+## IR414 The infrastructure stand-ins run without root or capabilities — 2026-10-12
+
+Recorded afterwards (commits 9a9e4bb and 8284d6d; security loop).
+
+1. valkey, mosquitto, stripe-mock and weather-mock run as their image's non-root user with `cap_drop: ALL` and `no-new-privileges`.
+2. postgres keeps only the five capabilities its entrypoint needs (CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID) with `no-new-privileges`; the server process runs as `postgres`. localstack still runs as root (it needs its own privileges).
+
+## IR415 The use case catalogue is in the repository — 2026-10-12
+
+Recorded afterwards (commit ef32ea3). The Figma Use Cases page had 127 use cases (UC-X 10, UC-C 36, UC-A 49, UC-P 16, UC-T 16) but the repository named only 14 of the IDs: [use-case-catalogue.csv](../01-requirements/use-case-catalogue.csv) holds all of them (127 rows, unique IDs). Figma corrections: the HQ heading says 49, UC-T03's label is English, UC-C04 no longer lists "02k-states".
+
 ## IR416 Contractors manage their own company's users (FR-P11, DEC-76) — 2026-10-13
 
 The user asked that a contractor can manage the contractors and technicians of its own organization (DEC-76). Until now, BR-A21 kept every contractor staff account with HQ, and the partner app showed the team read-only.
