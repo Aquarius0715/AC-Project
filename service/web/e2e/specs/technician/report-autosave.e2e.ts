@@ -14,12 +14,14 @@ test("the report autosaves once, 20 s after the last edit", async ({ browser }) 
   const page = await ctx.newPage();
   try {
     await signIn(page, app, "tech-external-a");
-    await page.goto("/technician?tab=all");
-    await page.locator('a[href*="/technician/jobs/"]').first().click();
-    await page.waitForURL(/\/technician\/jobs\//);
+    // the seed's job-contractor-a (assigned to tech-external-a, a checklist with results), not whichever job the list
+    // shows first: other specs change the list's order
+    await page.goto("/technician/jobs/41de64d5-73e5-52a7-bdd1-7c6c2cf13cf6");
     const main = page.locator("main");
     // a job already checked in (an earlier run) has no start button: the report is open either way
     const start = main.getByRole("button", { name: /^Start job/ });
+    // wait until the page shows one or the other (count() does not wait: right after the navigation it read 0)
+    await expect(start.or(main.locator("select").first()).first()).toBeVisible();
     if (await start.count()) {
       await start.first().click();
       const checkIn = page.getByRole("dialog", { name: "Check in at site" });

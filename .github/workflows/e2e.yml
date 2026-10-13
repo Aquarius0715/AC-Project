@@ -41,6 +41,8 @@ jobs:
               sleep 5
             done
           done
+      - name: 30 days of mock fleet history (the IoT demo spec's charts)
+        run: docker compose --env-file .env.local --profile full --profile iot run --rm mock-history
       - uses: actions/setup-node@v7
         with: { node-version: 22, cache: npm, cache-dependency-path: service/web/package-lock.json }
       - name: Playwright
