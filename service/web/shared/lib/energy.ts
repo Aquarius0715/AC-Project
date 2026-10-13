@@ -17,6 +17,14 @@ export function roundAway(x: number, digits: number): number {
 const nf = (digits: number) => new Intl.NumberFormat("en-MY", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 /** One decimal (energy, percentages, kgCO₂e). */
 export const one = (x: number) => nf(1).format(roundAway(x, 1));
+/** Coverage (0–1) as a percentage, rounded as one() rounds, except that coverage below 1 never shows as 100: a
+ * period missing even one reading must not read 100.0% next to the partial-coverage warning. `digits` 0 is whole. */
+export function coveragePct(coverage: number, digits: 0 | 1 = 1): string {
+  const x = coverage * 100;
+  const shown = digits === 1 ? roundAway(x, 1) : Math.round(x);
+  const value = coverage < 1 && shown >= 100 ? (digits === 1 ? 99.9 : 99) : shown;
+  return digits === 1 ? nf(1).format(value) : String(value);
+}
 /** An amount in minor units as "120.00 MYR". */
 export const amount = (minor: number, currency: string) => `${nf(2).format(roundAway(minor / 100, 2))} ${currency}`;
 
@@ -79,14 +87,14 @@ export function summaryView(s: ApiEnergySummary, i: I18n = EN): SummaryView {
     cost: t.amountMinor === null ? "—" : amount(t.amountMinor, s.currency),
     savedCost: t.savedAmountMinor === null ? tr("Cannot calculate") : saving(t.savedAmountMinor, "", (x) => amount(x, s.currency), tr),
     emissions: t.emissionsKg === null ? "—" : `${one(t.emissionsKg)} kgCO₂e`, savedEmissions: saving(t.savedEmissionsKg, " kgCO₂e", one, tr),
-    coverage: s.coverage === null ? "—" : `${one(s.coverage * 100)}%`, comparable: t.savedKWh !== null, increase: (t.savedKWh ?? 0) < 0,
+    coverage: s.coverage === null ? "—" : `${coveragePct(s.coverage)}%`, comparable: t.savedKWh !== null, increase: (t.savedKWh ?? 0) < 0,
     conditions: [
       [tr("Period"), `${klStamp(s.period.from)} → ${klStamp(s.period.to)} (Asia/Kuala_Lumpur)`],
       [tr("Boundary"), `${s.boundaryId} — ${s.boundary}`],
       [tr("Baseline"), b ? tr("v{version} · {method} · {from} → {to} · {n} units", { version: b.version, method: b.method, from: klStamp(b.period.from), to: klStamp(b.period.to), n: b.unitIds.length }) : tr("none selected")],
       ...(b ? [[tr("Baseline assumptions"), b.assumptions] as [string, string]] : []),
       [tr("Emission factor"), f ? `${f.region} ${f.year} v${f.version} · ${f.kgCO2ePerKWh} kgCO₂e/kWh · ${f.source}` : tr("missing")],
-      [tr("Tariff"), s.tariffVersion], [tr("Coverage"), s.coverage === null ? "—" : tr("{pct}% of expected readings", { pct: one(s.coverage * 100) })],
+      [tr("Tariff"), s.tariffVersion], [tr("Coverage"), s.coverage === null ? "—" : tr("{pct}% of expected readings", { pct: coveragePct(s.coverage) })],
     ],
     warnings: s.qualityWarnings.map((w) => warning(w, tr)),
   };

@@ -2,7 +2,7 @@
 // buckets of energy.summary, the unit comparison rows and the selection carried to the offsets page. Pure code shared
 // by the Server Components and the client views. The periods are Kuala Lumpur days (REV18-035); their labels follow the
 // display language (`i`, IR265).
-import { klInstant, klLocal, klStamp, one, saving, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
+import { coveragePct, klInstant, klLocal, klStamp, one, saving, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
 import { EN, intlTag, showDay, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
 
 export type PeriodKind = "today" | "7d" | "30d" | "custom";
@@ -61,7 +61,7 @@ export function compareRow(unitId: string, name: string, s: ApiEnergySummary, tr
   return {
     unitId, name, actual: t.kWh === null ? "—" : one(t.kWh), baseline: b?.baselineKWh === null || !b ? "—" : one(b.baselineKWh), difference,
     tone: comparable && (t.savedKWh ?? 0) > 0 ? "ok" : comparable && (t.savedKWh ?? 0) < 0 ? "warn" : "muted",
-    coverage: s.coverage === null ? "—" : `${one(s.coverage * 100)}%`,
+    coverage: s.coverage === null ? "—" : `${coveragePct(s.coverage)}%`,
   };
 }
 /** The URL's units (up to 4 of the customer's), else the first unit by name — the same default on Energy & cost and

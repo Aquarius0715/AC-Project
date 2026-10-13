@@ -3,6 +3,7 @@
 // in the user's display time zone (IR44), the period in Kuala Lumpur days (named so).
 import { EN, showClock, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { statusWord } from "@ac/web/lib/partnerJobDetail";
+import { coveragePct } from "@ac/web/lib/energy";
 
 const en = translator("en");
 export type ApiForecast = {
@@ -28,7 +29,7 @@ export function kpisFrom(a: AdminSummary, t: T = en): Kpis {
     customers: a.customerCount, units: a.total, on: a.powerOn, off: a.powerOff, unknown: a.powerUnknown,
     rate: a.operatingRate === null ? "—" : `${a.operatingRate.toFixed(1)}%`, alerts: a.alertCount,
     kwh: e?.totals.kWh == null ? "—" : `${e.totals.kWh.toFixed(1)} kWh`,
-    kwhSub: t("measured · coverage {coverage} · cost {cost}", { coverage: e?.coverage == null ? "—" : `${Math.round(e.coverage * 100)}%`, cost: e?.totals.amountMinor == null ? "—" : `${(e.totals.amountMinor / 100).toFixed(2)} MYR` }),
+    kwhSub: t("measured · coverage {coverage} · cost {cost}", { coverage: e?.coverage == null ? "—" : `${coveragePct(e.coverage, 0)}%`, cost: e?.totals.amountMinor == null ? "—" : `${(e.totals.amountMinor / 100).toFixed(2)} MYR` }),
     billing: a.billingVisibility === "forbidden" ? t("Not permitted") : (a.amountsByCurrency ?? []).map(money).join(" · ") || "0.00 MYR",
     billingSub: a.billingVisibility === "forbidden" ? t("billing.read required") : t(overdue === 1 ? "1 overdue invoice · unpaid, per currency" : "{n} overdue invoices · unpaid, per currency", { n: overdue }),
     jobs: Object.values(a.jobCounts).reduce((x, y) => x + y, 0), online: a.online, offline: a.offline, connUnknown: a.unknown,

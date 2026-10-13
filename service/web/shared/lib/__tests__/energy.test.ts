@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compareRow, dayRanges, periodRange, pickUnits, selectionQuery } from "@ac/web/lib/clientEnergy";
-import { amount, baselineErrors, baselineRows, one, roundAway, saving, summaryView, warning, type ApiEnergySummary, type BaselineDraft } from "@ac/web/lib/energy";
+import { amount, baselineErrors, baselineRows, coveragePct, one, roundAway, saving, summaryView, warning, type ApiEnergySummary, type BaselineDraft } from "@ac/web/lib/energy";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const NOW = new Date("2026-09-14T01:30:20Z"); // Mon 09:30 KL
@@ -119,5 +119,9 @@ describe("HQ energy baselines in the display language (IR296)", () => {
     });
     expect(baselineErrors({ ...draft, unitIds: ["u1"], from: "2025-01-01T00:00", to: "2026-09-01T00:00", method: "demo_fixed", baselineKWh: "-1", boundaryId: "ac_input_electricity", boundary: "AC", source: "demo" }))
       .toEqual({ period: "At most 366 days", baselineKWh: "A value ≥ 0 kWh" });
+  });
+
+  it("never shows coverage below full as 100 (one reading missing is not 100.0%)", () => {
+    expect([coveragePct(1), coveragePct(0.99996), coveragePct(0.9875), coveragePct(0.996, 0), coveragePct(1, 0)]).toEqual(["100.0", "99.9", "98.8", "99", "100"]);
   });
 });
