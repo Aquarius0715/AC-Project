@@ -41,4 +41,5 @@ sh scripts/check.sh                       # before a push: web lint/typecheck/Vi
 ```
 
 GitHub Actions run the same: `.github/workflows/ci.yml` (seven parallel jobs) and `.github/workflows/e2e.yml` (the
-compose stack + Playwright) on every push to `main` and on pull requests.
+compose stack + Playwright) on every push to `main` and on pull requests. Actions are pinned by commit SHA, images by
+digest and Go/npm dependencies by lock file; `.github/dependabot.yml` proposes their updates as weekly pull requests.
