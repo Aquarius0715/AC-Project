@@ -126,7 +126,8 @@ func Deliver(ctx context.Context, tx pgx.Tx, s Sender, apps Apps, now time.Time,
 		FROM notify.notifications n JOIN identity.memberships m ON m.id = n.recipient_membership_id JOIN identity.users u ON u.id = m.user_id
 		LEFT JOIN notify.deliveries d ON d.notification_id = n.id AND d.channel = 'email'
 		WHERE n.channel = 'email' AND (d.id IS NULL OR (d.state = 'failed' AND d.attempts < $1))
-		ORDER BY n.occurred_at LIMIT $2`, maxAttempts, limit, now)
+		ORDER BY n.occurred_at LIMIT $2
+		FOR UPDATE OF n SKIP LOCKED`, maxAttempts, limit, now) // a second worker takes other rows: no e-mail is sent twice
 	if err != nil {
 		return 0, err
 	}
@@ -169,7 +170,8 @@ func Deliver(ctx context.Context, tx pgx.Tx, s Sender, apps Apps, now time.Time,
 		}
 	}
 	rows, err = tx.Query(ctx, `SELECT id, to_email::text, kind, params, attempts FROM notify.outbound_mail
-		WHERE state = 'queued' OR (state = 'failed' AND attempts < $1) ORDER BY created_at LIMIT $2`, maxAttempts, limit)
+		WHERE state = 'queued' OR (state = 'failed' AND attempts < $1) ORDER BY created_at LIMIT $2
+		FOR UPDATE SKIP LOCKED`, maxAttempts, limit)
 	if err != nil {
 		return sent, err
 	}

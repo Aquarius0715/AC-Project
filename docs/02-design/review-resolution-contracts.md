@@ -6461,6 +6461,7 @@ The user chose to send the e-mails for real, starting with a local mail catcher 
    - the queued rows of the new `notify.outbound_mail` (invitations to addresses that are not memberships yet).
    - A failure is retried up to five times, with its reason. An address or subject with a line break is refused before SMTP (no header injection).
    - A notification whose recipient's membership has ended (disabled or removed) is recorded as `suppressed` and never sent.
+   - The worker locks the rows it sends (`FOR UPDATE SKIP LOCKED`), so a second instance takes other rows and no e-mail goes out twice.
    - Without `MAIL_SMTP_ADDR` the worker idles and nothing changes.
 2. **Development.** `mailpit` (`axllent/mailpit:v1.21.8`, pinned by digest, not root) catches every e-mail on SMTP 1025 and shows it at http://localhost:8025; nothing leaves the machine. Keycloak's realm uses it as its SMTP server too. Production sends through Amazon SES with the same worker (adapter planned with the AWS target).
 3. **Invitations.** `clientUsers.save` / `partnerUsers.save` (invite) queue the invitation e-mail. `clientUsers.resendInvite` and `partnerUsers.resendInvite` become writes (idempotency key, audit): they queue it again, record `last_invite_sent_at`, and answer the NotificationPreview with `deliveryState: 'queued'` (a new value of the union). A technician's invitation links to the technician app, a contractor's to the partner app, a client user's to the customer app.
