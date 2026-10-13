@@ -49,3 +49,31 @@ test("a contractor invites, edits and removes a user, waits to resend, and canno
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(tech).toContainText("Active");
 });
+
+// IR426: correcting a pending invite's address sends the invitation to the new address; the invite is then withdrawn.
+test("a contractor corrects an invite's address and the invitation goes to the new one", async ({ page, app }) => {
+  test.skip(app.id !== "partner", "partner only");
+  await page.goto("/partner/users");
+  const row = (text: string) => page.getByRole("row").filter({ hasText: text });
+  const typo = `e2e-typo-${Date.now()}@example.com`, fixed = typo.replace("typo", "fixed");
+  await page.getByRole("button", { name: "Invite user" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Email").fill(typo);
+  await dialog.getByRole("combobox", { name: "Role" }).selectOption("technician");
+  await dialog.getByRole("button", { name: "Send invite" }).click();
+  await expect(row(typo)).toContainText("Invite pending");
+  await row(typo).getByRole("button", { name: "Edit" }).click();
+  await dialog.getByLabel("Email").fill(fixed);
+  await dialog.getByLabel("Reason").fill("Typo in the address");
+  await dialog.getByRole("button", { name: "Save invite" }).click();
+  await expect(page.getByText(`Invite changed — invitation e-mail queued for ${fixed}`).first()).toBeVisible();
+  await expect(row(fixed)).toContainText("Invite pending");
+  const search = `http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:"${fixed}"`)}`;
+  if ((await fetch(search).catch(() => null))?.ok) {
+    await expect.poll(async () => ((await (await fetch(search)).json()) as { messages_count: number }).messages_count, { timeout: 30_000 }).toBe(1);
+  }
+  await row(fixed).getByRole("button", { name: "Remove" }).click();
+  await dialog.getByLabel("Reason").fill("Not joining");
+  await dialog.getByRole("button", { name: "Remove" }).click();
+  await expect(row(fixed)).toHaveCount(0);
+});
