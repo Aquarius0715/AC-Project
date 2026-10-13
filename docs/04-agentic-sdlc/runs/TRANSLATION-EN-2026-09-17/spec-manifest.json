@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "d6512ca00830e82361c5153cbbc8a0d2f1661feb0aa78f1917746ef439a861d3",
+  "spec_baseline_id": "2465d06c449bd515293e74773c5123e613b916fa64fa7edf6bf1fe32523cf628",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -294,7 +294,7 @@
     },
     {
       "path": "tools/gen_operation_persistence_map.py",
-      "sha256": "ade9797c36acca98d2a8eaa9c3e82bb1e2239e29e368afda52f8e7dc22cbb626"
+      "sha256": "0a87eeac58501d37a04d8027f0eaca97913342ff805be173df6c1439a9e5313c"
     },
     {
       "path": "tools/validate_documents.py",
