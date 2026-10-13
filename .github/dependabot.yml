@@ -1,0 +1,23 @@
+# Pinned versions (actions by SHA, images by digest, modules and packages by lock file) do not move on their own:
+# Dependabot proposes the updates as pull requests every week, each checked by CI and E2E.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups: { actions: { patterns: ["*"] } }
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directories: [/service/api/build, /service/web]
+    schedule: { interval: weekly }
+  - package-ecosystem: gomod
+    directory: /service/api
+    schedule: { interval: weekly }
+    groups: { go: { patterns: ["*"], update-types: [minor, patch] } }
+  - package-ecosystem: npm
+    directory: /service/web
+    schedule: { interval: weekly }
+    groups: { web: { patterns: ["*"], update-types: [minor, patch] } }
+    open-pull-requests-limit: 5
