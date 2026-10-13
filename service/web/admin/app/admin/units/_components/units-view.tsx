@@ -686,7 +686,7 @@ function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive;
         ]} />
       )}
       <p className="mt-2 text-[11px] text-muted-foreground">{t("Client users have no permission editor — the customer's owners also manage them from the customer app (Users: invite, roles, access, remove). Contractors manage their own staff in the partner app; HQ sets permissions and access periods in Access & roles. The last active owner cannot be demoted, disabled or removed.")}</p>
-      {invite && <InviteModal c={c} pending={pending} onClose={() => setInvite(false)} onSave={(email, role) => run(() => inviteClientUser(c.row.id, email, role), t("Invitation preview created for {email}", { email: email.trim() }), () => setInvite(false))} />}
+      {invite && <InviteModal c={c} pending={pending} onClose={() => setInvite(false)} onSave={(email, role) => run(() => inviteClientUser(c.row.id, email, role), t("Invitation e-mail queued for {email}", { email: email.trim() }), () => setInvite(false))} />}
       {change && <ClientUserModal change={change} pending={pending} onClose={() => setChange(null)} onSave={(role, reason) => {
         const { u, kind } = change;
         const close = () => setChange(null);
@@ -709,7 +709,7 @@ function InviteModal({ c, pending, onClose, onSave }: { c: CustomerLive; pending
   return (
     <Modal open onClose={onClose} title={t("Invite client user")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e) onSave(email, role); }}>{t("Send invite")}</Btn></>}>
       <div className="flex flex-col gap-3">
-        <Field label={t("Email")} hint={t("Unique per customer; the demo creates an invite preview and sends nothing")} error={tried ? e : undefined}><Input type="email" value={email} onChange={(x) => setEmail(x.target.value)} /></Field>
+        <Field label={t("Email")} hint={t("Unique per customer; the invitation is sent by e-mail")} error={tried ? e : undefined}><Input type="email" value={email} onChange={(x) => setEmail(x.target.value)} /></Field>
         <Field label={t("Role")}><Choice value={role} onChange={(v: "owner" | "member") => setRole(v)} options={[{ id: "member", label: t("Member") }, { id: "owner", label: t("Owner") }]} /></Field>
       </div>
     </Modal>

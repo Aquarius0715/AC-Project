@@ -25,7 +25,7 @@ var (
 //	@Summary		clientUsers.save (write) — update
 //	@ID				clientUsers.save.update
 //	@Description	Authorization: client:self-customer:owner | admin:asset.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer; last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account and an accepted user's e-mail (IR417)
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer; last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account (IR417); an accepted user's e-mail stays (IR422)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A17, DD-C19
 //	@Tags			clientUsers

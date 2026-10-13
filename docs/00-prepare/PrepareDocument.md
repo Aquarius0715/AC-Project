@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.291.0
+version: 0.292.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -274,6 +274,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.292.0: Review fixes: booked technicians stay (IR421), accepted client e-mails stay (IR422). Phase 1A unchanged.
 0.291.0: Review fixes: service start order and token keys (IR419), disabled accounts stay closed on HQ changes (IR420). Phase 1A unchanged.
 0.290.0: E-mails are sent, through Mailpit in development (DEC-78, IR418). Phase 1A unchanged.
 0.289.0: Customer owners manage their users, FR-C19 (DEC-77, IR417); automation cards and editor show a schedule's start and end apart. Phase 1A unchanged.

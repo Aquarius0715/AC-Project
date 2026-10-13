@@ -6445,7 +6445,7 @@ The user asked that the customer app can manage its users (DEC-77). Until now an
 
 1. **Operations.** `clientUsers.save` and `clientUsers.remove` now admit `client:self-customer:owner` (own customer only; another customer's user is NOT_FOUND, a member FORBIDDEN).
    - An owner invites members and owners, changes a pending invite's e-mail and role, and changes a user's role and status with a reason.
-   - An accepted user's e-mail is fixed for an owner (VALIDATION `error.immutable`); HQ may still correct it.
+   - An accepted user's e-mail is fixed for an owner (VALIDATION `error.immutable`); HQ may still correct it (superseded by IR422: fixed for HQ too).
    - An owner never changes or removes the own account (CONFLICT `errors.own_account`); the last active owner stays (CONFLICT `errors.last_owner`, as before).
    - Password resets stay with HQ.
 2. **Accepted invites.** When HQ creates a client membership (`members.save`) for an e-mail with a pending invite at that customer, the membership takes the invite's role and the invite becomes the active user (before, the membership was always a member and the invite stayed pending).
@@ -6491,3 +6491,10 @@ Found in review: a contractor could disable or remove a technician who still hel
 2. The web says what to do for the user management refusals (own account, last owner, last contractor, access ended, booked technician, pending invite), in English and Malay, instead of a humanized key.
 3. Tests: `TestPartnerUserAccess` (booked seed technician refused; disable and enable on a technician without assignments), `actionMessage.test.ts`, and the partner Users E2E.
 
+## IR422 An accepted client user's e-mail stays, for HQ too — 2026-10-14
+
+Found in review: HQ could change the e-mail of a client user who had already signed in. Only the listed copy changed: the sign-in identity and the address the e-mails go to (`identity.users`) kept the old one, so the Users tab showed an address that received nothing.
+
+1. `clientUsers.save` refuses a changed e-mail of an accepted user for every caller (VALIDATION `fieldErrors.email = error.immutable`, compared case-insensitively); a pending invite's e-mail can still be corrected. The admin web never offered the change. A new address is a new invite; changing the sign-in identity's e-mail belongs to the identity provider.
+2. The HQ Invite user dialog says the invitation is sent by e-mail and the toast says it is queued (IR418), instead of the demo's preview wording.
+3. Test: `TestClientUserMembershipSync` (HQ changing an accepted user's e-mail → VALIDATION).

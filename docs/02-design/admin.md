@@ -704,7 +704,7 @@ Scope: FR-A17 / Main display pattern: **UI-LIST**. Service boundary: `clientUser
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| email | string/required | Valid address, unique per customer | Invitation |
+| email | string/required | Valid address, unique per customer; fixed once the invite is accepted (IR422) | Invitation |
 | clientRole | enum/required | owner/member; default member | Role |
 | status | enum | invited/active/disabled | Account state |
 | reason | string/required for remove | 1–1000 characters | Audit |
@@ -715,11 +715,11 @@ Scope: FR-A17 / Main display pattern: **UI-LIST**. Service boundary: `clientUser
 2. “+ Invite user” (centered modal) → `clientUsers.save` without id. Menu: change role / disable (`clientUsers.save` with id), resend invite (`clientUsers.resendInvite`, queues the invitation e-mail, IR418 only), reset password (`auth.previewPasswordReset`, generic message), sign out everywhere (`members.revokeSessions` with the user's membership, the modal of Admin 03-8, IR384; not offered while the invite is pending), remove (`clientUsers.remove`).
 3. Queries to update: `client users / audit`.
 
-**Boundary cases and failures**: Last active owner → CONFLICT; duplicate email → VALIDATION. No permission editor for client users.
+**Boundary cases and failures**: Last active owner → CONFLICT; duplicate email → VALIDATION; a changed e-mail of an accepted user → VALIDATION `error.immutable` (IR422). No permission editor for client users.
 
 **Verification**: Check the traceability entries under AT-A17 (N/E/B).
 
-**Customer app (IR114)**: Client owners list users, invite members, and resend invites from `/customer/users` (DD-C19); role changes, disabling, password resets, and removal remain on this tab.
+**Customer app (IR114, IR417)**: Client owners list, invite, change roles, disable and remove their customer's users from `/customer/users` (DD-C19); password resets and sign out everywhere remain on this tab.
 
 ### DD-A18 Details
 

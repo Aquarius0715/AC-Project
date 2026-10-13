@@ -214,7 +214,7 @@ func otherActiveOwner(ctx context.Context, c *ops.Call, customer, except uuid.UU
 // @Summary		clientUsers.save (write)
 // @ID				clientUsers.save
 // @Description	Authorization: client:self-customer:owner | admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer; last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account and an accepted user's e-mail (IR417)
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer; last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account (IR417); an accepted user's e-mail stays (IR422)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A17, DD-C19
 // @Tags			clientUsers
@@ -279,13 +279,12 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 	if x.Version != *c.ExpectedVersion {
 		return x, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
-	if c.Principal.Role == "client" { // an owner (IR417): never the own account; an accepted user's e-mail stays (HQ may change it)
-		if x.MembershipID != nil && *x.MembershipID == c.Principal.MembershipID {
-			return x, apperr.E(apperr.Conflict, "errors.own_account")
-		}
-		if x.Status != "invited" && in.Email != x.Email {
-			return x, apperr.Fields(map[string]string{"email": "error.immutable"})
-		}
+	if c.Principal.Role == "client" && x.MembershipID != nil && *x.MembershipID == c.Principal.MembershipID { // an owner never changes the own account (IR417)
+		return x, apperr.E(apperr.Conflict, "errors.own_account")
+	}
+	// an accepted user's e-mail is the sign-in identity's, where the e-mails go: it stays, for HQ too (IR422)
+	if x.Status != "invited" && !strings.EqualFold(in.Email, x.Email) {
+		return x, apperr.Fields(map[string]string{"email": "error.immutable"})
 	}
 	if x.CustomerID != in.CustomerID {
 		return x, apperr.Fields(map[string]string{"customerId": "error.immutable"})

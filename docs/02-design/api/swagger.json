@@ -3251,7 +3251,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self-customer:owner | admin:asset.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer; last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account and an accepted user's e-mail (IR417)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A17, DD-C19",
+                "description": "Authorization: client:self-customer:owner | admin:asset.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer; last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account (IR417); an accepted user's e-mail stays (IR422)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A17, DD-C19",
                 "consumes": [
                     "application/json"
                 ],
@@ -3358,7 +3358,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self-customer:owner | admin:asset.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer; last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account and an accepted user's e-mail (IR417)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A17, DD-C19",
+                "description": "Authorization: client:self-customer:owner | admin:asset.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer; last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account (IR417); an accepted user's e-mail stays (IR422)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A17, DD-C19",
                 "consumes": [
                     "application/json"
                 ],

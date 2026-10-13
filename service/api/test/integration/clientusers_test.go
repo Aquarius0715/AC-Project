@@ -172,6 +172,10 @@ func TestClientUserMembershipSync(t *testing.T) {
 	if code, m := save(seed.ID("cust-a").String(), "active", 1); code != 422 || m["fieldErrors"].(map[string]any)["customerId"] != "error.immutable" {
 		t.Errorf("move a user to another customer: %d %v", code, m)
 	}
+	// the e-mail of a signed-in user is the sign-in identity's: HQ cannot change it either (IR422)
+	if code, m := write(s, &hq, "clientUsers.save", `{"id":"`+user+`","customerId":"`+cust+`","email":"other-`+email+`","clientRole":"member","reason":"admin change"}`, 1); code != 422 || fields(m) != "email=error.immutable" {
+		t.Errorf("HQ changes an accepted user's e-mail: %d %v", code, m)
+	}
 	if code, m := save(cust, "disabled", 1); code != 200 || data(m)["status"] != "disabled" {
 		t.Fatalf("disable: %d %v", code, m)
 	}
