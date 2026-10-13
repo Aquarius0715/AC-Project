@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "2ea6fa824d3ba887a722f58b4c05dc70f7fe5a58c5c6eeb07b7d9a59e81cc477",
+  "spec_baseline_id": "eefe3c31c25ef6934dbdf415f134487f27c829ce0b603791a6187903053c21b0",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -110,7 +110,7 @@
     },
     {
       "path": "02-design/backend-go-design.md",
-      "sha256": "75990421f7c54592f255453e773c693d5211d60ecfc6821f3ebd0c6efb8daaf2"
+      "sha256": "6cbda4c52bd9d9ebf0528157abb1ebb71a1fb40a6029dd7b2418ca45977625b0"
     },
     {
       "path": "02-design/client.md",
@@ -122,7 +122,7 @@
     },
     {
       "path": "02-design/container-design.md",
-      "sha256": "8df16fa2479b8b9fa30a458ed06b91d5a4a6d4d8e34d1356f9259c9b68e6a8c1"
+      "sha256": "8830a51322d94f562b99a48c2cb1c9bb91e05983f6de3e9ab1d19d5eefc222a7"
     },
     {
       "path": "02-design/contractor.md",

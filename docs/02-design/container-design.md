@@ -37,7 +37,7 @@ One backend image with several entry commands keeps every service on the same bu
 | Rule | Web (Node) | Backend (Go) |
 |---|---|---|
 | Build | Multi-stage: `npm ci` → `npm run typecheck && npm run build` | Multi-stage: `go mod download` → `CGO_ENABLED=0 go build -trimpath -ldflags="-s -w"`; cross-compiled with `$BUILDPLATFORM` / `$TARGETARCH` |
-| Base | `node:22-bookworm-slim` (as built, IR409; the distroless Node 22 line stopped at 22.22.0, while the fixes need 22.23.x). npm, npx and corepack are removed from the runtime, and the Debian packages are upgraded to their security fixes | `gcr.io/distroless/static-debian12:nonroot` |
+| Base | `node:22.23.3-bookworm-slim` (as built, IR409; exact version since 2026-10-14; the distroless Node 22 line stopped at 22.22.0, while the fixes need 22.23.x). npm, npx and corepack are removed from the runtime, and the Debian packages are upgraded to their security fixes | `gcr.io/distroless/static-debian12:nonroot` |
 | Toolchain | Node 22 LTS (22.23.3 or later) | Go 1.26.9 (`go.mod` toolchain line, IR408: docker scout found standard-library CVEs fixed only from 1.26.9) |
 | User | `node` (UID 1000, as built, IR409) | `nonroot:nonroot` |
 | Filesystem | Read-only root; tmpfs `/tmp`, `/app/.next/cache` | Read-only root; tmpfs `/tmp` |
@@ -67,7 +67,7 @@ FROM build AS build-dev
 ARG TARGETOS TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /out/ ./cmd/iotbridge ./cmd/devicesim
 
-FROM gcr.io/distroless/static-debian12:nonroot AS runtime
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872…   # pinned by digest in build/*.Dockerfile
 COPY --from=build /out/ /app/
 USER nonroot:nonroot
 EXPOSE 8080
