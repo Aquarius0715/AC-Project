@@ -18,18 +18,20 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
+	"github.com/pradita/ac-project/service/api/internal/iotbridge"
+	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
 func main() {
 	broker := flag.String("broker", envOr("MQTT_URL", "tcp://localhost:1883"), "MQTT broker URL")
 	tenant := flag.String("tenant", "", "tenant ID the devices belong to (required)")
-	ids := flag.String("device-ids", "", "comma-separated device IDs of the registered modules (required)")
+	names := flag.String("devices", strings.Join(demoDevices(), ","), "comma-separated fixture device IDs (demoSeed.devices); their API IDs are derived with seed.ID")
 	firmware := flag.String("firmware", "v1", "firmware version the modules report")
 	interval := flag.Duration("telemetry-interval", time.Minute, "time between telemetry batches (design: every minute)")
 	beat := flag.Duration("heartbeat-interval", time.Minute, "time between heartbeats (design: every 60 seconds)")
 	flag.Parse()
-	if *tenant == "" || *ids == "" {
-		log.Fatal("--tenant and --device-ids are required")
+	if *tenant == "" || *names == "" {
+		log.Fatal("--tenant is required, and --devices must name at least one device")
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -44,11 +46,12 @@ func main() {
 	defer client.Disconnect(500)
 
 	var modules []*devicesim.Module
-	for _, id := range strings.Split(*ids, ",") {
-		id = strings.TrimSpace(id)
-		if id == "" {
+	for _, name := range strings.Split(*names, ",") {
+		name = strings.TrimSpace(name)
+		if name == "" {
 			continue
 		}
+		id := seed.ID(name).String()
 		modules = append(modules, devicesim.NewModule(*tenant, id, *firmware, seedOf(id)))
 	}
 	log.Printf("devicesim: %d modules on %s", len(modules), *broker)
@@ -114,6 +117,15 @@ func clientTag(tenant string) string {
 		return tenant[:8]
 	}
 	return tenant
+}
+
+// demoDevices are the fixture devices that report measurements (the links of internal/iotbridge).
+func demoDevices() []string {
+	out := make([]string, 0, len(iotbridge.Links))
+	for _, l := range iotbridge.Links {
+		out = append(out, l.Device)
+	}
+	return out
 }
 
 // seedOf gives each device its own deterministic random seed, so a demo run is repeatable per device.
