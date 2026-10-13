@@ -1,20 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkBtn, Modal, Page, PageHead } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkBtn, Modal, Page, PageHead, Select, Textarea } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { inviteError, type ClientUserRow } from "@ac/web/lib/assets";
-import { inviteMember, resendInvite } from "../actions";
+import { reasonError } from "@ac/web/lib/partnerUsers";
+import { inviteUser, removeUser, resendInvite, updateUser } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 
-/** Users (FR-C19) in API mode: the owner lists the customer's users, invites members and resends pending invites. Texts
- * in the user's display language (IR267). */
-export function UsersView({ live }: { live: { customerId: string; customer: string; rows: ClientUserRow[]; emails: string[] } | null }) {
+type Role = "owner" | "member";
+type Dialog = { kind: "invite" } | { kind: "edit" | "role" | "disable" | "enable" | "remove"; row: ClientUserRow };
+
+/** Users (FR-C19, IR417) in API mode: the owner manages the customer's users — invites members and owners, edits or
+ * resends pending invites, changes roles, disables / enables and removes users, each change with a reason; the own row
+ * has no actions and the last active owner cannot be demoted, disabled or removed. Texts in the display language. */
+export function UsersView({ live }: { live: { customerId: string; customer: string; rows: ClientUserRow[]; all: { id: string; email: string }[] } | null }) {
   const t = useT();
   const [pending, run] = useAction();
-  const [open, setOpen] = useState(false);
+  const [dialog, setDialog] = useState<Dialog | null>(null);
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState<Role>("member");
+  const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   if (!live) {
     return (
@@ -26,28 +33,72 @@ export function UsersView({ live }: { live: { customerId: string; customer: stri
       </Page>
     );
   }
-  const err = inviteError(email, live.emails.map((e) => ({ email: e })), t);
-  const close = () => { setOpen(false); setTried(false); setEmail(""); };
+  const open = (d: Dialog) => {
+    setDialog(d); setTried(false); setReason("");
+    setEmail("row" in d ? d.row.email : ""); setRole("row" in d ? (d.kind === "role" ? (d.row.role === "owner" ? "member" : "owner") : d.row.role) : "member");
+  };
+  const close = () => setDialog(null);
+  const withEmail = dialog?.kind === "invite" || dialog?.kind === "edit";
+  const others = live.all.filter((u) => !(dialog && "row" in dialog && u.id === dialog.row.id));
+  const emailErr = withEmail ? inviteError(email, others, t) : undefined;
+  const reasonErr = dialog && dialog.kind !== "invite" ? reasonError(reason, t) : undefined;
+  const name = (r: ClientUserRow) => r.name ?? r.email;
+  const submit = () => {
+    setTried(true);
+    if (!dialog || emailErr || reasonErr) return;
+    if (dialog.kind === "invite") return run(() => inviteUser(live.customerId, email, role), t("Invitation preview created for {email} — nothing is sent in the demo", { email: email.trim() }), close);
+    const r = dialog.row;
+    if (dialog.kind === "remove") return run(() => removeUser(r.id, r.version, reason), t("{name} removed", { name: name(r) }), close);
+    if (dialog.kind === "edit") return run(() => updateUser(r.id, r.version, live.customerId, email, role, null, reason), t("Invite changed for {email}", { email: email.trim() }), close);
+    if (dialog.kind === "role") return run(() => updateUser(r.id, r.version, live.customerId, r.email, role, null, reason), t(role === "owner" ? "{name} is now an owner" : "{name} is now a member", { name: name(r) }), close);
+    const status = dialog.kind === "disable" ? "disabled" : "active";
+    run(() => updateUser(r.id, r.version, live.customerId, r.email, r.role, status, reason), t(status === "disabled" ? "{name} disabled — they can no longer sign in" : "{name} enabled again", { name: name(r) }), close);
+  };
+  const title = !dialog ? "" : dialog.kind === "invite" ? (live.customer ? t("Invite a user to {company}", { company: live.customer }) : t("Invite a user"))
+    : t({ edit: "Edit invite", role: "Change role of {name}", disable: "Disable {name}", enable: "Enable {name}", remove: "Remove {name}" }[dialog.kind], { name: name(dialog.row) });
+  const action = !dialog ? "" : t({ invite: "Send invite", edit: "Save invite", role: "Change role", disable: "Disable", enable: "Enable", remove: "Remove" }[dialog.kind]);
   return (
     <Page>
-      <PageHead title={live.customer ? t("Users of {customer}", { customer: live.customer }) : t("Users")} sub={t("People who can sign in to this customer app. As the owner you can invite members.")} action={<Btn variant="primary" onClick={() => setOpen(true)}><Icon name="add" /> {t("Invite member")}</Btn>} />
+      <PageHead title={live.customer ? t("Users of {customer}", { customer: live.customer }) : t("Users")} sub={t("People who can sign in to this customer app. As an owner you invite users, change their role and access, and remove them.")} action={<Btn variant="primary" onClick={() => open({ kind: "invite" })}><Icon name="add" /> {t("Invite user")}</Btn>} />
       <Card pad={false}>
         <DataTable rows={live.rows} rowKey={(u) => u.id} cols={[
           { key: "u", label: t("User"), render: (u) => <div><b>{u.name ?? u.email}{u.you ? ` ${t("(you)")}` : ""}</b><div className="text-xs text-muted-foreground">{u.sub}</div></div> },
           { key: "r", label: t("Role"), render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{t(u.role === "owner" ? "Owner" : "Member")}</Badge> },
           { key: "s", label: t("Status"), render: (u) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{t(u.status === "active" ? "Active" : u.status === "invited" ? "Invite pending" : "Disabled")}</Badge> },
           { key: "l", label: t("Last sign-in"), render: (u) => u.lastSignIn, hideBelow: "sm" },
-          { key: "a", label: t("Actions"), render: (u) => (u.status === "invited"
-            ? <Btn size="sm" variant="ghost" disabled={pending} onClick={() => run(() => resendInvite(u.id), t("Invitation preview re-created for {email} — nothing is sent in the demo", { email: u.email }))}><Icon name="send" />{t("Resend invite")}</Btn>
-            : <span className="text-muted-foreground">—</span>) },
+          { key: "a", label: t("Actions"), render: (u) => {
+            if (u.you) return <span className="text-xs text-muted-foreground">{t("Your account")}</span>;
+            const invited = u.status === "invited";
+            return (
+              <div className="flex flex-wrap gap-1">
+                {invited && <Btn size="sm" variant="ghost" disabled={pending} onClick={() => run(() => resendInvite(u.id), t("Invitation preview re-created for {email} — nothing is sent in the demo", { email: u.email }))}><Icon name="send" />{t("Resend invite")}</Btn>}
+                {invited && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "edit", row: u })}><Icon name="edit" />{t("Edit")}</Btn>}
+                {!invited && !u.lastOwner && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "role", row: u })}>{t(u.role === "owner" ? "Make member" : "Make owner")}</Btn>}
+                {u.status === "active" && !u.lastOwner && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "disable", row: u })}>{t("Disable")}</Btn>}
+                {u.status === "disabled" && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "enable", row: u })}>{t("Enable")}</Btn>}
+                {!u.lastOwner && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "remove", row: u })}><Icon name="delete" />{t("Remove")}</Btn>}
+                {u.lastOwner && <span className="text-xs text-muted-foreground">{t("Last active owner")}</span>}
+              </div>
+            );
+          } },
         ]} />
       </Card>
-      <Banner>{t("To change a role, disable sign-in, reset a password or remove someone, contact HQ — they manage it in Customers & units › Users. Only owners see this page.")}</Banner>
-      <p className="text-[11px] text-muted-foreground">{t("Invites are previews only in the demo — no e-mail is sent (FR-C19, IR114).")}</p>
-      <Modal open={open} onClose={close} title={live.customer ? t("Invite a member to {customer}", { customer: live.customer }) : t("Invite a member")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!err) run(() => inviteMember(live.customerId, email), t("Invitation preview created for {email} — nothing is sent in the demo", { email: email.trim() }), close); }}>{t("Send invite")}</Btn></>}>
-        <Field label={t("Email")} error={tried ? err : undefined}><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="lim.ka@example.com" /></Field>
-        <Field label={t("Role")} hint={t("Owners can invite members only. Ask HQ to make someone an owner.")}><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {t("Member")}</div></Field>
-        <Banner>{t("They get an invitation to sign in to the customer app and see only your properties and units. Demo: an invitation preview is shown — nothing is sent. The invite stays “pending” until they sign in.")}</Banner>
+      <Banner>{t("Your customer always keeps one active owner, and you can’t change your own account. An accepted user keeps their e-mail. For a password reset, contact HQ. Only owners see this page.")}</Banner>
+      <p className="text-[11px] text-muted-foreground">{t("Invites are previews only in the demo — no e-mail is sent (FR-C19, IR417).")}</p>
+      <Modal open={!!dialog} onClose={close} title={title} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant={dialog?.kind === "remove" || dialog?.kind === "disable" ? "danger" : "primary"} disabled={pending} onClick={submit}>{action}</Btn></>}>
+        {withEmail && <Field label={t("Email")} error={tried ? emailErr : undefined}><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="lim.ka@example.com" /></Field>}
+        {(withEmail || dialog?.kind === "role") && (
+          <Field label={t("Role")} hint={t("Owners manage users and everything members can do; members use the app.")}>
+            <Select aria-label={t("Role")} value={role} onChange={(e) => setRole(e.target.value as Role)}>
+              <option value="member">{t("Member")}</option>
+              <option value="owner">{t("Owner")}</option>
+            </Select>
+          </Field>
+        )}
+        {dialog?.kind === "invite" && <Banner>{t("They get an invitation to sign in to the customer app and see only your properties and units. Demo: an invitation preview is shown — nothing is sent. The invite stays “pending” until they sign in.")}</Banner>}
+        {dialog?.kind === "disable" && <Banner tone="warn">{t("Their access ends now. You can enable them again later.")}</Banner>}
+        {dialog?.kind === "remove" && <Banner tone="warn">{dialog.row.status === "invited" ? t("The invite is withdrawn.") : t("Their access ends now and they leave your user list.")}</Banner>}
+        {dialog && dialog.kind !== "invite" && <Field label={t("Reason")} error={tried ? reasonErr : undefined}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("e.g. moved to another team")} /></Field>}
       </Modal>
     </Page>
   );

@@ -438,7 +438,7 @@ Design: [DD-A16](../02-design/admin.md#dd-a16-details). Assess parent AT-A16 usi
 ### FR-A17 Client user accounts
 
 - **Company request basis**: SRC-06 BIZ-04; Figma-confirmed Admin 02-15 (2026-10-01).
-- **Entry conditions**: asset.read to view, asset.write to change; Customers & units › customer › Users tab. A client owner can also invite members and resend invites from the customer app (FR-C19, `/customer/users`); every other change stays here.
+- **Entry conditions**: asset.read to view, asset.write to change; Customers & units › customer › Users tab. A client owner manages the same users from the customer app (FR-C19, `/customer/users`, IR417): invites, roles, access and removal; password resets stay here.
 - **Main flow**: List client users of the customer (user, role Owner/Member, status, last sign-in, notification channels) → + Invite user (email, role) → row menu: change role, resend invite, reset password, disable, remove.
 - **Business rule BR-A17**: Client users only ever see that customer's properties and units and have no permission editor; Owner can additionally use group control, edit filter-care reminders, and invite members. Email is unique per customer. The last active owner cannot be demoted, disabled, or removed (CONFLICT). Reset password uses the generic reset preview (`auth.previewPasswordReset`). HQ/contractor/technician accounts stay in Access & roles (FR-A03).
 - **Resulting business state**: ClientUser created as invited (pending until first sign-in), then active; role/status changes increment version; remove deletes the account but keeps audit history.

@@ -43,7 +43,7 @@ UC-C31,View contracts & invoices,Client,—,—,FR-C10,08a
 UC-C32,Pay invoice (demo card / instructions),Client,Payment service,—,FR-C11,08b; 08d; 08e; 08f
 UC-C33,Open payment guidance (e-mail / WhatsApp),—,Email / WhatsApp gateway,«extend» C32,FR-C11,08c
 UC-C34,View restriction & send inquiry,Client,—,—,FR-C12,08g; 02k
-UC-C35,Invite members & resend invites,Client owner,Email gateway (preview),—,FR-C19 · IR114 · clientUsers.*,11a; 11b; 11c
+UC-C35,"Manage customer users (invite, roles, access, remove)",Client owner,Email gateway (preview),—,FR-C19 · IR114 · IR417 · clientUsers.*,11a; 11b; 11c; 11d; 11e
 UC-C36,Send coordination note,—,—,«extend» C23,FR-C09 · IR114 · jobs.addNote,07b; 07o; 07p
 UC-A01,View overall dashboard,HQ user,—,—,FR-A01 · dashboard.read,01-1…01-10
 UC-A02,Manage customers,HQ user,—,—,FR-A02 · asset.write,02-1; 02-8

@@ -125,6 +125,7 @@ func TestForeignTargets(t *testing.T) {
 		{&customerB, "policies.delete", `{"policyId":"` + policyA + `"}`, 1},
 		{&customerB, "policies.setDefaultRule", `{"policyId":"` + defaultPolicyID(t) + `","ruleKey":"ventilation_co2","customerId":"` + custA + `","enabled":false,"reason":"quiet"}`, 1},
 		{&customerB, "clientUsers.resendInvite", `{"id":"` + clientUserA + `"}`, 0},
+		{&customerB, "clientUsers.remove", `{"id":"` + clientUserA + `","reason":"left"}`, 1},
 		{&customerB, "clientUsers.save", `{"customerId":"` + custA + `","email":"new.member@example.com","clientRole":"member"}`, 0},
 		{&customerB, "clientUsers.save", `{"id":"` + clientUserA + `","customerId":"` + custA + `","email":"new.member@example.com","clientRole":"member","status":"disabled","reason":"left"}`, 1},
 		{&customerB, "automations.save", scheduleRule(unitA, nil), 0},

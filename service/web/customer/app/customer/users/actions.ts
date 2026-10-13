@@ -1,7 +1,8 @@
 "use server";
 
-// Server Actions of the customer Users page (FR-C19): an owner invites members and resends pending invites. The Core
-// API refuses anything else from a client session (owner role, saves with id, removal: FORBIDDEN, IR114).
+// Server Actions of the customer Users page (FR-C19, IR417): an owner invites members and owners, changes a pending
+// invite, a user's role and access, removes users and resends invites. The Core API keeps every rule (own customer,
+// own account, last active owner, fixed e-mail once accepted).
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 
@@ -18,8 +19,15 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   }
 }
 
-export async function inviteMember(customerId: string, email: string) {
-  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, email: email.trim(), clientRole: "member" }, { write: true }).then((u) => u.id));
+export async function inviteUser(customerId: string, email: string, clientRole: "owner" | "member") {
+  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, email: email.trim(), clientRole }, { write: true }).then(() => null));
+}
+/** A pending invite's e-mail and role, or a user's role and access (status), with a reason. */
+export async function updateUser(id: string, version: number, customerId: string, email: string, clientRole: "owner" | "member", status: "active" | "disabled" | null, reason: string) {
+  return run(() => coreOp("clientUsers.save", { id, customerId, email: email.trim(), clientRole, ...(status ? { status } : {}), reason: reason.trim() }, { write: true, expectedVersion: version }).then(() => null));
+}
+export async function removeUser(id: string, version: number, reason: string) {
+  return run(() => coreOp("clientUsers.remove", { id, reason: reason.trim() }, { write: true, expectedVersion: version }).then(() => null));
 }
 /** Builds the invite preview again; nothing is sent in the demo. */
 export async function resendInvite(id: string) {

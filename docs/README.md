@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.288.0 / Created: 2026-09-14 / Updated: 2026-10-13 / Status: Draft for review / Language: English
+Version: 0.289.0 / Created: 2026-09-14 / Updated: 2026-10-13 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.289.0 (2026-10-13): Customer owners manage their users in the customer app — invite members and owners, change roles, disable, enable and remove (FR-C19, DEC-77, IR417); automation cards list a schedule's start and end as separate rows, and the editor puts them in their own boxes.
 0.288.0 (2026-10-13): Contractors manage their own company's users: the partner app's Users screen (FR-P11, DD-P11, SCR-P11) on `partnerUsers.list/save/remove/resendInvite` and `identity.partner_users`; 208 operations, 229 routes (DEC-76, IR416).
 0.287.0 (2026-10-12): the use case catalogue (127 use cases: UC-X 10, UC-C 36, UC-A 49, UC-P 16, UC-T 16) is in [01-requirements/use-case-catalogue.csv](01-requirements/use-case-catalogue.csv), exported from the Figma Use Cases page; the Figma HQ heading is corrected to 49 (IR415).
 0.286.0 (2026-10-12): shadcn/ui phase 4: toasts are Sonner, the shared table is TanStack Table on the shadcn Table, and the charts are shadcn charts on Recharts; the page CSP allows Sonner's stylesheet by its hash (IR403).

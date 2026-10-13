@@ -6439,3 +6439,16 @@ The user asked that a contractor can manage the contractors and technicians of i
 5. **Tests.** `partnerusers_test.go` (3 tests), the foreign-target cases in `idor_test.go`, and the filter samples in `querycatalog_test.go`.
 6. **Test suite fix.** In cluster mode, a test server that injects a failing transaction (`WrapTx`) is built in-process, because the split-service facade cannot carry the hook. The seven fault-injection tests passed only in the single-process suite before.
 
+## IR417 Customer owners manage their users (FR-C19, DEC-77) — 2026-10-13
+
+The user asked that the customer app can manage its users (DEC-77). Until now an owner could only invite members and resend invites (IR114); roles, access and removal were HQ's (FR-A17).
+
+1. **Operations.** `clientUsers.save` and `clientUsers.remove` now admit `client:self-customer:owner` (own customer only; another customer's user is NOT_FOUND, a member FORBIDDEN).
+   - An owner invites members and owners, changes a pending invite's e-mail and role, and changes a user's role and status with a reason.
+   - An accepted user's e-mail is fixed for an owner (VALIDATION `error.immutable`); HQ may still correct it.
+   - An owner never changes or removes the own account (CONFLICT `errors.own_account`); the last active owner stays (CONFLICT `errors.last_owner`, as before).
+   - Password resets stay with HQ.
+2. **Accepted invites.** When HQ creates a client membership (`members.save`) for an e-mail with a pending invite at that customer, the membership takes the invite's role and the invite becomes the active user (before, the membership was always a member and the invite stayed pending).
+3. **Screens.** Customer Users (`/customer/users`, SCR-C19): Invite user (Member/Owner), Edit, Change role, Disable / Enable and Remove dialogs, each change with a reason; the own row has no actions. Figma Client 11d (Change role / Disable) and 11e (Remove).
+4. **Tests.** `TestClientUsersByOwner`, `TestClientInviteAccepted`, and a foreign-target case for `clientUsers.remove` in `idor_test.go`.
+

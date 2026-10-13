@@ -43,7 +43,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | DD-C16 / FR-C16 | `/customer/energy` / `EnergyReportExport` | `energy.exportReport` | Completed month, at least one section, PDF/CSV | Same tariff and estimation labels as the screen |
 | DD-C17 / FR-C17 | `/customer/maintenance?jobId=` / `JobCompletionFeedback` | `jobs.get`, `jobs.rate`, `jobs.reportProblem` | 1–5 ★ required; editable 7 days; problem details 10–2000, up to 5 photos | Not completed → CONFLICT; ratings never shown to other customers |
 | DD-C18 / FR-C18 | `/customer/maintenance?tab=filter-care` / `FilterCare` | `filterCare.list`, `filterCare.markCleaned`, `filterCare.saveSettings`, `filterCare.getSettings` | Run time since cleaning per AC; threshold 50–2000 h or model default; fallback days 7–180 | Offline → unknown, never 0 |
-| DD-C19 / FR-C19 | `/customer/users` / `ClientUsers` | `clientUsers.list`, `clientUsers.save`, `clientUsers.resendInvite` | Owner only; invite e-mail unique per customer (case-insensitive); role fixed to member | Owners cannot change roles, disable, reset passwords, or remove users (HQ, DD-A17) |
+| DD-C19 / FR-C19 | `/customer/users` / `ClientUsers` | `clientUsers.list`, `clientUsers.save`, `clientUsers.remove`, `clientUsers.resendInvite` | Owner only; e-mail unique per customer (case-insensitive), fixed once accepted; never the own account; the customer keeps an active owner (IR417) | Password resets stay with HQ (DD-A17) |
 
 ## Shared Implementation Steps
 
@@ -633,26 +633,28 @@ Scope: FR-C18 / Main display pattern: **UI-LIST**. Service boundary: `filterCare
 
 ### DD-C19 Details
 
-**Source mapping**: SRC-06 BIZ-04 → FR-C19 → DD-C19. Source category: Figma-confirmed screen specification (Client 11a–11c, 2026-10-06, DEC-65).
+**Source mapping**: SRC-06 BIZ-04 → FR-C19 → DD-C19. Source category: Figma-confirmed screen specification (Client 11a–11c, 2026-10-06, DEC-65); full user management by owners, user request 2026-10-13 (DEC-77, IR417, Client 11d–11e).
 
-Scope: FR-C19 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `clientUsers.list, clientUsers.save, clientUsers.resendInvite`.
+Scope: FR-C19 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `clientUsers.list, clientUsers.save, clientUsers.remove, clientUsers.resendInvite`.
 
 **Initial view and prerequisites**: clientRole=owner; sidebar Users (`/customer/users`), shown only for owners (Shell sidebar variant Active=users).
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| email | string/required | Valid address, unique per customer (case-insensitive) | Invitation |
-| clientRole | enum (fixed) | member; owners cannot choose owner | Role |
-| status | Read-only | invited / active / disabled | Account state |
+| email | string/required | Valid address, ≤ 254, unique per customer (case-insensitive); fixed once accepted | Invitation |
+| clientRole | enum/required | member / owner; the customer keeps an active owner | Role |
+| status | enum | invited (read-only) / active / disabled | Access |
+| reason | string | 1–1000; required on every change after the invite | Audit |
 | lastSignInAt | Read-only | null = never signed in; recorded from the sign-in token (IR268) | Activity |
 
 **Steps**
 
-1. `clientUsers.list` (customerId = own customer) shows name, e-mail, role, status, and last sign-in; invited rows show “Invite pending” and Resend invite.
-2. + Invite member opens a centered dialog (e-mail; role Member locked with “Ask HQ to make someone an owner”) → `clientUsers.save` without id → the list refetches and an invitation preview is shown.
-3. Resend invite calls `clientUsers.resendInvite` (preview only).
+1. `clientUsers.list` (customerId = own customer) shows name, e-mail, role, status, and last sign-in; the owner's own row is marked “(you)” and has no actions.
+2. + Invite user opens a centered dialog (e-mail, role Member/Owner) → `clientUsers.save` without id → the list refetches and an invitation preview is shown.
+3. On an invite: Resend invite (`clientUsers.resendInvite`, preview only), Edit (e-mail, role, reason → `clientUsers.save` with id and version), Remove (reason → `clientUsers.remove`).
+4. On an accepted user: Change role, Disable / Enable (reason → `clientUsers.save` with clientRole / status) and Remove (reason → `clientUsers.remove`).
 
-**Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept, 11c). Member sessions have no sidebar item; the direct URL shows Page unavailable (FORBIDDEN). Role change, disable, password reset, and removal are not offered (HQ, DD-A17).
+**Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept, 11c). The own account → CONFLICT `errors.own_account`; demoting, disabling or removing the last active owner → CONFLICT `errors.last_owner`; a stale version → CONFLICT, the list refetches. Member sessions have no sidebar item; the direct URL shows Page unavailable (FORBIDDEN). Password resets stay with HQ (DD-A17).
 
 **Verification**: Check the traceability entries under AT-C19 (N/E/B).
 

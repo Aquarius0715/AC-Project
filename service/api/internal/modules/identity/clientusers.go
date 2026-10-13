@@ -212,8 +212,8 @@ func otherActiveOwner(ctx context.Context, c *ops.Call, customer, except uuid.UU
 
 // @Summary		clientUsers.save (write)
 // @ID				clientUsers.save
-// @Description	Authorization: client:self-customer:owner:invite-member-only | admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer; last active owner cannot be demoted or disabled (CONFLICT)
+// @Description	Authorization: client:self-customer:owner | admin:asset.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer; last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account and an accepted user's e-mail (IR417)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A17, DD-C19
 // @Tags			clientUsers
@@ -255,10 +255,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 	if dup {
 		return ClientUser{}, apperr.Fields(map[string]string{"email": "errors.email_taken"})
 	}
-	if in.ID == nil { // invite
-		if c.Principal.Role == "client" && (in.ClientRole != "member" || in.Status != nil || in.Reason != nil) { // invite-member-only
-			return ClientUser{}, apperr.E(apperr.Forbidden, "error.forbidden")
-		}
+	if in.ID == nil { // invite (an owner invites members and owners, IR417)
 		if in.Status != nil {
 			return ClientUser{}, apperr.Fields(map[string]string{"status": "error.notAllowed"})
 		}
@@ -271,15 +268,20 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 		c.Audit(ops.AuditEntry{Action: "clientUsers.save", TargetKind: "client_user", TargetID: id.String(), NextVersion: &v, Reason: "invite"})
 		return loadClientUser(ctx, c, id, false)
 	}
-	if c.Principal.Role == "client" {
-		return ClientUser{}, apperr.E(apperr.Forbidden, "error.forbidden")
-	}
 	x, err := loadClientUser(ctx, c, *in.ID, true)
 	if err != nil {
 		return x, err
 	}
 	if x.Version != *c.ExpectedVersion {
 		return x, apperr.E(apperr.Conflict, "error.versionConflict")
+	}
+	if c.Principal.Role == "client" { // an owner (IR417): never the own account; an accepted user's e-mail stays (HQ may change it)
+		if x.MembershipID != nil && *x.MembershipID == c.Principal.MembershipID {
+			return x, apperr.E(apperr.Conflict, "errors.own_account")
+		}
+		if x.Status != "invited" && in.Email != x.Email {
+			return x, apperr.Fields(map[string]string{"email": "error.immutable"})
+		}
 	}
 	if x.CustomerID != in.CustomerID {
 		return x, apperr.Fields(map[string]string{"customerId": "error.immutable"})
@@ -346,10 +348,10 @@ type Deleted struct {
 
 // @Summary		clientUsers.remove (write)
 // @ID				clientUsers.remove
-// @Description	Authorization: admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 reason 1–1000; last active owner cannot be removed (CONFLICT)
+// @Description	Authorization: client:self-customer:owner | admin:asset.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 reason 1–1000; last active owner cannot be removed (CONFLICT); an owner never removes the own account (IR417)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A17
+// @Description	Design: DD-A17, DD-C19
 // @Tags			clientUsers
 // @Accept			json
 // @Produce		json
@@ -369,12 +371,18 @@ type Deleted struct {
 // @Security		BearerAuth
 // @Router			/v1/client-users/{id} [delete]
 func clientUsersRemove(ctx context.Context, c *ops.Call, in *RemoveInput) (Deleted, error) {
+	if err := ownerOnly(c); err != nil {
+		return Deleted{}, err
+	}
 	x, err := loadClientUser(ctx, c, in.ID, true)
 	if err != nil {
 		return Deleted{}, err
 	}
 	if x.Version != *c.ExpectedVersion {
 		return Deleted{}, apperr.E(apperr.Conflict, "error.versionConflict")
+	}
+	if c.Principal.Role == "client" && x.MembershipID != nil && *x.MembershipID == c.Principal.MembershipID { // IR417
+		return Deleted{}, apperr.E(apperr.Conflict, "errors.own_account")
 	}
 	if x.ClientRole == "owner" && x.Status == "active" {
 		ok, err := otherActiveOwner(ctx, c, x.CustomerID, x.ID)

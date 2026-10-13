@@ -1,7 +1,7 @@
-// /customer/users (FR-C19, SCR-C19): in API mode a Server Component checks the session's client role (session.get) —
-// members get the shared Page unavailable view (FORBIDDEN, IR112) — and reads clientUsers.list for the owner's customer.
-// Inviting a member and resending an invite are Server Actions (actions.ts); role changes, disabling, password resets
-// and removal stay with HQ (DD-A17). Texts and times in the user's display language and time zone (IR267). The Phase 1A
+// /customer/users (FR-C19, SCR-C19, IR417): in API mode a Server Component checks the session's client role
+// (session.get) — members get the shared Page unavailable view (FORBIDDEN, IR112) — and reads clientUsers.list for the
+// owner's customer. Invites, edits, role and access changes, removals and resends are Server Actions (actions.ts);
+// password resets stay with HQ (DD-A17). Texts and times in the user's display language and time zone (IR267). The Phase 1A
 // demo keeps the local user store.
 import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreIdentity, corePrincipal } from "@ac/web/lib/dal";
@@ -18,5 +18,5 @@ export default async function CustomerUsersPage() {
   const [users, display, identity] = await Promise.all([coreAll<ApiClientUser>("clientUsers.list"), coreDisplay(), coreIdentity()]);
   const i = i18nOf(display);
   const customerId = users.find((u) => u.membershipId === me.membershipId)?.customerId ?? users[0]?.customerId ?? "";
-  return <UsersView live={{ customerId, customer: identity.organizationName, rows: clientUserRows(users, (m) => (m === me.membershipId ? i.t("you") : "HQ"), me.membershipId, i), emails: users.map((u) => u.email) }} />;
+  return <UsersView live={{ customerId, customer: identity.organizationName, rows: clientUserRows(users, (m) => (m === me.membershipId ? i.t("you") : users.find((u) => u.membershipId === m)?.displayName ?? "HQ"), me.membershipId, i), all: users.map((u) => ({ id: u.id, email: u.email })) }} />;
 }
