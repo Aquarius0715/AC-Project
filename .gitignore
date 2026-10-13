@@ -18,3 +18,5 @@ service/api/.test-all/
 service/web/e2e/.auth/
 service/web/e2e/test-results/
 service/web/e2e/playwright-report/
+# broker password file stamp (hash of the local keys, docker/mosquitto/passwd.sh)
+docker/mosquitto/.passwd.keys

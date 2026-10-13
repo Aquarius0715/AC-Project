@@ -19,8 +19,8 @@ import (
 // has been off for the last three hours; a power signal that is off has read 0 kW for the last six hours.
 //
 // Development only. The rows are written straight to the measurements and to energy's copy of the power samples, with
-// the row-capture triggers off for this transaction, instead of one capture event per row. Existing rows are kept, so it
-// can run again.
+// the row-capture triggers off for this transaction, instead of one capture event per row. A minute that already has a
+// reading of the sensor (an earlier run, or the simulator's live reading) is skipped, so it can run again.
 func ApplyFleetHistory(ctx context.Context, tx pgx.Tx, f devicesim.Fleet, until time.Time, days int) (int64, error) {
 	if days < 1 || days > 35 {
 		return 0, fmt.Errorf("history: %d days (1–35, the longest series the API serves)", days)
@@ -70,7 +70,8 @@ func ApplyFleetHistory(ctx context.Context, tx pgx.Tx, f devicesim.Fleet, until 
 				SELECT t, CASE WHEN t >= $7 THEN 0
 					WHEN `+on+` THEN round((0.9 + 0.35 * sin(pi() * ((extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') + extract(minute from t) / 60.0) - 8) / 14) + 0.15 * `+jitter+`)::numeric, 2)::float8
 					ELSE round((0.02 + 0.01 * `+jitter+`)::numeric, 3)::float8 END AS v
-				FROM generate_series($4::timestamptz, $5::timestamptz, interval '1 minute') AS t),
+				FROM generate_series($4::timestamptz, $5::timestamptz, interval '1 minute') AS t
+				WHERE NOT EXISTS (SELECT 1 FROM monitoring.measurements x WHERE x.sensor_id = $2 AND x.observed_at = t)),
 			m AS (INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, boundary_id, received_at, event_id)
 				SELECT $1, $3, $2, 'power', t, extract(epoch from t)::bigint / 60, v, 'kW', 'measured', 'valid', $8, t + interval '2 seconds', md5($9 || t::text)::uuid FROM s
 				ON CONFLICT DO NOTHING)
@@ -88,6 +89,7 @@ func ApplyFleetHistory(ctx context.Context, tx pgx.Tx, f devicesim.Fleet, until 
 					ELSE round((28.0 + 1.0 * sin(pi() * (extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') - 6) / 12) + 0.5 * `+strings.ReplaceAll(jitter, "$9", "$7")+`)::numeric, 1)::float8 END,
 				'°C', 'measured', 'valid', t + interval '2 seconds', md5($7 || t::text)::uuid
 			FROM generate_series($4::timestamptz, $5::timestamptz, interval '15 minutes') AS t
+			WHERE NOT EXISTS (SELECT 1 FROM monitoring.measurements x WHERE x.sensor_id = $2 AND x.observed_at = t)
 			ON CONFLICT DO NOTHING`,
 			tenant, tempID, unit, start, last, offFrom, tempID.String())
 		if err != nil {
@@ -105,7 +107,8 @@ func ApplyFleetHistory(ctx context.Context, tx pgx.Tx, f devicesim.Fleet, until 
 			tag, err = tx.Exec(ctx, `INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
 				SELECT $1, $3, $2, $8, t, extract(epoch from t)::bigint / 60,
 					round((CASE WHEN `+on+` THEN `+a.on+` ELSE `+a.off+` END)::numeric, 1)::float8, $9, 'measured', 'valid', t + interval '2 seconds', md5($7 || t::text)::uuid
-				FROM (SELECT t, `+strings.ReplaceAll(jitter, "$9", "$7")+` AS j FROM generate_series($4::timestamptz, $5::timestamptz, interval '15 minutes') AS t) g
+				FROM (SELECT t, `+strings.ReplaceAll(jitter, "$9", "$7")+` AS j FROM generate_series($4::timestamptz, $5::timestamptz, interval '15 minutes') AS t
+					WHERE NOT EXISTS (SELECT 1 FROM monitoring.measurements x WHERE x.sensor_id = $2 AND x.observed_at = t)) g
 				ON CONFLICT DO NOTHING`,
 				tenant, id, unit, start, last, offFrom, id.String(), a.metric, a.unit)
 			if err != nil {

@@ -12,6 +12,13 @@ set -a
 . "$env_file"
 set +a
 : "${MQTT_DEVICE_SIM_KEY:?set in .env.local}" "${MQTT_IOT_BRIDGE_KEY:?set in .env.local}"
+# the file only changes when a key changes: a stamp (git-ignored) keeps a hash of the keys it was written from
+stamp="$here/.passwd.keys"
+sum=$(printf '%s\n%s\n' "$MQTT_IOT_BRIDGE_KEY" "$MQTT_DEVICE_SIM_KEY" | shasum -a 256 | cut -d' ' -f1)
+if [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$sum" ] && grep -q '^device-sim:' "$here/passwd" 2>/dev/null; then
+  echo "broker password file is up to date"
+  exit 0
+fi
 docker run --rm --entrypoint sh -e MQTT_DEVICE_SIM_KEY -e MQTT_IOT_BRIDGE_KEY -v "$here:/work" eclipse-mosquitto:2 -c '
   set -eu
   rm -f /work/passwd.new
@@ -20,4 +27,5 @@ docker run --rm --entrypoint sh -e MQTT_DEVICE_SIM_KEY -e MQTT_IOT_BRIDGE_KEY -v
   chmod 644 /work/passwd.new
 '
 mv "$here/passwd.new" "$here/passwd"
+printf '%s\n' "$sum" > "$stamp"
 echo "wrote $here/passwd for: $(cut -d: -f1 "$here/passwd" | tr '\n' ' ')"

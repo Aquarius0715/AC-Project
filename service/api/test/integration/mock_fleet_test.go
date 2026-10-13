@@ -105,6 +105,13 @@ func TestMockFleetHistory(t *testing.T) {
 	if _, err := seed.ApplyFleetHistory(ctx, tx, fleet, until, 36); err == nil {
 		t.Error("36 days of history are accepted")
 	}
+	// a live reading the simulator already sent half an hour before until: history leaves that minute alone
+	live := until.Add(-30 * time.Minute)
+	if _, err := tx.Exec(ctx, `INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+		SELECT u.tenant_id, u.id, $2, 'power', $3, 1, 1.5, 'kW', 'measured', 'valid', $3, gen_random_uuid() FROM assets.units u WHERE u.id = $1`,
+		seed.ID("unit-mock-cool-on"), seed.ID("sensor-mock-cool-on-power"), live); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := seed.ApplyFleetHistory(ctx, tx, fleet, until, 2); err != nil {
 		t.Fatal(err)
 	}
@@ -116,11 +123,15 @@ func TestMockFleetHistory(t *testing.T) {
 		return n
 	}
 	power := seed.ID("sensor-mock-cool-on-power")
+	if n := count(`SELECT count(*) FROM monitoring.measurements WHERE sensor_id = $1 AND observed_at = $2`, power, live); n != 1 {
+		t.Errorf("%d power readings at the live minute, want only the live one", n)
+	}
 	if n := count(`SELECT count(*) FROM monitoring.measurements WHERE sensor_id = $1`, power); n != 2*24*60+1 {
 		t.Errorf("%d power readings, want one a minute for two days (%d)", n, 2*24*60+1)
 	}
-	if n := count(`SELECT count(*) FROM energy.ref_power_samples WHERE sensor_id = $1`, power); n != 2*24*60+1 {
-		t.Errorf("%d power samples for energy, want %d", n, 2*24*60+1)
+	// the live minute reaches energy through its own capture event, not through history
+	if n := count(`SELECT count(*) FROM energy.ref_power_samples WHERE sensor_id = $1`, power); n != 2*24*60 {
+		t.Errorf("%d power samples for energy, want %d (every minute but the live one)", n, 2*24*60)
 	}
 	if n := count(`SELECT count(*) FROM monitoring.measurements WHERE sensor_id = $1`, seed.ID("sensor-mock-cool-on-temperature")); n != 2*24*4+1 {
 		t.Errorf("%d temperatures, want one each 15 minutes (%d)", n, 2*24*4+1)
