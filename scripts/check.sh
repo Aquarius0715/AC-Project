@@ -1,0 +1,17 @@
+#!/bin/sh
+# The fast checks of .github/workflows/ci.yml, to run before a push: web ESLint (no warnings), typecheck and Vitest; Go
+# gofmt, vet and staticcheck; the design document validators. Each is judged by its exit code; the first failure
+# stops the script. The Go DB suites run with `make test-all` in service/api.
+#   sh scripts/check.sh
+set -eu
+cd "$(dirname "$0")/.."
+step() { printf '\n== %s\n' "$1"; }
+
+step "web lint";      (cd service/web && npm run lint >/dev/null)
+step "web typecheck"; (cd service/web && npm run typecheck >/dev/null)
+step "web vitest";    (cd service/web && npx vitest run >/dev/null)
+step "go gofmt";      (cd service/api && test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; })
+step "go vet";        (cd service/api && GOTOOLCHAIN=auto go vet ./...)
+step "staticcheck";   (cd service/api && GOTOOLCHAIN=go1.26.9 go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...)
+step "docs";          python3 docs/tools/validate_documents.py >/dev/null && python3 docs/tools/check_review_regressions.py >/dev/null
+printf '\nall checks passed\n'
