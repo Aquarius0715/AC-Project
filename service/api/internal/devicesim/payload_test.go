@@ -104,3 +104,36 @@ func TestHeartbeatCarriesFirmware(t *testing.T) {
 		t.Errorf("heartbeat %v", h)
 	}
 }
+
+// TestAcknowledgeAppliesAndExpires: a set-temperature command in time is applied and acknowledged with the new
+// setpoint; a command past its expiry is not applied and the module keeps its setpoint; an unknown kind is unsupported.
+func TestAcknowledgeAppliesAndExpires(t *testing.T) {
+	m := NewModule(tenant, device, "v1", 1)
+	now := time.Date(2026, 10, 13, 2, 0, 0, 0, time.UTC)
+	ack := func(cmd string, at time.Time) map[string]any {
+		raw, err := m.Acknowledge([]byte(cmd), at)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var a map[string]any
+		if err := json.Unmarshal(raw, &a); err != nil {
+			t.Fatal(err)
+		}
+		return a
+	}
+	a := ack(`{"commandId":"c1","kind":"set_temperature","setpointCelsius":26,"expiresAt":"2026-10-13T02:05:00Z"}`, now)
+	if a["result"] != "applied" || a["commandId"] != "c1" || a["observed"].(map[string]any)["setpointCelsius"] != 26.0 {
+		t.Fatalf("applied: %v", a)
+	}
+	a = ack(`{"commandId":"c2","kind":"set_temperature","setpointCelsius":18,"expiresAt":"2026-10-13T02:05:00Z"}`, now.Add(10*time.Minute))
+	if a["result"] != "expired" || a["observed"].(map[string]any)["setpointCelsius"] != 26.0 {
+		t.Fatalf("expired command changed the setpoint: %v", a)
+	}
+	a = ack(`{"commandId":"c3","kind":"reboot","expiresAt":"2026-10-13T02:05:00Z"}`, now)
+	if a["result"] != "unsupported" {
+		t.Fatalf("unsupported: %v", a)
+	}
+	if _, err := m.Acknowledge([]byte(`not json`), now); err == nil {
+		t.Error("a malformed command is accepted")
+	}
+}

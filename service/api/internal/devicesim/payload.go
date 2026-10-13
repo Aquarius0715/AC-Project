@@ -56,11 +56,12 @@ type Module struct {
 	Firmware string
 	rng      *rand.Rand
 	sequence int64
+	setpoint float64
 }
 
 // NewModule starts a module with its own random source, so each device drifts independently.
 func NewModule(tenantID, deviceID, firmware string, seed uint64) *Module {
-	return &Module{TenantID: tenantID, DeviceID: deviceID, Firmware: firmware, rng: rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15))}
+	return &Module{TenantID: tenantID, DeviceID: deviceID, Firmware: firmware, rng: rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)), setpoint: 24}
 }
 
 // Topic is the MQTT topic of one message kind of a device (backend-architecture §9).
@@ -89,4 +90,51 @@ func (m *Module) Telemetry(at time.Time) ([]byte, error) {
 // Beat returns the heartbeat at the given time.
 func (m *Module) Beat(at time.Time) ([]byte, error) {
 	return json.Marshal(Heartbeat{DeviceID: m.DeviceID, At: at.UTC(), Firmware: m.Firmware})
+}
+
+// Command is a control command the backend sends down on /cmd. ExpiresAt is when the command stops being valid; the
+// backend marks a late acknowledgement as late (backend-architecture §9, common design §5). The field names are the
+// simulator's own until the command contract fixes them.
+type Command struct {
+	CommandID string    `json:"commandId"`
+	Kind      string    `json:"kind"`
+	Setpoint  *float64  `json:"setpointCelsius,omitempty"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+// Ack is the acknowledgement sent on /cmd/ack: whether the command was applied and the state the module observes after it.
+type Ack struct {
+	DeviceID   string    `json:"deviceId"`
+	CommandID  string    `json:"commandId"`
+	ReceivedAt time.Time `json:"receivedAt"`
+	Result     string    `json:"result"`
+	Observed   Observed  `json:"observed"`
+}
+
+// Observed is the module's state after the command.
+type Observed struct {
+	SetpointCelsius float64 `json:"setpointCelsius"`
+}
+
+// CommandTopic and AckTopic are the downward and upward topics of the command exchange.
+func (m *Module) CommandTopic() string { return Topic(m.TenantID, m.DeviceID, "cmd") }
+func (m *Module) AckTopic() string     { return Topic(m.TenantID, m.DeviceID, "cmd/ack") }
+
+// Acknowledge applies a command to the module and returns the acknowledgement. A command the module has already
+// passed its expiry for is not applied; the acknowledgement says so, and the module keeps its state.
+func (m *Module) Acknowledge(raw []byte, at time.Time) ([]byte, error) {
+	var c Command
+	if err := json.Unmarshal(raw, &c); err != nil {
+		return nil, fmt.Errorf("command: %w", err)
+	}
+	result := "applied"
+	switch {
+	case !at.Before(c.ExpiresAt):
+		result = "expired"
+	case c.Kind == "set_temperature" && c.Setpoint != nil:
+		m.setpoint = *c.Setpoint
+	case c.Kind != "set_temperature":
+		result = "unsupported"
+	}
+	return json.Marshal(Ack{DeviceID: m.DeviceID, CommandID: c.CommandID, ReceivedAt: at.UTC(), Result: result, Observed: Observed{SetpointCelsius: m.setpoint}})
 }

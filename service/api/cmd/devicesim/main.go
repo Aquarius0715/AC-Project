@@ -52,6 +52,21 @@ func main() {
 		modules = append(modules, devicesim.NewModule(*tenant, id, *firmware, seedOf(id)))
 	}
 	log.Printf("devicesim: %d modules on %s", len(modules), *broker)
+	// each module hears its own command topic and answers on the acknowledgement topic (QoS 1, as the design says)
+	for _, m := range modules {
+		m := m
+		tok := client.Subscribe(m.CommandTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
+			raw, err := m.Acknowledge(msg.Payload(), time.Now())
+			if err != nil {
+				log.Printf("command %s: %v", m.DeviceID, err)
+				return
+			}
+			publish(client, m.AckTopic(), raw)
+		})
+		if tok.Wait() && tok.Error() != nil {
+			log.Fatalf("subscribe %s: %v", m.CommandTopic(), tok.Error())
+		}
+	}
 
 	telemetry := time.NewTicker(*interval)
 	heartbeat := time.NewTicker(*beat)
