@@ -179,8 +179,9 @@ func TestPartnerUserAccess(t *testing.T) {
 	if code, m := save(email, "contractor", "active", v); code != 422 || fields(m) != "partnerRole=error.immutable" {
 		t.Errorf("change an accepted role: %d %s", code, fields(m))
 	}
-	code, m = save(email, "technician", "disabled", v)
-	if code != 200 || data(m)["status"] != "disabled" || data(m)["accessUntil"] != until.UTC().Format(time.RFC3339) {
+	// the same address in capitals is no change: the stored spelling stays
+	code, m = save(strings.ToUpper(email), "technician", "disabled", v)
+	if code != 200 || data(m)["status"] != "disabled" || data(m)["email"] != email || data(m)["accessUntil"] != until.UTC().Format(time.RFC3339) {
 		t.Fatalf("disable: %d %v", code, m)
 	}
 	var now time.Time

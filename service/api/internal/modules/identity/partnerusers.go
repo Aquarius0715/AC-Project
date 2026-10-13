@@ -326,10 +326,12 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 		if status != "invited" && in.Status != nil { // an invite becomes active only when the account is created
 			return x, apperr.E(apperr.Conflict, "errors.invite_pending")
 		}
-	} else if in.Email != x.Email {
+	} else if !strings.EqualFold(in.Email, x.Email) {
 		return x, apperr.Fields(map[string]string{"email": "error.immutable"})
 	} else if in.PartnerRole != x.PartnerRole {
 		return x, apperr.Fields(map[string]string{"partnerRole": "error.immutable"})
+	} else {
+		in.Email = x.Email // the same address in other letter case keeps the stored spelling
 	}
 	if x.Status != "invited" && status != x.Status || x.PartnerRole != in.PartnerRole {
 		if err := notSelfOrLast(ctx, c, x); err != nil {
