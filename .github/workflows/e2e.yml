@@ -31,7 +31,12 @@ jobs:
           done
           sh docker/mosquitto/passwd.sh
       - name: build and start the stack
-        run: docker compose --env-file .env.local --profile full up -d --build
+        run: |
+          # on failure the last lines become an annotation, readable on the run without the logs
+          if ! docker compose --env-file .env.local --profile full up -d --build > compose-up.log 2>&1; then
+            tail -n 40 compose-up.log | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}' | sed 's/^/::error title=compose up failed::/'; echo
+            exit 1
+          fi
       - name: wait for the apps and the identity provider
         run: |
           for url in http://localhost:8081/realms/ac/.well-known/openid-configuration http://localhost:3000/login http://localhost:3001/login http://localhost:3002/login http://localhost:3003/login; do
