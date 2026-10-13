@@ -324,3 +324,36 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 		t.Errorf("disabled client user's membership after HQ's change: %v, want still closed at %v", end, clock)
 	}
 }
+
+// TestClientInviteMailFollowsTheInvite (IR426): HQ corrects a pending client invite's address: the invitation goes to
+// the new address, the unsent one to the old address is cancelled and the resend pause starts again; removing the
+// invite cancels what it has not sent yet.
+func TestClientInviteMailFollowsTheInvite(t *testing.T) {
+	s := server(t)
+	cust := seed.ID("cust-a").String()
+	old, corrected := "typo-"+uuid.NewString()[:8]+"@example.com", "fixed-"+uuid.NewString()[:8]+"@example.com"
+	code, m := write(s, &hq, "clientUsers.save", `{"customerId":"`+cust+`","email":"`+old+`","clientRole":"member"}`, 0)
+	if code != 200 {
+		t.Fatalf("invite: %d %v", code, m)
+	}
+	id := data(m)["id"].(string)
+	states := func(email string) (st string) {
+		ownerScan(t, `SELECT string_agg(state, ',' ORDER BY created_at) FROM notify.outbound_mail WHERE to_email = $1`, []any{email}, &st)
+		return
+	}
+	if code, m := write(s, &hq, "clientUsers.save", `{"id":"`+id+`","customerId":"`+cust+`","email":"`+corrected+`","clientRole":"member","reason":"typo in the address"}`, 1); code != 200 {
+		t.Fatalf("correct the address: %d %v", code, m)
+	}
+	if got, now := states(old), states(corrected); got != "cancelled" || now != "queued" {
+		t.Errorf("mail after the correction: old %q, corrected %q", got, now)
+	}
+	if code, m := write(s, &hq, "clientUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 429 || m["messageKey"] != "errors.invite_recently_sent" {
+		t.Errorf("resend right after the correction: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "clientUsers.remove", `{"id":"`+id+`","reason":"not joining"}`, 2); code != 200 {
+		t.Fatalf("remove: %d %v", code, m)
+	}
+	if got := states(corrected); got != "cancelled" {
+		t.Errorf("mail after the removal: %s", got)
+	}
+}

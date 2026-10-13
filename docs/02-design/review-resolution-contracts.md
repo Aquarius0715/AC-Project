@@ -6587,7 +6587,7 @@ Found in review: correcting the address of a pending invite sent nothing to the 
 
 1. `notify.outbound_mail.invite_id` names the client or partner user an invitation is for, and the new state `cancelled` marks one that will not be sent.
 2. `clientUsers.save` / `partnerUsers.save` on a pending invite whose e-mail changes cancel its unsent invitations, queue the invitation to the new address and start the resend pause then. `clientUsers.remove` / `partnerUsers.remove` cancel the unsent invitations of the invite.
-3. Test: `TestInviteMailFollowsTheInvite`.
+3. Tests: `TestInviteMailFollowsTheInvite` (partner), `TestClientInviteMailFollowsTheInvite` (client, by HQ).
 
 ## IR427 An event that keeps failing is dead-lettered instead of stopping its consumer — 2026-10-14
 
