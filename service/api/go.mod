@@ -13,6 +13,7 @@ require (
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/labstack/echo/v5 v5.4.0
 	github.com/redis/go-redis/v9 v9.22.0
+	golang.org/x/time v0.15.0
 )
 
 require (
@@ -44,7 +45,6 @@ require (
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
-	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect

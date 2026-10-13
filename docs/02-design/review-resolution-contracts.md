@@ -6466,3 +6466,11 @@ The user chose to send the e-mails for real, starting with a local mail catcher 
 4. **Web.** In API mode the toasts say “Invitation e-mail queued for …”, and the pages say where the e-mails go; the Phase 1A demo keeps its previews.
 5. **Tests.** `TestInviteMail` (queueing, a failing sender left for retry with its reason, a working one recorded as sent), `TestMailTexts`, `TestSMTPRefusesHeaderBreaks`; the resend tests call writes.
 
+## IR419 The services start after the identity provider answers (CI end-to-end) — 2026-10-13
+
+The first end-to-end run on GitHub Actions bounced every customer page back to the sign-in screen: the compose stack started the Core API services before Keycloak's realm answered, and they kept refusing the tokens of the first sign-ins.
+
+1. **Start order.** `keycloak` has a health check (its realm `ac` answers the discovery document). The Core API services and the four web apps wait for it to be healthy before they start.
+2. **Key refresh.** A token signed with a key the service has not loaded makes it fetch the keys again at most every 10 seconds (the library default was 5 minutes), and the keys are refreshed every 15 minutes. A recreated identity provider with new keys no longer needs a restart of the services.
+3. **Verified.** Locally, Keycloak and the services were recreated together and the failing specs passed at once; the E2E workflow runs the same order.
+

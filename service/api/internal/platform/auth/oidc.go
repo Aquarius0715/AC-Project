@@ -11,6 +11,7 @@ import (
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/time/rate"
 )
 
 // OIDCVerifier verifies RS256 access tokens from Cognito (production) or Keycloak (local): issuer, audience
@@ -101,7 +102,14 @@ func NewVerifierFromEnv(ctx context.Context) (Verifier, error) {
 	if jwks == "" {
 		jwks = strings.TrimRight(iss, "/") + "/protocol/openid-connect/certs"
 	}
-	k, err := keyfunc.NewDefaultCtx(ctx, []string{jwks})
+	// keys of a token with an unknown key ID are fetched again at most every 10 s (the library default is 5 min):
+	// a service that started before the identity provider, or one whose provider was recreated with new keys,
+	// accepts tokens again within seconds instead of refusing every request for minutes (CI e2e, IR419)
+	k, err := keyfunc.NewDefaultOverrideCtx(ctx, []string{jwks}, keyfunc.Override{
+		RefreshUnknownKID: rate.NewLimiter(rate.Every(10*time.Second), 1),
+		RefreshInterval:   15 * time.Minute,
+		RateLimitWaitMax:  15 * time.Second,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("jwks: %w", err)
 	}

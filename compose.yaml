@@ -74,6 +74,7 @@ x-backend: &backend          # Core API business-domain services (service/api/cm
   depends_on:
     migrate: { condition: service_completed_successfully }
     localstack: { condition: service_healthy }
+    keycloak: { condition: service_healthy }    # the token keys load at start: a service started before the realm answered refused every sign-in (IR419)
 
 x-web: &web                   # one Next.js app per entry point (service/web/<name>, service/web/Dockerfile, IR178)
   environment: &web-env
@@ -119,7 +120,7 @@ services:
       OIDC_APP_CLIENT_SECRET: local-ac-web-secret
     networks: [edge, app]
     profiles: [full]
-    depends_on: [gateway, keycloak, valkey]
+    depends_on: { gateway: { condition: service_started }, keycloak: { condition: service_healthy }, valkey: { condition: service_started } }
 
   partner-web:           # demo (mock data) — contractor entry point
     <<: *web
@@ -142,7 +143,7 @@ services:
       OIDC_APP_CLIENT_SECRET: local-ac-web-secret
     networks: [edge, app]
     profiles: [full]
-    depends_on: [gateway, keycloak, valkey]
+    depends_on: { gateway: { condition: service_started }, keycloak: { condition: service_healthy }, valkey: { condition: service_started } }
 
   technician-web:           # demo (mock data) — technician entry point
     <<: *web
@@ -165,7 +166,7 @@ services:
       OIDC_APP_CLIENT_SECRET: local-ac-web-secret
     networks: [edge, app]
     profiles: [full]
-    depends_on: [gateway, keycloak, valkey]
+    depends_on: { gateway: { condition: service_started }, keycloak: { condition: service_healthy }, valkey: { condition: service_started } }
 
   admin-web:           # demo (mock data) — admin entry point
     <<: *web
@@ -188,7 +189,7 @@ services:
       OIDC_APP_CLIENT_SECRET: local-ac-admin-secret
     networks: [edge, app]
     profiles: [full]
-    depends_on: [gateway, keycloak, valkey]
+    depends_on: { gateway: { condition: service_started }, keycloak: { condition: service_healthy }, valkey: { condition: service_started } }
 
   # ------------------------------------------------------------------ backend (Go + Echo)
   migrate:             # one-off: embedded migrations (cmd/migrate), local login role, demo fixture once
@@ -443,6 +444,12 @@ services:
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"  # containers may still reach it as keycloak:8080
     ports: ["127.0.0.1:8081:8080"]   # this machine only: not reachable from other devices on the network (IR373)
     volumes: [./docker/keycloak/realm-ac.json:/opt/keycloak/data/import/realm-ac.json:ro]
+    healthcheck:   # healthy once realm ac answers its discovery document (the image has bash, not curl)
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/ac/.well-known/openid-configuration HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200 '"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
     networks: [edge, app]
     profiles: [infra, backend, full]
 
