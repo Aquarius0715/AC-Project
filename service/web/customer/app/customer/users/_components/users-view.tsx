@@ -57,14 +57,17 @@ export function UsersView({ live }: { live: { customerId: string; customer: stri
   const title = !dialog ? "" : dialog.kind === "invite" ? (live.customer ? t("Invite a user to {company}", { company: live.customer }) : t("Invite a user"))
     : t({ edit: "Edit invite", role: "Change role of {name}", disable: "Disable {name}", enable: "Enable {name}", remove: "Remove {name}" }[dialog.kind], { name: name(dialog.row) });
   const action = !dialog ? "" : t({ invite: "Send invite", edit: "Save invite", role: "Change role", disable: "Disable", enable: "Enable", remove: "Remove" }[dialog.kind]);
+  const roleBadge = (u: ClientUserRow) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{t(u.role === "owner" ? "Owner" : "Member")}</Badge>;
+  const statusBadge = (u: ClientUserRow) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{t(u.status === "active" ? "Active" : u.status === "invited" ? "Invite pending" : "Disabled")}</Badge>;
   return (
     <Page>
       <PageHead title={live.customer ? t("Users of {customer}", { customer: live.customer }) : t("Users")} sub={t("People who can sign in to this customer app. As an owner you invite users, change their role and access, and remove them.")} action={<Btn variant="primary" onClick={() => open({ kind: "invite" })}><Icon name="add" /> {t("Invite user")}</Btn>} />
       <Card pad={false}>
         <DataTable rows={live.rows} rowKey={(u) => u.id} cols={[
-          { key: "u", label: t("User"), render: (u) => <div><b>{u.name ?? u.email}{u.you ? ` ${t("(you)")}` : ""}</b><div className="text-xs text-muted-foreground">{u.sub}</div></div> },
-          { key: "r", label: t("Role"), render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{t(u.role === "owner" ? "Owner" : "Member")}</Badge> },
-          { key: "s", label: t("Status"), render: (u) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{t(u.status === "active" ? "Active" : u.status === "invited" ? "Invite pending" : "Disabled")}</Badge> },
+          // on a phone the role and status sit under the name, so the actions keep their room
+          { key: "u", label: t("User"), render: (u) => <div><b>{u.name ?? u.email}{u.you ? ` ${t("(you)")}` : ""}</b><div className="text-xs text-muted-foreground">{u.sub}</div><div className="mt-1 flex flex-wrap gap-1 sm:hidden">{roleBadge(u)}{statusBadge(u)}</div></div> },
+          { key: "r", label: t("Role"), render: roleBadge, hideBelow: "sm" },
+          { key: "s", label: t("Status"), render: statusBadge, hideBelow: "sm" },
           { key: "l", label: t("Last sign-in"), render: (u) => u.lastSignIn, hideBelow: "sm" },
           { key: "a", label: t("Actions"), render: (u) => {
             if (u.you) return <span className="text-xs text-muted-foreground">{t("Your account")}</span>;

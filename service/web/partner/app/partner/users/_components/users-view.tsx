@@ -68,6 +68,8 @@ export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersD
     remove: t("Remove {name}", { name: "row" in dialog ? dialog.row.name ?? dialog.row.email : "" }),
   }[dialog.kind];
   const action = !dialog ? "" : { invite: t("Send invite"), edit: t("Save invite"), disable: t("Disable"), enable: t("Enable"), remove: t("Remove") }[dialog.kind];
+  const roleBadge = (u: PartnerUserRow) => <Badge tone={u.role === "contractor" ? "primary" : "muted"}>{t(roleLabel[u.role])}</Badge>;
+  const statusBadge = (u: PartnerUserRow) => <Badge tone={u.ended ? "muted" : u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{u.ended ? t("Access ended") : t(statusLabel[u.status])}</Badge>;
   return (
     <Page>
       <PageHead title={data.company ? t("Users of {company}", { company: data.company }) : t("Users")} sub={t("Contractors and technicians of your company who can sign in. You can invite, disable and remove them.")}
@@ -82,9 +84,10 @@ export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersD
       <Card pad={false}>
         {data.rows.length === 0 ? <EmptyState title={t("No users")}>{t("No account of your company has this status.")}</EmptyState> : (
           <DataTable rows={data.rows} rowKey={(u) => u.id} cols={[
-            { key: "u", label: t("User"), render: (u) => <div><b>{u.name ?? u.email}{u.you ? ` ${t("(you)")}` : ""}</b><div className="text-xs text-muted-foreground">{u.sub}</div></div> },
-            { key: "r", label: t("Role"), render: (u) => <Badge tone={u.role === "contractor" ? "primary" : "muted"}>{t(roleLabel[u.role])}</Badge> },
-            { key: "s", label: t("Status"), render: (u) => <Badge tone={u.ended ? "muted" : u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{u.ended ? t("Access ended") : t(statusLabel[u.status])}</Badge> },
+            // on a phone the role and status sit under the name, so the actions keep their room
+            { key: "u", label: t("User"), render: (u) => <div><b>{u.name ?? u.email}{u.you ? ` ${t("(you)")}` : ""}</b><div className="text-xs text-muted-foreground">{u.sub}</div><div className="mt-1 flex flex-wrap gap-1 sm:hidden">{roleBadge(u)}{statusBadge(u)}</div></div> },
+            { key: "r", label: t("Role"), render: roleBadge, hideBelow: "sm" },
+            { key: "s", label: t("Status"), render: statusBadge, hideBelow: "sm" },
             { key: "x", label: t("Access until"), render: (u) => u.access, hideBelow: "md" },
             { key: "l", label: t("Last sign-in"), render: (u) => u.lastSignIn, hideBelow: "sm" },
             { key: "a", label: t("Actions"), render: (u) => {
