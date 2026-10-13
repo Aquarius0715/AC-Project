@@ -6520,3 +6520,11 @@ Found in review: the notification worker runs every 5 seconds and retried a fail
 
 1. A failed e-mail notification (`notify.deliveries`, from `updated_at`) or invitation (`notify.outbound_mail`, new column `last_attempt_at`) is retried 1, 2, 4 and 8 minutes after the attempt before, at most five attempts in all: an outage of about a quarter of an hour loses nothing.
 2. Test: `TestInviteMail` (a failed invitation is not retried after 59 s, and is sent at 1 minute).
+
+## IR426 The invitation e-mail follows the invite — 2026-10-14
+
+Found in review: correcting the address of a pending invite sent nothing to the new address, and since IR423 the resend was refused for 5 minutes (the pause counted from the e-mail to the wrong address). Removing an invite left its unsent invitation (queued, or failed and waiting for a retry, IR425) to go out anyway.
+
+1. `notify.outbound_mail.invite_id` names the client or partner user an invitation is for, and the new state `cancelled` marks one that will not be sent.
+2. `clientUsers.save` / `partnerUsers.save` on a pending invite whose e-mail changes cancel its unsent invitations, queue the invitation to the new address and start the resend pause then. `clientUsers.remove` / `partnerUsers.remove` cancel the unsent invitations of the invite.
+3. Test: `TestInviteMailFollowsTheInvite`.

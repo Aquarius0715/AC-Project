@@ -1752,9 +1752,10 @@ CREATE TABLE notify.outbound_mail (            -- e-mails to an address that is 
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id           uuid NOT NULL,
   kind                text NOT NULL CHECK (kind IN ('invite')),
+  invite_id           uuid,               -- the client or partner user invited: its unsent e-mails are cancelled when it is removed or its address changes (IR426)
   to_email            citext NOT NULL,
   params              jsonb NOT NULL,     -- {organization, role, app}: rendered when sent
-  state               text NOT NULL DEFAULT 'queued' CHECK (state IN ('queued','sent','failed')),
+  state               text NOT NULL DEFAULT 'queued' CHECK (state IN ('queued','sent','failed','cancelled')),
   attempts            int NOT NULL DEFAULT 0,
   provider_message_id text,
   failure_reason      text,

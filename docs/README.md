@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.295.0 / Created: 2026-09-14 / Updated: 2026-10-14 / Status: Draft for review / Language: English
+Version: 0.296.0 / Created: 2026-09-14 / Updated: 2026-10-14 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.296.0 (2026-10-14): A corrected invite address gets the invitation, and a removed invite's unsent invitations are cancelled (IR426).
 0.295.0 (2026-10-14): A failed e-mail is retried 1, 2, 4 and 8 minutes later instead of every 5 s (IR425).
 0.294.0 (2026-10-14): Notification e-mails carry a Date header and an RFC 2047 encoded subject (IR424).
 0.293.0 (2026-10-14): Security review — an invitation is e-mailed at most every 5 minutes per invite (IR423).

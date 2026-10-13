@@ -265,7 +265,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, 'invited', $5, $6, $5, $5, $5)`, id, in.CustomerID, in.Email, in.ClientRole, c.Now, c.Principal.MembershipID); err != nil {
 			return ClientUser{}, err
 		}
-		if err := queueClientInvite(ctx, c, in.CustomerID, in.Email, in.ClientRole); err != nil {
+		if err := queueClientInvite(ctx, c, id, in.CustomerID, in.Email, in.ClientRole); err != nil {
 			return ClientUser{}, err
 		}
 		v := 1
@@ -311,6 +311,11 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 	if _, err := c.Tx.Exec(ctx, `UPDATE identity.client_users SET email = $2, client_role = $3, status = $4, version = version + 1, updated_at = $5 WHERE id = $1`,
 		x.ID, in.Email, in.ClientRole, status, c.Now); err != nil {
 		return x, err
+	}
+	if x.Status == "invited" && !strings.EqualFold(in.Email, x.Email) { // a corrected address gets the invitation (IR426)
+		if err := reinvite(ctx, c, "client_users", x.ID, func() error { return queueClientInvite(ctx, c, x.ID, x.CustomerID, in.Email, in.ClientRole) }); err != nil {
+			return x, err
+		}
 	}
 	if x.MembershipID != nil { // keep the membership in step: role and access window
 		// $4 is cast: inside CASE … ELSE NULL the parameter's type would be taken as text
@@ -395,6 +400,9 @@ func clientUsersRemove(ctx context.Context, c *ops.Call, in *RemoveInput) (Delet
 		if !ok {
 			return Deleted{}, apperr.E(apperr.Conflict, "errors.last_owner")
 		}
+	}
+	if err := notify.CancelInvites(ctx, c.Tx, x.ID); err != nil { // nothing more goes to a removed invite (IR426)
+		return Deleted{}, err
 	}
 	if _, err := c.Tx.Exec(ctx, `DELETE FROM identity.client_users WHERE id = $1`, x.ID); err != nil {
 		return Deleted{}, err
@@ -481,7 +489,7 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 	if err := inviteResendWait(ctx, c, "client_users", x.ID); err != nil {
 		return InvitePreview{}, err
 	}
-	if err := queueClientInvite(ctx, c, x.CustomerID, x.Email, x.ClientRole); err != nil {
+	if err := queueClientInvite(ctx, c, x.ID, x.CustomerID, x.Email, x.ClientRole); err != nil {
 		return InvitePreview{}, err
 	}
 	if _, err := c.Tx.Exec(ctx, `UPDATE identity.client_users SET last_invite_sent_at = $2 WHERE id = $1`, x.ID, c.Now); err != nil {
@@ -494,12 +502,12 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 }
 
 // queueClientInvite queues the invitation e-mail to the customer's app (IR418).
-func queueClientInvite(ctx context.Context, c *ops.Call, customer uuid.UUID, email, role string) error {
+func queueClientInvite(ctx context.Context, c *ops.Call, invite, customer uuid.UUID, email, role string) error {
 	var org string
 	if err := c.Tx.QueryRow(ctx, `SELECT o.name FROM notify.ref_customers cu JOIN identity.organizations o ON o.id = cu.organization_id WHERE cu.id = $1`, customer).Scan(&org); err != nil {
 		return err
 	}
-	return notify.QueueInvite(ctx, c.Tx, email, org, role, "customer")
+	return notify.QueueInvite(ctx, c.Tx, invite, email, org, role, "customer")
 }
 
 // RegisterClientUsers binds clientUsers.*.

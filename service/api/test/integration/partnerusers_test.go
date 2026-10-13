@@ -447,3 +447,39 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 		t.Errorf("membership after enabling: %v, want HQ's end %v", end, later)
 	}
 }
+
+// TestInviteMailFollowsTheInvite (IR426): a pending invite whose address is corrected gets its invitation at the new
+// address, the unsent one to the old address is cancelled and the resend pause counts from the change; removing the
+// invite cancels what it has not sent yet.
+func TestInviteMailFollowsTheInvite(t *testing.T) {
+	s := server(t)
+	old, corrected := "typo-"+uuid.NewString()[:8]+"@example.com", "fixed-"+uuid.NewString()[:8]+"@example.com"
+	code, m := write(s, &contrA, "partnerUsers.save", `{"email":"`+old+`","partnerRole":"technician"}`, 0)
+	if code != 200 {
+		t.Fatalf("invite: %d %v", code, m)
+	}
+	id := data(m)["id"].(string)
+	states := func(email string) (st string) {
+		ownerScan(t, `SELECT string_agg(state, ',' ORDER BY created_at) FROM notify.outbound_mail WHERE to_email = $1`, []any{email}, &st)
+		return
+	}
+	owner(t, `UPDATE identity.partner_users SET last_invite_sent_at = last_invite_sent_at - interval '10 minutes' WHERE id = $1`, id)
+	if code, m := write(s, &contrA, "partnerUsers.save", `{"id":"`+id+`","email":"`+corrected+`","partnerRole":"technician","reason":"typo in the address"}`, 1); code != 200 {
+		t.Fatalf("correct the address: %d %v", code, m)
+	}
+	if got := states(old); got != "cancelled" {
+		t.Errorf("mail to the old address: %s", got)
+	}
+	if got := states(corrected); got != "queued" {
+		t.Errorf("mail to the corrected address: %s", got)
+	}
+	if code, m := write(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 429 || m["messageKey"] != "errors.invite_recently_sent" {
+		t.Errorf("resend right after the correction: %d %v", code, m)
+	}
+	if code, m := write(s, &contrA, "partnerUsers.remove", `{"id":"`+id+`","reason":"not joining"}`, 2); code != 200 {
+		t.Fatalf("remove: %d %v", code, m)
+	}
+	if got := states(corrected); got != "cancelled" {
+		t.Errorf("mail after the removal: %s", got)
+	}
+}

@@ -212,6 +212,19 @@ func inviteResendWait(ctx context.Context, c *ops.Call, table string, id uuid.UU
 	return nil
 }
 
+// reinvite sends the invitation of a pending invite whose e-mail changed to the new address: the e-mails not yet sent
+// to the old one are cancelled, and the resend pause counts from now (IR426).
+func reinvite(ctx context.Context, c *ops.Call, table string, id uuid.UUID, queue func() error) error {
+	if err := notify.CancelInvites(ctx, c.Tx, id); err != nil {
+		return err
+	}
+	if err := queue(); err != nil {
+		return err
+	}
+	_, err := c.Tx.Exec(ctx, `UPDATE identity.`+table+` SET last_invite_sent_at = $2 WHERE id = $1`, id, c.Now)
+	return err
+}
+
 // notSelfOrLast refuses a change to the caller's own account, one that would leave the company without an active
 // contractor, and closing a technician who still holds an active assignment (IR421: reassign the job first).
 func notSelfOrLast(ctx context.Context, c *ops.Call, x PartnerUser) error {
@@ -288,7 +301,7 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, 'invited', $5, $6, $5, $5, $5)`, id, c.Principal.OrgID, in.Email, in.PartnerRole, c.Now, c.Principal.MembershipID); err != nil {
 			return PartnerUser{}, err
 		}
-		if err := queuePartnerInvite(ctx, c, in.Email, in.PartnerRole); err != nil {
+		if err := queuePartnerInvite(ctx, c, id, in.Email, in.PartnerRole); err != nil {
 			return PartnerUser{}, err
 		}
 		v := 1
@@ -345,6 +358,11 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 	if _, err := c.Tx.Exec(ctx, `UPDATE identity.partner_users SET email = $2, partner_role = $3, status = $4, access_until = $5, version = version + 1, updated_at = $6 WHERE id = $1`,
 		x.ID, in.Email, in.PartnerRole, status, kept, c.Now); err != nil {
 		return x, err
+	}
+	if x.Status == "invited" && !strings.EqualFold(in.Email, x.Email) { // a corrected address gets the invitation (IR426)
+		if err := reinvite(ctx, c, "partner_users", x.ID, func() error { return queuePartnerInvite(ctx, c, x.ID, in.Email, in.PartnerRole) }); err != nil {
+			return x, err
+		}
 	}
 	next := x.Version + 1
 	c.Audit(ops.AuditEntry{Action: "partnerUsers.save", TargetKind: "partner_user", TargetID: x.ID.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &next, Reason: *in.Reason})
@@ -405,6 +423,9 @@ func partnerUsersRemove(ctx context.Context, c *ops.Call, in *PartnerRemoveInput
 		return Deleted{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 	if err := notSelfOrLast(ctx, c, x); err != nil {
+		return Deleted{}, err
+	}
+	if err := notify.CancelInvites(ctx, c.Tx, x.ID); err != nil { // nothing more goes to a removed invite (IR426)
 		return Deleted{}, err
 	}
 	if _, err := c.Tx.Exec(ctx, `DELETE FROM identity.partner_users WHERE id = $1`, x.ID); err != nil {
@@ -469,7 +490,7 @@ func partnerUsersResend(ctx context.Context, c *ops.Call, in *PartnerResendInput
 	if err := inviteResendWait(ctx, c, "partner_users", x.ID); err != nil {
 		return InvitePreview{}, err
 	}
-	if err := queuePartnerInvite(ctx, c, x.Email, x.PartnerRole); err != nil {
+	if err := queuePartnerInvite(ctx, c, x.ID, x.Email, x.PartnerRole); err != nil {
 		return InvitePreview{}, err
 	}
 	if _, err := c.Tx.Exec(ctx, `UPDATE identity.partner_users SET last_invite_sent_at = $2 WHERE id = $1`, x.ID, c.Now); err != nil {
@@ -483,7 +504,7 @@ func partnerUsersResend(ctx context.Context, c *ops.Call, in *PartnerResendInput
 
 // queuePartnerInvite queues the invitation e-mail to the partner app (IR418); a technician's account opens the
 // technician app, which HQ creates with the membership.
-func queuePartnerInvite(ctx context.Context, c *ops.Call, email, role string) error {
+func queuePartnerInvite(ctx context.Context, c *ops.Call, invite uuid.UUID, email, role string) error {
 	var org string
 	if err := c.Tx.QueryRow(ctx, `SELECT name FROM identity.organizations WHERE id = $1`, c.Principal.OrgID).Scan(&org); err != nil {
 		return err
@@ -492,7 +513,7 @@ func queuePartnerInvite(ctx context.Context, c *ops.Call, email, role string) er
 	if role == "technician" {
 		app = "technician"
 	}
-	return notify.QueueInvite(ctx, c.Tx, email, org, role, app)
+	return notify.QueueInvite(ctx, c.Tx, invite, email, org, role, app)
 }
 
 // RegisterPartnerUsers binds partnerUsers.*.

@@ -253,10 +253,17 @@ func DeliverAll(ctx context.Context, m *db.TxManager, s Sender, apps Apps, now t
 	return total, nil
 }
 
-// QueueInvite queues an invitation e-mail to an address (IR418); the notification worker sends it. app is the app the
-// invitee signs in to: customer or partner.
-func QueueInvite(ctx context.Context, tx pgx.Tx, to, organization, role, app string) error {
+// QueueInvite queues an invitation e-mail to an address (IR418); the notification worker sends it. invite is the
+// client or partner user it invites; app is the app the invitee signs in to: customer, partner or technician.
+func QueueInvite(ctx context.Context, tx pgx.Tx, invite uuid.UUID, to, organization, role, app string) error {
 	params, _ := json.Marshal(map[string]string{"organization": organization, "role": role, "app": app})
-	_, err := tx.Exec(ctx, `INSERT INTO notify.outbound_mail (tenant_id, kind, to_email, params) VALUES (current_setting('app.tenant_id')::uuid, 'invite', $1, $2)`, to, params)
+	_, err := tx.Exec(ctx, `INSERT INTO notify.outbound_mail (tenant_id, kind, invite_id, to_email, params) VALUES (current_setting('app.tenant_id')::uuid, 'invite', $1, $2, $3)`, invite, to, params)
+	return err
+}
+
+// CancelInvites cancels the invitation e-mails of an invite that have not gone out yet (queued, or failed and waiting
+// for a retry): the invite was removed or its address changed (IR426).
+func CancelInvites(ctx context.Context, tx pgx.Tx, invite uuid.UUID) error {
+	_, err := tx.Exec(ctx, `UPDATE notify.outbound_mail SET state = 'cancelled' WHERE invite_id = $1 AND state IN ('queued', 'failed')`, invite)
 	return err
 }
