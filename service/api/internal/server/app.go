@@ -143,6 +143,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	maintenance.RegisterProposals(reg, maintenance.Proposals{Delivery: delivery})
 	cmds := control.Commands{Units: controlTargets{am}, Devices: devices.Models{}, Restrictions: restrictions.Busy{}, Access: maintenance.Access{}}
 	control.Register(reg, cmds)
+	control.RegisterQueries(reg) // internal: the commands the IoT gateway sends (IR195 system query)
 	automations := control.Automations{Units: controlTargets{am}, Cmd: cmds, Notifier: monitoring.Notifier{}}
 	control.RegisterAutomations(reg, automations)
 	reg.AddJob(ops.DomainEquipment, automations.FireSchedules) // IR54: schedule occurrences fire from the equipment scheduler

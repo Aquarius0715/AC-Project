@@ -335,8 +335,10 @@ services:
     environment:
       MQTT_USER: iot-bridge
       MQTT_PASSWORD: ${MQTT_IOT_BRIDGE_KEY:?set MQTT_IOT_BRIDGE_KEY in .env.local}
+      EQUIPMENT_API_URL: http://equipment-api:8080     # the control domain's internal queries (requested commands)
+      INTERNAL_API_TOKEN: local-internal-token-change-me   # the same dev value as the Core API services (backend-env)
     networks: [data, app]
-    depends_on: { mosquitto: { condition: service_started }, gateway: { condition: service_healthy } }
+    depends_on: { mosquitto: { condition: service_started }, gateway: { condition: service_healthy }, equipment-api: { condition: service_healthy } }
     profiles: [iot]
 
   device-sim:          # simulated IoT modules (telemetry each minute, heartbeats, command acks) for the demo fixture devices

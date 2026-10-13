@@ -263,11 +263,12 @@ func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Com
 	}
 	x, err := scanCommand(c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, job_id, reason, status, delivery,
 		requested_at, sent_at, expires_at, correlation_id, created_at, updated_at)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $10, $4, $5, $6, 'sent', 'sent', $7, $7, $8, $9, $7, $7) RETURNING `+commandCols,
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $10, $4, $5, $6, 'requested', 'not_sent', $7, NULL, $8, $9, $7, $7) RETURNING `+commandCols,
 		in.UnitID, dev, c.Principal.MembershipID, []byte(in.Action), in.JobID, in.Reason, c.Now, c.Now.Add(CommandTTL), c.CorrelationID, in.Source))
 	if err != nil {
 		return x, err
 	}
+	// requested: the IoT gateway sends it to the device and reports it sent (demo trigger command_sent)
 	c.Emit(ops.Event{AggregateType: "command", AggregateID: x.ID, Type: "CommandRequested", Payload: map[string]any{"unitId": in.UnitID, "deviceId": dev, "action": json.RawMessage(in.Action)}})
 	c.Audit(ops.AuditEntry{Action: "commands.create", TargetKind: "command", TargetID: x.ID.String(), NextVersion: &x.Version, Reason: deref(in.Reason)})
 	return x, nil

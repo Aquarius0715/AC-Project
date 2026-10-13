@@ -9,23 +9,30 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
 	"github.com/pradita/ac-project/service/api/internal/iotbridge"
+	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
 func main() {
 	broker := flag.String("broker", envOr("MQTT_URL", "tcp://localhost:1883"), "MQTT broker URL")
 	api := flag.String("api", envOr("CORE_API_URL", "http://localhost:8080"), "Core API base URL (the gateway)")
+	equipment := flag.String("equipment", envOr("EQUIPMENT_API_URL", "http://equipment-api:8080"), "equipment API base URL: the internal queries of the control domain are served there")
+	tenant := flag.String("tenant", seed.ID("tenant-a").String(), "tenant whose commands the bridge sends (the demo tenant by default)")
 	flag.Parse()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -95,6 +102,10 @@ func main() {
 	if ackTok.Wait() && ackTok.Error() != nil {
 		log.Fatalf("subscribe acks: %v", ackTok.Error())
 	}
+	// commands: poll the API for the requested commands of the demo tenant, send each to its device on its command topic,
+	// then report it sent (command_sent). The API moves it requested → sent; the module's acknowledgement comes back on
+	// cmd/ack (above) and moves it on.
+	go pollCommands(ctx, client, httpc, *equipment, endpoint, internalToken(), clock, *tenant)
 	log.Printf("iot-bridge: %s → %s", *broker, endpoint)
 	<-ctx.Done()
 	log.Print("iot-bridge: stopping")
@@ -194,4 +205,75 @@ func (d *demoClock) keepRefreshing(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// internalToken is the service token of the internal queries (INTERNAL_API_TOKEN, the same as the Core API's).
+func internalToken() string { return os.Getenv("INTERNAL_API_TOKEN") }
+
+// pollCommands sends the commands the API lists as requested, every two seconds, until the context ends.
+func pollCommands(ctx context.Context, mc mqtt.Client, httpc *http.Client, api, endpoint, token string, clock *demoClock, tenant string) {
+	t := time.NewTicker(2 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			waiting, err := fetchWaiting(httpc, api, token, tenant)
+			if err != nil {
+				log.Printf("requested commands: %v", err)
+				continue
+			}
+			for _, w := range waiting {
+				if err := sendCommand(mc, httpc, endpoint, tenant, w, clock.offset()); err != nil {
+					log.Printf("command %s: %v", w.ID, err)
+				}
+			}
+		}
+	}
+}
+
+// fetchWaiting asks the API for the requested commands with the internal service token and the tenant.
+func fetchWaiting(c *http.Client, api, token, tenant string) ([]iotbridge.Waiting, error) {
+	req, err := http.NewRequest(http.MethodPost, api+"/internal/v1/system/queries/control.requestedCommands", strings.NewReader(`{"limit":50}`))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(ops.InternalTokenHeader, token)
+	req.Header.Set("X-Tenant-Id", tenant)
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API answered %s", http.StatusText(resp.StatusCode))
+	}
+	var out struct {
+		Data []iotbridge.Waiting `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+// sendCommand publishes one requested command to its device, then reports it sent. The report comes only after the
+// publish succeeded, so a command is never reported sent without leaving the bridge.
+func sendCommand(mc mqtt.Client, httpc *http.Client, endpoint, tenant string, w iotbridge.Waiting, off time.Duration) error {
+	cmd, err := iotbridge.CommandMessage(w)
+	if err != nil {
+		return err
+	}
+	raw, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+	tok := mc.Publish(iotbridge.CommandTopic(uuid.MustParse(tenant), w.DeviceID), 1, false, raw)
+	tok.Wait()
+	if tok.Error() != nil {
+		return tok.Error()
+	}
+	return send(httpc, endpoint, iotbridge.SentTrigger(w, time.Now().Add(off)))
 }

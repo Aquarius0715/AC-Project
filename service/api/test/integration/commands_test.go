@@ -63,7 +63,7 @@ func TestCommands(t *testing.T) {
 	}
 	// the assistant's confirmed change (IR306): the same command, labelled voice
 	code, m := cmd(&customerA, `{"kind":"set_temperature","celsius":24}`, `,"source":"voice"`, v)
-	if code != 200 || data(m)["status"] != "sent" || data(m)["delivery"] != "sent" || data(m)["source"] != "voice" || data(m)["expiresAt"] != clock.Add(30*time.Second).Format(time.RFC3339) {
+	if code != 200 || data(m)["status"] != "requested" || data(m)["delivery"] != "not_sent" || data(m)["sentAt"] != nil || data(m)["source"] != "voice" || data(m)["expiresAt"] != clock.Add(30*time.Second).Format(time.RFC3339) {
 		t.Fatalf("create: %d %v", code, m)
 	}
 	id := data(m)["id"].(string)
@@ -82,6 +82,8 @@ func TestCommands(t *testing.T) {
 	if code, _ := post(s, &hq, "commands.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
 		t.Error("unknown command")
 	}
+	// the IoT gateway sends the requested command and reports it sent (demo trigger command_sent, the same update)
+	owner(t, `UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2 WHERE id = $1 AND status = 'requested'`, id, clock)
 	// acknowledgement before expiry; late acknowledgement is only recorded
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, testDB("postgres"))
