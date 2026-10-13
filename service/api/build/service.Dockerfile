@@ -17,10 +17,11 @@ RUN mkdir -p /out/blobs
 
 # dev: toolchain image with the sources (local tools such as the IoT bridge build here)
 FROM build AS dev
-# the demo IoT commands (compose profile planned): the simulated modules and the bridge to the demo trigger
+# the demo IoT commands (compose profile iot): the simulated modules, the bridge to the demo trigger, the fleet history
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     mkdir -p /app && CGO_ENABLED=0 go build -trimpath -o /app/devicesim ./cmd/devicesim \
-    && CGO_ENABLED=0 go build -trimpath -o /app/iotbridge ./cmd/iotbridge
+    && CGO_ENABLED=0 go build -trimpath -o /app/iotbridge ./cmd/iotbridge \
+    && CGO_ENABLED=0 go build -trimpath -o /app/mockhistory ./cmd/mockhistory
 
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 COPY --from=build /out/server /app/server

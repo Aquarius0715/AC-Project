@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -74,5 +75,90 @@ func TestMockFleetSeeds(t *testing.T) {
 	}
 	if n := count(`SELECT count(*) FROM assets.units WHERE property_id = $1 AND archived`, property); n != 1 {
 		t.Errorf("%d archived fleet units, want 1", n)
+	}
+}
+
+// TestMockFleetHistory: two days of history give each reporting module a power reading every minute (copied to
+// energy's power samples) and a temperature every 15 minutes; power follows the Kuala Lumpur day (running in the
+// afternoon, standby at night); a module that is not reporting stopped a day earlier; more than 35 days is refused.
+func TestMockFleetHistory(t *testing.T) {
+	server(t)
+	fleet, err := devicesim.MockFleet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, testDB("postgres"))
+	if err != nil {
+		t.Skip(err)
+	}
+	defer conn.Close(ctx)
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // the test never commits
+	if _, err := seed.ApplyFleet(ctx, tx, fleet, clock); err != nil {
+		t.Fatal(err)
+	}
+	until := time.Date(2026, 9, 14, 6, 0, 0, 0, time.UTC) // 14:00 in Kuala Lumpur, a Monday
+	if _, err := seed.ApplyFleetHistory(ctx, tx, fleet, until, 36); err == nil {
+		t.Error("36 days of history are accepted")
+	}
+	if _, err := seed.ApplyFleetHistory(ctx, tx, fleet, until, 2); err != nil {
+		t.Fatal(err)
+	}
+	count := func(sql string, args ...any) int {
+		var n int
+		if err := tx.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	power := seed.ID("sensor-mock-cool-on-power")
+	if n := count(`SELECT count(*) FROM monitoring.measurements WHERE sensor_id = $1`, power); n != 2*24*60+1 {
+		t.Errorf("%d power readings, want one a minute for two days (%d)", n, 2*24*60+1)
+	}
+	if n := count(`SELECT count(*) FROM energy.ref_power_samples WHERE sensor_id = $1`, power); n != 2*24*60+1 {
+		t.Errorf("%d power samples for energy, want %d", n, 2*24*60+1)
+	}
+	if n := count(`SELECT count(*) FROM monitoring.measurements WHERE sensor_id = $1`, seed.ID("sensor-mock-cool-on-temperature")); n != 2*24*4+1 {
+		t.Errorf("%d temperatures, want one each 15 minutes (%d)", n, 2*24*4+1)
+	}
+	var afternoon, night float64
+	if err := tx.QueryRow(ctx, `SELECT value FROM monitoring.measurements WHERE sensor_id = $1 AND observed_at = $2`, power, until.Add(-time.Hour)).Scan(&afternoon); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.QueryRow(ctx, `SELECT value FROM monitoring.measurements WHERE sensor_id = $1 AND observed_at = $2`, power, until.Add(-12*time.Hour)).Scan(&night); err != nil {
+		t.Fatal(err)
+	}
+	if afternoon < 0.8 || night > 0.05 {
+		t.Errorf("power at 13:00 %.2f kW, at 02:00 %.3f kW", afternoon, night)
+	}
+	for _, metric := range []string{"humidity", "co2", "pm25"} {
+		if n := count(`SELECT count(*) FROM monitoring.measurements WHERE sensor_id = $1`, seed.ID("sensor-mock-cool-on-"+metric)); n != 2*24*4+1 {
+			t.Errorf("%d %s readings, want one each 15 minutes (%d)", n, metric, 2*24*4+1)
+		}
+	}
+	var co2Day, co2Night float64
+	if err := tx.QueryRow(ctx, `SELECT value FROM monitoring.measurements WHERE sensor_id = $1 AND observed_at = $2`, seed.ID("sensor-mock-cool-on-co2"), until.Add(-time.Hour)).Scan(&co2Day); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.QueryRow(ctx, `SELECT value FROM monitoring.measurements WHERE sensor_id = $1 AND observed_at = $2`, seed.ID("sensor-mock-cool-on-co2"), until.Add(-12*time.Hour)).Scan(&co2Night); err != nil {
+		t.Fatal(err)
+	}
+	if co2Day < 800 || co2Night > 500 {
+		t.Errorf("CO2 at 13:00 %.0f ppm, at 02:00 %.0f ppm", co2Day, co2Night)
+	}
+	var seen time.Time
+	if err := tx.QueryRow(ctx, `SELECT last_seen_at FROM devices.devices WHERE id = $1`, seed.ID("device-mock-cool-on")).Scan(&seen); err != nil || !seen.Equal(until) {
+		t.Errorf("the module was last seen at %v (%v), want %v", seen, err, until)
+	}
+	var latest time.Time
+	if err := tx.QueryRow(ctx, `SELECT max(observed_at) FROM monitoring.measurements WHERE sensor_id = $1`, seed.ID("sensor-mock-offline-power")).Scan(&latest); err != nil {
+		t.Fatal(err)
+	}
+	if !latest.Equal(until.Add(-24 * time.Hour)) {
+		t.Errorf("the offline module's last reading is %v, want a day before %v", latest, until)
 	}
 }

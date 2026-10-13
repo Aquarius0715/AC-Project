@@ -353,6 +353,18 @@ services:
     depends_on: { mosquitto: { condition: service_started } }
     profiles: [iot]
 
+  mock-history:        # one-off: 30 days of past readings for the mock fleet, up to the scenario clock (charts)
+    image: ac-api:dev-tools
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: dev, args: { SERVICE: gateway } }
+    command: ["/app/mockhistory", "--api", "http://gateway:8080"]
+    environment:
+      DATABASE_URL: postgres://postgres:local@postgres:5432/ac?sslmode=disable   # local owner login, as migrate uses
+      MOCK_HISTORY_DAYS: "30"
+    networks: [data, app]
+    depends_on: { gateway: { condition: service_healthy }, migrate: { condition: service_completed_successfully } }
+    restart: "no"
+    profiles: [iot]
+
   # ------------------------------------------------------------------ local stand-ins for AWS services
   postgres:            # Aurora PostgreSQL 16
     image: postgres:16

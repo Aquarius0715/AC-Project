@@ -82,3 +82,15 @@ func TestCommandBehaviours(t *testing.T) {
 		t.Errorf("late: %v at %v", a, at)
 	}
 }
+
+// TestOnlyNarrowsTheReadings: a module narrowed to two sensors reports those two, in the register's order.
+func TestOnlyNarrowsTheReadings(t *testing.T) {
+	raw, err := NewModule(tenant, device, "v1", 1).Only("power", "temperature", "unknown").Telemetry(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := readings(t, raw)
+	if len(r) != 2 || r[0]["metric"] != "temperature" || r[1]["metric"] != "power" {
+		t.Errorf("readings %v", r)
+	}
+}

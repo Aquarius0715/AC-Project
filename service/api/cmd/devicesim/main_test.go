@@ -42,3 +42,17 @@ func TestEnvOr(t *testing.T) {
 		t.Error("envOr")
 	}
 }
+
+// TestSensorsOfAFixtureDevice: a fixture device reports the sensors its link names, an unknown device none.
+func TestSensorsOfAFixtureDevice(t *testing.T) {
+	got := map[string]bool{}
+	for _, s := range sensorsOf("device-tamper") {
+		got[s] = true
+	}
+	if len(got) != 3 || !got["temperature"] || !got["power"] || !got["humidity"] {
+		t.Errorf("device-tamper sensors %v", got)
+	}
+	if sensorsOf("device-unknown") != nil {
+		t.Error("an unknown device has sensors")
+	}
+}

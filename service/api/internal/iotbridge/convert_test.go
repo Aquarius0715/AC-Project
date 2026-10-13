@@ -152,3 +152,18 @@ func TestFleetLinksResolve(t *testing.T) {
 		t.Error("a unit without a module has a link")
 	}
 }
+
+// TestToScenarioKeepsTheMinuteSlot: a reading taken at the start of a minute on the module stays at the start of a
+// minute on the scenario clock, whatever seconds the clock offset has; the batch given is not changed.
+func TestToScenarioKeepsTheMinuteSlot(t *testing.T) {
+	b := batch("device-online-rto", 1)
+	offset := -(29*24*time.Hour + 4*time.Hour + 17*time.Second + 403*time.Millisecond)
+	got := ToScenario(b, offset)
+	want := at.Add(offset).Truncate(time.Minute)
+	if !got.Measurements[0].ObservedAt.Equal(want) || got.Measurements[0].ObservedAt.Second() != 0 || got.Measurements[0].ObservedAt.Nanosecond() != 0 {
+		t.Errorf("scenario time %v, want %v", got.Measurements[0].ObservedAt, want)
+	}
+	if !b.Measurements[0].ObservedAt.Equal(at) {
+		t.Error("the given batch was changed")
+	}
+}

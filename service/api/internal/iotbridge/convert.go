@@ -23,10 +23,13 @@ type Link struct {
 	Sensors map[string]string // simulator sensor name → fixture sensor ID
 }
 
-// Links are the four demo devices that report measurements (the fifth, device-no-sensor, reports none).
+// Links are the four demo devices that report measurements, with the sensors each has in the fixture (the fifth,
+// device-no-sensor, reports none).
 var Links = []Link{
-	{Device: "device-online-rto", Unit: "unit-online-rto", Sensors: map[string]string{"temperature": "sensor-online-temperature", "power": "sensor-online-power"}},
-	{Device: "device-tamper", Unit: "unit-non-rto", Sensors: map[string]string{"temperature": "sensor-tamper-temperature", "power": "sensor-tamper-power"}},
+	{Device: "device-online-rto", Unit: "unit-online-rto", Sensors: map[string]string{"temperature": "sensor-online-temperature", "power": "sensor-online-power",
+		"humidity": "sensor-online-humidity", "co2": "sensor-online-co2", "pm25": "sensor-online-pm25"}},
+	{Device: "device-tamper", Unit: "unit-non-rto", Sensors: map[string]string{"temperature": "sensor-tamper-temperature", "power": "sensor-tamper-power",
+		"humidity": "sensor-tamper-humidity"}},
 	{Device: "device-offline-rto", Unit: "unit-offline-rto", Sensors: map[string]string{"temperature": "sensor-offline-temperature", "power": "sensor-offline-power"}},
 	{Device: "device-limited", Unit: "unit-limited", Sensors: map[string]string{"temperature": "sensor-limited-temperature", "power": "sensor-limited-power"}},
 }
@@ -164,6 +167,19 @@ func FleetLinks(f devicesim.Fleet) []Link {
 			sensors[s.ID] = devicesim.SensorName(p, s)
 		}
 		out = append(out, Link{Device: devicesim.DeviceName(p), Unit: devicesim.UnitName(p), Sensors: sensors})
+	}
+	return out
+}
+
+// ToScenario moves a batch from the module's clock onto the API's scenario clock (offset: scenario minus real) and
+// keeps each reading at the start of its minute there, because energy counts a power sample only at a minute slot (D07).
+// A reading the module stamped in the future stays in the future.
+func ToScenario(b devicesim.Batch, offset time.Duration) devicesim.Batch {
+	out := b
+	out.Measurements = make([]devicesim.Measurement, len(b.Measurements))
+	for i, m := range b.Measurements {
+		m.ObservedAt = m.ObservedAt.Add(offset).Truncate(time.Minute)
+		out.Measurements[i] = m
 	}
 	return out
 }

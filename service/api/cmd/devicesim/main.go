@@ -54,7 +54,7 @@ func main() {
 			continue
 		}
 		id := seed.ID(name).String()
-		m := devicesim.NewModule(*tenant, id, *firmware, seedOf(id))
+		m := devicesim.NewModule(*tenant, id, *firmware, seedOf(id)).Only(sensorsOf(name)...)
 		modules = append(modules, m)
 		beats[m] = true
 	}
@@ -150,6 +150,20 @@ func clientTag(tenant string) string {
 		return tenant[:8]
 	}
 	return tenant
+}
+
+// sensorsOf names the sensors a fixture device has (its bridge link), so it reports only those.
+func sensorsOf(device string) []string {
+	for _, l := range iotbridge.Links {
+		if l.Device == device {
+			out := make([]string, 0, len(l.Sensors))
+			for name := range l.Sensors {
+				out = append(out, name)
+			}
+			return out
+		}
+	}
+	return nil
 }
 
 // demoDevices are the fixture devices that report measurements (the links of internal/iotbridge).

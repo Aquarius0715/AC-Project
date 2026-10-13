@@ -47,8 +47,12 @@ func ApplyFleet(ctx context.Context, tx pgx.Tx, f devicesim.Fleet, at time.Time)
 			return n, fmt.Errorf("fleet device %s: %w", p.Key, err)
 		}
 		for _, s := range devicesim.Sensors {
+			var boundary *string
+			if s.Boundary != "" {
+				boundary = &s.Boundary
+			}
 			if err := ex(`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds, calibrated_at)
-				VALUES ($1,$2,$3,$4,$5,NULL,120,NULL) ON CONFLICT DO NOTHING`, ID(devicesim.SensorName(p, s)), tenant, device, s.Metric, s.Unit); err != nil {
+				VALUES ($1,$2,$3,$4,$5,$6,120,NULL) ON CONFLICT (id) DO UPDATE SET boundary_id = EXCLUDED.boundary_id`, ID(devicesim.SensorName(p, s)), tenant, device, s.Metric, s.Unit, boundary); err != nil {
 				return n, fmt.Errorf("fleet sensor %s/%s: %w", p.Key, s.Metric, err)
 			}
 		}

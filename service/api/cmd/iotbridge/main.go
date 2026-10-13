@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -68,9 +67,7 @@ func main() {
 		}
 		// stamp a little in the past: the offset is an estimate, and the API refuses a reading received after its clock
 		off := clock.offset() - clockMargin
-		for i := range b.Measurements {
-			b.Measurements[i].ObservedAt = b.Measurements[i].ObservedAt.Add(off)
-		}
+		b = iotbridge.ToScenario(b, off)
 		triggers, err := resolver.Triggers(b, time.Now().Add(off))
 		if err != nil {
 			log.Printf("telemetry from %s: %v", b.DeviceID, err)
@@ -168,31 +165,13 @@ func (d *demoClock) offset() time.Duration {
 
 func (d *demoClock) refresh() error {
 	before := time.Now()
-	body := []byte(`{"demoEmail":"clock.probe@iot-bridge.invalid"}`)
-	req, err := http.NewRequest(http.MethodPost, d.api+"/v1/auth/password-reset-preview", bytes.NewReader(body))
+	scenario, err := iotbridge.ScenarioNow(d.c, d.api)
 	if err != nil {
 		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := d.c.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	var out struct {
-		Meta struct {
-			SnapshotAt time.Time `json:"snapshotAt"`
-		} `json:"meta"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return err
-	}
-	if out.Meta.SnapshotAt.IsZero() {
-		return errors.New("no snapshot time in the preview's answer")
 	}
 	mid := before.Add(time.Since(before) / 2)
 	d.mu.Lock()
-	d.off = out.Meta.SnapshotAt.Sub(mid)
+	d.off = scenario.Sub(mid)
 	d.mu.Unlock()
 	return nil
 }

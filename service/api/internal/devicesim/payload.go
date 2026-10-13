@@ -11,19 +11,25 @@ import (
 	"time"
 )
 
-// Sensor is one measurement a module reports: the metric, its unit and the value range it simulates.
+// Sensor is one measurement a module reports: the metric, its unit, the value range it simulates and its measurement
+// boundary (power is measured at the air conditioner's input, the boundary energy counts, IR11).
 type Sensor struct {
-	ID     string
-	Metric string
-	Unit   string
-	Base   float64
-	Swing  float64
+	ID       string
+	Metric   string
+	Unit     string
+	Base     float64
+	Swing    float64
+	Boundary string
 }
 
-// Sensors are the two a simulated AC module reports (the same metrics as the capability register's sensors).
+// Sensors are the ones a simulated AC module can report (the metrics and units of the capability register's sensors).
+// Temperature and power come first; a module reports the subset its device has (Only).
 var Sensors = []Sensor{
 	{ID: "temperature", Metric: "temperature", Unit: "°C", Base: 24, Swing: 2},
-	{ID: "power", Metric: "power", Unit: "kW", Base: 1.2, Swing: 0.4},
+	{ID: "power", Metric: "power", Unit: "kW", Base: 1.2, Swing: 0.4, Boundary: "ac_input_electricity"},
+	{ID: "humidity", Metric: "humidity", Unit: "%", Base: 60, Swing: 8},
+	{ID: "co2", Metric: "co2", Unit: "ppm", Base: 650, Swing: 250},
+	{ID: "pm25", Metric: "pm25", Unit: "µg/m³", Base: 14, Swing: 9},
 }
 
 // Measurement is one reading in a telemetry batch.
@@ -60,11 +66,28 @@ type Module struct {
 	// behaviour of the pattern the module plays (mock fleet); empty is normal readings and applied commands
 	telemetry, commands string
 	powerOff            bool
+	sensors             []Sensor // the sensors the device has (all of Sensors unless Only narrows them)
 }
 
 // NewModule starts a module with its own random source, so each device drifts independently.
 func NewModule(tenantID, deviceID, firmware string, seed uint64) *Module {
 	return &Module{TenantID: tenantID, DeviceID: deviceID, Firmware: firmware, rng: rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)), setpoint: 24}
+}
+
+// Only narrows the module to the sensors its device has, by sensor name; unknown names are ignored.
+func (m *Module) Only(names ...string) *Module {
+	keep := map[string]bool{}
+	for _, n := range names {
+		keep[n] = true
+	}
+	var out []Sensor
+	for _, s := range Sensors {
+		if keep[s.ID] {
+			out = append(out, s)
+		}
+	}
+	m.sensors = out
+	return m
 }
 
 // Behave makes the module play a pattern of the mock fleet: how it reports (Telemetry), how it answers commands
@@ -93,12 +116,17 @@ func (m *Module) Telemetry(at time.Time) ([]byte, error) {
 	if m.telemetry == "silent" {
 		return nil, nil
 	}
-	observed := at.UTC()
+	// readings are taken at the start of the minute: energy counts a power sample only at a minute slot (D07)
+	observed := at.UTC().Truncate(time.Minute)
 	if m.telemetry == "invalid_time" {
 		observed = observed.Add(time.Hour)
 	}
-	b := Batch{DeviceID: m.DeviceID, Measurements: make([]Measurement, 0, len(Sensors))}
-	for _, s := range Sensors {
+	sensors := m.sensors
+	if sensors == nil {
+		sensors = Sensors
+	}
+	b := Batch{DeviceID: m.DeviceID, Measurements: make([]Measurement, 0, len(sensors))}
+	for _, s := range sensors {
 		m.sequence++
 		v := math.Round((s.Base+(m.rng.Float64()*2-1)*s.Swing)*100) / 100
 		unit := s.Unit
