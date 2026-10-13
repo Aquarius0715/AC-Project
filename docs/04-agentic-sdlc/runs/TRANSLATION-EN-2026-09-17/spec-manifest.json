@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "23f3b1caa5243a8313cc0a53131b3a26e5fd9aa45f77389bad47aac1d1ca9161",
+  "spec_baseline_id": "d6512ca00830e82361c5153cbbc8a0d2f1661feb0aa78f1917746ef439a861d3",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -150,7 +150,7 @@
     },
     {
       "path": "02-design/operation-persistence-map.csv",
-      "sha256": "c1633e457f0638af217f101b2e8af9108bf94b32ee05fa2f1fc2e46558866ebb"
+      "sha256": "e75252a5dc5e41ccf0407f5e0f1df54329f6d386f7e535fd9ba859a9583ddf7b"
     },
     {
       "path": "02-design/query-catalog.csv",

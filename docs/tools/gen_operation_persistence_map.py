@@ -194,6 +194,6 @@ for r in rows:
     out.append({'operation':name,'mode':r['mode'],'module':mname,'own_reads':';'.join(ro),'own_writes':';'.join(wo),'other_module_calls':';'.join(calls),'write_side_effects':r['write_side_effects'],'notes':r['notes']})
 rows=out
 #W
-w = csv.DictWriter(open(D + 'operation-persistence-map.csv', 'w', newline=''), fieldnames=list(rows[0].keys()))
+w = csv.DictWriter(open(D + 'operation-persistence-map.csv', 'w', newline=''), fieldnames=list(rows[0].keys()), lineterminator='\n')  # LF, as git stores it
 w.writeheader(); w.writerows(rows)
 print(len(rows),'rows; writes without own table:',[r['operation'] for r in rows if r['mode']=='write' and not r['own_writes']])
