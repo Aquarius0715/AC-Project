@@ -120,19 +120,20 @@ func Deliver(ctx context.Context, tx pgx.Tx, s Sender, apps Apps, now time.Time,
 		to, key, role string
 		params        []byte
 		attempts      int
+		ended         bool // the recipient's membership has ended: the e-mail is suppressed, not sent
 	}
-	rows, err := tx.Query(ctx, `SELECT n.id, u.email::text, n.template_key, m.role, n.params, COALESCE(d.attempts, 0)
+	rows, err := tx.Query(ctx, `SELECT n.id, u.email::text, n.template_key, m.role, n.params, COALESCE(d.attempts, 0), m.valid_until IS NOT NULL AND m.valid_until <= $3
 		FROM notify.notifications n JOIN identity.memberships m ON m.id = n.recipient_membership_id JOIN identity.users u ON u.id = m.user_id
 		LEFT JOIN notify.deliveries d ON d.notification_id = n.id AND d.channel = 'email'
 		WHERE n.channel = 'email' AND (d.id IS NULL OR (d.state = 'failed' AND d.attempts < $1))
-		ORDER BY n.occurred_at LIMIT $2`, maxAttempts, limit)
+		ORDER BY n.occurred_at LIMIT $2`, maxAttempts, limit, now)
 	if err != nil {
 		return 0, err
 	}
 	var ns []pending
 	for rows.Next() {
 		var p pending
-		if err := rows.Scan(&p.id, &p.to, &p.key, &p.role, &p.params, &p.attempts); err != nil {
+		if err := rows.Scan(&p.id, &p.to, &p.key, &p.role, &p.params, &p.attempts, &p.ended); err != nil {
 			rows.Close()
 			return 0, err
 		}
@@ -146,12 +147,18 @@ func Deliver(ctx context.Context, tx pgx.Tx, s Sender, apps Apps, now time.Time,
 		var params map[string]any
 		_ = json.Unmarshal(p.params, &params)
 		subject, body := notificationMail(p.key, params, p.role, apps)
-		msgID, err := s.Send(ctx, p.to, subject, body)
+		var msgID string
+		var err error
 		state, reason := "sent", (*string)(nil)
-		if err != nil {
-			state, reason = "failed", ptr(err.Error())
-		} else {
-			sent++
+		switch {
+		case p.ended: // a disabled or removed account gets no more e-mails (recorded, never retried)
+			state, reason = "suppressed", ptr("membership ended")
+		default:
+			if msgID, err = s.Send(ctx, p.to, subject, body); err != nil {
+				state, reason = "failed", ptr(err.Error())
+			} else {
+				sent++
+			}
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO notify.deliveries (tenant_id, notification_id, channel, state, provider_message_id, failure_reason, attempts, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, 'email', $2, NULLIF($3, ''), $4, $5, $6)

@@ -325,3 +325,46 @@ func (f *fakeMail) Send(_ context.Context, to, subject, body string) (string, er
 	f.sent = append(f.sent, sentMail{to, subject, body})
 	return uuid.NewString(), nil
 }
+
+// TestNotificationMail (IR418): an e-mail notification goes to the recipient's address; one whose recipient's
+// membership has ended is recorded as suppressed and never sent.
+func TestNotificationMail(t *testing.T) {
+	s := server(t)
+	note := func(membership string) string {
+		id := uuid.NewString()
+		owner(t, `INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel, template_key, target, params, severity, occurred_at)
+			VALUES ($1, $2, $3, 1, 'fault', 'email', 'alert', '{"kind":"unit","id":"`+seed.ID("unit-online-rto").String()+`"}', '{"targetName":"Mail AC","status":"open"}', 'warning', $4)`,
+			id, seed.ID("tenant-a"), membership, clock)
+		return id
+	}
+	member := func(until time.Time) string {
+		id := uuid.NewString()
+		owner(t, `INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from, valid_until)
+			VALUES ($1, $2, $3, $4, 'client', 'member', $5, $6)`, id, seed.ID("tenant-a"), newUser(t), seed.ID("org-customer-a"), clock.Add(-time.Hour), until)
+		return id
+	}
+	active, ended := note(member(clock.Add(time.Hour))), note(member(clock.Add(-time.Minute)))
+	sender := &fakeMail{}
+	if _, err := notify.DeliverAll(context.Background(), s.DB, sender, notify.Apps{Customer: "http://c"}, clock, 500); err != nil {
+		t.Fatal(err)
+	}
+	state := func(id string) (st, reason string) {
+		ownerScan(t, `SELECT state, COALESCE(failure_reason, '') FROM notify.deliveries WHERE notification_id = $1 AND channel = 'email'`, []any{id}, &st, &reason)
+		return
+	}
+	if st, _ := state(active); st != "sent" {
+		t.Errorf("active recipient: %s", st)
+	}
+	if st, reason := state(ended); st != "suppressed" || reason != "membership ended" {
+		t.Errorf("ended recipient: %s %s", st, reason)
+	}
+	mail := 0
+	for _, m := range sender.sent {
+		if m.subject == "Alert: Mail AC" {
+			mail++
+		}
+	}
+	if mail != 1 {
+		t.Errorf("sent %d alert e-mails, want 1", mail)
+	}
+}
