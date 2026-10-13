@@ -144,7 +144,7 @@ Rules that need data from more than one schema or from the clock (scope, validit
 | `platform.outbox` | none | Published rows deleted after 7 days; as built, rows every subscriber applied (IR428) | Hourly cleanup (`worker --role=outbox`, IR428) |
 | `platform.idempotency_keys` | none | 24 hours | Hourly cleanup by `expires_at` (IR428) |
 | `platform.processed_events` | none | 14 days (longer than the SQS retention), once the event has left the outbox | Hourly cleanup (IR428); `platform.event_failures` rows go with their event |
-| `notify.notifications`, `deliveries` | none (index on time) | 2 years | Monthly cleanup (planned) |
+| `notify.notifications`, `deliveries` | none (index on time) | 2 years (and `outbound_mail` no longer queued) | Hourly cleanup with the platform tables (IR428) |
 
 The schema file creates only `DEFAULT` partitions so that it runs anywhere; production creates real partitions through pg_partman before the first write. Measurement writes use `COPY` (pgx `CopyFrom`) in batches; indexes are the primary key `(sensor_id, observed_at, sequence)`, `(unit_id, metric, observed_at DESC)` for the 24-hour chart (FR-T03), and a BRIN index on `observed_at`.
 

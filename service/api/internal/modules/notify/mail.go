@@ -267,3 +267,49 @@ func CancelInvites(ctx context.Context, tx pgx.Tx, invite uuid.UUID) error {
 	_, err := tx.Exec(ctx, `UPDATE notify.outbound_mail SET state = 'cancelled' WHERE invite_id = $1 AND state IN ('queued', 'failed')`, invite)
 	return err
 }
+
+// Retention is how long the notifications, their deliveries and the sent invitation e-mails are kept (database design
+// §6, IR428).
+const Retention = 2 * 365 * 24 * time.Hour
+
+// Sweep deletes, in the tenant of tx, the notifications older than Retention with their deliveries, and the outbound
+// e-mails created before then that are no longer waiting to be sent. It answers how many rows went.
+func Sweep(ctx context.Context, tx pgx.Tx, now time.Time) (int64, error) {
+	cut := now.Add(-Retention)
+	var n int64
+	for _, q := range []string{
+		`DELETE FROM notify.deliveries d USING notify.notifications x WHERE x.id = d.notification_id AND x.occurred_at < $1`,
+		`DELETE FROM notify.notifications WHERE occurred_at < $1`,
+		`DELETE FROM notify.outbound_mail WHERE created_at < $1 AND state <> 'queued'`,
+	} {
+		tag, err := tx.Exec(ctx, q, cut)
+		if err != nil {
+			return n, err
+		}
+		n += tag.RowsAffected()
+	}
+	return n, nil
+}
+
+// SweepAll runs Sweep for every tenant, each in its own transaction with the tenant set (row-level security).
+func SweepAll(ctx context.Context, m *db.TxManager, now time.Time) (int64, error) {
+	var tenants []uuid.UUID
+	rows, err := m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
+	if err != nil {
+		return 0, err
+	}
+	if tenants, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID]); err != nil {
+		return 0, err
+	}
+	var total int64
+	for _, t := range tenants {
+		if err := m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {
+			n, err := Sweep(ctx, tx, now)
+			total += n
+			return err
+		}); err != nil {
+			return total, err
+		}
+	}
+	return total, nil
+}

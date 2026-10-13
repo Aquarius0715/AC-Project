@@ -399,6 +399,20 @@ func TestNotificationMail(t *testing.T) {
 	if mail != 1 {
 		t.Errorf("sent %d alert e-mails, want 1", mail)
 	}
+	// retention (IR428): a notification older than two years goes with its delivery; a recent one stays
+	owner(t, `UPDATE notify.notifications SET occurred_at = $2 WHERE id = $1`, active, clock.Add(-notify.Retention-time.Hour))
+	if _, err := notify.SweepAll(context.Background(), s.DB, clock); err != nil {
+		t.Fatal(err)
+	}
+	var left int
+	ownerScan(t, `SELECT (SELECT count(*) FROM notify.notifications WHERE id = $1) + (SELECT count(*) FROM notify.deliveries WHERE notification_id = $1)`, []any{active}, &left)
+	if left != 0 {
+		t.Errorf("an old notification and its delivery: %d rows left", left)
+	}
+	ownerScan(t, `SELECT count(*) FROM notify.notifications WHERE id = $1`, []any{ended}, &left)
+	if left != 1 {
+		t.Errorf("a recent notification was swept")
+	}
 }
 
 // TestDisabledAccountStaysClosed (IR420): HQ extending the membership of an account its contractor disabled does not

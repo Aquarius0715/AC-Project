@@ -118,7 +118,8 @@ func envOr(key, def string) string {
 }
 
 // runHousekeeping deletes, every hour, the outbox events every subscriber has applied, the records of events no
-// longer in the outbox and the expired idempotency keys (events.Housekeep, IR428). It runs on the all-domain role so
+// longer in the outbox and the expired idempotency keys (events.Housekeep), and the notifications and sent e-mails
+// older than two years (notify.SweepAll, IR428). It runs on the all-domain role so
 // it knows every consumer's subscriptions; the outbox relay to SNS joins this role later.
 func runHousekeeping(ctx context.Context) {
 	logger := logging.New(os.Stdout, "outbox")
@@ -134,10 +135,16 @@ func runHousekeeping(ctx context.Context) {
 	t := time.NewTicker(time.Hour)
 	defer t.Stop()
 	for {
-		if s, err := events.Housekeep(ctx, srv.DB, srv.Registry.Clock(), srv.Consumers); err != nil {
+		now := srv.Registry.Clock()
+		if s, err := events.Housekeep(ctx, srv.DB, now, srv.Consumers); err != nil {
 			log.Printf("housekeeping: %v", err)
 		} else {
 			log.Printf("housekeeping: removed %d outbox events, %d processed-event records, %d failure records, %d idempotency keys", s.Outbox, s.Processed, s.Failures, s.IdempotencyKeys)
+		}
+		if n, err := notify.SweepAll(ctx, srv.DB, now); err != nil { // notifications and sent e-mails older than 2 years
+			log.Printf("housekeeping: notifications: %v", err)
+		} else if n > 0 {
+			log.Printf("housekeeping: removed %d notification and e-mail rows older than 2 years", n)
 		}
 		select {
 		case <-ctx.Done():

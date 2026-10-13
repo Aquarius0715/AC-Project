@@ -6602,5 +6602,5 @@ Found in review: the outbox consumers (IR183) stop at the first failing event to
 Found in review: database design §6 sets the retention of the outbox (7 days), the idempotency keys (24 hours) and the processed-event records (14 days), but nothing deleted any of them; the tables grew without bound, and the `outbox` worker role only idled.
 
 1. `worker --role=outbox` runs `events.Housekeep` every hour on the business clock: it deletes outbox events older than 7 days that every consumer subscribing to their type has applied or dead-lettered (an event a consumer still needs stays), the processed-event records of events no longer in the outbox once they are 14 days old (so nothing is delivered twice), the failure records of such events (IR427), and the expired idempotency keys tenant by tenant (row-level security). Each run logs what it removed.
-2. The two-year cleanup of `notify.notifications` / `deliveries` stays planned.
-3. Test: `TestHousekeep`.
+2. The same run deletes, tenant by tenant, the notifications older than two years with their deliveries, and the outbound e-mails created before then that are no longer queued (`notify.SweepAll`).
+3. Tests: `TestHousekeep`, `TestNotificationMail` (an old notification goes with its delivery, a recent one stays).
