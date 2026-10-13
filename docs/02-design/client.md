@@ -650,7 +650,7 @@ Scope: FR-C19 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 **Steps**
 
 1. `clientUsers.list` (customerId = own customer) shows name, e-mail, role, status, and last sign-in; the owner's own row is marked “(you)” and has no actions.
-2. + Invite user opens a centered dialog (e-mail, role Member/Owner) → `clientUsers.save` without id → the list refetches and an invitation preview is shown.
+2. + Invite user opens a centered dialog (e-mail, role Member/Owner) → `clientUsers.save` without id → the list refetches and the invitation e-mail is queued (IR418).
 3. On an invite: Resend invite (`clientUsers.resendInvite`, queues the invitation e-mail again, IR418), Edit (e-mail, role, reason → `clientUsers.save` with id and version), Remove (reason → `clientUsers.remove`).
 4. On an accepted user: Change role, Disable / Enable (reason → `clientUsers.save` with clientRole / status) and Remove (reason → `clientUsers.remove`).
 
