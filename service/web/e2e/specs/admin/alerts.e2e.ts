@@ -44,25 +44,26 @@ test("the alerts tab filters in the URL and opens a job or the unit from an aler
 });
 
 // IR327: the Resolve dialog lists the evidence candidates of alerts.evidence — the seed's five valid readings of the
-// Bedroom AC after the policy-free "Possible open window" was detected, and no evidence attached at detection — and an
+// Bedroom AC (and the IoT demo's live ones, when it runs) after the policy-free "Possible open window" was detected, and no evidence attached at detection — and an
 // alert without a policy needs a reason and at least one of them. Nothing is resolved: the dialog is cancelled.
 test("the Resolve dialog requires evidence for an alert without a policy", async ({ page }) => {
   await page.goto("/admin/alerts");
   const main = page.getByRole("main");
-  await main.getByRole("button", { name: /Possible open window/ }).click();
+  await main.getByRole("button", { name: /Possible open window/ }).filter({ hasText: "Bedroom AC" }).first().click(); // not a mock fleet unit's
   await page.waitForURL(/alertId=/);
   await main.getByRole("button", { name: "Resolve…" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "Resolve alert" })).toBeVisible();
   await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   const evidence = dialog.getByRole("group", { name: "Resolution evidence · required" });
-  await expect(evidence.getByRole("checkbox", { name: /^Remeasurement · / })).toHaveCount(5);
+  // the seed's five readings, and more once the IoT demo's simulator reports for the unit
+  await expect(evidence.getByRole("checkbox", { name: /^Remeasurement · / }).nth(4)).toBeVisible();
   await expect(evidence.getByRole("checkbox", { name: /Evidence attached to this alert/ })).toBeDisabled(); // none attached
 
   await dialog.getByRole("button", { name: "Resolve alert" }).click(); // checked before anything is sent
   await expect(dialog).toContainText("A reason is required");
   await expect(dialog).toContainText("Pick at least one evidence record — this alert has no policy");
-  await evidence.getByRole("checkbox", { name: /^Remeasurement · Temperature 28\.0 °C/ }).check();
+  await evidence.getByRole("checkbox", { name: /^Remeasurement · / }).first().check();
   await expect(dialog).not.toContainText("Pick at least one evidence record");
   await dialog.getByLabel("Resolution reason · required").fill("Window closed");
   await expect(dialog).toContainText("13 / 1000");

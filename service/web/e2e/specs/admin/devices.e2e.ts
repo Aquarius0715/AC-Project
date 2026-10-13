@@ -1,7 +1,8 @@
 // HQ IoT devices (FR-A04, DD-A04, Figma Admin 246:2, IR319): the list is sorted by serial with the state chips — All,
 // Online, Offline, Tamper, No sensors — and a search; the detail shows the tiles, the bound unit, the actions, sensors
 // with Calibrate, the operation and calibration history and the events. In the seed AC-DEMO-0003 (Meeting room AC)
-// is offline and AC-DEMO-0005 (Bedroom AC B) has no sensors. Nothing is sent to a device.
+// is offline and AC-DEMO-0005 (Bedroom AC B) has no sensors; the state checks look at the seed's AC-DEMO devices, since
+// the IoT demo's mock fleet (AC-MOCK-…, SEED_MOCK_FLEET) adds a device for every state. Nothing is sent to a device.
 import { test, expect } from "../../fixtures/test";
 
 test("the device list filters by state and the detail shows the device as Figma draws it", async ({ page }) => {
@@ -10,14 +11,15 @@ test("the device list filters by state and the detail shows the device as Figma 
   const list = main.getByRole("heading", { name: "Devices", exact: true }).locator('xpath=ancestor::*[self::section or @data-slot="card"][1]');
   const serials = async () => (await list.getByRole("button").allInnerTexts()).map((x) => x.split("\n")[0].trim());
   await expect(list.getByRole("button").first()).toBeVisible();
+  const seed = async () => (await serials()).filter((x) => x.startsWith("AC-DEMO-"));
   const all = await serials();
   expect(all).toEqual([...all].sort()); // sorted by serial
   await main.getByRole("button", { name: /^Offline\s*\d+$/ }).click();
-  expect(await serials()).toEqual(["AC-DEMO-0003"]);
+  expect(await seed()).toEqual(["AC-DEMO-0003"]);
   await main.getByRole("button", { name: /^No sensors\s*\d+$/ }).click();
-  expect(await serials()).toEqual(["AC-DEMO-0005"]);
+  expect(await seed()).toEqual(["AC-DEMO-0005"]);
   await main.getByRole("button", { name: /^All\s*\d+$/ }).click();
-  await main.getByPlaceholder("Search serial, device or unit…").fill("0004");
+  await main.getByPlaceholder("Search serial, device or unit…").fill("DEMO-0004");
   expect(await serials()).toEqual(["AC-DEMO-0004"]);
   await main.getByPlaceholder("Search serial, device or unit…").fill("");
 

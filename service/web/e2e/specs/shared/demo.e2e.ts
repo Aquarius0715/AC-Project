@@ -27,7 +27,8 @@ test("a device loses its connection and gets it back", async ({ page }) => {
   const select = page.getByLabel("Device");
   test.skip((await select.count()) === 0, "no device this role can manage now");
   const options = await select.locator("option").allInnerTexts();
-  const online = options.findIndex((o) => / · online$/.test(o));
+  // a seed device: the IoT demo's mock fleet ("Mock · …") reconnects with its next heartbeat
+  const online = options.findIndex((o) => / · online$/.test(o) && !o.startsWith("Mock · "));
   test.skip(online < 0, "no online device to take offline");
   await select.selectOption({ index: online });
   const unit = options[online].split(" · ")[0];
