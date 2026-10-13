@@ -49,7 +49,8 @@ export function UsersView({ live }: { live: { customerId: string; customer: stri
     if (dialog.kind === "invite") return run(() => inviteUser(live.customerId, email, role), t("Invitation e-mail queued for {email}", { email: email.trim() }), close);
     const r = dialog.row;
     if (dialog.kind === "remove") return run(() => removeUser(r.id, r.version, reason), t("{name} removed", { name: name(r) }), close);
-    if (dialog.kind === "edit") return run(() => updateUser(r.id, r.version, live.customerId, email, role, null, reason), t("Invite changed for {email}", { email: email.trim() }), close);
+    // a corrected address gets the invitation (IR426)
+    if (dialog.kind === "edit") return run(() => updateUser(r.id, r.version, live.customerId, email, role, null, reason), t(email.trim().toLowerCase() !== r.email.toLowerCase() ? "Invite changed — invitation e-mail queued for {email}" : "Invite changed for {email}", { email: email.trim() }), close);
     if (dialog.kind === "role") return run(() => updateUser(r.id, r.version, live.customerId, r.email, role, null, reason), t(role === "owner" ? "{name} is now an owner" : "{name} is now a member", { name: name(r) }), close);
     const status = dialog.kind === "disable" ? "disabled" : "active";
     run(() => updateUser(r.id, r.version, live.customerId, r.email, r.role, status, reason), t(status === "disabled" ? "{name} disabled — they can no longer sign in" : "{name} enabled again", { name: name(r) }), close);

@@ -56,7 +56,8 @@ export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersD
     if (!dialog || emailErr || reasonErr) return;
     const who = dialog.kind === "invite" ? email.trim() : dialog.row.name ?? dialog.row.email;
     if (dialog.kind === "invite") run(() => ops.invite(email, role), sends ? t("Invitation e-mail queued for {email}", { email: who }) : t("Invitation preview created for {email} — nothing is sent in the demo", { email: who }), close);
-    else if (dialog.kind === "edit") run(() => ops.edit(dialog.row, email, role, reason), t("Invite changed for {email}", { email: email.trim() }), close);
+    // a corrected address gets the invitation (IR426)
+    else if (dialog.kind === "edit") run(() => ops.edit(dialog.row, email, role, reason), t(sends && email.trim().toLowerCase() !== dialog.row.email.toLowerCase() ? "Invite changed — invitation e-mail queued for {email}" : "Invite changed for {email}", { email: email.trim() }), close);
     else if (dialog.kind === "remove") run(() => ops.remove(dialog.row, reason), t("{name} removed", { name: who }), close);
     else run(() => ops.setStatus(dialog.row, dialog.kind === "disable" ? "disabled" : "active", reason), t(dialog.kind === "disable" ? "{name} disabled — they can no longer sign in" : "{name} enabled again", { name: who }), close);
   };
