@@ -44,6 +44,10 @@ func TestTriggersUseTheFixtureIDs(t *testing.T) {
 	if tr.Measurement.Value == nil || *tr.Measurement.Value != 24.5 || !tr.Measurement.ReceivedAt.Equal(received) {
 		t.Errorf("value or receipt time %+v", tr.Measurement)
 	}
+	// the API keys a repeat on the measurement's own event ID and the scenario sequence: both must be the reading's
+	if tr.Measurement.Quality != "valid" || tr.Measurement.EventID != tr.EventID || tr.Measurement.Sequence == nil || *tr.Measurement.Sequence != 1 {
+		t.Errorf("quality, event ID or sequence of the measurement: %+v", tr.Measurement)
+	}
 }
 
 // TestEventIDIsOnePerReading: the same reading twice has the same event ID (a redelivery is one event), and the next

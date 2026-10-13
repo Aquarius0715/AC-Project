@@ -77,6 +77,11 @@ type Measurement struct {
 	ObservedAt time.Time `json:"observedAt"`
 	ReceivedAt time.Time `json:"receivedAt"`
 	Origin     string    `json:"origin"`
+	Quality    string    `json:"quality"`
+	Sequence   *int64    `json:"sequence,omitempty"`
+	// EventID is the key the API checks for a repeat of this reading; without it every reading shares the nil ID and all
+	// but the first are taken as repeats (and dropped without an error).
+	EventID uuid.UUID `json:"eventId"`
 }
 
 // Triggers converts one telemetry batch. A device the links do not know, or a sensor it does not have, is an error for
@@ -102,14 +107,17 @@ func (r *Resolver) Triggers(b devicesim.Batch, received time.Time) ([]Trigger, e
 			continue
 		}
 		v := m.Value
+		seq := m.Sequence
+		event := uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/%d", b.DeviceID, m.Sequence)))
 		out = append(out, Trigger{
 			ScenarioID: Scenario,
-			EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/%d", b.DeviceID, m.Sequence))),
+			EventID:    event,
 			OccurredAt: m.ObservedAt,
 			EventType:  "telemetry",
 			Measurement: Measurement{
 				UnitID: t.unit, SensorID: sensor, Metric: m.Metric, Value: &v, Unit: m.Unit,
-				ObservedAt: m.ObservedAt, ReceivedAt: received.UTC(), Origin: "measured",
+				ObservedAt: m.ObservedAt, ReceivedAt: received.UTC(), Origin: "measured", Quality: "valid",
+				Sequence: &seq, EventID: event,
 			},
 		})
 	}
