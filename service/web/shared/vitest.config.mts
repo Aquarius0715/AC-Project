@@ -10,5 +10,7 @@ const here = fileURLToPath(new URL(".", import.meta.url)).replace(/\/$/, "");
 export default defineConfig({
   plugins: [react()],
   resolve: { alias: { "@ac/web": here } },
-  test: { environment: "jsdom", include: ["**/*.test.{ts,tsx}"], exclude: ["**/node_modules/**", "**/.next/**"] },
+  // 30 s per test: the guards that parse every source file of the four apps (contract, controls, i18n, icons) take a
+  // few seconds here and more on a busy CI runner, where the default 5 s timed out
+  test: { environment: "jsdom", include: ["**/*.test.{ts,tsx}"], exclude: ["**/node_modules/**", "**/.next/**"], testTimeout: 30_000 },
 });
