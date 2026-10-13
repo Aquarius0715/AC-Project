@@ -247,7 +247,7 @@ Rules every handler follows:
 
 ## 7. Workers
 
-All workers share `internal/platform/events` (SNS FIFO publish, SQS long-poll consume, visibility extension, dead-letter after 5 receives) and record consumed event IDs in `platform.processed_events` inside the same transaction as their effect.
+All workers share `internal/platform/events` (SNS FIFO publish, SQS long-poll consume, visibility extension, dead-letter after 5 receives) and record consumed event IDs in `platform.processed_events` inside the same transaction as their effect. As built (IR183, IR427): each consumer polls `platform.outbox` in `seq` order; a failing event is retried 1, 2, 4 and 8 minutes after the attempt before while the events after it wait, and after the fifth failure it is dead-lettered (`platform.event_failures.dead_at`, logged) and skipped. The SNS/SQS relay replaces the polling with the same handler contract.
 
 | Role (`--role=`) | Input | Work | Notes |
 |---|---|---|---|

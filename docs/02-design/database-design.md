@@ -19,7 +19,7 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 
 | Schema | Owning module | Main tables |
 |---|---|---|
-| platform | shared infrastructure | tenants, outbox, idempotency_keys, scheduled_items, processed_events, stream_checkpoints, demo_clock (demo environment only, IR168) |
+| platform | shared infrastructure | tenants, outbox, idempotency_keys, scheduled_items, processed_events, event_failures (IR427), stream_checkpoints, demo_clock (demo environment only, IR168) |
 | identity | Identity & access | users, organizations, memberships, membership_permissions, membership_scopes, qualification_grants, permissions (38), preferences, two_factor, consents, client_users |
 | assets | Assets | customers, properties, spaces, units, unit_alert_policies, unit_imports, unit_import_previews (30-minute CSV validation results written outside the read transaction of `units.importPreview`, purged after expiry), warranty_reminders (the BR-A19 reminders sent, IR340), unit_offer_access and unit_assignment_access (projections of accepted Offers and of Assignments with an `active` flag for the unit scope and the diagnostic-run scope, fed by change-capture events, IR186, IR187) |
 | devices | Devices | capabilities (versioned), devices, sensors, device_bindings, device_operations, device_events, device_event_notes, calibration_records, firmware_campaigns, firmware_campaign_devices |

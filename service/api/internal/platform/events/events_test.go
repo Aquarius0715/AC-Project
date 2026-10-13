@@ -3,8 +3,11 @@ package events
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -74,7 +77,8 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 
 	var seen []int
 	fail := true
-	c := &Consumer{Name: "test-" + uuid.NewString(), DB: m, Batch: 1, Handlers: map[string]Handler{typ: func(ctx context.Context, tx pgx.Tx, e Event) error {
+	clock := time.Now()
+	c := &Consumer{Name: "test-" + uuid.NewString(), DB: m, Batch: 1, Now: func() time.Time { return clock }, Handlers: map[string]Handler{typ: func(ctx context.Context, tx pgx.Tx, e Event) error {
 		var p struct{ N int }
 		if err := e.Decode(&p); err != nil {
 			return err
@@ -94,6 +98,11 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 		t.Fatalf("first drain: n=%d seen=%v err=%v", n, seen, err)
 	}
 	fail = false
+	// the retry waits a minute after the failure (IR427)
+	if n, err := c.Drain(ctx); err != nil || n != 0 || len(seen) != 1 {
+		t.Fatalf("before the pause: n=%d seen=%v err=%v", n, seen, err)
+	}
+	clock = clock.Add(time.Minute)
 	if n, err := c.Drain(ctx); err != nil || n != 1 || len(seen) != 2 || seen[1] != 2 {
 		t.Fatalf("retry: n=%d seen=%v err=%v", n, seen, err)
 	}
@@ -110,4 +119,61 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 		t.Fatalf("replay: done=%v seen=%v err=%v", done, seen, err)
 	}
 	_ = second
+}
+
+// TestConsumerDeadLetters (IR427): an event that fails MaxAttempts times, 1, 2, 4 and 8 minutes apart, is recorded as
+// dead and skipped, and the events after it are applied; until then they wait behind it.
+func TestConsumerDeadLetters(t *testing.T) {
+	ctx := context.Background()
+	m := testDB(t)
+	var tenant uuid.UUID
+	if err := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT id FROM platform.tenants ORDER BY id LIMIT 1`).Scan(&tenant)
+	}); err != nil {
+		t.Skip("no tenant seeded:", err)
+	}
+	typ := "Poison" + uuid.NewString()[:8]
+	poison := emit(t, m, tenant, typ, `{"n":1}`)
+	emit(t, m, tenant, typ, `{"n":2}`)
+	clock := time.Now()
+	var applied []int
+	var logged []string
+	c := &Consumer{Name: "test-" + uuid.NewString(), DB: m, Now: func() time.Time { return clock },
+		Logf: func(f string, a ...any) { logged = append(logged, fmt.Sprintf(f, a...)) },
+		Handlers: map[string]Handler{typ: func(_ context.Context, _ pgx.Tx, e Event) error {
+			var p struct{ N int }
+			_ = e.Decode(&p)
+			if p.N == 1 {
+				return errors.New("never applies")
+			}
+			applied = append(applied, p.N)
+			return nil
+		}}}
+	for i, pause := range []time.Duration{0, time.Minute, 2 * time.Minute, 4 * time.Minute} {
+		clock = clock.Add(pause)
+		if _, err := c.Drain(ctx); err == nil || len(applied) != 0 {
+			t.Fatalf("attempt %d: err=%v applied=%v", i+1, err, applied)
+		}
+	}
+	clock = clock.Add(8*time.Minute - time.Second)
+	if n, err := c.Drain(ctx); n != 0 || err != nil {
+		t.Fatalf("before the last pause: n=%d err=%v", n, err)
+	}
+	clock = clock.Add(time.Second)
+	if n, err := c.Drain(ctx); n != 1 || err != nil || len(applied) != 1 || applied[0] != 2 {
+		t.Fatalf("fifth attempt: n=%d err=%v applied=%v", n, err, applied)
+	}
+	var attempts int
+	var dead bool
+	if err := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT attempts, dead_at IS NOT NULL FROM platform.event_failures WHERE consumer = $1 AND event_id = $2`, c.Name, poison).Scan(&attempts, &dead)
+	}); err != nil || attempts != MaxAttempts || !dead {
+		t.Fatalf("failure record: attempts=%d dead=%v err=%v", attempts, dead, err)
+	}
+	if len(logged) != 1 || !strings.Contains(logged[0], "dead-lettered") {
+		t.Errorf("logged: %q", logged)
+	}
+	if n, err := c.Drain(ctx); n != 0 || err != nil {
+		t.Errorf("after the dead letter: n=%d err=%v", n, err)
+	}
 }

@@ -6588,3 +6588,11 @@ Found in review: correcting the address of a pending invite sent nothing to the 
 1. `notify.outbound_mail.invite_id` names the client or partner user an invitation is for, and the new state `cancelled` marks one that will not be sent.
 2. `clientUsers.save` / `partnerUsers.save` on a pending invite whose e-mail changes cancel its unsent invitations, queue the invitation to the new address and start the resend pause then. `clientUsers.remove` / `partnerUsers.remove` cancel the unsent invitations of the invite.
 3. Test: `TestInviteMailFollowsTheInvite`.
+
+## IR427 An event that keeps failing is dead-lettered instead of stopping its consumer — 2026-10-14
+
+Found in review: the outbox consumers (IR183) stop at the first failing event to keep the order, and retried it on every poll without a bound or a pause. One event that could never apply (a handler bug, data it does not accept) stopped that consumer for every tenant for good, with only a log line each poll. Backend architecture §8 asks for bounded retries with backoff and dead letters.
+
+1. `platform.event_failures` (consumer, event, attempts, last error, last attempt, `dead_at`) records each failed attempt. The consumer retries the event 1, 2, 4 and 8 minutes after the attempt before (the events after it wait, so the order holds) and, after the fifth failure, dead-letters it: `dead_at` is set, the event is recorded as processed for that consumer, the log names it, and the events after it are applied.
+2. A dead-lettered event is replayed by deleting its rows for that consumer from `platform.processed_events` and `platform.event_failures` once the cause is fixed.
+3. Tests: `TestConsumerOrderDedupAndRetry` (the retry waits a minute), `TestConsumerDeadLetters` (five attempts at 0, 1, 2, 4 and 8 minutes, then skipped and recorded).

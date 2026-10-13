@@ -11,6 +11,7 @@ package events
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -31,6 +32,9 @@ type Event struct {
 	Payload       json.RawMessage
 	CorrelationID string
 	OccurredAt    time.Time
+
+	failures    int        // this consumer's failed attempts on the event (IR427)
+	lastFailure *time.Time // the last of them
 }
 
 // Decode unmarshals the payload into v.
@@ -47,10 +51,57 @@ type Consumer struct {
 	Handlers map[string]Handler // by event type
 	Batch    int                // events per poll (default 100)
 	Logf     func(string, ...any)
+	Now      func() time.Time // the wall clock of the retry pauses (default time.Now)
+}
+
+// MaxAttempts bounds how often a consumer tries one event (backend architecture §8 "Dead letters", IR427). A failing
+// event is retried 1, 2, 4 and 8 minutes after the attempt before, and the events after it wait, so the order holds;
+// after the fifth failure it is dead-lettered: recorded in platform.event_failures, logged, and skipped, so one
+// event that can never apply does not stop the consumer for every tenant.
+const MaxAttempts = 5
+
+func (c *Consumer) now() time.Time {
+	if c.Now != nil {
+		return c.Now()
+	}
+	return time.Now()
+}
+
+// retryWait answers how long the event must still wait after its last failure (0: due, or it never failed).
+func (c *Consumer) retryWait(e Event) time.Duration {
+	if e.failures == 0 || e.lastFailure == nil {
+		return 0
+	}
+	return max(0, e.lastFailure.Add(time.Minute<<(e.failures-1)).Sub(c.now()))
+}
+
+// failed records a failed attempt; on the last one the event is dead-lettered (skipped from now on). It answers
+// whether the event is dead.
+func (c *Consumer) failed(ctx context.Context, e Event, cause error) (bool, error) {
+	dead := false
+	err := c.DB.Run(ctx, false, nil, func(tx pgx.Tx) error {
+		var attempts int
+		if err := tx.QueryRow(ctx, `INSERT INTO platform.event_failures (consumer, event_id, attempts, last_error, last_attempt_at) VALUES ($1, $2, 1, $3, $4)
+			ON CONFLICT (consumer, event_id) DO UPDATE SET attempts = platform.event_failures.attempts + 1, last_error = EXCLUDED.last_error, last_attempt_at = EXCLUDED.last_attempt_at
+			RETURNING attempts`, c.Name, e.ID, cause.Error(), c.now()).Scan(&attempts); err != nil {
+			return err
+		}
+		if attempts < MaxAttempts {
+			return nil
+		}
+		dead = true
+		if _, err := tx.Exec(ctx, `UPDATE platform.event_failures SET dead_at = $3 WHERE consumer = $1 AND event_id = $2`, c.Name, e.ID, c.now()); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `INSERT INTO platform.processed_events (consumer, event_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, c.Name, e.ID)
+		return err
+	})
+	return dead, err
 }
 
 // Drain applies every pending event once, in order, and returns how many were applied. It stops at the first
-// failing event so events of the same aggregate are never applied out of order; the failure is returned.
+// failing event, and at one still waiting for its retry, so events are never applied out of order; the failure is
+// returned. An event that failed MaxAttempts times is dead-lettered and the drain goes on (IR427).
 func (c *Consumer) Drain(ctx context.Context) (int, error) {
 	if len(c.Handlers) == 0 {
 		return 0, nil
@@ -73,9 +124,22 @@ func (c *Consumer) Drain(ctx context.Context) (int, error) {
 			return applied, nil
 		}
 		for _, e := range pending {
+			if c.retryWait(e) > 0 {
+				return applied, nil // its retry is not due: the events after it wait too
+			}
 			done, err := c.apply(ctx, e)
 			if err != nil {
-				return applied, fmt.Errorf("events: %s %s %s: %w", c.Name, e.Type, e.ID, err)
+				dead, ferr := c.failed(ctx, e, err)
+				if ferr != nil {
+					return applied, errors.Join(err, ferr)
+				}
+				if !dead {
+					return applied, fmt.Errorf("events: %s %s %s: %w", c.Name, e.Type, e.ID, err)
+				}
+				if c.Logf != nil {
+					c.Logf("consumer %s: dead-lettered %s %s after %d attempts: %v", c.Name, e.Type, e.ID, MaxAttempts, err)
+				}
+				continue
 			}
 			if done {
 				applied++
@@ -90,8 +154,9 @@ func (c *Consumer) Drain(ctx context.Context) (int, error) {
 func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Event, error) {
 	var out []Event
 	err := c.DB.Run(ctx, true, nil, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT o.id, o.seq, o.tenant_id, o.aggregate_type, o.aggregate_id, o.event_type, o.payload, o.correlation_id, o.occurred_at
-			FROM platform.outbox o
+		rows, err := tx.Query(ctx, `SELECT o.id, o.seq, o.tenant_id, o.aggregate_type, o.aggregate_id, o.event_type, o.payload, o.correlation_id, o.occurred_at,
+				COALESCE(f.attempts, 0), f.last_attempt_at
+			FROM platform.outbox o LEFT JOIN platform.event_failures f ON f.consumer = $2 AND f.event_id = o.id
 			WHERE o.event_type = ANY($1)
 			  AND NOT EXISTS (SELECT 1 FROM platform.processed_events p WHERE p.consumer = $2 AND p.event_id = o.id)
 			ORDER BY o.seq LIMIT $3`, types, c.Name, limit)
@@ -101,7 +166,7 @@ func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Ev
 		defer rows.Close()
 		for rows.Next() {
 			var e Event
-			if err := rows.Scan(&e.ID, &e.Seq, &e.TenantID, &e.AggregateType, &e.AggregateID, &e.Type, &e.Payload, &e.CorrelationID, &e.OccurredAt); err != nil {
+			if err := rows.Scan(&e.ID, &e.Seq, &e.TenantID, &e.AggregateType, &e.AggregateID, &e.Type, &e.Payload, &e.CorrelationID, &e.OccurredAt, &e.failures, &e.lastFailure); err != nil {
 				return err
 			}
 			out = append(out, e)

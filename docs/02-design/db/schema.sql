@@ -122,6 +122,16 @@ CREATE TABLE platform.processed_events (       -- consumer-side de-duplication (
   PRIMARY KEY (consumer, event_id)
 );
 
+CREATE TABLE platform.event_failures (         -- failed attempts of a consumer on an event; dead_at: dead-lettered after 5 (IR427)
+  consumer        text NOT NULL,
+  event_id        uuid NOT NULL,
+  attempts        int NOT NULL,
+  last_error      text NOT NULL,
+  last_attempt_at timestamptz NOT NULL,
+  dead_at         timestamptz,
+  PRIMARY KEY (consumer, event_id)
+);
+
 CREATE TABLE platform.stream_checkpoints (     -- Kinesis shard checkpoints for the telemetry worker
   stream_name     text NOT NULL,
   shard_id        text NOT NULL,
