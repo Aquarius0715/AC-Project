@@ -69,7 +69,8 @@ func main() {
 			}
 			id := seed.ID(devicesim.DeviceName(p)).String()
 			powerOff := p.PowerSignal == "off" || (p.State.Power != nil && !*p.State.Power)
-			m := devicesim.NewModule(*tenant, id, fleet.FirmwareOf(p), seedOf(id)).Behave(p.Telemetry, p.Commands, powerOff)
+			m := devicesim.NewModule(*tenant, id, fleet.FirmwareOf(p), seedOf(id)).Behave(p.Telemetry, p.Commands, powerOff).
+				Reports(p.State.Power, p.State.Celsius, p.State.Mode, p.State.FanLevel) // the fleet's units show their state live
 			modules = append(modules, m)
 			beats[m] = p.Connection == "online"
 		}

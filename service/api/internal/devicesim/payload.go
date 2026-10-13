@@ -48,11 +48,21 @@ type Batch struct {
 	Measurements []Measurement `json:"measurements"`
 }
 
-// Heartbeat is the liveness message sent every 60 seconds.
+// Heartbeat is the liveness message sent every 60 seconds. A module that reports its air conditioner's state carries it
+// (the API keeps the unit's observed state fresh from it).
 type Heartbeat struct {
-	DeviceID string    `json:"deviceId"`
-	At       time.Time `json:"at"`
-	Firmware string    `json:"firmware"`
+	DeviceID string         `json:"deviceId"`
+	At       time.Time      `json:"at"`
+	Firmware string         `json:"firmware"`
+	State    *ReportedState `json:"state,omitempty"`
+}
+
+// ReportedState is the air conditioner's state as the module sees it: power, setpoint, mode and fan level.
+type ReportedState struct {
+	Power    *bool    `json:"power"`
+	Celsius  *float64 `json:"celsius"`
+	Mode     *string  `json:"mode"`
+	FanLevel *string  `json:"fanLevel"`
 }
 
 // Module is one simulated device: its identity, its firmware and the next sequence number of its readings.
@@ -66,7 +76,8 @@ type Module struct {
 	// behaviour of the pattern the module plays (mock fleet); empty is normal readings and applied commands
 	telemetry, commands string
 	powerOff            bool
-	sensors             []Sensor // the sensors the device has (all of Sensors unless Only narrows them)
+	sensors             []Sensor       // the sensors the device has (all of Sensors unless Only narrows them)
+	state               *ReportedState // reported with each heartbeat when set (Reports)
 }
 
 // NewModule starts a module with its own random source, so each device drifts independently.
@@ -87,6 +98,16 @@ func (m *Module) Only(names ...string) *Module {
 		}
 	}
 	m.sensors = out
+	return m
+}
+
+// Reports makes the module report its air conditioner's state with each heartbeat, starting from the given one; a
+// set-temperature command it applies changes the reported setpoint.
+func (m *Module) Reports(power *bool, celsius *float64, mode, fanLevel *string) *Module {
+	m.state = &ReportedState{Power: power, Celsius: celsius, Mode: mode, FanLevel: fanLevel}
+	if celsius != nil {
+		m.setpoint = *celsius
+	}
 	return m
 }
 
@@ -149,7 +170,7 @@ func (m *Module) Telemetry(at time.Time) ([]byte, error) {
 
 // Beat returns the heartbeat at the given time.
 func (m *Module) Beat(at time.Time) ([]byte, error) {
-	return json.Marshal(Heartbeat{DeviceID: m.DeviceID, At: at.UTC(), Firmware: m.Firmware})
+	return json.Marshal(Heartbeat{DeviceID: m.DeviceID, At: at.UTC(), Firmware: m.Firmware, State: m.state})
 }
 
 // Command is a control command the backend sends down on /cmd. ExpiresAt is when the command stops being valid; the
@@ -201,6 +222,10 @@ func (m *Module) Acknowledge(raw []byte, at time.Time) ([]byte, time.Time, error
 		result = "unsupported"
 	case c.Setpoint != nil:
 		m.setpoint = *c.Setpoint
+		if m.state != nil {
+			sp := m.setpoint
+			m.state.Celsius = &sp
+		}
 	}
 	if m.commands == "late" && result == "applied" {
 		sendAt = c.ExpiresAt.Add(2 * time.Second)

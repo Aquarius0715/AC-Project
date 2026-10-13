@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/pradita/ac-project/service/api/internal/devicesim"
 )
 
 // TestCommandMessageFromTheStoredAction: a stored set-temperature action becomes the module's command with its setpoint and
@@ -65,5 +67,23 @@ func TestCommandExpiryOnTheDeviceClock(t *testing.T) {
 	}
 	if !cmd.ExpiresAt.Equal(scenario.Add(29 * 24 * time.Hour)) {
 		t.Errorf("device expiry %v, want %v", cmd.ExpiresAt, scenario.Add(29*24*time.Hour))
+	}
+}
+
+// TestStateTriggerFromAHeartbeat: a heartbeat with a state becomes the device's state report at the scenario time;
+// one without a state reports nothing; a device ID that is not a UUID is refused.
+func TestStateTriggerFromAHeartbeat(t *testing.T) {
+	on, c := true, 24.0
+	dev := DeviceID("device-mock-cool-on")
+	at := time.Date(2026, 9, 15, 1, 30, 0, 0, time.UTC)
+	tr, ok, err := StateTrigger(devicesim.Heartbeat{DeviceID: dev.String(), State: &devicesim.ReportedState{Power: &on, Celsius: &c}}, at)
+	if err != nil || !ok || tr.EventType != "state" || tr.DeviceID == nil || *tr.DeviceID != dev || tr.State == nil || *tr.State.Celsius != 24 || !tr.OccurredAt.Equal(at) {
+		t.Fatalf("state trigger %+v ok=%v err=%v", tr, ok, err)
+	}
+	if _, ok, _ := StateTrigger(devicesim.Heartbeat{DeviceID: dev.String()}, at); ok {
+		t.Error("a heartbeat without a state reports one")
+	}
+	if _, _, err := StateTrigger(devicesim.Heartbeat{DeviceID: "nope", State: &devicesim.ReportedState{}}, at); err == nil {
+		t.Error("a bad device ID is accepted")
 	}
 }

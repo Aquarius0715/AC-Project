@@ -69,9 +69,34 @@ func TestFleetRefusesBadDefinitions(t *testing.T) {
 		"unknown telemetry": `{"patterns":[{"key":"a","telemetry":"loud"}]}`,
 		"unknown commands":  `{"patterns":[{"key":"a","commands":"maybe"}]}`,
 		"module behaviour":  `{"patterns":[{"key":"a","noDevice":true,"telemetry":"normal"}]}`,
+		"unknown room":      `{"floors":[{"key":"1f","rooms":[{"key":"r1"}]}],"patterns":[{"key":"a","room":"r2"}]}`,
+		"repeated room":     `{"floors":[{"key":"1f","rooms":[{"key":"r1"},{"key":"r1"}]}],"patterns":[]}`,
 	} {
 		if _, err := parseFleet([]byte(raw)); err == nil {
 			t.Errorf("%s: accepted", name)
 		}
+	}
+}
+
+// TestEveryUnitIsInARoom: every pattern's unit is in a room of the fleet's floors, and the rooms hold the 20 units.
+func TestEveryUnitIsInARoom(t *testing.T) {
+	f, err := MockFleet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rooms := map[string]int{}
+	for _, fl := range f.Floors {
+		for _, r := range fl.Rooms {
+			rooms[r.Key] = 0
+		}
+	}
+	for _, p := range f.Patterns {
+		if _, ok := rooms[p.Room]; !ok {
+			t.Errorf("%s is in no room (%q)", p.Key, p.Room)
+		}
+		rooms[p.Room]++
+	}
+	if len(f.Floors) != 3 || len(rooms) != 10 || SpaceName("lab") != "space-mock-lab" {
+		t.Errorf("%d floors, %d rooms, space name %s", len(f.Floors), len(rooms), SpaceName("lab"))
 	}
 }

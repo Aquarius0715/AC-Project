@@ -293,6 +293,7 @@
   "scenarioId",
   "sequence",
   "severity",
+  "state",
   "unitId"
  ],
  "demoSession.extend": [],

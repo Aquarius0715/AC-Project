@@ -66,9 +66,9 @@ func main() {
 			return
 		}
 		// stamp a little in the past: the offset is an estimate, and the API refuses a reading received after its clock
-		off := clock.offset() - clockMargin
-		b = iotbridge.ToScenario(b, off)
-		triggers, err := resolver.Triggers(b, time.Now().Add(off))
+		now, off := time.Now(), clock.offset()
+		b = iotbridge.ToScenario(b, now, off, clockMargin)
+		triggers, err := resolver.Triggers(b, now.Add(off-clockMargin))
 		if err != nil {
 			log.Printf("telemetry from %s: %v", b.DeviceID, err)
 		}
@@ -80,6 +80,28 @@ func main() {
 	})
 	if tok.Wait() && tok.Error() != nil {
 		log.Fatalf("subscribe: %v", tok.Error())
+	}
+	// t/<tenantId>/d/<deviceId>/heartbeat: a module that reports its air conditioner's state carries it (QoS 1)
+	hbTok := client.Subscribe("t/+/d/+/heartbeat", 1, func(_ mqtt.Client, msg mqtt.Message) {
+		var hb devicesim.Heartbeat
+		if err := json.Unmarshal(msg.Payload(), &hb); err != nil {
+			log.Printf("heartbeat on %s: %v", msg.Topic(), err)
+			return
+		}
+		tr, ok, err := iotbridge.StateTrigger(hb, time.Now().Add(clock.offset()-clockMargin))
+		if err != nil {
+			log.Printf("heartbeat from %s: %v", hb.DeviceID, err)
+			return
+		}
+		if !ok {
+			return
+		}
+		if err := send(httpc, endpoint, tr); err != nil {
+			log.Printf("state %s: %v", hb.DeviceID, err)
+		}
+	})
+	if hbTok.Wait() && hbTok.Error() != nil {
+		log.Fatalf("subscribe heartbeats: %v", hbTok.Error())
 	}
 	// t/<tenantId>/d/<deviceId>/cmd/ack: a module's answer to a command the API sent (QoS 1)
 	ackTok := client.Subscribe("t/+/d/+/cmd/ack", 1, func(_ mqtt.Client, msg mqtt.Message) {

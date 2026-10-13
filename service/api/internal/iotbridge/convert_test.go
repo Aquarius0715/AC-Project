@@ -153,17 +153,34 @@ func TestFleetLinksResolve(t *testing.T) {
 	}
 }
 
-// TestToScenarioKeepsTheMinuteSlot: a reading taken at the start of a minute on the module stays at the start of a
-// minute on the scenario clock, whatever seconds the clock offset has; the batch given is not changed.
+// TestToScenarioKeepsTheMinuteSlot: a reading received 19 seconds into a real minute lands at the start of the scenario
+// minute it was received in, whatever seconds the clock offset has; a reading the module stamped an hour ahead stays an
+// hour ahead; the batch given is not changed.
 func TestToScenarioKeepsTheMinuteSlot(t *testing.T) {
-	b := batch("device-online-rto", 1)
+	now := time.Date(2026, 10, 13, 5, 0, 19, 0, time.UTC)
 	offset := -(29*24*time.Hour + 4*time.Hour + 17*time.Second + 403*time.Millisecond)
-	got := ToScenario(b, offset)
-	want := at.Add(offset).Truncate(time.Minute)
-	if !got.Measurements[0].ObservedAt.Equal(want) || got.Measurements[0].ObservedAt.Second() != 0 || got.Measurements[0].ObservedAt.Nanosecond() != 0 {
-		t.Errorf("scenario time %v, want %v", got.Measurements[0].ObservedAt, want)
+	margin := 2 * time.Second
+	b := batch("device-online-rto", 1, 2)
+	b.Measurements[0].ObservedAt = now.Truncate(time.Minute)
+	b.Measurements[1].ObservedAt = now.Truncate(time.Minute).Add(time.Hour)
+	got := ToScenario(b, now, offset, margin)
+	slot := now.Add(offset - margin).Truncate(time.Minute)
+	if !got.Measurements[0].ObservedAt.Equal(slot) {
+		t.Errorf("reading at %v, want the received minute %v", got.Measurements[0].ObservedAt, slot)
 	}
-	if !b.Measurements[0].ObservedAt.Equal(at) {
+	if !got.Measurements[1].ObservedAt.Equal(slot.Add(time.Hour)) {
+		t.Errorf("future reading at %v, want %v", got.Measurements[1].ObservedAt, slot.Add(time.Hour))
+	}
+	if !b.Measurements[0].ObservedAt.Equal(now.Truncate(time.Minute)) {
 		t.Error("the given batch was changed")
+	}
+	if received := now.Add(offset - margin); got.Measurements[0].ObservedAt.After(received) {
+		t.Error("a reading is observed after it was received")
+	}
+	// a batch the module stamped a minute earlier (sent late) still lands in the minute it was received in
+	late := batch("device-online-rto", 3)
+	late.Measurements[0].ObservedAt = now.Truncate(time.Minute).Add(-time.Minute)
+	if got := ToScenario(late, now, offset, margin); !got.Measurements[0].ObservedAt.Equal(slot) {
+		t.Errorf("late reading at %v, want %v", got.Measurements[0].ObservedAt, slot)
 	}
 }

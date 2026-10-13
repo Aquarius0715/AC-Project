@@ -63,12 +63,14 @@ func DeviceID(fixtureDevice string) uuid.UUID { return seed.ID(fixtureDevice) }
 
 // Trigger is the body of POST /v1/demo/trigger for one telemetry reading.
 type Trigger struct {
-	ScenarioID  string       `json:"scenarioId"`
-	EventID     uuid.UUID    `json:"eventId"`
-	OccurredAt  time.Time    `json:"occurredAt"`
-	EventType   string       `json:"eventType"`
-	CommandID   *uuid.UUID   `json:"commandId,omitempty"`
-	Measurement *Measurement `json:"measurement,omitempty"`
+	ScenarioID  string                   `json:"scenarioId"`
+	EventID     uuid.UUID                `json:"eventId"`
+	OccurredAt  time.Time                `json:"occurredAt"`
+	EventType   string                   `json:"eventType"`
+	CommandID   *uuid.UUID               `json:"commandId,omitempty"`
+	Measurement *Measurement             `json:"measurement,omitempty"`
+	DeviceID    *uuid.UUID               `json:"deviceId,omitempty"` // state
+	State       *devicesim.ReportedState `json:"state,omitempty"`    // state
 }
 
 // Measurement is the RawMeasurement the trigger carries.
@@ -171,14 +173,21 @@ func FleetLinks(f devicesim.Fleet) []Link {
 	return out
 }
 
-// ToScenario moves a batch from the module's clock onto the API's scenario clock (offset: scenario minus real) and
-// keeps each reading at the start of its minute there, because energy counts a power sample only at a minute slot (D07).
-// A reading the module stamped in the future stays in the future.
-func ToScenario(b devicesim.Batch, offset time.Duration) devicesim.Batch {
+// ToScenario stamps a batch received at real time now on the API's scenario clock: each reading is put at the start of
+// the scenario minute it was received in (now + offset - margin), the slot energy counts (D07), so the newest reading is
+// never more than about a minute old there. What the module stamped beyond its own current minute (a reading from the
+// future) is kept as that many minutes ahead.
+func ToScenario(b devicesim.Batch, now time.Time, offset, margin time.Duration) devicesim.Batch {
+	slot := now.Add(offset - margin).UTC().Truncate(time.Minute)
+	moduleMinute := now.UTC().Truncate(time.Minute)
 	out := b
 	out.Measurements = make([]devicesim.Measurement, len(b.Measurements))
 	for i, m := range b.Measurements {
-		m.ObservedAt = m.ObservedAt.Add(offset).Truncate(time.Minute)
+		ahead := m.ObservedAt.Sub(moduleMinute).Round(time.Minute)
+		if ahead < 0 {
+			ahead = 0
+		}
+		m.ObservedAt = slot.Add(ahead)
 		out.Measurements[i] = m
 	}
 	return out

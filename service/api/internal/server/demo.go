@@ -187,6 +187,8 @@ type TriggerInput struct {
 	BindingID *uuid.UUID        `json:"bindingId,omitempty"`
 	Kind      string            `json:"kind,omitempty"`
 	Recovery  *devices.Recovery `json:"recovery,omitempty"`
+	// state: the device reports its air conditioner's settings with each heartbeat (deviceId, state)
+	State *ReportedState `json:"state,omitempty"`
 	// operation (IR67): the device's result for a running check / firmware operation
 	OperationID *uuid.UUID `json:"operationId,omitempty"`
 	Result      string     `json:"result,omitempty"`
@@ -208,6 +210,15 @@ type TriggerInput struct {
 	RetryAfterSeconds *int       `json:"retryAfterSeconds,omitempty"`
 	DelayMs           *int       `json:"delayMs,omitempty"`
 	RemainingCalls    *int       `json:"remainingCalls,omitempty"`
+}
+
+// ReportedState is the state a device reports for its air conditioner (DemoTrigger state): ObservedState without
+// observedAt, which is the trigger's occurredAt.
+type ReportedState struct {
+	Power    *bool    `json:"power"`
+	Celsius  *float64 `json:"celsius"`
+	Mode     *string  `json:"mode"`
+	FanLevel *string  `json:"fanLevel"`
 }
 
 // RawMeasurement is RawMeasurement of service-contracts.ts.
@@ -261,6 +272,20 @@ func (in *TriggerInput) Validate() map[string]string {
 			fe["kind"] = "error.invalid"
 		case in.Kind != "restored" && r != nil:
 			fe["recovery"] = "error.invalid" // faults carry no recovery (SR20)
+		}
+	case "state":
+		if in.DeviceID == nil {
+			fe["deviceId"] = "error.required"
+		}
+		switch st := in.State; {
+		case st == nil:
+			fe["state"] = "error.required"
+		case st.Mode != nil && *st.Mode != "cool" && *st.Mode != "dry" && *st.Mode != "fan":
+			fe["state.mode"] = "error.invalid"
+		case st.FanLevel != nil && *st.FanLevel != "low" && *st.FanLevel != "mid" && *st.FanLevel != "high":
+			fe["state.fanLevel"] = "error.invalid"
+		case st.Celsius != nil && (*st.Celsius < 10 || *st.Celsius > 40):
+			fe["state.celsius"] = "error.range"
 		}
 	case "operation":
 		if in.OperationID == nil {
@@ -379,6 +404,21 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 	case "operation": // IR67: the result of a running check / firmware operation
 		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE id = $1)`, *in.OperationID, func(tx pgx.Tx, _ uuid.UUID) error {
 			return devices.FinishOperation(ctx, tx, *in.OperationID, in.Result == "succeeded", in.OccurredAt, c.Now)
+		})
+	}
+	if in.EventType == "state" { // the device's state report: the unit's observed settings and when the device was last heard
+		if in.OccurredAt.After(c.Now) {
+			return out, apperr.Fields(map[string]string{"occurredAt": "error.range"})
+		}
+		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1 AND unit_id IS NOT NULL)`, *in.DeviceID, func(tx pgx.Tx, _ uuid.UUID) error {
+			st := in.State
+			state, _ := json.Marshal(map[string]any{"power": st.Power, "celsius": st.Celsius, "mode": st.Mode, "fanLevel": st.FanLevel, "observedAt": in.OccurredAt.UTC()})
+			if _, err := tx.Exec(ctx, `UPDATE assets.units u SET observed_state = $2, last_seen_at = GREATEST(COALESCE(u.last_seen_at, $3), $3)
+				FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`, *in.DeviceID, state, in.OccurredAt); err != nil {
+				return err
+			}
+			_, err := tx.Exec(ctx, `UPDATE devices.devices SET last_seen_at = GREATEST(COALESCE(last_seen_at, $2), $2) WHERE id = $1`, *in.DeviceID, in.OccurredAt)
+			return err
 		})
 	}
 	if in.EventType == "restriction_observation" { // SR26: a device reports which restriction it enforces

@@ -94,3 +94,34 @@ func TestOnlyNarrowsTheReadings(t *testing.T) {
 		t.Errorf("readings %v", r)
 	}
 }
+
+// TestHeartbeatReportsTheState: a module that reports its state sends it with the heartbeat, and a set-temperature
+// command it applies changes the reported setpoint; a module that does not report sends no state.
+func TestHeartbeatReportsTheState(t *testing.T) {
+	on, c, mode, fan := true, 24.0, "cool", "mid"
+	m := NewModule(tenant, device, "v1", 1).Reports(&on, &c, &mode, &fan)
+	beat := func(m *Module) map[string]any {
+		raw, err := m.Beat(time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var h map[string]any
+		if err := json.Unmarshal(raw, &h); err != nil {
+			t.Fatal(err)
+		}
+		return h
+	}
+	st := beat(m)["state"].(map[string]any)
+	if st["power"] != true || st["celsius"] != 24.0 || st["mode"] != "cool" || st["fanLevel"] != "mid" {
+		t.Errorf("state %v", st)
+	}
+	if _, _, err := m.Acknowledge([]byte(`{"commandId":"c1","kind":"set_temperature","setpointCelsius":27,"expiresAt":"2099-01-01T00:00:00Z"}`), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if st := beat(m)["state"].(map[string]any); st["celsius"] != 27.0 {
+		t.Errorf("state after the command %v", st)
+	}
+	if _, ok := beat(NewModule(tenant, device, "v1", 1))["state"]; ok {
+		t.Error("a module that does not report sends a state")
+	}
+}

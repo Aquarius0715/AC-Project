@@ -1,30 +1,94 @@
 {
   "note": "Mock fleet: one air conditioner (unit) and its IoT module per state pattern, so every state can be seen on the screens. Loaded in development only (SEED_MOCK_FLEET=1), never in tests or production. IDs are fixture-style names; the API IDs come from seed.ID.",
   "customerOrgId": "org-customer-b",
-  "property": { "id": "property-mock-fleet", "kind": "office", "name": "Mock fleet" },
+  "property": {
+    "id": "property-mock-fleet",
+    "kind": "office",
+    "name": "Mock fleet"
+  },
   "modelId": "cap-split-std",
   "capabilityVersion": 1,
   "firmware": "v1",
+  "floors": [
+    {
+      "key": "1f",
+      "name": "1F",
+      "rooms": [
+        {
+          "key": "reception",
+          "name": "Reception"
+        },
+        {
+          "key": "meeting-a",
+          "name": "Meeting room A"
+        },
+        {
+          "key": "meeting-b",
+          "name": "Meeting room B"
+        },
+        {
+          "key": "open-office",
+          "name": "Open office"
+        }
+      ]
+    },
+    {
+      "key": "2f",
+      "name": "2F",
+      "rooms": [
+        {
+          "key": "server-room",
+          "name": "Server room"
+        },
+        {
+          "key": "lab",
+          "name": "Lab"
+        },
+        {
+          "key": "pantry",
+          "name": "Pantry"
+        },
+        {
+          "key": "training",
+          "name": "Training room"
+        }
+      ]
+    },
+    {
+      "key": "3f",
+      "name": "3F",
+      "rooms": [
+        {
+          "key": "store-room",
+          "name": "Store room"
+        },
+        {
+          "key": "director",
+          "name": "Director's office"
+        }
+      ]
+    }
+  ],
   "patterns": [
-    { "key": "cool-on", "name": "Mock · cooling, on", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": { "power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid" }, "telemetry": "normal", "commands": "apply" },
-    { "key": "dry-off", "name": "Mock · dry, switched off", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": { "power": false, "celsius": 26, "mode": "dry", "fanLevel": "low" }, "telemetry": "normal", "commands": "apply" },
-    { "key": "fan-high", "name": "Mock · fan only, high", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": { "power": true, "celsius": 25, "mode": "fan", "fanLevel": "high" }, "telemetry": "normal", "commands": "apply" },
-    { "key": "offline", "name": "Mock · offline", "connection": "offline", "powerSignal": "unknown", "tamper": "clear", "state": { "power": null, "celsius": null, "mode": null, "fanLevel": null }, "telemetry": "silent", "commands": "ignore" },
-    { "key": "connection-unknown", "name": "Mock · connection unknown", "connection": "unknown", "powerSignal": "unknown", "tamper": "clear", "state": { "power": null, "celsius": null, "mode": null, "fanLevel": null }, "telemetry": "silent", "commands": "ignore" },
-    { "key": "connecting", "name": "Mock · connecting", "connection": "connecting", "powerSignal": "unknown", "tamper": "clear", "state": { "power": null, "celsius": null, "mode": null, "fanLevel": null }, "telemetry": "silent", "commands": "ignore" },
-    { "key": "connection-error", "name": "Mock · connection error", "connection": "error", "powerSignal": "unknown", "tamper": "clear", "state": { "power": null, "celsius": null, "mode": null, "fanLevel": null }, "telemetry": "silent", "commands": "ignore" },
-    { "key": "power-lost", "name": "Mock · power signal off", "connection": "online", "powerSignal": "off", "tamper": "clear", "state": { "power": false, "celsius": null, "mode": null, "fanLevel": null }, "telemetry": "normal", "commands": "ignore" },
-    { "key": "tamper", "name": "Mock · tamper detected", "connection": "online", "powerSignal": "on", "tamper": "detected", "state": { "power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid" }, "telemetry": "normal", "commands": "apply" },
-    { "key": "stale", "name": "Mock · stale readings", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": { "power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid" }, "telemetry": "silent", "commands": "apply" },
-    { "key": "unit-mismatch", "name": "Mock · wrong unit in readings", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": { "power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid" }, "telemetry": "unit_mismatch", "commands": "apply" },
-    { "key": "out-of-range", "name": "Mock · readings out of range", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": { "power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid" }, "telemetry": "out_of_range", "commands": "apply" },
-    { "key": "missing", "name": "Mock · readings missing", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": { "power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid" }, "telemetry": "missing", "commands": "apply" },
-    { "key": "invalid-time", "name": "Mock · readings from the future", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": { "power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid" }, "telemetry": "invalid_time", "commands": "apply" },
-    { "key": "rejects-commands", "name": "Mock · rejects commands", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": { "power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid" }, "telemetry": "normal", "commands": "reject" },
-    { "key": "silent-on-commands", "name": "Mock · never answers commands", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": { "power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid" }, "telemetry": "normal", "commands": "ignore" },
-    { "key": "late-ack", "name": "Mock · answers commands late", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": { "power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid" }, "telemetry": "normal", "commands": "late" },
-    { "key": "old-firmware", "name": "Mock · old firmware", "connection": "online", "powerSignal": "on", "tamper": "clear", "firmware": "v0.9", "state": { "power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid" }, "telemetry": "normal", "commands": "apply" },
-    { "key": "no-module", "name": "Mock · no IoT module", "noDevice": true, "state": { "power": null, "celsius": null, "mode": null, "fanLevel": null } },
-    { "key": "archived", "name": "Mock · archived", "noDevice": true, "archived": true, "state": { "power": null, "celsius": null, "mode": null, "fanLevel": null } }
+    {"key": "cool-on", "name": "Mock · cooling, on", "room": "reception", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": {"power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid"}, "telemetry": "normal", "commands": "apply"},
+    {"key": "dry-off", "name": "Mock · dry, switched off", "room": "meeting-a", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": {"power": false, "celsius": 26, "mode": "dry", "fanLevel": "low"}, "telemetry": "normal", "commands": "apply"},
+    {"key": "fan-high", "name": "Mock · fan only, high", "room": "meeting-a", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": {"power": true, "celsius": 25, "mode": "fan", "fanLevel": "high"}, "telemetry": "normal", "commands": "apply"},
+    {"key": "offline", "name": "Mock · offline", "room": "server-room", "connection": "offline", "powerSignal": "unknown", "tamper": "clear", "state": {"power": null, "celsius": null, "mode": null, "fanLevel": null}, "telemetry": "silent", "commands": "ignore"},
+    {"key": "connection-unknown", "name": "Mock · connection unknown", "room": "server-room", "connection": "unknown", "powerSignal": "unknown", "tamper": "clear", "state": {"power": null, "celsius": null, "mode": null, "fanLevel": null}, "telemetry": "silent", "commands": "ignore"},
+    {"key": "connecting", "name": "Mock · connecting", "room": "lab", "connection": "connecting", "powerSignal": "unknown", "tamper": "clear", "state": {"power": null, "celsius": null, "mode": null, "fanLevel": null}, "telemetry": "silent", "commands": "ignore"},
+    {"key": "connection-error", "name": "Mock · connection error", "room": "lab", "connection": "error", "powerSignal": "unknown", "tamper": "clear", "state": {"power": null, "celsius": null, "mode": null, "fanLevel": null}, "telemetry": "silent", "commands": "ignore"},
+    {"key": "power-lost", "name": "Mock · power signal off", "room": "pantry", "connection": "online", "powerSignal": "off", "tamper": "clear", "state": {"power": false, "celsius": null, "mode": null, "fanLevel": null}, "telemetry": "normal", "commands": "ignore"},
+    {"key": "tamper", "name": "Mock · tamper detected", "room": "store-room", "connection": "online", "powerSignal": "on", "tamper": "detected", "state": {"power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid"}, "telemetry": "normal", "commands": "apply"},
+    {"key": "stale", "name": "Mock · stale readings", "room": "training", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": {"power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid"}, "telemetry": "silent", "commands": "apply"},
+    {"key": "unit-mismatch", "name": "Mock · wrong unit in readings", "room": "open-office", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": {"power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid"}, "telemetry": "unit_mismatch", "commands": "apply"},
+    {"key": "out-of-range", "name": "Mock · readings out of range", "room": "open-office", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": {"power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid"}, "telemetry": "out_of_range", "commands": "apply"},
+    {"key": "missing", "name": "Mock · readings missing", "room": "meeting-b", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": {"power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid"}, "telemetry": "missing", "commands": "apply"},
+    {"key": "invalid-time", "name": "Mock · readings from the future", "room": "meeting-b", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": {"power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid"}, "telemetry": "invalid_time", "commands": "apply"},
+    {"key": "rejects-commands", "name": "Mock · rejects commands", "room": "director", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": {"power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid"}, "telemetry": "normal", "commands": "reject"},
+    {"key": "silent-on-commands", "name": "Mock · never answers commands", "room": "director", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": {"power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid"}, "telemetry": "normal", "commands": "ignore"},
+    {"key": "late-ack", "name": "Mock · answers commands late", "room": "training", "connection": "online", "powerSignal": "on", "tamper": "clear", "state": {"power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid"}, "telemetry": "normal", "commands": "late"},
+    {"key": "old-firmware", "name": "Mock · old firmware", "room": "pantry", "connection": "online", "powerSignal": "on", "tamper": "clear", "firmware": "v0.9", "state": {"power": true, "celsius": 24, "mode": "cool", "fanLevel": "mid"}, "telemetry": "normal", "commands": "apply"},
+    {"key": "no-module", "name": "Mock · no IoT module", "room": "store-room", "noDevice": true, "state": {"power": null, "celsius": null, "mode": null, "fanLevel": null}},
+    {"key": "archived", "name": "Mock · archived", "room": "reception", "noDevice": true, "archived": true, "state": {"power": null, "celsius": null, "mode": null, "fanLevel": null}}
   ]
 }

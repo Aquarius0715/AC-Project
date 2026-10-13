@@ -54,3 +54,24 @@ func SentTrigger(w Waiting, at time.Time) Trigger {
 func CommandTopic(tenant, device uuid.UUID) string {
 	return devicesim.Topic(tenant.String(), device.String(), "cmd")
 }
+
+// StateTrigger turns a heartbeat into the device's state report (DemoTrigger state) at the given scenario time; a
+// heartbeat without a state reports nothing.
+func StateTrigger(hb devicesim.Heartbeat, at time.Time) (Trigger, bool, error) {
+	if hb.State == nil {
+		return Trigger{}, false, nil
+	}
+	dev, err := uuid.Parse(hb.DeviceID)
+	if err != nil {
+		return Trigger{}, false, fmt.Errorf("device %q: %w", hb.DeviceID, err)
+	}
+	at = at.UTC()
+	return Trigger{
+		ScenarioID: Scenario,
+		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/state/%s", dev, at.Format(time.RFC3339Nano)))),
+		OccurredAt: at,
+		EventType:  "state",
+		DeviceID:   &dev,
+		State:      hb.State,
+	}, true, nil
+}

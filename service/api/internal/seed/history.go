@@ -34,6 +34,8 @@ func ApplyFleetHistory(ctx context.Context, tx pgx.Tx, f devicesim.Fleet, until 
 	}
 	end := until.UTC().Truncate(time.Minute)
 	start := end.Add(-time.Duration(days) * 24 * time.Hour)
+	// the 15-minute series sit on the quarter hours, so a later run lands on the same instants and skips them
+	quarter := start.Truncate(15 * time.Minute)
 	var total int64
 	for _, p := range f.Patterns {
 		if p.NoDevice {
@@ -91,7 +93,7 @@ func ApplyFleetHistory(ctx context.Context, tx pgx.Tx, f devicesim.Fleet, until 
 			FROM generate_series($4::timestamptz, $5::timestamptz, interval '15 minutes') AS t
 			WHERE NOT EXISTS (SELECT 1 FROM monitoring.measurements x WHERE x.sensor_id = $2 AND x.observed_at = t)
 			ON CONFLICT DO NOTHING`,
-			tenant, tempID, unit, start, last, offFrom, tempID.String())
+			tenant, tempID, unit, quarter, last, offFrom, tempID.String())
 		if err != nil {
 			return total, fmt.Errorf("history temperature %s: %w", p.Key, err)
 		}
@@ -110,7 +112,7 @@ func ApplyFleetHistory(ctx context.Context, tx pgx.Tx, f devicesim.Fleet, until 
 				FROM (SELECT t, `+strings.ReplaceAll(jitter, "$9", "$7")+` AS j FROM generate_series($4::timestamptz, $5::timestamptz, interval '15 minutes') AS t
 					WHERE NOT EXISTS (SELECT 1 FROM monitoring.measurements x WHERE x.sensor_id = $2 AND x.observed_at = t)) g
 				ON CONFLICT DO NOTHING`,
-				tenant, id, unit, start, last, offFrom, id.String(), a.metric, a.unit)
+				tenant, id, unit, quarter, last, offFrom, id.String(), a.metric, a.unit)
 			if err != nil {
 				return total, fmt.Errorf("history %s %s: %w", a.metric, p.Key, err)
 			}

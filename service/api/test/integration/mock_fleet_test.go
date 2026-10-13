@@ -76,6 +76,17 @@ func TestMockFleetSeeds(t *testing.T) {
 	if n := count(`SELECT count(*) FROM assets.units WHERE property_id = $1 AND archived`, property); n != 1 {
 		t.Errorf("%d archived fleet units, want 1", n)
 	}
+	if n := count(`SELECT count(*) FROM assets.spaces WHERE property_id = $1 AND kind = 'floor'`, property); n != 3 {
+		t.Errorf("%d floors, want 3", n)
+	}
+	if n := count(`SELECT count(*) FROM assets.spaces WHERE property_id = $1 AND kind = 'room'`, property); n != 10 {
+		t.Errorf("%d rooms, want 10", n)
+	}
+	for _, p := range fleet.Patterns {
+		if n := count(`SELECT count(*) FROM assets.units WHERE id = $1 AND space_id = $2`, seed.ID(devicesim.UnitName(p)), seed.ID(devicesim.SpaceName(p.Room))); n != 1 {
+			t.Errorf("%s is not in its room %s", p.Key, p.Room)
+		}
+	}
 }
 
 // TestMockFleetHistory: two days of history give each reporting module a power reading every minute (copied to
@@ -165,11 +176,22 @@ func TestMockFleetHistory(t *testing.T) {
 	if err := tx.QueryRow(ctx, `SELECT last_seen_at FROM devices.devices WHERE id = $1`, seed.ID("device-mock-cool-on")).Scan(&seen); err != nil || !seen.Equal(until) {
 		t.Errorf("the module was last seen at %v (%v), want %v", seen, err, until)
 	}
+	// a later run (7 minutes on) keeps the quarter hours: no reading lands between them and none is doubled
+	if _, err := seed.ApplyFleetHistory(ctx, tx, fleet, until.Add(7*time.Minute), 2); err != nil {
+		t.Fatal(err)
+	}
+	temperature := seed.ID("sensor-mock-cool-on-temperature")
+	if n := count(`SELECT count(*) FROM monitoring.measurements WHERE sensor_id = $1 AND extract(minute from observed_at)::int % 15 <> 0`, temperature); n != 0 {
+		t.Errorf("%d temperatures off the quarter hours", n)
+	}
+	if n := count(`SELECT count(*) FROM monitoring.measurements WHERE sensor_id = $1`, temperature); n > 2*24*4+2 {
+		t.Errorf("%d temperatures after a second run, want no doubling (at most %d)", n, 2*24*4+2)
+	}
 	var latest time.Time
 	if err := tx.QueryRow(ctx, `SELECT max(observed_at) FROM monitoring.measurements WHERE sensor_id = $1`, seed.ID("sensor-mock-offline-power")).Scan(&latest); err != nil {
 		t.Fatal(err)
 	}
-	if !latest.Equal(until.Add(-24 * time.Hour)) {
-		t.Errorf("the offline module's last reading is %v, want a day before %v", latest, until)
+	if !latest.Equal(until.Add(7*time.Minute - 24*time.Hour)) {
+		t.Errorf("the offline module's last reading is %v, want a day before %v", latest, until.Add(7*time.Minute))
 	}
 }

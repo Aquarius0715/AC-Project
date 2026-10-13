@@ -13,6 +13,7 @@ var fleetJSON []byte
 type Pattern struct {
 	Key         string `json:"key"`
 	Name        string `json:"name"`
+	Room        string `json:"room"` // the room of the property the unit is in (Fleet.Floors)
 	Connection  string `json:"connection"`
 	PowerSignal string `json:"powerSignal"`
 	Tamper      string `json:"tamper"`
@@ -39,7 +40,21 @@ type Fleet struct {
 	ModelID           string                          `json:"modelId"`
 	CapabilityVersion int                             `json:"capabilityVersion"`
 	Firmware          string                          `json:"firmware"`
+	Floors            []Floor                         `json:"floors"`
 	Patterns          []Pattern                       `json:"patterns"`
+}
+
+// Floor is a floor of the fleet's property and its rooms (assets spaces: floor, then room).
+type Floor struct {
+	Key   string `json:"key"`
+	Name  string `json:"name"`
+	Rooms []Room `json:"rooms"`
+}
+
+// Room is a room on a floor.
+type Room struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
 }
 
 // Telemetry and command behaviours a pattern may name.
@@ -57,6 +72,15 @@ func parseFleet(raw []byte) (Fleet, error) {
 	if err := json.Unmarshal(raw, &f); err != nil {
 		return f, fmt.Errorf("fleet: %w", err)
 	}
+	rooms := map[string]bool{}
+	for _, fl := range f.Floors {
+		for _, r := range fl.Rooms {
+			if r.Key == "" || rooms[r.Key] || r.Key == fl.Key {
+				return f, fmt.Errorf("fleet: room key %q is empty or repeated", r.Key)
+			}
+			rooms[r.Key] = true
+		}
+	}
 	seen := map[string]bool{}
 	for _, p := range f.Patterns {
 		switch {
@@ -64,6 +88,8 @@ func parseFleet(raw []byte) (Fleet, error) {
 			return f, fmt.Errorf("fleet: pattern key %q is empty or repeated", p.Key)
 		case !telemetryKinds[p.Telemetry] || !commandKinds[p.Commands]:
 			return f, fmt.Errorf("fleet: pattern %s has an unknown behaviour (%q, %q)", p.Key, p.Telemetry, p.Commands)
+		case len(rooms) > 0 && !rooms[p.Room]:
+			return f, fmt.Errorf("fleet: pattern %s is in no known room (%q)", p.Key, p.Room)
 		case p.NoDevice && (p.Telemetry != "" || p.Commands != ""):
 			return f, fmt.Errorf("fleet: pattern %s has no module but a behaviour", p.Key)
 		}
@@ -85,3 +111,4 @@ func UnitName(p Pattern) string             { return "unit-mock-" + p.Key }
 func DeviceName(p Pattern) string           { return "device-mock-" + p.Key }
 func BindingName(p Pattern) string          { return "binding-mock-" + p.Key }
 func SensorName(p Pattern, s Sensor) string { return "sensor-mock-" + p.Key + "-" + s.Metric }
+func SpaceName(key string) string           { return "space-mock-" + key } // a floor or a room
