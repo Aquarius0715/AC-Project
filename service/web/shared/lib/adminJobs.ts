@@ -243,7 +243,8 @@ export function hqRefusal(f: { code: string; messageKey: string; fieldErrors: Re
 
 export type CostLine = { kind: "estimate" | "actual"; description: string; visibility: "internal" | "customer"; amountMinor: number; currency: "MYR" | "USD" };
 /** “80.00 MYR” from minor units. */
-export const money = (amountMinor: number, currency: string) => `${(amountMinor / 100).toFixed(2)} ${currency}`;
+export { money } from "@ac/web/lib/money";
+import { money } from "@ac/web/lib/money";
 /** Estimate and actual totals per currency, never converted (“80.00 MYR + 6.20 USD”). */
 export function costTotals(lines: CostLine[]): { estimate: string; actual: string } {
   const total = (kind: CostLine["kind"]) => {

@@ -59,7 +59,8 @@ export function monthsText(from: string | undefined, to: string | undefined, i: 
   if (to) return i.t("until {month}", { month: name(to) });
   return null;
 }
-export const money = (minor: number, currency: string) => `${(minor / 100).toFixed(2)} ${currency}`;
+export { money } from "@ac/web/lib/money";
+import { money } from "@ac/web/lib/money";
 const methodName = (m: string | null, t: T) => (m === "demo_credit_card" ? t("Credit card") : m === "demo_debit_card" ? t("Debit card") : m);
 /** A payment's status as the screen words it; another code stays as it is. */
 export const paymentWord = (s: string, t: T = en) =>

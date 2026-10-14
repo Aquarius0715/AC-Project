@@ -7,6 +7,7 @@
 import { businessDay, KL } from "@ac/web/lib/clientBilling";
 import { EN, showDayMonth, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
+import { amount } from "@ac/web/lib/money";
 import { qualificationLabel } from "@ac/web/lib/partnerJobDetail";
 import type { IconName } from "@ac/web/components/Icon";
 
@@ -72,8 +73,8 @@ export const WORK_TYPES: { id: WorkType; label: string }[] = [
   { id: "periodic_inspection", label: "Periodic inspection (per unit)" }, { id: "repair_base", label: "Repair — base visit" },
   { id: "emergency", label: "Emergency call-out (< 4 h)" }, { id: "rework_deduction", label: "Rework deduction (2nd return)" },
 ];
-/** “450.00”, a rework deduction as “− 120.00”. */
-export const rateAmount = (l: { workType: WorkType; amountMinor: number }) => `${l.workType === "rework_deduction" && l.amountMinor > 0 ? "− " : ""}${(l.amountMinor / 100).toFixed(2)}`;
+/** “450.00”, a rework deduction as “− 120.00” (thousands separated, as every amount). */
+export const rateAmount = (l: { workType: WorkType; amountMinor: number }) => `${l.workType === "rework_deduction" && l.amountMinor > 0 ? "− " : ""}${amount(l.amountMinor)}`;
 
 /** The rate card in effect (rateCardId) and the versions scheduled after it. Lines keep their work type (`workType`)
  * beside the label, so the rate card form finds them in any language. */

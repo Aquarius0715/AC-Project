@@ -7,6 +7,7 @@ import { Badge, Banner, Btn, Card, Check, EmptyState, Field, Input, ListRow, Pag
 import { useT } from "@ac/web/components/I18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { KL } from "@ac/web/lib/billing";
+import { amount, money } from "@ac/web/lib/money";
 import { dayInstant, draftErrors, planLabel, planWord, priceMinor, type ContractDraft, type ContractRow, type PlanType, type UnitOption } from "@ac/web/lib/contracts";
 import { saveContract } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
@@ -17,7 +18,7 @@ type Live = { scope: Scope; rows: ContractRow[]; counts: Record<PlanType | "all"
 const demoCustomers = [{ id: "customer-a", name: "customer-a" }, { id: "customer-b", name: "customer-b" }];
 const demoRow = (id: string, cust: string, planType: PlanType, unitIds: string[], priceMinor: number, start: string, end: string, eligible: boolean, restrictionIds: string[]): ContractRow => ({
   id, version: 1, planType, plan: planLabel[planType], customerId: cust, cust, unitIds, units: `${unitIds.length} unit${unitIds.length === 1 ? "" : "s"}`, priceMinor, currency: "MYR",
-  price: `${(priceMinor / 100).toFixed(2)} MYR`, startAt: `${start}T00:00:00+08:00`, endAt: `${end}T00:00:00+08:00`, start, end, period: `${start} → ${end}`, restrictionEligible: eligible, rulesVersion: eligible ? "demo-v1" : null,
+  price: money(priceMinor, "MYR"), startAt: `${start}T00:00:00+08:00`, endAt: `${end}T00:00:00+08:00`, start, end, period: `${start} → ${end}`, restrictionEligible: eligible, rulesVersion: eligible ? "demo-v1" : null,
   restrictionIds, recovery: false,
 });
 const seedRows = [
@@ -101,7 +102,7 @@ export function ContractsView({ live }: { live?: Live }) {
         const minor = priceMinor(d.price);
         setDemoRows((l) => l.map((r) => (r.id === sel.id ? {
           ...r, planType: d.planType, plan: planLabel[d.planType], unitIds: d.unitIds, units: `${d.unitIds.length} unit${d.unitIds.length === 1 ? "" : "s"}`,
-          priceMinor: minor, price: `${(minor / 100).toFixed(2)} ${d.currency}`, currency: d.currency, end: d.end, period: `${r.start} → ${d.end}`, version: r.version + 1,
+          priceMinor: minor, price: money(minor, d.currency), currency: d.currency, end: d.end, period: `${r.start} → ${d.end}`, version: r.version + 1,
           restrictionEligible: eligible, rulesVersion: eligible ? d.rulesVersion.trim() : null,
         } : r)));
         toast(t("Saved as version {v}", { v: sel.version + 1 }));
@@ -170,7 +171,7 @@ export function ContractsView({ live }: { live?: Live }) {
                 <div className="mt-2 max-w-xs"><Field label={t("Rules version · required when eligible")} hint={t("Demo rules — not approved production rules")} error={tried ? errors.rulesVersion : undefined}><Input value={d.rulesVersion} maxLength={64} disabled={blocked || !d.restrictionEligible} onChange={(e) => set({ rulesVersion: e.target.value })} /></Field></div>
               </section>
               {blocked && sel && <Banner tone="warn" action={sel.restrictionIds[0] && <Link className="text-xs font-semibold text-primary" href={live ? `/admin/restrictions?restrictionId=${sel.restrictionIds[0]}` : "/admin/restrictions"}>{t("Open restriction")} <Icon name="arrowRight" /></Link>}>{t("Save is disabled (SR19): {reason}. Cancel the notice or release the restriction first — contract changes never cancel or release restrictions.", { reason: sel.restrictionIds.length > 0 ? t(sel.restrictionIds.length === 1 ? "1 active restriction on this contract" : "{n} active restrictions on this contract", { n: sel.restrictionIds.length }) : t("an unresolved recovery case exists") })}</Banner>}
-              <section className="rounded-xl bg-surface2 p-3 text-xs"><b className="text-[13px]">{t("What saving does")}</b><ul className="mt-1 list-disc pl-5">{creating || !sel ? <><li>{t("Creates version 1 of a new contract for this customer")}</li><li>{t("New invoices can be issued against it")}</li></> : <><li>{t("Creates version {next} — version {v} stays in history", { next: sel.version + 1, v: sel.version })}</li><li>{t("Invoices already issued keep version {v} and their original amounts", { v: sel.version })}</li><li>{t("New invoices will use version {next} ({amount})", { next: sel.version + 1, amount: `${/^\d+(\.\d{1,2})?$/.test(d.price.trim()) ? (priceMinor(d.price) / 100).toFixed(2) : "—"} ${d.currency}` })}</li></>}</ul></section>
+              <section className="rounded-xl bg-surface2 p-3 text-xs"><b className="text-[13px]">{t("What saving does")}</b><ul className="mt-1 list-disc pl-5">{creating || !sel ? <><li>{t("Creates version 1 of a new contract for this customer")}</li><li>{t("New invoices can be issued against it")}</li></> : <><li>{t("Creates version {next} — version {v} stays in history", { next: sel.version + 1, v: sel.version })}</li><li>{t("Invoices already issued keep version {v} and their original amounts", { v: sel.version })}</li><li>{t("New invoices will use version {next} ({amount})", { next: sel.version + 1, amount: `${/^\d+(\.\d{1,2})?$/.test(d.price.trim()) ? amount(priceMinor(d.price)) : "—"} ${d.currency}` })}</li></>}</ul></section>
               <div className="flex justify-end gap-2">{creating && <Btn onClick={() => setCreating(false)}>{t("Cancel")}</Btn>}{blocked && <Badge tone="muted">{t("Read-only while a restriction is active")}</Badge>}<Btn variant="primary" disabled={pending || blocked} onClick={save}>{creating || !sel ? t("Create contract") : t("Save as version {n}", { n: sel.version + 1 })}</Btn></div>
             </div>
           </Card>

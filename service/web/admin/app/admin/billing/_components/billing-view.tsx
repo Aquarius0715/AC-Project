@@ -8,6 +8,7 @@ import { Badge, Banner, Btn, Card, DataTable, EmptyState, Field, Input, ListRow,
 import { useI18n } from "@ac/web/components/I18n";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { actionMessage } from "@ac/web/lib/actionMessage";
+import { money } from "@ac/web/lib/money";
 import { KL, monthsText, statementWord, totals, type ApiRecipient, type ContractOption, type InquiryRow, type InvoiceDetail, type InvoiceRow, type InvoiceStatus, type StatementDetail, type StatementRow } from "@ac/web/lib/billing";
 import { previewText } from "@ac/web/lib/clientBilling";
 import type { Channel } from "@ac/web/lib/contracts.gen";
@@ -259,7 +260,7 @@ export function BillingView({ live }: { live?: BillingLive }) {
         <Field label={t("Contract")}><Select value={contract?.id ?? ""} onChange={(e) => setNw({ ...nw, contractId: e.target.value })}>{contracts.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}><Field label={t("Billing period start")} error={tried && !nw.from ? t("Required") : undefined}><Input type="date" value={nw.from} onChange={(e) => setNw({ ...nw, from: e.target.value })} /></Field><Field label={t("Billing period end")} error={tried && (!nw.to || nw.from >= nw.to) ? t("After the start") : undefined}><Input type="date" value={nw.to} onChange={(e) => setNw({ ...nw, to: e.target.value })} /></Field><Field label={t("Due date")} error={tried && !nw.dueAt ? t("Required") : undefined}><Input type="date" value={nw.dueAt} onChange={(e) => setNw({ ...nw, dueAt: e.target.value })} /></Field></div>
         <p className="text-xs text-muted-foreground">{t("Dates are Kuala Lumpur days ({zone}).", { zone: KL })}</p>
-        {contract && <p className="text-xs text-muted-foreground">{t("Amount from the contract version: {amount}", { amount: `${(contract.priceMinor / 100).toFixed(2)} ${contract.currency}` })}</p>}
+        {contract && <p className="text-xs text-muted-foreground">{t("Amount from the contract version: {amount}", { amount: money(contract.priceMinor, contract.currency) })}</p>}
       </Modal>
     </Page>
   );

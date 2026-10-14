@@ -4,6 +4,7 @@
 import { EN, showClock, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { statusWord } from "@ac/web/lib/partnerJobDetail";
 import { coveragePct } from "@ac/web/lib/energy";
+import { money as formatMoney } from "@ac/web/lib/money";
 
 const en = translator("en");
 export type ApiForecast = {
@@ -21,7 +22,7 @@ export type AdminSummary = {
 };
 export type Kpis = { customers: number; units: number; on: number; off: number; unknown: number; rate: string; alerts: number; kwh: string; kwhSub: string; billing: string; billingSub: string; jobs: number; online: number; offline: number; connUnknown: number };
 export const mockKpis: Kpis = { customers: 2, units: 5, on: 2, off: 2, unknown: 1, rate: "50.0%", alerts: 1, kwh: "9.0 kWh", kwhSub: "measured · coverage 40% · cost 3.29 MYR", billing: "120.00 MYR", billingSub: "1 overdue invoice · unpaid, per currency", jobs: 2, online: 5, offline: 0, connUnknown: 0 };
-const money = (m: { amountMinor: number; currency: string }) => `${(m.amountMinor / 100).toFixed(2)} ${m.currency}`;
+const money = (m: { amountMinor: number; currency: string }) => formatMoney(m.amountMinor, m.currency);
 export function kpisFrom(a: AdminSummary, t: T = en): Kpis {
   const e = a.energySummary;
   const overdue = a.overdueInvoiceCount ?? 0;
@@ -29,7 +30,7 @@ export function kpisFrom(a: AdminSummary, t: T = en): Kpis {
     customers: a.customerCount, units: a.total, on: a.powerOn, off: a.powerOff, unknown: a.powerUnknown,
     rate: a.operatingRate === null ? "—" : `${a.operatingRate.toFixed(1)}%`, alerts: a.alertCount,
     kwh: e?.totals.kWh == null ? "—" : `${e.totals.kWh.toFixed(1)} kWh`,
-    kwhSub: t("measured · coverage {coverage} · cost {cost}", { coverage: e?.coverage == null ? "—" : `${coveragePct(e.coverage, 0)}%`, cost: e?.totals.amountMinor == null ? "—" : `${(e.totals.amountMinor / 100).toFixed(2)} MYR` }),
+    kwhSub: t("measured · coverage {coverage} · cost {cost}", { coverage: e?.coverage == null ? "—" : `${coveragePct(e.coverage, 0)}%`, cost: e?.totals.amountMinor == null ? "—" : formatMoney(e.totals.amountMinor, "MYR") }),
     billing: a.billingVisibility === "forbidden" ? t("Not permitted") : (a.amountsByCurrency ?? []).map(money).join(" · ") || "0.00 MYR",
     billingSub: a.billingVisibility === "forbidden" ? t("billing.read required") : t(overdue === 1 ? "1 overdue invoice · unpaid, per currency" : "{n} overdue invoices · unpaid, per currency", { n: overdue }),
     jobs: Object.values(a.jobCounts).reduce((x, y) => x + y, 0), online: a.online, offline: a.offline, connUnknown: a.unknown,
