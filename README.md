@@ -35,7 +35,7 @@ workers), `full` (+ the four apps), `iot` (bridge, simulator, mock history), `ob
 ## Checks
 
 ```sh
-sh scripts/check.sh                       # before a push: web lint/typecheck/Vitest, gofmt/vet/staticcheck, docs validators
+sh scripts/check.sh                       # before a push: web lint/typecheck/Vitest, gofmt/vet/staticcheck, generated files, docs validators
 (cd service/api && make test-all)         # Go unit + integration suites on fresh test databases (both service layouts)
 (cd service/web && npm run e2e)           # Playwright against the running stack
 ```
