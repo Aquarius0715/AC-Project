@@ -128,10 +128,10 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	eq := equipmentView{am: am, alerts: monitoring.Alerts{}, tel: monitoring.Telemetry{Sensors: devices.Models{}}, models: devices.Models{}} // other domains' view (IR193)
 	devices.Register(reg, devices.Capabilities{Units: am})
 	monitoring.RegisterAlerts(reg, monitoring.Alerts{Units: am, Access: maintenance.Access{}, Devices: deviceRecoveries{}})
-	jobs := maintenance.Jobs{Units: eq, Severity: eq, HQOrg: func(c *ops.Call) uuid.UUID { return c.Principal.OrgID }, Sites: eq}
+	blobs := blob.NewDirFromEnv()
+	jobs := maintenance.Jobs{Units: eq, Severity: eq, HQOrg: func(c *ops.Call) uuid.UUID { return c.Principal.OrgID }, Sites: eq, Blobs: blobs}
 	maintenance.RegisterJobs(reg, jobs)
 	maintenance.RegisterOnSite(reg, maintenance.OnSite{Jobs: jobs})
-	blobs := blob.NewDirFromEnv()
 	reports := maintenance.Reports{Jobs: jobs, Units: eq}
 	maintenance.RegisterFollowUps(reg, maintenance.FollowUps{Jobs: jobs, Blobs: blobs, Warranty: eq})
 	maintenance.RegisterReports(reg, reports)

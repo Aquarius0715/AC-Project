@@ -110,6 +110,21 @@ func TestRateAndReportProblem(t *testing.T) {
 	if attachments != 1 {
 		t.Errorf("photos stored: %d", attachments)
 	}
+	// the photo is listed with the follow-up and opens for HQ and the customer (IR437)
+	_, g := post(s, &hq, "jobs.get", `{"jobId":"`+follow+`"}`)
+	photos, _ := data(g)["problemPhotos"].([]any)
+	if len(photos) != 1 || photos[0].(map[string]any)["name"] != "leak.png" {
+		t.Fatalf("problemPhotos: %v", data(g)["problemPhotos"])
+	}
+	pid := photos[0].(map[string]any)["id"].(string)
+	for _, a := range []*actor{&hq, &customerA} {
+		if code, m := post(s, a, "jobs.getAttachment", `{"jobId":"`+follow+`","attachmentId":"`+pid+`"}`); code != 200 || data(m)["mime"] != "image/png" || data(m)["bytes"] != png {
+			t.Errorf("jobs.getAttachment: %d %v", code, m)
+		}
+	}
+	if code, _ := post(s, &customerB, "jobs.getAttachment", `{"jobId":"`+follow+`","attachmentId":"`+pid+`"}`); code != 404 {
+		t.Errorf("another customer opens the photo: %d", code)
+	}
 	if code, m := prob(`"reasonCode":"other","details":"Another issue with the louver","photos":[],"preferredSlot":null`, 4); code != 200 || len(data(m)["preferredSlots"].([]any)) != 0 {
 		t.Fatalf("reportProblem without slot: %d %v", code, m)
 	}

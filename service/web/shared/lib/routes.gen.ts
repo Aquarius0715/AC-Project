@@ -100,6 +100,7 @@ export const coreRoutes: Readonly<Record<string, readonly CoreRoute[]>> = {
   "jobs.events": [{ method: "GET", path: "/v1/jobs/{jobId}/events" }],
   "jobs.extendAccess": [{ method: "POST", path: "/v1/jobs/{jobId}/extend-access" }],
   "jobs.get": [{ method: "GET", path: "/v1/jobs/{jobId}" }],
+  "jobs.getAttachment": [{ method: "GET", path: "/v1/jobs/{jobId}/attachments/{attachmentId}/content" }],
   "jobs.hold": [{ method: "POST", path: "/v1/jobs/{jobId}/hold" }],
   "jobs.list": [{ method: "GET", path: "/v1/jobs" }],
   "jobs.offer": [{ method: "POST", path: "/v1/jobs/{jobId}/offers" }],

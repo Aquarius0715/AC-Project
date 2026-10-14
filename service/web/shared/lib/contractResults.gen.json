@@ -1983,6 +1983,7 @@
    "planId",
    "preferenceRound",
    "preferredSlots",
+   "problemPhotos",
    "projection",
    "rating",
    "redactedReportSummary",
@@ -2005,6 +2006,15 @@
    "version",
    "visitSlot",
    "warrantyClaims"
+  ],
+  "items": null
+ },
+ "jobs.getAttachment": {
+  "fields": [
+   "bytes",
+   "mime",
+   "name",
+   "size"
   ],
   "items": null
  },

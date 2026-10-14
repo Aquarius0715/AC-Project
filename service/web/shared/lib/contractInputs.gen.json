@@ -555,6 +555,10 @@
  "jobs.get": [
   "jobId"
  ],
+ "jobs.getAttachment": [
+  "attachmentId",
+  "jobId"
+ ],
  "jobs.hold": [
   "jobId",
   "reason"

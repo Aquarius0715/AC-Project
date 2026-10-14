@@ -17,6 +17,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/blob"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -40,6 +41,8 @@ type Jobs struct {
 	// HQOrg returns the operator organization of the tenant (internal delivery, IR122 item 6).
 	HQOrg func(c *ops.Call) uuid.UUID
 	Sites SiteAddresses
+	// Blobs holds the problem photos that jobs.getAttachment answers (IR437)
+	Blobs blob.Store
 }
 
 // Slot is Slot of service-contracts.ts.
@@ -132,6 +135,8 @@ type Job struct {
 	Assignment  *Assignment `json:"assignment"`
 	Offer       any         `json:"offer"`
 	EventCursor int         `json:"eventCursor"`
+	// the photos the customer sent with jobs.reportProblem, kept with this follow-up job (IR437)
+	ProblemPhotos []JobAttachment `json:"problemPhotos"`
 	// summary-only
 	customerOrg uuid.UUID
 }
@@ -427,6 +432,9 @@ func (m Jobs) load(ctx context.Context, c *ops.Call, id uuid.UUID, scope string,
 	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.job_events WHERE job_id = $1`, id).Scan(&j.EventCursor); err != nil {
 		return j, err
 	}
+	if j.ProblemPhotos, err = problemPhotos(ctx, c, id); err != nil {
+		return j, err
+	}
 	rows, err := c.Tx.Query(ctx, `SELECT id, version, state FROM maintenance.work_reports WHERE job_id = $1 ORDER BY version`, id)
 	if err != nil {
 		return j, err
@@ -576,6 +584,121 @@ func (m Jobs) assignmentWhere(ctx context.Context, c *ops.Call, job uuid.UUID, c
 		a.AlternativeSlot = &Slot{*altStart, *altEnd}
 	}
 	return &a, err
+}
+
+//	@Summary		jobs.get (read)
+//	@ID				jobs.get
+//	@Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR86 expired unanswered offer: NOT_FOUND for contractor
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			jobId	path		string	true	"input field jobId"
+//	@Success		200		{object}	ops.Envelope
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId} [get]
+//
+// JobAttachment is JobAttachment of service-contracts.ts: a problem photo of a follow-up job (IR437).
+type JobAttachment struct {
+	ID        uuid.UUID `json:"id"`
+	TenantID  uuid.UUID `json:"tenantId"`
+	Version   int       `json:"version"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	JobID     uuid.UUID `json:"jobId"`
+	Name      string    `json:"name"`
+	Mime      string    `json:"mime"`
+	Size      int       `json:"size"`
+	Status    string    `json:"status"`
+}
+
+// problemPhotos lists the job's own attachments: those without a work report, which jobs.reportProblem stores.
+func problemPhotos(ctx context.Context, c *ops.Call, job uuid.UUID) ([]JobAttachment, error) {
+	rows, err := c.Tx.Query(ctx, `SELECT id, tenant_id, created_at, updated_at, job_id, name, mime, size_bytes, status FROM maintenance.attachments
+		WHERE job_id = $1 AND report_id IS NULL ORDER BY created_at, id`, job)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []JobAttachment{}
+	for rows.Next() {
+		a := JobAttachment{Version: 1}
+		if err := rows.Scan(&a.ID, &a.TenantID, &a.CreatedAt, &a.UpdatedAt, &a.JobID, &a.Name, &a.Mime, &a.Size, &a.Status); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// JobAttachmentInput is jobs.getAttachment input.
+type JobAttachmentInput struct {
+	JobID        uuid.UUID `json:"jobId"`
+	AttachmentID uuid.UUID `json:"attachmentId"`
+}
+
+// Validate implements ops.Validator.
+func (in *JobAttachmentInput) Validate() map[string]string {
+	if in.JobID == uuid.Nil || in.AttachmentID == uuid.Nil {
+		return map[string]string{"attachmentId": "error.required"}
+	}
+	return nil
+}
+
+// getAttachment answers a problem photo of a job to whoever may read the job (jobs.get decides, IR437).
+//
+//	@Summary		jobs.getAttachment (read)
+//	@ID				jobs.getAttachment
+//	@Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; a problem photo of a follow-up job (IR437) for whoever may read the job
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A06, DD-C17, DD-P02, DD-T04
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			jobId			path		string	true	"input field jobId"
+//	@Param			attachmentId	path		string	true	"input field attachmentId"
+//	@Success		200				{object}	ops.Envelope{data=BlobOut}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/attachments/{attachmentId}/content [get]
+func (m Jobs) getAttachment(ctx context.Context, c *ops.Call, in *JobAttachmentInput) (BlobOut, error) {
+	if _, err := m.get(ctx, c, &JobIDInput{JobID: in.JobID}); err != nil {
+		return BlobOut{}, err
+	}
+	var key string
+	var out BlobOut
+	err := c.Tx.QueryRow(ctx, `SELECT object_key, name, mime, size_bytes FROM maintenance.attachments WHERE id = $1 AND job_id = $2 AND report_id IS NULL AND status = 'ready'`,
+		in.AttachmentID, in.JobID).Scan(&key, &out.Name, &out.Mime, &out.Size)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return out, apperr.E(apperr.NotFound, "error.notFound")
+	}
+	if err != nil {
+		return out, err
+	}
+	if out.Bytes, err = m.Blobs.Get(ctx, key); errors.Is(err, blob.ErrNotFound) {
+		return out, apperr.E(apperr.NotFound, "error.notFound")
+	} else if err != nil {
+		return out, err
+	}
+	return out, nil
 }
 
 // @Summary		jobs.get (read)
@@ -1389,6 +1512,7 @@ func (m Jobs) addNote(ctx context.Context, c *ops.Call, in *NoteInput) (Note, er
 func RegisterJobs(r *ops.Registry, m Jobs) {
 	ops.Register(r, "jobs.create", m.create)
 	ops.Register(r, "jobs.get", m.get)
+	ops.Register(r, "jobs.getAttachment", m.getAttachment)
 	ops.Register(r, "jobs.list", m.list)
 	ops.Register(r, "jobs.events", m.events)
 	ops.Register(r, "jobs.cancel", m.cancel)

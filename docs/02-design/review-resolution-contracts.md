@@ -6665,3 +6665,11 @@ Found in review: `certificates.verify` approves or rejects an uploaded certifica
 1. New read operation `certificates.getContent` (`{certificateId}` → `DocumentContent`: name, type, size, base64 bytes; `GET /v1/certificates/{certificateId}/content`), with the authorization of `certificates.list`: HQ with `job.read`, a contractor for its own company only (another company's certificate is NOT_FOUND, as is one without a document). The type comes from the stored bytes (PDF, PNG, JPEG, the types `certificates.submit` admits). 209 operations, 230 routes; the maintenance service gains one.
 2. Admin web: Verify uploads shows “Open the document” on each certificate with a file; it opens `/admin/certificates/:id/document`, which sends the file itself (`no-store`, the name the RFC 5987 way). Partner web: a certificate's View dialog opens it the same way (`/partner/certificates/:id/document`), instead of telling the contractor to ask HQ for a copy.
 3. Tests: `TestCertificatesAndParts` (HQ and the owning contractor read the PDF; an unknown ID is 404), `TestForeignTargets` (contractor B → contractor A's certificate), `documentResponse.test.ts`.
+
+## IR437 A problem report's photos can be seen — 2026-10-14
+
+Found in review: `jobs.reportProblem` stores up to five customer photos with the follow-up job, but no operation listed or returned them (`attachments.getContent` reads only work-report attachments). HQ classified the follow-up (rework or new request) and the contractor and technician went to it without seeing the photos.
+
+1. `JobDetail.problemPhotos` lists the follow-up job's own attachments (`JobAttachment`: name, type, size, status), and the new read operation `jobs.getAttachment` (`{jobId, attachmentId}` → `BlobContent`, `GET /v1/jobs/{jobId}/attachments/{attachmentId}/content`) answers one to whoever may read the job (`jobs.get` decides; otherwise NOT_FOUND). 210 operations, 231 routes; the maintenance service gains one.
+2. Admin web: the follow-up card lists the client's photos; each opens `/admin/jobs/:id/photos/:attachmentId`, which sends the image itself (`no-store`).
+3. Tests: `TestRateAndReportProblem` (the photo is listed, opens for HQ and the customer, another customer gets 404), `TestForeignTargets`, `jobPhotoResponse.test.ts`.

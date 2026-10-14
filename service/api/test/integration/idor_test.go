@@ -103,6 +103,7 @@ func TestForeignTargets(t *testing.T) {
 		{&customerB, "inquiries.create", `{"subjectType":"payment","invoiceId":"` + invA + `","message":"Why this amount?"}`, 0},
 		{&customerB, "payments.simulate", `{"event":"initiate","invoiceId":"` + invA + `","method":"demo_credit_card","demoConfirmed":true}`, 1},
 		{&customerB, "jobs.get", `{"jobId":"` + jobA + `"}`, 0},
+		{&customerB, "jobs.getAttachment", `{"jobId":"` + jobA + `","attachmentId":"` + uuid.NewString() + `"}`, 0},
 		{&customerB, "jobs.events", `{"jobId":"` + jobA + `","query":{"limit":5}}`, 0},
 		{&customerB, "jobs.create", jobBody(unitA, nil), 0},
 		{&customerB, "jobs.cancel", `{"jobId":"` + jobA + `","cancelReason":"Not needed"}`, 1},

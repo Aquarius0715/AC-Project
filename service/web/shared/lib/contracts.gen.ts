@@ -75,7 +75,9 @@ export type CostLine = Money & {kind:'estimate'|'actual';description:string;visi
 export type MaintenanceJob = Entity & {planId:ID|null;occurrenceAt:Instant|null;unitId:ID;alertIds:ID[];type:'periodic'|'reactive'|'preventive';status:JobStatus;symptom:string;contactWindow:string|null;requestedSlot:Slot;origin:JobOrigin;preferredSlots:Slot[];preferenceRound:number;slotProposal:SlotProposal|null;partnerSlotProposal:PartnerSlotProposal|null;scheduledSlot:Slot|null;dueAt:Instant;startedAt:Instant|null;completedAt:Instant|null;contractorOrgId:ID|null;assignmentId:ID|null;draftReportRef:ReportRef|null;reportRefs:ReportRef[];costs:CostLine[];followUpOfJobId:ID|null;followUpClass:'pending'|'rework'|'new_request'|null;timeOnSite:TimeOnSite|null;rating:JobRating|null;customerConfirmedAt:Instant|null;warrantyClaims:WarrantyClaim[]};
 export type JobSummary = Pick<MaintenanceJob,'id'|'version'|'createdAt'|'unitId'|'type'|'status'|'dueAt'|'requestedSlot'|'scheduledSlot'|'assignmentId'|'origin'|'preferredSlots'|'followUpOfJobId'|'followUpClass'> & {projection:'summary';severity:Severity;isDemo:true;displayStatus:JobDisplayStatus;assignmentAcknowledgement:Assignment['acknowledgement']|null;technicianMembershipId:ID|null;accessValidFrom:Instant|null;accessValidUntil:Instant|null};
 export type JobOfferSummary = {projection:'offer';status:'offered'|'accepted';severity:null;jobId:ID;jobVersion:number;offerId:ID;type:MaintenanceJob['type'];siteAddress:string|null;requiredQualifications:QualificationCode[];requestedSlot:Slot;dueAt:Instant;offerExpiresAt:Instant;termsVersion:ID;origin:JobOrigin;visitSlot:Slot;offeredAt:Instant;accessValidFrom:Instant;accessValidUntil:Instant;partnerSlotProposal:PartnerSlotProposal|null};
-export type JobDetail = MaintenanceJob & {projection:'detail';assignment:Assignment|null;offer:Offer|null;eventCursor:number};
+export type JobDetail = MaintenanceJob & {projection:'detail';assignment:Assignment|null;offer:Offer|null;eventCursor:number;problemPhotos:JobAttachment[]};
+/** A photo the customer sent with jobs.reportProblem, kept with the follow-up job (no work report), opened with jobs.getAttachment (IR437). */
+export type JobAttachment = Entity & {jobId:ID;name:string;mime:'image/jpeg'|'image/png';size:number;status:'processing'|'ready'|'failed'};
 export type ReportHistorySummary = {hasReport:false;acceptance:'not_accepted'}|{hasReport:true;acceptance:'accepted'|'not_accepted'};
 export type JobHistorySnapshot = {projection:'history';asOf:Instant;severity:null;dueAt:null;jobId:ID;type:MaintenanceJob['type'];status:JobStatus;contractorOrgId:ID|null;completedAt:Instant|null;ownDecisionEvents:JobEvent[];redactedReportSummary:ReportHistorySummary};
 export type ComponentKey = 'filter'|'evaporator_coil'|'blower_motor'|'blower_fan'|'drain_pipe'|'drain_pan'|'outlet'|'louver'|'condenser_coil'|'compressor'|'fan'|'blade'|'refrigerant_pipe'|'thermostat'|'sensor'|'capacitor'|'contactor'|'wiring';
@@ -319,6 +321,7 @@ export type OperationContracts = {
   'jobs.events': {input:{jobId:ID;query:Query};result:Page<JobEvent>;mode:'read'};
   'jobs.extendAccess': {input:{jobId:ID;accessValidUntil:Instant;reason:string};result:MaintenanceJob;mode:'write'};
   'jobs.get': {input:{jobId:ID};result:JobDetail|JobOfferSummary|JobHistorySnapshot;mode:'read'};
+  'jobs.getAttachment': {input:{jobId:ID;attachmentId:ID};result:BlobContent;mode:'read'};
   'jobs.hold': {input:{jobId:ID;reason:string};result:MaintenanceJob;mode:'write'};
   'jobs.list': {input:Query;result:Page<JobSummary|JobOfferSummary|JobHistorySnapshot>;mode:'read'};
   'jobs.offer': {input:{jobId:ID;contractorOrgId:ID;visitSlot:Slot;offerExpiresAt:Instant;accessValidFrom:Instant;accessValidUntil:Instant;termsVersion:ID};result:MaintenanceJob;mode:'write'};

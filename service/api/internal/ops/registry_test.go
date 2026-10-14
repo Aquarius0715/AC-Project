@@ -258,7 +258,7 @@ func TestRegisterGuards(t *testing.T) {
 }
 
 func TestCatalogShape(t *testing.T) {
-	if len(Catalog) != 209 { // IR436 certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions, IR416 partnerUsers.*
+	if len(Catalog) != 210 { // IR437 jobs.getAttachment, IR436 certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions, IR416 partnerUsers.*
 		t.Fatalf("catalog size %d", len(Catalog))
 	}
 	for _, s := range Catalog {

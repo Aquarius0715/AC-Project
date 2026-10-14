@@ -93,6 +93,7 @@ jobs.decline,write,Maintenance,maintenance.jobs;maintenance.offers,maintenance.j
 jobs.events,read,Maintenance,maintenance.job_events,,,,
 jobs.extendAccess,write,Maintenance,maintenance.assignments,maintenance.assignments;maintenance.job_events,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 jobs.get,read,Maintenance,maintenance.jobs;maintenance.job_events,,,,
+jobs.getAttachment,read,Maintenance,maintenance.attachments,,,,
 jobs.hold,write,Maintenance,maintenance.jobs;maintenance.job_events,maintenance.jobs;maintenance.job_events,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 jobs.list,read,Maintenance,maintenance.jobs;maintenance.job_events,,,,
 jobs.offer,write,Maintenance,maintenance.jobs;maintenance.contractors,maintenance.jobs;maintenance.offers;maintenance.job_events,,audit.audit_log;platform.idempotency_keys;platform.outbox,

@@ -5685,6 +5685,7 @@ export const ms: Record<string, string> = {
   "Access until": "Akses sehingga",
   "Your account": "Akaun anda",
   "Last active contractor": "Kontraktor aktif terakhir",
+  "Client’s photos": "Foto pelanggan",
   "Open the document": "Buka dokumen",
   "This technician's access ends before the visit — choose another technician or ask HQ to extend it": "Akses juruteknik ini tamat sebelum lawatan — pilih juruteknik lain atau minta HQ melanjutkannya",
   "Has an assigned job — reassign it first": "Ada kerja yang ditugaskan — tugaskan semula dahulu",
