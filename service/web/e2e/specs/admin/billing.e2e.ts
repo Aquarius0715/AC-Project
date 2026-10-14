@@ -28,8 +28,13 @@ test("billing months filter the invoices and the related restriction opens on th
 
   // a reversed range is not sent: the fields say why and the URL keeps the last valid period
   await page.goto("/admin/billing?from=2026-08");
-  await main.getByLabel("Billing months to").fill("2026-07");
-  await expect(main).toContainText("The first month must not be after the last");
+  // filled again until the page has hydrated: a value typed before that never reaches the form's checks (a busy CI
+  // runner hydrates late; 67b7072)
+  await expect(async () => {
+    await main.getByLabel("Billing months to").fill("");
+    await main.getByLabel("Billing months to").fill("2026-07");
+    await expect(main).toContainText("The first month must not be after the last", { timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
   expect(new URL(page.url()).searchParams.has("to")).toBe(false);
 });
 
