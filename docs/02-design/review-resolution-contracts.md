@@ -6680,3 +6680,12 @@ Found in review: a problem report creates a requested follow-up job that HQ must
 
 1. For `jobs.reportProblem` the notifier sends the “requested” notice for the follow-up job the report created; the audit entry still names the reported job.
 2. Test: `TestRateAndReportProblem` (HQ has one notice for the follow-up).
+
+## IR439 An assignment is released when the technician's access ends before the visit (OPEN-BE-09) — 2026-10-14
+
+Decided by the user (the recommended option of OPEN-BE-09): HQ keeps the power to end or shorten a technician's access at once (security), and a job must not stay assigned to an account that can no longer open it. The contractor cannot do this while the technician is booked (IR421, IR432); new assignments must fit the access (IR433).
+
+1. A maintenance scheduler job (`Jobs.ReleaseEndedAccess`, every tick) finds the active assignments of jobs in status `assigned` whose technician's access (the replicated `maintenance.ref_memberships.valid_until`) ends before the assignment's end. For each it revokes the assignment (`reason = access_ended`), clears the job's assignment and scheduled slot and returns it to `accepted` (a contractor's job: the contractor assigns again on its accepted offer) or `requested` (HQ's own delivery), keeping the agreed visit; it writes the job event `job.assignment_released`, sends a `job_update` notice (warning) to the contractor's assigners (`partner.assign`) or HQ's (`job.write`), and audits `jobs.releaseAssignment`. The technician's unit access follows the revoked assignment (change capture, IR186).
+2. A job already started keeps its assignment: HQ handles it.
+3. The web names the event (“Technician's access ended — to be reassigned”, English and Malay) in the customer's and the contractor's job history.
+4. Test: `TestReleaseEndedAccess`.

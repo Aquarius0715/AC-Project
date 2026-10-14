@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -335,5 +336,54 @@ func TestAssignWithinAccess(t *testing.T) {
 	owner(t, `UPDATE identity.memberships SET valid_until = $2 WHERE id = $1`, tech, clock.Add(28*time.Hour)) // the agreed slot is fixed: extend the access
 	if code, m := assign(25, 27); code != 200 {
 		t.Errorf("the same slot within the access: %d %v", code, m)
+	}
+}
+
+// TestReleaseEndedAccess (OPEN-BE-09, IR439): HQ shortens a booked technician's access to end before the visit; the
+// maintenance scheduler releases the assignment of the job that has not started, the job goes back to be assigned
+// (requested for HQ's own delivery), and HQ's assigners get a job_update notice.
+func TestReleaseEndedAccess(t *testing.T) {
+	s := server(t)
+	ctx := context.Background()
+	tech := seed.ID("tech-internal-a")
+	var until *time.Time
+	ownerScan(t, `SELECT valid_until FROM identity.memberships WHERE id = $1`, []any{tech}, &until)
+	t.Cleanup(func() {
+		owner(t, `UPDATE identity.memberships SET valid_until = $2 WHERE id = $1`, tech, until)
+		owner(t, `UPDATE maintenance.ref_memberships SET valid_until = $2 WHERE id = $1`, tech, until)
+	})
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active'`, tech)
+	code, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	if code != 200 {
+		t.Fatalf("create: %d %v", code, m)
+	}
+	job := data(m)["id"].(string)
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	if code, m := write(s, &hq, "jobs.assign", `{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+ts(25)+`","endAt":"`+ts(27)+`"}`, 1); code != 200 {
+		t.Fatalf("assign: %d %v", code, m)
+	}
+	before := countNotes(t, job, "hq-operator", "job_update")
+	// HQ ends the access tomorrow, before the visit ends (Access & roles); maintenance holds its copy of the membership
+	owner(t, `UPDATE identity.memberships SET valid_until = $2 WHERE id = $1`, tech, clock.Add(24*time.Hour))
+	owner(t, `UPDATE maintenance.ref_memberships SET valid_until = $2 WHERE id = $1`, tech, clock.Add(24*time.Hour))
+	if _, err := schedTick(ctx, s, clock.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	var status, reason string
+	var assignment *string
+	ownerScan(t, `SELECT j.status, j.assignment_id::text, a.reason FROM maintenance.jobs j JOIN maintenance.assignments a ON a.job_id = j.id WHERE j.id = $1 ORDER BY a.created_at DESC LIMIT 1`,
+		[]any{job}, &status, &assignment, &reason)
+	if status != "requested" || assignment != nil || reason != "access_ended" {
+		t.Errorf("after the release: status %s, assignment %v, reason %s", status, assignment, reason)
+	}
+	if n := countNotes(t, job, "hq-operator", "job_update"); n != before+1 {
+		t.Errorf("HQ notices: %d, want %d", n, before+1)
+	}
+	// nothing more to release on the next tick
+	if _, err := schedTick(ctx, s, clock.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if n := countNotes(t, job, "hq-operator", "job_update"); n != before+1 {
+		t.Errorf("released twice: %d notices", n)
 	}
 }

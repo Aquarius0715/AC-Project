@@ -236,7 +236,7 @@ Compose runs one scheduler per domain. `platform.scheduled_items` stays empty; i
 | Scheduler | Built transitions |
 |---|---|
 | Equipment | Command expiry at `expiresAt`, diagnostic run ends (IR123), automation schedules (FR-C04, IR54), device operation start and time-out (IR67), firmware campaigns (IR339), warranty reminders (IR340) |
-| Maintenance | Offer expiry, the slot proposal reply deadline (IR113), auto-confirm of completed jobs (FR-C17), the work window end (the assignment history is frozen, IR89), filter cleaning reminders (IR239), certificate expiry reminders (IR336) |
+| Maintenance | Offer expiry, the slot proposal reply deadline (IR113), auto-confirm of completed jobs (FR-C17), the work window end (the assignment history is frozen, IR89), filter cleaning reminders (IR239), certificate expiry reminders (IR336), the release of an assignment whose technician's access ends before the visit (IR439) |
 | Billing | The contractor payout drafts of the month that ended, on the 1st (IR341) |
 
 Items of the table above that are not scheduled yet:
@@ -316,6 +316,6 @@ Items of the table above that are not scheduled yet:
 | OPEN-BE-06 | Decided 2026-10-07: capacity in §13 | — |
 | OPEN-BE-07 | Contractor payout rail (bank transfer file or Stripe Connect) | Payouts (FR-A23) |
 | OPEN-BE-08 | The scheduled items that are not built yet (§10 as built): the monthly energy report e-mail waits for a decision. Several instances per domain are decided: the advisory lock per domain and tenant (IR356) | Scheduler, worker |
-| OPEN-BE-09 | HQ ending the membership of a technician who holds an assigned job (Access & roles, `members.save` / revoke): the contractor cannot (IR421, IR432), HQ can, and the job stays assigned to an account that can no longer sign in. The same holds when HQ shortens the access to end before an assigned visit (new assignments must fit the access, IR433). Options: refuse as for the contractor, or release the technician's active assignments so the job returns to the contractor for reassignment (event from identity, as completion releases them, DEC-73) | Access & roles (FR-A03), assignments |
+| OPEN-BE-09 | Closed by IR439: when HQ ends or shortens a booked technician's access so that it ends before an assigned visit, the maintenance scheduler releases the assignment of the job that has not started; the job returns to be assigned (accepted for a contractor, requested for HQ's own delivery) and the assigners get a job_update notice. HQ can still end access at once | Access & roles (FR-A03), assignments |
 
 Additional contracts for current version 0.49.0: Read IR01–IR386 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

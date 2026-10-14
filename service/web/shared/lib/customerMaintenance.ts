@@ -31,7 +31,7 @@ export const slotLong = (s: Slot, i: I18n = EN) => showSpan(s.startAt, s.endAt, 
 /** The job history in the client's words (the shared titles are written for the service partner). */
 const CLIENT_TITLE: Record<string, string> = {
   "job.created": "Request created", "job.offered": "HQ booked a service partner", "offer.accepted": "Service partner accepted", "offer.declined": "Service partner declined — HQ is rebooking",
-  offer_expired: "HQ is rebooking", "offer.access_extended": "Service partner’s access extended", "job.assigned": "Technician assigned", "assignment.accepted": "Technician confirmed the time",
+  offer_expired: "HQ is rebooking", "offer.access_extended": "Service partner’s access extended", "job.assigned": "Technician assigned", "job.assignment_released": "Technician’s access ended — to be reassigned", "assignment.accepted": "Technician confirmed the time",
   "assignment.cant_make": "Technician can’t make it — HQ is rebooking", "partner.review": "Report checked by the service partner", "job.reviewed": "Report reviewed by HQ",
   "job.rated": "You rated the job", "job.problem_reported": "You reported a problem", "proposal.sent": "New time proposed", "proposal.accepted": "You accepted the proposed time",
   "proposal.declined": "You declined the proposed time", "job.reschedule_requested": "You asked for another time",
