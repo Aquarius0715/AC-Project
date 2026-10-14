@@ -137,6 +137,9 @@
   "ventilation",
   "ventilationLevels"
  ],
+ "certificates.getContent": [
+  "certificateId"
+ ],
  "certificates.list": [
   "cursor",
   "filters",

@@ -6657,3 +6657,11 @@ Found in review: the gateway's request-ID middleware kept an `X-Request-Id` the 
 
 1. The gateway drops an incoming `X-Request-Id` before the middleware, so every request gets a new UUIDv7 from the gateway; the services keep the one the gateway passes on (they are not reachable from outside, IR373).
 2. Test: `TestResponsesAreNotSniffedOrCachedAndCarryOneRequestID` (a client-chosen ID is not answered back).
+
+## IR436 HQ opens a certificate's document before verifying it — 2026-10-14
+
+Found in review: `certificates.verify` approves or rejects an uploaded certificate (FR-A21), but no operation returned the uploaded document; HQ saw only the file name, so a certificate was verified without its document being seen.
+
+1. New read operation `certificates.getContent` (`{certificateId}` → `DocumentContent`: name, type, size, base64 bytes; `GET /v1/certificates/{certificateId}/content`), with the authorization of `certificates.list`: HQ with `job.read`, a contractor for its own company only (another company's certificate is NOT_FOUND, as is one without a document). The type comes from the stored bytes (PDF, PNG, JPEG, the types `certificates.submit` admits). 209 operations, 230 routes; the maintenance service gains one.
+2. Admin web: Verify uploads shows “Open the document” on each certificate with a file; it opens `/admin/certificates/:id/document`, which sends the file itself (`no-store`, the name the RFC 5987 way).
+3. Tests: `TestCertificatesAndParts` (HQ and the owning contractor read the PDF; an unknown ID is 404), `TestForeignTargets` (contractor B → contractor A's certificate), `documentResponse.test.ts`.

@@ -147,6 +147,7 @@ func TestForeignTargets(t *testing.T) {
 		{&customerB, "voice.resolveIntent", `{"text":"temperature Bedroom","locale":"en","selectedUnitId":"` + unitA + `"}`, 0},
 		// contractor B → contractor A
 		{&contrB, "partnerUsers.resendInvite", `{"id":"` + partnerUserA + `"}`, 0},
+		{&contrB, "certificates.getContent", `{"certificateId":"` + certA + `"}`, 0},
 		{&contrB, "partnerUsers.save", `{"id":"` + partnerUserA + `","email":"moved@example.com","partnerRole":"technician","status":"disabled","reason":"left"}`, 1},
 		{&contrB, "partnerUsers.remove", `{"id":"` + partnerUserA + `","reason":"left"}`, 1},
 		{&contrB, "jobs.get", `{"jobId":"` + jobC + `"}`, 0},

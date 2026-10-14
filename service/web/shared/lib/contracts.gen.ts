@@ -168,6 +168,7 @@ export type Query = {cursor?:string;limit?:number;sort?:{field:'id'|'version'|'n
 export type Save<T> = Omit<T,keyof Entity|'ownerMembershipId'|'createdByUserId'> & {id?:ID};
 export type BlobInput = {name:string;mime:'image/jpeg'|'image/png';size:number;bytes:string}; // bytes: base64 in JSON; the leading bytes must be of mime (IR308); name: 1–200 characters, no control, path-separator or bidirectional formatting characters (IR368)
 export type BlobContent = {name:string;mime:Attachment['mime'];size:number;bytes:string}; // attachments.getContent: bytes base64 in JSON (IR129 item 1), not a browser Blob
+export type DocumentContent = {name:string;mime:DocumentInput['mime'];size:number;bytes:string}; // certificates.getContent: the uploaded certificate document, bytes base64 in JSON (IR436)
 export type DocumentInput = {name:string;mime:'application/pdf'|'image/jpeg'|'image/png';size:number;bytes:string}; // bytes: base64 in JSON (IR308); name as BlobInput's (IR368)
 
 
@@ -425,6 +426,7 @@ export type OperationContracts = {
   'contractors.setOfferStatus': {input:{contractorOrgId:ID;status:'active'|'suspended';reason:string};result:ContractorProfile;mode:'write'};
   'rateCards.list': {input:Query;result:Page<RateCard>;mode:'read'};
   'rateCards.save': {input:{contractorOrgId:ID;effectiveFrom:Instant;currency:Currency;lines:RateCard['lines']};result:RateCard;mode:'write'};
+  'certificates.getContent': {input:{certificateId:ID};result:DocumentContent;mode:'read'};
   'certificates.list': {input:Query;result:Page<Certificate>;mode:'read'};
   'certificates.submit': {input:{membershipId:ID;code:Certificate['code'];name:string;number:string;issuedAt:Instant;expiresAt:Instant;file:DocumentInput;renewalOf?:ID};result:Certificate;mode:'write'};
   'certificates.verify': {input:{certificateId:ID;decision:'approve'|'reject';reason?:string};result:Certificate;mode:'write'};

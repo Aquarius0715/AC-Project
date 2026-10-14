@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 	"time"
@@ -57,6 +58,17 @@ func TestCertificatesAndParts(t *testing.T) {
 		t.Fatalf("submit: %d %v", code, m)
 	}
 	cert := data(m)["id"].(string)
+	// the uploaded document opens for HQ and for the company that sent it, before it is verified (IR436)
+	for _, a := range []*actor{&hq, &contrA} {
+		code, m := post(s, a, "certificates.getContent", `{"certificateId":"`+cert+`"}`)
+		d := data(m)
+		if code != 200 || d["name"] != "cert.pdf" || d["mime"] != "application/pdf" || d["size"] != float64(13) || d["bytes"] != base64.StdEncoding.EncodeToString([]byte("%PDF-1.4 demo")) {
+			t.Fatalf("certificates.getContent: %d %v", code, m)
+		}
+	}
+	if code, _ := post(s, &hq, "certificates.getContent", `{"certificateId":"`+uuid.NewString()+`"}`); code != 404 {
+		t.Errorf("an unknown certificate: %d", code)
+	}
 	// verify
 	if code, m := write(s, &hq, "certificates.verify", `{"certificateId":"`+cert+`","decision":"reject"}`, 1); code != 422 || fields(m) != "reason=error.required" {
 		t.Errorf("reject without reason: %d %s", code, fields(m))

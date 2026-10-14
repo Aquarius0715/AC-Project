@@ -345,6 +345,116 @@ func (m Certificates) requestTraining(ctx context.Context, c *ops.Call, in *Trai
 
 // ---- certificates.list ----
 
+//	@Summary		certificates.list (read)
+//	@ID				certificates.list
+//	@Description	Authorization: admin:job.read | contractor:partner.assign:own-company
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A21, DD-P09 · Query: filters organizationId,membershipId,code,status,expiringWithinDays · sort id,expiresAt,status (default expiresAt asc;id asc)
+//	@Tags			certificates
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor				query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit				query		integer	false	"page size 1–100, default 25"
+//	@Param			sort				query		string	false	"field:direction — fields id,expiresAt,status; default expiresAt asc;id asc"
+//	@Param			organizationId		query		string	false	"filter → organizationId"
+//	@Param			membershipId		query		string	false	"filter → membershipId"
+//	@Param			code				query		string	false	"filter → code (QualificationCode or other)"
+//	@Param			status				query		string	false	"filter → status"
+//	@Param			expiringWithinDays	query		number	false	"filter → expiresAt within N days of now"
+//	@Success		200					{object}	ops.Envelope{data=CertificatePage}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/certificates [get]
+//
+// CertificateContentInput is certificates.getContent input.
+type CertificateContentInput struct {
+	CertificateID uuid.UUID `json:"certificateId"`
+}
+
+// Validate implements ops.Validator.
+func (in *CertificateContentInput) Validate() map[string]string {
+	if in.CertificateID == uuid.Nil {
+		return map[string]string{"certificateId": "error.required"}
+	}
+	return nil
+}
+
+// DocumentOut is DocumentContent of service-contracts.ts: the uploaded certificate document (IR436).
+type DocumentOut struct {
+	Name  string `json:"name"`
+	Mime  string `json:"mime"`
+	Size  int    `json:"size"`
+	Bytes []byte `json:"bytes"`
+}
+
+// documentMime names an uploaded document's type from its leading bytes (certificates.submit admitted only these).
+func documentMime(b []byte) string {
+	for _, m := range []string{"application/pdf", "image/png", "image/jpeg"} {
+		if ContentMatches(m, b) {
+			return m
+		}
+	}
+	return "application/octet-stream"
+}
+
+// content answers a certificate's uploaded document, so HQ sees what it verifies (IR436). Scoped as list: a
+// contractor reads only its own company's certificates; another company's is NOT_FOUND.
+//
+//	@Summary		certificates.getContent (read)
+//	@ID				certificates.getContent
+//	@Description	Authorization: admin:job.read | contractor:partner.assign:own-company
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; the uploaded document of a certificate so HQ sees what it verifies (IR436); another company's certificate is NOT_FOUND
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A21, DD-P09
+//	@Tags			certificates
+//	@Accept			json
+//	@Produce		json
+//	@Param			certificateId	path		string	true	"input field certificateId"
+//	@Success		200				{object}	ops.Envelope{data=DocumentOut}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/certificates/{certificateId}/content [get]
+func (m Certificates) content(ctx context.Context, c *ops.Call, in *CertificateContentInput) (DocumentOut, error) {
+	var key, name *string
+	var org uuid.UUID
+	err := c.Tx.QueryRow(ctx, `SELECT object_key, file_name, organization_id FROM maintenance.certificates WHERE id = $1`, in.CertificateID).Scan(&key, &name, &org)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && c.Principal.Role == "contractor" && org != c.Principal.OrgID) {
+		return DocumentOut{}, apperr.E(apperr.NotFound, "error.notFound")
+	}
+	if err != nil {
+		return DocumentOut{}, err
+	}
+	if key == nil || *key == "" {
+		return DocumentOut{}, apperr.E(apperr.NotFound, "error.notFound") // a certificate without an uploaded document
+	}
+	out := DocumentOut{Name: "certificate"}
+	if name != nil && *name != "" {
+		out.Name = *name
+	}
+	if out.Bytes, err = m.Blobs.Get(ctx, *key); errors.Is(err, blob.ErrNotFound) {
+		return out, apperr.E(apperr.NotFound, "error.notFound")
+	} else if err != nil {
+		return out, err
+	}
+	out.Mime, out.Size = documentMime(out.Bytes), len(out.Bytes)
+	return out, nil
+}
+
 // @Summary		certificates.list (read)
 // @ID				certificates.list
 // @Description	Authorization: admin:job.read | contractor:partner.assign:own-company
@@ -597,5 +707,6 @@ func RegisterCertificates(r *ops.Registry, m Certificates) {
 	ops.Register(r, "certificates.verify", m.verify)
 	ops.Register(r, "certificates.requestTraining", m.requestTraining)
 	ops.Register(r, "certificates.list", m.list)
+	ops.Register(r, "certificates.getContent", m.content)
 	ops.Register(r, "parts.list", m.parts)
 }

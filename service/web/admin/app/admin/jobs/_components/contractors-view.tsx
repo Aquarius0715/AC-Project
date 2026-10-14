@@ -202,6 +202,7 @@ function VerifyModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
     <Modal open wide onClose={() => onClose()} title={t("Verify uploads · {name}", { name: d.org.name })} footer={<Btn onClick={() => onClose()}>{t("Close")}</Btn>}>
       {d.pending.map((c) => (
         <Card key={c.id} title={`${c.technician} · ${c.name}`} sub={[c.code.replace(/^demo_/, ""), t("no. {number}", { number: c.number }), `${day(c.issuedAt)} → ${day(c.expiresAt)}`, ...(c.renewal ? [t("renewal")] : []), ...(c.fileName ? [c.fileName] : [])].join(" · ")}>
+          {c.fileName && <p className="mb-2 text-[13px]"><a href={`/admin/certificates/${c.id}/document`} target="_blank" rel="noreferrer" className="font-semibold text-primary"><Icon name="external" /> {t("Open the document")}</a></p>}
           <Field label={t("Reason (to reject)")} error={tried === c.id && !reasons[c.id]?.trim() ? t("A reason is required to reject") : undefined}><Input value={reasons[c.id] ?? ""} maxLength={1000} onChange={(e) => setReasons({ ...reasons, [c.id]: e.target.value })} /></Field>
           <div className="mt-2 flex justify-end gap-2"><Btn size="sm" variant="danger" disabled={pending} onClick={() => decide(c, "reject")}>{t("Reject")}</Btn><Btn size="sm" variant="primary" disabled={pending} onClick={() => decide(c, "approve")}>{t("Approve")}</Btn></div>
         </Card>

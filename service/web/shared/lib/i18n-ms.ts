@@ -5685,6 +5685,7 @@ export const ms: Record<string, string> = {
   "Access until": "Akses sehingga",
   "Your account": "Akaun anda",
   "Last active contractor": "Kontraktor aktif terakhir",
+  "Open the document": "Buka dokumen",
   "This technician's access ends before the visit — choose another technician or ask HQ to extend it": "Akses juruteknik ini tamat sebelum lawatan — pilih juruteknik lain atau minta HQ melanjutkannya",
   "Has an assigned job — reassign it first": "Ada kerja yang ditugaskan — tugaskan semula dahulu",
   "HQ sets permissions, qualifications and access periods in Access & roles. An accepted account keeps its e-mail and role — to change them, remove it and invite again. You can’t change your own account, and your company always keeps one active contractor.": "Ibu pejabat menetapkan kebenaran, kelayakan dan tempoh akses dalam Akses & peranan. Akaun yang diterima mengekalkan e-mel dan peranannya — untuk mengubahnya, alih keluar dan jemput semula. Anda tidak boleh mengubah akaun anda sendiri, dan syarikat anda sentiasa mengekalkan seorang kontraktor aktif.",

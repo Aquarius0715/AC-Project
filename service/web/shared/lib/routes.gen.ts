@@ -27,6 +27,7 @@ export const coreRoutes: Readonly<Record<string, readonly CoreRoute[]>> = {
   "baselines.save": [{ method: "POST", path: "/v1/baselines" }, { method: "PUT", path: "/v1/baselines/{id}" }],
   "capabilities.list": [{ method: "GET", path: "/v1/capabilities" }],
   "capabilities.save": [{ method: "POST", path: "/v1/capabilities" }, { method: "PUT", path: "/v1/capabilities/{id}" }],
+  "certificates.getContent": [{ method: "GET", path: "/v1/certificates/{certificateId}/content" }],
   "certificates.list": [{ method: "GET", path: "/v1/certificates" }],
   "certificates.requestTraining": [{ method: "POST", path: "/v1/certificates/{certificateId}/request-training" }],
   "certificates.submit": [{ method: "POST", path: "/v1/certificates" }],

@@ -33,7 +33,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | DD-P06 / FR-P06 | `/partner/team` / `TeamCapacity` | `members.list`, `jobs.list`, `members.capacity`, `members.setUnavailability` | Filter by date or qualification within the user's company. Qualifications are fictional demo attributes | Do not assign candidates with expired memberships. Refer new user registration to HQ |
 | DD-P07 / FR-P07 | `/partner/history` / `PartnerHistory` | `jobs.events`, `jobs.addNote`, `notifications.preview`, `notifications.recipients`, `jobs.list`, `members.list`, `units.list` | Select jobId and a template. Notes are 1–2000 characters (provisional); select only authorized recipients | Do not allow free-entry external recipients or include confidential customer billing data in templates |
 | DD-P08 / FR-P08 | `/partner/*` / `PartnerAccessGuard` | `jobs.get`, `session.get` | Recheck accepted delegation and its period immediately before every action. Use the demo clock for expiry | Once expired, reject the next action and discard cached data even if the screen remains open |
-| DD-P09 / FR-P09 | `/partner/team?tab=certifications` / `CertificateList` | `certificates.list`, `certificates.submit`, `certificates.requestTraining` | Renewal file PDF/JPG/PNG ≤ 10 MB; issuedAt < expiresAt; eligibility uses verified certificates | Pending renewals do not extend eligibility; other companies NOT_FOUND |
+| DD-P09 / FR-P09 | `/partner/team?tab=certifications` / `CertificateList` | `certificates.list`, `certificates.getContent`, `certificates.submit`, `certificates.requestTraining` | Renewal file PDF/JPG/PNG ≤ 10 MB; issuedAt < expiresAt; eligibility uses verified certificates | Pending renewals do not extend eligibility; other companies NOT_FOUND |
 | DD-P10 / FR-P10 | `/partner/payouts` / `PartnerPayouts` | `payouts.list`, `payouts.get`, `payouts.query`, `rateCards.list`, `jobs.get`, `units.get`, `jobs.list` | Approved/paid statements only; question message 1–2000 | Corrections only as next-statement adjustments |
 | DD-P11 / FR-P11 | `/partner/users` / `PartnerUsers` | `partnerUsers.list`, `partnerUsers.save`, `partnerUsers.remove`, `partnerUsers.resendInvite` | Own company only; e-mail unique per company (case-insensitive); e-mail and role fixed once accepted; never the own account; the company keeps an active contractor | Permissions, qualifications and access periods stay with HQ (DD-A03) |
 
@@ -310,7 +310,7 @@ Scope: FR-P08 / Main display pattern: **Guard shared by all patterns**. Service 
 
 **Source mapping**: SRC-06 BIZ-12 → FR-P09 → DD-P09. Source category: Figma-confirmed screen specification (Contractor 04-6/04-7, 2026-10-01).
 
-Scope: FR-P09 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `certificates.list, certificates.submit, certificates.requestTraining`.
+Scope: FR-P09 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `certificates.list, certificates.getContent, certificates.submit, certificates.requestTraining`. A certificate's uploaded document opens from its row (`certificates.getContent`, IR436).
 
 **Initial view and prerequisites**: Contractor with partner.assign; Team & capacity tab `certifications`.
 

@@ -86,7 +86,7 @@ SQL stays inline with pgx. sqlc remains an option if the SQL should be type-chec
 
 | Source (docs) | Generator | Output | Check in CI |
 |---|---|---|---|
-| [operation-catalog.csv](operation-catalog.csv) | `cmd/gen/ops` | `internal/ops/catalog_gen.go`: 208 entries with name, mode, module, design IDs, authorization expression | Every catalog operation has exactly one registered handler; no extra handlers |
+| [operation-catalog.csv](operation-catalog.csv) | `cmd/gen/ops` | `internal/ops/catalog_gen.go`: 209 entries with name, mode, module, design IDs, authorization expression | Every catalog operation has exactly one registered handler; no extra handlers |
 | [service-contracts.ts](service-contracts.ts) | `cmd/gen/ops` | The web's `contracts.gen.ts` (IR313). The Go inputs and results are hand-written structs with JSON tags; the planned `types_gen.go` is not built (IR363) | The web's contract tests (IR312, IR314) and the integration tests read the API's JSON against the contract |
 | [write-version-catalog.csv](write-version-catalog.csv) | `cmd/gen/ops` | expected-version requirement per write operation | Writes listed as `required` reject a missing version with VALIDATION |
 | [fixture-contract.json](../04-agentic-sdlc/fixture-contract.json) | `internal/seed` (`cmd/seed`, `make seed`) | The demo fixture of the integration tests and the local stack | The integration and E2E suites pass on it |

@@ -63,7 +63,7 @@ Show retry only for recoverable errors. For forbidden and not-found, follow IR57
 | DD-A18 / FR-A18 | `/admin/units` (Import CSV) / `UnitImportWizard` | `units.importPreview`、`units.importCommit`、`units.importUndo`、`customers.list` | UTF-8 CSV ≤ 1000 rows; 8 mapped columns; nothing written before import | Error rows skipped; undo only 24 h and before telemetry/jobs |
 | DD-A19 / FR-A19 | `/admin/units?tab=warranty` / `WarrantyCoverage` | `units.coverage`、`jobs.recordWarrantyClaim`、`contracts.list` | Coverage = warranty or active contract; claim amount > 0 | Claims only for parts replaced under warranty |
 | DD-A20 / FR-A20 | `/admin/devices?tab=firmware` / `FirmwareCampaigns` | `firmwareCampaigns.list`、`firmwareCampaigns.get`、`firmwareCampaigns.schedule`、`firmwareCampaigns.control`、`devices.list` | Signed version; start ≥ 24 h ahead; waves end at 100 %; auto-pause 1–50 % | Busy/offline/tampered devices skipped; failed devices keep the old version |
-| DD-A21 / FR-A21 | `/admin/jobs?tab=contractors` / `ContractorRegister` | `contractors.list`、`contractors.save`、`contractors.setOfferStatus`、`rateCards.list`、`rateCards.save`、`certificates.list`、`certificates.verify` | Rate card from a future date; suspension reason 1–1000 | Suspension blocks new offers only |
+| DD-A21 / FR-A21 | `/admin/jobs?tab=contractors` / `ContractorRegister` | `contractors.list`、`contractors.save`、`contractors.setOfferStatus`、`rateCards.list`、`rateCards.save`、`certificates.list`、`certificates.getContent`、`certificates.verify` | Rate card from a future date; suspension reason 1–1000 | Suspension blocks new offers only |
 | DD-A22 / FR-A22 | `/admin/jobs?tab=sla` / `SlaScorecard` | `sla.scorecard`、`sla.saveTargets` | Percentages 0–100; response 1–168 h; targets per plan | New targets apply only to new jobs |
 | DD-A23 / FR-A23 | `/admin/billing?tab=payouts` / `ContractorPayouts` | `payouts.list`、`payouts.get`、`payouts.generate`、`payouts.transition`、`payouts.resolveQuery`、`rateCards.list` | billing.payment for every write; mark paid on or after the pay date | Approved/paid statements are never regenerated |
 
@@ -810,7 +810,7 @@ Scope: FR-A20 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 **Source mapping**: SRC-06 BIZ-12 → FR-A21 → DD-A21. Source category: Figma-confirmed screen specification (Admin 06-9, 2026-10-01).
 
-Scope: FR-A21 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary: `contractors.list, contractors.save, contractors.setOfferStatus, rateCards.list, rateCards.save, certificates.list, certificates.verify`.
+Scope: FR-A21 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary: `contractors.list, contractors.save, contractors.setOfferStatus, rateCards.list, rateCards.save, certificates.list, certificates.getContent, certificates.verify`.
 
 **Initial view and prerequisites**: job.read; tab `contractors`; URL `contractorId`.
 
@@ -823,7 +823,7 @@ Scope: FR-A21 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 **Steps**
 
 1. KPI tiles (offer acceptance, arrival in window, report accepted first time, customer rating with count, rework rate; 90 days) for the selected contractor.
-2. Contractor list (status, region, technician count); detail cards: registration, service areas, delegation period, contact, insurance; technicians & certificates with “Verify uploads (n)” (`certificates.verify` approve/reject); rate card table with version and Edit rate card (`rateCards.save`); Suspend offers (`contractors.setOfferStatus`).
+2. Contractor list (status, region, technician count); detail cards: registration, service areas, delegation period, contact, insurance; technicians & certificates with “Verify uploads (n)”: the uploaded document opens first (`certificates.getContent`, IR436), then `certificates.verify` approves or rejects it; rate card table with version and Edit rate card (`rateCards.save`); Suspend offers (`contractors.setOfferStatus`).
 3. Queries to update: `contractors / rate cards / certificates / members`.
 
 **Boundary cases and failures**: Offers to a suspended contractor are rejected by `jobs.offer` (CONFLICT); the Jobs tab does not propose it. Contractor organizations without a profile are listed and get a profile from the register; KPI tiles name their measure (targets are per plan in the SLA tab). As built: IR235.

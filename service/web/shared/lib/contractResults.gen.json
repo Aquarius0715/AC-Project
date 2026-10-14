@@ -425,6 +425,15 @@
   ],
   "items": null
  },
+ "certificates.getContent": {
+  "fields": [
+   "bytes",
+   "mime",
+   "name",
+   "size"
+  ],
+  "items": null
+ },
  "certificates.list": {
   "fields": [
    "items",
