@@ -76,6 +76,14 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 	}
 	e.HTTPErrorHandler = ops.HTTPErrorHandler
 	e.Use(middleware.Recover())
+	// the request ID is the gateway's own: one a client sends is dropped, so no caller chooses the correlation ID the
+	// services log and store with its writes (IR435)
+	e.Pre(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c *echo.Context) error {
+			c.Request().Header.Del(echo.HeaderXRequestID)
+			return next(c)
+		}
+	})
 	e.Use(middleware.RequestIDWithConfig(middleware.RequestIDConfig{Generator: func() string { return uuid.Must(uuid.NewV7()).String() }}))
 	e.Use(notSniffedOrCached)
 	proxies := map[string]*httputil.ReverseProxy{}

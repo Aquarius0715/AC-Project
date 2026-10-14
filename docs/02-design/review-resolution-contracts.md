@@ -6650,3 +6650,10 @@ Found in review: the gateway sends `Cache-Control: no-store` on every answer (pe
 1. The route answers `Cache-Control: no-store`, as the gateway does.
 2. The BFF routes (`/bff/session`, `/bff/ops/*`, `/bff/auth/*`) sent no `Cache-Control` at all; every app's `next.config.ts` now sets `no-store` on `/bff/:path*` (verified on the rebuilt customer app).
 3. Test: `attachmentResponse.test.ts`.
+
+## IR435 The gateway makes every request ID itself — 2026-10-14
+
+Found in review: the gateway's request-ID middleware kept an `X-Request-Id` the client sent, so any caller chose the correlation ID that the services log, return in errors and store with their writes (outbox events, audit entries). A caller could make its requests look like another's in the logs.
+
+1. The gateway drops an incoming `X-Request-Id` before the middleware, so every request gets a new UUIDv7 from the gateway; the services keep the one the gateway passes on (they are not reachable from outside, IR373).
+2. Test: `TestResponsesAreNotSniffedOrCachedAndCarryOneRequestID` (a client-chosen ID is not answered back).

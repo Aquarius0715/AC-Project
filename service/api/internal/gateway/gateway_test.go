@@ -151,11 +151,12 @@ func TestResponsesAreNotSniffedOrCachedAndCarryOneRequestID(t *testing.T) {
 	rt := ops.SpecByName()["jobs.create"].Routes[0]
 	req := httptest.NewRequest(rt.Method, rt.Path, strings.NewReader(`{"limit":1}`))
 	req.Header.Set("Authorization", "Bearer tok")
+	req.Header.Set("X-Request-Id", "client-chosen") // dropped: the gateway makes its own (IR435)
 	for _, r := range []*http.Request{req, httptest.NewRequest(http.MethodGet, "/healthz", nil)} {
 		w := httptest.NewRecorder()
 		e.ServeHTTP(w, r)
 		h := w.Result().Header
-		if got := h.Values("X-Request-Id"); len(got) != 1 || got[0] == "upstream-id" {
+		if got := h.Values("X-Request-Id"); len(got) != 1 || got[0] == "upstream-id" || got[0] == "client-chosen" {
 			t.Errorf("%s %s: X-Request-Id = %q, want one gateway ID", r.Method, r.URL.Path, got)
 		}
 		if got := h.Values("X-Content-Type-Options"); len(got) != 1 || got[0] != "nosniff" {
