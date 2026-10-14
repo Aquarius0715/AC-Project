@@ -6609,7 +6609,7 @@ Found in review: database design §6 sets the retention of the outbox (7 days), 
 
 Found in review: while the database is away, the scheduler (every second) and each event consumer (every 250 ms) logged one line per poll, a flood that hides everything else in the logs.
 
-1. `logging.Repeats` logs a failure once, then the same failure at most once a minute with how often it recurred, a different failure at once, and the first success after a failure as a recovery. The scheduler loop and `events.Consumer.Run` use it; the dead-letter lines (IR427) stay one per event.
+1. `logging.Repeats` logs a failure once, then the same failure at most once a minute with how often it recurred, a different failure at once, and the first success after a failure as a recovery. The scheduler loop, `events.Consumer.Run` and the IoT bridge's command poll use it; the dead-letter lines (IR427) stay one per event.
 2. Test: `TestRepeats`.
 
 ## IR430 The public local secrets are refused outside local runs — 2026-10-14

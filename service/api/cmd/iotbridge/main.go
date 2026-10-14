@@ -24,6 +24,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
 	"github.com/pradita/ac-project/service/api/internal/iotbridge"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -224,6 +225,7 @@ func internalToken() string { return os.Getenv("INTERNAL_API_TOKEN") }
 func pollCommands(ctx context.Context, mc mqtt.Client, httpc *http.Client, api, endpoint, token string, clock *demoClock, tenant string) {
 	t := time.NewTicker(2 * time.Second)
 	defer t.Stop()
+	rep := &logging.Repeats{Logf: log.Printf} // while the API is away, once a minute instead of every poll (IR429)
 	for {
 		select {
 		case <-ctx.Done():
@@ -231,9 +233,10 @@ func pollCommands(ctx context.Context, mc mqtt.Client, httpc *http.Client, api, 
 		case <-t.C:
 			waiting, err := fetchWaiting(httpc, api, token, tenant)
 			if err != nil {
-				log.Printf("requested commands: %v", err)
+				rep.Failed(fmt.Sprintf("requested commands: %v", err))
 				continue
 			}
+			rep.OK("requested commands")
 			for _, w := range waiting {
 				if err := sendCommand(mc, httpc, endpoint, tenant, w, clock.offset()); err != nil {
 					log.Printf("command %s: %v", w.ID, err)
