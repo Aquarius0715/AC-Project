@@ -305,8 +305,11 @@ test("the default policy's demo test on a unit of the scoped customer", async ({
   await expect(preview).toContainText("Warning");
   const check = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Test with demo data", exact: true }) }).last();
   await expect(check.getByRole("spinbutton", { name: "Reading" })).toHaveValue("35");
-  await check.getByRole("button", { name: "Evaluate (demo)" }).click();
-  await expect(check.getByRole("status")).toHaveText(/^35 µg\/m³ on .+ raises an alert and notifies the recipients — simulated, nothing is stored\.$/);
+  // clicked again until the page has hydrated: a click before that does nothing (a busy CI runner hydrates late; 1b4cc87)
+  await expect(async () => {
+    await check.getByRole("button", { name: "Evaluate (demo)" }).click();
+    await expect(check.getByRole("status")).toHaveText(/^35 µg\/m³ on .+ raises an alert and notifies the recipients — simulated, nothing is stored\.$/, { timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
   await check.getByRole("spinbutton", { name: "Reading" }).fill("34.9");
   await check.getByRole("button", { name: "Evaluate (demo)" }).click();
   await expect(check.getByRole("status")).toHaveText("No alert: 34.9 µg/m³ does not meet ≥ 35 µg/m³.");
