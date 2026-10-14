@@ -280,9 +280,9 @@ Design: [DD-P10](../02-design/contractor.md#dd-p10-details). Assess parent AT-P1
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-P11-N | contractor-a with its technician tech-external-a. When: open Users → invite lim.tech@example.com as Technician → Resend invite → disable tech-external-a (reason “On leave”) → enable it again | ① List shows contractor-a (Contractor, Active) and tech-external-a (Technician, Active, access until 2026-10-01) ② One PartnerUser invited ③ Resend queues the invitation e-mail again (IR418) ④ tech-external-a's membership ends now ⑤ Its access until 2026-10-01 comes back |
+| AT-P11-N | contractor-a with its technicians tech-external-a (holds job-contractor-a) and tech-external-a2 (no assigned job). When: open Users → invite lim.tech@example.com as Technician → Resend invite 5 minutes later → disable tech-external-a2 (reason “On leave”) → enable it again | ① List shows contractor-a (Contractor, Active) and both technicians (Active, access until 2026-10-01); tech-external-a is marked booked and offers no Disable or Remove (IR432) ② One PartnerUser invited ③ Resend queues the invitation e-mail again (IR418, IR423) ④ tech-external-a2's membership ends now ⑤ Its access until 2026-10-01 comes back |
 | AT-P11-E | ① Invite contractor-a's own e-mail again (any case) ② Disable or remove the own account ③ contractor-b opens contractor-a's invite ④ A technician opens /partner/users | ① VALIDATION, input kept ② CONFLICT, zero changes ③ NOT_FOUND ④ Page unavailable (FORBIDDEN), no Users item |
-| AT-P11-B | ① Change an accepted account's role ② Remove the company's last active contractor ③ Enable an account whose access end has passed | ① VALIDATION (immutable) ② CONFLICT ③ CONFLICT |
+| AT-P11-B | ① Change an accepted account's role ② Remove the company's last active contractor ③ Enable an account whose access end has passed ④ Disable tech-external-a, who holds an assigned job ⑤ Resend an invite within 5 minutes of its invitation | ① VALIDATION (immutable) ② CONFLICT ③ CONFLICT ④ CONFLICT `errors.technician_booked`, zero changes (IR421) ⑤ RATE_LIMITED `errors.invite_recently_sent` with the seconds to wait, no e-mail (IR423) |
 
 Design: [DD-P11](../02-design/contractor.md#dd-p11-details). Assess parent AT-P11 using all N/E/B cases in traceability.
 

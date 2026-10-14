@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "d18ecd9fb93d80944a49148b6e9308b6476526216aa6d6874d35e5a9c9cdad66",
+  "spec_baseline_id": "75881ed829eeb798d1c8236d9ef7d111787c7fc0c3a655e6776891ecb385be0d",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -78,7 +78,7 @@
     },
     {
       "path": "01-requirements/client.md",
-      "sha256": "24cd14116c77e8d4855937b645f0361e09df27aca6c7c7273c50e7ed5fce1a3a"
+      "sha256": "32cdcc5d482a32dce679f8d298ea66ef5c02a006435c19f6137cc537d1caa6bc"
     },
     {
       "path": "01-requirements/common.md",
@@ -86,7 +86,7 @@
     },
     {
       "path": "01-requirements/contractor.md",
-      "sha256": "cdef0372ea1facb0487e713b61a95431696062c30778dc8b7e39c5dd7a3a8d6e"
+      "sha256": "a8cb4deae49c295499870d179888635c11655083f593bf4f96d259651c27d895"
     },
     {
       "path": "01-requirements/technician.md",
