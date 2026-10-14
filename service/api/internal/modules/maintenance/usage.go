@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 )
@@ -23,7 +24,15 @@ const (
 	// QueryTechnicianBooked answers whether a technician membership holds an active assignment whose access has not
 	// ended: the contractor cannot disable or remove that account (IR421). Asked by identity by name.
 	QueryTechnicianBooked = "maintenance.technicianBooked"
+	// QueryBookedTechnicians answers which of the given technician memberships hold such an assignment: the
+	// contractor's Users list marks them, so Disable and Remove are not offered (IR432).
+	QueryBookedTechnicians = "maintenance.bookedTechnicians"
 )
+
+// MembershipsInput names memberships.
+type MembershipsInput struct {
+	MembershipIDs []uuid.UUID `json:"membershipIds"`
+}
 
 // MembershipInput names a membership.
 type MembershipInput struct {
@@ -72,6 +81,20 @@ func registerUsage(r *ops.Registry) {
 	ops.RegisterQuery(r, ops.DomainMaintenance, QueryUnitActive, unitActive)
 	ops.RegisterQuery(r, ops.DomainMaintenance, QueryOrgActive, orgActive)
 	ops.RegisterQuery(r, ops.DomainMaintenance, QueryTechnicianBooked, technicianBooked)
+	ops.RegisterQuery(r, ops.DomainMaintenance, QueryBookedTechnicians, bookedTechnicians)
+}
+
+func bookedTechnicians(ctx context.Context, c *ops.Call, in *MembershipsInput) ([]uuid.UUID, error) {
+	out := []uuid.UUID{}
+	if len(in.MembershipIDs) == 0 {
+		return out, nil
+	}
+	rows, err := c.Tx.Query(ctx, `SELECT DISTINCT technician_membership_id FROM maintenance.assignments
+		WHERE technician_membership_id = ANY($1) AND status = 'active' AND valid_until > $2`, in.MembershipIDs, c.Now)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 }
 
 func technicianBooked(ctx context.Context, c *ops.Call, in *MembershipInput) (bool, error) {

@@ -32,6 +32,11 @@ describe("partnerUserRows (FR-P11)", () => {
     expect(r.actions).toEqual({ resend: false, edit: false, disable: false, enable: false, remove: true });
     expect(partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-09-15T00:00:00Z"))[0].ended).toBe(false);
   });
+  it("keeps a technician who holds an assigned job: no disable, no remove until it is reassigned (IR432)", () => {
+    const [r] = partnerUserRows([user({ id: "b", displayName: "Busy", status: "active", membershipId: "m", booked: true })], null);
+    expect(r.booked).toBe(true);
+    expect(r.actions).toEqual({ resend: false, edit: false, disable: false, enable: false, remove: false });
+  });
   it("enables a disabled account; an invite has no access end yet", () => {
     const [d, i] = partnerUserRows([user({ id: "d", displayName: "A", status: "disabled", membershipId: "m" }), user({ id: "i", displayName: "B" })], null);
     expect(d.actions.enable).toBe(true);

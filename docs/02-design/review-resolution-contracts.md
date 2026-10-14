@@ -6626,3 +6626,11 @@ Found in review (coverage scan): the operations' pipeline runs an input's `Valid
 
 1. `ops.RegisterQuery` runs `Validate` when the query's input implements it and answers VALIDATION with the field errors, as an operation does.
 2. Test: `TestRequestedCommandsForTheGateway` (limits 0 and 1,000,000 → 422).
+
+## IR432 The contractor's Users list marks a booked technician — 2026-10-14
+
+Found in review: since IR421 a technician who holds an assigned job cannot be disabled or removed, but the Users page still offered Disable and Remove and only refused after the dialog.
+
+1. `PartnerUser.booked` (service contracts): `partnerUsers.list` marks the active technicians of the page that hold an active assignment, with one internal query to the maintenance service for the page (`maintenance.bookedTechnicians`). The save and remove results leave it false; the page reads the list again after a write.
+2. The partner Users page offers no Disable or Remove on such a row and says “Has an assigned job — reassign it first” (English and Malay). The refusal of IR421 stays for any other caller.
+3. Tests: `TestPartnerUsers` (the seed technician is booked, the contractor is not), `partnerUsers.test.ts`, the partner Users E2E.

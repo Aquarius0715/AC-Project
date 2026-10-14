@@ -1,6 +1,6 @@
-// Partner Users (FR-P11, IR416, IR418, IR423): contractor-a invites a technician (the invitation e-mail reaches
-// Mailpit), is told to wait before resending it, edits the invite, removes it, and is refused when it disables its booked technician; its own row has no
-// actions.
+// Partner Users (FR-P11, IR416, IR418, IR423, IR432): contractor-a invites a technician (the invitation e-mail reaches
+// Mailpit), is told to wait before resending it, edits the invite and removes it; its booked technician offers no
+// Disable or Remove, and its own row has no actions.
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 
 test("a contractor invites, edits and removes a user, waits to resend, and cannot disable its booked technician", async ({ page, app }) => {
@@ -40,13 +40,12 @@ test("a contractor invites, edits and removes a user, waits to resend, and canno
   await dialog.getByRole("button", { name: "Remove" }).click();
   await expect(row(email)).toHaveCount(0);
 
-  // the technician holds an assigned job: disabling is refused with what to do, and it stays active (IR421)
+  // the technician holds an assigned job: Disable and Remove are not offered, the row says what to do, and it stays
+  // active (IR421, IR432)
   const tech = row("tech-external-a");
-  await tech.getByRole("button", { name: "Disable" }).click();
-  await dialog.getByLabel("Reason").fill("On leave");
-  await dialog.getByRole("button", { name: "Disable" }).click();
-  await expect(page.getByText("This technician still has an assigned job — reassign it first").first()).toBeVisible();
-  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(tech).toContainText("Has an assigned job — reassign it first");
+  await expect(tech.getByRole("button", { name: "Disable" })).toHaveCount(0);
+  await expect(tech.getByRole("button", { name: "Remove" })).toHaveCount(0);
   await expect(tech).toContainText("Active");
 });
 

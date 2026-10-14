@@ -74,6 +74,10 @@ func TestPartnerUsers(t *testing.T) {
 	if self == nil || self["partnerRole"] != "contractor" || self["status"] != "active" || tech == nil || tech["partnerRole"] != "technician" || tech["accessUntil"] == nil {
 		t.Fatalf("seed accounts listed: %v", m)
 	}
+	// the seed technician holds an assigned job: the list marks it (IR432); the contractor is not a technician
+	if tech["booked"] != true || self["booked"] != false {
+		t.Errorf("booked: technician %v, contractor %v", tech["booked"], self["booked"])
+	}
 	if _, m := post(s, &contrA, "partnerUsers.list", `{"filters":{"status":"invited","partnerRole":"technician","search":"`+email[:12]+`"},"limit":100}`); len(items(m)) != 1 {
 		t.Errorf("filtered list: %v", m)
 	}

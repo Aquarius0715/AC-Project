@@ -26,7 +26,7 @@ vi.mock("@redis/client", () => ({ createClient: () => { const c = { on: () => c,
 import { ABSOLUTE_SECONDS, createSessionCookie, dropSession, loadSession, renewSessionCookie, seal, unseal, type Session } from "@ac/web/lib/session";
 
 const NOW = Date.parse("2026-09-15T01:00:00Z");
-const session = (over: Partial<Session> = {}): Session => ({ accessToken: "header.claims.sig", refreshToken: "r-1", tenantId: "t-1", membershipId: "m-1", role: "client", expiresAt: NOW / 1000 + 300, ...over });
+const session = (over: Partial<Session> = {}): Session => ({ accessToken: "header.claims.sig", refreshToken: "refresh:r-1", tenantId: "t-1", membershipId: "m-1", role: "client", expiresAt: NOW / 1000 + 300, ...over });
 const later = (minutes: number) => vi.setSystemTime(Date.now() + minutes * 60_000);
 
 beforeEach(() => {
@@ -48,7 +48,8 @@ describe("the server-side session store", () => {
     expect([Object.keys(unseal<object>(cookie) ?? {}), id.length]).toEqual([["sid"], 43]);
     const [key, rec] = [...kv.data.entries()][0];
     expect(key).toBe(`ac:session:${createHash("sha256").update(id).digest("hex")}`); // the key reveals no cookie
-    expect([rec.value.includes("header.claims.sig"), rec.value.includes("r-1"), kv.data.size]).toEqual([false, false, 1]);
+    // the markers hold ":" and "." around words, which base64url ciphertext cannot reproduce by chance
+    expect([rec.value.includes("header.claims.sig"), rec.value.includes("refresh:r-1"), kv.data.size]).toEqual([false, false, 1]);
     expect(await loadSession(cookie)).toEqual(session());
   });
 

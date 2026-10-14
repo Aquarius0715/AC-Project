@@ -31374,6 +31374,10 @@
                 "accessUntil": {
                     "type": "string"
                 },
+                "booked": {
+                    "description": "an active technician who holds an assigned job: not disabled or removed until reassigned (IR421, IR432)",
+                    "type": "boolean"
+                },
                 "createdAt": {
                     "type": "string"
                 },

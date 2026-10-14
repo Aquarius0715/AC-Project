@@ -38,6 +38,7 @@ type PartnerUser struct {
 	AccessUntil           *time.Time `json:"accessUntil"`
 	InvitedAt             time.Time  `json:"invitedAt"`
 	InvitedByMembershipID uuid.UUID  `json:"invitedByMembershipId"`
+	Booked                bool       `json:"booked"` // an active technician who holds an assigned job: not disabled or removed until reassigned (IR421, IR432)
 	accessKept            *time.Time // the access end kept while disabled
 }
 
@@ -138,7 +139,35 @@ func partnerUsersList(ctx context.Context, c *ops.Call, in *paging.Query) (pagin
 	if err := rows.Err(); err != nil {
 		return paging.Page[PartnerUser]{}, err
 	}
+	rows.Close()
+	if err := markBooked(ctx, c, items); err != nil {
+		return paging.Page[PartnerUser]{}, err
+	}
 	return paging.Page[PartnerUser]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}, nil
+}
+
+// markBooked sets Booked on the active technicians of the page that hold an assigned job (one question to the
+// maintenance service for the page, IR432).
+func markBooked(ctx context.Context, c *ops.Call, items []PartnerUser) error {
+	var ids []uuid.UUID
+	for _, x := range items {
+		if x.PartnerRole == "technician" && x.Status == "active" && x.MembershipID != nil {
+			ids = append(ids, *x.MembershipID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	booked, err := ops.Query[[]uuid.UUID](ctx, c, "maintenance.bookedTechnicians", map[string]any{"membershipIds": ids})
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		if items[i].MembershipID != nil && slices.Contains(booked, *items[i].MembershipID) {
+			items[i].Booked = true
+		}
+	}
+	return nil
 }
 
 // loadPartnerUser loads an account of the caller's company; another company's is NOT_FOUND.

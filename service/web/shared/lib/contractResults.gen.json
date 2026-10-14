@@ -3284,6 +3284,7 @@
   ],
   "items": [
    "accessUntil",
+   "booked",
    "createdAt",
    "displayName",
    "email",
@@ -3332,6 +3333,7 @@
  "partnerUsers.save": {
   "fields": [
    "accessUntil",
+   "booked",
    "createdAt",
    "displayName",
    "email",

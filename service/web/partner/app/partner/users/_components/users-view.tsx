@@ -93,7 +93,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersD
             { key: "l", label: t("Last sign-in"), render: (u) => u.lastSignIn, hideBelow: "sm" },
             { key: "a", label: t("Actions"), render: (u) => {
               const a = u.actions;
-              if (!a.resend && !a.edit && !a.disable && !a.enable && !a.remove) return <span className="text-xs text-muted-foreground">{u.you ? t("Your account") : u.lastContractor ? t("Last active contractor") : "—"}</span>;
+              if (!a.resend && !a.edit && !a.disable && !a.enable && !a.remove) return <span className="text-xs text-muted-foreground">{u.you ? t("Your account") : u.lastContractor ? t("Last active contractor") : u.booked ? t("Has an assigned job — reassign it first") : "—"}</span>;
               return (
                 <div className="flex flex-wrap gap-1">
                   {a.resend && <Btn size="sm" variant="ghost" disabled={pending} onClick={() => run(() => ops.resend(u), sends ? t("Invitation e-mail queued again for {email}", { email: u.email }) : t("Invitation preview re-created for {email} — nothing is sent in the demo", { email: u.email }))}><Icon name="send" />{t("Resend invite")}</Btn>}

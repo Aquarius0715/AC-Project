@@ -5685,6 +5685,7 @@ export const ms: Record<string, string> = {
   "Access until": "Akses sehingga",
   "Your account": "Akaun anda",
   "Last active contractor": "Kontraktor aktif terakhir",
+  "Has an assigned job — reassign it first": "Ada kerja yang ditugaskan — tugaskan semula dahulu",
   "HQ sets permissions, qualifications and access periods in Access & roles. An accepted account keeps its e-mail and role — to change them, remove it and invite again. You can’t change your own account, and your company always keeps one active contractor.": "Ibu pejabat menetapkan kebenaran, kelayakan dan tempoh akses dalam Akses & peranan. Akaun yang diterima mengekalkan e-mel dan peranannya — untuk mengubahnya, alih keluar dan jemput semula. Anda tidak boleh mengubah akaun anda sendiri, dan syarikat anda sentiasa mengekalkan seorang kontraktor aktif.",
   "Invites are previews only in the demo — no e-mail is sent (FR-P11, IR416).": "Jemputan hanya pratonton dalam demo — tiada e-mel dihantar (FR-P11, IR416).",
   "Contractors manage jobs, the team and users; technicians do the work on site.": "Kontraktor mengurus kerja, pasukan dan pengguna; juruteknik melakukan kerja di tapak.",

@@ -9,12 +9,15 @@ export type PartnerStatus = "invited" | "active" | "disabled";
 export type ApiPartnerUser = {
   id: string; version: number; organizationId: string; membershipId: string | null; email: string; displayName: string | null; partnerRole: PartnerRole;
   status: PartnerStatus; lastSignInAt: string | null; accessUntil: string | null; invitedAt: string; invitedByMembershipId: string;
+  /** an active technician who holds an assigned job (IR432); absent in the demo data */
+  booked?: boolean;
 };
-/** What a row may do: nothing on the caller's own account; the last active contractor cannot be disabled or removed. */
+/** What a row may do: nothing on the caller's own account; the last active contractor, and a technician who holds an
+ * assigned job (IR421, IR432), cannot be disabled or removed. */
 export type RowActions = { resend: boolean; edit: boolean; disable: boolean; enable: boolean; remove: boolean };
 export type PartnerUserRow = {
   id: string; version: number; email: string; name: string | null; role: PartnerRole; status: PartnerStatus; sub: string; access: string; lastSignIn: string;
-  you: boolean; lastContractor: boolean; ended: boolean; actions: RowActions;
+  you: boolean; lastContractor: boolean; booked: boolean; ended: boolean; actions: RowActions;
 };
 
 export const PARTNER_ROLES: PartnerRole[] = ["contractor", "technician"];
@@ -32,14 +35,15 @@ export function partnerUserRows(us: ApiPartnerUser[], self: string | null, i: I1
     const lastContractor = u.partnerRole === "contractor" && u.status === "active" && contractors === 1;
     const invited = u.status === "invited";
     const ended = u.status === "active" && !!now && !!u.accessUntil && Date.parse(u.accessUntil) <= now.getTime();
+    const booked = !!u.booked && u.status === "active";
     return {
-      id: u.id, version: u.version, email: u.email, name: u.displayName, role: u.partnerRole, status: u.status, you, lastContractor, ended,
+      id: u.id, version: u.version, email: u.email, name: u.displayName, role: u.partnerRole, status: u.status, you, lastContractor, booked, ended,
       sub: u.displayName ? u.email : t("invited {date}", { date: showDate(u.invitedAt, i.display) }),
       access: u.accessUntil ? showDate(u.accessUntil, i.display) : invited ? "—" : t("No end date"),
       lastSignIn: u.lastSignInAt ? showTime(u.lastSignInAt, i.display) : "—",
       actions: you
         ? { resend: false, edit: false, disable: false, enable: false, remove: false }
-        : { resend: invited, edit: invited, disable: u.status === "active" && !lastContractor && !ended, enable: u.status === "disabled", remove: !lastContractor },
+        : { resend: invited, edit: invited, disable: u.status === "active" && !lastContractor && !booked && !ended, enable: u.status === "disabled", remove: !lastContractor && !booked },
     };
   });
 }
