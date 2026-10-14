@@ -579,8 +579,16 @@ func (m Delivery) checkTechnician(ctx context.Context, c *ops.Call, unit, member
 	return nil
 }
 
-// checkQualified applies IR123 item 3 for the unit's service scope over the slot.
+// checkQualified applies IR123 item 3 for the unit's service scope over the slot, and requires the technician's access
+// to last until the slot ends: a technician whose access ends sooner could not open the job then (IR433).
 func (m Delivery) checkQualified(ctx context.Context, c *ops.Call, unit, membership uuid.UUID, slot Slot) error {
+	tech, found, err := m.Directory.Technician(ctx, c, membership)
+	if err != nil {
+		return err
+	}
+	if found && tech.ValidUntil != nil && tech.ValidUntil.Before(slot.EndAt) {
+		return apperr.E(apperr.Forbidden, "errors.technician_access_ends")
+	}
 	_, _, scope, err := m.Units.UnitService(ctx, c, unit)
 	if err != nil {
 		return err

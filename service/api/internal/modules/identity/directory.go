@@ -128,6 +128,7 @@ func technician(ctx context.Context, c *ops.Call, in *MembershipInput) (Technici
 		t.Employment = *emp
 	}
 	t.Active = !from.After(c.Now) && (until == nil || until.After(c.Now))
+	t.ValidUntil = until
 	t.Scopes = map[string][]uuid.UUID{}
 	rows, err := c.Tx.Query(ctx, `SELECT kind, ref_id FROM identity.membership_scopes WHERE membership_id = $1`, in.MembershipID)
 	if err != nil {

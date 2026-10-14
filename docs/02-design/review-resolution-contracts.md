@@ -6634,3 +6634,11 @@ Found in review: since IR421 a technician who holds an assigned job cannot be di
 1. `PartnerUser.booked` (service contracts): `partnerUsers.list` marks the active technicians of the page that hold an active assignment, with one internal query to the maintenance service for the page (`maintenance.bookedTechnicians`). The save and remove results leave it false; the page reads the list again after a write.
 2. The partner Users page offers no Disable or Remove on such a row and says “Has an assigned job — reassign it first” (English and Malay). The refusal of IR421 stays for any other caller.
 3. Tests: `TestPartnerUsers` (the seed technician is booked, the contractor is not), `partnerUsers.test.ts`, the partner Users E2E.
+
+## IR433 A technician is assigned only within their access period — 2026-10-14
+
+Found in review: an assignment checked that the technician was active now and qualified over the slot (IR123), but not that their access lasted until the slot ended. A technician whose access ends on 1 October could be given a visit on 5 October and would not be able to open the job.
+
+1. The qualification check of every assignment path (`jobs.assign`, proposals, the free-technician candidates) also requires the membership's access end, when there is one, not to fall before the slot's end: FORBIDDEN `errors.technician_access_ends`; a candidate list leaves such a technician out.
+2. The web says what to do (choose another technician or ask HQ to extend the access), in English and Malay.
+3. Test: `TestAssignWithinAccess`.

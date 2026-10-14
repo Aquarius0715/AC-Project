@@ -309,3 +309,31 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		t.Error("before the access window")
 	}
 }
+
+// TestAssignWithinAccess (IR433): a technician is assigned only to a slot that ends before their access does; a slot
+// past the access end is FORBIDDEN errors.technician_access_ends, and the same slot is fine once the access lasts.
+func TestAssignWithinAccess(t *testing.T) {
+	s := server(t)
+	tech := seed.ID("tech-internal-a")
+	var until *time.Time
+	ownerScan(t, `SELECT valid_until FROM identity.memberships WHERE id = $1`, []any{tech}, &until)
+	t.Cleanup(func() { owner(t, `UPDATE identity.memberships SET valid_until = $2 WHERE id = $1`, tech, until) })
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active'`, tech)
+	owner(t, `UPDATE identity.memberships SET valid_until = $2 WHERE id = $1`, tech, clock.Add(26*time.Hour))
+	code, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	if code != 200 {
+		t.Fatalf("create: %d %v", code, m)
+	}
+	job := data(m)["id"].(string)
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	assign := func(from, to int) (int, map[string]any) {
+		return write(s, &hq, "jobs.assign", `{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+ts(from)+`","endAt":"`+ts(to)+`"}`, 1)
+	}
+	if code, m := assign(25, 27); code != 403 || m["messageKey"] != "errors.technician_access_ends" {
+		t.Errorf("a slot past the access end: %d %v", code, m)
+	}
+	owner(t, `UPDATE identity.memberships SET valid_until = $2 WHERE id = $1`, tech, clock.Add(28*time.Hour)) // the agreed slot is fixed: extend the access
+	if code, m := assign(25, 27); code != 200 {
+		t.Errorf("the same slot within the access: %d %v", code, m)
+	}
+}

@@ -17,13 +17,14 @@ const fieldText: Record<string, string> = {
   "error.count": "{field} has the wrong number of entries",
   "error.invalidFile": "{field} is not an accepted file — check its type and size", // the bytes, the type or the size (IR308)
 };
-// the refusals of the user management (IR416, IR417, IR420, IR421) say what to do
+// the refusals of the user management and assignment (IR416, IR417, IR420, IR421, IR433) say what to do
 const keyText: Record<string, string> = {
   "errors.own_account": "You can’t change or remove your own account",
   "errors.last_owner": "The last active owner can’t be demoted, disabled or removed",
   "errors.last_contractor": "Your company keeps one active contractor — this one can’t be disabled or removed",
   "errors.access_expired": "This account’s access period has ended — ask HQ to extend it first",
   "errors.technician_booked": "This technician still has an assigned job — reassign it first",
+  "errors.technician_access_ends": "This technician's access ends before the visit — choose another technician or ask HQ to extend it",
   "errors.invite_pending": "The invite is still pending — it becomes active when the account is opened",
   "errors.invite_not_pending": "Only a pending invite can be sent again",
 };

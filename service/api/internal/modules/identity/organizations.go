@@ -242,6 +242,7 @@ type Technician struct {
 	OrgID      uuid.UUID              `json:"orgId"`
 	Employment string                 `json:"employment"`
 	Active     bool                   `json:"active"`
+	ValidUntil *time.Time             `json:"validUntil"` // the end of the membership's access, nil for none (IR433)
 	Scopes     map[string][]uuid.UUID `json:"scopes"`
 }
 
