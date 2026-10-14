@@ -110,6 +110,10 @@ func TestRateAndReportProblem(t *testing.T) {
 	if attachments != 1 {
 		t.Errorf("photos stored: %d", attachments)
 	}
+	// HQ hears of the follow-up as of any new request: it has 1 business day to classify it (IR114)
+	if n := countNotes(t, follow, "hq-operator", "job_update"); n != 1 {
+		t.Errorf("HQ notifications of the follow-up: %d", n)
+	}
 	// the photo is listed with the follow-up and opens for HQ and the customer (IR437)
 	_, g := post(s, &hq, "jobs.get", `{"jobId":"`+follow+`"}`)
 	photos, _ := data(g)["problemPhotos"].([]any)

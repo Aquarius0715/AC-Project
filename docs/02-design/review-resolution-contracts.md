@@ -6673,3 +6673,10 @@ Found in review: `jobs.reportProblem` stores up to five customer photos with the
 1. `JobDetail.problemPhotos` lists the follow-up job's own attachments (`JobAttachment`: name, type, size, status), and the new read operation `jobs.getAttachment` (`{jobId, attachmentId}` → `BlobContent`, `GET /v1/jobs/{jobId}/attachments/{attachmentId}/content`) answers one to whoever may read the job (`jobs.get` decides; otherwise NOT_FOUND). 210 operations, 231 routes; the maintenance service gains one.
 2. Web: HQ's follow-up card, the contractor's job detail and the technician's job workspace list the client's photos (“Client's photos”); each opens the image itself (`/admin/jobs/:id/photos/:attachmentId`, `/partner/jobs/:id/photos/:attachmentId`, `/technician/jobs/:id/problem-photos/:attachmentId`; `no-store`).
 3. Tests: `TestRateAndReportProblem` (the photo is listed, opens for HQ and the customer, another customer gets 404), `TestForeignTargets`, `jobPhotoResponse.test.ts`.
+
+## IR438 HQ's notice of a reported problem opens the follow-up job — 2026-10-14
+
+Found in review: a problem report creates a requested follow-up job that HQ must classify within one business day (IR114), and HQ's `job_update` notice for it (IR95) named the reported, completed job: the audit entry of `jobs.reportProblem` targets that job, and the notifier followed the audit. HQ landed on the old job and the follow-up had no notice of its own.
+
+1. For `jobs.reportProblem` the notifier sends the “requested” notice for the follow-up job the report created; the audit entry still names the reported job.
+2. Test: `TestRateAndReportProblem` (HQ has one notice for the follow-up).

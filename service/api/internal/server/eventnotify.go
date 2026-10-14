@@ -123,6 +123,11 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 		}
 		switch a.TargetKind {
 		case "job":
+			if op == "jobs.reportProblem" { // the audit names the reported job; the request is the follow-up it created (IR438)
+				if err := c.Tx.QueryRow(ctx, `SELECT id FROM maintenance.jobs WHERE follow_up_of_job_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1`, id).Scan(&id); err != nil {
+					return err
+				}
+			}
 			if err := r.job(ctx, c, op, id); err != nil {
 				return err
 			}
