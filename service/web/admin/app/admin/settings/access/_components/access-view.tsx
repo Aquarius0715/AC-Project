@@ -143,6 +143,7 @@ export function AccessView({ live }: { live: Live }) {
       </div>
       <Modal open={revoke !== null} onClose={() => setRevoke(null)} title={t("Revoke access — {name}", { name: sel?.name ?? "" })} footer={<><Btn onClick={() => setRevoke(null)}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !revoke?.trim()} onClick={doRevoke}>{t("Revoke")}</Btn></>}>
         <p className="text-[13px]">{t("Revoking sets “Valid until” to now. The membership stays listed as inactive; nothing is deleted.")}</p>
+        {sel?.role === "technician" && <p className="mt-2 text-[11px] text-muted-foreground">{t("A job assigned to this technician that has not started is released and returns to be assigned; its assigners are notified.")}</p>}
         <Field label={t("Reason")}><Textarea value={revoke ?? ""} maxLength={1000} onChange={(e) => setRevoke(e.target.value)} /></Field>
       </Modal>
       <Modal open={signOut !== null} onClose={() => setSignOut(null)} title={t("Sign out {name} everywhere?", { name: sel?.name ?? "" })} footer={<><Btn onClick={() => setSignOut(null)}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !signOut?.trim()} onClick={doSignOut}>{t("Sign out everywhere")}</Btn></>}>
