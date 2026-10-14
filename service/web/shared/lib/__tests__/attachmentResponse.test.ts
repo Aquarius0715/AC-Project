@@ -24,6 +24,7 @@ describe("a stored report photo as a response", () => {
     expect([res.status, res.headers.get("content-type"), res.headers.get("content-disposition")])
       .toEqual([200, "image/jpeg", `inline; filename="__ 1.jpg"; filename*=UTF-8''%E5%86%99%E7%9C%9F%201.jpg`]);
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array([0xff, 0xd8, 0xff, 0x01]));
+    expect(res.headers.get("cache-control")).toBe("no-store"); // a signature is personal data (IR434)
   });
   it("passes the API's refusals on", async () => {
     dal.coreOp.mockRejectedValueOnce(new dal.CoreError({ code: "NOT_FOUND", messageKey: "error.notFound" }));

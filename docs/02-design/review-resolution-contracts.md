@@ -6642,3 +6642,10 @@ Found in review: an assignment checked that the technician was active now and qu
 1. The qualification check of every assignment path (`jobs.assign`, proposals, the free-technician candidates) also requires the membership's access end, when there is one, not to fall before the slot's end: FORBIDDEN `errors.technician_access_ends`; a candidate list leaves such a technician out.
 2. The web says what to do (choose another technician or ask HQ to extend the access), in English and Malay.
 3. Test: `TestAssignWithinAccess`.
+
+## IR434 Report photos and signatures are not stored by the browser — 2026-10-14
+
+Found in review: the gateway sends `Cache-Control: no-store` on every answer (personal data, IR407), but the technician app's photo route (`/technician/jobs/:id/photos/:attachmentId`, FR-T09) served report photos and the customer's sign-off signature with `private, max-age=300`, so the browser kept them for five minutes.
+
+1. The route answers `Cache-Control: no-store`, as the gateway does.
+2. Test: `attachmentResponse.test.ts`.
