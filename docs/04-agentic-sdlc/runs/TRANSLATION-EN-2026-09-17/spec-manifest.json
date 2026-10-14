@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "9154b396f7db3a20938169024d4e83a2e2ef1787c16f7db15f8020b0d70a6d5c",
+  "spec_baseline_id": "e43b1187ad336ea0e50aa93222c127bf6e09b0e314a6db3a0896a286531e411e",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -78,7 +78,7 @@
     },
     {
       "path": "01-requirements/client.md",
-      "sha256": "32cdcc5d482a32dce679f8d298ea66ef5c02a006435c19f6137cc537d1caa6bc"
+      "sha256": "9205995570d5056d2b683bffff949b4b218e5c71cf71999d5d5519ae922da692"
     },
     {
       "path": "01-requirements/common.md",

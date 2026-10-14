@@ -415,7 +415,7 @@ Design: [DD-C16](../02-design/client.md#dd-c16-details). Assess parent AT-C16 us
 |---|---|---|
 | AT-C17-N | customer-a, completed job-c02. When: rate 4 ★ with tags “On time”, “Clean work”, “Fixed the problem” and a comment | ① job-c02 rating.stars=4, customerConfirmedAt set ② Admin contractor KPIs include the rating |
 | AT-C17-E | ① Rate an in-progress job ② Report a problem with 9-character details ③ Change the rating 8 days later | ① CONFLICT ② VALIDATION, input kept ③ CONFLICT (window closed) |
-| AT-C17-B | ① Rate 2 ★ ② Report a problem on job-c02 | ① “What went wrong?” and Report a problem offered ② New requested job with followUpOfJobId=job-c02, followUpClass=pending |
+| AT-C17-B | ① Rate 2 ★ ② Report a problem on job-c02 with one photo | ① “What went wrong?” and Report a problem offered ② New requested job with followUpOfJobId=job-c02, followUpClass=pending; the photo is listed with it (problemPhotos) and opens for HQ, the contractor and technician sent to it (jobs.getAttachment, IR437) |
 
 Design: [DD-C17](../02-design/client.md#dd-c17-details). Assess parent AT-C17 using all N/E/B cases in traceability.
 
