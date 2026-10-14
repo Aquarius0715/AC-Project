@@ -438,7 +438,7 @@ func (in *AssignInput) Validate() map[string]string {
 // @Summary		jobs.assign (write)
 // @ID				jobs.assign
 // @Description	Authorization: contractor:partner.assign:own-valid-offer | admin:job.write:internal-job
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR89 success updates Job.assignmentId/scheduledSlot and version; IR94 technician scope must include Job.unitId; IR113 client_request/periodic_plan: [startAt,endAt) must equal the agreed slot (offer visitSlot for contractors) else VALIDATION errors.slot_not_agreed; creates acknowledgement=pending
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR89 success updates Job.assignmentId/scheduledSlot and version; IR94 technician scope must include Job.unitId; IR113 client_request/periodic_plan: [startAt,endAt) must equal the agreed slot (offer visitSlot for contractors) else VALIDATION errors.slot_not_agreed; IR433 the technician's access must last until endAt else FORBIDDEN errors.technician_access_ends; creates acknowledgement=pending
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A06, DD-P03
 // @Tags			jobs
