@@ -19,6 +19,8 @@ export type ApiClientJob = {
   planId: string | null; occurrenceAt: string | null; requestedSlot: Slot; preferredSlots: Slot[]; preferenceRound: number; slotProposal: ApiClientProposal | null;
   scheduledSlot: Slot | null; dueAt: string; completedAt: string | null; contractorOrgId: string | null; followUpOfJobId: string | null; followUpClass: "pending" | "rework" | "new_request" | null;
   rating: ApiRating | null; customerConfirmedAt: string | null; reportRefs: { reportId: string; reportVersion: number }[];
+  /** the photos sent with the problem report this follow-up answers (IR437); absent in the demo data */
+  problemPhotos?: { id: string; name: string; status: string }[];
   assignment: { acknowledgement: "pending" | "accepted" | "cant_make"; technicianName: string | null; scheduledStart: string; scheduledEnd: string; status: string } | null;
 };
 
@@ -77,6 +79,8 @@ export function detailFacts(j: ApiClientJob, unit: { name: string; place: string
   const out: [string, string][] = [[t("Unit"), `${unit.name}${unit.place ? ` · ${unit.place}` : ""}`], [t("Origin · type"), plan ? t("Periodic plan · visit {date}", { date: j.occurrenceAt ? showDate(j.occurrenceAt, i.display) : "" }) : t("Client request · {type}", { type: t(TYPE[j.type] ?? j.type) })]];
   if (j.followUpOfJobId) out.push([t("Follow-up of"), `${j.followUpOfJobId.slice(0, 8)} · ${followUpText(j.followUpClass, t)}`]);
   if (!plan && j.symptom) out.push([t("Request"), `“${j.symptom}”`]);
+  const photos = (j.problemPhotos ?? []).filter((p) => p.status === "ready").length; // HQ and the technician see them too (IR437)
+  if (photos) out.push([t("Your photos"), t(photos === 1 ? "1 photo sent with your report" : "{n} photos sent with your report", { n: photos })]);
   if (j.contactWindow) out.push([t("Contact window"), j.contactWindow]);
   if (j.scheduledSlot && j.slotProposal?.status !== "pending") out.push([t(plan ? "Scheduled" : "Confirmed time"), plan ? t("{slot} · set by HQ from your plan", { slot: slotLong(j.scheduledSlot, i) }) : slotLong(j.scheduledSlot, i)]);
   const a = j.assignment;

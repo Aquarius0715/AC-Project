@@ -43,6 +43,9 @@ describe("customer maintenance", () => {
       ["Confirmed time", "Thu, 17 Sept, 10:00 am – 12:00 pm MYT"], ["Technician", "tech-internal-a · HQ"],
     ]);
     expect(detailFacts(job({ status: "offered", contractorOrgId: "org-c", scheduledSlot: row({}).preferredSlots[0] }), unit).at(-1)).toEqual(["Technician", "being confirmed — the name shows once the technician accepts"]);
+    // the photos sent with a problem report are counted on the follow-up (IR437); one still processing is not
+    const follow = job({ problemPhotos: [{ id: "p1", name: "a.png", status: "ready" }, { id: "p2", name: "b.png", status: "ready" }, { id: "p3", name: "c.png", status: "processing" }] });
+    expect(detailFacts(follow, unit)).toContainEqual(["Your photos", "2 photos sent with your report"]);
     expect(preferredLines(booked).map((l) => [l.text, l.note])).toEqual([["1st · Wed, 16 Sept, 10:00 am – 12:00 pm MYT", null], ["2nd · Thu, 17 Sept, 10:00 am – 12:00 pm MYT", "booked"], ["3rd · Fri, 18 Sept, 10:00 am – 12:00 pm MYT", null]]);
     expect(detailFacts(job({ followUpOfJobId: "job-0-zzzz", followUpClass: "pending" }), unit)[2]).toEqual(["Follow-up of", "job-0-zz · Under HQ review"]);
   });
