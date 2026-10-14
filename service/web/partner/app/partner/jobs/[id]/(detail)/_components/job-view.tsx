@@ -183,6 +183,7 @@ function DetailView({ live }: { live: Extract<JobDetailLive, { kind: "detail" }>
             <SummaryList items={[
               [t("Job type"), typeLabel(j.type, t)],
               ...(j.symptom ? [[t("Request"), `“${j.symptom}”`] as [string, React.ReactNode]] : []),
+              ...((j.problemPhotos ?? []).some((p) => p.status === "ready") ? [[t("Client’s photos"), <span key="p" className="flex flex-wrap gap-x-3">{(j.problemPhotos ?? []).filter((p) => p.status === "ready").map((p) => <a key={p.id} href={`/partner/jobs/${j.id}/photos/${p.id}`} target="_blank" rel="noreferrer" className="font-semibold text-primary">{p.name}</a>)}</span>] as [string, React.ReactNode]] : []),
               [t("Site address"), u?.location.address ?? "—"],
               [t("Entry instructions"), u?.location.accessInstructions ?? "—"],
               [t("Required qualification"), live.required.map((q) => qualificationLabel(q, t)).join(" · ") || "—"],

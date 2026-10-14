@@ -22,6 +22,8 @@ export type ApiDetail = {
   projection: "detail"; id: string; version: number; unitId: string; type: string; status: string; symptom: string; origin: string; alertIds: string[];
   requestedSlot: Slot; scheduledSlot: Slot | null; dueAt: string; startedAt: string | null; completedAt: string | null; assignmentId: string | null;
   partnerSlotProposal: ApiProposal | null; reportRefs: { reportId: string; reportVersion: number }[];
+  /** the photos the client sent with the problem report this follow-up answers (IR437) */
+  problemPhotos?: { id: string; name: string; status: string }[];
   assignment: { technicianMembershipId: string; scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: string; cantMakeReason: string | null; alternativeSlot?: Slot | null } | null;
   offer: { id: string; termsVersion: string; visitSlot: Slot; offeredAt: string; accessValidFrom: string; accessValidUntil: string; decision: string | null; decidedAt: string | null } | null;
 };

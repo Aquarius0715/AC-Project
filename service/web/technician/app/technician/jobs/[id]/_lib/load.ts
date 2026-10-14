@@ -16,7 +16,7 @@ import type { WorkspaceLive } from "../_components/workspace-view";
 type JobRead = {
   projection: "detail"; id: string; version: number; status: string; type: string; unitId: string; symptom: string; alertIds: string[];
   origin: string; dueAt: string | null; timeOnSite: TimeOnSite | null; draftReportRef: { reportId: string; reportVersion: number } | null;
-  reportRefs: { reportId: string; reportVersion: number }[];
+  reportRefs: { reportId: string; reportVersion: number }[]; problemPhotos?: { id: string; name: string; status: string }[];
   assignment: { scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: "pending" | "accepted" | "cant_make"; cantMakeReason: string | null } | null;
 } | ApiTechHistory | { projection: "offer" };
 type Part = { code: string; name: string; vanStockQuantity: number | null };
@@ -55,6 +55,7 @@ export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | { ki
     job: {
       id: job.id, version: job.version, status: job.status, type: job.type, unitId: job.unitId, symptom: job.symptom, alertCount: job.alertIds.length, origin: job.origin,
       assignment: job.assignment, timeOnSite: job.timeOnSite, draftReportRef: job.draftReportRef, reportRefs: job.reportRefs,
+      problemPhotos: (job.problemPhotos ?? []).filter((p) => p.status === "ready").map((p) => ({ id: p.id, name: p.name })), // IR437
     },
     unit: u ? { name: u.displayName, place: u.location.pathLabels.join(" › "), access: u.location.accessInstructions, model: `${u.capabilities.manufacturer} ${u.capabilities.model}`, scope: u.serviceScope ?? ["indoor", "outdoor", "electrical"] } : null,
     unitRefused: isRefused(unit) ? unit.refused : null,

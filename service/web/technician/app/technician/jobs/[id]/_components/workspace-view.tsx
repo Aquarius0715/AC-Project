@@ -22,6 +22,7 @@ export type WorkspaceLive = {
     id: string; version: number; status: string; type: string; unitId: string; symptom: string; alertCount: number; origin: string;
     assignment: { scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: "pending" | "accepted" | "cant_make"; cantMakeReason: string | null } | null;
     timeOnSite: TimeOnSite | null; draftReportRef: { reportId: string; reportVersion: number } | null; reportRefs: { reportId: string; reportVersion: number }[];
+    problemPhotos: { id: string; name: string }[];
   };
   unit: { name: string; place: string; access: string | null; model: string; scope: string[] } | null; unitRefused: string | null;
   components: { group: Group; key: string }[];
@@ -239,6 +240,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                   [t("Window"), <span key="w" className={win.phase === "ending" || win.phase === "ended" ? "font-semibold text-crit" : undefined}>{job.assignment ? f.span(job.assignment.scheduledStart, job.assignment.scheduledEnd) : "—"}</span>],
                   [t("Site"), live.unit?.place ?? (live.unitRefused ? t("opens at the start of your window") : "—")], [t("Access"), live.unit?.access ?? "—"], [t("Unit"), live.unit ? `${live.unit.name} · ${live.unit.model}` : job.unitId.slice(0, 8)],
                   [t("Job"), `${typeLabel(job.type, t)} · ${t(job.origin === "periodic_plan" ? "periodic plan" : "client request")}`], [t("Request"), job.symptom ? `“${job.symptom}”` : "—"],
+                  ...(job.problemPhotos.length ? [[t("Client’s photos"), <span key="p" className="flex flex-wrap gap-x-3">{job.problemPhotos.map((p) => <a key={p.id} href={`/technician/jobs/${job.id}/problem-photos/${p.id}`} target="_blank" rel="noreferrer" className="font-semibold text-primary">{p.name}</a>)}</span>] as [string, React.ReactNode]] : []),
                   [t("Linked alerts"), job.alertCount ? <Link key="a" className="font-semibold text-crit" href={`/technician/units/${job.unitId}/alerts?jobId=${job.id}`}>{t(job.alertCount === 1 ? "1 alert" : "{n} alerts", { n: job.alertCount })} <Icon name="arrowRight" /></Link> : t("none")],
                 ]} />
                 {unitOpen && (
