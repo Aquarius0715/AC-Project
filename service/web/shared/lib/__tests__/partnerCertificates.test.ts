@@ -44,7 +44,7 @@ describe("partner certifications", () => {
 
   it("notes a pending renewal, a training request and a rejected first upload", () => {
     const [electrical] = certRows([a], [...certs, renewal], [job], 60, NOW);
-    expect([electrical.renewalPending, electrical.actions, electrical.cert]).toEqual([true, ["view", "training"], { id: "c1", version: 1, number: "EB-2023-1120" }]);
+    expect([electrical.renewalPending, electrical.actions, electrical.cert]).toEqual([true, ["view", "training"], { id: "c1", version: 1, number: "EB-2023-1120", fileName: "eb.pdf" }]); // the document opens from View (IR436)
     const trained = certRows([a], [cert("c1", { trainingRequestedAt: "2026-09-12T02:00:00Z" })], [], 60, NOW)[0];
     expect([trained.training, trained.actions]).toEqual(["Training requested 12 Sept 2026", ["view", "renew"]]);
     const first = certRows([member("m-c", "tech-external-a2", [])], [cert("c9", { membershipId: "m-c", code: "other", name: "Working at height", status: "rejected", createdAt: "2026-09-01T00:00:00Z" })], [], 60, NOW);

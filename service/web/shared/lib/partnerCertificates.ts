@@ -34,7 +34,7 @@ export function certQuery(sp: { membershipId?: string; status?: string; expiring
 export type CertRow = {
   key: string; technicianId: string; technician: string; code: string; name: string; detail: string; expires: string; expiresAt: string | null;
   status: CertStatus; badge: { text: string; tone: "ok" | "warn" | "crit" | "primary" | "muted" }; days: number | null;
-  blocks: { jobId: string; text: string; day: string }[]; cert: { id: string; version: number; number: string } | null; renewalPending: boolean;
+  blocks: { jobId: string; text: string; day: string }[]; cert: { id: string; version: number; number: string; fileName: string | null } | null; renewalPending: boolean;
   training: string | null; actions: ("view" | "renew" | "training" | "add")[];
 };
 
@@ -88,7 +88,7 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
         key: `${m.id}:${k}`, technicianId: m.id, technician: m.displayName, code: shown.code, name: shown.name || qualificationLabel(shown.code, t),
         detail: t("{number} · issued {date}", { number: shown.number, date: businessDay(shown.issuedAt, locale) }), expires: businessDay(shown.expiresAt, locale), expiresAt: shown.expiresAt,
         status: s.status, badge: badgeOf(s.status, s.days), days: s.days, blocks: s.status === "pending" || s.status === "rejected" ? [] : blocks(m.id, shown.code, ends),
-        cert: { id: shown.id, version: shown.version, number: shown.number }, renewalPending: !!onFile && !!pending, training, actions,
+        cert: { id: shown.id, version: shown.version, number: shown.number, fileName: shown.fileName ?? null }, renewalPending: !!onFile && !!pending, training, actions,
       });
     }
     for (const code of QUALIFICATION_CODES) {

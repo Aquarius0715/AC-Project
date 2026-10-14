@@ -193,7 +193,9 @@ function ViewModal({ row, onClose }: { row: CertRow; onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title={row.name} footer={<Btn onClick={onClose}>{t("Close")}</Btn>}>
       <SummaryList items={[[t("Technician"), row.technician], [t("Certificate number"), row.cert?.number ?? "—"], [t("Details"), row.detail], [t("Expires"), row.expires], [t("Status"), row.badge.text]]} />
-      <p className="text-[11px] text-muted-foreground">{t("HQ keeps the uploaded file; ask HQ for a copy.")}</p>
+      {row.cert?.fileName
+        ? <p className="text-[13px]"><a href={`/partner/certificates/${row.cert.id}/document`} target="_blank" rel="noreferrer" className="font-semibold text-primary"><Icon name="external" /> {t("Open the document")}</a></p>
+        : <p className="text-[11px] text-muted-foreground">{t("No document was uploaded with this certificate.")}</p>}
     </Modal>
   );
 }

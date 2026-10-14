@@ -2377,7 +2377,7 @@ export const ms: Record<string, string> = {
   "A note is required (1–1000 characters)": "Nota diperlukan (1–1000 aksara)",
   "Refresher course before the certificate expires.": "Kursus ulang kaji sebelum sijil tamat tempoh.",
   "Details": "Butiran",
-  "HQ keeps the uploaded file; ask HQ for a copy.": "HQ menyimpan fail yang dimuat naik; minta salinan daripada HQ.",
+  "No document was uploaded with this certificate.": "Tiada dokumen dimuat naik bersama sijil ini.",
 
   // partner job history (lib/partnerHistory)
   "Delegation ended": "Delegasi tamat",
