@@ -6619,3 +6619,10 @@ Found in review (security, secrets): the local values in `compose.yaml` are in t
 1. Web: on https, `cookieKey` also refuses a secret that is the local value (contains `change-me`); the app cannot seal or open a session and fails closed.
 2. Go: outside the demo (`DEMO_OPS` not `1`), `ConfigFromEnv` refuses an `INTERNAL_API_TOKEN` shorter than 32 characters or containing `change-me`, so the service does not start. The demo stack keeps the local value.
 3. Tests: `session.test.ts` (the local value on https), `TestInternalTokenOutsideTheDemo`.
+
+## IR431 Internal query inputs are validated — 2026-10-14
+
+Found in review (coverage scan): the operations' pipeline runs an input's `Validate`, but the internal queries (`ops.RegisterQuery`, IR190) only decoded the JSON. `control.requestedCommands` declares a limit of 1–100 that nothing checked, so the IoT gateway's system query took any limit.
+
+1. `ops.RegisterQuery` runs `Validate` when the query's input implements it and answers VALIDATION with the field errors, as an operation does.
+2. Test: `TestRequestedCommandsForTheGateway` (limits 0 and 1,000,000 → 422).

@@ -25,8 +25,8 @@ func TestRequestedCommandsForTheGateway(t *testing.T) {
 		VALUES ($1,$2,$3,$4,$5,'ui',$6,'requested','not_sent',$7,$8,'corr-requested',$7,$7)`,
 		command, seed.ID("tenant-a"), unit, device, seed.ID("hq-operator"), `{"kind":"set_temperature","celsius":26}`, clock, clock.Add(5*time.Minute))
 
-	ask := func(token string) (int, []map[string]any) {
-		req, _ := http.NewRequest(http.MethodPost, cl.urls[ops.DomainEquipment]+"/internal/v1/system/queries/control.requestedCommands", strings.NewReader(`{"limit":50}`))
+	askBody := func(token, input string) (int, []map[string]any) {
+		req, _ := http.NewRequest(http.MethodPost, cl.urls[ops.DomainEquipment]+"/internal/v1/system/queries/control.requestedCommands", strings.NewReader(input))
 		req.Header.Set("Content-Type", "application/json")
 		if token != "" {
 			req.Header.Set(ops.InternalTokenHeader, token)
@@ -43,6 +43,7 @@ func TestRequestedCommandsForTheGateway(t *testing.T) {
 		_ = json.NewDecoder(resp.Body).Decode(&body)
 		return resp.StatusCode, body.Data
 	}
+	ask := func(token string) (int, []map[string]any) { return askBody(token, `{"limit":50}`) }
 	find := func(rows []map[string]any) map[string]any {
 		for _, r := range rows {
 			if r["id"] == command {
@@ -54,6 +55,12 @@ func TestRequestedCommandsForTheGateway(t *testing.T) {
 
 	if code, _ := ask(""); code != 401 {
 		t.Fatalf("without the internal token: %d", code)
+	}
+	// the query's input is validated as an operation's is (IR431): 1–100 commands
+	for _, body := range []string{`{"limit":0}`, `{"limit":1000000}`} {
+		if code, _ := askBody("test-internal", body); code != 422 {
+			t.Errorf("%s: %d, want 422", body, code)
+		}
 	}
 	code, rows := ask("test-internal")
 	if code != 200 {

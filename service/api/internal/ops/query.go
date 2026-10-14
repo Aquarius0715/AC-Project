@@ -52,6 +52,12 @@ func RegisterQuery[I any, O any](r *Registry, domain, name string, h func(contex
 		if err := json.Unmarshal(raw, in); err != nil {
 			return nil, apperr.Fields(map[string]string{"_": "error.malformedInput"})
 		}
+		// an input that validates itself is checked here too, as the operations' inputs are (IR431)
+		if v, ok := any(in).(Validator); ok {
+			if fe := v.Validate(); len(fe) > 0 {
+				return nil, apperr.Fields(fe)
+			}
+		}
 		return h(ctx, c, in)
 	}}
 }
