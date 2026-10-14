@@ -20,7 +20,10 @@ const nextConfig: NextConfig = {
       // the apps use none of these browser features, so a page cannot ask for them even if a script were injected
       // (IR383); the simulated QR camera needs no camera. A real scanner would allow camera=(self) on its app only
       { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()" },
-    ] }];
+    ] }, {
+      // the BFF answers carry the session and Core API data: never stored by the browser, as the gateway's (IR407, IR434)
+      source: "/bff/:path*", headers: [{ key: "Cache-Control", value: "no-store" }],
+    }];
   },
 };
 

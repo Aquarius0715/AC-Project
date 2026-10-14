@@ -6648,4 +6648,5 @@ Found in review: an assignment checked that the technician was active now and qu
 Found in review: the gateway sends `Cache-Control: no-store` on every answer (personal data, IR407), but the technician app's photo route (`/technician/jobs/:id/photos/:attachmentId`, FR-T09) served report photos and the customer's sign-off signature with `private, max-age=300`, so the browser kept them for five minutes.
 
 1. The route answers `Cache-Control: no-store`, as the gateway does.
-2. Test: `attachmentResponse.test.ts`.
+2. The BFF routes (`/bff/session`, `/bff/ops/*`, `/bff/auth/*`) sent no `Cache-Control` at all; every app's `next.config.ts` now sets `no-store` on `/bff/:path*` (verified on the rebuilt customer app).
+3. Test: `attachmentResponse.test.ts`.

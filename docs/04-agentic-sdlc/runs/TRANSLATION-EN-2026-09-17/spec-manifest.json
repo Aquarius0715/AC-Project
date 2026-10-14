@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "de381814c57721d76688394639c81156fe115ede6bd5afa1309178d3caebc7c3",
+  "spec_baseline_id": "11493da96d326e134e5f987e068678a6333eef86b23ce222cf05178af8c93042",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -158,7 +158,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "3179f3514b1280ca5c455d113771e77d2d96871ff8896804556bf0538cc2fd4a"
+      "sha256": "733ca30b04f672a5a74143ebd2a9c361b1446a03bd0831f1ee536ee785fa58bd"
     },
     {
       "path": "02-design/service-contracts.ts",
