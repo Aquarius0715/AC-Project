@@ -514,9 +514,9 @@ Design: [DD-A20](../02-design/admin.md#dd-a20-details). Assess parent AT-A20 usi
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-A21-N | contractor-a. When: edit rate card (repair base 450.00, effective next month) → verify tech-external-a renewal | ① RateCard new version, effectiveFrom future ② Certificate valid, Membership qualification validUntil updated |
+| AT-A21-N | contractor-a. When: edit rate card (repair base 450.00, effective next month) → open tech-external-a's renewal document → verify the renewal | ① RateCard new version, effectiveFrom future ② The uploaded file opens (certificates.getContent, IR436) ③ Certificate valid, Membership qualification validUntil updated |
 | AT-A21-E | ① Suspend without reason ② jobs.offer to suspended contractor-c | ① VALIDATION ② CONFLICT |
-| AT-A21-B | Suspend contractor-b with an open job | Open job unchanged; no new offers |
+| AT-A21-B | ① Suspend contractor-b with an open job ② contractor-b opens contractor-a's certificate document | ① Open job unchanged; no new offers ② NOT_FOUND (IR436) |
 
 Design: [DD-A21](../02-design/admin.md#dd-a21-details). Assess parent AT-A21 using all N/E/B cases in traceability.
 
