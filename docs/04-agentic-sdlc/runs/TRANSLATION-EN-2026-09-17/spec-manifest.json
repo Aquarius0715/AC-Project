@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "75881ed829eeb798d1c8236d9ef7d111787c7fc0c3a655e6776891ecb385be0d",
+  "spec_baseline_id": "8eb82d3e2197236799634d4912a84070b55c91b681204d07e5dc93c5b283d599",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -106,7 +106,7 @@
     },
     {
       "path": "02-design/backend-architecture.md",
-      "sha256": "185f6abf149917bd6ac7b6c8322063804133f10e6f7476c51e93301bbe63dc82"
+      "sha256": "be854ec9116d704abf721c8be4b94f76e69454e25b7f57be7cbd01d8c97f2c2a"
     },
     {
       "path": "02-design/backend-go-design.md",
