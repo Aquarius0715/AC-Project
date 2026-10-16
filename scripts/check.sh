@@ -9,7 +9,7 @@ step() { printf '\n== %s\n' "$1"; }
 
 step "web lint";      (cd service/web && npm run lint >/dev/null)
 step "web typecheck"; (cd service/web && npm run typecheck >/dev/null)
-step "web vitest";    (cd service/web && npx vitest run >/dev/null)
+step "web vitest";    (cd service/web && npm test >/dev/null)   # as CI: each workspace with its own vitest.config (shared: jsdom, 30 s per test)
 step "go gofmt";      (cd service/api && test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; })
 step "go vet";        (cd service/api && GOTOOLCHAIN=auto go vet ./...)
 step "staticcheck";   (cd service/api && GOTOOLCHAIN=go1.26.9 go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...)
