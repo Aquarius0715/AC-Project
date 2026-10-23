@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -200,6 +201,25 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	// IR42: clients see customer lines only
 	if _, m := post(s, &customerA, "jobs.get", `{"jobId":"`+job+`"}`); len(data(m)["costs"].([]any)) != 1 || data(m)["costs"].([]any)[0].(map[string]any)["description"] != "Parts" {
 		t.Fatalf("client costs: %v", data(m)["costs"])
+	}
+	// IR442: the client's history leaves out HQ's cost record (counted out of total too); HQ sees it
+	actions := func(a *actor) ([]string, float64) {
+		t.Helper()
+		code, m := post(s, a, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
+		if code != 200 {
+			t.Fatalf("jobs.events: %d %v", code, m)
+		}
+		var out []string
+		for _, e := range data(m)["items"].([]any) {
+			out = append(out, e.(map[string]any)["action"].(string))
+		}
+		return out, data(m)["total"].(float64)
+	}
+	if got, total := actions(&customerA); slices.Contains(got, "job.costs_saved") || int(total) != len(got) {
+		t.Errorf("client history: %v (total %v)", got, total)
+	}
+	if got, _ := actions(&hq); !slices.Contains(got, "job.costs_saved") {
+		t.Errorf("HQ history lacks the cost record: %v", got)
 	}
 	// warranty claims need a warranty that covers completion
 	claim := `{"jobId":"` + job + `","partLabel":"Compressor","amountMinor":12000,"currency":"MYR","reason":"failed in warranty"}`

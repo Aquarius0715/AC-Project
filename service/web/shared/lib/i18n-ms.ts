@@ -649,6 +649,7 @@ export const ms: Record<string, string> = {
   "You rated the job": "Anda telah menilai kerja ini",
   "You reported a problem": "Anda melaporkan masalah",
   "New time proposed": "Masa baharu dicadangkan",
+  "HQ reviewed your problem report": "HQ telah menyemak laporan masalah anda",
   "You accepted the proposed time": "Anda menerima masa yang dicadangkan",
   "You declined the proposed time": "Anda menolak masa yang dicadangkan",
   "You asked for another time": "Anda meminta masa lain",

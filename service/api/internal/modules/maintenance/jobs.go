@@ -1069,10 +1069,42 @@ type Event struct {
 	ReportRef   any        `json:"reportRef"`
 }
 
+//	@Summary		jobs.events (read)
+//	@ID				jobs.events
+//	@Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-P07, DD-P01, DD-P02, DD-A06, DD-C09 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			jobId	path		string	true	"input field jobId"
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,occurredAt; default occurredAt asc;id asc"
+//	@Param			from	query		string	false	"filter → [from,to) on occurredAt"
+//	@Param			to		query		string	false	"filter → [from,to) on occurredAt"
+//	@Success		200		{object}	ops.Envelope{data=EventPage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/jobs/{jobId}/events [get]
+//
+// clientHiddenActions are the job events of HQ's and the contractor's own handling that the client's history leaves out,
+// like internal notes (IR442): the costs and warranty records, and the contractor's time change while HQ alone decides
+// on it (the change sent to the client shows as the client's proposal). Constants, so the query lists them inline.
+var clientHiddenActions = []string{"job.costs_saved", "job.warranty_claim_filed", "partner_proposal.sent", "partner_proposal.withdrawn", "partner_proposal.kept"}
+
 // @Summary		jobs.events (read)
 // @ID				jobs.events
 // @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
-// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; clients do not get HQ's and the contractor's own handling events (IR442)
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
 // @Description	Design: DD-P07, DD-P01, DD-P02, DD-A06, DD-C09 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)
 // @Tags			jobs
@@ -1134,7 +1166,7 @@ func (m Jobs) events(ctx context.Context, c *ops.Call, in *EventsInput) (paging.
 	args := []any{in.JobID}
 	where := "e.job_id = $1"
 	if c.Principal.Role == "client" {
-		where += " AND (n.id IS NULL OR n.visibility = 'customer')"
+		where += " AND (n.id IS NULL OR n.visibility = 'customer') AND e.action NOT IN ('" + strings.Join(clientHiddenActions, "','") + "')"
 	}
 	if ownOnly {
 		args = append(args, c.Principal.UserID)
