@@ -1173,7 +1173,7 @@ Gaps found while implementing `contractors.*`, `rateCards.*` and `sla.*` (IR118)
 3. **Rate cards.** `rateCards.save` needs an existing contractor profile (NOT_FOUND), effectiveFrom after now (VALIDATION), currency MYR or USD, 1–4 lines with distinct workType, amountMinor integer ≥ 0 and note trimmed 0–200; each save is a new row whose `version` is the contractor's previous highest + 1. `rateCards.list` filters contractorOrgId (contractors see only their own) and orders effectiveFrom desc.
 4. **SLA targets.** `sla.saveTargets` stores a new row per plan type (version = previous highest + 1 for that plan type) with effectiveFrom ≥ now; responseHours integer 1–168; percentages 0–100. A job's plan type is its customer's `serviceProfile`; its target is the latest row with effectiveFrom ≤ job createdAt, otherwise the default 4 h / 90 % / 85 %.
 5. **Scorecard metrics** (jobs created in the period; `contractorOrgId` limits to jobs delivered by that contractor). Response: hours from job creation to the accepted Offer (contractor) or first Assignment (internal); a job without one counts as a miss once the target time has passed. Jobs generated from a maintenance plan have no response target (IR451). Arrival in window: jobs with an arrival time — arrival inside the scheduled slot. First-time fix: completed jobs whose report was accepted without a return and whose unit got no follow-up job within 30 days of completion (a job created from a maintenance plan is a scheduled visit, not a follow-up, IR450). Rating: average stars and count of rated jobs. Open overdue: open jobs past dueAt. Percentages are rounded to one decimal; no data is null. Customer status: `breached` when a metric misses its target by more than 10 points (response: share within target) or the customer has open overdue jobs; `at_risk` when a metric misses by up to 10 points; otherwise `on_track`. Breaches list every response, arrival, first-time-fix and overdue miss (newest first, at most 50).
-6. **Contractor KPIs** (90 days ending now). offerAcceptance: accepted ÷ (accepted + declined + expired) Offers offered in the window; arrivalInWindow as item 5; firstTimeAccepted: share of jobs whose first submitted report version was accepted; averageRating / ratingCount; reworkRate: share of completed jobs that got a follow-up classified `rework`.
+6. **Contractor KPIs** (90 days ending now). offerAcceptance: accepted ÷ (accepted + declined + expired) Offers offered in the window, without the offers closed by HQ's cancellation or a reschedule (IR452); arrivalInWindow as item 5; firstTimeAccepted: share of jobs whose first submitted report version was accepted; averageRating / ratingCount; reworkRate: share of completed jobs that got a follow-up classified `rework`.
 
 ## IR132 Memberships, eligibility, capacity and unavailability in the backend — 2026-10-08
 
@@ -6789,4 +6789,11 @@ Found in review: the scorecard measured the response of every job from its creat
 
 1. Jobs with `origin = periodic_plan` are left out of the response metric (neither within the target nor a miss, and no breach). Their arrival, first-time fix, rating and overdue still count.
 2. Test: `TestFirstTimeFixIgnoresPlanVisits` (the plan's visit generated 7.5 hours ago is no breach of any kind).
+
+## IR452 An offer closed by a cancellation is no decline of the contractor — 2026-10-24
+
+Found in review: `jobs.cancel` and the client's reschedule (`jobs.requestReschedule`) close the job's open offer as declined (`decline_reason` `job_cancelled` / `rescheduled`). The contractor KPI offerAcceptance counted these as the contractor's declines, so HQ's own cancellations lowered the contractor's score.
+
+1. offerAcceptance leaves out offers declined with the reason `job_cancelled` or `rescheduled`. Expired offers and the contractor's own declines still count.
+2. Test: `TestOfferAcceptanceIgnoresCancelledJobs` (HQ's cancellation leaves the share as it was).
 

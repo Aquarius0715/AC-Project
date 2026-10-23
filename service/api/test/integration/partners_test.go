@@ -402,3 +402,55 @@ func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
 		t.Error("a client's new request within 30 days is no miss")
 	}
 }
+
+// TestOfferAcceptanceIgnoresCancelledJobs (IR452): an offer HQ's cancellation closes is no decline of the contractor,
+// so the contractor's offer acceptance stays as it was.
+func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
+	s := server(t)
+	org := seed.ID("org-contractor-a")
+	owner(t, `INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email, delegation)
+		SELECT $1, $2, 'A', 'active', 'R-A', 'a@partner.example', tstzrange($3, $4) WHERE NOT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $2)`,
+		seed.ID("tenant-a"), org, clock.Add(-time.Hour), clock.Add(1000*time.Hour))
+	owner(t, `UPDATE maintenance.contractors SET status = 'active' WHERE organization_id = $1`, org)
+	acceptance := func() any {
+		t.Helper()
+		_, m := post(s, &hq, "contractors.list", `{"limit":100}`)
+		for _, it := range items(m) {
+			if it["organizationId"] == org.String() {
+				return it["kpis"].(map[string]any)["offerAcceptance"]
+			}
+		}
+		t.Fatal("contractor-a not listed")
+		return nil
+	}
+	// one accepted offer, so the share is defined
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	offer := func() string {
+		_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+		job := data(m)["id"].(string)
+		if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+org.String()+`","visitSlot":`+slotJSON(49, 2)+
+			`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"t"}`, 1); code != 200 {
+			t.Fatalf("offer: %d %v", code, m)
+		}
+		// the KPI window ends now (exclusive): an offer made at the clock time is not in it yet
+		owner(t, `UPDATE maintenance.offers SET offered_at = offered_at - interval '1 hour' WHERE job_id = $1`, job)
+		return job
+	}
+	accepted := offer()
+	var oid string
+	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{accepted}, &oid)
+	if code, m := write(s, &contrA, "jobs.accept", `{"jobId":"`+accepted+`","offerId":"`+oid+`","termsVersion":"t"}`, 2); code != 200 {
+		t.Fatalf("accept: %d %v", code, m)
+	}
+	before := acceptance()
+	if before == nil {
+		t.Fatal("no offer acceptance after an accepted offer")
+	}
+	cancelled := offer()
+	if code, m := write(s, &hq, "jobs.cancel", `{"jobId":"`+cancelled+`","cancelReason":"client moved out"}`, 2); code != 200 {
+		t.Fatalf("cancel: %d %v", code, m)
+	}
+	if after := acceptance(); after != before {
+		t.Errorf("offer acceptance moved from %v to %v by HQ's cancellation", before, after)
+	}
+}

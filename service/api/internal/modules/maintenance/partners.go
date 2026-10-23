@@ -98,8 +98,11 @@ func pct(n, d int) *float64 {
 func (m Partners) kpis(ctx context.Context, c *ops.Call, org uuid.UUID) (KPIs, error) {
 	k := KPIs{Period: Range{c.Now.Add(-90 * 24 * time.Hour), c.Now}}
 	var acc, dec int
+	// offers closed by HQ's cancellation or the client's reschedule were no decision of the contractor (IR452)
 	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE decision = 'accept'), count(*) FILTER (WHERE decision IS NOT NULL OR expired_at IS NOT NULL)
-		FROM maintenance.offers WHERE contractor_org_id = $1 AND offered_at >= $2 AND offered_at < $3`, org, k.Period.From, k.Period.To).Scan(&acc, &dec); err != nil {
+		FROM maintenance.offers WHERE contractor_org_id = $1 AND offered_at >= $2 AND offered_at < $3
+		AND NOT COALESCE(decision = 'decline' AND decline_reason IN ('job_cancelled','rescheduled'), false)`,
+		org, k.Period.From, k.Period.To).Scan(&acc, &dec); err != nil {
 		return k, err
 	}
 	k.OfferAcceptance = pct(acc, dec)
