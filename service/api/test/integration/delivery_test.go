@@ -511,3 +511,21 @@ func TestReleaseQualificationEnded(t *testing.T) {
 		t.Errorf("job.qualification_released events: %d", events)
 	}
 }
+
+// TestPastSlotsRefused (IR456): a preferred time that is over can neither be assigned nor offered.
+func TestPastSlotsRefused(t *testing.T) {
+	s := server(t)
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	job := data(m)["id"].(string)
+	// the client's preferred times have all passed
+	owner(t, `UPDATE maintenance.jobs SET preferred_slots = jsonb_build_array(jsonb_build_object('startAt', $2::timestamptz, 'endAt', $3::timestamptz)),
+		requested_slot = tstzrange($2, $3) WHERE id = $1`, job, clock.Add(-3*time.Hour), clock.Add(-time.Hour))
+	if code, m := write(s, &hq, "jobs.assign", `{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-internal-a").String()+`","startAt":"`+ts(-3)+`","endAt":"`+ts(-1)+`"}`, 1); code != 422 || fields(m) != "endAt=error.past" {
+		t.Errorf("assign a time that is over: %d %s", code, fields(m))
+	}
+	if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":{"startAt":"`+ts(-3)+`","endAt":"`+ts(-1)+`"}`+
+		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(-4)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"t"}`, 1); code != 422 || fields(m) != "visitSlot=error.past" {
+		t.Errorf("offer a visit that is over: %d %s", code, fields(m))
+	}
+}

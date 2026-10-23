@@ -189,6 +189,9 @@ func (m Delivery) offerJob(ctx context.Context, c *ops.Call, in *OfferInput) (Jo
 	if !c.Now.Before(in.OfferExpiresAt) {
 		return Job{}, apperr.Fields(map[string]string{"offerExpiresAt": "error.past"})
 	}
+	if !in.VisitSlot.EndAt.After(c.Now) { // a visit already over (IR456)
+		return Job{}, apperr.Fields(map[string]string{"visitSlot": "error.past"})
+	}
 	kind, status, found, err := m.Directory.OrgState(ctx, c, in.ContractorOrgID)
 	if err != nil {
 		return Job{}, err
@@ -508,6 +511,9 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, in *AssignInput) (
 	// state and slot rules (IR113 / IR49 / IR123 item 4)
 	switch {
 	case (r.status == "requested" && !contractor) || (r.status == "accepted" && contractor):
+		if !slot.EndAt.After(c.Now) { // a time already over cannot be worked (IR456): HQ proposes another
+			return Job{}, apperr.Fields(map[string]string{"endAt": "error.past"})
+		}
 		ok := contractor && sameSlot(visit, slot)
 		if !contractor {
 			if ok, err = m.agreed(ctx, c, in.JobID, r, slot); err != nil {
