@@ -12855,7 +12855,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 pending partner proposal; send_to_client creates a SlotProposal(source=contractor) and needs replyBy\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06",
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 pending partner proposal; send_to_client creates a SlotProposal(source=contractor) and needs replyBy not after the slot start (IR455)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06",
                 "consumes": [
                     "application/json"
                 ],
@@ -14563,7 +14563,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 status requested (or offered/accepted/assigned after cant_make/decline); slot not one of preferredSlots (errors.slot_is_preferred); no pending proposal; message 1–1000; replyBy future ≤7 days\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06",
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 status requested (or offered/accepted/assigned after cant_make/decline); slot not one of preferredSlots (errors.slot_is_preferred); no pending proposal; message 1–1000; replyBy future ≤7 days and not after the slot start (IR455)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06",
                 "consumes": [
                     "application/json"
                 ],

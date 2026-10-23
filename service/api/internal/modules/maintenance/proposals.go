@@ -33,8 +33,10 @@ type Proposals struct {
 
 func (m Proposals) jobs() Jobs { return m.Delivery.Jobs }
 
-func replyByOK(now, replyBy time.Time) bool {
-	return replyBy.After(now) && !replyBy.After(now.Add(7*24*time.Hour))
+// replyByOK: after now, at most 7 days ahead, and not after the proposed slot starts (IR455), so the client cannot
+// accept a time that has begun.
+func replyByOK(now, replyBy, slotStart time.Time) bool {
+	return replyBy.After(now) && !replyBy.After(now.Add(7*24*time.Hour)) && !replyBy.After(slotStart)
 }
 
 func (m Proposals) pending(ctx context.Context, c *ops.Call, job uuid.UUID) (bool, error) {
@@ -121,7 +123,7 @@ func (in *ProposeInput) Validate() map[string]string {
 // @Summary		jobs.proposeSlot (write)
 // @ID				jobs.proposeSlot
 // @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 status requested (or offered/accepted/assigned after cant_make/decline); slot not one of preferredSlots (errors.slot_is_preferred); no pending proposal; message 1–1000; replyBy future ≤7 days
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 status requested (or offered/accepted/assigned after cant_make/decline); slot not one of preferredSlots (errors.slot_is_preferred); no pending proposal; message 1–1000; replyBy future ≤7 days and not after the slot start (IR455)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A06
 // @Tags			jobs
@@ -183,7 +185,7 @@ func (m Proposals) proposeSlotJob(ctx context.Context, c *ops.Call, in *ProposeI
 			return Job{}, apperr.Fields(map[string]string{"slot": "errors.slot_is_preferred"})
 		}
 	}
-	if !replyByOK(c.Now, in.ReplyBy) {
+	if !replyByOK(c.Now, in.ReplyBy, in.Slot.StartAt) {
 		return Job{}, apperr.Fields(map[string]string{"replyBy": "error.range"})
 	}
 	if err := m.checkHold(ctx, c, r.unit, in.Hold, in.Slot); err != nil {
@@ -405,6 +407,10 @@ func (m Proposals) respondJob(ctx context.Context, c *ops.Call, in *RespondInput
 			return Job{}, err
 		}
 		return m.finish(ctx, c, in.JobID, "proposal.declined", "jobs.respondProposal", "ProposalDeclined", deref(in.DeclineReason))
+	}
+	// a proposal whose time has begun cannot be accepted any more (IR455)
+	if !slot.StartAt.After(c.Now) {
+		return Job{}, apperr.E(apperr.Conflict, "errors.proposal_expired")
 	}
 	// the hold is checked again: since the proposal, the contractor may have been suspended or the technician's access or
 	// qualification may have ended (IR446); HQ withdraws the proposal and proposes again
@@ -774,7 +780,7 @@ func (in *ResolveInput) Validate() map[string]string {
 // @Summary		jobs.resolvePartnerSlot (write)
 // @ID				jobs.resolvePartnerSlot
 // @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 pending partner proposal; send_to_client creates a SlotProposal(source=contractor) and needs replyBy
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 pending partner proposal; send_to_client creates a SlotProposal(source=contractor) and needs replyBy not after the slot start (IR455)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A06
 // @Tags			jobs
@@ -820,7 +826,7 @@ func (m Proposals) resolvePartnerJob(ctx context.Context, c *ops.Call, in *Resol
 			}
 			return Job{}, apperr.E(apperr.Conflict, "errors.proposal_pending")
 		}
-		if !replyByOK(c.Now, *in.ReplyBy) {
+		if !replyByOK(c.Now, *in.ReplyBy, slot.StartAt) {
 			return Job{}, apperr.Fields(map[string]string{"replyBy": "error.range"})
 		}
 		hold := Hold{Kind: "contractor", ContractorOrgID: &org, TechnicianMembershipID: &tech}

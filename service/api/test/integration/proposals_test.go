@@ -674,3 +674,34 @@ func TestAcceptedProposalExtendsAccess(t *testing.T) {
 		t.Errorf("access until %v, want %v (the moved visit's end + 24 h)", until, want)
 	}
 }
+
+// TestProposalReplyByBeforeSlot (IR455): the reply-by cannot fall after the proposed time starts, and a proposal whose
+// time has begun cannot be accepted.
+func TestProposalReplyByBeforeSlot(t *testing.T) {
+	s := server(t)
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	job := data(m)["id"].(string)
+	hold := `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `"}`
+	propose := func(replyBy string) (int, map[string]any) {
+		return write(s, &hq, "jobs.proposeSlot", `{"jobId":"`+job+`","slot":`+slotJSON(30, 2)+`,"hold":`+hold+`,"message":"Can we come then?","replyBy":"`+replyBy+`"}`, 1)
+	}
+	if code, m := propose(ts(31)); code != 422 || fields(m) != "replyBy=error.range" {
+		t.Errorf("reply-by after the slot starts: %d %s", code, fields(m))
+	}
+	if code, m := propose(ts(30)); code != 200 {
+		t.Fatalf("reply-by at the slot start: %d %v", code, m)
+	}
+	var proposal string
+	ownerScan(t, `SELECT id::text FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'pending'`, []any{job}, &proposal)
+	// the proposed time has begun (moved into the past directly): the acceptance is refused and nothing is booked
+	owner(t, `UPDATE maintenance.slot_proposals SET slot = tstzrange($2, $3), reply_by = $4 WHERE id = $1`, proposal, clock.Add(-time.Hour), clock.Add(time.Hour), clock.Add(time.Hour))
+	if code, m := write(s, &customerA, "jobs.respondProposal", `{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`, 2); code != 409 || m["messageKey"] != "errors.proposal_expired" {
+		t.Errorf("accepting a time that has begun: %d %v", code, m)
+	}
+	var offers int
+	ownerScan(t, `SELECT count(*) FROM maintenance.offers WHERE job_id = $1`, []any{job}, &offers)
+	if offers != 0 {
+		t.Errorf("offers after the refused acceptance: %d", offers)
+	}
+}
