@@ -245,7 +245,7 @@ export function capacity(days: ApiCapacity[][], members: ApiMember[], t: T = en)
 /** Titles of the job events (jobs.events actions). */
 export const jobEventTitle: Record<string, string> = {
   "job.created": "Job created", "job.offered": "Offer received from HQ", "offer.accepted": "Job accepted", "offer.declined": "Offer declined", offer_expired: "Offer expired",
-  "offer.access_extended": "Access window extended", "job.assigned": "Technician assigned", "job.assignment_released": "Technician’s access ended — to be reassigned", "assignment.accepted": "Technician confirmed the slot", "assignment.cant_make": "Technician can’t make the slot",
+  "offer.access_extended": "Access window extended", "job.assigned": "Technician assigned", "job.assignment_released": "Technician’s access ended — to be reassigned", "job.qualification_released": "Technician’s qualification ended — to be reassigned", "assignment.accepted": "Technician confirmed the slot", "assignment.cant_make": "Technician can’t make the slot",
   "job.checked_in": "Checked in on site", "job.started": "Work started", "job.paused": "Work paused", "job.resumed_work": "Work resumed", "job.submitted": "Report submitted",
   "partner.review": "Partner review", "job.reviewed": "Report reviewed", "job.rework_started": "Rework started", "job.costs_saved": "Costs saved", "job.held": "Job on hold",
   "job.resumed": "Job resumed", "job.cancelled": "Job cancelled", "job.reschedule_requested": "Reschedule requested", "proposal.sent": "Time proposed", "proposal.accepted": "Proposal accepted",

@@ -443,3 +443,71 @@ func TestReleaseEndedAccessContractor(t *testing.T) {
 		t.Errorf("HQ assigners notified of the contractor's job: %d", n)
 	}
 }
+
+// TestReleaseQualificationEnded (IR440): HQ approves a technician's certificate whose window no longer covers an
+// assigned visit on a unit that requires the code; the not-started assignment is released like an ended access
+// (IR439). A certificate that still covers the visit releases nothing.
+func TestReleaseQualificationEnded(t *testing.T) {
+	s := server(t)
+	tech := seed.ID("tech-external-a")
+	var from, until time.Time
+	ownerScan(t, `SELECT valid_from, valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_indoor'`, []any{tech}, &from, &until)
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active'`, tech)
+	t.Cleanup(func() {
+		owner(t, `UPDATE identity.qualification_grants SET valid_from = $2, valid_until = $3 WHERE membership_id = $1 AND code = 'demo_indoor'`, tech, from, until)
+		owner(t, `UPDATE maintenance.assignments a SET status = 'active' WHERE a.id = $1 AND NOT EXISTS (SELECT 1 FROM maintenance.assignments b
+			WHERE b.id <> a.id AND b.status = 'active' AND b.technician_membership_id = a.technician_membership_id AND b.scheduled && a.scheduled)`, seed.ID("assignment-contractor-a"))
+	})
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	code, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	if code != 200 {
+		t.Fatalf("create: %d %v", code, m)
+	}
+	job := data(m)["id"].(string)
+	if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
+		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"terms-v1"}`, 1); code != 200 {
+		t.Fatalf("offer: %d %v", code, m)
+	}
+	var offer string
+	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
+	if code, m := write(s, &contrA, "jobs.accept", `{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"terms-v1"}`, 2); code != 200 {
+		t.Fatalf("accept: %d %v", code, m)
+	}
+	if code, m := write(s, &contrA, "jobs.assign", `{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+ts(49)+`","endAt":"`+ts(51)+`"}`, 3); code != 200 {
+		t.Fatalf("assign: %d %v", code, m)
+	}
+	pdf := blobJSON("cert.pdf", "application/pdf", []byte("%PDF-1.4 demo"), 13)
+	approve := func(expires int) {
+		t.Helper()
+		code, m := write(s, &contrA, "certificates.submit", `{"membershipId":"`+tech.String()+`","code":"demo_indoor","name":"Indoor AC","number":"N-2","issuedAt":"`+ts(-240)+
+			`","expiresAt":"`+ts(expires)+`","file":`+pdf+`}`, 0)
+		if code != 200 {
+			t.Fatalf("submit: %d %v", code, m)
+		}
+		if code, m := write(s, &hq, "certificates.verify", `{"certificateId":"`+data(m)["id"].(string)+`","decision":"approve"}`, 1); code != 200 {
+			t.Fatalf("approve: %d %v", code, m)
+		}
+	}
+	state := func() (status string, assignment *string, reason *string) {
+		ownerScan(t, `SELECT j.status, j.assignment_id::text, a.reason FROM maintenance.jobs j JOIN maintenance.assignments a ON a.job_id = j.id WHERE j.id = $1 ORDER BY a.created_at DESC LIMIT 1`,
+			[]any{job}, &status, &assignment, &reason)
+		return
+	}
+	before := countNotes(t, job, "contractor-a", "job_update")
+	approve(100) // still covers the visit
+	if status, assignment, _ := state(); status != "assigned" || assignment == nil {
+		t.Fatalf("a covering certificate released the job: %s %v", status, assignment)
+	}
+	approve(50) // ends during the visit
+	if status, assignment, reason := state(); status != "accepted" || assignment != nil || reason == nil || *reason != "qualification_ended" {
+		t.Errorf("after the release: status %s, assignment %v, reason %v", status, assignment, reason)
+	}
+	if n := countNotes(t, job, "contractor-a", "job_update"); n != before+1 {
+		t.Errorf("contractor notices: %d, want %d", n, before+1)
+	}
+	var events int
+	ownerScan(t, `SELECT count(*) FROM maintenance.job_events WHERE job_id = $1 AND action = 'job.qualification_released'`, []any{job}, &events)
+	if events != 1 {
+		t.Errorf("job.qualification_released events: %d", events)
+	}
+}

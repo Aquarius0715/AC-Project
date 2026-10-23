@@ -5690,6 +5690,7 @@ export const ms: Record<string, string> = {
   "{n} photos sent with your report": "{n} foto dihantar bersama laporan anda",
   "A job assigned to this technician that has not started is released and returns to be assigned; its assigners are notified.": "Kerja yang ditugaskan kepada juruteknik ini yang belum bermula akan dilepaskan untuk ditugaskan semula; penugasnya akan dimaklumkan.",
   "Technician’s access ended — to be reassigned": "Akses juruteknik telah tamat — akan ditugaskan semula",
+  "Technician’s qualification ended — to be reassigned": "Kelayakan juruteknik telah tamat — akan ditugaskan semula",
   "Client’s photos": "Foto pelanggan",
   "Open the document": "Buka dokumen",
   "This technician's access ends before the visit — choose another technician or ask HQ to extend it": "Akses juruteknik ini tamat sebelum lawatan — pilih juruteknik lain atau minta HQ melanjutkannya",

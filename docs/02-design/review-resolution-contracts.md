@@ -6689,3 +6689,13 @@ Decided by the user (the recommended option of OPEN-BE-09): HQ keeps the power t
 2. A job already started keeps its assignment: HQ handles it.
 3. The web names the event (“Technician's access ended — to be reassigned”, English and Malay) in the customer's and the contractor's job history.
 4. Test: `TestReleaseEndedAccess`.
+
+## IR440 An assignment is released when the technician's qualification no longer covers the visit — 2026-10-23
+
+Decided by the user (2026-10-23), following IR439: an assignment must not stay with a technician who is no longer qualified for the unit at the visit (IR123 item 3 is checked only when assigning). A grant changes only when HQ approves a certificate (`certificates.verify`): its window [issuedAt, expiresAt) replaces the technician's grant for the code (QualificationGranted, IR192), so a renewal with an earlier expiry can shorten it.
+
+1. `certificates.verify` (approve, code other than `other`) releases, in the same transaction, every active assignment of the technician on a job in status `assigned` whose unit's service scope requires the code (`QualificationRequirements`) and whose slot the approved window does not cover. The release is that of IR439 (job back to `accepted` or `requested` with its agreed visit, job_update warning to the assigners, audit `jobs.releaseAssignment`), with the assignment reason `qualification_ended`, the job event `job.qualification_released` and the notice reason `technician_qualification_ended`.
+2. A job already started keeps its assignment: HQ handles it.
+3. The web names the event (“Technician's qualification ended — to be reassigned”, English and Malay) in the customer's and the contractor's job history.
+4. No operation revokes a grant (`revoked_at`) today; one added later must release the same way.
+5. Test: `TestReleaseQualificationEnded` (a covering certificate releases nothing; one ending during the visit releases the contractor's job).

@@ -231,7 +231,7 @@ func (in *VerifyInput) Validate() map[string]string {
 // @Summary		certificates.verify (write)
 // @ID				certificates.verify
 // @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 only pending_verification; approve updates the Membership qualification validUntil
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 only pending_verification; approve updates the Membership qualification validUntil; a not-started assignment on a unit that requires the code and that the approved window no longer covers is released (IR440)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A21
 // @Tags			certificates
@@ -267,6 +267,9 @@ func (m Certificates) verify(ctx context.Context, c *ops.Call, in *VerifyInput) 
 		}
 		if x.Code != "other" {
 			if err := m.Grants.SetGrant(ctx, c, x.MembershipID, x.Code, x.IssuedAt, x.ExpiresAt); err != nil {
+				return x, err
+			}
+			if err := releaseQualificationEnded(ctx, c, m.Delivery.Units, x.MembershipID, x.Code, x.IssuedAt, x.ExpiresAt); err != nil { // IR440
 				return x, err
 			}
 		}

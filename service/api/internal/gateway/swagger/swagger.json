@@ -3097,7 +3097,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 only pending_verification; approve updates the Membership qualification validUntil\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A21",
+                "description": "Authorization: admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 only pending_verification; approve updates the Membership qualification validUntil; a not-started assignment on a unit that requires the code and that the approved window no longer covers is released (IR440)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A21",
                 "consumes": [
                     "application/json"
                 ],
