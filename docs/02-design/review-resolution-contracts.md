@@ -4000,7 +4000,7 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
      - sign-in for a missing or expiring session;
      - whole lists: the cursor, filters and sort, 100 per page, never past `max`;
      - the principal, permissions, business clock and display settings, with their defaults.
-   - `unitCommands.test.ts` (4 tests): `waitForCommand` polls every 2 s, stops at the first final state, gives up after 40 s, and passes a failed read on.
+   - `unitCommands.test.ts` (4 tests): `waitForCommand` polls every 2 s, stops at the first final state, gives up after 40 s (50 s since IR453), and passes a failed read on.
 3. **Backend tests.**
    - `TestRequiredInputs` checks the input rules of 79 operations in 85 cases. The rules run before authorization: a missing ID, an unknown choice, a reversed period or an over-long text is VALIDATION with the field named. Path parameters are sent as the nil UUID, so the route matches.
    - Payments:
@@ -6802,5 +6802,6 @@ Found in review: `jobs.cancel` and the client's reschedule (`jobs.requestResched
 Found in review: the equipment scheduler (every second) expired a command as soon as `expiresAt` passed. The IoT bridge stamps an acknowledgement with the time it received it and then calls the API, so an acknowledgement received before `expiresAt` could reach the API after the tick had expired the command. It was then recorded only as late, against the rule that the time of receipt decides (common design §5).
 
 1. `ExpireCommands` expires `requested` / `sent` commands `ExpireGrace` (5 s) after `expiresAt`. The result is still decided by the time of receipt: an acknowledgement received before `expiresAt` acknowledges the command, a later one is recorded as late.
-2. Tests: `TestCommands` (a tick 2 s after expiresAt leaves the command; one after the grace expires it), `TestDiagnosticRuns`.
+2. The web's `waitForCommand` polls for up to 50 s (was 40 s), so the 30 s window, the grace and the scheduler's tick fit.
+3. Tests: `TestCommands` (a tick 2 s after expiresAt leaves the command; one after the grace expires it), `TestDiagnosticRuns`, `unitCommands.test.ts`.
 

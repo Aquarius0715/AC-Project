@@ -37,12 +37,12 @@ describe("following a command until the device answers (D04, Unit Control and th
     expect(callOp).not.toHaveBeenCalled();
   });
 
-  it("gives up after 40 s (20 reads) and returns the last state it saw", async () => {
+  it("gives up after 50 s (25 reads: the window, the expiry grace of IR453 and a tick fit) and returns the last state it saw", async () => {
     callOp.mockResolvedValue(cmd("sent"));
     const done = waitForCommand(cmd("sent"), () => {});
-    await vi.advanceTimersByTimeAsync(40_000);
+    await vi.advanceTimersByTimeAsync(50_000);
     expect((await done).status).toBe("sent");
-    expect(callOp).toHaveBeenCalledTimes(20);
+    expect(callOp).toHaveBeenCalledTimes(25);
   });
 
   it("passes a failed read to the caller", async () => {

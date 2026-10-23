@@ -8,11 +8,11 @@ import type { ApiCommand } from "@ac/web/lib/units";
 
 const terminal = new Set<ApiCommand["status"]>(["acknowledged", "failed", "expired", "cancelled"]);
 
-/** Polls every 2 s (at most 40 s) and reports each state. */
+/** Polls every 2 s (at most 50 s: the 30 s window, the 5 s expiry grace of IR453 and the scheduler's tick fit) and reports each state. */
 export async function waitForCommand(first: ApiCommand, onUpdate: (c: ApiCommand) => void): Promise<ApiCommand> {
   let c = first;
   onUpdate(c);
-  for (let i = 0; i < 20 && !terminal.has(c.status); i++) {
+  for (let i = 0; i < 25 && !terminal.has(c.status); i++) {
     await new Promise((r) => setTimeout(r, 2000));
     c = await callOp<ApiCommand>("commands.get", { id: c.id });
     onUpdate(c);
