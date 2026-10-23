@@ -79,6 +79,8 @@ describe("customer maintenance", () => {
     expect(notesOf([{ id: "e1", action: "note.added", occurredAt: "2026-09-14T01:00:00Z", actorUserId: "me", note: { visibility: "customer", message: "Gate code 4821" } }, { id: "e2", action: "job.created", occurredAt: "2026-09-13T01:00:00Z", actorUserId: "me", note: null }], "me"))
       .toEqual([{ id: "e1", who: "You", at: "14 Sept 2026, 9:00 am MYT", text: "Gate code 4821" }]);
     expect(clientJobRefusal({ code: "CONFLICT", messageKey: "errors.reschedule_too_late", fieldErrors: {} })).toBe("Not saved: less than 48 h before the visit — contact HQ.");
+    // IR446: the proposal's hold no longer holds when the client accepts
+    expect(clientJobRefusal({ code: "CONFLICT", messageKey: "errors.proposal_unavailable", fieldErrors: {} })).toBe("Not saved: the proposed time can no longer be booked — HQ will look again.");
   });
 
   it("words the list, the detail and the checks in Malay, with times in the display time zone (IR262)", () => {
