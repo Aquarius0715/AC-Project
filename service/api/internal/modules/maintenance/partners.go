@@ -153,6 +153,7 @@ type jobMetric struct {
 	reworkFollowUp        bool
 	stars                 int
 	cancelledAt           *time.Time // the job.cancelled event
+	planned               bool       // generated from a maintenance plan: no response target (IR451)
 }
 
 // jobMetrics loads the per-job facts for SLA / KPI metrics of jobs created in [$1, $2) matching extra.
@@ -170,7 +171,8 @@ func jobMetrics(ctx context.Context, c *ops.Call, extra string, args []any) ([]j
 			AND f.created_at > j.completed_at AND f.created_at <= j.completed_at + interval '30 days'), -- a plan's next visit is no follow-up (IR450)
 		EXISTS (SELECT 1 FROM maintenance.jobs f WHERE f.follow_up_of_job_id = j.id AND f.follow_up_class = 'rework'),
 		COALESCE((j.rating->>'stars')::int, 0),
-		(SELECT min(e.occurred_at) FROM maintenance.job_events e WHERE e.job_id = j.id AND e.action = 'job.cancelled')
+		(SELECT min(e.occurred_at) FROM maintenance.job_events e WHERE e.job_id = j.id AND e.action = 'job.cancelled'),
+		j.origin = 'periodic_plan'
 		FROM maintenance.jobs j WHERE j.created_at >= $1 AND j.created_at < $2 AND `+extra+` ORDER BY j.created_at, j.id`, args...)
 	if err != nil {
 		return nil, err
@@ -180,7 +182,7 @@ func jobMetrics(ctx context.Context, c *ops.Call, extra string, args []any) ([]j
 	for rows.Next() {
 		var j jobMetric
 		if err := rows.Scan(&j.id, &j.customerOrg, &j.unit, &j.createdAt, &j.dueAt, &j.status, &j.responseAt, &j.arrivedAt, &j.inWindow, &j.firstReview,
-			&j.everReturned, &j.followUpWithin30, &j.reworkFollowUp, &j.stars, &j.cancelledAt); err != nil {
+			&j.everReturned, &j.followUpWithin30, &j.reworkFollowUp, &j.stars, &j.cancelledAt, &j.planned); err != nil {
 			return nil, err
 		}
 		out = append(out, j)
@@ -990,6 +992,8 @@ func (m Partners) scorecard(ctx context.Context, c *ops.Call, in *ScorecardInput
 			out.Breaches = append(out.Breaches, b)
 		}
 		switch {
+		case j.planned:
+			// a plan's visit is generated ahead of its date: the response target applies to requests (IR451)
 		case j.responseAt != nil:
 			ok := j.responseAt.Sub(j.createdAt) <= limit
 			for _, t := range []*tally{total, per[cust]} {

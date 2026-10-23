@@ -366,23 +366,31 @@ func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
 	unit := newUnit(t, s, "FTF AC")
 	_, m := write(s, &hq, "jobs.create", jobBody(unit, map[string]string{"alternativeSlots": "[]"}), 0)
 	job := data(m)["id"].(string)
-	owner(t, `UPDATE maintenance.jobs SET created_at = $2, status = 'completed', completed_at = $3 WHERE id = $1`, job, clock.Add(-10*time.Hour), clock.Add(-2*time.Hour))
+	owner(t, `UPDATE maintenance.jobs SET created_at = $2, status = 'completed', completed_at = $3 WHERE id = $1`, job, clock.Add(-10*time.Hour), clock.Add(-9*time.Hour))
 	var tenant, org string
 	ownerScan(t, `SELECT tenant_id::text, customer_org_id::text FROM maintenance.jobs WHERE id = $1`, []any{job}, &tenant, &org)
+	// the plan's next visit, generated 90 minutes after the completion for a date three months ahead: no response target
+	// either (IR451), though nobody has taken it after the default 4 h
+	visit := uuid.NewString()
 	owner(t, `INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, created_at)
-		VALUES (gen_random_uuid(), $1, $2, $3, 'periodic', 'requested', 'periodic_plan', tstzrange($4, $5), $5, $6)`, tenant, unit, org, clock.Add(90*24*time.Hour), clock.Add(90*24*time.Hour+time.Hour), clock.Add(-time.Hour))
+		VALUES ($7, $1, $2, $3, 'periodic', 'requested', 'periodic_plan', tstzrange($4, $5), $5, $6)`, tenant, unit, org, clock.Add(90*24*time.Hour), clock.Add(90*24*time.Hour+time.Hour), clock.Add(-7*time.Hour-30*time.Minute), visit)
 	miss := func() bool {
 		t.Helper()
 		code, m := post(s, &hq, "sla.scorecard", `{"period":{"from":"`+clock.Add(-48*time.Hour).Format(time.RFC3339)+`","to":"`+clock.Format(time.RFC3339)+`"}}`)
 		if code != 200 {
 			t.Fatalf("scorecard: %d %v", code, m)
 		}
+		found := false
 		for _, b := range data(m)["breaches"].([]any) {
-			if b := b.(map[string]any); b["jobId"] == job && b["kind"] == "first_time_fix" {
-				return true
+			b := b.(map[string]any)
+			if b["jobId"] == visit {
+				t.Errorf("the plan's visit is a %v breach", b["kind"])
+			}
+			if b["jobId"] == job && b["kind"] == "first_time_fix" {
+				found = true
 			}
 		}
-		return false
+		return found
 	}
 	if miss() {
 		t.Error("the plan's next visit made the job a first-time-fix miss")
