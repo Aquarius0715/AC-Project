@@ -306,3 +306,50 @@ func TestWorkerConfirmsUnratedJobs(t *testing.T) {
 		t.Fatalf("auto confirm: %v", m)
 	}
 }
+
+// TestExtendAccessRefreezesHistory (IR458): an access window that already ended was frozen into the contractor's
+// history; extending it removes that snapshot, and the next end freezes it again with the new end.
+func TestExtendAccessRefreezesHistory(t *testing.T) {
+	s := server(t)
+	ctx := context.Background()
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	job := data(m)["id"].(string)
+	if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
+		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"t"}`, 1); code != 200 {
+		t.Fatalf("offer: %d %v", code, m)
+	}
+	var offer string
+	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
+	if code, m := write(s, &contrA, "jobs.accept", `{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`, 2); code != 200 {
+		t.Fatalf("accept: %d %v", code, m)
+	}
+	// the access window ended an hour ago and the worker froze the contractor's history
+	owner(t, `UPDATE maintenance.offers SET access_valid_from = $2, access_valid_until = $3 WHERE id = $1`, offer, clock.Add(-5*time.Hour), clock.Add(-time.Hour))
+	asOf := func() *time.Time {
+		t.Helper()
+		var at *time.Time
+		ownerScan(t, `SELECT (SELECT as_of FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'organization')`, []any{job}, &at)
+		return at
+	}
+	if _, err := schedTick(ctx, s, clock); err != nil {
+		t.Fatal(err)
+	}
+	if at := asOf(); at == nil || !at.Equal(clock.Add(-time.Hour)) {
+		t.Fatalf("frozen at the first end: %v", at)
+	}
+	var v int
+	ownerScan(t, `SELECT version FROM maintenance.jobs WHERE id = $1`, []any{job}, &v)
+	if code, m := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+job+`","accessValidUntil":"`+ts(2)+`","reason":"parts arrived late"}`, v); code != 200 {
+		t.Fatalf("extend: %d %v", code, m)
+	}
+	if at := asOf(); at != nil {
+		t.Errorf("the old snapshot stays while the access is open again: %v", at)
+	}
+	if _, err := schedTick(ctx, s, clock.Add(3*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if at := asOf(); at == nil || !at.Equal(clock.Add(2*time.Hour)) {
+		t.Errorf("frozen again at the new end: %v", at)
+	}
+}

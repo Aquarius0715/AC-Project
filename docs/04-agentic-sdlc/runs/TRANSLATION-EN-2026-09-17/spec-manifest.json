@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "a81f3849d8f510110db8c9aca849d28fa2c12bcfad477e103e83a521c60d15d2",
+  "spec_baseline_id": "29c4652bba4f1bb7b472e58635be517c8f9839fa1d3d05bee6b7175559415262",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "50abafb1663372dc33637e319f789b1bf962a1b03b57950d8a86e06851c2864d"
+      "sha256": "43a5aa6bb04e4113283649c5241fe10802866e5bbeb0eba873f4df08eabee0fd"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -158,7 +158,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "633fbab3c55d0296069145340cf6ddb3cb08b1f6a7b70870b0c3e428cbc4f674"
+      "sha256": "b2e7b03ba36f71a70acef88cad1c028608180266bc332ddb8d18110f6176209b"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -286,7 +286,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "99dad31b21b1001821c3437d9719b450e97f5b4e9e9c3bfef50582bc158cb19f"
+      "sha256": "9690aff831d5da1bfb5416e13559ade1a2fc15c74df873dd6edd6d5eb126464d"
     },
     {
       "path": "tools/check_review_regressions.py",

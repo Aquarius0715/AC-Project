@@ -577,10 +577,10 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 	if _, err := m.lock(ctx, c, in.JobID); err != nil {
 		return Job{}, err
 	}
-	var offer uuid.UUID
+	var offer, contractor uuid.UUID
 	var until time.Time
-	err := c.Tx.QueryRow(ctx, `SELECT id, access_valid_until FROM maintenance.offers WHERE job_id = $1 AND decision = 'accept' ORDER BY decided_at DESC LIMIT 1 FOR UPDATE`, in.JobID).
-		Scan(&offer, &until)
+	err := c.Tx.QueryRow(ctx, `SELECT id, access_valid_until, contractor_org_id FROM maintenance.offers WHERE job_id = $1 AND decision = 'accept' ORDER BY decided_at DESC LIMIT 1 FOR UPDATE`, in.JobID).
+		Scan(&offer, &until, &contractor)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Job{}, apperr.E(apperr.Conflict, "errors.no_accepted_offer")
 	}
@@ -591,6 +591,10 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 		return Job{}, apperr.Fields(map[string]string{"accessValidUntil": "error.mustExtend"})
 	}
 	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.offers SET access_valid_until = $2, version = version + 1, updated_at = platform.app_now() WHERE id = $1`, offer, in.AccessValidUntil); err != nil {
+		return Job{}, err
+	}
+	// a window that had already ended was frozen into the contractor's history; it is frozen again at the new end (IR458)
+	if _, err := c.Tx.Exec(ctx, `DELETE FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'organization' AND owner_id = $2`, in.JobID, contractor); err != nil {
 		return Job{}, err
 	}
 	if err := m.bump(ctx, c, in.JobID, ""); err != nil {

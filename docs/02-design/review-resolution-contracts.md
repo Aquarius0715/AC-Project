@@ -1131,7 +1131,7 @@ Details fixed while implementing `jobs.rate`, `jobs.reportProblem`, `jobs.classi
 2. **jobs.reportProblem.** Client of the job's customer, job `completed`, within 7 days of `completedAt` (CONFLICT otherwise); details trimmed 10–2000; photos 0–5 JPEG/PNG of 1 byte–5 MiB (`BlobInput.bytes` travels as base64 in JSON); `preferredSlot` null or an IR113 slot. It creates a `requested` reactive job on the same unit with `followUpOfJobId`, `followUpClass=pending`, `symptom=details`, `origin=client_request`; with a preferred slot it is the requested slot and the only preferred slot, without one the requested slot is the next Kuala Lumpur day 09:00–12:00 and `preferredSlots=[]` (HQ contacts the client). Photos become ready Attachments of the new job. The source job's version is bumped.
 3. **jobs.classifyFollowUp.** HQ job.write; only a job with `followUpClass=pending` (CONFLICT otherwise); classification rework or new_request; reason trimmed 1–1000 (stored as `followUpReason`).
 4. **jobs.saveCost.** HQ job.write; not for cancelled jobs (CONFLICT); 0–50 lines replace the costs; each line kind estimate/actual, amountMinor integer ≥ 0, currency MYR or USD, description trimmed 1–200, visibility internal/customer.
-5. **jobs.extendAccess.** HQ job.write; the job's accepted Offer (otherwise CONFLICT); new `accessValidUntil` later than both now and the current end; reason trimmed 1–1000. The Offer's access end moves; the job version is bumped.
+5. **jobs.extendAccess.** HQ job.write; the job's accepted Offer (otherwise CONFLICT); new `accessValidUntil` later than both now and the current end; reason trimmed 1–1000. The Offer's access end moves; the job version is bumped; a contractor history snapshot frozen at the old end is removed and frozen again at the new end (IR458).
 6. **jobs.recordWarrantyClaim.** HQ job.write; job `completed`; the unit's `warrantyEndsAt` must exist and not be before `completedAt` (VALIDATION `errors.outside_warranty`); partLabel trimmed 1–120; amountMinor integer > 0; reason trimmed 1–1000. Appends a WarrantyClaim with state `filed` and `filedAt` = now.
 7. **IR42 projections.** JobDetail applies IR42 for every role, and `offer` is the job's latest Offer that was not declined or expired (contractors only their own company's, without declineReason).
 
@@ -6835,4 +6835,11 @@ Found in review: `jobs.offer` required `offerExpiresAt` ≤ `accessValidUntil` o
 1. `jobs.offer` is VALIDATION `offerExpiresAt=error.afterVisit` when `offerExpiresAt` is after `visitSlot.start`.
 2. Web: HQ reads “must not be after the visit starts” (and “must not be after the access ends” for `error.afterAccess`), English and Malay.
 3. Test: `TestPastSlotsRefused` (a future visit offered with an expiry after its start; a visit that has begun).
+
+## IR458 Extending ended access refreezes the contractor's history — 2026-10-24
+
+Found in review: the maintenance scheduler freezes the contractor's job history when the accepted offer's access window ends (IR89). `jobs.extendAccess` may extend a window that has already ended, but the snapshot stayed, and the next freeze kept it (`ON CONFLICT DO NOTHING`). The contractor's history therefore showed the job as it was at the first end, without anything that happened during the extension.
+
+1. `jobs.extendAccess` removes the contractor's snapshot of the job; the next end of the window freezes it again (as of the new end).
+2. Test: `TestExtendAccessRefreezesHistory`.
 
