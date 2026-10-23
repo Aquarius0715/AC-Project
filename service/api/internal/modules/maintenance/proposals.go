@@ -270,6 +270,11 @@ func (m Proposals) withdrawProposalJob(ctx context.Context, c *ops.Call, in *Pro
 	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.slot_proposals SET status = 'withdrawn', decided_at = $2 WHERE id = $1`, in.ProposalID, c.Now); err != nil {
 		return Job{}, err
 	}
+	// the contractor's time change HQ had sent on: HQ keeps the agreed time, and the contractor may accept or propose again (IR443)
+	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.partner_slot_proposals SET status = 'kept' WHERE status = 'sent_to_client'
+		AND offer_id IN (SELECT id FROM maintenance.offers WHERE job_id = $1)`, in.JobID); err != nil {
+		return Job{}, err
+	}
 	return m.finish(ctx, c, in.JobID, "proposal.withdrawn", "jobs.withdrawProposal", "ProposalWithdrawn", "")
 }
 
@@ -819,8 +824,20 @@ func (m Proposals) resolvePartnerJob(ctx context.Context, c *ops.Call, in *Resol
 
 // ExpireProposals applies IR128 item 4 in the worker tick.
 func ExpireProposals(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
-	tag, err := tx.Exec(ctx, `UPDATE maintenance.slot_proposals SET status = 'expired', decided_at = $1 WHERE status = 'pending' AND reply_by <= $1`, now)
-	return int(tag.RowsAffected()), err
+	rows, err := tx.Query(ctx, `UPDATE maintenance.slot_proposals SET status = 'expired', decided_at = $1 WHERE status = 'pending' AND reply_by <= $1 RETURNING job_id`, now)
+	if err != nil {
+		return 0, err
+	}
+	jobs, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil || len(jobs) == 0 {
+		return 0, err
+	}
+	// a contractor's time change the client left unanswered ends as declined, as when the client declines (IR443)
+	if _, err := tx.Exec(ctx, `UPDATE maintenance.partner_slot_proposals SET status = 'declined' WHERE status = 'sent_to_client'
+		AND offer_id IN (SELECT id FROM maintenance.offers WHERE job_id = ANY($1))`, jobs); err != nil {
+		return 0, err
+	}
+	return len(jobs), nil
 }
 
 // RegisterProposals binds the IR128 operations.

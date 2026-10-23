@@ -445,3 +445,65 @@ func TestRescheduleOfferedPeriodicVisit(t *testing.T) {
 		t.Errorf("an offered visit in 100 hours: %d %v", code, m)
 	}
 }
+
+// TestPartnerProposalEndsWithClientProposal (IR443): when the client's proposal made from a contractor's time change
+// ends without an answer, the time change ends too — kept when HQ withdraws the proposal, declined when the client lets
+// it expire — so the contractor can accept the offer or propose again.
+func TestPartnerProposalEndsWithClientProposal(t *testing.T) {
+	s := server(t)
+	ctx := context.Background()
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND lower(scheduled) > $2`,
+		seed.ID("tech-external-a"), clock.Add(2*time.Hour))
+	unit := seed.ID("unit-non-rto").String()
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	sent := func(slotHour int) (job, offer, partner string) {
+		t.Helper()
+		_, m := write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
+		job = data(m)["id"].(string)
+		if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
+			`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(200)+`","termsVersion":"t"}`, 1); code != 200 {
+			t.Fatalf("offer: %d %v", code, m)
+		}
+		ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
+		if code, m := write(s, &contrA, "jobs.proposePartnerSlot", `{"jobId":"`+job+`","offerId":"`+offer+`","slot":`+slotJSON(slotHour, 2)+
+			`,"technicianMembershipId":"`+seed.ID("tech-external-a").String()+`","reason":"team busy"}`, 2); code != 200 {
+			t.Fatalf("partner proposal: %d %v", code, m)
+		}
+		ownerScan(t, `SELECT id::text FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND status = 'pending'`, []any{offer}, &partner)
+		if code, m := write(s, &hq, "jobs.resolvePartnerSlot", `{"jobId":"`+job+`","proposalId":"`+partner+`","decision":"send_to_client","replyBy":"`+ts(6)+`"}`, 3); code != 200 {
+			t.Fatalf("send to client: %d %v", code, m)
+		}
+		return
+	}
+	status := func(partner string) (st string) {
+		ownerScan(t, `SELECT status FROM maintenance.partner_slot_proposals WHERE id = $1`, []any{partner}, &st)
+		return
+	}
+
+	// HQ withdraws the proposal: the agreed time stays, and the contractor accepts the offer
+	job, offer, partner := sent(105)
+	var proposal string
+	ownerScan(t, `SELECT id::text FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'pending'`, []any{job}, &proposal)
+	if code, m := write(s, &hq, "jobs.withdrawProposal", `{"jobId":"`+job+`","proposalId":"`+proposal+`"}`, 4); code != 200 {
+		t.Fatalf("withdraw: %d %v", code, m)
+	}
+	if st := status(partner); st != "kept" {
+		t.Errorf("after HQ withdrew the client's proposal the time change is %s", st)
+	}
+	if code, m := write(s, &contrA, "jobs.accept", `{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`, 5); code != 200 {
+		t.Errorf("accept after the withdrawal: %d %v", code, m)
+	}
+
+	// the client lets it expire: the contractor may propose again
+	job, offer, partner = sent(129)
+	if _, err := schedTick(ctx, s, clock.Add(6*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if st := status(partner); st != "declined" {
+		t.Errorf("after the client's proposal expired the time change is %s", st)
+	}
+	if code, m := write(s, &contrA, "jobs.proposePartnerSlot", `{"jobId":"`+job+`","offerId":"`+offer+`","slot":`+slotJSON(153, 2)+
+		`,"technicianMembershipId":"`+seed.ID("tech-external-a").String()+`","reason":"another time"}`, 4); code != 200 {
+		t.Errorf("propose again after the expiry: %d %v", code, m)
+	}
+}
