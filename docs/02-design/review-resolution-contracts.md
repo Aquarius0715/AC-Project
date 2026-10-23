@@ -6718,4 +6718,5 @@ Found in review: `jobs.events` removed only internal notes for clients, so the c
 
 1. For clients, `jobs.events` also leaves out the actions `job.costs_saved`, `job.warranty_claim_filed`, `partner_proposal.sent`, `partner_proposal.withdrawn` and `partner_proposal.kept` (whole rows; `total` and cursors count without them, as for internal notes). The client-visible cost lines stay on `jobs.get` (IR42).
 2. The events that concern the client get the client's words: `partner_proposal.sent_to_client` → “New time proposed” (the proposal the client answers), `job.follow_up_classified` → “HQ reviewed your problem report” (English and Malay).
-3. Test: `TestCostsAccessWarrantyAndProjections` (the client's history has no cost record and its total matches; HQ's has it).
+3. `JobDetail.eventCursor` counted every event of the job, so a client's count revealed internal notes and these actions; for clients it now counts what their `jobs.events` lists.
+4. Test: `TestCostsAccessWarrantyAndProjections` (the client's history has no cost record and its total matches; HQ's has it; each caller's eventCursor equals what their history lists).

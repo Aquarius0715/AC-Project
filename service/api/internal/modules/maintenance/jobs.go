@@ -429,7 +429,11 @@ func (m Jobs) load(ctx context.Context, c *ops.Call, id uuid.UUID, scope string,
 	case err != nil && !errors.Is(err, pgx.ErrNoRows):
 		return j, err
 	}
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.job_events WHERE job_id = $1`, id).Scan(&j.EventCursor); err != nil {
+	cursorSQL := `SELECT count(*) FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE e.job_id = $1`
+	if c.Principal.Role == "client" {
+		cursorSQL += clientEventFilter // the cursor counts what the client's jobs.events lists, so it reveals no hidden event (IR42, IR442)
+	}
+	if err := c.Tx.QueryRow(ctx, cursorSQL, id).Scan(&j.EventCursor); err != nil {
 		return j, err
 	}
 	if j.ProblemPhotos, err = problemPhotos(ctx, c, id); err != nil {
@@ -1101,6 +1105,10 @@ type Event struct {
 // on it (the change sent to the client shows as the client's proposal). Constants, so the query lists them inline.
 var clientHiddenActions = []string{"job.costs_saved", "job.warranty_claim_filed", "partner_proposal.sent", "partner_proposal.withdrawn", "partner_proposal.kept"}
 
+// clientEventFilter is the condition on job_events e (joined to job_notes n) of what a client may see: no internal note
+// (IR42) and no hidden action.
+var clientEventFilter = " AND (n.id IS NULL OR n.visibility = 'customer') AND e.action NOT IN ('" + strings.Join(clientHiddenActions, "','") + "')"
+
 // @Summary		jobs.events (read)
 // @ID				jobs.events
 // @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
@@ -1166,7 +1174,7 @@ func (m Jobs) events(ctx context.Context, c *ops.Call, in *EventsInput) (paging.
 	args := []any{in.JobID}
 	where := "e.job_id = $1"
 	if c.Principal.Role == "client" {
-		where += " AND (n.id IS NULL OR n.visibility = 'customer') AND e.action NOT IN ('" + strings.Join(clientHiddenActions, "','") + "')"
+		where += clientEventFilter
 	}
 	if ownOnly {
 		args = append(args, c.Principal.UserID)

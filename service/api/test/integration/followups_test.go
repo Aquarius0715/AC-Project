@@ -218,8 +218,22 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	if got, total := actions(&customerA); slices.Contains(got, "job.costs_saved") || int(total) != len(got) {
 		t.Errorf("client history: %v (total %v)", got, total)
 	}
-	if got, _ := actions(&hq); !slices.Contains(got, "job.costs_saved") {
-		t.Errorf("HQ history lacks the cost record: %v", got)
+	clientEvents, clientTotal := actions(&customerA)
+	hqEvents, _ := actions(&hq)
+	if !slices.Contains(hqEvents, "job.costs_saved") {
+		t.Errorf("HQ history lacks the cost record: %v", hqEvents)
+	}
+	// the detail's event cursor counts only what the caller's history lists, so it reveals no hidden event
+	cursor := func(a *actor) float64 {
+		t.Helper()
+		_, m := post(s, a, "jobs.get", `{"jobId":"`+job+`"}`)
+		return data(m)["eventCursor"].(float64)
+	}
+	if got := cursor(&customerA); got != clientTotal || len(clientEvents) >= len(hqEvents) {
+		t.Errorf("client eventCursor %v, client events %d, HQ events %d", got, len(clientEvents), len(hqEvents))
+	}
+	if got := cursor(&hq); int(got) != len(hqEvents) {
+		t.Errorf("HQ eventCursor %v, HQ events %d", got, len(hqEvents))
 	}
 	// warranty claims need a warranty that covers completion
 	claim := `{"jobId":"` + job + `","partLabel":"Compressor","amountMinor":12000,"currency":"MYR","reason":"failed in warranty"}`
