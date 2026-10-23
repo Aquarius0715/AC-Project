@@ -108,7 +108,15 @@ func TestCommands(t *testing.T) {
 		t.Fatalf("second command: %d %v", code, m)
 	}
 	id2 := data(m)["id"].(string)
-	if _, err := schedTick(ctx, s, clock.Add(31*time.Second)); err != nil {
+	// IR453: a tick just after expiresAt leaves the command for an acknowledgement still on its way; the grace after
+	// it expires the command
+	if _, err := schedTick(ctx, s, clock.Add(32*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, m := post(s, &hq, "commands.get", `{"id":"`+id2+`"}`); data(m)["status"] == "expired" {
+		t.Fatalf("expired within the grace: %v", m)
+	}
+	if _, err := schedTick(ctx, s, clock.Add(30*time.Second+control.ExpireGrace+time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	if _, m := post(s, &hq, "commands.get", `{"id":"`+id2+`"}`); data(m)["status"] != "expired" || data(m)["failureCode"] != "TIMEOUT" {

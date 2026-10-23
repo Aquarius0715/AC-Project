@@ -118,7 +118,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Fatalf("second run: %d %v", code, m)
 	}
 	r2 := data(m)["id"].(string)
-	if _, err := schedTick(ctx, s, clock.Add(31*time.Second)); err != nil {
+	if _, err := schedTick(ctx, s, clock.Add(36*time.Second)); err != nil { // 30 s window + the 5 s grace (IR453)
 		t.Fatal(err)
 	}
 	if _, m := post(s, &hq, "diagnosticRuns.get", `{"diagnosticRunId":"`+r2+`"}`); data(m)["state"] != "start_failed" || data(m)["failureCode"] != "TIMEOUT" {

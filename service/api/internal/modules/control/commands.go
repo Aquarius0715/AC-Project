@@ -479,10 +479,14 @@ func (m Commands) list(ctx context.Context, c *ops.Call, in *ListInput) (paging.
 	return paging.Page[Command]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}, rows.Err()
 }
 
-// ExpireCommands marks sent commands past their window as expired (worker tick, IR138 item 2).
+// ExpireGrace is how long after expiresAt a command waits before it is expired (IR453): an acknowledgement the bridge
+// received before expiresAt may still be on its way to the API, and the time it was received decides the result.
+const ExpireGrace = 5 * time.Second
+
+// ExpireCommands marks sent commands past their window as expired (worker tick, IR138 item 2), ExpireGrace after it.
 func ExpireCommands(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
 	rows, err := tx.Query(ctx, `UPDATE control.commands SET status = 'expired', failure_code = 'TIMEOUT', version = version + 1, updated_at = $1
-		WHERE status IN ('requested','sent') AND expires_at <= $1 RETURNING id`, now)
+		WHERE status IN ('requested','sent') AND expires_at <= $2 RETURNING id`, now, now.Add(-ExpireGrace))
 	if err != nil {
 		return 0, err
 	}

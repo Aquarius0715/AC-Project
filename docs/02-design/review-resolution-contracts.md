@@ -6797,3 +6797,10 @@ Found in review: `jobs.cancel` and the client's reschedule (`jobs.requestResched
 1. offerAcceptance leaves out offers declined with the reason `job_cancelled` or `rescheduled`. Expired offers and the contractor's own declines still count.
 2. Test: `TestOfferAcceptanceIgnoresCancelledJobs` (HQ's cancellation leaves the share as it was).
 
+## IR453 A command expires a few seconds after its window — 2026-10-24
+
+Found in review: the equipment scheduler (every second) expired a command as soon as `expiresAt` passed. The IoT bridge stamps an acknowledgement with the time it received it and then calls the API, so an acknowledgement received before `expiresAt` could reach the API after the tick had expired the command. It was then recorded only as late, against the rule that the time of receipt decides (common design §5).
+
+1. `ExpireCommands` expires `requested` / `sent` commands `ExpireGrace` (5 s) after `expiresAt`. The result is still decided by the time of receipt: an acknowledgement received before `expiresAt` acknowledges the command, a later one is recorded as late.
+2. Tests: `TestCommands` (a tick 2 s after expiresAt leaves the command; one after the grace expires it), `TestDiagnosticRuns`.
+
