@@ -71,11 +71,18 @@ func TestWorkReportEdges(t *testing.T) {
 	owner(t, `UPDATE maintenance.jobs SET time_on_site = jsonb_build_object('arrivedAt', $2::timestamptz, 'startedAt', $2::timestamptz, 'pauses',
 		jsonb_build_array(jsonb_build_object('from', $3::timestamptz, 'to', $4::timestamptz), jsonb_build_object('from', $5::timestamptz))) WHERE id = $1`,
 		job, clock.Add(-time.Hour), clock.Add(-40*time.Minute), clock.Add(-30*time.Minute), clock.Add(-20*time.Minute))
+	// and HQ held the job for 5 minutes in between (IR449): 25 minutes
+	for _, e := range []struct {
+		action string
+		at     time.Duration
+	}{{"job.held", -50 * time.Minute}, {"job.resumed", -45 * time.Minute}} {
+		owner(t, `INSERT INTO maintenance.job_events (id, tenant_id, job_id, action, occurred_at) SELECT gen_random_uuid(), tenant_id, id, $2, $3 FROM maintenance.jobs WHERE id = $1`, job, e.action, clock.Add(e.at))
+	}
 	code, m = write(s, &techInt, "jobs.submit", `{"jobId":"`+job+`","reportVersion":3}`, 3)
 	if code != 200 {
 		t.Fatalf("submit: %d %v", code, m)
 	}
-	if tos := data(m)["timeOnSite"].(map[string]any); tos["onSiteMinutes"].(float64) != 30 || tos["pauses"].([]any)[1].(map[string]any)["to"] == nil {
+	if tos := data(m)["timeOnSite"].(map[string]any); tos["onSiteMinutes"].(float64) != 25 || tos["pauses"].([]any)[1].(map[string]any)["to"] == nil {
 		t.Errorf("time on site without the pauses: %v", tos)
 	}
 

@@ -688,13 +688,11 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 		t.Pauses[n-1].To = &now
 	}
 	if from := firstNonNil(t.ArrivedAt, t.StartedAt); from != nil {
-		d := now.Sub(*from)
-		for _, p := range t.Pauses {
-			if p.To != nil {
-				d -= p.To.Sub(p.From)
-			}
+		off, err := offWork(ctx, c, in.JobID, *from, t.Pauses)
+		if err != nil {
+			return Job{}, err
 		}
-		mins := int(d / time.Minute)
+		mins := int(workedFor(*from, now, off) / time.Minute)
 		t.OnSiteMinutes = &mins
 	}
 	tos, _ := json.Marshal(t)
@@ -706,6 +704,63 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 		return Job{}, err
 	}
 	return m.Jobs.finishScoped(ctx, c, in.JobID, "jobs.submit", "ReportSubmitted", "")
+}
+
+// offWork lists the intervals since from when the technician was not working on the job (IR449): the pauses and the
+// periods the job left in_progress — held by HQ (job.held → job.resumed) or submitted and sent back (job.submitted →
+// job.rework_started, or held and resumed).
+func offWork(ctx context.Context, c *ops.Call, job uuid.UUID, from time.Time, pauses []Pause) ([][2]time.Time, error) {
+	var off [][2]time.Time
+	for _, p := range pauses {
+		if p.To != nil {
+			off = append(off, [2]time.Time{p.From, *p.To})
+		}
+	}
+	rows, err := c.Tx.Query(ctx, `SELECT action, occurred_at FROM maintenance.job_events WHERE job_id = $1 AND occurred_at >= $2
+		AND action IN ('job.held','job.submitted','job.resumed','job.rework_started') ORDER BY occurred_at, id`, job, from)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var since *time.Time
+	for rows.Next() {
+		var action string
+		var at time.Time
+		if err := rows.Scan(&action, &at); err != nil {
+			return nil, err
+		}
+		switch {
+		case (action == "job.held" || action == "job.submitted") && since == nil:
+			since = &at
+		case (action == "job.resumed" || action == "job.rework_started") && since != nil:
+			off = append(off, [2]time.Time{*since, at})
+			since = nil
+		}
+	}
+	return off, rows.Err()
+}
+
+// workedFor is the time in [from, to) outside the off intervals, overlaps counted once.
+func workedFor(from, to time.Time, off [][2]time.Time) time.Duration {
+	slices.SortFunc(off, func(a, b [2]time.Time) int { return a[0].Compare(b[0]) })
+	d, cur := time.Duration(0), from
+	for _, o := range off {
+		start, end := o[0], o[1]
+		if end.After(to) {
+			end = to
+		}
+		if !end.After(cur) {
+			continue
+		}
+		if start.After(cur) {
+			d += start.Sub(cur)
+		}
+		cur = end
+	}
+	if to.After(cur) {
+		d += to.Sub(cur)
+	}
+	return d
 }
 
 func firstNonNil(ts ...*time.Time) *time.Time {
