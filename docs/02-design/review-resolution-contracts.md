@@ -773,6 +773,7 @@ Shared rules: channel=inApp, deliveryState=simulated, one notification per recip
 | job.accepted | job_update | job | HQ job.write holders; customer clients |
 | job.declined | job_update | job | HQ job.write holders |
 | job.assigned (initial assignment, reassignment, extension) | schedule_change | job | Technician of the new Assignment; customer clients; HQ job.write holders; for outsourced work, partner.assign holders at the accepted contractor |
+| job.assignment_released / job.qualification_released (IR439, IR440: the technician's access or qualification no longer covers a not-started visit; severity warning) | job_update | job | HQ job.write holders for HQ's own delivery; partner.assign holders at the accepted contractor for outsourced work |
 | report.submitted | job_update | job | For outsourced work, partner.review holders at the accepted contractor; for internal work, HQ job.write holders; customer clients (progress only) |
 | report.returned | report_return | job | Assigned technician; HQ job.write holders |
 | job.completed | completion | job | Customer clients; HQ job.write holders; assigned technician; for outsourced work, partner.review holders at the accepted contractor |
