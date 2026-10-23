@@ -392,7 +392,8 @@ func (m Billing) recordManual(ctx context.Context, c *ops.Call, in *ManualInput)
 		return Payment{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 	var any bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.payments WHERE invoice_id = $1)`, inv.ID).Scan(&any); err != nil {
+	// a failed or expired attempt does not stop it: the customer may have paid another way (IR447); one still in flight does
+	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.payments WHERE invoice_id = $1 AND status IN ('initiated','processing','confirmed'))`, inv.ID).Scan(&any); err != nil {
 		return Payment{}, err
 	}
 	if any || inv.Status == "paid" {

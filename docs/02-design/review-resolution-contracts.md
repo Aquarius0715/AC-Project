@@ -1222,7 +1222,7 @@ Details fixed while implementing `payments.*` (IR118). The schema follows the co
 
 1. **payments.simulate (client, IR59/IR60).** `initiate`: own invoice in `unpaid` (CONFLICT otherwise), method demo_credit_card/demo_debit_card, `demoConfirmed=true`; creates an `initiated` Payment for the full amount; expectedVersion and version bump on the invoice. `instructions`: returns a NotificationPreview (payment template, channel inApp, deliveryState preview) and changes nothing except the version check. `processing` (initiated → processing; invoice processing), `confirm` (processing → confirmed with paymentReference 1–128 unique in the tenant; invoice paid) and `fail` (initiated/processing → failed; invoice back to unpaid) use the payment version. A repeated eventId returns the payment unchanged; confirm after failed and fail after confirmed are CONFLICT.
 2. **payments.confirm (HQ billing.payment).** An existing `processing` payment; paymentReference 1–128 unique; confirmedAmountMinor equal to the invoice amount and currency equal (VALIDATION); reason trimmed 1–1000; the payment becomes confirmed (method unchanged) and the invoice paid.
-3. **payments.recordManual (HQ billing.payment).** Only an invoice without any Payment (CONFLICT otherwise; the same invoice/reference/amount again returns the existing confirmed payment); same field rules; creates a confirmed manual Payment with method null; the invoice becomes paid.
+3. **payments.recordManual (HQ billing.payment).** Only an invoice without an initiated, processing or confirmed Payment (CONFLICT otherwise; a failed or expired attempt does not block it, IR447; the same invoice/reference/amount again returns the existing confirmed payment); same field rules; creates a confirmed manual Payment with method null; the invoice becomes paid.
 4. **Release trigger (IR35 ①).** In the same change set as an invoice becomes paid, restrictions citing it whose cause invoices are all paid move scheduled → cancelled and requested/applied → release_requested with `releaseIntent {source: payment, at, actorMembershipId}`. Release Commands follow the restriction release evaluation (Restrictions module).
 
 ## IR137 Contractor payouts in the backend — 2026-10-08
@@ -6754,4 +6754,11 @@ Found in review: a SlotProposal's hold (IR128 item 1) was checked only when HQ p
 1. `jobs.respondProposal` accept checks the hold again as `jobs.proposeSlot` does (contractor active and not suspended; technician in scope, with access and qualified for the slot). If it fails, the answer is CONFLICT `errors.proposal_unavailable` with no change: the proposal stays pending for HQ to withdraw and propose again.
 2. Web: the client reads “the proposed time can no longer be booked — HQ will look again” (English and Malay).
 3. Test: `TestAcceptRechecksHold`.
+
+## IR447 HQ records a manual payment after a failed attempt — 2026-10-24
+
+Found in review: `payments.recordManual` refused any invoice that had a Payment, so after the customer's card payment failed HQ could not record the bank transfer it then received. The payment rules (“recordManual returns CONFLICT if either initiated or processing exists”) and the IR118 detail (“only an invoice without any Payment”) disagreed; the first one is kept.
+
+1. `payments.recordManual` is CONFLICT `errors.invoice_has_payment` while the invoice has an `initiated`, `processing` or `confirmed` Payment; `failed` and `expired` attempts do not block it.
+2. Test: `TestManualAfterFailedPayment` (refused while the card payment is in flight, recorded after it failed; the invoice becomes paid).
 

@@ -223,3 +223,34 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		t.Error("confirm twice")
 	}
 }
+
+// TestManualAfterFailedPayment (IR447): after the customer's card payment failed, HQ records the bank transfer it
+// received; an attempt still in flight keeps refusing it.
+func TestManualAfterFailedPayment(t *testing.T) {
+	s := server(t)
+	_, inv := newInvoice(t, s)
+	sim := func(body string, v int) (int, map[string]any) {
+		return write(s, &customerB, "payments.simulate", body, v)
+	}
+	code, m := sim(`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`, 1)
+	if code != 200 {
+		t.Fatalf("initiate: %d %v", code, m)
+	}
+	pay := data(m)["id"].(string)
+	manual := func(v int) (int, map[string]any) {
+		return write(s, &hq, "payments.recordManual", `{"invoiceId":"`+inv+`","paymentReference":"BANK-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"bank transfer seen"}`, v)
+	}
+	if code, m := manual(2); code != 409 || m["messageKey"] != "errors.invoice_has_payment" {
+		t.Errorf("manual while a card payment is in flight: %d %v", code, m)
+	}
+	if code, m := sim(`{"event":"fail","paymentId":"`+pay+`","eventId":"`+uuid.NewString()+`","paymentReference":"REF-`+pay[:8]+`"}`, 1); code != 200 || data(m)["status"] != "failed" {
+		t.Fatalf("fail: %d %v", code, m)
+	}
+	_, m = post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`)
+	if code, m := manual(ver(m)); code != 200 || data(m)["status"] != "confirmed" {
+		t.Fatalf("manual after the failed card payment: %d %v", code, m)
+	}
+	if _, m := post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`); data(m)["status"] != "paid" {
+		t.Errorf("invoice after the manual payment: %v", data(m)["status"])
+	}
+}
