@@ -6699,3 +6699,13 @@ Decided by the user (2026-10-23), following IR439: an assignment must not stay w
 3. The web names the event (“Technician's qualification ended — to be reassigned”, English and Malay) in the customer's and the contractor's job history.
 4. No operation revokes a grant (`revoked_at`) today; one added later must release the same way.
 5. Test: `TestReleaseQualificationEnded` (a covering certificate releases nothing; one ending during the visit releases the contractor's job).
+
+## IR441 Dependency upgrades: Node 26, PostgreSQL 18, TypeScript 6 — 2026-10-23
+
+Decided by the user (2026-10-23): take the Dependabot updates, including the major versions of Node, TypeScript and PostgreSQL.
+
+1. **Next.js 16.4.2** (with React 19.3.1 and the rest of the web group): `npm audit --omit=dev` reported a critical advisory for Next.js 16.0.0–16.4.0 (GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r, GHSA-673q-mjm6-r5xr); after the update it reports none.
+2. **Node 26** (26.12.1): the web image (`NODE_VERSION`), CI and E2E `setup-node`, `engines` `>=26.0.0`, `@types/node` 26. Vitest 5 does not start its workers on Node 23.
+3. **TypeScript 6.0.3**, not 7: typescript-eslint 8.72 (used by eslint-config-next) supports TypeScript below 6.1, and TypeScript 7 no longer ships the JavaScript compiler API that it and `contract.test.ts` use. Move to 7 when typescript-eslint supports it. The E2E tsconfig uses `module: preserve` with `moduleResolution: bundler`, as node10 resolution is deprecated in 6.
+4. **PostgreSQL 18**: compose `postgres:18` (pinned by digest) with a new volume `pgdata18` mounted at `/var/lib/postgresql` (the 18 images keep PGDATA under `/var/lib/postgresql/18/docker`; data of 16 does not start on 18, so the dev database is rebuilt from the seed), CI services `postgres:18`, the schema's target Aurora PostgreSQL 18 (to be confirmed for ap-southeast-5 before provisioning).
+5. Also taken: Vitest 5, jsdom 30, the Go group, Valkey 9, Jaeger 1.76, OpenTelemetry collector 0.162, WireMock 3.13.2, Playwright 1.64.

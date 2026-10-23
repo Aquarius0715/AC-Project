@@ -377,13 +377,13 @@ services:
     profiles: [iot]
 
   # ------------------------------------------------------------------ local stand-ins for AWS services
-  postgres:            # Aurora PostgreSQL 16
+  postgres:            # Aurora PostgreSQL 18
     image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336   # pinned by digest (IR373)
     environment:
       POSTGRES_DB: ac
       POSTGRES_PASSWORD: local
     ports: ["127.0.0.1:5432:5432"]   # this machine only: not reachable from other devices on the network (IR373)
-    volumes: [pgdata:/var/lib/postgresql/data]
+    volumes: [pgdata18:/var/lib/postgresql]   # PostgreSQL 18 images keep PGDATA under /var/lib/postgresql/18/docker; a new volume, since 16's data does not start on 18
     cap_drop: [ALL]                  # only what the entrypoint needs to set up the data directory and drop to postgres (security loop, IR414)
     cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
     security_opt: [no-new-privileges:true]
@@ -495,5 +495,5 @@ networks:
     internal: false
 
 volumes:
-  pgdata: {}
+  pgdata18: {}
   blobs: {}            # maintenance-api local blob store (development; S3 in staging and production)

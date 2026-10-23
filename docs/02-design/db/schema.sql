@@ -1,5 +1,5 @@
 -- AC Project production database schema (PROPOSED, DOC 0.28.0, IR118)
--- Target: Amazon Aurora PostgreSQL 16 (ap-southeast-5). Design: docs/02-design/database-design.md
+-- Target: Amazon Aurora PostgreSQL 18 (ap-southeast-5; IR441). Design: docs/02-design/database-design.md
 -- Conventions
 --   * One schema per Core API module; a module only touches its own schema (database-design.md §2).
 --   * Every business table carries tenant_id and is protected by row-level security (RLS) on

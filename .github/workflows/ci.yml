@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-24.04
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env: { POSTGRES_PASSWORD: local }
         ports: ["5432:5432"]
         options: >-
@@ -74,7 +74,7 @@ jobs:
     runs-on: ubuntu-24.04
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env: { POSTGRES_PASSWORD: local }
         ports: ["5432:5432"]
         options: >-
@@ -101,7 +101,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 22, cache: npm, cache-dependency-path: service/web/package-lock.json }
+        with: { node-version: 26, cache: npm, cache-dependency-path: service/web/package-lock.json }
       - run: npm ci
       - run: npm run lint
 
@@ -112,7 +112,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 22, cache: npm, cache-dependency-path: service/web/package-lock.json }
+        with: { node-version: 26, cache: npm, cache-dependency-path: service/web/package-lock.json }
       - run: npm ci
       - run: npm run typecheck
 
@@ -123,7 +123,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 22, cache: npm, cache-dependency-path: service/web/package-lock.json }
+        with: { node-version: 26, cache: npm, cache-dependency-path: service/web/package-lock.json }
       - run: npm ci
       - run: npm test
 
@@ -135,7 +135,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with: { python-version: "3.12" }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 22 }
+        with: { node-version: 26 }
       - name: TypeScript for the contract check
         run: npm install --no-save --prefix "$RUNNER_TEMP/ts" typescript@5.9.3
       - name: validate_documents.py

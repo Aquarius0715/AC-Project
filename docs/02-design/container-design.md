@@ -37,8 +37,8 @@ One backend image with several entry commands keeps every service on the same bu
 | Rule | Web (Node) | Backend (Go) |
 |---|---|---|
 | Build | Multi-stage: `npm ci` → `npm run typecheck && npm run build` | Multi-stage: `go mod download` → `CGO_ENABLED=0 go build -trimpath -ldflags="-s -w"`; cross-compiled with `$BUILDPLATFORM` / `$TARGETARCH` |
-| Base | `node:22.23.3-bookworm-slim` (as built, IR409; exact version since 2026-10-14; the distroless Node 22 line stopped at 22.22.0, while the fixes need 22.23.x). npm, npx and corepack are removed from the runtime, and the Debian packages are upgraded to their security fixes | `gcr.io/distroless/static-debian12:nonroot` |
-| Toolchain | Node 22 LTS (22.23.3 or later) | Go 1.26.9 (`go.mod` toolchain line, IR408: docker scout found standard-library CVEs fixed only from 1.26.9) |
+| Base | `node:26.12.1-bookworm-slim` (as built, IR441; the official image since IR409, as the distroless Node 22 line stopped at 22.22.0 without the fixes of 22.23.x). npm, npx and corepack are removed from the runtime, and the Debian packages are upgraded to their security fixes | `gcr.io/distroless/static-debian12:nonroot` |
+| Toolchain | Node 26 (26.12.1 or later; CI `setup-node` 26, `engines` >=26, IR441) | Go 1.26.9 (`go.mod` toolchain line, IR408: docker scout found standard-library CVEs fixed only from 1.26.9) |
 | User | `node` (UID 1000, as built, IR409) | `nonroot:nonroot` |
 | Filesystem | Read-only root; tmpfs `/tmp`, `/app/.next/cache` | Read-only root; tmpfs `/tmp` |
 | Privileges | No Linux capability (`cap_drop: [ALL]`) and `no-new-privileges` (as built, IR373) | same |
@@ -83,7 +83,7 @@ COPY --from=build-dev /out/ /app/
 | Profile | Starts | Use |
 |---|---|---|
 | `demo` | `customer-web`, `partner-web`, `technician-web`, `admin-web` (mock mode, ports 3000–3003) | Phase 1A clickable demo |
-| `infra` | PostgreSQL 16, Valkey, LocalStack, Mosquitto, Keycloak, Mailpit, stripe-mock, weather mock | Stand-ins for AWS services |
+| `infra` | PostgreSQL 18, Valkey, LocalStack, Mosquitto, Keycloak, Mailpit, stripe-mock, weather mock | Stand-ins for AWS services |
 | `schema` | one-off `migrate` (cmd/migrate): schema, local `ac_app_login` and the domain logins `ac_<domain>_login`, demo fixture | Database only, without the Go services |
 | `backend` | `migrate`, `gateway` (8080), `identity-api`, `equipment-api`, `maintenance-api`, `billing-api`, `energy-api`, `worker-scheduler-equipment`, `worker-scheduler-maintenance`, `worker-scheduler-billing`, `worker-notification` (e-mails, IR418), `worker-outbox` (table retention, IR428) and the idle `worker-*` roles, with the `infra` stand-ins | Go backend against the stand-ins (IR180, IR194, IR195, IR341) |
 | `full` | `customer-web-api`, `partner-web-api`, `technician-web-api`, `admin-web-api` (BFF mode, ports 3000–3003) + backend + infra | Production-like end-to-end runs and acceptance tests |
@@ -96,8 +96,8 @@ Local stand-ins for the AWS managed services:
 
 | Production (AWS) | Local container | Notes |
 |---|---|---|
-| Aurora PostgreSQL 16 | `postgres:16` | Same schema and RLS; only DEFAULT partitions (no pg_partman) |
-| ElastiCache (Valkey) | `valkey/valkey:8` | The BFF session store (IR382) and the write limit's counters (IR375) |
+| Aurora PostgreSQL 18 (confirm that ap-southeast-5 offers the engine version before provisioning, IR441) | `postgres:18` (data in the `pgdata18` volume at `/var/lib/postgresql`) | Same schema and RLS; only DEFAULT partitions (no pg_partman) |
+| ElastiCache (Valkey) | `valkey/valkey:9` | The BFF session store (IR382) and the write limit's counters (IR375) |
 | SQS / SNS FIFO, Kinesis, Firehose, S3, SES, Secrets Manager, KMS, EventBridge Scheduler | `localstack/localstack:4` | Resources created by `docker/localstack/init-aws.sh`; the AWS clients will use `AWS_ENDPOINT_URL` (none is built yet, IR334) |
 | AWS IoT Core (MQTT, rules) | `eclipse-mosquitto:2` + `iot-bridge` | Same topic layout; the bridge forwards topics to Kinesis / SQS like the IoT rules. Mutual TLS and IoT policies are verified in staging against IoT Core |
 | Amazon Cognito | `keycloak:26` realm `ac` (`docker/keycloak/realm-ac.json`) | Two OIDC clients `ac-web` and `ac-admin-web` (HQ network rule), and identity-api's service-account client `ac-identity-admin` (no sign-in flow; its service account holds realm-management `manage-users` only, to end a user's sessions when HQ signs them out everywhere, IR386), TOTP (required for HQ users; the local realm pre-provisions a test TOTP credential per HQ user for end-to-end runs, IR177); one local user per fixture actor (username = `membershipId` in `docs/04-agentic-sdlc/fixture-contract.json`, password `AcDemoLocal-2026`); the Go verifier is configured by issuer and JWKS URL only; brute-force protection like Cognito's lockout (10 failures lock an account for 60 s, growing to 15 min, IR370) |

@@ -3,7 +3,7 @@
 #   sh scripts/resetdb.sh            development database "ac" (local API, worker, BFF)
 #   DB=ac_test sh scripts/resetdb.sh  test database used by go test (never shared with running services)
 # Needs the compose postgres service (docker compose --profile infra up -d postgres), or PG_ADMIN_URL (an admin
-# connection to any PostgreSQL 16, as in CI).
+# connection to any PostgreSQL 18, as in CI).
 set -e
 cd "$(dirname "$0")/../../.."
 PG=${PG_CONTAINER:-ac-project-postgres-1}

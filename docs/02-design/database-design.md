@@ -170,7 +170,7 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 - Expand → migrate → contract: add nullable columns or new tables first, deploy code that writes both, backfill in batches, then drop the old shape in a later release. CHECK changes for new enum values ship before the code that uses them.
 - Large index builds use `CREATE INDEX CONCURRENTLY` in their own migration (no transaction).
 - Go tests use their own database `ac_test` (`make testdb` in service/ rebuilds it with cmd/migrate; `AC_TEST_DATABASE_URL` / `AC_TEST_OWNER_DATABASE_URL` override it), never the development database `ac` that a running local API, worker or BFF uses (IR171).
-- Each migration runs in CI against PostgreSQL 16 with the store tests; production runs it as a one-off ECS task before the service deploy (backend Go design §10).
+- Each migration runs in CI against PostgreSQL 18 (IR441) with the store tests; production runs it as a one-off ECS task before the service deploy (backend Go design §10).
 
 ## 10. Main read patterns and their indexes
 
