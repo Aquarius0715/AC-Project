@@ -26,3 +26,8 @@ updates:
     schedule: { interval: weekly }
     groups: { web: { patterns: ["*"], update-types: [minor, patch] } }
     open-pull-requests-limit: 5
+    ignore:
+      # TypeScript 7 drops the JavaScript compiler API: typescript-eslint (eslint-config-next) supports TypeScript below
+      # 6.1 and contract.test.ts uses the API, so the workspace stays on 6 until typescript-eslint supports 7 (IR441)
+      - dependency-name: typescript
+        versions: [">=7"]
