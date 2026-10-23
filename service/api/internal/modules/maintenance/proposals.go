@@ -465,6 +465,10 @@ func (m Proposals) applyAccepted(ctx context.Context, c *ops.Call, job uuid.UUID
 		offer, slot.StartAt, slot.EndAt, slot.EndAt.Add(24*time.Hour)); err != nil {
 		return err
 	}
+	// a contractor history frozen at an earlier end is frozen again at the widened one (IR458)
+	if _, err := c.Tx.Exec(ctx, `DELETE FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'organization' AND owner_id = $2`, job, *h.ContractorOrgID); err != nil {
+		return err
+	}
 	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.partner_slot_proposals SET status = 'approved' WHERE offer_id = $1 AND status IN ('pending','sent_to_client')`, offer); err != nil {
 		return err
 	}

@@ -665,8 +665,16 @@ func TestAcceptedProposalExtendsAccess(t *testing.T) {
 		t.Fatalf("send to client: %d %v", code, m)
 	}
 	ownerScan(t, `SELECT id::text FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'pending'`, []any{job}, &proposal)
+	// a contractor history frozen earlier (IR458) is removed when the window widens
+	owner(t, `INSERT INTO maintenance.job_history_snapshots (tenant_id, job_id, owner_kind, owner_id, as_of, type, status, has_report, acceptance)
+		SELECT tenant_id, id, 'organization', $2, $3, type, status, false, 'not_accepted' FROM maintenance.jobs WHERE id = $1`, job, seed.ID("org-contractor-a"), clock)
 	if code, m := write(s, &customerA, "jobs.respondProposal", `{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`, 4); code != 200 {
 		t.Fatalf("accept: %d %v", code, m)
+	}
+	var snapshots int
+	ownerScan(t, `SELECT count(*) FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'organization'`, []any{job}, &snapshots)
+	if snapshots != 0 {
+		t.Errorf("the contractor's frozen history stays after the window widened: %d", snapshots)
 	}
 	var until time.Time
 	ownerScan(t, `SELECT access_valid_until FROM maintenance.offers WHERE id = $1`, []any{offer}, &until)

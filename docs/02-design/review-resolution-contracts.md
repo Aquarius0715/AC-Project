@@ -6841,7 +6841,8 @@ Found in review: `jobs.offer` required `offerExpiresAt` ≤ `accessValidUntil` o
 Found in review: the maintenance scheduler freezes the contractor's job history when the accepted offer's access window ends (IR89). `jobs.extendAccess` may extend a window that has already ended, but the snapshot stayed, and the next freeze kept it (`ON CONFLICT DO NOTHING`). The contractor's history therefore showed the job as it was at the first end, without anything that happened during the extension.
 
 1. `jobs.extendAccess` removes the contractor's snapshot of the job; the next end of the window freezes it again (as of the new end).
-2. Test: `TestExtendAccessRefreezesHistory`.
+1a. The same holds when an accepted proposal widens the window (IR454).
+2. Tests: `TestExtendAccessRefreezesHistory`, `TestAcceptedProposalExtendsAccess`.
 
 ## IR459 A technician's new window refreezes their job history — 2026-10-24
 
