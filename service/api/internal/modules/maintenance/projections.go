@@ -416,6 +416,12 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 	if err := rows.Err(); err != nil {
 		return 0, err
 	}
+	// a contractor's time change still waiting for HQ ends with its expired offer (IR444); one sent to the client stays, as
+	// the client's acceptance offers the job to the contractor again (IR128)
+	if _, err := tx.Exec(ctx, `UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE status = 'pending' AND offer_id IN
+		(SELECT id FROM maintenance.offers WHERE decision IS NULL AND expired_at IS NULL AND offer_expires_at <= $1)`, now); err != nil {
+		return 0, err
+	}
 	if _, err := tx.Exec(ctx, `UPDATE maintenance.offers SET expired_at = $1 WHERE decision IS NULL AND expired_at IS NULL AND offer_expires_at <= $1`, now); err != nil {
 		return 0, err
 	}

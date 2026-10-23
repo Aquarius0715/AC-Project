@@ -330,6 +330,10 @@ func (m Delivery) decide(ctx context.Context, c *ops.Call, job, offer uuid.UUID,
 	next, contractor := "accepted", "contractor_org_id"
 	if decision == "decline" {
 		next, contractor = "requested", "NULL"
+		// a time change still waiting for HQ ends with the declined offer (IR444)
+		if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE offer_id = $1 AND status = 'pending'`, offer); err != nil {
+			return Receipt{}, err
+		}
 	}
 	var v int
 	if err := c.Tx.QueryRow(ctx, `UPDATE maintenance.jobs SET status = $2, contractor_org_id = `+contractor+`, version = version + 1, updated_at = platform.app_now()

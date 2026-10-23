@@ -507,3 +507,53 @@ func TestPartnerProposalEndsWithClientProposal(t *testing.T) {
 		t.Errorf("propose again after the expiry: %d %v", code, m)
 	}
 }
+
+// TestPartnerProposalEndsWithOffer (IR444): a contractor's time change still waiting for HQ ends (withdrawn) when its
+// offer is declined or expires, so HQ's job no longer shows it once the job is offered again.
+func TestPartnerProposalEndsWithOffer(t *testing.T) {
+	s := server(t)
+	ctx := context.Background()
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND lower(scheduled) > $2`,
+		seed.ID("tech-external-a"), clock.Add(2*time.Hour))
+	unit := seed.ID("unit-non-rto").String()
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	proposed := func(slotHour int) (job, offer, partner string) {
+		t.Helper()
+		_, m := write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
+		job = data(m)["id"].(string)
+		if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
+			`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(200)+`","termsVersion":"t"}`, 1); code != 200 {
+			t.Fatalf("offer: %d %v", code, m)
+		}
+		ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
+		if code, m := write(s, &contrA, "jobs.proposePartnerSlot", `{"jobId":"`+job+`","offerId":"`+offer+`","slot":`+slotJSON(slotHour, 2)+
+			`,"technicianMembershipId":"`+seed.ID("tech-external-a").String()+`","reason":"team busy"}`, 2); code != 200 {
+			t.Fatalf("partner proposal: %d %v", code, m)
+		}
+		ownerScan(t, `SELECT id::text FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND status = 'pending'`, []any{offer}, &partner)
+		return
+	}
+	ended := func(job, partner string) {
+		t.Helper()
+		var st string
+		ownerScan(t, `SELECT status FROM maintenance.partner_slot_proposals WHERE id = $1`, []any{partner}, &st)
+		if st != "withdrawn" {
+			t.Errorf("the time change is %s after its offer ended", st)
+		}
+		if _, m := post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`); data(m)["partnerSlotProposal"] != nil || data(m)["status"] != "requested" {
+			t.Errorf("HQ's job after the offer ended: status %v, partnerSlotProposal %v", data(m)["status"], data(m)["partnerSlotProposal"])
+		}
+	}
+
+	job, offer, partner := proposed(110)
+	if code, m := write(s, &contrA, "jobs.decline", `{"jobId":"`+job+`","offerId":"`+offer+`","reason":"no capacity"}`, 3); code != 200 {
+		t.Fatalf("decline: %d %v", code, m)
+	}
+	ended(job, partner)
+
+	job, _, partner = proposed(134)
+	if _, err := schedTick(ctx, s, clock.Add(12*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	ended(job, partner)
+}
