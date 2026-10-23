@@ -568,3 +568,46 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 	}
 	ended(job, partner)
 }
+
+// TestDeclineWithdrawsClientProposal (IR445): a contractor that declines its offer while HQ has sent its time change to
+// the client ends that client proposal too, so the client's acceptance cannot offer the job again to that company.
+func TestDeclineWithdrawsClientProposal(t *testing.T) {
+	s := server(t)
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND lower(scheduled) > $2`,
+		seed.ID("tech-external-a"), clock.Add(2*time.Hour))
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	job := data(m)["id"].(string)
+	if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
+		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(200)+`","termsVersion":"t"}`, 1); code != 200 {
+		t.Fatalf("offer: %d %v", code, m)
+	}
+	var offer, partner, proposal string
+	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
+	if code, m := write(s, &contrA, "jobs.proposePartnerSlot", `{"jobId":"`+job+`","offerId":"`+offer+`","slot":`+slotJSON(146, 2)+
+		`,"technicianMembershipId":"`+seed.ID("tech-external-a").String()+`","reason":"team busy"}`, 2); code != 200 {
+		t.Fatalf("partner proposal: %d %v", code, m)
+	}
+	ownerScan(t, `SELECT id::text FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND status = 'pending'`, []any{offer}, &partner)
+	if code, m := write(s, &hq, "jobs.resolvePartnerSlot", `{"jobId":"`+job+`","proposalId":"`+partner+`","decision":"send_to_client","replyBy":"`+ts(10)+`"}`, 3); code != 200 {
+		t.Fatalf("send to client: %d %v", code, m)
+	}
+	ownerScan(t, `SELECT id::text FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'pending'`, []any{job}, &proposal)
+	if code, m := write(s, &contrA, "jobs.decline", `{"jobId":"`+job+`","offerId":"`+offer+`","reason":"no capacity"}`, 4); code != 200 {
+		t.Fatalf("decline: %d %v", code, m)
+	}
+	var clientStatus, partnerStatus string
+	ownerScan(t, `SELECT (SELECT status FROM maintenance.slot_proposals WHERE id = $1), (SELECT status FROM maintenance.partner_slot_proposals WHERE id = $2)`,
+		[]any{proposal, partner}, &clientStatus, &partnerStatus)
+	if clientStatus != "withdrawn" || partnerStatus != "withdrawn" {
+		t.Errorf("after the decline: client proposal %s, time change %s", clientStatus, partnerStatus)
+	}
+	if code, _ := write(s, &customerA, "jobs.respondProposal", `{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`, 5); code != 409 {
+		t.Errorf("the client accepted a proposal of the company that declined: %d", code)
+	}
+	var offers int
+	ownerScan(t, `SELECT count(*) FROM maintenance.offers WHERE job_id = $1`, []any{job}, &offers)
+	if offers != 1 {
+		t.Errorf("offers after the decline: %d", offers)
+	}
+}

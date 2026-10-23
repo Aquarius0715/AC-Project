@@ -6734,8 +6734,16 @@ Found in review: after `jobs.resolvePartnerSlot` sent a contractor's time change
 
 Found in review: a partner proposal still `pending` when the contractor declined the offer or the offer expired stayed pending. `jobs.get` shows the job's latest partner proposal that was not withdrawn, so HQ's job kept showing it, even after the job was offered again.
 
-1. `jobs.decline` and the offer expiry of the maintenance scheduler mark the offer's `pending` partner proposals `withdrawn`.
+1. `jobs.decline` and the offer expiry of the maintenance scheduler mark the offer's `pending` partner proposals `withdrawn` (a decline also its `sent_to_client` one, IR445).
 2. A partner proposal already `sent_to_client` stays: the client's acceptance offers the job to that contractor again (IR128).
 3. `jobs.cancel` marks the job's `pending` and `sent_to_client` partner proposals `withdrawn`, as it withdraws the client's pending proposal.
 4. Test: `TestPartnerProposalEndsWithOffer` (decline, cancellation, expiry).
+
+## IR445 A contractor's decline ends the client's proposals that hold it — 2026-10-23
+
+Found in review: a contractor could decline its offer while a client proposal held it (its time change sent on by HQ, or HQ's own proposal with that contractor). The client's acceptance then created a new offer to the company that had just declined (IR128 item 2 offers the job again when no open offer exists).
+
+1. `jobs.decline` withdraws the job's pending client proposals whose hold names the declining contractor, and ends its partner proposals `pending` or `sent_to_client` (`withdrawn`, IR444).
+2. The client's late acceptance is CONFLICT (`error.invalidState`); the job stays `requested` for HQ to offer again.
+3. Test: `TestDeclineWithdrawsClientProposal`.
 

@@ -330,8 +330,13 @@ func (m Delivery) decide(ctx context.Context, c *ops.Call, job, offer uuid.UUID,
 	next, contractor := "accepted", "contractor_org_id"
 	if decision == "decline" {
 		next, contractor = "requested", "NULL"
-		// a time change still waiting for HQ ends with the declined offer (IR444)
-		if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE offer_id = $1 AND status = 'pending'`, offer); err != nil {
+		// the contractor's open time change ends with the declined offer (IR444), and so does a client proposal that holds
+		// this contractor: accepting it would offer the job again to the company that just declined it (IR445)
+		if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE offer_id = $1 AND status IN ('pending','sent_to_client')`, offer); err != nil {
+			return Receipt{}, err
+		}
+		if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.slot_proposals SET status = 'withdrawn', decided_at = $3 WHERE job_id = $1 AND status = 'pending'
+			AND hold->>'contractorOrgId' = $2`, job, c.Principal.OrgID.String(), c.Now); err != nil {
 			return Receipt{}, err
 		}
 	}
