@@ -166,8 +166,8 @@ func jobMetrics(ctx context.Context, c *ops.Call, extra string, args []any) ([]j
 			WHERE w.job_id = j.id ORDER BY rr.occurred_at, rr.report_version LIMIT 1), ''),
 		EXISTS (SELECT 1 FROM maintenance.report_reviews rr JOIN maintenance.work_reports w ON w.id = rr.report_id AND w.version = rr.report_version
 			WHERE w.job_id = j.id AND rr.decision = 'return'),
-		EXISTS (SELECT 1 FROM maintenance.jobs f WHERE f.unit_id = j.unit_id AND f.id <> j.id AND j.completed_at IS NOT NULL
-			AND f.created_at > j.completed_at AND f.created_at <= j.completed_at + interval '30 days'),
+		EXISTS (SELECT 1 FROM maintenance.jobs f WHERE f.unit_id = j.unit_id AND f.id <> j.id AND j.completed_at IS NOT NULL AND f.origin <> 'periodic_plan'
+			AND f.created_at > j.completed_at AND f.created_at <= j.completed_at + interval '30 days'), -- a plan's next visit is no follow-up (IR450)
 		EXISTS (SELECT 1 FROM maintenance.jobs f WHERE f.follow_up_of_job_id = j.id AND f.follow_up_class = 'rework'),
 		COALESCE((j.rating->>'stars')::int, 0),
 		(SELECT min(e.occurred_at) FROM maintenance.job_events e WHERE e.job_id = j.id AND e.action = 'job.cancelled')

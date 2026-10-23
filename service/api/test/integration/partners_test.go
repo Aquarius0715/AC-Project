@@ -358,3 +358,39 @@ func TestContractorQualityMetrics(t *testing.T) {
 	}
 	t.Error("contractor B listed")
 }
+
+// TestFirstTimeFixIgnoresPlanVisits (IR450): a plan's next visit on the unit is no follow-up, so it does not make the
+// completed job a first-time-fix miss; a client's new request within 30 days does.
+func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
+	s := server(t)
+	unit := newUnit(t, s, "FTF AC")
+	_, m := write(s, &hq, "jobs.create", jobBody(unit, map[string]string{"alternativeSlots": "[]"}), 0)
+	job := data(m)["id"].(string)
+	owner(t, `UPDATE maintenance.jobs SET created_at = $2, status = 'completed', completed_at = $3 WHERE id = $1`, job, clock.Add(-10*time.Hour), clock.Add(-2*time.Hour))
+	var tenant, org string
+	ownerScan(t, `SELECT tenant_id::text, customer_org_id::text FROM maintenance.jobs WHERE id = $1`, []any{job}, &tenant, &org)
+	owner(t, `INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, created_at)
+		VALUES (gen_random_uuid(), $1, $2, $3, 'periodic', 'requested', 'periodic_plan', tstzrange($4, $5), $5, $6)`, tenant, unit, org, clock.Add(90*24*time.Hour), clock.Add(90*24*time.Hour+time.Hour), clock.Add(-time.Hour))
+	miss := func() bool {
+		t.Helper()
+		code, m := post(s, &hq, "sla.scorecard", `{"period":{"from":"`+clock.Add(-48*time.Hour).Format(time.RFC3339)+`","to":"`+clock.Format(time.RFC3339)+`"}}`)
+		if code != 200 {
+			t.Fatalf("scorecard: %d %v", code, m)
+		}
+		for _, b := range data(m)["breaches"].([]any) {
+			if b := b.(map[string]any); b["jobId"] == job && b["kind"] == "first_time_fix" {
+				return true
+			}
+		}
+		return false
+	}
+	if miss() {
+		t.Error("the plan's next visit made the job a first-time-fix miss")
+	}
+	if code, m := write(s, &customerB, "jobs.create", jobBody(unit, nil), 0); code != 200 {
+		t.Fatalf("client request: %d %v", code, m)
+	}
+	if !miss() {
+		t.Error("a client's new request within 30 days is no miss")
+	}
+}
