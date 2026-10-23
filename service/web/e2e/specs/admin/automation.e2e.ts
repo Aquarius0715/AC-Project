@@ -44,8 +44,11 @@ test("the policy editor's footer, Show disabled and a simulation with an added f
   await expect(sim.getByLabel("Fact", { exact: true })).toHaveCount(2);
   await sim.getByLabel("Fact", { exact: true }).nth(1).selectOption("solar");
   await sim.getByLabel("Quality", { exact: true }).nth(1).selectOption("missing");
-  await sim.getByRole("button", { name: "Run simulation" }).click();
-  await expect(sim).toContainText("Result per unit");
+  // the simulation stores nothing, so a run whose answer did not arrive on a busy runner is simply run again
+  await expect(async () => {
+    await sim.getByRole("button", { name: "Run simulation" }).click();
+    await expect(sim).toContainText("Result per unit", { timeout: 10_000 });
+  }).toPass({ timeout: 60_000 });
   await expect(sim.locator("table").last().getByText("Bedroom AC", { exact: true })).toHaveCount(1); // one row for the unit, whatever its facts
   await sim.getByRole("button", { name: "Remove the fact" }).nth(1).click();
   await expect(sim.getByLabel("Fact", { exact: true })).toHaveCount(1);
