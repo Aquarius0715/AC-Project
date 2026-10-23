@@ -477,7 +477,7 @@ services:
     profiles: [infra, backend, full]
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.111.0@sha256:a2a52e43c1a80aa94120ad78c2db68780eb90e6d11c8db5b3ce2f6a0cc6b5029
+    image: otel/opentelemetry-collector-contrib:0.162.0@sha256:39923a8e431bd1f57be82411999d389fcfe40857492e4365456d97a4c1f74be6
     volumes: [./docker/otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro]
     networks: [app]
     profiles: [obs]
