@@ -452,7 +452,11 @@ func (m Proposals) applyAccepted(ctx context.Context, c *ops.Call, job uuid.UUID
 	case err != nil:
 		return err
 	}
-	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.offers SET visit_slot = tstzrange($2, $3), version = version + 1, updated_at = platform.app_now() WHERE id = $1`, offer, slot.StartAt, slot.EndAt); err != nil {
+	// the access window follows the moved visit (IR454): it still has to cover it, as jobs.offer requires, and reaches
+	// slot end + 24 h like an offer the acceptance creates; it is never shortened
+	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.offers SET visit_slot = tstzrange($2, $3), access_valid_from = LEAST(access_valid_from, $2),
+		access_valid_until = GREATEST(access_valid_until, $4), version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
+		offer, slot.StartAt, slot.EndAt, slot.EndAt.Add(24*time.Hour)); err != nil {
 		return err
 	}
 	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.partner_slot_proposals SET status = 'approved' WHERE offer_id = $1 AND status IN ('pending','sent_to_client')`, offer); err != nil {

@@ -640,3 +640,37 @@ func TestAcceptRechecksHold(t *testing.T) {
 		t.Errorf("after the refused acceptance: %d offers, proposal %s", offers, status)
 	}
 }
+
+// TestAcceptedProposalExtendsAccess (IR454): a contractor's time change after the offer's access window ends moves the
+// visit, and the access window follows it to the new slot end + 24 h.
+func TestAcceptedProposalExtendsAccess(t *testing.T) {
+	s := server(t)
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND lower(scheduled) > $2`,
+		seed.ID("tech-external-a"), clock.Add(2*time.Hour))
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	job := data(m)["id"].(string)
+	if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
+		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(60)+`","termsVersion":"t"}`, 1); code != 200 {
+		t.Fatalf("offer: %d %v", code, m)
+	}
+	var offer, partner, proposal string
+	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
+	if code, m := write(s, &contrA, "jobs.proposePartnerSlot", `{"jobId":"`+job+`","offerId":"`+offer+`","slot":`+slotJSON(101, 2)+
+		`,"technicianMembershipId":"`+seed.ID("tech-external-a").String()+`","reason":"team busy"}`, 2); code != 200 {
+		t.Fatalf("partner proposal: %d %v", code, m)
+	}
+	ownerScan(t, `SELECT id::text FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND status = 'pending'`, []any{offer}, &partner)
+	if code, m := write(s, &hq, "jobs.resolvePartnerSlot", `{"jobId":"`+job+`","proposalId":"`+partner+`","decision":"send_to_client","replyBy":"`+ts(24)+`"}`, 3); code != 200 {
+		t.Fatalf("send to client: %d %v", code, m)
+	}
+	ownerScan(t, `SELECT id::text FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'pending'`, []any{job}, &proposal)
+	if code, m := write(s, &customerA, "jobs.respondProposal", `{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`, 4); code != 200 {
+		t.Fatalf("accept: %d %v", code, m)
+	}
+	var until time.Time
+	ownerScan(t, `SELECT access_valid_until FROM maintenance.offers WHERE id = $1`, []any{offer}, &until)
+	if want := clock.Add(103*time.Hour + 24*time.Hour); !until.Equal(want) {
+		t.Errorf("access until %v, want %v (the moved visit's end + 24 h)", until, want)
+	}
+}
