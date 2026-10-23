@@ -5,6 +5,7 @@
 // operation relay (policies.delete with its version). The unit page's “+ New policy for …” opens the same draft.
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
+import { selectForURL } from "../../fixtures/select";
 
 let created: string | null = null;
 
@@ -104,8 +105,7 @@ test("the Policies tab's scope, Show disabled and a scoped new policy with activ
   const name = `E2E office hours ${Date.now()}`;
   await page.goto("/admin/alerts?tab=policies");
   const main = page.getByRole("main");
-  await main.getByRole("combobox", { name: "Customer" }).selectOption({ label: "Demo Customer A" });
-  await page.waitForURL(/customerId=/);
+  await selectForURL(page, main.getByRole("combobox", { name: "Customer" }), { label: "Demo Customer A" }, /customerId=/);
   await main.getByRole("button", { name: "New policy for Demo Customer A" }).click();
   await page.waitForURL((u) => u.searchParams.get("tab") === "policies" && !!u.searchParams.get("new") && u.searchParams.get("new") === u.searchParams.get("customerId"));
 
@@ -230,8 +230,7 @@ test("the notification preview and the demo test of a policy attached to a unit"
   const name = `E2E hot room ${Date.now()}`;
   await page.goto("/admin/alerts?tab=policies");
   const main = page.getByRole("main");
-  await main.getByRole("combobox", { name: "Customer" }).selectOption({ label: "Demo Customer A" });
-  await page.waitForURL(/customerId=/);
+  await selectForURL(page, main.getByRole("combobox", { name: "Customer" }), { label: "Demo Customer A" }, /customerId=/);
   await main.getByRole("button", { name: "New policy for Demo Customer A" }).click();
   await page.waitForURL(/new=/);
   await main.getByRole("textbox", { name: /^Name/ }).fill(name);
@@ -292,8 +291,7 @@ test("the notification preview and the demo test of a policy attached to a unit"
 test("the default policy's demo test on a unit of the scoped customer", async ({ page }) => {
   await page.goto("/admin/alerts?tab=policies");
   const main = page.getByRole("main");
-  await main.getByRole("combobox", { name: "Customer" }).selectOption({ label: "Demo Customer A" });
-  await page.waitForURL(/customerId=/);
+  await selectForURL(page, main.getByRole("combobox", { name: "Customer" }), { label: "Demo Customer A" }, /customerId=/);
   await main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Alert policies", exact: true }) }).getByRole("button", { name: /Default policy/ }).click();
   await page.waitForURL(/policyId=/);
   const rules = main.getByRole("region", { name: "Rules" });
