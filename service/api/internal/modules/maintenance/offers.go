@@ -633,6 +633,10 @@ func (m Delivery) createAssignment(ctx context.Context, c *ops.Call, job, tech u
 		}
 		return err
 	}
+	// a window of this technician that had ended was frozen into their history; it is frozen again when the new one ends (IR459)
+	if _, err := c.Tx.Exec(ctx, `DELETE FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'membership' AND owner_id = $2`, job, tech); err != nil {
+		return err
+	}
 	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.jobs SET status = CASE WHEN status IN ('requested','accepted') THEN 'assigned' ELSE status END,
 		assignment_id = $2, scheduled_slot = tstzrange($3, $4), version = version + 1, updated_at = platform.app_now() WHERE id = $1`, job, aid, slot.StartAt, slot.EndAt); err != nil {
 		return err

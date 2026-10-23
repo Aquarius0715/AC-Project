@@ -365,14 +365,17 @@ func freezeTechnicians(ctx context.Context, tx pgx.Tx, now time.Time, job *uuid.
 			CASE WHEN EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state = 'accepted') THEN 'accepted' ELSE 'not_accepted' END
 		FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id JOIN maintenance.ref_memberships mb ON mb.id = a.technician_membership_id
 		WHERE ((a.status = 'active' AND upper(a.scheduled) <= $1) OR (a.status = 'revoked' AND lower(a.scheduled) <= a.updated_at AND a.updated_at <= $1)
-			OR (a.status = 'completed' AND a.updated_at <= $1))`
+			OR (a.status = 'completed' AND a.updated_at <= $1))
+			-- not while the same technician still holds an open window on the job (an extension or a new assignment, IR459)
+			AND NOT EXISTS (SELECT 1 FROM maintenance.assignments b WHERE b.job_id = a.job_id AND b.technician_membership_id = a.technician_membership_id
+				AND b.status = 'active' AND upper(b.scheduled) > $1)`
 	args := []any{now}
 	if job != nil {
 		q += " AND a.job_id = $2"
 		args = append(args, *job)
 	}
 	tag, err := tx.Exec(ctx, q+`
-		ORDER BY a.job_id, a.technician_membership_id, a.updated_at DESC
+		ORDER BY a.job_id, a.technician_membership_id, CASE WHEN a.status IN ('revoked', 'completed') THEN a.updated_at ELSE upper(a.scheduled) END DESC, a.updated_at DESC
 		ON CONFLICT (job_id, owner_kind, owner_id) DO NOTHING`, args...)
 	if err != nil {
 		return 0, err

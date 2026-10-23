@@ -537,3 +537,51 @@ func TestPastSlotsRefused(t *testing.T) {
 		t.Errorf("offer answered after the visit began: %d %s", code, fields(m))
 	}
 }
+
+// TestExtensionRefreezesTechnicianHistory (IR459): a technician whose window ended was frozen into their history; an
+// extension for the same technician removes that snapshot, nothing is frozen while the new window is open, and its end
+// freezes the history again.
+func TestExtensionRefreezesTechnicianHistory(t *testing.T) {
+	s := server(t)
+	ctx := context.Background()
+	tech := seed.ID("tech-internal-a")
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active'`, tech)
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	job := data(m)["id"].(string)
+	if code, m := write(s, &hq, "jobs.assign", `{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+ts(25)+`","endAt":"`+ts(27)+`"}`, 1); code != 200 {
+		t.Fatalf("assign: %d %v", code, m)
+	}
+	// the work started and its window ended an hour ago
+	owner(t, `UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1 AND status = 'active'`, job, clock.Add(-3*time.Hour), clock.Add(-time.Hour))
+	owner(t, `UPDATE maintenance.jobs SET status = 'in_progress', scheduled_slot = tstzrange($2, $3) WHERE id = $1`, job, clock.Add(-3*time.Hour), clock.Add(-time.Hour))
+	asOf := func() *time.Time {
+		t.Helper()
+		var at *time.Time
+		ownerScan(t, `SELECT (SELECT as_of FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'membership' AND owner_id = $2)`, []any{job, tech}, &at)
+		return at
+	}
+	if _, err := schedTick(ctx, s, clock); err != nil {
+		t.Fatal(err)
+	}
+	if at := asOf(); at == nil || !at.Equal(clock.Add(-time.Hour)) {
+		t.Fatalf("frozen at the first end: %v", at)
+	}
+	var v int
+	ownerScan(t, `SELECT version FROM maintenance.jobs WHERE id = $1`, []any{job}, &v)
+	if code, m := write(s, &hq, "jobs.assign", `{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+ts(-3)+`","endAt":"`+ts(2)+`","reason":"more time on site"}`, v); code != 200 {
+		t.Fatalf("extension: %d %v", code, m)
+	}
+	if _, err := schedTick(ctx, s, clock.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if at := asOf(); at != nil {
+		t.Errorf("frozen while the extension is open: %v", at)
+	}
+	if _, err := schedTick(ctx, s, clock.Add(3*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if at := asOf(); at == nil || !at.Equal(clock.Add(2*time.Hour)) {
+		t.Errorf("frozen again at the extension's end: %v", at)
+	}
+}

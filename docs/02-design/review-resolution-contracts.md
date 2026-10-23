@@ -6843,3 +6843,11 @@ Found in review: the maintenance scheduler freezes the contractor's job history 
 1. `jobs.extendAccess` removes the contractor's snapshot of the job; the next end of the window freezes it again (as of the new end).
 2. Test: `TestExtendAccessRefreezesHistory`.
 
+## IR459 A technician's new window refreezes their job history — 2026-10-24
+
+Found in review, after IR458: the technician's job history is frozen when their assignment's window ends (IR89, IR234). An extension (IR49: a new assignment with the same start and a later end) or a new assignment of the same technician after their window ended left the first snapshot in place, and the next freeze kept it (`ON CONFLICT DO NOTHING`). The revoked first assignment was also frozen at once, while the extension was still open.
+
+1. `jobs.assign` (any new assignment) removes the technician's snapshot of the job.
+2. The scheduler freezes a technician's history only when they hold no open window on the job any more, and from the window that ends last.
+3. Test: `TestExtensionRefreezesTechnicianHistory` (frozen at the first end, nothing while the extension is open, frozen again at its end).
+
