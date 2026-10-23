@@ -524,8 +524,16 @@ func TestPastSlotsRefused(t *testing.T) {
 	if code, m := write(s, &hq, "jobs.assign", `{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-internal-a").String()+`","startAt":"`+ts(-3)+`","endAt":"`+ts(-1)+`"}`, 1); code != 422 || fields(m) != "endAt=error.past" {
 		t.Errorf("assign a time that is over: %d %s", code, fields(m))
 	}
+	// an offer must be answered by the visit's start (IR457), so a visit that has begun cannot be offered either
 	if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":{"startAt":"`+ts(-3)+`","endAt":"`+ts(-1)+`"}`+
-		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(-4)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"t"}`, 1); code != 422 || fields(m) != "visitSlot=error.past" {
+		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(-4)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"t"}`, 1); code != 422 || fields(m) != "offerExpiresAt=error.afterVisit" {
 		t.Errorf("offer a visit that is over: %d %s", code, fields(m))
+	}
+	// IR457: a future visit whose offer could still be answered after it begins
+	_, m = write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	later := data(m)["id"].(string)
+	if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+later+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
+		`,"offerExpiresAt":"`+ts(50)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"t"}`, 1); code != 422 || fields(m) != "offerExpiresAt=error.afterVisit" {
+		t.Errorf("offer answered after the visit began: %d %s", code, fields(m))
 	}
 }

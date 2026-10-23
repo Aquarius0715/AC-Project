@@ -3697,6 +3697,8 @@ export const ms: Record<string, string> = {
   "the plan changed meanwhile — the latest version is shown": "pelan telah berubah sementara itu — versi terkini dipaparkan",
   "a plan’s unit cannot change": "unit pelan tidak boleh diubah",
   "must be in the future": "mesti pada masa hadapan",
+  "must not be after the access ends": "tidak boleh selepas akses tamat",
+  "must not be after the visit starts (IR457)": "tidak boleh selepas lawatan bermula (IR457)",
   "not a valid value (monthly, every 1–12 months)": "bukan nilai yang sah (bulanan, setiap 1–12 bulan)",
   "Every contractor organization has a profile — add the organization in Access & roles first.": "Setiap organisasi kontraktor mempunyai profil — tambah organisasi dalam Akses & peranan dahulu.",
   "No contractor organizations": "Tiada organisasi kontraktor",

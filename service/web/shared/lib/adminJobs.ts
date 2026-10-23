@@ -233,6 +233,7 @@ export function hqRefusal(f: { code: string; messageKey: string; fieldErrors: Re
     "errors.contact_details_forbidden": "no e-mail addresses or phone numbers in the contact window (IR64)",
     "error.count": "too many entries", "error.invalid": "not a valid value",
     "error.length": "1–1000 characters", "error.required": "required", "error.range": "the end must be after the start", "error.past": "must be in the future",
+    "error.afterAccess": "must not be after the access ends", "error.afterVisit": "must not be after the visit starts (IR457)",
   };
   const byField: Record<string, string> = { "symptom:error.length": "10–2000 characters", "contactWindow:error.length": "up to 200 characters", "alternativeSlots:error.count": "up to two more times" };
   const word = (k: string | undefined) => (k ? t(k) : undefined);

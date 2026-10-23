@@ -146,6 +146,8 @@ func (in *OfferInput) Validate() map[string]string {
 	}
 	if in.OfferExpiresAt.After(in.AccessValidUntil) {
 		fe["offerExpiresAt"] = "error.afterAccess"
+	} else if in.OfferExpiresAt.After(in.VisitSlot.StartAt) { // an answer after the visit began could not be worked (IR457)
+		fe["offerExpiresAt"] = "error.afterVisit"
 	}
 	if in.AccessValidFrom.After(in.VisitSlot.StartAt) || in.VisitSlot.EndAt.After(in.AccessValidUntil) {
 		fe["accessValidFrom"] = "error.accessMustCoverVisit"
@@ -159,7 +161,7 @@ func (in *OfferInput) Validate() map[string]string {
 // @Summary		jobs.offer (write)
 // @ID				jobs.offer
 // @Description	Authorization: admin:job.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR48 requested only; offerExpiresAt<=accessValidUntil; expiry returns requested; IR113 visitSlot must be an agreed slot (preferred or accepted proposal; plan occurrence) else VALIDATION errors.slot_not_agreed; access window covers visitSlot
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR48 requested only; offerExpiresAt<=accessValidUntil and <= visit start (IR457); expiry returns requested; IR113 visitSlot must be an agreed slot (preferred or accepted proposal; plan occurrence) else VALIDATION errors.slot_not_agreed; access window covers visitSlot
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A06
 // @Tags			jobs
@@ -188,9 +190,6 @@ func (m Delivery) offer(ctx context.Context, c *ops.Call, in *OfferInput) (Maint
 func (m Delivery) offerJob(ctx context.Context, c *ops.Call, in *OfferInput) (Job, error) {
 	if !c.Now.Before(in.OfferExpiresAt) {
 		return Job{}, apperr.Fields(map[string]string{"offerExpiresAt": "error.past"})
-	}
-	if !in.VisitSlot.EndAt.After(c.Now) { // a visit already over (IR456)
-		return Job{}, apperr.Fields(map[string]string{"visitSlot": "error.past"})
 	}
 	kind, status, found, err := m.Directory.OrgState(ctx, c, in.ContractorOrgID)
 	if err != nil {
