@@ -326,7 +326,7 @@ func (in *RespondInput) Validate() map[string]string {
 // @Summary		jobs.respondProposal (write)
 // @ID				jobs.respondProposal
 // @Description	Authorization: client:self:pending-proposal
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 pending proposal of own customer job; decline needs declineReason; preferredSlots empty or exactly 3 distinct future slots
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 pending proposal of own customer job; accept checks the hold again (CONFLICT errors.proposal_unavailable; IR446); decline needs declineReason; preferredSlots empty or exactly 3 distinct future slots
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-C09
 // @Tags			jobs
@@ -405,6 +405,15 @@ func (m Proposals) respondJob(ctx context.Context, c *ops.Call, in *RespondInput
 			return Job{}, err
 		}
 		return m.finish(ctx, c, in.JobID, "proposal.declined", "jobs.respondProposal", "ProposalDeclined", deref(in.DeclineReason))
+	}
+	// the hold is checked again: since the proposal, the contractor may have been suspended or the technician's access or
+	// qualification may have ended (IR446); HQ withdraws the proposal and proposes again
+	if err := m.checkHold(ctx, c, r.unit, hold, slot); err != nil {
+		var de *apperr.DomainError
+		if errors.As(err, &de) {
+			return Job{}, apperr.E(apperr.Conflict, "errors.proposal_unavailable")
+		}
+		return Job{}, err
 	}
 	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.slot_proposals SET status = 'accepted', decided_at = $2 WHERE id = $1`, in.ProposalID, c.Now); err != nil {
 		return Job{}, err

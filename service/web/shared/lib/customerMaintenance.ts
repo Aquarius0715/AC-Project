@@ -181,7 +181,7 @@ export function clientJobRefusal(f: { code: string; messageKey: string; fieldErr
   const keys: Record<string, string> = {
     "error.invalidState": "not possible in the request's current state", "error.versionConflict": "the request changed meanwhile — the latest state is shown",
     "errors.reschedule_too_late": "less than 48 h before the visit — contact HQ", "errors.rating_locked": "the rating can no longer be changed",
-    "errors.proposal_expired": "the proposal has expired — HQ will look again", "error.slotRules": "the times break the rules (1–4 h, from tomorrow, all different)",
+    "errors.proposal_expired": "the proposal has expired — HQ will look again", "errors.proposal_unavailable": "the proposed time can no longer be booked — HQ will look again", "error.slotRules": "the times break the rules (1–4 h, from tomorrow, all different)",
     "errors.contact_details_forbidden": "no e-mail addresses or phone numbers in the contact window", "error.length": "wrong length", "error.count": "wrong number of entries",
     "error.invalidFile": "photos must be JPEG or PNG up to 5 MiB", "error.unitArchived": "the unit is archived", "error.required": "required", "error.invalid": "not a valid value",
   };

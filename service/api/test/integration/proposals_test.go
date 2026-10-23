@@ -611,3 +611,32 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 		t.Errorf("offers after the decline: %d", offers)
 	}
 }
+
+// TestAcceptRechecksHold (IR446): the client's acceptance checks the proposal's hold again. HQ suspends the held
+// contractor after proposing; the acceptance is CONFLICT errors.proposal_unavailable and no offer is created.
+func TestAcceptRechecksHold(t *testing.T) {
+	s := server(t)
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	job := data(m)["id"].(string)
+	hold := `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `"}`
+	if code, m := write(s, &hq, "jobs.proposeSlot", `{"jobId":"`+job+`","slot":`+slotJSON(98, 2)+`,"hold":`+hold+`,"message":"A partner can come then","replyBy":"`+ts(48)+`"}`, 1); code != 200 {
+		t.Fatalf("propose: %d %v", code, m)
+	}
+	var proposal string
+	ownerScan(t, `SELECT id::text FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'pending'`, []any{job}, &proposal)
+	owner(t, `INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email, delegation, suspended_reason)
+		VALUES ($1, $2, 'Demo Contractor A', 'suspended', 'SSM-TEST', 'ops@contractor-a.example', tstzrange($3, $4), 'test')`, seed.ID("tenant-a"), seed.ID("org-contractor-a"), clock.Add(-time.Hour), clock.Add(24*365*time.Hour))
+	t.Cleanup(func() {
+		owner(t, `DELETE FROM maintenance.contractors WHERE organization_id = $1`, seed.ID("org-contractor-a"))
+	})
+	if code, m := write(s, &customerA, "jobs.respondProposal", `{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`, 2); code != 409 || m["messageKey"] != "errors.proposal_unavailable" {
+		t.Errorf("accepting a suspended contractor's hold: %d %v", code, m)
+	}
+	var offers int
+	var status string
+	ownerScan(t, `SELECT (SELECT count(*) FROM maintenance.offers WHERE job_id = $1), (SELECT status FROM maintenance.slot_proposals WHERE id = $2)`, []any{job, proposal}, &offers, &status)
+	if offers != 0 || status != "pending" {
+		t.Errorf("after the refused acceptance: %d offers, proposal %s", offers, status)
+	}
+}

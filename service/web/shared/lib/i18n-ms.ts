@@ -721,6 +721,7 @@ export const ms: Record<string, string> = {
   "less than 48 h before the visit — contact HQ": "kurang daripada 48 j sebelum lawatan — hubungi HQ",
   "the rating can no longer be changed": "penilaian tidak boleh diubah lagi",
   "the proposal has expired — HQ will look again": "cadangan telah tamat tempoh — HQ akan melihat semula",
+  "the proposed time can no longer be booked — HQ will look again": "masa yang dicadangkan tidak lagi boleh ditempah — HQ akan menyemak semula",
   "the times break the rules (1–4 h, from tomorrow, all different)": "masa melanggar peraturan (1–4 j, mulai esok, semua berbeza)",
   "no e-mail addresses or phone numbers in the contact window": "tiada alamat e-mel atau nombor telefon dalam waktu dihubungi",
   "wrong length": "panjang salah",
