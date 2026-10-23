@@ -392,7 +392,7 @@ services:
     profiles: [infra, schema, backend, full]
 
   valkey:              # ElastiCache (sessions, idempotency fast path, rate limits)
-    image: valkey/valkey:8@sha256:640c5e62cea04b6d6f2084232651d0cc70362d31f4f805e7be94dbed6855e8f2   # pinned by digest (IR373)
+    image: valkey/valkey:9@sha256:418652cfb58ef879d4978c33553735d7147016032d5aefaa14c828e611eb9dfd   # pinned by digest (IR373)
     user: "999:999"                # the image's valkey user, not root (security loop, IR414)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
