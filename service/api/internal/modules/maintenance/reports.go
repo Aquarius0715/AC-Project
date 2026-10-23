@@ -683,6 +683,10 @@ func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (J
 	}
 	now := c.Now
 	t.FinishedAt = &now
+	// a pause still open ends with the submission, so its time is not counted as on site (IR448)
+	if n := len(t.Pauses); n > 0 && t.Pauses[n-1].To == nil {
+		t.Pauses[n-1].To = &now
+	}
 	if from := firstNonNil(t.ArrivedAt, t.StartedAt); from != nil {
 		d := now.Sub(*from)
 		for _, p := range t.Pauses {

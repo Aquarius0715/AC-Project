@@ -66,16 +66,17 @@ func TestWorkReportEdges(t *testing.T) {
 		t.Errorf("measurement corrected in place: %v → %v", first, again)
 	}
 
-	// on site from 60 minutes ago with a 10-minute pause that ended: 50 minutes
+	// on site from 60 minutes ago with a 10-minute pause that ended and one still open for 20 minutes, which the
+	// submission ends (IR448): 30 minutes
 	owner(t, `UPDATE maintenance.jobs SET time_on_site = jsonb_build_object('arrivedAt', $2::timestamptz, 'startedAt', $2::timestamptz, 'pauses',
-		jsonb_build_array(jsonb_build_object('from', $3::timestamptz, 'to', $4::timestamptz))) WHERE id = $1`,
-		job, clock.Add(-time.Hour), clock.Add(-40*time.Minute), clock.Add(-30*time.Minute))
+		jsonb_build_array(jsonb_build_object('from', $3::timestamptz, 'to', $4::timestamptz), jsonb_build_object('from', $5::timestamptz))) WHERE id = $1`,
+		job, clock.Add(-time.Hour), clock.Add(-40*time.Minute), clock.Add(-30*time.Minute), clock.Add(-20*time.Minute))
 	code, m = write(s, &techInt, "jobs.submit", `{"jobId":"`+job+`","reportVersion":3}`, 3)
 	if code != 200 {
 		t.Fatalf("submit: %d %v", code, m)
 	}
-	if tos := data(m)["timeOnSite"].(map[string]any); tos["onSiteMinutes"].(float64) != 50 {
-		t.Errorf("time on site without the pause: %v", tos)
+	if tos := data(m)["timeOnSite"].(map[string]any); tos["onSiteMinutes"].(float64) != 30 || tos["pauses"].([]any)[1].(map[string]any)["to"] == nil {
+		t.Errorf("time on site without the pauses: %v", tos)
 	}
 
 	// the report is read through its own job only; reviewing a job that does not exist says so

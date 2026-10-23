@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.317.0
+version: 0.318.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -274,6 +274,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.318.0: A pause still open ends with the report's submission (IR448). Phase 1A unchanged.
 0.317.0: HQ records a manual payment after a failed attempt (IR447). Phase 1A unchanged.
 0.316.0: The client's acceptance checks the proposal's hold again (IR446). Phase 1A unchanged.
 0.315.0: A contractor's decline ends the client's proposals that hold it (IR445). Phase 1A unchanged.
