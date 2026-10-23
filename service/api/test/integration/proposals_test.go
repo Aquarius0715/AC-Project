@@ -551,6 +551,17 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 	}
 	ended(job, partner)
 
+	// HQ cancels the job: the time change ends with it
+	job, _, partner = proposed(122)
+	if code, m := write(s, &hq, "jobs.cancel", `{"jobId":"`+job+`","cancelReason":"client moved out"}`, 3); code != 200 {
+		t.Fatalf("cancel: %d %v", code, m)
+	}
+	var st string
+	ownerScan(t, `SELECT status FROM maintenance.partner_slot_proposals WHERE id = $1`, []any{partner}, &st)
+	if _, m := post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`); st != "withdrawn" || data(m)["partnerSlotProposal"] != nil {
+		t.Errorf("after the cancellation the time change is %s, HQ's job shows %v", st, data(m)["partnerSlotProposal"])
+	}
+
 	job, _, partner = proposed(134)
 	if _, err := schedTick(ctx, s, clock.Add(12*time.Hour)); err != nil {
 		t.Fatal(err)

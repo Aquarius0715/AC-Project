@@ -1352,6 +1352,11 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.slot_proposals SET status = 'withdrawn', decided_at = $2 WHERE job_id = $1 AND status = 'pending'`, in.JobID, c.Now); err != nil {
 		return Job{}, err
 	}
+	// the contractor's open time change ends with the job (IR444)
+	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE status IN ('pending','sent_to_client')
+		AND offer_id IN (SELECT id FROM maintenance.offers WHERE job_id = $1)`, in.JobID); err != nil {
+		return Job{}, err
+	}
 	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.jobs SET status = 'cancelled', hold_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`, in.JobID); err != nil {
 		return Job{}, err
 	}
