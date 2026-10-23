@@ -387,3 +387,59 @@ func TestReleaseEndedAccess(t *testing.T) {
 		t.Errorf("released twice: %d notices", n)
 	}
 }
+
+// TestReleaseEndedAccessContractor (IR439): the contractor's job whose technician's access now ends before the visit
+// goes back to accepted with its offer, and the contractor's assigners get the job_update notice.
+func TestReleaseEndedAccessContractor(t *testing.T) {
+	s := server(t)
+	ctx := context.Background()
+	tech := seed.ID("tech-external-a")
+	var until *time.Time
+	ownerScan(t, `SELECT valid_until FROM identity.memberships WHERE id = $1`, []any{tech}, &until)
+	// the seed assignment of tech-external-a (09-14..09-20) would overlap the visit: revoke it for this test
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active'`, tech)
+	t.Cleanup(func() {
+		owner(t, `UPDATE identity.memberships SET valid_until = $2 WHERE id = $1`, tech, until)
+		owner(t, `UPDATE maintenance.ref_memberships SET valid_until = $2 WHERE id = $1`, tech, until)
+		owner(t, `UPDATE maintenance.assignments a SET status = 'active' WHERE a.id = $1 AND NOT EXISTS (SELECT 1 FROM maintenance.assignments b
+			WHERE b.id <> a.id AND b.status = 'active' AND b.technician_membership_id = a.technician_membership_id AND b.scheduled && a.scheduled)`, seed.ID("assignment-contractor-a"))
+	})
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	code, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	if code != 200 {
+		t.Fatalf("create: %d %v", code, m)
+	}
+	job := data(m)["id"].(string)
+	if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
+		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"terms-v1"}`, 1); code != 200 {
+		t.Fatalf("offer: %d %v", code, m)
+	}
+	var offer string
+	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
+	if code, m := write(s, &contrA, "jobs.accept", `{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"terms-v1"}`, 2); code != 200 {
+		t.Fatalf("accept: %d %v", code, m)
+	}
+	if code, m := write(s, &contrA, "jobs.assign", `{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+ts(49)+`","endAt":"`+ts(51)+`"}`, 3); code != 200 {
+		t.Fatalf("assign: %d %v", code, m)
+	}
+	before, hqBefore := countNotes(t, job, "contractor-a", "job_update"), countNotes(t, job, "hq-operator", "job_update")
+	// HQ ends the access during the visit (Access & roles)
+	owner(t, `UPDATE identity.memberships SET valid_until = $2 WHERE id = $1`, tech, clock.Add(50*time.Hour))
+	owner(t, `UPDATE maintenance.ref_memberships SET valid_until = $2 WHERE id = $1`, tech, clock.Add(50*time.Hour))
+	if _, err := schedTick(ctx, s, clock.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	var status, reason string
+	var assignment *string
+	ownerScan(t, `SELECT j.status, j.assignment_id::text, a.reason FROM maintenance.jobs j JOIN maintenance.assignments a ON a.job_id = j.id WHERE j.id = $1 ORDER BY a.created_at DESC LIMIT 1`,
+		[]any{job}, &status, &assignment, &reason)
+	if status != "accepted" || assignment != nil || reason != "access_ended" {
+		t.Errorf("after the release: status %s, assignment %v, reason %s", status, assignment, reason)
+	}
+	if n := countNotes(t, job, "contractor-a", "job_update"); n != before+1 {
+		t.Errorf("contractor notices: %d, want %d", n, before+1)
+	}
+	if n := countNotes(t, job, "hq-operator", "job_update"); n != hqBefore {
+		t.Errorf("HQ assigners notified of the contractor's job: %d", n)
+	}
+}
