@@ -4,6 +4,7 @@ import { useState } from "react";
 import { setSearchParam, useSearchParam } from "@ac/web/lib/urlState";
 import { ImportCsvModal, WarrantyTab } from "@ac/web/components/Features";
 import { ClientRole, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
+import { nameError } from "@ac/web/lib/partnerUsers";
 import { Badge, Banner, Btn, Card, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, useToast, ActionMenu, Plain } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 
@@ -101,36 +102,40 @@ export function UnitsDemo() {
   );
 }
 
-/** FR-A17 — HQ manages every client user; owners also manage them from the customer app (FR-C19, IR417). */
+/** FR-A17 — HQ manages every client user; owners also manage them from the customer app (FR-C19, IR417). Adding a user
+ * creates their account at once (IR461); the demo sends nothing. */
 function ClientUsersTab() {
   const toast = useToast();
   const users = useClientUsers();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [role, setRole] = useState<ClientRole>("member");
   const [tried, setTried] = useState(false);
   const err = tried ? emailError(email, users) : undefined;
-  const close = () => { setOpen(false); setTried(false); setEmail(""); setRole("member"); };
+  const nameErr = tried ? nameError(name) : undefined;
+  const close = () => { setOpen(false); setTried(false); setEmail(""); setName(""); setRole("member"); };
   const run = (e: string | undefined, ok: string) => toast(e ?? ok, e ? "warn" : undefined);
   const act = (u: ClientUser, a: string) => {
-    if (a === "resend") run(clientUserActions.resend(u.id), `Invitation preview re-created for ${u.email}`);
+    if (a === "resend") run(clientUserActions.resend(u.id), `Set-up e-mail re-sent to ${u.email} — nothing is sent in the demo`);
     if (a === "role") run(clientUserActions.setRole(u.id, u.role === "owner" ? "member" : "owner"), `Role changed to ${u.role === "owner" ? "Member" : "Owner"}`);
     if (a === "reset") toast("Password reset preview created (generic message)");
     if (a === "disable") run(clientUserActions.setStatus(u.id, u.status === "disabled" ? "active" : "disabled"), u.status === "disabled" ? "Sign-in enabled" : "Sign-in disabled");
     if (a === "remove") run(clientUserActions.remove(u.id), `${u.email} removed from customer-a`);
   };
   return (
-    <Card title="Client users of customer-a" sub="People who sign in to the customer app. They only ever see customer-a’s properties and units." action={<Btn size="sm" variant="primary" onClick={() => setOpen(true)}><Icon name="add" /> Invite user</Btn>}>
+    <Card title="Client users of customer-a" sub="People who sign in to the customer app. They only ever see customer-a’s properties and units." action={<Btn size="sm" variant="primary" onClick={() => setOpen(true)}><Icon name="add" /> Add user</Btn>}>
       <DataTable rows={users} rowKey={(u) => u.id} cols={[
         { key: "u", label: "User", render: (u) => <><b>{u.name ?? u.email}</b><div className="text-xs text-muted-foreground">{u.name ? u.email : `invited ${u.invitedAt ?? ""} by ${u.invitedBy ?? "—"}`}</div></> },
         { key: "r", label: "Role", render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{u.role === "owner" ? "Owner" : "Member"}</Badge> },
-        { key: "s", label: "Status", render: (u) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{u.status === "active" ? "Active" : u.status === "invited" ? "Invite pending" : "Disabled"}</Badge> },
+        { key: "s", label: "Status", render: (u) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{u.status === "active" ? "Active" : u.status === "invited" ? "Not signed in yet" : "Disabled"}</Badge> },
         { key: "l", label: "Last sign-in", render: (u) => u.lastSignIn ?? "—", hideBelow: "md" },
-        { key: "a", label: "", render: (u) => <ActionMenu label="Actions" onChoose={(v) => act(u, v)}><option value="role">Change role (Owner / Member)</option>{u.status === "invited" && <option value="resend">Resend invite</option>}<option value="reset">Reset password</option><option value="disable">{u.status === "disabled" ? "Enable sign-in" : "Disable sign-in"}</option><option value="remove">Remove from customer</option></ActionMenu> },
+        { key: "a", label: "", render: (u) => <ActionMenu label="Actions" onChoose={(v) => act(u, v)}><option value="role">Change role (Owner / Member)</option>{u.status === "invited" && <option value="resend">Resend set-up e-mail</option>}<option value="reset">Reset password</option><option value="disable">{u.status === "disabled" ? "Enable sign-in" : "Disable sign-in"}</option><option value="remove">Remove from customer</option></ActionMenu> },
       ]} />
-      <p className="mt-2 text-[11px] text-muted-foreground">Client users have no permission editor — the customer’s owners also manage them from the customer app (Users: invite, roles, access, remove). HQ, contractor and technician accounts are managed in Access &amp; roles.</p>
-      <Modal open={open} onClose={close} title="Invite client user" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); const e = clientUserActions.invite(email, role, "hq-operator"); if (e) return; toast(`Invitation preview created for ${email.trim()}`); close(); }}>Send invite</Btn></>}>
-        <Field label="Email" error={err}><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+      <p className="mt-2 text-[11px] text-muted-foreground">Client users have no permission editor — the customer’s owners also manage them from the customer app (Users: add, roles, access, remove). Contractors manage their own staff in the partner app; HQ sets permissions and access periods in Access &amp; roles. The last active owner cannot be demoted, disabled or removed.</p>
+      <Modal open={open} onClose={close} title="Add client user" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (nameError(name)) return; const e = clientUserActions.invite(email, role, "hq-operator", name); if (e) return; toast(`${name.trim()} added — nothing is sent in the demo`); close(); }}>Add user</Btn></>}>
+        <Field label="Name" error={nameErr}><Input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} /></Field>
+        <Field label="Email" hint="One account per person; the set-up e-mail goes to this address" error={err}><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         <Field label="Role"><Select value={role} onChange={(e) => setRole(e.target.value as ClientRole)}><option value="member">Member</option><option value="owner">Owner</option></Select></Field>
       </Modal>
     </Card>

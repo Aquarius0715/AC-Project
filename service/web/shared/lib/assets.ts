@@ -341,7 +341,7 @@ export type ApiClientUser = {
 export type ClientUserRow = {
   id: string; version: number; email: string; name: string | null; role: "owner" | "member"; status: ApiClientUser["status"]; sub: string; lastSignIn: string; channels: string;
   lastOwner: boolean; you: boolean;
-  membershipId: string | null; // the membership Sign out everywhere ends the sessions of (IR385); null while the invite is pending
+  membershipId: string | null; // the membership Sign out everywhere ends the sessions of (IR385); null only for an invite from before IR461, which has no account yet
 };
 const channelLabel: Record<Channel, string> = { inApp: "In-app", email: "Email", whatsapp: "WhatsApp" };
 /** Rows by name; the last active owner is marked because it cannot be demoted, disabled or removed (CONFLICT). The

@@ -1,7 +1,7 @@
 // /customer/users (FR-C19, SCR-C19, IR417): in API mode a Server Component checks the session's client role
 // (session.get) — members get the shared Page unavailable view (FORBIDDEN, IR112) — and reads clientUsers.list for the
-// owner's customer. Invites, edits, role and access changes, removals and resends are Server Actions (actions.ts);
-// password resets stay with HQ (DD-A17). Texts and times in the user's display language and time zone (IR267). The Phase 1A
+// owner's customer. Adding users, role and access changes, removals and set-up e-mail resends are Server Actions
+// (actions.ts); password resets stay with HQ (DD-A17). Texts and times in the user's display language and time zone (IR267). The Phase 1A
 // demo keeps the local user store.
 import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreIdentity, corePrincipal } from "@ac/web/lib/dal";

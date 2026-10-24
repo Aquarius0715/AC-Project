@@ -3,7 +3,7 @@
 /**
  * Shared client-user mock store (FR-A17 / FR-C19 / IR114). The customer owner (Client app,
  * /customer/users) and HQ (Admin › Customers & units › Users) read and write the same rows.
- * Demo only: invitations and resends are previews; state lives in the tab (lib/demoStore: a reload or /demo reset
+ * Demo only: adding users and set-up e-mail resends are previews; state lives in the tab (lib/demoStore: a reload or /demo reset
  * restores the seed, FR-X05).
  */
 import { useSyncExternalStore } from "react";

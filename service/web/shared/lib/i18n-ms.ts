@@ -1676,7 +1676,6 @@ export const ms: Record<string, string> = {
   "Role": "Peranan",
   "Owner": "Pemilik",
   "Member": "Ahli",
-  "Invite pending": "Jemputan belum diterima",
   "Last sign-in": "Log masuk terakhir",
   "Users of {customer}": "Pengguna {customer}",
 
@@ -4410,7 +4409,6 @@ export const ms: Record<string, string> = {
   "Role changed to Member": "Peranan ditukar kepada Ahli",
   "Sign-in enabled": "Log masuk didayakan",
   "Sign-in disabled": "Log masuk dilumpuhkan",
-  "Invite client user": "Jemput pengguna pelanggan",
   "Change role of {email}": "Tukar peranan {email}",
   "Remove {email}?": "Buang {email}?",
   "Enable sign-in for {email}": "Dayakan log masuk untuk {email}",

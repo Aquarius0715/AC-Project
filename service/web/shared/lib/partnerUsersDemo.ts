@@ -3,7 +3,7 @@
 /**
  * Phase 1A demo store of the contractor's company users (FR-P11, IR416): the same PartnerUser rows and rules as
  * partnerUsers.* (own account untouched, the last active contractor kept, an accepted account's e-mail and role fixed).
- * State lives in the tab (lib/demoStore: a reload or /demo reset restores the seed, FR-X05); invites are previews.
+ * State lives in the tab (lib/demoStore: a reload or /demo reset restores the seed, FR-X05); nothing is sent.
  */
 import { useSyncExternalStore } from "react";
 import { readDemo, writeDemo } from "@ac/web/lib/demoStore";

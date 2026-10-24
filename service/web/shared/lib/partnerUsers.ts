@@ -1,5 +1,5 @@
 // Company users of a contractor (FR-P11, DD-P11, IR416): the PartnerUser rows of partnerUsers.list as table rows, the
-// invite form's checks and the actions each row offers. Pure code, shared by the partner Users page in API mode and
+// add form's checks and the actions each row offers. Pure code, shared by the partner Users page in API mode and
 // its Phase 1A demo (partnerUsersDemo.ts). Texts in the display language, times in the display time zone (IR267).
 import { EN, showDate, showTime, type I18n } from "@ac/web/lib/i18n";
 import { klDate, klStart } from "@ac/web/lib/partnerTeam";
@@ -28,7 +28,7 @@ export const roleLabel: Record<PartnerRole, string> = { contractor: "Contractor"
 export const statusLabel: Record<PartnerStatus, string> = { invited: "Not signed in yet", active: "Active", disabled: "Disabled" };
 export const PARTNER_STATUSES: PartnerStatus[] = ["active", "invited", "disabled"];
 
-/** The rows by name (an invite by its e-mail), the caller's own account marked and without actions. An account whose
+/** The rows by name (one without a name by its e-mail), the caller's own account marked and without actions. An account whose
  * access end has passed by `now` (the business clock) reads as ended: nothing to disable or resend, a technician's
  * access end can move again (IR461), and it can be removed. */
 export function partnerUserRows(us: ApiPartnerUser[], self: string | null, i: I18n = EN, now?: Date): PartnerUserRow[] {
