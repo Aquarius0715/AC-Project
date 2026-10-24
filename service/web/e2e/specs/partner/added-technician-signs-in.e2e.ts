@@ -4,26 +4,11 @@
 // then shows them as Active. The contractor removes them again. Skipped on a stack without Mailpit.
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { APPS } from "../../fixtures/apps";
-
-const MAILPIT = "http://localhost:8025/api/v1";
-
-/** The set-up link of the newest e-mail to `email`. */
-async function setupLink(email: string): Promise<string> {
-  const search = `${MAILPIT}/search?query=${encodeURIComponent(`to:"${email}"`)}`;
-  let id = "";
-  await expect.poll(async () => {
-    id = ((await (await fetch(search)).json()) as { messages: { ID: string }[] }).messages[0]?.ID ?? "";
-    return id;
-  }, { timeout: 30_000 }).not.toBe("");
-  const text = ((await (await fetch(`${MAILPIT}/message/${id}`)).json()) as { Text: string }).Text;
-  const link = text.match(/https?:\/\/\S+\/login-actions\/action-token\?\S+/)?.[0];
-  if (!link) throw new Error("the set-up e-mail has no link");
-  return link;
-}
+import { mailpitUp, setupLink } from "../../fixtures/mailpit";
 
 test("a technician the contractor adds sets a password from the e-mail and signs in as themselves", async ({ page, app, browser }) => {
   test.skip(app.id !== "partner", "partner only");
-  test.skip(!(await fetch(`${MAILPIT}/messages?limit=1`).catch(() => null))?.ok, "needs the local Mailpit inbox");
+  test.skip(!(await mailpitUp()), "needs the local Mailpit inbox");
   const email = `e2e-signin-${Date.now()}@example.com`;
   await page.goto("/partner/users");
   await page.getByRole("button", { name: "Add user" }).click();
