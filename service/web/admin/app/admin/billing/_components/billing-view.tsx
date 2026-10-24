@@ -92,6 +92,8 @@ export function BillingView({ live }: { live?: BillingLive }) {
   const detail = live?.selectedInvoice;
   const shown = list.filter((x) => f === "All" || x.st === f);
   const hasPayment = live ? (detail?.payments.length ?? 0) > 0 : sel?.paymentState != null;
+  // a failed or expired card payment leaves the invoice open to a manual one (IR447)
+  const manualBlocked = live ? !(detail?.manualAllowed ?? true) : sel?.paymentState != null && sel.paymentState !== "failed";
   const [modal, setModal] = useState<null | "create" | "manual" | "confirm">(null);
   const [m, setM] = useState({ amount: "", ref: "", reason: "", paidAt: "2026-09-14" });
   const [tried, setTried] = useState(false);
@@ -208,9 +210,9 @@ export function BillingView({ live }: { live?: BillingLive }) {
                   <SummaryList cols={2} items={[[t("Billing period"), sel.period], [t("Due"), sel.due], [t("Payment method"), sel.methodName], [t("Payment status"), sel.st === "Paid" ? t("Paid") : sel.st === "Processing" ? t("Processing — confirm to settle") : hasPayment ? sel.paymentState ?? "—" : t("— no payment yet")]]} />
                   {detail && detail.payments.length > 0 && <p className="mt-2 text-xs text-muted-foreground">{t("Payments: {list}", { list: detail.payments.join(" · ") })}</p>}
                   {sel.st === "Processing" && <div className="mt-3"><Btn variant="primary" disabled={pending || (live && !detail?.processingPaymentId)} onClick={() => { if (live) return openPayment("confirm"); setDemoList((l) => l.map((x) => (x.id === sel.id ? { ...x, st: "Paid" } : x))); toast(t("Card payment confirmed")); }}>{t("Confirm card payment")}</Btn></div>}
-                  {(sel.st === "Unpaid" || sel.st === "Overdue") && (hasPayment
-                    ? <p className="mt-3 text-xs text-muted-foreground">{t("Manual recording is only for invoices without a payment — this invoice already has one ({method}). The customer can retry the card payment.", { method: sel.method })}</p>
-                    : <><p className="mt-3 text-xs text-muted-foreground">{t("The customer has not started a payment. Record a manual payment if it was received outside the app (e.g. bank transfer).")}</p><div className="mt-2"><Btn onClick={() => openPayment("manual")}>{t("Record manual payment…")}</Btn></div></>)}
+                  {(sel.st === "Unpaid" || sel.st === "Overdue") && (manualBlocked
+                    ? <p className="mt-3 text-xs text-muted-foreground">{t("Manual recording waits while a payment is started ({method}). The customer can finish or retry the card payment.", { method: sel.method })}</p>
+                    : <><p className="mt-3 text-xs text-muted-foreground">{t(hasPayment ? "The customer's card payment did not go through. Record a manual payment if it was received outside the app (e.g. bank transfer)." : "The customer has not started a payment. Record a manual payment if it was received outside the app (e.g. bank transfer).")}</p><div className="mt-2"><Btn onClick={() => openPayment("manual")}>{t("Record manual payment…")}</Btn></div></>)}
                   {conflict && <div className="mt-3"><Banner tone="warn">{t("CONFLICT — the invoice changed first (for example a payment arrived), so the action was stopped. The screen shows the latest version.")}</Banner></div>}
                 </Card>
                 {sel.st === "Overdue" && <Card title={t("Payment reminder")} sub={t("Only overdue unpaid invoices can be reminded. If payment arrives first, the reminder is stopped. Delivery is simulated.")}>

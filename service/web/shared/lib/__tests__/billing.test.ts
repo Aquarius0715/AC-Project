@@ -35,7 +35,11 @@ describe("HQ billing (FR-A08, FR-A23, DD-A08)", () => {
       { id: "p1", version: 1, amountMinor: 12000, currency: "MYR", invoiceId: "i1", method: null, status: "confirmed", paymentReference: "BANK-1", confirmationReason: "Bank transfer", confirmedAt: "2026-09-12T02:00:00Z" },
       { id: "p2", version: 3, amountMinor: 12000, currency: "MYR", invoiceId: "i1", method: "demo_debit_card", status: "processing", paymentReference: null, confirmationReason: null, confirmedAt: null },
     ] });
-    expect(d).toEqual({ id: "i1", version: 1, processingPaymentId: "p2", processingPaymentVersion: 3, restrictionIds: ["r1"], payments: ["No method (recorded by HQ) · confirmed · ref BANK-1 · reason “Bank transfer”", "Debit card · processing"] });
+    expect(d).toEqual({ id: "i1", version: 1, processingPaymentId: "p2", processingPaymentVersion: 3, restrictionIds: ["r1"], manualAllowed: false, payments: ["No method (recorded by HQ) · confirmed · ref BANK-1 · reason “Bank transfer”", "Debit card · processing"] });
+    // IR447: only a failed (or expired) card payment leaves the invoice open to a manual payment
+    const failed = { id: "p3", version: 2, amountMinor: 12000, currency: "MYR" as const, invoiceId: "i1", method: "demo_credit_card" as const, status: "failed" as const, paymentReference: null, confirmationReason: null, confirmedAt: null };
+    expect([invoiceDetail({ ...invoice({}), restrictionIds: [], paymentRefs: [failed] }).manualAllowed, invoiceDetail({ ...invoice({}), restrictionIds: [], paymentRefs: [] }).manualAllowed,
+      invoiceDetail({ ...invoice({}), restrictionIds: [], paymentRefs: [{ ...failed, status: "initiated" }] }).manualAllowed]).toEqual([true, true, false]);
     const iq: ApiInquiry = { id: "q1", version: 1, customerId: "c1", invoiceId: "i1", restrictionId: null, subjectType: "payment", message: "Paid already", state: "received", reply: null, createdAt: "2026-09-14T02:00:00Z" };
     expect(inquiryRows([{ ...iq, id: "q0", state: "answered", createdAt: "2026-09-15T00:00:00Z", subjectType: "restriction" }, iq], customers).map((r) => [r.id, r.kind, r.at, r.text])).toEqual([
       ["q1", "Payment", "14 Sept 2026, 10:00 am MYT", "“Paid already”"], ["q0", "Cooling restriction", "15 Sept 2026, 8:00 am MYT", "“Paid already”"],

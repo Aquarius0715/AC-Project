@@ -21,7 +21,7 @@ export type InvoiceRow = {
   id: string; version: number; number: string; amt: string; amountMinor: number; currency: Currency; meta: string; method: string; methodName: string; paymentState: string | null;
   st: InvoiceStatus; customerId: string; contractId: string; period: string; due: string;
 };
-export type InvoiceDetail = { id: string; version: number; processingPaymentId: string | null; processingPaymentVersion: number | null; payments: string[]; restrictionIds: string[] };
+export type InvoiceDetail = { id: string; version: number; processingPaymentId: string | null; processingPaymentVersion: number | null; payments: string[]; restrictionIds: string[]; manualAllowed: boolean };
 export type InquiryRow = { id: string; version: number; cust: string; kind: string; at: string; text: string; state: "received" | "answered"; reply: string | null; invoiceId: string | null; restrictionId: string | null };
 export type ContractOption = { id: string; version: number; label: string; priceMinor: number; currency: Currency };
 
@@ -108,6 +108,8 @@ export function invoiceDetail(d: ApiInvoiceDetail, t: T = en): InvoiceDetail {
       p.confirmationReason && t("reason “{reason}”", { reason: p.confirmationReason }),
     ].filter(Boolean).join(" · ")),
     restrictionIds: d.restrictionIds,
+    // payments.recordManual: refused while a payment is started, processing or confirmed; a failed one does not stop it (IR447)
+    manualAllowed: !d.paymentRefs.some((p) => p.status === "initiated" || p.status === "processing" || p.status === "confirmed"),
   };
 }
 

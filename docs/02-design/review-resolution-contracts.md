@@ -1885,7 +1885,7 @@ Three admin data screens of the IR198 inventory now follow IR176 (Server Compone
 
 - **Audit** (`/admin/audit`, FR-A16): `audit.list` for the URL filters (`from`, `to`, `corr`, `result`, `limit` up to 100), the device events tab (`tab=devices`, `deviceId`) with `devices.list` and `devices.events`.
 - **Alerts** (`/admin/alerts`, FR-A05): `alerts.list`, `policies.list`, `units.list`, `customers.list`, `members.list`; Server Actions `alerts.acknowledge`, `alerts.resolve` (reason and evidence IDs) and `policies.save` (recipients, channels, recovery threshold checked before the call).
-- **Billing** (`/admin/billing`, FR-A08 / FR-A23): the SCR-A08 URL keys (`tab`, `invoiceId`, `inquiryId`, `statementId`, `customerId` → `propertyId` → `contractId`, `overdueOnly`); `invoices.get` of the selected invoice, `notifications.recipients` for an overdue one; Server Actions `invoices.create`, `payments.recordManual` (only when the invoice has no Payment), `payments.confirm` (the processing Payment and its version), `notifications.preview` then `invoices.remind`, `inquiries.answer`, `payouts.generate`, `payouts.transition`, `payouts.resolveQuery`. A link with only `inquiryId` opens the inquiries tab (D08).
+- **Billing** (`/admin/billing`, FR-A08 / FR-A23): the SCR-A08 URL keys (`tab`, `invoiceId`, `inquiryId`, `statementId`, `customerId` → `propertyId` → `contractId`, `overdueOnly`); `invoices.get` of the selected invoice, `notifications.recipients` for an overdue one; Server Actions `invoices.create`, `payments.recordManual` (only when the invoice has no started, processing or confirmed Payment, IR447), `payments.confirm` (the processing Payment and its version), `notifications.preview` then `invoices.remind`, `inquiries.answer`, `payouts.generate`, `payouts.transition`, `payouts.resolveQuery`. A link with only `inquiryId` opens the inquiries tab (D08).
 
 Backend and contract fixes found while wiring:
 
@@ -6760,7 +6760,8 @@ Found in review: a SlotProposal's hold (IR128 item 1) was checked only when HQ p
 Found in review: `payments.recordManual` refused any invoice that had a Payment, so after the customer's card payment failed HQ could not record the bank transfer it then received. The payment rules (“recordManual returns CONFLICT if either initiated or processing exists”) and the IR118 detail (“only an invoice without any Payment”) disagreed; the first one is kept.
 
 1. `payments.recordManual` is CONFLICT `errors.invoice_has_payment` while the invoice has an `initiated`, `processing` or `confirmed` Payment; `failed` and `expired` attempts do not block it.
-2. Test: `TestManualAfterFailedPayment` (refused while the card payment is in flight, recorded after it failed; the invoice becomes paid).
+2. Web: HQ's billing view offers “Record manual payment…” after a failed card payment too (`InvoiceDetail.manualAllowed`); it said manual recording was only for invoices without any payment.
+3. Tests: `TestManualAfterFailedPayment` (refused while the card payment is in flight, recorded after it failed; the invoice becomes paid), `billing.test.ts`.
 
 ## IR448 A pause still open ends with the report's submission — 2026-10-24
 
