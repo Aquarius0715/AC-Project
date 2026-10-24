@@ -68,6 +68,35 @@ type newAccount struct {
 	Scopes                   []ScopeRef
 }
 
+// AccountsPerOrgPerDay is how many accounts a contractor or a customer owner adds to their organization in 24 hours
+// (IR464): each one mails a set-up link to the address typed in, so a member cannot have the sign-in service mail
+// strangers in bulk. HQ is not limited. ACCOUNTS_PER_ORG_PER_DAY sets another value at start-up (server Config).
+var AccountsPerOrgPerDay = 30
+
+// addCap refuses an account beyond AccountsPerOrgPerDay with the seconds until the oldest of them is a day old. The
+// organization row is locked so two adds at once count each other. Memberships dated after now (the seed's, written
+// on the wall clock ahead of the demo clock) do not count.
+func addCap(ctx context.Context, c *ops.Call, org uuid.UUID) error {
+	if c.Principal.Role == "admin" {
+		return nil
+	}
+	if _, err := c.Tx.Exec(ctx, `SELECT 1 FROM identity.organizations WHERE id = $1 FOR UPDATE`, org); err != nil {
+		return err
+	}
+	var n int
+	var oldest *time.Time
+	if err := c.Tx.QueryRow(ctx, `SELECT count(*), min(created_at) FROM (SELECT created_at FROM identity.memberships
+		WHERE organization_id = $1 AND created_at > $2 AND created_at <= $3 ORDER BY created_at DESC LIMIT $4) x`,
+		org, c.Now.Add(-24*time.Hour), c.Now, AccountsPerOrgPerDay).Scan(&n, &oldest); err != nil {
+		return err
+	}
+	if n < AccountsPerOrgPerDay || oldest == nil {
+		return nil
+	}
+	wait := oldest.Add(24 * time.Hour).Sub(c.Now)
+	return apperr.E(apperr.RateLimited, "errors.too_many_accounts").RetryAfter(int((wait + time.Second - 1) / time.Second))
+}
+
 // errEmailTaken: the address is a person's whom this tenant may not add (personFor).
 var errEmailTaken = errors.New("identity: e-mail taken")
 
@@ -103,6 +132,9 @@ func personFor(ctx context.Context, c *ops.Call, email, name string) (uuid.UUID,
 // and scopes, and asks the identity consumer to open or re-point the provider account and e-mail the set-up link
 // (IR461, IR462). An e-mail another person holds is a field error.
 func createAccount(ctx context.Context, c *ops.Call, a newAccount) (user, membership uuid.UUID, err error) {
+	if err = addCap(ctx, c, a.OrgID); err != nil {
+		return user, membership, err
+	}
 	user, err = personFor(ctx, c, a.Email, a.DisplayName)
 	if errors.Is(err, errEmailTaken) {
 		return user, membership, apperr.Fields(map[string]string{"email": "errors.email_taken"})

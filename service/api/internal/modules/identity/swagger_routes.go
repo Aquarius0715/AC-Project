@@ -25,7 +25,7 @@ var (
 //	@Summary		clientUsers.save (write) — update
 //	@ID				clientUsers.save.update
 //	@Description	Authorization: client:self-customer:owner | admin:asset.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer and one account per person (errors.email_taken; a person this tenant removed is added again; IR462); a new user needs displayName 1–120 and is created at once with a set-up e-mail (IR461); last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account (IR417); the e-mail stays (IR422)
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer and one account per person (errors.email_taken; a person this tenant removed is added again; IR462); at most 30 accounts a contractor or customer owner adds to the organization in 24 hours (RATE_LIMITED errors.too_many_accounts with retryAfterSeconds; HQ not limited; IR464); a new user needs displayName 1–120 and is created at once with a set-up e-mail (IR461); last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account (IR417); the e-mail stays (IR422)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A17, DD-C19
 //	@Tags			clientUsers
@@ -109,7 +109,7 @@ func swaggerOrganizationsSaveUpdate() {}
 //	@Summary		partnerUsers.save (write) — update
 //	@ID				partnerUsers.save.update
 //	@Description	Authorization: contractor:own-company
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; email unique per company and one account per person (errors.email_taken; a person this tenant removed is added again; IR462); a new user needs displayName 1–120 and is created at once with a set-up e-mail; a technician needs accessUntil at most a year ahead (IR461); email and role fixed; not the caller's own account; not the last active contractor; not a technician with an active assignment (CONFLICT; IR421)
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; email unique per company and one account per person (errors.email_taken; a person this tenant removed is added again; IR462); at most 30 accounts a contractor or customer owner adds to the organization in 24 hours (RATE_LIMITED errors.too_many_accounts with retryAfterSeconds; HQ not limited; IR464); a new user needs displayName 1–120 and is created at once with a set-up e-mail; a technician needs accessUntil at most a year ahead (IR461); email and role fixed; not the caller's own account; not the last active contractor; not a technician with an active assignment (CONFLICT; IR421)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-P11
 //	@Tags			partnerUsers

@@ -121,6 +121,7 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `OIDC_ISSUER` | backend, web | `http://localhost:8081/realms/ac` (Keycloak `KC_HOSTNAME` fixes the `iss` claim) | Cognito user pool issuer |
 | `RATE_LIMIT_URL` | backend | `redis://valkey:6379` | ElastiCache endpoint (TLS, `rediss://`) — the shared counters of the write limit per membership (IR375); unset = no limit |
 | `WRITE_LIMIT_PER_MINUTE` | backend | not set (60) | not set (60) — writes per membership and minute (network architecture §6) |
+| `ACCOUNTS_PER_ORG_PER_DAY` | backend (identity-api) | `500` (repeated end-to-end runs add many accounts to the demo companies) | not set (30) — accounts a contractor or customer owner adds to their organization in 24 hours (IR464) |
 | `OIDC_JWKS_URL` | backend | `http://keycloak:8080/realms/ac/protocol/openid-connect/certs` (container network) | not set (derived from the issuer discovery document) |
 | `OIDC_INTERNAL_ISSUER` | web | `http://keycloak:8080/realms/ac` (container network) | not set (same as `OIDC_ISSUER`) |
 | `OIDC_APP_CLIENT_ID` / `OIDC_ADMIN_CLIENT_ID` | backend, web | `ac-web` / `ac-admin-web` | Cognito app clients for `app.<domain>` / `admin.<domain>` (HQ network rule, IR117) |

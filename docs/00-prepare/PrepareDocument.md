@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.333.0
+version: 0.334.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -275,6 +275,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.334.0: A contractor or customer owner adds at most 30 accounts to the organization in 24 hours (IR464). Phase 1A unchanged.
 0.333.0: The common permission table and the backend actors describe adding users with an account (IR461). Phase 1A unchanged.
 0.332.0: A person removed earlier can be added again with the same e-mail, and HQ's new membership for an existing person reaches their sign-in (IR462); the accounts people are added with carry their sign-in claims, checked end to end by signing in as a new technician (IR463). Phase 1A unchanged.
 0.331.0: Accounts are created where people are added, with a set-up e-mail; contractors add technicians with an access end of at most a year; no set-up e-mail after the access end (DEC-79, IR461). FR/DD-P11, C19, A17 and A03 describe adding instead of inviting. Phase 1A unchanged.

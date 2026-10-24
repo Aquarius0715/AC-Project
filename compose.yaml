@@ -56,6 +56,7 @@ x-backend: &backend          # Core API business-domain services (service/api/cm
     WEATHER_API_BASE: http://weather-mock:8080          # WireMock GET /v1/current
     OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     RATE_LIMIT_URL: redis://:${VALKEY_PASSWORD:-local-valkey-only}@valkey:6379                   # write limit per membership, 60 per minute (IR375)
+    ACCOUNTS_PER_ORG_PER_DAY: "500"                     # accounts added per organization in 24 h (IR464; 30 in production): local E2E runs add many
     INTERNAL_API_TOKEN: local-internal-token-change-me   # service-to-service calls (identity principal, IR181)
     IDENTITY_INTERNAL_URL: http://identity-api:8080      # ignored by identity-api itself
     # internal queries between the services (IR190, IR193); a service never calls itself

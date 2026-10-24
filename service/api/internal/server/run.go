@@ -106,6 +106,14 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		}
 		cfg.WriteLimit = &ratelimit.Window{Store: store, Limit: limit, Window: time.Minute, Prefix: "ac:rl:write:"}
 	}
+	// the accounts a contractor or customer owner adds per organization in 24 hours (IR464; 30 by default)
+	if v := os.Getenv("ACCOUNTS_PER_ORG_PER_DAY"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			return cfg, fmt.Errorf("ACCOUNTS_PER_ORG_PER_DAY: %q", v)
+		}
+		cfg.AccountsPerDay = n
+	}
 	// the identity provider's admin API ends a user's sessions when HQ signs them out everywhere (IR386): the token
 	// endpoint and admin API of the realm with a service-account client; all four or none
 	if v := []string{os.Getenv("IDP_TOKEN_URL"), os.Getenv("IDP_ADMIN_URL"), os.Getenv("IDP_ADMIN_CLIENT_ID"), os.Getenv("IDP_ADMIN_CLIENT_SECRET")}; v[0]+v[1]+v[2]+v[3] != "" {

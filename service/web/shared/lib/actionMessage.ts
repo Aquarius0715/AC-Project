@@ -54,6 +54,10 @@ export function actionMessage(r: ActionFailure, t: T = translator("en")): string
   // the write limit per member (IR375): how long to wait, as the implementation contracts ask for RATE_LIMITED
   if (r.code === "RATE_LIMITED") {
     // the set-up e-mail goes at most every 5 minutes per user (IR423, IR461)
+    // a contractor or a customer owner adds at most 30 accounts a day (IR464)
+    if (r.messageKey === "errors.too_many_accounts") {
+      return t("Many users were added in the last 24 hours — you can add more in {h} h", { h: Math.max(1, Math.ceil((r.retryAfterSeconds ?? 86400) / 3600)) });
+    }
     if (r.messageKey === "errors.invite_recently_sent") {
       return t("The set-up e-mail was sent a moment ago — send it again in {m} min", { m: Math.max(1, Math.ceil((r.retryAfterSeconds ?? 300) / 60)) });
     }

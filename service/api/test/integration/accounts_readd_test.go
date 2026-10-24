@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/idp"
 	"github.com/pradita/ac-project/service/api/internal/seed"
@@ -259,5 +260,53 @@ func TestAccountProviderTrouble(t *testing.T) {
 	drain()
 	if sub, signIn := account(again); sub != "sub-"+email+"#2" || signIn != again {
 		t.Errorf("the lost account: %q %q", sub, signIn)
+	}
+}
+
+// TestAccountsPerOrgPerDay (IR464): a contractor or a customer owner adds at most identity.AccountsPerOrgPerDay accounts
+// to their organization in 24 hours — the next is RATE_LIMITED errors.too_many_accounts with the seconds until the
+// oldest of them is a day old; HQ is not limited.
+func TestAccountsPerOrgPerDay(t *testing.T) {
+	s := server(t)
+	filler := uuid.New()
+	owner(t, `INSERT INTO identity.users (id, email, display_name) VALUES ($1, $2, 'Cap Filler')`, filler, "cap-"+uuid.NewString()[:8]+"@example.com")
+	var ids []uuid.UUID
+	for _, org := range []string{"org-contractor-b", "org-customer-b"} {
+		for i := 0; i < identity.AccountsPerOrgPerDay; i++ { // ended memberships added 1 h to 1 h 29 min ago
+			id := uuid.New()
+			ids = append(ids, id)
+			role, employment, clientRole := "technician", any("external"), any(nil)
+			if org == "org-customer-b" {
+				role, employment, clientRole = "client", nil, "member"
+			}
+			owner(t, `INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, client_role, valid_from, valid_until, created_at)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, id, seed.ID("tenant-a"), filler, seed.ID(org), role, employment, clientRole,
+				clock.Add(-3*time.Hour), clock.Add(-2*time.Hour), clock.Add(-time.Hour-time.Duration(i)*time.Minute))
+		}
+	}
+	t.Cleanup(func() {
+		owner(t, `DELETE FROM identity.memberships WHERE id = ANY($1)`, ids)
+		owner(t, `DELETE FROM identity.users WHERE id = $1`, filler)
+	})
+	// the wait runs until the oldest of the latest 30 is a day old: at most 23 h, as each of ours is an hour old or more
+	// (other tests may have added to contractor B since, which only shortens it)
+	code, m := write(s, &contrB, "partnerUsers.save", `{"email":"cap-`+uuid.NewString()[:8]+`@example.com","partnerRole":"technician","displayName":"Cap Tech","accessUntil":"`+clock.Add(24*time.Hour).Format(time.RFC3339)+`"}`, 0)
+	wait, _ := m["retryAfterSeconds"].(float64)
+	if code != 429 || m["messageKey"] != "errors.too_many_accounts" || wait <= 0 || wait > float64(23*time.Hour/time.Second) {
+		t.Errorf("contractor over the cap: %d %v", code, m)
+	}
+	cust := seed.ID("cust-b").String()
+	add := func(a *actor) (int, map[string]any) {
+		return write(s, a, "clientUsers.save", `{"customerId":"`+cust+`","email":"cap-`+uuid.NewString()[:8]+`@example.com","clientRole":"member","displayName":"Cap Client"}`, 0)
+	}
+	if code, m := add(&customerB); code != 429 || m["messageKey"] != "errors.too_many_accounts" {
+		t.Errorf("customer owner over the cap: %d %v", code, m)
+	}
+	code, m = add(&hq)
+	if code != 200 {
+		t.Fatalf("HQ is not limited: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "clientUsers.remove", `{"id":"`+data(m)["id"].(string)+`","reason":"cap test"}`, 1); code != 200 {
+		t.Errorf("remove: %d %v", code, m)
 	}
 }

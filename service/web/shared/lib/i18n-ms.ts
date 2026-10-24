@@ -5735,6 +5735,7 @@ export const ms: Record<string, string> = {
   "Make member": "Jadikan ahli",
   "{name} is now an owner": "{name} kini pemilik",
   "{name} is now a member": "{name} kini ahli",
+  "Many users were added in the last 24 hours — you can add more in {h} h": "Ramai pengguna telah ditambah dalam 24 jam yang lalu — anda boleh menambah lagi dalam {h} jam",
   "The set-up e-mail was sent a moment ago — send it again in {m} min": "E-mel persediaan telah dihantar sebentar tadi — hantar semula dalam {m} min",
   "You can’t change or remove your own account": "Anda tidak boleh mengubah atau mengalih keluar akaun anda sendiri",
   "The last active owner can’t be demoted, disabled or removed": "Pemilik aktif terakhir tidak boleh diturunkan, dilumpuhkan atau dialih keluar",

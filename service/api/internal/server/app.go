@@ -54,6 +54,7 @@ type Config struct {
 	WriteLimit        ops.WriteLimiter     // writes per membership and minute (IR375); nil = no limit
 	IdentityProvider  identity.Provider    // ends sessions (IR386) and opens / turns off accounts (IR461) at the identity provider; nil = none
 	AccountApps       identity.AccountApps // the apps a new account's set-up e-mail returns to (IR461)
+	AccountsPerDay    int                  // accounts a contractor or customer owner adds per organization in 24 h (IR464); 0 = 30
 	WrapTx            func(pgx.Tx) pgx.Tx  // tests only: wraps each operation's transaction to inject database failures; nil = none
 }
 
@@ -96,6 +97,9 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	reg.ServeDomains(cfg.Domains...)
 	reg.DB, reg.Rec, reg.Idem = m, notifyingRecorder{inner: db.Recorder{}}, db.Idempotency{M: m}
 	reg.Limit = cfg.WriteLimit
+	if cfg.AccountsPerDay > 0 {
+		identity.AccountsPerOrgPerDay = cfg.AccountsPerDay
+	}
 	if cfg.Clock != nil {
 		reg.Clock = cfg.Clock
 	}
