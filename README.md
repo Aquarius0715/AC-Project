@@ -10,6 +10,7 @@ app on a Go Core API split into business-domain services. The specification live
 | `docs` | requirements, design, catalogs, validators (`docs/tools`) |
 | `docker` | Keycloak realm, Mosquitto, IoT demo script |
 | `compose.yaml` | the local stack (profiles below) |
+| `AC_Project_Overview.pptx` | the overview deck as of docs 0.21.0 (2026-10-01): historical — it predates the implementation; the current state is in [docs/README.md](docs/README.md) |
 
 ## Run locally
 
