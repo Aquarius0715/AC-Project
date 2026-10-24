@@ -6853,3 +6853,10 @@ Found in review, after IR458: the technician's job history is frozen when their 
 2. The scheduler freezes a technician's history only when they hold no open window on the job any more, and from the window that ends last.
 3. Test: `TestExtensionRefreezesTechnicianHistory` (frozen at the first end, nothing while the extension is open, frozen again at its end).
 
+## IR460 Alerts opened at the same time end as one — 2026-10-24
+
+Found in review: the policy evaluation (sensor alerts), the tamper alert and the reconciliation alert each looked for an open alert of the incident and inserted one if none was found. Two transactions doing so at once both found none; the second insert then failed on `alerts_one_open_per_rule`, and the whole telemetry or device write with it.
+
+1. The inserts are `ON CONFLICT DO NOTHING`; when another transaction opened the alert first, the open alert is read and used (sensor and tamper), or nothing more is done (reconciliation).
+2. Test: `TestConcurrentAlertOpening` (two transactions open the tamper alert of one unit at once: one open alert, both see its ID).
+

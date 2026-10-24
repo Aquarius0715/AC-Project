@@ -50,7 +50,8 @@ func EventHandlers() map[string]events.Handler {
 				SELECT u.tenant_id, u.id, u.customer_org_id, 'reconciliation_required', 'warning', 'open', 'unknown', 'demo_observation',
 					'Device still reports an ended restriction; reconcile it from HQ', platform.app_now(), platform.app_now(), platform.app_now(), platform.app_now()
 				FROM assets.units u
-				WHERE u.id = ANY($1) AND NOT EXISTS (SELECT 1 FROM monitoring.alerts a WHERE a.unit_id = u.id AND a.type = 'reconciliation_required' AND a.status <> 'resolved')`, p.UnitIDs)
+				WHERE u.id = ANY($1) AND NOT EXISTS (SELECT 1 FROM monitoring.alerts a WHERE a.unit_id = u.id AND a.type = 'reconciliation_required' AND a.status <> 'resolved')
+				ON CONFLICT DO NOTHING`, p.UnitIDs) // a concurrent delivery may have opened it (alerts_one_open_per_rule)
 			return err
 		},
 		events.ReconciliationResolved: func(ctx context.Context, tx pgx.Tx, e events.Event) error {

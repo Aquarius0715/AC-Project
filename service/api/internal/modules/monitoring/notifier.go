@@ -403,7 +403,11 @@ func sourceAlert(ctx context.Context, c *ops.Call, unit, org, policy uuid.UUID, 
 	err = c.Tx.QueryRow(ctx, `INSERT INTO monitoring.alerts (tenant_id, unit_id, customer_org_id, policy_id, rule_key, type, severity, status, cause_code, evidence_kind, evidence_text,
 		observed_at, detected_at, created_at, updated_at, previous_alert_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'sensor', $5, 'open', 'unknown', 'demo_observation', $6, $7, $7, $7, $7,
 		(SELECT p.id FROM monitoring.alerts p WHERE p.unit_id = $1 AND p.policy_id = $3 AND p.rule_key IS NOT DISTINCT FROM $4 AND p.type = 'sensor' ORDER BY p.detected_at DESC, p.id DESC LIMIT 1))
-		RETURNING id`, unit, org, policy, key, cnd.Severity, "Demo event: "+cnd.Metric+" "+cnd.Operator+" threshold", at).Scan(&id)
+		ON CONFLICT DO NOTHING RETURNING id`, unit, org, policy, key, cnd.Severity, "Demo event: "+cnd.Metric+" "+cnd.Operator+" threshold", at).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) { // a concurrent evaluation opened it first (alerts_one_open_per_rule)
+		err = c.Tx.QueryRow(ctx, `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND rule_key IS NOT DISTINCT FROM $3 AND type = 'sensor' AND status <> 'resolved'`,
+			unit, policy, key).Scan(&id)
+	}
 	return id, err
 }
 

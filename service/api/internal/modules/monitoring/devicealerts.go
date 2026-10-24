@@ -25,6 +25,9 @@ func (Alerts) TamperAlert(ctx context.Context, tx pgx.Tx, unit, org uuid.UUID, t
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'tamper', 'critical', 'open', 'unknown', 'demo_observation', $3, $4, $4,
 			(SELECT p.id FROM monitoring.alerts p WHERE p.unit_id = $1 AND p.policy_id IS NULL AND p.type = 'tamper' AND p.cause_code = 'unknown' ORDER BY p.detected_at DESC, p.id DESC LIMIT 1),
 			$4, $4)
-		RETURNING id`, unit, org, text, at).Scan(&id)
+		ON CONFLICT DO NOTHING RETURNING id`, unit, org, text, at).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) { // a concurrent tamper event opened it first (alerts_one_open_per_rule)
+		err = tx.QueryRow(ctx, `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id IS NULL AND type = 'tamper' AND cause_code = 'unknown' AND status <> 'resolved'`, unit).Scan(&id)
+	}
 	return id, err
 }
