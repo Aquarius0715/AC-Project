@@ -6900,3 +6900,12 @@ Found in the security round (rate limits): since IR461 every account added mails
 2. **Web.** “Many users were added in the last 24 hours — you can add more in {h} h” (hours rounded up), English and Malay.
 3. **Tests.** `TestAccountsPerOrgPerDay` (contractor B and customer B at the cap: their 31st is refused with the seconds to wait; HQ adds to customer B); web `actionMessage.test.ts`.
 
+## IR465 The first contractor company is added from the register — 2026-10-24
+
+Found in the business operation review of 2026-10-15 (high-2): in an environment without contractor organizations HQ could not add the first contractor. Add contractor only gave a profile to an existing contractor organization and was disabled when none was left, pointing to Access & roles — which reads organizations but creates none. No screen created a contractor organization, so offers, assignments, rate cards and payouts could not start.
+
+1. **New company.** Add contractor is always available. Its organization choice lists the contractor companies without a profile and **New company…**; a new company takes a name (1–120). Saving runs `organizations.save` (kind contractor, active), then `contractors.save` for the profile, and opens the new contractor. In an empty register New company is the default.
+2. **No second company on a retry.** When the profile is refused after the company was created, the dialog stays open with that company chosen (the failure shows as a toast), so saving again adds only the profile; Cancel leaves the company listed without a profile. A second contractor company with the same name is CONFLICT `error.duplicateName` (existing rule, IR208) and creates nothing; the register says “a contractor company with this name exists already”.
+3. **Texts.** The empty register says that Add contractor creates the first company with its profile; the footnote says HQ adds the staff in Access & roles and the company's contractors in the partner app's Users (no more “organizations are created in Access & roles”). English and Malay. The screen catalog lists `organizations.save` for SCR-A06.
+4. **Tests.** E2E `admin/contractors.e2e.ts`: a new company with its profile is created and opened, the dialog passes the axe check, and the same name again is refused with no second company.
+

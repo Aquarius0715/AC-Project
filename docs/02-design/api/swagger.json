@@ -18214,7 +18214,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:asset.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A02",
+                "description": "Authorization: admin:asset.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A02, DD-A21",
                 "consumes": [
                     "application/json"
                 ],
@@ -18321,7 +18321,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:asset.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A02",
+                "description": "Authorization: admin:asset.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A02, DD-A21",
                 "consumes": [
                     "application/json"
                 ],

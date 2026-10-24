@@ -507,7 +507,7 @@ Design: [DD-A20](../02-design/admin.md#dd-a20-details). Assess parent AT-A20 usi
 
 - **Company request basis**: SRC-06 BIZ-12; Figma-confirmed Admin 06-9 (2026-10-01).
 - **Entry conditions**: job.read to view, job.write to change; Maintenance jobs › Contractors tab.
-- **Main flow**: KPIs (offer acceptance, arrival in window, report accepted first time, customer rating, rework rate; last 90 days) → contractor list (Active/Suspended) → detail: registration, service areas, delegation period, contact, insurance, technicians & certificates (Verify uploads), rate card (versioned) → Edit rate card / Suspend offers / + Add contractor.
+- **Main flow**: KPIs (offer acceptance, arrival in window, report accepted first time, customer rating, rework rate; last 90 days) → contractor list (Active/Suspended) → detail: registration, service areas, delegation period, contact, insurance, technicians & certificates (Verify uploads), rate card (versioned) → Edit rate card / Suspend offers / + Add contractor (a company without a profile, or a new company with its name, IR465).
 - **Business rule BR-A21**: Contractor companies are partners, not users; HQ sets their staff's memberships, permissions and access periods in Access & roles (FR-A03), and since DEC-76 the contractor adds, disables and removes its own company's contractors and technicians (FR-P11); since DEC-79 both HQ and the contractor create technicians, the contractor with an access end at most a year ahead. A rate card change creates a new version from a future date and is used by payouts (FR-A23). Suspending offers needs a reason; open jobs continue, only new offers are blocked. Certificates uploaded by the contractor (FR-P09) count only after HQ verification (`certificates.verify`). Customer rating comes from the client Confirm & rate step (FR-C17).
 - **Resulting business state**: ContractorProfile/RateCard versions; Certificate approved or rejected.
 - **Boundaries/prohibitions**: Offering a job to a suspended contractor → CONFLICT; rate card from a past date → VALIDATION.
@@ -516,7 +516,7 @@ Design: [DD-A20](../02-design/admin.md#dd-a20-details). Assess parent AT-A20 usi
 |---|---|---|
 | AT-A21-N | contractor-a. When: edit rate card (repair base 450.00, effective next month) → open tech-external-a's renewal document → verify the renewal | ① RateCard new version, effectiveFrom future ② The uploaded file opens (certificates.getContent, IR436) ③ Certificate valid, Membership qualification validUntil updated |
 | AT-A21-E | ① Suspend without reason ② jobs.offer to suspended contractor-c | ① VALIDATION ② CONFLICT |
-| AT-A21-B | ① Suspend contractor-b with an open job ② contractor-b opens contractor-a's certificate document | ① Open job unchanged; no new offers ② NOT_FOUND (IR436) |
+| AT-A21-B | ① Suspend contractor-b with an open job ② contractor-b opens contractor-a's certificate document ③ In an empty register, Add contractor with New company “Lim Aircon Services”, then the same name again | ① Open job unchanged; no new offers ② NOT_FOUND (IR436) ③ The company and its profile are created and opened; the same name again → CONFLICT, no second company (IR465) |
 
 Design: [DD-A21](../02-design/admin.md#dd-a21-details). Assess parent AT-A21 using all N/E/B cases in traceability.
 

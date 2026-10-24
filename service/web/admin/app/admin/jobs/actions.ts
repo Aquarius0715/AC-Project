@@ -143,6 +143,14 @@ const value = async <T,>(fn: () => Promise<T>): Promise<{ ok: true; value: T } |
   }
 };
 
+/** organizations.save: a new contractor company (IR465) — Add contractor creates it, then its profile. */
+export async function createContractorOrganization(name: string) {
+  return value(async () => {
+    const o = await coreOp<{ id: string; name: string }>("organizations.save", { name: name.trim(), kind: "contractor", status: "active" }, { write: true });
+    return { id: o.id, name: o.name };
+  });
+}
+
 /** contractors.save: a new profile for a contractor organization, or the profile (with its version). */
 export async function saveContractor(input: { id: string | null; version: number | null; organizationId: string; registrationNo: string; serviceAreas: string[]; contactEmail: string; insuranceValidUntil: string | null }) {
   return value(async () => {

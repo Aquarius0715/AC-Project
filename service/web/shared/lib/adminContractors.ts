@@ -148,6 +148,7 @@ export function nextMonthStart(now: number): string {
 export function contractorRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   const keys: Record<string, string> = {
     "errors.profile_exists": "this organization already has a contractor profile",
+    "error.duplicateName": "a contractor company with this name exists already", // a new company's name (IR465)
     "error.notContractor": "the organization is not a contractor", "error.organizationFixed": "a profile’s organization cannot change",
     "error.invalidState": "nothing to change in the current state", "error.versionConflict": "the record changed meanwhile — the latest version is shown",
     "error.count": "wrong number of entries", "error.invalid": "not a valid value", "error.length": "too long", "error.required": "required", "error.past": "must be in the future",

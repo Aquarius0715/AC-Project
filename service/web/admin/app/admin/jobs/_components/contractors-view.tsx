@@ -9,7 +9,7 @@ import { businessDay, KL } from "@ac/web/lib/clientBilling";
 import { klDate, klStart } from "@ac/web/lib/partnerTeam";
 import { areasOf, contractorRefusal, nextMonthStart, profileErrors, rateCardErrors, WORK_TYPES, type WorkType } from "@ac/web/lib/adminContractors";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
-import { saveContractor, saveRateCard, setOfferStatus, verifyCertificate } from "../actions";
+import { createContractorOrganization, saveContractor, saveRateCard, setOfferStatus, verifyCertificate } from "../actions";
 import type { ContractorsLive } from "../_lib/load";
 import { JobsTabs } from "./jobs-header";
 import { NewJobModal } from "./jobs-view";
@@ -17,6 +17,9 @@ import { Icon } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 
 type Detail = NonNullable<ContractorsLive["detail"]>;
+/** The organization choice of a company still to create (IR465). */
+const NEW_COMPANY = "new";
+
 type ModalState = null | { kind: "profile"; organizationId: string | null } | { kind: "status" } | { kind: "rates" } | { kind: "verify" } | { kind: "job" };
 
 /** HQ contractor register (FR-A21, DD-A21, Figma Admin 06-9) from the Core API. Texts in the display language; the
@@ -33,8 +36,8 @@ export function ContractorsView({ live }: { live: ContractorsLive }) {
       <JobsTabs tab="contractors" counts={live.counts} q={{}} action={<Btn variant="primary" size="sm" onClick={() => setModal({ kind: "job" })}><Icon name="add" /> {t("New job")}</Btn>} />
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
       <div className="split-rev">
-        <Card title={t("Contractors")} className="self-start" action={<Btn size="sm" disabled={!live.withoutProfile.length} title={live.withoutProfile.length ? undefined : t("Every contractor organization has a profile — add the organization in Access & roles first.")} onClick={() => setModal({ kind: "profile", organizationId: live.withoutProfile[0]?.id ?? null })}><Icon name="add" /> {t("Add contractor")}</Btn>}>
-          {live.rows.length === 0 ? <EmptyState title={t("No contractor organizations")}>{t("Contractor organizations are created in Access & roles (A03).")}</EmptyState> : (
+        <Card title={t("Contractors")} className="self-start" action={<Btn size="sm" onClick={() => setModal({ kind: "profile", organizationId: live.withoutProfile[0]?.id ?? null })}><Icon name="add" /> {t("Add contractor")}</Btn>}>
+          {live.rows.length === 0 ? <EmptyState title={t("No contractor organizations")}>{t("Add contractor creates the first company with its profile; its staff are added afterwards.")}</EmptyState> : (
             <div className="flex flex-col gap-1.5">{live.rows.map((r) => (
               <ListRow key={r.id} selected={d?.org.id === r.id} href={`/admin/jobs?tab=contractors&contractorId=${r.id}`}>
                 <div className="min-w-0 flex-1"><b className="block truncate text-[13px]">{r.name}</b><div className="text-[11px] text-muted-foreground">{r.sub}</div></div>
@@ -42,7 +45,7 @@ export function ContractorsView({ live }: { live: ContractorsLive }) {
               </ListRow>
             ))}</div>
           )}
-          <p className="mt-2 text-[11px] text-muted-foreground">{t("Contractor companies are partners, not users — their staff accounts are managed in Access & roles (A03).")}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("Contractor companies are partners, not users — HQ adds their staff in Access & roles (A03), and their contractors in the partner app's Users.")}</p>
         </Card>
         {d ? <ContractorDetail key={`${d.org.id}:${d.profile?.version ?? 0}`} d={d} open={setModal} /> : <Card title={t("Contractor")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That contractor no longer exists." : "Pick a contractor.")}</p></Card>}
       </div>
@@ -98,21 +101,41 @@ function ProfileModal({ live, d, organizationId, onClose, onFail }: ModalProps &
   const router = useRouter();
   const [pending, run] = useAction();
   const existing = d?.profile && d.profile.organizationId === organizationId ? d.profile : null;
-  const [org, setOrg] = useState(organizationId ?? live.withoutProfile[0]?.id ?? "");
+  // a company without a profile, or a new one created first (IR465); once created it stays chosen, so trying again
+  // after a refused profile adds the profile only
+  const [org, setOrg] = useState(organizationId ?? live.withoutProfile[0]?.id ?? NEW_COMPANY);
+  const [company, setCompany] = useState("");
+  const [created, setCreated] = useState<{ id: string; name: string } | null>(null);
   const [f, setF] = useState({ registrationNo: existing?.registrationNo ?? "", serviceAreas: existing?.serviceAreas.join(", ") ?? "", contactEmail: existing?.contactEmail ?? "", insurance: existing?.insuranceValidUntil ? klDate(existing.insuranceValidUntil) : "" });
   const [tried, setTried] = useState(false);
   const errors = profileErrors(f, t);
-  const choices = existing ? [{ id: existing.organizationId, name: existing.name }] : live.withoutProfile;
+  const choices = existing ? [{ id: existing.organizationId, name: existing.name }] : [...live.withoutProfile, ...(created ? [created] : [])];
+  const companyLength = [...company.trim()].length;
+  const companyError = org === NEW_COMPANY && (companyLength < 1 || companyLength > 120) ? t("A company name of 1–120 characters") : undefined;
   const save = () => {
     setTried(true);
-    if (Object.keys(errors).length || !org) return;
+    if (Object.keys(errors).length || !org || companyError) return;
     const insuranceValidUntil = f.insurance ? klStart(f.insurance) : null; // the start of that Kuala Lumpur day
-    run(() => saveContractor({ id: existing?.id ?? null, version: existing?.version ?? null, organizationId: org, registrationNo: f.registrationNo, serviceAreas: areasOf(f.serviceAreas), contactEmail: f.contactEmail, insuranceValidUntil }),
-      t(existing ? "Profile saved" : "Contractor profile created"), () => { onClose(t(existing ? "Profile saved." : "Contractor profile created — its KPIs, rate card and certificates show here.")); if (!existing) router.push(`/admin/jobs?tab=contractors&contractorId=${org}`); }, onFail);
+    let made = false; // this attempt created the company: a refused profile keeps the dialog open on it
+    run(async () => {
+      let target = org;
+      if (target === NEW_COMPANY) {
+        const o = await createContractorOrganization(company);
+        if (!o.ok) return o;
+        target = o.value.id;
+        made = true;
+        setCreated(o.value);
+        setOrg(target);
+      }
+      const r = await saveContractor({ id: existing?.id ?? null, version: existing?.version ?? null, organizationId: target, registrationNo: f.registrationNo, serviceAreas: areasOf(f.serviceAreas), contactEmail: f.contactEmail, insuranceValidUntil });
+      return r.ok ? { ok: true as const, value: { organizationId: target } } : r;
+    }, t(existing ? "Profile saved" : "Contractor profile created"), (v) => { onClose(t(existing ? "Profile saved." : "Contractor profile created — its KPIs, rate card and certificates show here.")); if (!existing) router.push(`/admin/jobs?tab=contractors&contractorId=${v.organizationId}`); },
+    (r) => { if (made) router.refresh(); else onFail(r); }); // the new company exists: fix the profile and save again
   };
   return (
     <Modal open onClose={() => onClose()} title={existing ? t("Edit {name}", { name: existing.name }) : t("Add contractor")} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t(existing ? "Save" : "Add contractor")}</Btn></>}>
-      <Field label={t("Contractor organization")} hint={t(existing ? "A profile’s organization cannot change." : "Organizations of kind contractor without a profile (Access & roles creates them).")}><Select value={org} disabled={!!existing} onChange={(e) => setOrg(e.target.value)}>{choices.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select></Field>
+      <Field label={t("Contractor organization")} hint={t(existing ? "A profile’s organization cannot change." : "A company without a profile, or a new company.")}><Select value={org} disabled={!!existing} onChange={(e) => setOrg(e.target.value)}>{choices.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}{!existing && <option value={NEW_COMPANY}>{t("New company…")}</option>}</Select></Field>
+      {org === NEW_COMPANY && <Field label={t("Company name · required")} hint={t("The contractor company is created with this name, then its profile")} error={tried ? companyError : undefined}><Input value={company} maxLength={120} onChange={(e) => setCompany(e.target.value)} placeholder="Lim Aircon Services Sdn Bhd" /></Field>}
       <Field label={t("Registration number · required")} error={tried ? errors.registrationNo : undefined}><Input value={f.registrationNo} maxLength={64} onChange={(e) => setF({ ...f, registrationNo: e.target.value })} placeholder="SSM 202301012345" /></Field>
       <Field label={t("Service areas · required")} hint={t("Comma-separated, 1–20")} error={tried ? errors.serviceAreas : undefined}><Input value={f.serviceAreas} onChange={(e) => setF({ ...f, serviceAreas: e.target.value })} placeholder="Kuala Lumpur, Selangor" /></Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>

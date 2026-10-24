@@ -165,7 +165,7 @@ func uniqueName(ctx context.Context, c *ops.Call, id uuid.UUID) error {
 // @Description	Authorization: admin:asset.write
 // @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-// @Description	Design: DD-A02
+// @Description	Design: DD-A02, DD-A21
 // @Tags			organizations
 // @Accept			json
 // @Produce		json
