@@ -264,8 +264,9 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 		}
 	}
 	for _, a := range f.Actors {
-		if err := ex(`INSERT INTO identity.users (id, email, display_name) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
-			ID(a.UserID), a.MembershipID+"@ac.local", a.DisplayName); err != nil {
+		// the realm's account of the actor names this membership in its claims (IR462)
+		if err := ex(`INSERT INTO identity.users (id, email, display_name, sign_in_membership_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+			ID(a.UserID), a.MembershipID+"@ac.local", a.DisplayName, ID(a.MembershipID)); err != nil {
 			return fmt.Errorf("user %s: %w", a.UserID, err)
 		}
 		if err := ex(`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, client_role, scope_version, valid_from, valid_until)

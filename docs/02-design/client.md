@@ -642,7 +642,7 @@ Scope: FR-C19 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
 | displayName | string/required when adding | 1–120; the person's name | Identity |
-| email | string/required | Valid address, ≤ 254, unique per customer (case-insensitive) and one person per address (another use → `errors.email_taken`); fixed once added | Sign-in |
+| email | string/required | Valid address, ≤ 254, unique per customer (case-insensitive) and one person per address (another use → `errors.email_taken`; a person this tenant removed is taken back, IR462); fixed once added | Sign-in |
 | clientRole | enum/required | member / owner; the customer keeps an active owner | Role |
 | status | enum | invited (= not signed in yet, read-only) / active / disabled | Access |
 | reason | string | 1–1000; required on every change after the adding | Audit |
@@ -655,7 +655,7 @@ Scope: FR-C19 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 3. Not signed in yet: Resend set-up e-mail (`clientUsers.resendInvite`; at most every 5 minutes per user, sooner → RATE_LIMITED `errors.invite_recently_sent` with the seconds to wait, IR423), Change role and Remove (reason → `clientUsers.remove`; the sign-in account is turned off).
 4. On a user who has signed in: Change role, Disable / Enable (reason → `clientUsers.save` with clientRole / status; the sign-in account is turned off / on) and Remove (reason → `clientUsers.remove`; the membership ends now and the sign-in account is turned off).
 
-**Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept, 11c); an address another person uses → VALIDATION `errors.email_taken`; a changed e-mail → VALIDATION `error.immutable`. The own account → CONFLICT `errors.own_account`; demoting, disabling or removing the last active owner → CONFLICT `errors.last_owner`; a stale version → CONFLICT, the list refetches. Member sessions have no sidebar item; the direct URL shows Page unavailable (FORBIDDEN). Password resets stay with HQ (DD-A17).
+**Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept, 11c); an address someone with access holds → VALIDATION `errors.email_taken` (a person removed here is added again instead, IR462); a changed e-mail → VALIDATION `error.immutable`. The own account → CONFLICT `errors.own_account`; demoting, disabling or removing the last active owner → CONFLICT `errors.last_owner`; a stale version → CONFLICT, the list refetches. Member sessions have no sidebar item; the direct URL shows Page unavailable (FORBIDDEN). Password resets stay with HQ (DD-A17).
 
 **Verification**: Check the traceability entries under AT-C19 (N/E/B).
 

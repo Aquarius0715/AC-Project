@@ -193,6 +193,7 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 - Aurora PITR 35 days, daily snapshots copied to ap-southeast-1; restore drills quarterly (RPO 15 minutes, RTO 4 hours).
 - Dev and staging use synthetic data only; production data is never copied to lower environments. Acceptance tests seed from fixture-contract.json.
 - `identity.users.last_sign_in_at` is the business time of the latest sign-in, and `sign_in_auth_time` is the identity provider's `auth_time` of that sign-in. Only a later `auth_time` replaces them (IR268).
+- `identity.users.sign_in_membership_id` is the membership the provider account's claims name (IR462). A person whose sign-in membership is this tenant's and has no open membership here can be added again; another tenant's sign-in membership is invisible under RLS, so its person stays taken.
 - Personal data anonymisation (backend architecture §7) updates `identity.users` (status `anonymised`, e-mail replaced) and `identity.client_users`; audit rows keep IDs but never contact data (masked at write time).
 
 Additional contracts for current version 0.40.0: Read IR01–IR384 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

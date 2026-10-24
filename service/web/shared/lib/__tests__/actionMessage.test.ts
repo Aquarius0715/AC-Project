@@ -20,7 +20,9 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     // IR375: the write limit says how long to wait
     expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "error.rateLimited", retryAfterSeconds: 40 }))).toBe("Too many changes in a short time — try again in 40 s");
     expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "error.rateLimited" }))).toBe("Too many changes in a short time — try again shortly");
-    expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "errors.invite_recently_sent", retryAfterSeconds: 241 }))).toBe("The invitation was e-mailed a moment ago — send it again in 5 min");
+    expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "errors.invite_recently_sent", retryAfterSeconds: 241 }))).toBe("The set-up e-mail was sent a moment ago — send it again in 5 min");
+    // IR462: an address someone with access holds says what to do; a nested field is named by its last part
+    expect(actionMessage(failure({ fieldErrors: { "newUser.email": "errors.email_taken" } }))).toBe("Email belongs to someone who still has access — use another address or ask HQ");
   });
   it("words the line in the display language; field names and domain keys stay humanized English (IR269)", () => {
     const t = translator("ms");

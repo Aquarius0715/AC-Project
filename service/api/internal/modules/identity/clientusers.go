@@ -225,7 +225,7 @@ func otherActiveOwner(ctx context.Context, c *ops.Call, customer, except uuid.UU
 // @Summary		clientUsers.save (write)
 // @ID				clientUsers.save
 // @Description	Authorization: client:self-customer:owner | admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer and one account per person (errors.email_taken); a new user needs displayName 1–120 and is created at once with a set-up e-mail (IR461); last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account (IR417); the e-mail stays (IR422)
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer and one account per person (errors.email_taken; a person this tenant removed is added again; IR462); a new user needs displayName 1–120 and is created at once with a set-up e-mail (IR461); last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account (IR417); the e-mail stays (IR422)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A17, DD-C19
 // @Tags			clientUsers

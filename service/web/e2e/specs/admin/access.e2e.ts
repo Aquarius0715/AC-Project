@@ -83,7 +83,7 @@ test("HQ adds a new person with a membership, and revoking it ends the membershi
   await main.getByRole("button", { name: "Create membership" }).click();
   await expect(page.getByText("Membership created").first()).toBeVisible();
   await page.waitForURL(/membershipId=[0-9a-f-]{36}/);
-  await expect(main.locator("button[aria-pressed]", { hasText: "E2E Colleague" })).toBeVisible();
+  await expect(main.locator('button[aria-pressed="true"]', { hasText: "E2E Colleague" })).toBeVisible(); // the new one is selected (an earlier run's stays listed, revoked)
   const search = `http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`;
   if ((await fetch(search).catch(() => null))?.ok) {
     await expect.poll(async () => ((await (await fetch(search)).json()) as { messages_count: number }).messages_count, { timeout: 30_000 }).toBeGreaterThanOrEqual(1);

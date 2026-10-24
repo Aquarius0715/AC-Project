@@ -3,15 +3,17 @@ package idp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
-// TestKeycloakAccounts (IR461): a created account carries the claim attributes and returns the new user's ID; an
-// existing e-mail is found and updated instead (a retried provisioning is one account); the set-up e-mail asks for a
-// password and the e-mail check and returns to the app; an account is turned off.
+// TestKeycloakAccounts (IR461, IR462): a created account carries the claim attributes and returns the new user's ID;
+// an existing e-mail is found and updated instead (a retried provisioning is one account), keeping the user's other
+// attributes; an update of an account the realm lost is ErrNoAccount; the set-up e-mail asks for a password and the
+// e-mail check and returns to the app; an account is turned off.
 func TestKeycloakAccounts(t *testing.T) {
 	type call struct{ method, path, query, body string }
 	var calls []call
@@ -34,6 +36,10 @@ func TestKeycloakAccounts(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 		case r.Method == http.MethodGet && r.URL.Path == "/admin/users":
 			_, _ = w.Write([]byte(`[{"id":"old-id"}]`))
+		case r.Method == http.MethodGet && r.URL.Path == "/admin/users/old-id":
+			_, _ = w.Write([]byte(`{"id":"old-id","username":"tech@contractor.example","email":"tech@contractor.example","enabled":false,"attributes":{"locale":["ms"],"membership_id":["m0"]}}`))
+		case r.URL.Path == "/admin/users/gone-id":
+			w.WriteHeader(http.StatusNotFound)
 		default:
 			w.WriteHeader(http.StatusNoContent)
 		}
@@ -56,8 +62,20 @@ func TestKeycloakAccounts(t *testing.T) {
 		t.Errorf("created user: %s", calls[0].body)
 	}
 	exists, calls = true, nil
-	if id, err := k.CreateAccount(ctx, a); err != nil || id != "old-id" || len(calls) != 3 || calls[2].method != http.MethodPut || calls[2].path != "/users/old-id" {
-		t.Errorf("existing e-mail: %q %v %v", id, err, calls)
+	if id, err := k.CreateAccount(ctx, a); err != nil || id != "old-id" || len(calls) != 4 || calls[3].method != http.MethodPut || calls[3].path != "/users/old-id" {
+		t.Fatalf("existing e-mail: %q %v %v", id, err, calls)
+	}
+	var updated struct {
+		Email      string              `json:"email"`
+		Enabled    bool                `json:"enabled"`
+		Attributes map[string][]string `json:"attributes"`
+	}
+	// the whole user goes back: the e-mail stays (IR463), the other attributes too
+	if err := json.Unmarshal([]byte(calls[3].body), &updated); err != nil || !updated.Enabled || updated.Email != a.Email || updated.Attributes["membership_id"][0] != "m1" || updated.Attributes["locale"][0] != "ms" {
+		t.Errorf("updated user: %s", calls[3].body)
+	}
+	if err := k.UpdateAccount(ctx, "gone-id", a); !errors.Is(err, ErrNoAccount) {
+		t.Errorf("an account the realm lost: %v", err)
 	}
 	calls = nil
 	if err := k.SendSetup(ctx, "new-id", a); err != nil || calls[0].path != "/users/new-id/execute-actions-email" ||

@@ -166,6 +166,7 @@ CREATE TABLE identity.users (
   status        text NOT NULL DEFAULT 'active' CHECK (status IN ('invited','active','disabled','anonymised')),
   last_sign_in_at timestamptz,             -- business time of the latest sign-in (IR268)
   sign_in_auth_time timestamptz,           -- the identity provider's auth_time of that sign-in (IR268)
+  sign_in_membership_id uuid,              -- the membership the sign-in account's claims name; null = not provisioned (IR462)
   created_at    timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at    timestamptz NOT NULL DEFAULT platform.app_now(),
   version       int NOT NULL DEFAULT 1

@@ -16,6 +16,8 @@ const fieldText: Record<string, string> = {
   "error.duplicate": "{field} is already used",
   "error.count": "{field} has the wrong number of entries",
   "error.invalidFile": "{field} is not an accepted file — check its type and size", // the bytes, the type or the size (IR308)
+  // the address belongs to someone who still has access, here or elsewhere (IR461, IR462)
+  "errors.email_taken": "{field} belongs to someone who still has access — use another address or ask HQ",
 };
 // the refusals of the user management and assignment (IR416, IR417, IR420, IR421, IR433) say what to do
 const keyText: Record<string, string> = {
@@ -25,8 +27,8 @@ const keyText: Record<string, string> = {
   "errors.access_expired": "This account’s access period has ended — set a new access end first",
   "errors.technician_booked": "This technician still has an assigned job — reassign it first",
   "errors.technician_access_ends": "This technician's access ends before the visit — choose another technician or ask HQ to extend it",
-  "errors.invite_pending": "The invite is still pending — it becomes active when the account is opened",
-  "errors.invite_not_pending": "Only a pending invite can be sent again",
+  "errors.invite_pending": "This user hasn’t signed in yet — remove them, or wait until they have",
+  "errors.invite_not_pending": "Only a user who hasn’t signed in yet gets the set-up e-mail again",
 };
 const codeText: Record<string, string> = {
   FORBIDDEN: "You don't have permission for this action",
@@ -51,9 +53,9 @@ export function actionMessage(r: ActionFailure, t: T = translator("en")): string
   if (r.messageKey === "error.versionConflict") return t("Someone changed this in the meantime — the screen now shows the latest version");
   // the write limit per member (IR375): how long to wait, as the implementation contracts ask for RATE_LIMITED
   if (r.code === "RATE_LIMITED") {
-    // one invite is e-mailed at most every 5 minutes (IR423)
+    // the set-up e-mail goes at most every 5 minutes per user (IR423, IR461)
     if (r.messageKey === "errors.invite_recently_sent") {
-      return t("The invitation was e-mailed a moment ago — send it again in {m} min", { m: Math.max(1, Math.ceil((r.retryAfterSeconds ?? 300) / 60)) });
+      return t("The set-up e-mail was sent a moment ago — send it again in {m} min", { m: Math.max(1, Math.ceil((r.retryAfterSeconds ?? 300) / 60)) });
     }
     return r.retryAfterSeconds ? t("Too many changes in a short time — try again in {s} s", { s: r.retryAfterSeconds }) : t("Too many changes in a short time — try again shortly");
   }

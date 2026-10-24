@@ -177,6 +177,7 @@ func TestPartnerUserAccess(t *testing.T) {
 		t.Fatalf("members.save: %d %v", code, m)
 	}
 	membership := uuid.MustParse(data(m)["id"].(string))
+	firstSignIn(t, s, membership.String()) // HQ's first membership of the person is theirs once they sign in (IR462)
 	var until time.Time
 	ownerScan(t, `SELECT valid_until FROM identity.memberships WHERE id = $1`, []any{membership}, &until)
 	t.Cleanup(func() {
@@ -321,6 +322,15 @@ func TestPartnerAccountCreated(t *testing.T) {
 	if !slices.Contains(fake.switched, "sub-"+email+"=false") {
 		t.Errorf("sign-in after the removal: %v", fake.switched)
 	}
+}
+
+// firstSignIn is the person's first sign-in with the membership: a user HQ or the company added becomes active
+// (IR461, IR462).
+func firstSignIn(t *testing.T, s *apiserver.Server, membership string) {
+	t.Helper()
+	var user string
+	ownerScan(t, `SELECT user_id::text FROM identity.memberships WHERE id = $1`, []any{membership}, &user)
+	(&auth.Authenticator{DB: s.DB, Now: clockFunc}).RecordSignIn(context.Background(), &ops.Principal{TenantID: seed.ID("tenant-a"), UserID: uuid.MustParse(user), MembershipID: uuid.MustParse(membership)}, clock)
 }
 
 // TestPartnerResendAfterAccessEnd: no set-up e-mail goes to a technician whose access ended before they signed in; once
@@ -531,6 +541,7 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 		t.Fatalf("members.save: %d %v", code, m)
 	}
 	membership := data(m)["id"].(string)
+	firstSignIn(t, s, membership) // an active account (IR462)
 	var account string
 	var v int
 	ownerScan(t, `SELECT id::text, version FROM identity.partner_users WHERE membership_id = $1`, []any{membership}, &account, &v)

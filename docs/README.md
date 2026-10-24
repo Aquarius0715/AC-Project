@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.331.0 / Created: 2026-09-14 / Updated: 2026-10-24 / Status: Draft for review / Language: English
+Version: 0.332.0 / Created: 2026-09-14 / Updated: 2026-10-24 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.332.0 (2026-10-24): A person a contractor or customer owner removed can be added again with the same e-mail, keeping one person and one sign-in account; HQ giving such a person a new membership points their sign-in at it (IR462). The accounts people are added with now carry the tenant, membership and role claims (the local realm declares them admin-only), and an end-to-end test signs in as a newly added technician (IR463).
 0.331.0 (2026-10-24): HQ, contractors and customer owners add users whose sign-in accounts are created at once with a set-up e-mail; a contractor gives a technician an access end of at most a year, and no set-up e-mail goes out after it (DEC-79, IR461). The requirements and designs of FR-P11, FR-C19, FR-A17 and FR-A03 describe adding instead of inviting.
 0.330.0 (2026-10-24): Two events opening the same alert at once no longer fail; they share the one open alert (IR460).
 0.329.0 (2026-10-24): A technician's extension or new assignment refreezes their job history at its end (IR459).

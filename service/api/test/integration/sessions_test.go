@@ -134,8 +134,10 @@ type fakeIdP struct {
 	mu       sync.Mutex
 	subjects []string
 	err      error
-	// IR461: the accounts created (by e-mail), the set-up e-mails sent and the accounts turned on / off (subject=bool)
+	// IR461: the accounts created (by e-mail), the set-up e-mails sent and the accounts turned on / off (subject=bool);
+	// IR462: the accounts pointed at another membership
 	created  []idp.Account
+	updated  []idp.Account
 	setups   []string
 	switched []string
 }
@@ -145,6 +147,13 @@ func (f *fakeIdP) CreateAccount(_ context.Context, a idp.Account) (string, error
 	defer f.mu.Unlock()
 	f.created = append(f.created, a)
 	return "sub-" + a.Email, nil
+}
+
+func (f *fakeIdP) UpdateAccount(_ context.Context, _ string, a idp.Account) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.updated = append(f.updated, a)
+	return nil
 }
 
 func (f *fakeIdP) SendSetup(_ context.Context, subject string, _ idp.Account) error {

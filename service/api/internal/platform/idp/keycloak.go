@@ -154,6 +154,14 @@ func (k *Keycloak) do(ctx context.Context, method, path string, body any) (*http
 	return res, err
 }
 
+// ErrNoAccount is UpdateAccount's answer for a subject the provider does not know (an account deleted there).
+var ErrNoAccount = errors.New("idp: no such account")
+
+// claims are the attributes the apps read at sign-in (IR461).
+func (a Account) claims() map[string][]string {
+	return map[string][]string{"tenant_id": {a.TenantID}, "membership_id": {a.Membership}, "role": {a.Role}}
+}
+
 // CreateAccount creates the person's user (enabled, e-mail not yet verified) with the claim attributes and returns
 // its subject. An account that exists for the e-mail already is updated with the attributes and returned, so a
 // retried provisioning is one account.
@@ -161,8 +169,7 @@ func (k *Keycloak) CreateAccount(ctx context.Context, a Account) (string, error)
 	if a.Email == "" {
 		return "", errors.New("idp: no e-mail")
 	}
-	attrs := map[string][]string{"tenant_id": {a.TenantID}, "membership_id": {a.Membership}, "role": {a.Role}}
-	user := map[string]any{"username": a.Email, "email": a.Email, "firstName": a.DisplayName, "enabled": true, "emailVerified": false, "attributes": attrs}
+	user := map[string]any{"username": a.Email, "email": a.Email, "firstName": a.DisplayName, "enabled": true, "emailVerified": false, "attributes": a.claims()}
 	res, err := k.do(ctx, http.MethodPost, "/users", user)
 	if err != nil {
 		return "", err
@@ -180,17 +187,52 @@ func (k *Keycloak) CreateAccount(ctx context.Context, a Account) (string, error)
 		if err != nil {
 			return "", err
 		}
-		upd, err := k.do(ctx, http.MethodPut, "/users/"+url.PathEscape(id), map[string]any{"email": a.Email, "firstName": a.DisplayName, "enabled": true, "attributes": attrs})
-		if err != nil {
-			return "", err
-		}
-		upd.Body.Close()
-		if upd.StatusCode != http.StatusNoContent && upd.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("idp: update user answered %d", upd.StatusCode)
-		}
-		return id, nil
+		return id, k.UpdateAccount(ctx, id, a)
 	}
 	return "", fmt.Errorf("idp: create user answered %d", res.StatusCode)
+}
+
+// UpdateAccount points the person's account at another membership (a person added again, IR462): the claim
+// attributes change, the name is the one given, and the account is on. The whole user is read and written back: with
+// the realm's user profile an update replaces the profile — a field left out, the e-mail too, would be cleared — and
+// the attribute map (IR463).
+func (k *Keycloak) UpdateAccount(ctx context.Context, subject string, a Account) error {
+	res, err := k.do(ctx, http.MethodGet, "/users/"+url.PathEscape(subject), nil)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	switch res.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		return ErrNoAccount
+	default:
+		return fmt.Errorf("idp: read user answered %d", res.StatusCode)
+	}
+	var user map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&user); err != nil {
+		return err
+	}
+	attrs, _ := user["attributes"].(map[string]any)
+	if attrs == nil {
+		attrs = map[string]any{}
+	}
+	for key, v := range a.claims() {
+		attrs[key] = v
+	}
+	user["attributes"], user["firstName"], user["enabled"] = attrs, a.DisplayName, true
+	upd, err := k.do(ctx, http.MethodPut, "/users/"+url.PathEscape(subject), user)
+	if err != nil {
+		return err
+	}
+	defer upd.Body.Close()
+	switch upd.StatusCode {
+	case http.StatusNoContent, http.StatusOK:
+		return nil
+	case http.StatusNotFound:
+		return ErrNoAccount
+	}
+	return fmt.Errorf("idp: update user answered %d", upd.StatusCode)
 }
 
 func (k *Keycloak) findByEmail(ctx context.Context, email string) (string, error) {

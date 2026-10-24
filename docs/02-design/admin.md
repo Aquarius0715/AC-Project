@@ -166,7 +166,7 @@ Scope: FR-A03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
 | userId / organizationId | ID/required | Active user and their organization | Target |
-| newUser {email, displayName} | object/instead of userId | A new person (IR461): e-mail one person per address (`newUser.email=errors.email_taken`), name 1–120; their sign-in account is created with the membership | New person |
+| newUser {email, displayName} | object/instead of userId | A new person (IR461): e-mail one person per address (`newUser.email=errors.email_taken`; a person this tenant removed is taken back, IR462), name 1–120; their sign-in account is created with the membership; an existing user whose memberships here have all ended signs in with the new membership | New person |
 | role | enum/required | client/contractor/technician/admin | Role |
 | employment | enum/required for technicians | internal/external | Employment type |
 | permissions | enum array/required | Choose from the role's allowed permissions | Capabilities |
@@ -706,7 +706,7 @@ Scope: FR-A17 / Main display pattern: **UI-LIST**. Service boundary: `clientUser
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
 | displayName | string/required when adding | 1–120; the person's name | Identity |
-| email | string/required | Valid address, unique per customer and one person per address (`errors.email_taken`); fixed once added (IR422, IR461) | Sign-in |
+| email | string/required | Valid address, unique per customer and one person per address (`errors.email_taken`; a person this tenant removed is taken back, IR462); fixed once added (IR422, IR461) | Sign-in |
 | clientRole | enum/required | owner/member; default member | Role |
 | status | enum | invited (= not signed in yet)/active/disabled | Account state |
 | reason | string/required for remove | 1–1000 characters | Audit |
@@ -717,7 +717,7 @@ Scope: FR-A17 / Main display pattern: **UI-LIST**. Service boundary: `clientUser
 2. “+ Add user” (centered modal: name, e-mail, role) → `clientUsers.save` without id creates the person, the client membership and the row `invited`, and the sign-in service e-mails the link to set the password (IR461). Menu: change role / disable (`clientUsers.save` with id; disabling turns the sign-in account off), resend set-up e-mail (`clientUsers.resendInvite`; at most every 5 minutes per user, IR423), reset password (`auth.previewPasswordReset`, generic message), sign out everywhere (`members.revokeSessions` with the user's membership, the modal of Admin 03-8, IR384; not offered before the first sign-in), remove (`clientUsers.remove`; the sign-in account is turned off).
 3. Queries to update: `client users / audit`.
 
-**Boundary cases and failures**: Last active owner → CONFLICT; duplicate email → VALIDATION; an address another person uses → VALIDATION `errors.email_taken`; a changed e-mail → VALIDATION `error.immutable` (IR422). No permission editor for client users.
+**Boundary cases and failures**: Last active owner → CONFLICT; duplicate email → VALIDATION; an address someone with access holds → VALIDATION `errors.email_taken` (a person removed here is added again instead, IR462); a changed e-mail → VALIDATION `error.immutable` (IR422). No permission editor for client users.
 
 **Verification**: Check the traceability entries under AT-A17 (N/E/B).
 

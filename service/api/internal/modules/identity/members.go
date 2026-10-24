@@ -13,7 +13,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -365,7 +364,7 @@ func (in *MemberInput) Validate() map[string]string {
 // @Summary		members.save (write)
 // @ID				members.save
 // @Description	Authorization: admin:identity.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR84 new client membership creates initial Consent granted=false; newUser creates the person with the membership instead of userId and sends a set-up e-mail (IR461)
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR84 new client membership creates initial Consent granted=false; newUser creates the person with the membership instead of userId and sends a set-up e-mail (IR461; a person this tenant removed is taken back; for an existing user whose memberships here have all ended the sign-in account is pointed at the new one; IR462)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A03
 // @Tags			members
@@ -386,11 +385,10 @@ func (in *MemberInput) Validate() map[string]string {
 // @Router			/v1/members [post]
 func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, error) {
 	newPerson := in.NewUser != nil
-	if newPerson { // the person is created with the membership (IR461)
-		err := c.Tx.QueryRow(ctx, `INSERT INTO identity.users (email, display_name, status, created_at, updated_at) VALUES ($1, $2, 'active', $3, $3) RETURNING id`,
-			in.NewUser.Email, in.NewUser.DisplayName, c.Now).Scan(&in.UserID)
-		var pe *pgconn.PgError
-		if errors.As(err, &pe) && pe.Code == "23505" {
+	if newPerson { // the person is created with the membership, or taken back if this tenant removed them (IR461, IR462)
+		var err error
+		in.UserID, err = personFor(ctx, c, in.NewUser.Email, in.NewUser.DisplayName)
+		if errors.Is(err, errEmailTaken) {
 			return Member{}, apperr.Fields(map[string]string{"newUser.email": "errors.email_taken"})
 		}
 		if err != nil {
@@ -458,11 +456,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	}
 	var id uuid.UUID
 	var prev *int
+	account := false // the sign-in account is opened or pointed at this new membership (IR461, IR462)
 	if in.ID == nil {
-		listed := "active" // the status the customer's or contractor's user list shows
-		if newPerson {
-			listed = "invited"
-		}
 		var clientRole *string
 		if in.Role == "client" { // a member, or the role a pending invite for the user's e-mail gives (IR417)
 			cr := "member"
@@ -476,6 +471,20 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $8) RETURNING id`,
 			in.UserID, in.OrganizationID, in.Role, in.Employment, clientRole, in.ValidFrom, in.ValidUntil, c.Now).Scan(&id); err != nil {
 			return Member{}, err
+		}
+		// an existing person whose memberships here have all ended signs in with this one from now on (IR462); one
+		// whose sign-in belongs to another tenant keeps it
+		account = newPerson
+		if !newPerson {
+			if err := c.Tx.QueryRow(ctx, `SELECT (u.sign_in_membership_id IS NULL OR EXISTS (SELECT 1 FROM identity.memberships s WHERE s.id = u.sign_in_membership_id))
+				AND NOT EXISTS (SELECT 1 FROM identity.memberships m WHERE m.user_id = u.id AND m.id <> $2 AND (m.valid_until IS NULL OR m.valid_until > $3))
+				FROM identity.users u WHERE u.id = $1`, in.UserID, id, c.Now).Scan(&account); err != nil {
+				return Member{}, err
+			}
+		}
+		listed := "active" // the status the customer's or contractor's user list shows: invited until the first sign-in
+		if account {
+			listed = "invited"
 		}
 		if in.Role == "client" { // IR84 initial Consent
 			if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES (current_setting('app.tenant_id')::uuid, $1, 'location_automation', false)`, id); err != nil {
@@ -603,7 +612,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		return x, err
 	}
 	c.Emit(ops.Event{AggregateType: "membership", AggregateID: id, Type: "MembershipSaved", Payload: map[string]any{"role": in.Role}})
-	if newPerson {
+	if account {
 		requestAccount(c, in.UserID, id, in.Role)
 	}
 	c.Audit(ops.AuditEntry{Action: "members.save", TargetKind: "membership", TargetID: id.String(), PreviousVersion: prev, NextVersion: &ms[0].Version, Reason: in.Reason})
