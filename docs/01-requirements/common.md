@@ -53,7 +53,7 @@ Assess each AT-NFR using the measurement method above and the [verification plan
 | View units/locations | Own use scope | Information needed for accepted jobs | Internal: assigned scope / external: assigned units and period | Managed scope |
 | Create/move/delete properties/locations/units | No (rename locations and units only, IR109) | No | No | asset.write within managed scope |
 | Alert policies | Own customer's policies; default-rule on/off for own customer; attach on own units (IR108) | No | No | alert.policy.write; default policy limits HQ only |
-| Client user accounts | Owner lists users, invites members, and resends invites (FR-C19) | No | No | asset.write (Customers & units › Users) |
+| Client user accounts | Owner lists, adds (the account is created at once, IR461), changes the role of, disables and removes the customer's users (FR-C19, IR417) | No | No | asset.write (Customers & units › Users) |
 | Normal AC control | Within scope/capabilities | No (do not grant commands.create/voice.resolveIntent to contractors) | Diagnostic permission and valid target/period | control.execute permission |
 | Maintenance requests | Own units | Coordinate accepted jobs | Handle assigned jobs | Create/assign within managed scope |
 | Contractor acceptance/own assignment | No | Accepted jobs, own company, valid qualifications/period | No | Outsource or assign internally |
@@ -64,7 +64,7 @@ Assess each AT-NFR using the measurement method above and the [verification plan
 | Restrictions/grace/release | View reasons | No | No | restriction.write; override requires separate permission |
 | IoT registration/calibration/firmware updates | View status | View accepted units' status | device.maintain within assigned scope | device.write permission |
 | MRV/audit | Own estimates/history | History needed for jobs only | History of assigned actions | mrv.read/mrv.write; mrv.review records reviews; mrv.factors changes factors; audit.read |
-| Change users/roles | No | View own assignment candidates only | No | identity.read to view, identity.write to change (HQ/contractor/technician only); identity.write and restriction.override are granted only by another identity administrator |
+| Change users/roles | No | Own company's contractors and technicians (FR-P11): add, a technician's access end of at most a year, disable, remove (IR416, IR461); permissions and qualifications stay with HQ | No | identity.read to view, identity.write to change (HQ/contractor/technician only); identity.write and restriction.override are granted only by another identity administrator |
 
 HQ permissions are the 38 values of IR107: Read/Write per resource plus independent actions; Write implies Read. Use IR46 for allowed AC actions under restrictions, and IR47 for rejection based on connectivity/power signals. Do not disclose details, including existence, of inaccessible data. Show reasons for blocked actions only when viewing the data itself is allowed. Contractors do not automatically gain technician control permissions. If one manager has several roles, switch Membership so the active role is clear.
 

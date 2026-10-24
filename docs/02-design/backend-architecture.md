@@ -37,9 +37,9 @@ Decisions applied (DEC-67, DEC-68, DEC-69):
 | Contractor | Accepts offers, assigns own technicians, reviews reports, payouts | Browser → Web/BFF |
 | Technician | Works assigned jobs on site, diagnostics, device maintenance | Mobile browser → Web/BFF |
 | AC unit with IoT module | Sends telemetry, heartbeats, events, command acknowledgements; receives commands and firmware | MQTT over TLS → IoT gateway |
-| Identity provider | Authenticates people (password, reset, two-step verification) | OIDC |
+| Identity provider | Authenticates people (password, reset, two-step verification); the identity service opens, points and turns off the accounts of the people added, with their set-up e-mail (IR461–IR463) | OIDC; admin API |
 | Stripe | Hosted Stripe Checkout (cards, FPX) and signed result webhooks | HTTPS redirect + webhook |
-| E-mail and WhatsApp providers | Deliver notifications, payment guidance, invites, reports | HTTPS API (egress) |
+| E-mail and WhatsApp providers | Deliver notifications, payment guidance, reports (a new account's set-up e-mail comes from the identity provider, IR461) | HTTPS API (egress) |
 | Weather and location sources | Automation triggers (weather), client location with consent (FR-C05) | HTTPS API / browser |
 | Speech service | Optional voice recognition for the assistant (FR-X02) | HTTPS API (egress) |
 | Carbon registry / market | Future offset purchase and retirement (FR-A15, FR-C13 remain demo) | HTTPS API (egress), OPEN |
