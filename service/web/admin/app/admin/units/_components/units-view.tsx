@@ -15,6 +15,7 @@ import {
   type CoverageRow, type coverageKpis, type CustomerDraft, type CustomerRow, type PolicyLine, type PowerState, type Profile, type PropertyDraft, type RuleLine, type Scope,
   type Selection, type TreeProperty, type TreeSpace, type UnitDraft, type UnitRow, type registerKpis,
 } from "@ac/web/lib/assets";
+import { nameError as personNameError } from "@ac/web/lib/partnerUsers";
 import { amount } from "@ac/web/lib/energy";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { archiveLocation, archiveUnit, createCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
@@ -660,23 +661,23 @@ function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive;
   const canWrite = live.canWrite;
   const act = (u: ClientUserRow, a: string) => {
     if (a === "role" || a === "status" || a === "remove" || a === "signout") setChange({ u, kind: a });
-    if (a === "resend") run(() => resendInvite(u.id), t("Invitation e-mail queued again for {email}", { email: u.email }));
+    if (a === "resend") run(() => resendInvite(u.id), t("Set-up e-mail sent again to {email}", { email: u.email }));
     if (a === "reset") run(() => previewPasswordReset(u.email), t("Password reset preview created — the same generic message for every address"));
   };
   return (
     <Card title={t("Client users of {name}", { name: c.row.name })} sub={t("People who sign in to the customer app. They only ever see {name}’s properties and units.", { name: c.row.name })}
-      action={canWrite && <Btn size="sm" variant="primary" onClick={() => setInvite(true)}><Icon name="add" /> {t("Invite user")}</Btn>}>
-      {c.users.length === 0 ? <EmptyState title={t("No client users yet")}>{t("Invite the customer’s owner first; the owner can then invite and manage users from the customer app.")}</EmptyState> : (
+      action={canWrite && <Btn size="sm" variant="primary" onClick={() => setInvite(true)}><Icon name="add" /> {t("Add user")}</Btn>}>
+      {c.users.length === 0 ? <EmptyState title={t("No client users yet")}>{t("Add the customer’s owner first; the owner can then add and manage users from the customer app.")}</EmptyState> : (
         <DataTable rows={c.users} rowKey={(u) => u.id} cols={[
           { key: "u", label: t("User"), render: (u) => <><b>{u.name ?? u.email}</b><div className="text-xs text-muted-foreground">{u.sub}</div></> },
           { key: "r", label: t("Role"), render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{t(u.role === "owner" ? "Owner" : "Member")}</Badge> },
-          { key: "s", label: t("Status"), render: (u) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{t(u.status === "active" ? "Active" : u.status === "invited" ? "Invite pending" : "Disabled")}</Badge> },
+          { key: "s", label: t("Status"), render: (u) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{t(u.status === "active" ? "Active" : u.status === "invited" ? "Not signed in yet" : "Disabled")}</Badge> },
           { key: "l", label: t("Last sign-in"), render: (u) => u.lastSignIn, hideBelow: "md" },
           { key: "c", label: t("Notification channels"), render: (u) => u.channels, hideBelow: "md" },
           { key: "a", label: "", render: (u) => canWrite && (
             <ActionMenu label={t("Actions for {email}", { email: u.email })} disabled={pending} onChoose={(v) => act(u, v)}>
               {!u.lastOwner && <option value="role">{t("Change role (Owner / Member)")}</option>}
-              {u.status === "invited" && <option value="resend">{t("Resend invite")}</option>}
+              {u.status === "invited" && <option value="resend">{t("Resend set-up e-mail")}</option>}
               <option value="reset">{t("Reset password")}</option>
               {u.status === "active" && u.membershipId && <option value="signout">{t("Sign out everywhere…")}</option>}
               {u.status !== "invited" && !u.lastOwner && <option value="status">{t(u.status === "disabled" ? "Enable sign-in" : "Disable sign-in")}</option>}
@@ -685,8 +686,8 @@ function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive;
           ) },
         ]} />
       )}
-      <p className="mt-2 text-[11px] text-muted-foreground">{t("Client users have no permission editor — the customer's owners also manage them from the customer app (Users: invite, roles, access, remove). Contractors manage their own staff in the partner app; HQ sets permissions and access periods in Access & roles. The last active owner cannot be demoted, disabled or removed.")}</p>
-      {invite && <InviteModal c={c} pending={pending} onClose={() => setInvite(false)} onSave={(email, role) => run(() => inviteClientUser(c.row.id, email, role), t("Invitation e-mail queued for {email}", { email: email.trim() }), () => setInvite(false))} />}
+      <p className="mt-2 text-[11px] text-muted-foreground">{t("Client users have no permission editor — the customer's owners also manage them from the customer app (Users: add, roles, access, remove). Contractors manage their own staff in the partner app; HQ sets permissions and access periods in Access & roles. The last active owner cannot be demoted, disabled or removed.")}</p>
+      {invite && <InviteModal c={c} pending={pending} onClose={() => setInvite(false)} onSave={(email, role, name) => run(() => inviteClientUser(c.row.id, email, role, name), t("{name} added — a set-up e-mail is on its way to {email}", { name: name.trim(), email: email.trim() }), () => setInvite(false))} />}
       {change && <ClientUserModal change={change} pending={pending} onClose={() => setChange(null)} onSave={(role, reason) => {
         const { u, kind } = change;
         const close = () => setChange(null);
@@ -700,16 +701,20 @@ function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive;
   );
 }
 
-function InviteModal({ c, pending, onClose, onSave }: { c: CustomerLive; pending: boolean; onClose: () => void; onSave: (email: string, role: "owner" | "member") => void }) {
+/** Adds a client user: the account is created at once and gets a set-up e-mail (IR461). */
+function InviteModal({ c, pending, onClose, onSave }: { c: CustomerLive; pending: boolean; onClose: () => void; onSave: (email: string, role: "owner" | "member", name: string) => void }) {
   const t = useT();
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [role, setRole] = useState<"owner" | "member">("member");
   const [tried, setTried] = useState(false);
   const e = inviteError(email, c.users, t);
+  const ne = personNameError(name, t); // the person's name, worded as on the partner and customer Users pages
   return (
-    <Modal open onClose={onClose} title={t("Invite client user")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e) onSave(email, role); }}>{t("Send invite")}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Add client user")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e && !ne) onSave(email, role, name); }}>{t("Add user")}</Btn></>}>
       <div className="flex flex-col gap-3">
-        <Field label={t("Email")} hint={t("Unique per customer; the invitation is sent by e-mail")} error={tried ? e : undefined}><Input type="email" value={email} onChange={(x) => setEmail(x.target.value)} /></Field>
+        <Field label={t("Name")} error={tried ? ne : undefined}><Input value={name} maxLength={120} onChange={(x) => setName(x.target.value)} /></Field>
+        <Field label={t("Email")} hint={t("One account per person; the set-up e-mail goes to this address")} error={tried ? e : undefined}><Input type="email" value={email} onChange={(x) => setEmail(x.target.value)} /></Field>
         <Field label={t("Role")}><Choice value={role} onChange={(v: "owner" | "member") => setRole(v)} options={[{ id: "member", label: t("Member") }, { id: "owner", label: t("Owner") }]} /></Field>
       </div>
     </Modal>

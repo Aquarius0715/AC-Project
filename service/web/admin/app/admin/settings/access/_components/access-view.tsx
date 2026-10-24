@@ -93,13 +93,17 @@ export function AccessView({ live }: { live: Live }) {
             {t("It does not exist, or the organization, role or status filter hides it.")}
           </EmptyState>
         ) : (
-        <Card title={sel ? sel.name : t("New membership")} sub={sel ? t("{validity} · scopeVersion {scope} · version {v}", { validity: sel.validity, scope: sel.m.scopeVersion, v: sel.version }) : t("Another membership for an existing user (users come from the identity provider)")}>
+        <Card title={sel ? sel.name : t("New membership")} sub={sel ? t("{validity} · scopeVersion {scope} · version {v}", { validity: sel.validity, scope: sel.m.scopeVersion, v: sel.version }) : t("For an existing user, or a new person whose account is created with it")}>
           <div className="flex flex-col gap-5">
             {!live.canWrite && <Banner>{t("Read only — editing needs identity.write.")}</Banner>}
             <section>
               <h3 className="mb-2 text-[13px] font-bold">{t("Identity & role")}</h3>
               <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
-                <Field label={t("User")} error={err("userId")} hint={!isNew ? t("Fixed after creation") : undefined}><Select value={d.userId} disabled={!isNew || !live.canWrite} onChange={(e) => set({ userId: e.target.value })}><option value="">{t("Select…")}</option>{live.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select></Field>
+                {isNew && live.canWrite && <div className="col-span-full"><Choice value={d.newUser ? "new" : "existing"} onChange={(v: string) => set({ newUser: v === "new" })} options={[{ id: "existing", label: t("Existing user") }, { id: "new", label: t("New person") }]} /></div>}
+                {isNew && d.newUser ? <>
+                  <Field label={t("Name")} error={err("newUser.displayName")}><Input value={d.newName} maxLength={120} onChange={(e) => set({ newName: e.target.value })} /></Field>
+                  <Field label={t("Email")} error={err("newUser.email")} hint={t("Their account is created now; the set-up e-mail goes to this address")}><Input type="email" value={d.newEmail} onChange={(e) => set({ newEmail: e.target.value })} /></Field>
+                </> : <Field label={t("User")} error={err("userId")} hint={!isNew ? t("Fixed after creation") : undefined}><Select value={d.userId} disabled={!isNew || !live.canWrite} onChange={(e) => set({ userId: e.target.value })}><option value="">{t("Select…")}</option>{live.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select></Field>}
                 <Field label={t("Organization")} error={err("organizationId")} hint={!isNew ? t("Fixed after creation") : undefined}><Select value={d.organizationId} disabled={!isNew || !live.canWrite} onChange={(e) => chooseOrg(e.target.value)}><option value="">{t("Select…")}</option>{orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select></Field>
               </div>
               <div className="mt-3"><div className="mb-1 text-xs font-semibold">{t("Role")}</div>{isNew ? <Choice value={d.role} onChange={chooseRole} options={roles} /> : <Badge tone="primary">{roleWord(d.role, d.role === "technician" ? d.employment : null, t)}</Badge>}<p className="mt-1 text-[11px] text-muted-foreground">{t("Choosing a role only pre-checks its typical permissions; every permission below stays editable. The client role is not offered here.")}</p></div>

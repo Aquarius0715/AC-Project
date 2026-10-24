@@ -79,6 +79,8 @@ export function memberRows(ms: ApiMember[], orgs: ApiOrganization[], now: Date, 
 
 export type MemberDraft = {
   userId: string; organizationId: string; role: Role; employment: "internal" | "external"; permissions: string[]; scopes: ScopeRef[]; validFrom: string; validUntil: string; reason: string;
+  /** a person created with the membership instead of an existing user (IR461) */
+  newUser: boolean; newEmail: string; newName: string;
 };
 /** An instant as the datetime-local value of the form in a time zone ("2026-09-14T08:00"). */
 export const zonedLocal = (iso: string, zone: string) => {
@@ -87,10 +89,14 @@ export const zonedLocal = (iso: string, zone: string) => {
 };
 const zonedFrom = (local: string, zone: string) => zonedInstant(local.slice(0, 10), local.slice(11, 16), zone);
 
+/** The user ID members.save receives with newUser: none yet. */
+const NO_USER = "00000000-0000-0000-0000-000000000000";
+
 /** The form of a membership; the valid period is typed in the display time zone (NFR-08). */
 export function memberDraft(m?: ApiMember, tenantId = "", zone = "Asia/Kuala_Lumpur"): MemberDraft {
-  if (!m || m.role === "client") return { userId: "", organizationId: "", role: "contractor", employment: "internal", permissions: roleDefaults.contractor, scopes: [], validFrom: "", validUntil: "", reason: "" };
+  if (!m || m.role === "client") return { userId: "", organizationId: "", role: "contractor", employment: "internal", permissions: roleDefaults.contractor, scopes: [], validFrom: "", validUntil: "", reason: "", newUser: false, newEmail: "", newName: "" };
   return {
+    newUser: false, newEmail: "", newName: "",
     userId: m.userId, organizationId: m.organizationId, role: m.role, employment: m.employment ?? "internal", permissions: m.permissions, scopes: m.role === "admin" && m.scopes.length === 0 && tenantId ? [{ kind: "tenant", id: tenantId }] : m.scopes,
     validFrom: zonedLocal(m.validFrom, zone), validUntil: m.validUntil ? zonedLocal(m.validUntil, zone) : "", reason: "",
   };
@@ -101,13 +107,18 @@ export const orgKind = (role: Role, employment: MemberDraft["employment"]): ApiO
 
 export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?: ApiMember }, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!d.userId) e.userId = t("Choose a user");
+  if (d.newUser) { // IR461: the person is created with the membership
+    const email = d.newEmail.trim();
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e["newUser.email"] = t("A valid email address (up to 254 characters)");
+    const n = [...d.newName.trim()].length;
+    if (n < 1 || n > 120) e["newUser.displayName"] = t("A name of 1–120 characters");
+  } else if (!d.userId) e.userId = t("Choose a user");
   if (!d.organizationId) e.organizationId = t("Choose the organization");
   const bad = d.permissions.filter((p) => !allowedFor[d.role].includes(p));
   if (bad.length) e.permissions = t("Not allowed for this role: {list}", { list: bad.join(", ") });
   for (const r of permissionRows) if (r.write && d.permissions.includes(r.write) && r.read && !d.permissions.includes(r.read)) e.permissions = t("{write} needs {read}", { write: r.write, read: r.read });
   const gained = d.permissions.filter((p) => selfBlocked.includes(p) && !(ctx.current?.permissions ?? []).includes(p));
-  if (d.userId === ctx.selfUserId && gained.length) e.permissions = t("Another identity administrator must grant {list} to you", { list: gained.join(", ") });
+  if (!d.newUser && d.userId === ctx.selfUserId && gained.length) e.permissions = t("Another identity administrator must grant {list} to you", { list: gained.join(", ") });
   if (d.role === "technician" && d.scopes.length === 0) e.scopes = t("Add at least one unit, property or customer organization");
   if (!d.validFrom) e.validFrom = t("Required");
   if (d.validUntil && d.validFrom && d.validUntil <= d.validFrom) e.validUntil = t("Must be after valid from");
@@ -119,7 +130,9 @@ export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?
 /** members.save input; the valid period typed in `zone` becomes instants. */
 export function memberInput(d: MemberDraft, id?: string, zone = "Asia/Kuala_Lumpur"): OpInput<"members.save"> {
   return {
-    ...(id ? { id } : {}), userId: d.userId, organizationId: d.organizationId, role: d.role, employment: d.role === "technician" ? d.employment : null,
+    ...(id ? { id } : {}), organizationId: d.organizationId, role: d.role, employment: d.role === "technician" ? d.employment : null,
+    // a new person goes as newUser, with no user ID yet (IR461)
+    ...(!id && d.newUser ? { userId: NO_USER, newUser: { email: d.newEmail.trim(), displayName: d.newName.trim() } } : { userId: d.userId }),
     permissions: d.permissions as Permission[], scopes: d.scopes, validFrom: zonedFrom(d.validFrom, zone), validUntil: d.validUntil ? zonedFrom(d.validUntil, zone) : null, reason: d.reason.trim(),
   };
 }

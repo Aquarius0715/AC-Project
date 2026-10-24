@@ -25,7 +25,7 @@ var (
 //	@Summary		clientUsers.save (write) — update
 //	@ID				clientUsers.save.update
 //	@Description	Authorization: client:self-customer:owner | admin:asset.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer; last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account (IR417); an accepted user's e-mail stays (IR422)
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer and one account per person (errors.email_taken); a new user needs displayName 1–120 and is created at once with a set-up e-mail (IR461); last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account (IR417); the e-mail stays (IR422)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A17, DD-C19
 //	@Tags			clientUsers
@@ -53,7 +53,7 @@ func swaggerClientUsersSaveUpdate() {}
 //	@Summary		members.save (write) — update
 //	@ID				members.save.update
 //	@Description	Authorization: admin:identity.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR84 new client membership creates initial Consent granted=false
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR84 new client membership creates initial Consent granted=false; newUser creates the person with the membership instead of userId and sends a set-up e-mail (IR461)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A03
 //	@Tags			members
@@ -109,7 +109,7 @@ func swaggerOrganizationsSaveUpdate() {}
 //	@Summary		partnerUsers.save (write) — update
 //	@ID				partnerUsers.save.update
 //	@Description	Authorization: contractor:own-company
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; email unique per company; email and role fixed once accepted; not the caller's own account; not the last active contractor; not a technician with an active assignment (CONFLICT; IR421)
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; email unique per company and one account per person (errors.email_taken); a new user needs displayName 1–120 and is created at once with a set-up e-mail; a technician needs accessUntil at most a year ahead (IR461); email and role fixed; not the caller's own account; not the last active contractor; not a technician with an active assignment (CONFLICT; IR421)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-P11
 //	@Tags			partnerUsers

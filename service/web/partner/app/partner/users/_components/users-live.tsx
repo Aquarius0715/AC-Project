@@ -1,12 +1,12 @@
 "use client";
 
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import { editPartnerInvite, invitePartnerUser, removePartnerUser, resendPartnerInvite, setPartnerUserStatus } from "../actions";
+import { invitePartnerUser, removePartnerUser, resendPartnerInvite, setPartnerAccess, setPartnerUserStatus } from "../actions";
 import { UsersView, type UsersData, type UsersOps } from "./users-view";
 
 const ops: UsersOps = {
   invite: invitePartnerUser,
-  edit: (r, email, role, reason) => editPartnerInvite(r.id, r.version, email, role, reason),
+  access: (r, until, reason) => setPartnerAccess(r.id, r.version, r.email, r.role, until, reason),
   setStatus: (r, status, reason) => setPartnerUserStatus(r.id, r.version, r.email, r.role, status, reason),
   remove: (r, reason) => removePartnerUser(r.id, r.version, reason),
   resend: (r) => resendPartnerInvite(r.id),

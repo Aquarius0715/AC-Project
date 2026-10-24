@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.330.0
+version: 0.331.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -174,6 +174,7 @@ Small text and controls are adjusted for readability and usability in work scree
 | DEC-76 | A contractor manages its own company's accounts: it invites contractors and technicians by e-mail, changes or resends pending invites, and disables, enables and removes accounts, never its own and never the last active contractor; HQ keeps permissions, qualifications and access periods (FR-A03) | User request in this conversation, 2026-10-13 (“Contractorでもユーザー管理の画面や機能を作ってください。Contractorは同じ組織のContractorとTechnicianを管理することができます。”); reflected in IR416 |
 | DEC-77 | A customer owner manages the customer's users in the customer app: invites members and owners, edits or resends pending invites, changes roles, disables, enables and removes users with a reason, never the own account and never the last active owner; HQ keeps password resets (supersedes the IR114 limits of DEC-65) | User request in this conversation, 2026-10-13 (“クライアント画面でユーザー管理ができるようにしてください”); reflected in IR417 |
 | DEC-78 | E-mails are sent for real: in development through Mailpit, a local mail catcher with a web inbox (nothing leaves the machine), and in production through Amazon SES with the same notification worker | User request in this conversation, 2026-10-13 (“メール送信までやって見たいです” → option A “Aでいきましょうか”); reflected in IR418 |
+| DEC-79 | Accounts are created where people are added: HQ adds anyone (a new person in Access & roles), a contractor adds its contractors and technicians, a customer owner adds owners and members; the sign-in account (Keycloak locally, Cognito in production) is opened at once and the person gets an e-mail to set their password. A technician a contractor adds gets an access end of at most a year, set by the contractor; HQ still verifies their certificates before they can be assigned. One account per person (an e-mail is used once). Supersedes the invites of DEC-76 / DEC-77 that only HQ could turn into accounts | User request in this conversation, 2026-10-24 (“TechnicianはContractor ,ADminどちらも作れるようにした方がいい”, “Client側でもClientを追加できるようにしましょうか”, option 1 “案１でお願いします”); reflected in IR461 |
 
 **DEC-10 (design proposal)**: Preserve work status on reassignment. Release restrictions only after all cause invoices fixed at notice time are paid. Release does not automatically power units on or restore previous set temperatures. Manual payment recording, test-run end confirmation, and viewing saved reports are specified for the 1A demo. This does not mean company approval of commercial rules. See [input/output contract DDC-08](../02-design/implementation-contracts.md#ddc-08-multi-resource-revisit-and-cross-role-contracts).
 
@@ -274,6 +275,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.331.0: Accounts are created where people are added, with a set-up e-mail; contractors add technicians with an access end of at most a year; no set-up e-mail after the access end (DEC-79, IR461). FR/DD-P11, C19, A17 and A03 describe adding instead of inviting. Phase 1A unchanged.
 0.330.0: Alerts opened at the same time end as one (IR460). Phase 1A unchanged.
 0.329.0: A technician's new window refreezes their job history (IR459). Phase 1A unchanged.
 0.328.0: Extending ended access refreezes the contractor's history (IR458). Phase 1A unchanged.

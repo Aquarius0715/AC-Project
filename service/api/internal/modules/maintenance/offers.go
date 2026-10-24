@@ -583,6 +583,11 @@ func (m Delivery) checkTechnician(ctx context.Context, c *ops.Call, unit, member
 	if (contractor && tech.OrgID != own) || (!contractor && tech.Employment != "internal") {
 		return apperr.E(apperr.Forbidden, "errors.technician_not_allowed")
 	}
+	if contractor && len(tech.Scopes) == 0 {
+		// a technician the contractor added has no unit scope (IR461): the contractor assigns them only on its own
+		// accepted offer, which already bounds the unit, and they reach it only in the assignment's window (IR49)
+		return nil
+	}
 	uorg, prop, _, err := m.Units.UnitService(ctx, c, unit)
 	if err != nil {
 		return err

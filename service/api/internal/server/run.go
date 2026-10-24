@@ -18,6 +18,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
 	"github.com/pradita/ac-project/service/api/internal/platform/idp"
@@ -118,6 +119,8 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		}
 		cfg.IdentityProvider = &idp.Keycloak{TokenURL: v[0], AdminURL: strings.TrimRight(v[1], "/"), ClientID: v[2], ClientSecret: v[3]}
 	}
+	cfg.AccountApps = identity.AccountApps{Customer: envOr("APP_URL_CUSTOMER", "http://localhost:3000"), Partner: envOr("APP_URL_PARTNER", "http://localhost:3001"),
+		Technician: envOr("APP_URL_TECHNICIAN", "http://localhost:3002"), Admin: envOr("APP_URL_ADMIN", "http://localhost:3003")}
 	if cfg.DemoOps { // fixture.clock unless DEMO_CLOCK_START overrides it (IR36); shared with the workers (IR168)
 		start, err := democlock.StartFromEnv(os.Getenv)
 		if err != nil {

@@ -172,7 +172,7 @@ func TestDemoOperations(t *testing.T) {
 		t.Fatalf("advance: %d %v", code, m)
 	}
 	// rows created after the jump carry the scenario clock (platform.app_now, IR157)
-	code, m = write(s, &customerB, "clientUsers.save", `{"customerId":"`+seed.ID("cust-b").String()+`","email":"clock-`+uuid.NewString()[:8]+`@example.com","clientRole":"member"}`, 0)
+	code, m = write(s, &customerB, "clientUsers.save", `{"customerId":"`+seed.ID("cust-b").String()+`","email":"clock-`+uuid.NewString()[:8]+`@example.com","clientRole":"member","displayName":"Clock Member"}`, 0)
 	if code != 200 || data(m)["createdAt"] != clock.Add(time.Hour).Format(time.RFC3339) {
 		t.Errorf("created after the jump: %d %v", code, m)
 	}

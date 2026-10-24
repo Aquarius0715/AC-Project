@@ -1,8 +1,8 @@
 "use server";
 
-// Server Actions of the customer Users page (FR-C19, IR417): an owner invites members and owners, changes a pending
-// invite, a user's role and access, removes users and resends invites. The Core API keeps every rule (own customer,
-// own account, last active owner, fixed e-mail once accepted).
+// Server Actions of the customer Users page (FR-C19, IR417, IR461): an owner adds members and owners (the account is
+// created at once and gets a set-up e-mail), changes a user's role and access, removes users and resends the set-up
+// e-mail. The Core API keeps every rule (own customer, own account, last active owner, fixed e-mail).
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 
@@ -19,17 +19,17 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   }
 }
 
-export async function inviteUser(customerId: string, email: string, clientRole: "owner" | "member") {
-  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, email: email.trim(), clientRole }, { write: true }).then(() => null));
+export async function inviteUser(customerId: string, email: string, clientRole: "owner" | "member", displayName: string) {
+  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, email: email.trim(), clientRole, displayName: displayName.trim() }, { write: true }).then(() => null));
 }
-/** A pending invite's e-mail and role, or a user's role and access (status), with a reason. */
+/** A user's role and access (status), with a reason; the e-mail is sent unchanged. */
 export async function updateUser(id: string, version: number, customerId: string, email: string, clientRole: "owner" | "member", status: "active" | "disabled" | null, reason: string) {
   return run(() => coreOp("clientUsers.save", { id, customerId, email: email.trim(), clientRole, ...(status ? { status } : {}), reason: reason.trim() }, { write: true, expectedVersion: version }).then(() => null));
 }
 export async function removeUser(id: string, version: number, reason: string) {
   return run(() => coreOp("clientUsers.remove", { id, reason: reason.trim() }, { write: true, expectedVersion: version }).then(() => null));
 }
-/** Queues the invitation e-mail again (IR418). */
+/** Sends the set-up e-mail again (IR461). */
 export async function resendInvite(id: string) {
   return run(() => coreOp("clientUsers.resendInvite", { id }, { write: true }).then(() => null));
 }

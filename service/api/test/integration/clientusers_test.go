@@ -17,7 +17,7 @@ func TestClientUsers(t *testing.T) {
 	save := func(a *actor, body string, v int) (int, map[string]any) {
 		return write(s, a, "clientUsers.save", body, v)
 	}
-	invite := `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member"}`
+	invite := `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","displayName":"New Member"}`
 	want := map[string]string{ // the field each case is refused for
 		"bad email":    "email=error.invalid",
 		"bad role":     "clientRole=error.invalid",
@@ -25,22 +25,22 @@ func TestClientUsers(t *testing.T) {
 		"blank reason": "reason=error.length",
 	}
 	for name, b := range map[string]string{
-		"bad email":    `{"customerId":"` + cust + `","email":"not-an-email","clientRole":"member"}`,
-		"bad role":     `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"admin"}`,
-		"bad status":   `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","status":"invited"}`,
-		"blank reason": `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","reason":" "}`,
+		"bad email":    `{"customerId":"` + cust + `","email":"not-an-email","clientRole":"member","displayName":"N"}`,
+		"bad role":     `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"admin","displayName":"N"}`,
+		"bad status":   `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","status":"invited","displayName":"N"}`,
+		"blank reason": `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","reason":" ","displayName":"N"}`,
 	} {
 		code, m := save(&hq, b, 0)
 		refusal(t, name, code, m, want[name])
 	}
-	if code, m := save(&hq, `{"customerId":"`+cust+`","email":"`+email+`","clientRole":"member","status":"active"}`, 0); code != 422 || fields(m) != "status=error.notAllowed" {
+	if code, m := save(&hq, `{"customerId":"`+cust+`","email":"`+email+`","clientRole":"member","status":"active","displayName":"N"}`, 0); code != 422 || fields(m) != "status=error.notAllowed" {
 		t.Errorf("status on invite: %d %s", code, fields(m))
 	}
 	if code, _ := save(&customerA, invite, 0); code != 404 {
 		t.Error("client invites into another customer")
 	}
 	code, m := save(&customerB, invite, 0)
-	if code != 200 || data(m)["status"] != "invited" || data(m)["membershipId"] != nil || data(m)["invitedByMembershipId"] != seed.ID("customer-b").String() {
+	if code != 200 || data(m)["status"] != "invited" || data(m)["membershipId"] == nil || data(m)["invitedByMembershipId"] != seed.ID("customer-b").String() {
 		t.Fatalf("invite: %d %v", code, m)
 	}
 	id := data(m)["id"].(string)
@@ -217,14 +217,18 @@ func TestClientUsersByOwner(t *testing.T) {
 	save := func(body string, v int) (int, map[string]any) {
 		return write(s, &customerB, "clientUsers.save", body, v)
 	}
-	code, m := save(`{"customerId":"`+cust+`","email":"`+email+`","clientRole":"owner"}`, 0)
+	code, m := save(`{"customerId":"`+cust+`","email":"`+email+`","clientRole":"owner","displayName":"New Owner"}`, 0)
 	if code != 200 || data(m)["clientRole"] != "owner" || data(m)["status"] != "invited" {
 		t.Fatalf("owner invites an owner: %d %v", code, m)
 	}
 	id := data(m)["id"].(string)
-	email2 := "fixed-" + email
-	if code, m := save(`{"id":"`+id+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","reason":"typo"}`, 1); code != 200 || data(m)["email"] != email2 || data(m)["clientRole"] != "member" {
-		t.Fatalf("change the invite: %d %v", code, m)
+	// the account exists from the start (IR461): its e-mail is fixed, its role can change
+	if code, m := save(`{"id":"`+id+`","customerId":"`+cust+`","email":"fixed-`+email+`","clientRole":"member","reason":"typo"}`, 1); code != 422 || fields(m) != "email=error.immutable" {
+		t.Errorf("change the e-mail: %d %s", code, fields(m))
+	}
+	email2 := email
+	if code, m := save(`{"id":"`+id+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","reason":"not an owner"}`, 1); code != 200 || data(m)["clientRole"] != "member" {
+		t.Fatalf("change the role: %d %v", code, m)
 	}
 	if code, m := save(`{"id":"`+id+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","status":"active","reason":"x"}`, 2); code != 409 || m["messageKey"] != "errors.invite_pending" {
 		t.Errorf("activate an invite: %d %v", code, m)
@@ -268,29 +272,30 @@ func TestClientUsersByOwner(t *testing.T) {
 	}
 }
 
-// TestClientInviteAccepted (IR417): when HQ creates the client membership for an invited e-mail, the invite becomes
-// that account, and an owner invite makes an owner membership.
-func TestClientInviteAccepted(t *testing.T) {
+// TestClientAccountCreated (IR417, IR461): an owner adds an owner: the person and an owner client membership of the
+// customer are created at once, with the client permissions and the customer's scope, and the user is listed as invited.
+func TestClientAccountCreated(t *testing.T) {
 	s := server(t)
-	user := newUser(t)
 	cust := seed.ID("cust-b").String()
-	code, m := write(s, &customerB, "clientUsers.save", `{"customerId":"`+cust+`","email":"`+user+`@ac.local","clientRole":"owner"}`, 0)
-	if code != 200 {
-		t.Fatalf("invite: %d %v", code, m)
+	email := "added-owner-" + uuid.NewString()[:8] + "@example.com"
+	code, m := write(s, &customerB, "clientUsers.save", `{"customerId":"`+cust+`","email":"`+email+`","clientRole":"owner","displayName":"Added Owner"}`, 0)
+	if code != 200 || data(m)["status"] != "invited" || data(m)["membershipId"] == nil {
+		t.Fatalf("add: %d %v", code, m)
 	}
-	id := data(m)["id"].(string)
-	from := clock.Add(-time.Hour).Format(time.RFC3339)
-	code, m = write(s, &hq, "members.save", `{"userId":"`+user+`","organizationId":"`+seed.ID("org-customer-b").String()+`","role":"client","permissions":[],"scopes":[],"validFrom":"`+from+`","validUntil":null,"reason":"onboarding"}`, 0)
-	if code != 200 || data(m)["clientRole"] != "owner" {
-		t.Fatalf("members.save: %d %v", code, m)
-	}
+	membership := data(m)["membershipId"].(string)
 	t.Cleanup(func() { // later tests count customer B's owners: this one ends before them
-		owner(t, `UPDATE identity.memberships SET valid_until = $2 WHERE id = $1`, data(m)["id"], clock.Add(-30*time.Minute))
+		owner(t, `UPDATE identity.memberships SET valid_from = $2, valid_until = $3 WHERE id = $1`, membership, clock.Add(-time.Hour), clock.Add(-30*time.Minute))
 	})
-	var status, membership string
-	ownerScan(t, `SELECT status, COALESCE(membership_id::text, '') FROM identity.client_users WHERE id = $1`, []any{id}, &status, &membership)
-	if status != "active" || membership != data(m)["id"] {
-		t.Errorf("accepted invite: %s %s", status, membership)
+	var role, clientRole, org string
+	var perms, scopes int
+	ownerScan(t, `SELECT m.role, m.client_role, m.organization_id::text, (SELECT count(*) FROM identity.membership_permissions p WHERE p.membership_id = m.id),
+		(SELECT count(*) FROM identity.membership_scopes s WHERE s.membership_id = m.id AND s.kind = 'organization' AND s.ref_id = m.organization_id) FROM identity.memberships m WHERE m.id = $1`,
+		[]any{membership}, &role, &clientRole, &org, &perms, &scopes)
+	if role != "client" || clientRole != "owner" || org != seed.ID("org-customer-b").String() || perms != 1 || scopes != 1 {
+		t.Errorf("membership: %s %s %s perms %d scopes %d", role, clientRole, org, perms, scopes)
+	}
+	if code, m := write(s, &customerB, "clientUsers.save", `{"customerId":"`+cust+`","email":"`+strings.ToUpper(email)+`","clientRole":"member","displayName":"Again"}`, 0); code != 422 || fields(m) != "email=errors.email_taken" {
+		t.Errorf("the same e-mail again: %d %s", code, fields(m))
 	}
 }
 
@@ -322,38 +327,5 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 	ownerScan(t, `SELECT valid_until FROM identity.memberships WHERE id = $1`, []any{membership}, &end)
 	if !end.Equal(clock) {
 		t.Errorf("disabled client user's membership after HQ's change: %v, want still closed at %v", end, clock)
-	}
-}
-
-// TestClientInviteMailFollowsTheInvite (IR426): HQ corrects a pending client invite's address: the invitation goes to
-// the new address, the unsent one to the old address is cancelled and the resend pause starts again; removing the
-// invite cancels what it has not sent yet.
-func TestClientInviteMailFollowsTheInvite(t *testing.T) {
-	s := server(t)
-	cust := seed.ID("cust-a").String()
-	old, corrected := "typo-"+uuid.NewString()[:8]+"@example.com", "fixed-"+uuid.NewString()[:8]+"@example.com"
-	code, m := write(s, &hq, "clientUsers.save", `{"customerId":"`+cust+`","email":"`+old+`","clientRole":"member"}`, 0)
-	if code != 200 {
-		t.Fatalf("invite: %d %v", code, m)
-	}
-	id := data(m)["id"].(string)
-	states := func(email string) (st string) {
-		ownerScan(t, `SELECT string_agg(state, ',' ORDER BY created_at) FROM notify.outbound_mail WHERE to_email = $1`, []any{email}, &st)
-		return
-	}
-	if code, m := write(s, &hq, "clientUsers.save", `{"id":"`+id+`","customerId":"`+cust+`","email":"`+corrected+`","clientRole":"member","reason":"typo in the address"}`, 1); code != 200 {
-		t.Fatalf("correct the address: %d %v", code, m)
-	}
-	if got, now := states(old), states(corrected); got != "cancelled" || now != "queued" {
-		t.Errorf("mail after the correction: old %q, corrected %q", got, now)
-	}
-	if code, m := write(s, &hq, "clientUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 429 || m["messageKey"] != "errors.invite_recently_sent" {
-		t.Errorf("resend right after the correction: %d %v", code, m)
-	}
-	if code, m := write(s, &hq, "clientUsers.remove", `{"id":"`+id+`","reason":"not joining"}`, 2); code != 200 {
-		t.Fatalf("remove: %d %v", code, m)
-	}
-	if got := states(corrected); got != "cancelled" {
-		t.Errorf("mail after the removal: %s", got)
 	}
 }

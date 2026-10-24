@@ -323,7 +323,8 @@ func TestRestrictionScheduleRecipients(t *testing.T) {
 	s := server(t)
 	u := boundUnit(t, s, "online")
 	k, inv := overdueContract(t, s, u)
-	owner(t, `UPDATE identity.memberships SET valid_until = $2 WHERE role = 'client' AND organization_id = $1 AND (valid_until IS NULL OR valid_until > $2)`,
+	// accounts other tests added start at the clock (IR461): their start moves back too
+	owner(t, `UPDATE identity.memberships SET valid_from = LEAST(valid_from, $2 - interval '1 hour'), valid_until = $2 WHERE role = 'client' AND organization_id = $1 AND (valid_until IS NULL OR valid_until > $2)`,
 		seed.ID("org-customer-b"), clock.Add(-time.Minute))
 	t.Cleanup(func() {
 		owner(t, `UPDATE identity.memberships SET valid_until = NULL WHERE id = $1`, seed.ID("customer-b"))

@@ -35,7 +35,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | DD-P08 / FR-P08 | `/partner/*` / `PartnerAccessGuard` | `jobs.get`, `session.get` | Recheck accepted delegation and its period immediately before every action. Use the demo clock for expiry | Once expired, reject the next action and discard cached data even if the screen remains open |
 | DD-P09 / FR-P09 | `/partner/team?tab=certifications` / `CertificateList` | `certificates.list`, `certificates.getContent`, `certificates.submit`, `certificates.requestTraining` | Renewal file PDF/JPG/PNG ≤ 10 MB; issuedAt < expiresAt; eligibility uses verified certificates | Pending renewals do not extend eligibility; other companies NOT_FOUND |
 | DD-P10 / FR-P10 | `/partner/payouts` / `PartnerPayouts` | `payouts.list`, `payouts.get`, `payouts.query`, `rateCards.list`, `jobs.get`, `units.get`, `jobs.list` | Approved/paid statements only; question message 1–2000 | Corrections only as next-statement adjustments |
-| DD-P11 / FR-P11 | `/partner/users` / `PartnerUsers` | `partnerUsers.list`, `partnerUsers.save`, `partnerUsers.remove`, `partnerUsers.resendInvite` | Own company only; e-mail unique per company (case-insensitive); e-mail and role fixed once accepted; never the own account; the company keeps an active contractor | Permissions, qualifications and access periods stay with HQ (DD-A03) |
+| DD-P11 / FR-P11 | `/partner/users` / `PartnerUsers` | `partnerUsers.list`, `partnerUsers.save`, `partnerUsers.remove`, `partnerUsers.resendInvite` | Own company only; e-mail unique per company (case-insensitive); the account is created when added and its e-mail and role are fixed (IR461); a technician's access end at most a year ahead; never the own account; the company keeps an active contractor | Permissions and qualifications stay with HQ (DD-A03) |
 
 ## Shared Implementation Steps
 
@@ -364,7 +364,7 @@ Scope: FR-P10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 ### DD-P11 Details
 
-**Source mapping**: SRC-06 BIZ-12 → FR-P11 → DD-P11. Source category: user request 2026-10-13 (DEC-76, IR416); Figma Contractor row 08 (08-1…08-4).
+**Source mapping**: SRC-06 BIZ-12 → FR-P11 → DD-P11. Source category: user request 2026-10-13 (DEC-76, IR416) and 2026-10-24 (DEC-79, IR461); Figma Contractor row 08 (08-1…08-4).
 
 Scope: FR-P11 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `partnerUsers.list, partnerUsers.save, partnerUsers.remove, partnerUsers.resendInvite`.
 
@@ -372,21 +372,22 @@ Scope: FR-P11 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| email | string/required | Valid address, ≤ 254, unique per company (case-insensitive); fixed once accepted | Invitation |
-| partnerRole | enum/required | contractor / technician; fixed once accepted | Role |
-| status | enum | invited (read-only) / active / disabled | Access |
-| reason | string | 1–1000; required on every change after the invite | Audit |
-| accessUntil | Read-only | The membership's access end; kept while disabled | Access period |
+| displayName | string/required when adding | 1–120; the person's name | Identity |
+| email | string/required | Valid address, ≤ 254, unique per company (case-insensitive) and one person per address (another use → `errors.email_taken`); fixed once added | Sign-in |
+| partnerRole | enum/required | contractor / technician; fixed once added | Role |
+| accessUntil | Instant / technicians only | Required when adding a technician: after now and at most a year ahead (the web takes a Kuala Lumpur date, the end of that day, and offers three months ahead); kept while disabled | Access period |
+| status | enum | invited (= not signed in yet, read-only) / active / disabled | Access |
+| reason | string | 1–1000; required on every change after the adding | Audit |
 | lastSignInAt | Read-only | null = never signed in | Activity |
 
 **Steps**
 
-1. `partnerUsers.list` (status filter in the URL) shows name, e-mail, role, status, access until and last sign-in; the caller's row is marked “You” and has no actions; an active account whose access end has passed (business clock) reads “Access ended” and can only be removed.
-2. + Invite user opens a centered dialog (e-mail, role Contractor/Technician) → `partnerUsers.save` without id → the list refetches and the invitation e-mail is queued (IR418).
-3. On an invite: Resend invite (`partnerUsers.resendInvite`, queues the invitation e-mail again, IR418; at most every 5 minutes per invite, sooner → RATE_LIMITED `errors.invite_recently_sent` with the seconds to wait, IR423), Edit invite (e-mail, role, reason → `partnerUsers.save` with id and version; a corrected e-mail gets the invitation, and the unsent one to the old address is cancelled, IR426), Remove (reason → `partnerUsers.remove`; cancels the invitation e-mails not yet sent).
-4. On an account: Disable / Enable (reason → `partnerUsers.save` with status) and Remove (reason → `partnerUsers.remove`).
+1. `partnerUsers.list` (status filter in the URL) shows name, e-mail, role, status, access until and last sign-in; the caller's row is marked “You” and has no actions; an account whose access end has passed (business clock) reads “Access ended”, also before the first sign-in, and offers only Access (technicians) and Remove.
+2. + Add user opens a centered dialog (name, e-mail, role Contractor/Technician, a technician's access end) → `partnerUsers.save` without id creates the person, the membership (a technician: external, the technician permissions, no unit scope; a contractor: the company's organization scope) and the row `invited`; the sign-in service opens the account and e-mails the link to set the password (IR461). The first sign-in makes the row `active`. A contractor or technician that HQ adds as a new person (DD-A03) is listed the same way.
+3. Not signed in yet: Resend set-up e-mail (`partnerUsers.resendInvite`; at most every 5 minutes per user, sooner → RATE_LIMITED `errors.invite_recently_sent` with the seconds to wait, IR423), Access (technicians) and Remove (reason → `partnerUsers.remove`; the sign-in account is turned off).
+4. On an account: Access (technicians: a new access end and a reason → `partnerUsers.save` with `accessUntil`), Disable / Enable (reason → `partnerUsers.save` with status; the sign-in account is turned off / on) and Remove (reason → `partnerUsers.remove`; the membership ends now and the sign-in account is turned off).
 
-**Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept). The own account → CONFLICT `errors.own_account`; the last active contractor → CONFLICT `errors.last_contractor`; a technician with an active assignment → CONFLICT `errors.technician_booked` (reassign first, IR421); enabling after the access end → CONFLICT `errors.access_expired`; a stale version → CONFLICT, the list refetches. Technician sessions have no Users item; the direct URL shows Page unavailable (FORBIDDEN). The list marks such a technician (`booked`, IR432): the row offers no Disable or Remove and says “Has an assigned job — reassign it first”.
+**Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept); an address another person uses → VALIDATION `errors.email_taken`; a changed e-mail or role → VALIDATION `error.immutable`; an access end in the past or more than a year ahead → VALIDATION `accessUntil=error.range`. The own account → CONFLICT `errors.own_account`; the last active contractor → CONFLICT `errors.last_contractor`; a technician with an active assignment → CONFLICT `errors.technician_booked` on Disable, Remove or a shorter access end (reassign first, IR421); enabling or resending after the access end → CONFLICT `errors.access_expired` (set a new access end first); a stale version → CONFLICT, the list refetches. Technician sessions have no Users item; the direct URL shows Page unavailable (FORBIDDEN). The list marks such a technician (`booked`, IR432): the row offers no Disable or Remove and says “Has an assigned job — reassign it first” beside the Access action.
 
 **Verification**: Check the traceability entries under AT-P11 (N/E/B).
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/mail"
 	"slices"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -276,12 +278,32 @@ type MemberInput struct {
 	ValidFrom      time.Time  `json:"validFrom"`
 	ValidUntil     *time.Time `json:"validUntil"`
 	Reason         string     `json:"reason"`
+	// NewUser creates the person with the membership instead of choosing an existing userId; the account then gets
+	// the set-up e-mail (IR461)
+	NewUser *NewUserInput `json:"newUser,omitempty"`
+}
+
+// NewUserInput names the person members.save creates (IR461).
+type NewUserInput struct {
+	Email       string `json:"email"`
+	DisplayName string `json:"displayName"`
 }
 
 // Validate implements ops.Validator for the lookup-free rules.
 func (in *MemberInput) Validate() map[string]string {
 	fe := map[string]string{}
-	if in.UserID == uuid.Nil {
+	if in.NewUser != nil {
+		if in.UserID != uuid.Nil || in.ID != nil {
+			fe["newUser"] = "error.notAllowed"
+		}
+		in.NewUser.Email, in.NewUser.DisplayName = strings.TrimSpace(in.NewUser.Email), strings.TrimSpace(in.NewUser.DisplayName)
+		if a, err := mail.ParseAddress(in.NewUser.Email); err != nil || a.Address != in.NewUser.Email || len(in.NewUser.Email) > 254 {
+			fe["newUser.email"] = "error.invalid"
+		}
+		if n := utf8.RuneCountInString(in.NewUser.DisplayName); n < 1 || n > 120 {
+			fe["newUser.displayName"] = "error.length"
+		}
+	} else if in.UserID == uuid.Nil {
 		fe["userId"] = "error.required"
 	}
 	if in.OrganizationID == uuid.Nil {
@@ -343,7 +365,7 @@ func (in *MemberInput) Validate() map[string]string {
 // @Summary		members.save (write)
 // @ID				members.save
 // @Description	Authorization: admin:identity.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR84 new client membership creates initial Consent granted=false
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR84 new client membership creates initial Consent granted=false; newUser creates the person with the membership instead of userId and sends a set-up e-mail (IR461)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A03
 // @Tags			members
@@ -363,6 +385,18 @@ func (in *MemberInput) Validate() map[string]string {
 // @Security		BearerAuth
 // @Router			/v1/members [post]
 func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, error) {
+	newPerson := in.NewUser != nil
+	if newPerson { // the person is created with the membership (IR461)
+		err := c.Tx.QueryRow(ctx, `INSERT INTO identity.users (email, display_name, status, created_at, updated_at) VALUES ($1, $2, 'active', $3, $3) RETURNING id`,
+			in.NewUser.Email, in.NewUser.DisplayName, c.Now).Scan(&in.UserID)
+		var pe *pgconn.PgError
+		if errors.As(err, &pe) && pe.Code == "23505" {
+			return Member{}, apperr.Fields(map[string]string{"newUser.email": "errors.email_taken"})
+		}
+		if err != nil {
+			return Member{}, err
+		}
+	}
 	var exists bool
 	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.users WHERE id = $1)`, in.UserID).Scan(&exists); err != nil {
 		return Member{}, err
@@ -425,6 +459,10 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	var id uuid.UUID
 	var prev *int
 	if in.ID == nil {
+		listed := "active" // the status the customer's or contractor's user list shows
+		if newPerson {
+			listed = "invited"
+		}
 		var clientRole *string
 		if in.Role == "client" { // a member, or the role a pending invite for the user's e-mail gives (IR417)
 			cr := "member"
@@ -443,26 +481,26 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES (current_setting('app.tenant_id')::uuid, $1, 'location_automation', false)`, id); err != nil {
 				return Member{}, err
 			}
-			// IR144: the customer's user list includes the new active member; a pending invite for the same e-mail becomes
-			// this account (IR417)
+			// IR144: the customer's user list includes the new member; a pending invite for the same e-mail becomes this
+			// account (IR417); a person created with the membership is listed as not signed in yet (IR461)
 			if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.client_users (tenant_id, customer_id, membership_id, email, display_name, client_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
-				SELECT current_setting('app.tenant_id')::uuid, cu.id, $1, u.email, u.display_name, $6, 'active', $3, $4, $3, $3
+				SELECT current_setting('app.tenant_id')::uuid, cu.id, $1, u.email, u.display_name, $6, $7, $3, $4, $3, $3
 				FROM notify.ref_customers cu, identity.users u WHERE cu.organization_id = $2 AND u.id = $5
 				ON CONFLICT (tenant_id, customer_id, email) DO UPDATE SET membership_id = EXCLUDED.membership_id, display_name = EXCLUDED.display_name,
-					status = 'active', version = identity.client_users.version + 1, updated_at = EXCLUDED.updated_at
-				WHERE identity.client_users.membership_id IS NULL`, id, in.OrganizationID, c.Now, c.Principal.MembershipID, in.UserID, *clientRole); err != nil {
+					status = EXCLUDED.status, version = identity.client_users.version + 1, updated_at = EXCLUDED.updated_at
+				WHERE identity.client_users.membership_id IS NULL`, id, in.OrganizationID, c.Now, c.Principal.MembershipID, in.UserID, *clientRole, listed); err != nil {
 				return Member{}, err
 			}
 		}
-		// FR-P11: the contractor company's user list includes the new active account; a pending invite for the same
-		// email becomes this account
+		// FR-P11: the contractor company's user list includes the new account; a pending invite for the same email
+		// becomes this account; a person created with the membership is listed as not signed in yet (IR461)
 		if in.Role == "contractor" || in.Role == "technician" {
 			if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
-				SELECT current_setting('app.tenant_id')::uuid, o.id, $1, u.email, u.display_name, $5, 'active', $3, $4, $3, $3
+				SELECT current_setting('app.tenant_id')::uuid, o.id, $1, u.email, u.display_name, $5, $7, $3, $4, $3, $3
 				FROM identity.organizations o, identity.users u WHERE o.id = $2 AND o.kind = 'contractor' AND u.id = $6
 				ON CONFLICT (tenant_id, organization_id, email) DO UPDATE SET membership_id = EXCLUDED.membership_id, display_name = EXCLUDED.display_name,
-					partner_role = EXCLUDED.partner_role, status = 'active', version = identity.partner_users.version + 1, updated_at = EXCLUDED.updated_at
-				WHERE identity.partner_users.membership_id IS NULL`, id, in.OrganizationID, c.Now, c.Principal.MembershipID, in.Role, in.UserID); err != nil {
+					partner_role = EXCLUDED.partner_role, status = EXCLUDED.status, version = identity.partner_users.version + 1, updated_at = EXCLUDED.updated_at
+				WHERE identity.partner_users.membership_id IS NULL`, id, in.OrganizationID, c.Now, c.Principal.MembershipID, in.Role, in.UserID, listed); err != nil {
 				return Member{}, err
 			}
 		}
@@ -565,6 +603,9 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		return x, err
 	}
 	c.Emit(ops.Event{AggregateType: "membership", AggregateID: id, Type: "MembershipSaved", Payload: map[string]any{"role": in.Role}})
+	if newPerson {
+		requestAccount(c, in.UserID, id, in.Role)
+	}
 	c.Audit(ops.AuditEntry{Action: "members.save", TargetKind: "membership", TargetID: id.String(), PreviousVersion: prev, NextVersion: &ms[0].Version, Reason: in.Reason})
 	return ms[0], nil
 }

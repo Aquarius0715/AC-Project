@@ -43,7 +43,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | DD-C16 / FR-C16 | `/customer/energy` / `EnergyReportExport` | `energy.exportReport` | Completed month, at least one section, PDF/CSV | Same tariff and estimation labels as the screen |
 | DD-C17 / FR-C17 | `/customer/maintenance?jobId=` / `JobCompletionFeedback` | `jobs.get`, `jobs.rate`, `jobs.reportProblem` | 1–5 ★ required; editable 7 days; problem details 10–2000, up to 5 photos | Not completed → CONFLICT; ratings never shown to other customers |
 | DD-C18 / FR-C18 | `/customer/maintenance?tab=filter-care` / `FilterCare` | `filterCare.list`, `filterCare.markCleaned`, `filterCare.saveSettings`, `filterCare.getSettings` | Run time since cleaning per AC; threshold 50–2000 h or model default; fallback days 7–180 | Offline → unknown, never 0 |
-| DD-C19 / FR-C19 | `/customer/users` / `ClientUsers` | `clientUsers.list`, `clientUsers.save`, `clientUsers.remove`, `clientUsers.resendInvite` | Owner only; e-mail unique per customer (case-insensitive), fixed once accepted; never the own account; the customer keeps an active owner (IR417) | Password resets stay with HQ (DD-A17) |
+| DD-C19 / FR-C19 | `/customer/users` / `ClientUsers` | `clientUsers.list`, `clientUsers.save`, `clientUsers.remove`, `clientUsers.resendInvite` | Owner only; e-mail unique per customer (case-insensitive); the account is created when added and its e-mail is fixed (IR461); never the own account; the customer keeps an active owner (IR417) | Password resets stay with HQ (DD-A17) |
 
 ## Shared Implementation Steps
 
@@ -633,7 +633,7 @@ Scope: FR-C18 / Main display pattern: **UI-LIST**. Service boundary: `filterCare
 
 ### DD-C19 Details
 
-**Source mapping**: SRC-06 BIZ-04 → FR-C19 → DD-C19. Source category: Figma-confirmed screen specification (Client 11a–11c, 2026-10-06, DEC-65); full user management by owners, user request 2026-10-13 (DEC-77, IR417, Client 11d–11e).
+**Source mapping**: SRC-06 BIZ-04 → FR-C19 → DD-C19. Source category: Figma-confirmed screen specification (Client 11a–11c, 2026-10-06, DEC-65); full user management by owners, user request 2026-10-13 (DEC-77, IR417, Client 11d–11e); accounts created when added, user request 2026-10-24 (DEC-79, IR461).
 
 Scope: FR-C19 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `clientUsers.list, clientUsers.save, clientUsers.remove, clientUsers.resendInvite`.
 
@@ -641,20 +641,21 @@ Scope: FR-C19 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| email | string/required | Valid address, ≤ 254, unique per customer (case-insensitive); fixed once accepted | Invitation |
+| displayName | string/required when adding | 1–120; the person's name | Identity |
+| email | string/required | Valid address, ≤ 254, unique per customer (case-insensitive) and one person per address (another use → `errors.email_taken`); fixed once added | Sign-in |
 | clientRole | enum/required | member / owner; the customer keeps an active owner | Role |
-| status | enum | invited (read-only) / active / disabled | Access |
-| reason | string | 1–1000; required on every change after the invite | Audit |
+| status | enum | invited (= not signed in yet, read-only) / active / disabled | Access |
+| reason | string | 1–1000; required on every change after the adding | Audit |
 | lastSignInAt | Read-only | null = never signed in; recorded from the sign-in token (IR268) | Activity |
 
 **Steps**
 
 1. `clientUsers.list` (customerId = own customer) shows name, e-mail, role, status, and last sign-in; the owner's own row is marked “(you)” and has no actions.
-2. + Invite user opens a centered dialog (e-mail, role Member/Owner) → `clientUsers.save` without id → the list refetches and the invitation e-mail is queued (IR418).
-3. On an invite: Resend invite (`clientUsers.resendInvite`, queues the invitation e-mail again, IR418; at most every 5 minutes per invite, sooner → RATE_LIMITED `errors.invite_recently_sent` with the seconds to wait, IR423), Edit (e-mail, role, reason → `clientUsers.save` with id and version; a corrected e-mail gets the invitation, and the unsent one to the old address is cancelled, IR426), Remove (reason → `clientUsers.remove`; cancels the invitation e-mails not yet sent).
-4. On an accepted user: Change role, Disable / Enable (reason → `clientUsers.save` with clientRole / status) and Remove (reason → `clientUsers.remove`).
+2. + Add user opens a centered dialog (name, e-mail, role Member/Owner) → `clientUsers.save` without id creates the person, the client membership (the role's permissions, the customer's organization scope) and the row `invited`; the sign-in service opens the account and e-mails the link to set the password (IR461). The first sign-in makes the row `active`.
+3. Not signed in yet: Resend set-up e-mail (`clientUsers.resendInvite`; at most every 5 minutes per user, sooner → RATE_LIMITED `errors.invite_recently_sent` with the seconds to wait, IR423), Change role and Remove (reason → `clientUsers.remove`; the sign-in account is turned off).
+4. On a user who has signed in: Change role, Disable / Enable (reason → `clientUsers.save` with clientRole / status; the sign-in account is turned off / on) and Remove (reason → `clientUsers.remove`; the membership ends now and the sign-in account is turned off).
 
-**Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept, 11c). The own account → CONFLICT `errors.own_account`; demoting, disabling or removing the last active owner → CONFLICT `errors.last_owner`; a stale version → CONFLICT, the list refetches. Member sessions have no sidebar item; the direct URL shows Page unavailable (FORBIDDEN). Password resets stay with HQ (DD-A17).
+**Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept, 11c); an address another person uses → VALIDATION `errors.email_taken`; a changed e-mail → VALIDATION `error.immutable`. The own account → CONFLICT `errors.own_account`; demoting, disabling or removing the last active owner → CONFLICT `errors.last_owner`; a stale version → CONFLICT, the list refetches. Member sessions have no sidebar item; the direct URL shows Page unavailable (FORBIDDEN). Password resets stay with HQ (DD-A17).
 
 **Verification**: Check the traceability entries under AT-C19 (N/E/B).
 

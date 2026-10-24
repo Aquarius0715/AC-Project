@@ -12,7 +12,8 @@ const member = (over: Partial<ApiMember>): ApiMember => ({
   permissions: ["alert.read"], scopes: [{ kind: "unit", id: "unit-1" }], scopeVersion: 3, validFrom: "2026-09-01T00:00:00Z", validUntil: "2026-12-31T16:00:00Z", ...over,
 });
 const draft = (over: Partial<MemberDraft>): MemberDraft => ({
-  userId: "u1", organizationId: "org-p", role: "technician", employment: "external", permissions: ["alert.read"], scopes: [{ kind: "unit", id: "unit-1" }], validFrom: "2026-09-01T08:00", validUntil: "2027-01-01T00:00", reason: "Rotation", ...over,
+  userId: "u1", organizationId: "org-p", role: "technician", employment: "external", permissions: ["alert.read"], scopes: [{ kind: "unit", id: "unit-1" }], validFrom: "2026-09-01T08:00", validUntil: "2027-01-01T00:00", reason: "Rotation",
+  newUser: false, newEmail: "", newName: "", ...over,
 });
 
 describe("HQ access & roles (FR-A03, BR-A03, IR107)", () => {
@@ -47,6 +48,18 @@ describe("HQ access & roles (FR-A03, BR-A03, IR107)", () => {
     expect(memberErrors(draft({ role: "admin", permissions: ["asset.write"], validUntil: "2026-08-01T00:00" }), { selfUserId: "me" })).toEqual({ permissions: "asset.write needs asset.read", validUntil: "Must be after valid from" });
     expect(memberErrors(draft({ userId: "me", role: "admin", permissions: ["identity.read", "identity.write", "restriction.override"] }), { selfUserId: "me", current: member({ permissions: ["identity.read"] }) }).permissions)
       .toBe("Another identity administrator must grant identity.write, restriction.override to you");
+ 
+  });
+
+  it("creates a new person with the membership: e-mail and name instead of a user, and no user ID yet (IR461)", () => {
+    expect(memberErrors(draft({ userId: "", newUser: true, newEmail: "nope", newName: " " }), { selfUserId: "me" })).toEqual({
+      "newUser.email": "A valid email address (up to 254 characters)", "newUser.displayName": "A name of 1–120 characters",
+    });
+    expect(memberErrors(draft({ userId: "", newUser: true, newEmail: "new@example.com", newName: "New Colleague" }), { selfUserId: "me" })).toEqual({});
+    expect(memberInput(draft({ userId: "", newUser: true, newEmail: " new@example.com ", newName: " New Colleague " }))).toMatchObject({
+      userId: "00000000-0000-0000-0000-000000000000", newUser: { email: "new@example.com", displayName: "New Colleague" },
+    });
+    expect("newUser" in memberInput(draft({ newUser: true }), "m1")).toBe(false); // an existing membership keeps its user
   });
 });
 

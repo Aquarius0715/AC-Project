@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -10,18 +11,24 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
+	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/auth"
+	"github.com/pradita/ac-project/service/api/internal/platform/idp"
 	"github.com/pradita/ac-project/service/api/internal/seed"
+	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
-// TestPartnerUsers (FR-P11): a contractor lists its company's accounts, invites contractors and technicians, changes
-// a pending invite, resends it and removes it; another company's accounts are NOT_FOUND, and other roles are refused.
+// TestPartnerUsers (FR-P11, IR461): a contractor lists its company's accounts, adds contractors and technicians (the
+// account is created at once and listed as invited until its first sign-in), resends the set-up e-mail and removes the
+// account; another company's accounts are NOT_FOUND, and other roles are refused.
 func TestPartnerUsers(t *testing.T) {
 	s := server(t)
 	email := "tech-" + uuid.NewString()[:8] + "@example.com"
 	save := func(a *actor, body string, v int) (int, map[string]any) {
 		return write(s, a, "partnerUsers.save", body, v)
 	}
-	invite := `{"email":"` + email + `","partnerRole":"technician"}`
+	access := `,"displayName":"New Tech","accessUntil":"` + clock.Add(30*24*time.Hour).Format(time.RFC3339) + `"`
+	invite := `{"email":"` + email + `","partnerRole":"technician"` + access + `}`
 	want := map[string]string{ // the field each case is refused for
 		"bad email":    "email=error.invalid",
 		"bad role":     "partnerRole=error.invalid",
@@ -37,7 +44,7 @@ func TestPartnerUsers(t *testing.T) {
 		code, m := save(&contrA, b, 0)
 		refusal(t, name, code, m, want[name])
 	}
-	if code, m := save(&contrA, `{"email":"`+email+`","partnerRole":"technician","status":"active"}`, 0); code != 422 || fields(m) != "status=error.notAllowed" {
+	if code, m := save(&contrA, `{"email":"`+email+`","partnerRole":"technician","status":"active"`+access+`}`, 0); code != 422 || fields(m) != "status=error.notAllowed" {
 		t.Errorf("status on invite: %d %s", code, fields(m))
 	}
 	for _, a := range []*actor{&techA, &customerA, &hq} {
@@ -49,7 +56,7 @@ func TestPartnerUsers(t *testing.T) {
 		}
 	}
 	code, m := save(&contrA, invite, 0)
-	if code != 200 || data(m)["status"] != "invited" || data(m)["partnerRole"] != "technician" || data(m)["membershipId"] != nil ||
+	if code != 200 || data(m)["status"] != "invited" || data(m)["partnerRole"] != "technician" || data(m)["membershipId"] == nil ||
 		data(m)["organizationId"] != seed.ID("org-contractor-a").String() || data(m)["invitedByMembershipId"] != seed.ID("contractor-a").String() {
 		t.Fatalf("invite: %d %v", code, m)
 	}
@@ -57,8 +64,8 @@ func TestPartnerUsers(t *testing.T) {
 	if code, m := save(&contrA, strings.Replace(invite, email, strings.ToUpper(email[:1])+email[1:], 1), 0); code != 422 || fields(m) != "email=errors.email_taken" {
 		t.Errorf("duplicate email (case-insensitive): %d %s", code, fields(m))
 	}
-	if code, _ := save(&contrB, invite, 0); code != 200 { // the same email at another company is another account
-		t.Errorf("same email at company B: %d", code)
+	if code, m := save(&contrB, invite, 0); code != 422 || fields(m) != "email=errors.email_taken" { // one person, one account (IR461)
+		t.Errorf("same email at company B: %d %s", code, fields(m))
 	}
 	_, m = post(s, &contrA, "partnerUsers.list", `{"limit":100}`)
 	byMembership := map[string]map[string]any{}
@@ -99,7 +106,7 @@ func TestPartnerUsers(t *testing.T) {
 	if code, _ := write(s, &contrB, "partnerUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 404 {
 		t.Error("resend another company's invite")
 	}
-	// a pending invite: email and role can change, its status cannot
+	// an account not signed in yet: its e-mail and role are fixed (IR461), its status is not set by hand
 	upd := func(id, email, role, status string, v int) (int, map[string]any) {
 		st := ""
 		if status != "" {
@@ -116,11 +123,16 @@ func TestPartnerUsers(t *testing.T) {
 	if code, _ := upd(id, email, "contractor", "", 5); code != 409 {
 		t.Error("stale version")
 	}
-	email2 := "fixed-" + email
-	if code, m := upd(id, email2, "contractor", "", 1); code != 200 || data(m)["partnerRole"] != "contractor" || data(m)["email"] != email2 || data(m)["status"] != "invited" || ver(m) != 2 {
-		t.Fatalf("change the invite: %d %v", code, m)
+	if code, m := upd(id, "fixed-"+email, "technician", "", 1); code != 422 || fields(m) != "email=error.immutable" {
+		t.Errorf("change the e-mail: %d %s", code, fields(m))
 	}
-	if code, _ := save(&contrB, `{"id":"`+id+`","email":"`+email2+`","partnerRole":"technician","reason":"x"}`, 2); code != 404 {
+	if code, m := upd(id, email, "contractor", "", 1); code != 422 || fields(m) != "partnerRole=error.immutable" {
+		t.Errorf("change the role: %d %s", code, fields(m))
+	}
+	if code, m := upd(id, email, "technician", "", 1); code != 200 || data(m)["status"] != "invited" || ver(m) != 2 {
+		t.Fatalf("save unchanged: %d %v", code, m)
+	}
+	if code, _ := save(&contrB, `{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","reason":"x"}`, 2); code != 404 {
 		t.Error("company B changes company A's invite")
 	}
 	// the caller's own account is not changed here
@@ -227,27 +239,110 @@ func TestPartnerUserAccess(t *testing.T) {
 	}
 }
 
-// TestPartnerInviteAccepted: when HQ creates the account for an invited email (members.save), the invite becomes that
-// active account.
-func TestPartnerInviteAccepted(t *testing.T) {
+// TestPartnerAccountCreated (IR461): a contractor adds a technician: the person, an external technician membership with
+// the technicians' permissions, no unit scope and the contractor's access end are created; the identity consumer
+// opens the provider account and sends the set-up e-mail; the first sign-in makes the account active; the access end
+// moves within a year; removing the account turns its sign-in off.
+func TestPartnerAccountCreated(t *testing.T) {
+	fake := &fakeIdP{}
+	s := serverCfg(t, func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains })
+	email := "added-" + uuid.NewString()[:8] + "@example.com"
+	body := func(until time.Time) string {
+		return `{"email":"` + email + `","partnerRole":"technician","displayName":"Added Tech","accessUntil":"` + until.Format(time.RFC3339) + `"}`
+	}
+	if code, m := write(s, &contrA, "partnerUsers.save", body(clock.Add(367*24*time.Hour)), 0); code != 422 || fields(m) != "accessUntil=error.range" {
+		t.Errorf("access beyond a year: %d %s", code, fields(m))
+	}
+	if code, m := write(s, &contrA, "partnerUsers.save", `{"email":"`+email+`","partnerRole":"contractor","displayName":"Boss","accessUntil":"`+clock.Add(time.Hour).Format(time.RFC3339)+`"}`, 0); code != 422 || fields(m) != "accessUntil=error.notAllowed" {
+		t.Errorf("access end of a contractor account: %d %s", code, fields(m))
+	}
+	until := clock.Add(30 * 24 * time.Hour)
+	code, m := write(s, &contrA, "partnerUsers.save", body(until), 0)
+	if code != 200 || data(m)["status"] != "invited" || data(m)["membershipId"] == nil || data(m)["displayName"] != "Added Tech" {
+		t.Fatalf("add: %d %v", code, m)
+	}
+	id, membership := data(m)["id"].(string), data(m)["membershipId"].(string)
+	var role, employment string
+	var end time.Time
+	var perms, scopes int
+	ownerScan(t, `SELECT m.role, m.employment, m.valid_until, (SELECT count(*) FROM identity.membership_permissions p WHERE p.membership_id = m.id),
+		(SELECT count(*) FROM identity.membership_scopes s WHERE s.membership_id = m.id) FROM identity.memberships m WHERE m.id = $1`, []any{membership}, &role, &employment, &end, &perms, &scopes)
+	if role != "technician" || employment != "external" || !end.Equal(until) || perms != 4 || scopes != 0 {
+		t.Errorf("membership: %s %s %v perms %d scopes %d", role, employment, end, perms, scopes)
+	}
+	if err := s.DrainEvents(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	// other tests' accounts may be drained here too: look at this one only
+	var created []idp.Account
+	for _, a := range fake.created {
+		if a.Email == email {
+			created = append(created, a)
+		}
+	}
+	if len(created) != 1 || created[0].Role != "technician" || created[0].Membership != membership || !strings.HasSuffix(created[0].RedirectURI, "/login") ||
+		!slices.Contains(fake.setups, "sub-"+email) {
+		t.Fatalf("provider: created %+v, set-up %v", created, fake.setups)
+	}
+	var sub, user string
+	ownerScan(t, `SELECT u.cognito_sub, u.id::text FROM identity.users u JOIN identity.memberships m ON m.user_id = u.id WHERE m.id = $1`, []any{membership}, &sub, &user)
+	if sub != "sub-"+email {
+		t.Errorf("subject stored: %q", sub)
+	}
+	var queued int
+	ownerScan(t, `SELECT count(*) FROM notify.outbound_mail WHERE to_email = $1`, []any{email}, &queued)
+	if queued != 0 {
+		t.Errorf("an invitation e-mail besides the provider's set-up e-mail: %d", queued)
+	}
+	// the first sign-in makes the account active
+	(&auth.Authenticator{DB: s.DB, Now: clockFunc}).RecordSignIn(context.Background(), &ops.Principal{TenantID: seed.ID("tenant-a"), UserID: uuid.MustParse(user), MembershipID: uuid.MustParse(membership)}, clock)
+	var status string
+	var v int
+	ownerScan(t, `SELECT status, version FROM identity.partner_users WHERE id = $1`, []any{id}, &status, &v)
+	if status != "active" {
+		t.Fatalf("after the first sign-in: %s", status)
+	}
+	// the access end moves (at most a year ahead)
+	later := clock.Add(200 * 24 * time.Hour)
+	if code, m := write(s, &contrA, "partnerUsers.save", `{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+later.Format(time.RFC3339)+`","reason":"contract extended"}`, v); code != 200 {
+		t.Fatalf("extend: %d %v", code, m)
+	}
+	ownerScan(t, `SELECT valid_until FROM identity.memberships WHERE id = $1`, []any{membership}, &end)
+	if !end.Equal(later) {
+		t.Errorf("access after the extension: %v", end)
+	}
+	// removed: the membership ends and the sign-in is turned off
+	if code, m := write(s, &contrA, "partnerUsers.remove", `{"id":"`+id+`","reason":"left the company"}`, v+1); code != 200 {
+		t.Fatalf("remove: %d %v", code, m)
+	}
+	if err := s.DrainEvents(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(fake.switched, "sub-"+email+"=false") {
+		t.Errorf("sign-in after the removal: %v", fake.switched)
+	}
+}
+
+// TestPartnerResendAfterAccessEnd: no set-up e-mail goes to a technician whose access ended before they signed in; once
+// the contractor moves the end, it goes again (IR461).
+func TestPartnerResendAfterAccessEnd(t *testing.T) {
 	s := server(t)
-	user := newUser(t)
-	email := user + "@ac.local"
-	code, m := write(s, &contrA, "partnerUsers.save", `{"email":"`+email+`","partnerRole":"technician"}`, 0)
+	email := "late-" + uuid.NewString()[:8] + "@example.com"
+	code, m := write(s, &contrA, "partnerUsers.save", `{"email":"`+email+`","partnerRole":"technician","displayName":"Late Tech","accessUntil":"`+clock.Add(24*time.Hour).Format(time.RFC3339)+`"}`, 0)
 	if code != 200 {
-		t.Fatalf("invite: %d %v", code, m)
+		t.Fatalf("add: %d %v", code, m)
 	}
-	id := data(m)["id"].(string)
-	from, until := clock.Add(-time.Hour).Format(time.RFC3339), clock.Add(30*24*time.Hour).Format(time.RFC3339)
-	code, m = write(s, &hq, "members.save", `{"userId":"`+user+`","organizationId":"`+seed.ID("org-contractor-a").String()+`","role":"technician","employment":"external",
-		"permissions":[],"scopes":[],"validFrom":"`+from+`","validUntil":"`+until+`","reason":"onboarding"}`, 0)
-	if code != 200 {
-		t.Fatalf("members.save: %d %v", code, m)
+	id, membership := data(m)["id"].(string), data(m)["membershipId"].(string)
+	owner(t, `UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '2 days', valid_until = $2::timestamptz - interval '1 hour' WHERE id = $1`, membership, clock)
+	owner(t, `UPDATE identity.partner_users SET last_invite_sent_at = NULL WHERE id = $1`, id) // past the 5-minute wait (IR423)
+	if code, m := write(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 409 || m["messageKey"] != "errors.access_expired" {
+		t.Errorf("resend after the access end: %d %v", code, m)
 	}
-	membership := data(m)["id"].(string)
-	_, m = post(s, &contrA, "partnerUsers.list", `{"filters":{"search":"`+user[:13]+`"},"limit":10}`)
-	if len(items(m)) != 1 || items(m)[0]["id"] != id || items(m)[0]["status"] != "active" || items(m)[0]["membershipId"] != membership || items(m)[0]["accessUntil"] != until {
-		t.Fatalf("accepted invite: %v", m)
+	if code, m := write(s, &contrA, "partnerUsers.save", `{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+clock.Add(48*time.Hour).Format(time.RFC3339)+`","reason":"starts later"}`, 1); code != 200 {
+		t.Fatalf("move the access end: %d %v", code, m)
+	}
+	if code, m := write(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 200 {
+		t.Errorf("resend after the move: %d %v", code, m)
 	}
 }
 
@@ -261,7 +356,7 @@ func TestPartnerUserInputs(t *testing.T) {
 		"remove without id":   {"partnerUsers.remove", `{"id":"00000000-0000-0000-0000-000000000000","reason":"x"}`, "id=error.required"},
 		"remove long reason":  {"partnerUsers.remove", `{"id":"` + uuid.NewString() + `","reason":"` + strings.Repeat("x", 1001) + `"}`, "reason=error.length"},
 		"resend without id":   {"partnerUsers.resendInvite", `{"id":"00000000-0000-0000-0000-000000000000"}`, "id=error.required"},
-		"reason on an invite": {"partnerUsers.save", `{"email":"x-` + uuid.NewString()[:8] + `@example.com","partnerRole":"technician","reason":"why"}`, "reason=error.notAllowed"},
+		"reason on an invite": {"partnerUsers.save", `{"email":"x-` + uuid.NewString()[:8] + `@example.com","partnerRole":"contractor","displayName":"X","reason":"why"}`, "reason=error.notAllowed"},
 	} {
 		code, m := write(s, &contrA, c.op, c.body, 1)
 		if c.op == "partnerUsers.resendInvite" || c.op == "partnerUsers.save" {
@@ -294,13 +389,10 @@ func TestPartnerUserInputs(t *testing.T) {
 func TestInviteMail(t *testing.T) {
 	s := server(t)
 	email := "mail-" + uuid.NewString()[:8] + "@example.com"
-	code, m := write(s, &contrA, "partnerUsers.save", `{"email":"`+email+`","partnerRole":"technician"}`, 0)
-	if code != 200 {
-		t.Fatalf("invite: %d %v", code, m)
-	}
-	owner(t, `UPDATE identity.partner_users SET last_invite_sent_at = last_invite_sent_at - interval '5 minutes' WHERE id = $1`, data(m)["id"])
-	if code, _ := write(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+data(m)["id"].(string)+`"}`, 0); code != 200 {
-		t.Fatal("resend")
+	// invitations queued before IR461 (an invite without an account): the worker still delivers them
+	for range 2 {
+		owner(t, `INSERT INTO notify.outbound_mail (tenant_id, kind, invite_id, to_email, params) VALUES ($1, 'invite', $2, $3, '{"organization":"Demo Contractor A","role":"technician","app":"technician"}')`,
+			seed.ID("tenant-a"), uuid.New(), email)
 	}
 	var queued int
 	var params string
@@ -467,38 +559,34 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 	}
 }
 
-// TestInviteMailFollowsTheInvite (IR426): a pending invite whose address is corrected gets its invitation at the new
-// address, the unsent one to the old address is cancelled and the resend pause counts from the change; removing the
-// invite cancels what it has not sent yet.
-func TestInviteMailFollowsTheInvite(t *testing.T) {
+// TestContractorAddedTechnicianAssigned (IR461): a technician the contractor added has no unit scope, and the contractor
+// still assigns them on its own accepted offer once HQ verified their qualification; another contractor cannot.
+func TestContractorAddedTechnicianAssigned(t *testing.T) {
 	s := server(t)
-	old, corrected := "typo-"+uuid.NewString()[:8]+"@example.com", "fixed-"+uuid.NewString()[:8]+"@example.com"
-	code, m := write(s, &contrA, "partnerUsers.save", `{"email":"`+old+`","partnerRole":"technician"}`, 0)
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	email := "assign-" + uuid.NewString()[:8] + "@example.com"
+	code, m := write(s, &contrA, "partnerUsers.save", `{"email":"`+email+`","partnerRole":"technician","displayName":"Assignable","accessUntil":"`+ts(24*60)+`"}`, 0)
 	if code != 200 {
-		t.Fatalf("invite: %d %v", code, m)
+		t.Fatalf("add: %d %v", code, m)
 	}
-	id := data(m)["id"].(string)
-	states := func(email string) (st string) {
-		ownerScan(t, `SELECT string_agg(state, ',' ORDER BY created_at) FROM notify.outbound_mail WHERE to_email = $1`, []any{email}, &st)
-		return
+	tech := data(m)["membershipId"].(string)
+	// HQ verified the technician's certificates (the unit's service scope needs all three)
+	for _, code := range []string{"demo_indoor", "demo_outdoor", "demo_electrical"} {
+		owner(t, `INSERT INTO identity.qualification_grants (tenant_id, membership_id, code, valid_from, valid_until) VALUES ($1, $2, $3, $4, $5)`,
+			seed.ID("tenant-a"), tech, code, clock.Add(-time.Hour), clock.Add(365*24*time.Hour))
 	}
-	owner(t, `UPDATE identity.partner_users SET last_invite_sent_at = last_invite_sent_at - interval '10 minutes' WHERE id = $1`, id)
-	if code, m := write(s, &contrA, "partnerUsers.save", `{"id":"`+id+`","email":"`+corrected+`","partnerRole":"technician","reason":"typo in the address"}`, 1); code != 200 {
-		t.Fatalf("correct the address: %d %v", code, m)
+	_, m = write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	job := data(m)["id"].(string)
+	if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
+		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"t"}`, 1); code != 200 {
+		t.Fatalf("offer: %d %v", code, m)
 	}
-	if got := states(old); got != "cancelled" {
-		t.Errorf("mail to the old address: %s", got)
+	var offer string
+	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
+	if code, m := write(s, &contrA, "jobs.accept", `{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`, 2); code != 200 {
+		t.Fatalf("accept: %d %v", code, m)
 	}
-	if got := states(corrected); got != "queued" {
-		t.Errorf("mail to the corrected address: %s", got)
-	}
-	if code, m := write(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 429 || m["messageKey"] != "errors.invite_recently_sent" {
-		t.Errorf("resend right after the correction: %d %v", code, m)
-	}
-	if code, m := write(s, &contrA, "partnerUsers.remove", `{"id":"`+id+`","reason":"not joining"}`, 2); code != 200 {
-		t.Fatalf("remove: %d %v", code, m)
-	}
-	if got := states(corrected); got != "cancelled" {
-		t.Errorf("mail after the removal: %s", got)
+	if code, m := write(s, &contrA, "jobs.assign", `{"jobId":"`+job+`","technicianMembershipId":"`+tech+`","startAt":"`+ts(49)+`","endAt":"`+ts(51)+`"}`, 3); code != 200 {
+		t.Fatalf("assign the added technician: %d %v", code, m)
 	}
 }

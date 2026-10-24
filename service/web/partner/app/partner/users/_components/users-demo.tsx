@@ -13,8 +13,8 @@ const done = (refused: string | undefined): Promise<Awaited<ReturnType<UsersOps[
 };
 
 const ops: UsersOps = {
-  invite: (email, role) => done(partnerUserDemo.invite(email, role, new Date().toISOString())),
-  edit: (r, email, role) => done(partnerUserDemo.editInvite(r.id, email, role)),
+  invite: (email, role, name, until) => done(partnerUserDemo.invite(email, role, new Date().toISOString(), name, until)),
+  access: (r, until) => done(partnerUserDemo.setAccess(r.id, until)),
   setStatus: (r, status) => done(partnerUserDemo.setStatus(r.id, status)),
   remove: (r) => done(partnerUserDemo.remove(r.id)),
   resend: (r) => done(r.status === "invited" ? undefined : "errors.invite_not_pending"),
@@ -25,5 +25,5 @@ export function UsersDemo() {
   const users = usePartnerUsersDemo();
   const [status, setStatus] = useState<PartnerStatus | null>(null);
   const rows = partnerUserRows(users, DEMO_SELF, undefined, new Date("2026-09-15T00:00:00Z")).filter((r) => !status || r.status === status);
-  return <UsersView data={{ company: "contractor-a", status, rows, all: users.map((u) => ({ id: u.id, email: u.email })) }} ops={ops} onStatus={setStatus} />;
+  return <UsersView data={{ company: "contractor-a", status, rows, all: users.map((u) => ({ id: u.id, email: u.email })), today: "2026-09-15" }} ops={ops} onStatus={setStatus} />;
 }

@@ -4,7 +4,7 @@
 import { test, expect } from "../../fixtures/test";
 
 const DIALOGS: Record<string, [path: string, trigger: string | RegExp]> = {
-  customer: ["/customer/users", "Invite user"],
+  customer: ["/customer/users", "Add user"],
   partner: ["/partner/team", "Unavailable days"],
   technician: ["/technician", /Scan QR/],
   admin: ["/admin/alerts?tab=policies", "New policy"],

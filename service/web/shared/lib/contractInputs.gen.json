@@ -181,6 +181,7 @@
  "clientUsers.save": [
   "clientRole",
   "customerId",
+  "displayName",
   "email",
   "id",
   "reason",
@@ -707,6 +708,7 @@
  "members.save": [
   "employment",
   "id",
+  "newUser",
   "organizationId",
   "permissions",
   "reason",
@@ -836,6 +838,8 @@
   "id"
  ],
  "partnerUsers.save": [
+  "accessUntil",
+  "displayName",
   "email",
   "id",
   "partnerRole",

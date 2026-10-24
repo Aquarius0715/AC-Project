@@ -22,7 +22,7 @@ const keyText: Record<string, string> = {
   "errors.own_account": "You can’t change or remove your own account",
   "errors.last_owner": "The last active owner can’t be demoted, disabled or removed",
   "errors.last_contractor": "Your company keeps one active contractor — this one can’t be disabled or removed",
-  "errors.access_expired": "This account’s access period has ended — ask HQ to extend it first",
+  "errors.access_expired": "This account’s access period has ended — set a new access end first",
   "errors.technician_booked": "This technician still has an assigned job — reassign it first",
   "errors.technician_access_ends": "This technician's access ends before the visit — choose another technician or ask HQ to extend it",
   "errors.invite_pending": "The invite is still pending — it becomes active when the account is opened",

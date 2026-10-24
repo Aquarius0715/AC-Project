@@ -344,7 +344,7 @@ export type OperationContracts = {
   'members.eligible': {input:{jobId:ID;startAt:Instant;endAt:Instant;query:Query};result:Page<Membership>;mode:'read'};
   'members.list': {input:Query;result:Page<Membership>;mode:'read'};
   'members.revokeSessions': {input:{membershipId:ID;reason:string};result:SessionsRevoked;mode:'write'};
-  'members.save': {input:{id?:ID;userId:ID;organizationId:ID;role:Role;employment:Membership["employment"];permissions:Permission[];scopes:ScopeRef[];validFrom:Instant;validUntil:Instant|null;reason:string};result:Membership;mode:'write'};
+  'members.save': {input:{id?:ID;userId:ID;organizationId:ID;role:Role;employment:Membership["employment"];permissions:Permission[];scopes:ScopeRef[];validFrom:Instant;validUntil:Instant|null;reason:string;newUser?:{email:string;displayName:string}};result:Membership;mode:'write'};
   'mrv.get': {input:{id:ID;reportVersion?:number};result:MRVReport;mode:'read'};
   'mrv.list': {input:Query;result:Page<MRVReport>;mode:'read'};
   'mrv.preview': {input:MRVConditions;result:MRVPreview;mode:'read'};
@@ -408,11 +408,11 @@ export type OperationContracts = {
   'ventilation.log': {input:{spaceId:ID;unitId?:ID;method:VentilationLog['method'];durationMinutes:number};result:VentilationLog;mode:'write'};
   'ventilation.list': {input:Query;result:Page<VentilationLog>;mode:'read'};
   'clientUsers.list': {input:Query;result:Page<ClientUser>;mode:'read'};
-  'clientUsers.save': {input:{id?:ID;customerId:ID;email:string;clientRole:ClientRole;status?:'active'|'disabled';reason?:string};result:ClientUser;mode:'write'};
+  'clientUsers.save': {input:{id?:ID;customerId:ID;email:string;clientRole:ClientRole;status?:'active'|'disabled';reason?:string;displayName?:string};result:ClientUser;mode:'write'};
   'clientUsers.remove': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'clientUsers.resendInvite': {input:{id:ID};result:NotificationPreview;mode:'write'};
   'partnerUsers.list': {input:Query;result:Page<PartnerUser>;mode:'read'};
-  'partnerUsers.save': {input:{id?:ID;email:string;partnerRole:PartnerRole;status?:'active'|'disabled';reason?:string};result:PartnerUser;mode:'write'};
+  'partnerUsers.save': {input:{id?:ID;email:string;partnerRole:PartnerRole;status?:'active'|'disabled';reason?:string;displayName?:string;accessUntil?:Instant};result:PartnerUser;mode:'write'};
   'partnerUsers.remove': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'partnerUsers.resendInvite': {input:{id:ID};result:NotificationPreview;mode:'write'};
   'units.importPreview': {input:{customerId:ID;fileName:string;csvText:string;mapping:Record<string,string>};result:ImportPreview;mode:'read'};

@@ -155,9 +155,18 @@ func (a *Authenticator) RecordSignIn(ctx context.Context, p *ops.Principal, sign
 		return
 	}
 	err := a.DB.Run(ctx, false, p, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `UPDATE identity.users SET last_sign_in_at = $3, sign_in_auth_time = $2
-			WHERE id = $1 AND (sign_in_auth_time IS NULL OR sign_in_auth_time < $2)`, p.UserID, signedIn, a.now())
-		return err
+		if _, err := tx.Exec(ctx, `UPDATE identity.users SET last_sign_in_at = $3, sign_in_auth_time = $2
+			WHERE id = $1 AND (sign_in_auth_time IS NULL OR sign_in_auth_time < $2)`, p.UserID, signedIn, a.now()); err != nil {
+			return err
+		}
+		// an account HQ, a contractor or a customer owner added is listed as invited until its first sign-in (IR461)
+		for _, q := range []string{`UPDATE identity.partner_users SET status = 'active', version = version + 1, updated_at = $2 WHERE membership_id = $1 AND status = 'invited'`,
+			`UPDATE identity.client_users SET status = 'active', version = version + 1, updated_at = $2 WHERE membership_id = $1 AND status = 'invited'`} {
+			if _, err := tx.Exec(ctx, q, p.MembershipID, a.now()); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		slog.WarnContext(ctx, "auth: sign-in not recorded", "user", p.UserID, "err", err)

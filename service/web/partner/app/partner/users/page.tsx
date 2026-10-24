@@ -6,6 +6,7 @@ import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreIdentity, coreNow, corePrincipal, CoreError } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { partnerUserRows, statusFilter, type ApiPartnerUser } from "@ac/web/lib/partnerUsers";
+import { klDate } from "@ac/web/lib/partnerTeam";
 import { UsersDemo } from "./_components/users-demo";
 import { UsersLive } from "./_components/users-live";
 
@@ -20,5 +21,5 @@ export default async function PartnerUsersPage({ searchParams }: PageProps<"/par
   ]);
   if (!all) return <UsersLive live={null} />;
   const rows = partnerUserRows(all, me.membershipId, i18nOf(display), now);
-  return <UsersLive live={{ company: identity.organizationName, status, rows: status ? rows.filter((r) => r.status === status) : rows, all: all.map((u) => ({ id: u.id, email: u.email })) }} />;
+  return <UsersLive live={{ company: identity.organizationName, status, rows: status ? rows.filter((r) => r.status === status) : rows, all: all.map((u) => ({ id: u.id, email: u.email })), today: klDate(now.toISOString()) }} />;
 }

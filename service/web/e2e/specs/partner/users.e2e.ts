@@ -1,42 +1,47 @@
-// Partner Users (FR-P11, IR416, IR418, IR423, IR432): contractor-a invites a technician (the invitation e-mail reaches
-// Mailpit), is told to wait before resending it, edits the invite and removes it; its booked technician offers no
-// Disable or Remove, and its own row has no actions.
+// Partner Users (FR-P11, IR416, IR423, IR432, IR461): contractor-a adds a technician (the account is created at once
+// and the sign-in service e-mails the set-up link, which reaches Mailpit), is told to wait before resending it, moves
+// the technician's access end and removes the account; its booked technician offers no Disable or Remove, and its own
+// row has no actions.
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 
-test("a contractor invites, edits and removes a user, waits to resend, and cannot disable its booked technician", async ({ page, app }) => {
+test("a contractor adds a technician, waits to resend the set-up e-mail, moves the access end and removes them, and cannot disable its booked technician", async ({ page, app }) => {
   test.skip(app.id !== "partner", "partner only");
   await page.goto("/partner/users");
   await expect(page.locator("body")).not.toContainText(FAILED_PAGE);
   const row = (text: string) => page.getByRole("row").filter({ hasText: text });
   await expect(row("contractor-a (you)")).toContainText("Your account");
   const email = `e2e-${Date.now()}@example.com`;
-  await page.getByRole("button", { name: "Invite user" }).click();
+  await page.getByRole("button", { name: "Add user" }).click();
   const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Add user" }).click();
+  await expect(dialog.getByText("A name of 1–120 characters")).toBeVisible(); // nothing typed yet
+  await dialog.getByLabel("Name").fill("E2E Technician");
   await dialog.getByLabel("Email").fill(email);
   await dialog.getByRole("combobox", { name: "Role" }).selectOption("technician");
-  await dialog.getByRole("button", { name: "Send invite" }).click();
-  await expect(page.getByText(`Invitation e-mail queued for ${email}`).first()).toBeVisible();
-  await expect(row(email)).toContainText("Invite pending");
-  await row(email).getByRole("button", { name: "Resend invite" }).click();
-  // one invitation e-mail per 5 minutes (IR423): the resend right after the invite is refused with the wait
+  await expect(dialog.getByLabel("Access until")).not.toHaveValue(""); // three months ahead is offered
+  await dialog.getByRole("button", { name: "Add user" }).click();
+  await expect(page.getByText(`E2E Technician added — a set-up e-mail is on its way to ${email}`).first()).toBeVisible();
+  await expect(row(email)).toContainText("Not signed in yet");
+  await row(email).getByRole("button", { name: "Resend set-up e-mail" }).click();
+  // one e-mail per 5 minutes (IR423): the resend right after the adding is refused with the wait
   await expect(page.getByText("The invitation was e-mailed a moment ago — send it again in 5 min").first()).toBeVisible();
-  // the notification worker sends it to the local Mailpit inbox (IR418); skipped on a stack without Mailpit
+  // the sign-in service sends the set-up e-mail to the local Mailpit inbox (IR461); skipped on a stack without Mailpit
   const search = `http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`;
   if ((await fetch(search).catch(() => null))?.ok) {
-    await expect.poll(async () => ((await (await fetch(search)).json()) as { messages_count: number }).messages_count, { timeout: 30_000 }).toBe(1);
+    await expect.poll(async () => ((await (await fetch(search)).json()) as { messages_count: number }).messages_count, { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
   }
 
-  // a pending invite's role can change, with a reason
-  await row(email).getByRole("button", { name: "Edit" }).click();
-  await dialog.getByRole("combobox", { name: "Role" }).selectOption("contractor");
-  await dialog.getByRole("button", { name: "Save invite" }).click();
+  // the access end moves, with a reason
+  await row(email).getByRole("button", { name: "Access" }).click();
+  await dialog.getByLabel("Access until").fill("2026-12-31");
+  await dialog.getByRole("button", { name: "Save access" }).click();
   await expect(dialog.getByText("A reason of 1–1000 characters")).toBeVisible(); // no reason yet
-  await dialog.getByLabel("Reason").fill("Will run the second crew");
-  await dialog.getByRole("button", { name: "Save invite" }).click();
-  await expect(row(email)).toContainText("Contractor");
+  await dialog.getByLabel("Reason").fill("Contract until year end");
+  await dialog.getByRole("button", { name: "Save access" }).click();
+  await expect(row(email)).toContainText("31 Dec 2026");
 
   await row(email).getByRole("button", { name: "Remove" }).click();
-  await dialog.getByLabel("Reason").fill("Sent to the wrong address");
+  await dialog.getByLabel("Reason").fill("Not joining after all");
   await dialog.getByRole("button", { name: "Remove" }).click();
   await expect(row(email)).toHaveCount(0);
 
@@ -49,30 +54,20 @@ test("a contractor invites, edits and removes a user, waits to resend, and canno
   await expect(tech).toContainText("Active");
 });
 
-// IR426: correcting a pending invite's address sends the invitation to the new address; the invite is then withdrawn.
-test("a contractor corrects an invite's address and the invitation goes to the new one", async ({ page, app }) => {
+// IR461: a technician's access ends at most a year ahead; the form says so before anything is sent.
+test("a contractor cannot give a technician access for more than a year", async ({ page, app }) => {
   test.skip(app.id !== "partner", "partner only");
   await page.goto("/partner/users");
-  const row = (text: string) => page.getByRole("row").filter({ hasText: text });
-  const typo = `e2e-typo-${Date.now()}@example.com`, fixed = typo.replace("typo", "fixed");
-  await page.getByRole("button", { name: "Invite user" }).click();
+  await page.getByRole("button", { name: "Add user" }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Email").fill(typo);
+  await dialog.getByLabel("Name").fill("Too Long");
+  await dialog.getByLabel("Email").fill(`e2e-long-${Date.now()}@example.com`);
   await dialog.getByRole("combobox", { name: "Role" }).selectOption("technician");
-  await dialog.getByRole("button", { name: "Send invite" }).click();
-  await expect(row(typo)).toContainText("Invite pending");
-  await row(typo).getByRole("button", { name: "Edit" }).click();
-  await dialog.getByLabel("Email").fill(fixed);
-  await dialog.getByLabel("Reason").fill("Typo in the address");
-  await dialog.getByRole("button", { name: "Save invite" }).click();
-  await expect(page.getByText(`Invite changed — invitation e-mail queued for ${fixed}`).first()).toBeVisible();
-  await expect(row(fixed)).toContainText("Invite pending");
-  const search = `http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:"${fixed}"`)}`;
-  if ((await fetch(search).catch(() => null))?.ok) {
-    await expect.poll(async () => ((await (await fetch(search)).json()) as { messages_count: number }).messages_count, { timeout: 30_000 }).toBe(1);
-  }
-  await row(fixed).getByRole("button", { name: "Remove" }).click();
-  await dialog.getByLabel("Reason").fill("Not joining");
-  await dialog.getByRole("button", { name: "Remove" }).click();
-  await expect(row(fixed)).toHaveCount(0);
+  await dialog.getByLabel("Access until").fill("2030-01-01");
+  await dialog.getByRole("button", { name: "Add user" }).click();
+  await expect(dialog.getByText("At most a year ahead")).toBeVisible();
+  // a contractor account has no access end
+  await dialog.getByRole("combobox", { name: "Role" }).selectOption("contractor");
+  await expect(dialog.getByLabel("Access until")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
 });

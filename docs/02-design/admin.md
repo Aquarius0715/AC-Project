@@ -166,6 +166,7 @@ Scope: FR-A03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
 | userId / organizationId | ID/required | Active user and their organization | Target |
+| newUser {email, displayName} | object/instead of userId | A new person (IR461): e-mail one person per address (`newUser.email=errors.email_taken`), name 1–120; their sign-in account is created with the membership | New person |
 | role | enum/required | client/contractor/technician/admin | Role |
 | employment | enum/required for technicians | internal/external | Employment type |
 | permissions | enum array/required | Choose from the role's allowed permissions | Capabilities |
@@ -175,7 +176,7 @@ Scope: FR-A03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **Steps**
 
-1. Select user and organization. Choose one of four roles; for technicians, also select internal/external. Set scope, period, and individual permissions. Confirm and save.
+1. Select an existing user, or “New person” with a name and e-mail (IR461), and the organization. Choose one of four roles; for technicians, also select internal/external. Set scope, period, and individual permissions. Confirm and save. A new person's account is created at once and the sign-in service e-mails the link to set the password; a contractor or technician of a contractor is listed in that company's Users as not signed in yet until the first sign-in (DD-P11).
 2. Apply these business rules to reads and actions. Keep role and permissions separate. Admin status does not automatically grant restriction.write or override. External technicians must not have unit access without an end date. Increasing one's own permissions requires another HQ permission administrator to perform the change.
 3. Update Membership version and scopeVersion. Discard caches from old sessions; evaluate subsequent mutations using new permissions.
 4. Queries to update: `members / session scope / all affected query caches / audit`。
@@ -696,7 +697,7 @@ Convert condition forms to the Condition type's discriminated union. occupancy i
 
 ### DD-A17 Details
 
-**Source mapping**: SRC-06 BIZ-04 → FR-A17 → DD-A17. Source category: Figma-confirmed screen specification (Admin 02-15, 2026-10-01).
+**Source mapping**: SRC-06 BIZ-04 → FR-A17 → DD-A17. Source category: Figma-confirmed screen specification (Admin 02-15, 2026-10-01); accounts created when added, user request 2026-10-24 (DEC-79, IR461).
 
 Scope: FR-A17 / Main display pattern: **UI-LIST**. Service boundary: `clientUsers.list, clientUsers.save, clientUsers.remove, clientUsers.resendInvite, members.revokeSessions`.
 
@@ -704,22 +705,23 @@ Scope: FR-A17 / Main display pattern: **UI-LIST**. Service boundary: `clientUser
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| email | string/required | Valid address, unique per customer; fixed once the invite is accepted (IR422) | Invitation |
+| displayName | string/required when adding | 1–120; the person's name | Identity |
+| email | string/required | Valid address, unique per customer and one person per address (`errors.email_taken`); fixed once added (IR422, IR461) | Sign-in |
 | clientRole | enum/required | owner/member; default member | Role |
-| status | enum | invited/active/disabled | Account state |
+| status | enum | invited (= not signed in yet)/active/disabled | Account state |
 | reason | string/required for remove | 1–1000 characters | Audit |
 
 **Steps**
 
-1. Table: user (name, email), role, status (“Invite pending · invited <date> by <actor>”), last sign-in, notification channels, ⋯ menu.
-2. “+ Invite user” (centered modal) → `clientUsers.save` without id. Menu: change role / disable (`clientUsers.save` with id), resend invite (`clientUsers.resendInvite`, queues the invitation e-mail, IR418; at most every 5 minutes per invite, IR423), reset password (`auth.previewPasswordReset`, generic message), sign out everywhere (`members.revokeSessions` with the user's membership, the modal of Admin 03-8, IR384; not offered while the invite is pending), remove (`clientUsers.remove`).
+1. Table: user (name, email), role, status (“Not signed in yet” until the first sign-in), last sign-in, notification channels, ⋯ menu.
+2. “+ Add user” (centered modal: name, e-mail, role) → `clientUsers.save` without id creates the person, the client membership and the row `invited`, and the sign-in service e-mails the link to set the password (IR461). Menu: change role / disable (`clientUsers.save` with id; disabling turns the sign-in account off), resend set-up e-mail (`clientUsers.resendInvite`; at most every 5 minutes per user, IR423), reset password (`auth.previewPasswordReset`, generic message), sign out everywhere (`members.revokeSessions` with the user's membership, the modal of Admin 03-8, IR384; not offered before the first sign-in), remove (`clientUsers.remove`; the sign-in account is turned off).
 3. Queries to update: `client users / audit`.
 
-**Boundary cases and failures**: Last active owner → CONFLICT; duplicate email → VALIDATION; a changed e-mail of an accepted user → VALIDATION `error.immutable` (IR422). No permission editor for client users.
+**Boundary cases and failures**: Last active owner → CONFLICT; duplicate email → VALIDATION; an address another person uses → VALIDATION `errors.email_taken`; a changed e-mail → VALIDATION `error.immutable` (IR422). No permission editor for client users.
 
 **Verification**: Check the traceability entries under AT-A17 (N/E/B).
 
-**Customer app (IR114, IR417)**: Client owners list, invite, change roles, disable and remove their customer's users from `/customer/users` (DD-C19); password resets and sign out everywhere remain on this tab.
+**Customer app (IR114, IR417, IR461)**: Client owners list, add, change roles, disable and remove their customer's users from `/customer/users` (DD-C19); password resets and sign out everywhere remain on this tab.
 
 ### DD-A18 Details
 

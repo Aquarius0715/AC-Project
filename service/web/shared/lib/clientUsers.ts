@@ -47,12 +47,12 @@ export const emailError = (email: string, users: ClientUser[]) => {
 
 export const clientUserActions = {
   reset() { save(CLIENT_USERS_SEED); },
-  /** clientUsers.save without id. Owners may only invite members (IR114); HQ may invite owners too. */
-  invite(email: string, role: ClientRole, by: string) {
+  /** clientUsers.save without id: the account exists at once (IR461), listed as not signed in yet. */
+  invite(email: string, role: ClientRole, by: string, name = "") {
     const users = load();
     const err = emailError(email, users);
     if (err) return err;
-    save([...users, { id: `cu-${Date.now()}`, name: null, email: email.trim(), role, status: "invited", lastSignIn: null, invitedBy: by, invitedAt: "2026-10-06" }]);
+    save([...users, { id: `cu-${Date.now()}`, name: name.trim() || null, email: email.trim(), role, status: "invited", lastSignIn: null, invitedBy: by, invitedAt: "2026-10-06" }]);
     return undefined;
   },
   /** clientUsers.resendInvite — invited users only, preview only. */

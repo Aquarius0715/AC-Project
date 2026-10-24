@@ -1,7 +1,8 @@
 // HQ access & roles (FR-A03, DD-A03, SCR-A03, Figma Admin 539:16956, IR321): the organization filter is a
 // search-select in the URL (organizationId) beside the role and status filters, and a membershipId the list does not
-// hold says so instead of opening another membership. Nothing is saved, except by the last test: it signs
-// hq-override-only out everywhere (IR384, IR385), which is no project's shared user.
+// hold says so instead of opening another membership. Nothing is saved, except by the last two tests: one signs
+// hq-override-only out everywhere (IR384, IR385), which is no project's shared user; the other adds a new person and
+// revokes the membership again (IR461).
 import { test, expect } from "../../fixtures/test";
 
 test("the organization filter narrows the memberships; an unknown membership is not opened", async ({ page }) => {
@@ -62,4 +63,34 @@ test("Sign out everywhere asks for a reason and ends the member's sessions", asy
   await confirm.click();
   await expect(page.getByText(/Signed out everywhere — every session of .+ has ended/).first()).toBeVisible();
   await expect(dialog).toHaveCount(0);
+});
+
+// IR461: a membership for a new person — the account is created at once and the sign-in service e-mails the set-up
+// link, which reaches Mailpit — then revoking ends the membership again.
+test("HQ adds a new person with a membership, and revoking it ends the membership", async ({ page }) => {
+  await page.goto("/admin/settings/access");
+  const main = page.getByRole("main");
+  await main.getByRole("button", { name: "New membership" }).click();
+  await page.waitForURL(/membershipId=new/);
+  await main.getByRole("button", { name: "New person" }).click();
+  const email = `e2e-hq-${Date.now()}@example.com`;
+  await main.getByRole("textbox", { name: /^Name/ }).fill("E2E Colleague");
+  await main.getByRole("textbox", { name: /^Email/ }).fill(email);
+  await main.getByRole("button", { name: "Admin", exact: true }).last().click(); // the role, after the role filter
+  await main.getByRole("combobox", { name: /^Organization/ }).selectOption({ label: "Demo HQ" });
+  await main.getByLabel("Valid from").fill("2026-09-01T09:00"); // before the seed's demo clock
+  await main.getByRole("textbox", { name: /^Change reason/ }).fill("E2E: a new colleague");
+  await main.getByRole("button", { name: "Create membership" }).click();
+  await expect(page.getByText("Membership created").first()).toBeVisible();
+  await page.waitForURL(/membershipId=[0-9a-f-]{36}/);
+  await expect(main.locator("button[aria-pressed]", { hasText: "E2E Colleague" })).toBeVisible();
+  const search = `http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`;
+  if ((await fetch(search).catch(() => null))?.ok) {
+    await expect.poll(async () => ((await (await fetch(search)).json()) as { messages_count: number }).messages_count, { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
+  }
+  await main.getByRole("button", { name: "Revoke access…" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("textbox", { name: /^Reason/ }).fill("E2E: not joining after all");
+  await dialog.getByRole("button", { name: "Revoke", exact: true }).click();
+  await expect(page.getByText("Access revoked — the membership is now inactive").first()).toBeVisible();
 });

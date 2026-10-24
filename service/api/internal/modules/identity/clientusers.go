@@ -177,6 +177,8 @@ type ClientUserInput struct {
 	ClientRole string     `json:"clientRole"`
 	Status     *string    `json:"status,omitempty"`
 	Reason     *string    `json:"reason,omitempty"`
+	// DisplayName names a new user (IR461)
+	DisplayName *string `json:"displayName,omitempty"`
 }
 
 // Validate implements ops.Validator.
@@ -201,6 +203,15 @@ func (in *ClientUserInput) Validate() map[string]string {
 			fe["reason"] = "error.length"
 		}
 	}
+	if in.ID == nil { // a new user is named (IR461)
+		if in.DisplayName == nil {
+			fe["displayName"] = "error.required"
+		} else if *in.DisplayName = strings.TrimSpace(*in.DisplayName); utf8.RuneCountInString(*in.DisplayName) < 1 || utf8.RuneCountInString(*in.DisplayName) > 120 {
+			fe["displayName"] = "error.length"
+		}
+	} else if in.DisplayName != nil {
+		fe["displayName"] = "error.notAllowed"
+	}
 	return fe
 }
 
@@ -214,7 +225,7 @@ func otherActiveOwner(ctx context.Context, c *ops.Call, customer, except uuid.UU
 // @Summary		clientUsers.save (write)
 // @ID				clientUsers.save
 // @Description	Authorization: client:self-customer:owner | admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer; last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account (IR417); an accepted user's e-mail stays (IR422)
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer and one account per person (errors.email_taken); a new user needs displayName 1–120 and is created at once with a set-up e-mail (IR461); last active owner cannot be demoted or disabled (CONFLICT); an owner never changes the own account (IR417); the e-mail stays (IR422)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A17, DD-C19
 // @Tags			clientUsers
@@ -256,20 +267,23 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 	if dup {
 		return ClientUser{}, apperr.Fields(map[string]string{"email": "errors.email_taken"})
 	}
-	if in.ID == nil { // invite (an owner invites members and owners, IR417)
+	if in.ID == nil { // a new user: an owner (or HQ) adds members and owners, whose account is created now and gets the set-up e-mail (IR417, IR461)
 		if in.Status != nil {
 			return ClientUser{}, apperr.Fields(map[string]string{"status": "error.notAllowed"})
 		}
-		id := uuid.New()
-		if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.client_users (id, tenant_id, customer_id, email, client_role, status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, 'invited', $5, $6, $5, $5, $5)`, id, in.CustomerID, in.Email, in.ClientRole, c.Now, c.Principal.MembershipID); err != nil {
+		role := in.ClientRole
+		_, membership, err := createAccount(ctx, c, newAccount{Email: in.Email, DisplayName: *in.DisplayName, Role: "client", OrgID: org, ClientRole: &role,
+			Permissions: defaultPermissions["client"], Scopes: []ScopeRef{{Kind: "organization", ID: org}}})
+		if err != nil {
 			return ClientUser{}, err
 		}
-		if err := queueClientInvite(ctx, c, id, in.CustomerID, in.Email, in.ClientRole); err != nil {
+		id := uuid.New()
+		if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role, status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
+			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'invited', $7, $8, $7, $7, $7)`, id, in.CustomerID, membership, in.Email, *in.DisplayName, in.ClientRole, c.Now, c.Principal.MembershipID); err != nil {
 			return ClientUser{}, err
 		}
 		v := 1
-		c.Audit(ops.AuditEntry{Action: "clientUsers.save", TargetKind: "client_user", TargetID: id.String(), NextVersion: &v, Reason: "invite"})
+		c.Audit(ops.AuditEntry{Action: "clientUsers.save", TargetKind: "client_user", TargetID: id.String(), NextVersion: &v, Reason: "account created"})
 		return loadClientUser(ctx, c, id, false)
 	}
 	x, err := loadClientUser(ctx, c, *in.ID, true)
@@ -283,7 +297,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 		return x, apperr.E(apperr.Conflict, "errors.own_account")
 	}
 	// an accepted user's e-mail is the sign-in identity's, where the e-mails go: it stays, for HQ too (IR422)
-	if x.Status != "invited" {
+	if x.Status != "invited" || x.MembershipID != nil { // an account created with the user has its e-mail from the start (IR461)
 		if !strings.EqualFold(in.Email, x.Email) {
 			return x, apperr.Fields(map[string]string{"email": "error.immutable"})
 		}
@@ -299,7 +313,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 	if in.Status != nil {
 		status = *in.Status
 	}
-	if status == "active" && x.Status != "active" && x.MembershipID == nil { // an invite becomes active only on first sign-in
+	if status == "active" && x.Status == "invited" || status == "active" && x.Status != "active" && x.MembershipID == nil { // an invite becomes active only on first sign-in
 		return x, apperr.E(apperr.Conflict, "errors.invite_pending")
 	}
 	if x.ClientRole == "owner" && x.Status == "active" && (in.ClientRole != "owner" || status != "active") {
@@ -322,9 +336,13 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 	}
 	if x.MembershipID != nil { // keep the membership in step: role and access window
 		// $4 is cast: inside CASE … ELSE NULL the parameter's type would be taken as text
-		if _, err := c.Tx.Exec(ctx, `UPDATE identity.memberships SET client_role = $2, valid_until = CASE WHEN $3 = 'disabled' THEN $4::timestamptz ELSE NULL END,
+		// an account created this instant (IR461) ends a second after it starts, as the membership's check requires
+		if _, err := c.Tx.Exec(ctx, `UPDATE identity.memberships SET client_role = $2, valid_until = CASE WHEN $3 = 'disabled' THEN GREATEST($4::timestamptz, valid_from + interval '1 second') ELSE NULL END,
 			scope_version = scope_version + 1, version = version + 1, updated_at = $4 WHERE id = $1`, *x.MembershipID, in.ClientRole, status, c.Now); err != nil {
 			return x, err
+		}
+		if status != x.Status && (status == "disabled" || x.Status == "disabled") { // the sign-in follows (IR461)
+			setAccountEnabled(c, *x.MembershipID, status != "disabled")
 		}
 	}
 	next := x.Version + 1
@@ -411,10 +429,11 @@ func clientUsersRemove(ctx context.Context, c *ops.Call, in *RemoveInput) (Delet
 		return Deleted{}, err
 	}
 	if x.MembershipID != nil {
-		if _, err := c.Tx.Exec(ctx, `UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1, updated_at = $2
+		if _, err := c.Tx.Exec(ctx, `UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'), scope_version = scope_version + 1, version = version + 1, updated_at = $2
 			WHERE id = $1 AND (valid_until IS NULL OR valid_until > $2)`, *x.MembershipID, c.Now); err != nil {
 			return Deleted{}, err
 		}
+		setAccountEnabled(c, *x.MembershipID, false) // the sign-in ends too (IR461)
 	}
 	c.Audit(ops.AuditEntry{Action: "clientUsers.remove", TargetKind: "client_user", TargetID: x.ID.String(), PreviousVersion: c.ExpectedVersion, Reason: in.Reason})
 	return Deleted{ID: x.ID, Deleted: true}, nil
@@ -458,7 +477,7 @@ type InvitePreview struct {
 // @Summary		clientUsers.resendInvite (write)
 // @ID				clientUsers.resendInvite
 // @Description	Authorization: client:self-customer:owner | admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; queues the invitation e-mail (IR418); pending invites only (CONFLICT); at most every 5 minutes per invite (RATE_LIMITED retryAfterSeconds; IR423)
+// @Description	Validation: D01; input constraints in the corresponding DD; sends the set-up e-mail again (IR461; an invite from before IR461 queues the invitation e-mail; IR418); users not signed in yet only (CONFLICT); at most every 5 minutes per user (RATE_LIMITED retryAfterSeconds; IR423)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A17, DD-C19
 // @Tags			clientUsers
@@ -492,8 +511,16 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 	if err := inviteResendWait(ctx, c, "client_users", x.ID); err != nil {
 		return InvitePreview{}, err
 	}
-	if err := queueClientInvite(ctx, c, x.ID, x.CustomerID, x.Email, x.ClientRole); err != nil {
-		return InvitePreview{}, err
+	if x.MembershipID == nil { // an invite from before IR461
+		if err := queueClientInvite(ctx, c, x.ID, x.CustomerID, x.Email, x.ClientRole); err != nil {
+			return InvitePreview{}, err
+		}
+	} else { // the set-up e-mail again (IR461)
+		var user uuid.UUID
+		if err := c.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *x.MembershipID).Scan(&user); err != nil {
+			return InvitePreview{}, err
+		}
+		requestAccount(c, user, *x.MembershipID, "client")
 	}
 	if _, err := c.Tx.Exec(ctx, `UPDATE identity.client_users SET last_invite_sent_at = $2 WHERE id = $1`, x.ID, c.Now); err != nil {
 		return InvitePreview{}, err

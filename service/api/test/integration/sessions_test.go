@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/idp"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -133,6 +134,31 @@ type fakeIdP struct {
 	mu       sync.Mutex
 	subjects []string
 	err      error
+	// IR461: the accounts created (by e-mail), the set-up e-mails sent and the accounts turned on / off (subject=bool)
+	created  []idp.Account
+	setups   []string
+	switched []string
+}
+
+func (f *fakeIdP) CreateAccount(_ context.Context, a idp.Account) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.created = append(f.created, a)
+	return "sub-" + a.Email, nil
+}
+
+func (f *fakeIdP) SendSetup(_ context.Context, subject string, _ idp.Account) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.setups = append(f.setups, subject)
+	return nil
+}
+
+func (f *fakeIdP) SetEnabled(_ context.Context, subject string, enabled bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.switched = append(f.switched, fmt.Sprintf("%s=%v", subject, enabled))
+	return nil
 }
 
 func (f *fakeIdP) EndSessions(_ context.Context, subject string) error {

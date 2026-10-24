@@ -89,9 +89,10 @@ export async function setDefaultRule(policyId: string, ruleKey: string, customer
   return run(() => coreOp("policies.setDefaultRule", { policyId, ruleKey, customerId, enabled }, write(version)).then(() => null));
 }
 
-// ---- client users (FR-A17): invite, role / sign-in changes with a reason, removal, invite and reset previews ----
-export async function inviteClientUser(customerId: string, email: string, clientRole: "owner" | "member") {
-  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, email: email.trim(), clientRole }, write()).then((u) => u.id));
+// ---- client users (FR-A17): adding (the account at once, IR461), role / sign-in changes with a reason, removal, set-up
+// e-mail again and reset previews ----
+export async function inviteClientUser(customerId: string, email: string, clientRole: "owner" | "member", displayName: string) {
+  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, email: email.trim(), clientRole, displayName: displayName.trim() }, write()).then((u) => u.id));
 }
 export async function updateClientUser(id: string, version: number, input: { customerId: string; email: string; clientRole: "owner" | "member"; status?: "active" | "disabled"; reason: string }) {
   return run(() => coreOp("clientUsers.save", { id, ...input, reason: input.reason.trim() }, write(version)).then(() => null));
