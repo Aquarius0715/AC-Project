@@ -1,7 +1,9 @@
 // IR461, IR463: a technician the contractor adds sets their password from the set-up e-mail (the local Mailpit inbox)
 // and signs in to the technician app as themselves: the account the sign-in service opened carries the tenant,
-// membership and role claims the apps read, so the app frame shows their role, name and company, and the contractor's list
-// then shows them as Active. The contractor removes them again. Skipped on a stack without Mailpit.
+// membership and role claims the apps read, so the app frame shows their role, name and company, and the contractor's
+// list then shows them as Active. The contractor disables them: their open session is refused at once and the sign-in
+// service refuses a new sign-in (business operation review 2026-10-15). The contractor removes them at the end.
+// Skipped on a stack without Mailpit.
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { APPS } from "../../fixtures/apps";
 import { mailpitUp, setupLink } from "../../fixtures/mailpit";
@@ -41,12 +43,29 @@ test("a technician the contractor adds sets a password from the e-mail and signs
   await expect(me.locator("body")).not.toContainText(FAILED_PAGE);
   await expect(me.getByText("Technician — E2E Signer").first()).toBeVisible(); // their own name and company, from their membership
   await expect(me.locator("aside")).toContainText(/Demo Contractor A/i);
-  await own.close();
 
-  // the first sign-in made them active; the contractor removes them again
+  // the first sign-in made them active; the contractor disables them: the open session is refused at once, and the
+  // sign-in service refuses a new sign-in (IR461)
   await page.reload();
   const row = page.getByRole("row").filter({ hasText: email });
   await expect(row).toContainText("Active");
+  await row.getByRole("button", { name: "Disable" }).click();
+  await dialog.getByLabel("Reason").fill("E2E: the old session must end");
+  await dialog.getByRole("button", { name: "Disable" }).click();
+  await expect(row).toContainText("Disabled");
+  await me.reload();
+  await expect(me.getByText("Technician — E2E Signer")).toHaveCount(0);
+  await me.goto(`${tech.url}/login`);
+  await me.getByRole("link", { name: /^Continue as / }).click();
+  if (await me.locator("#password").isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await me.locator("#username").fill(email);
+    await me.locator("#password").fill(password);
+    await me.locator("#kc-login").click();
+  }
+  await expect(me.getByText(/disabled/i).first()).toBeVisible();
+  await own.close();
+
+  // the contractor removes them
   await row.getByRole("button", { name: "Remove" }).click();
   await dialog.getByLabel("Reason").fill("E2E: the sign-in was checked");
   await dialog.getByRole("button", { name: "Remove" }).click();
