@@ -103,6 +103,8 @@ func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 			}
 			id, err := a.Verifier.Verify(c.Request().Context(), token)
 			if err != nil {
+				// why, never the token: an expired one, an unknown signing key or another issuer or client
+				slog.InfoContext(c.Request().Context(), "auth: token refused", "err", err)
 				return unauth(c, "error.unauthenticated")
 			}
 			tenant, err1 := uuid.Parse(c.Request().Header.Get("X-Tenant-Id"))
