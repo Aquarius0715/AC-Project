@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.335.0
+version: 0.336.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -275,6 +275,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.336.0: The client's job history says “Report reviewed” without naming HQ (IR466). Phase 1A unchanged.
 0.335.0: HQ's Add contractor creates a new contractor company with its profile, so the first contractor is added from the register (IR465). Phase 1A unchanged.
 0.334.0: A contractor or customer owner adds at most 30 accounts to the organization in 24 hours (IR464). Phase 1A unchanged.
 0.333.0: The common permission table and the backend actors describe adding users with an account (IR461). Phase 1A unchanged.

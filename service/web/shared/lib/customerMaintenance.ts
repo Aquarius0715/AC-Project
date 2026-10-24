@@ -34,7 +34,7 @@ export const slotLong = (s: Slot, i: I18n = EN) => showSpan(s.startAt, s.endAt, 
 const CLIENT_TITLE: Record<string, string> = {
   "job.created": "Request created", "job.offered": "HQ booked a service partner", "offer.accepted": "Service partner accepted", "offer.declined": "Service partner declined — HQ is rebooking",
   offer_expired: "HQ is rebooking", "offer.access_extended": "Service partner’s access extended", "job.assigned": "Technician assigned", "job.assignment_released": "Technician’s access ended — to be reassigned", "job.qualification_released": "Technician’s qualification ended — to be reassigned", "assignment.accepted": "Technician confirmed the time",
-  "assignment.cant_make": "Technician can’t make it — HQ is rebooking", "partner.review": "Report checked by the service partner", "job.reviewed": "Report reviewed by HQ",
+  "assignment.cant_make": "Technician can’t make it — HQ is rebooking", "partner.review": "Report checked by the service partner", "job.reviewed": "Report reviewed", // by the service partner or HQ: the client is not told who (review 2026-10-15)
   "job.rated": "You rated the job", "job.problem_reported": "You reported a problem", "proposal.sent": "New time proposed", "partner_proposal.sent_to_client": "New time proposed", "job.follow_up_classified": "HQ reviewed your problem report", "proposal.accepted": "You accepted the proposed time",
   "proposal.declined": "You declined the proposed time", "job.reschedule_requested": "You asked for another time",
 };

@@ -103,6 +103,8 @@ describe("customer maintenance", () => {
     expect([slotShort(week), slotLong(week)]).toEqual(["14 Sept, 8:00 am – 20 Sept, 8:00 am MYT", "Mon, 14 Sept, 8:00 am – Sun, 20 Sept, 8:00 am MYT"]);
     expect([clientEventTitle("job.offered", { "job.offered": "Offer received from HQ" }), clientEventTitle("job.checked_in", { "job.checked_in": "Checked in on site" }), clientEventTitle("x.y", {})])
       .toEqual(["HQ booked a service partner", "Checked in on site", "x y"]);
+    // a report review is the service partner's or HQ's: the client's history does not name either (review 2026-10-15)
+    expect(clientEventTitle("job.reviewed", { "job.reviewed": "Report reviewed by HQ" })).toBe("Report reviewed");
   });
 
   it("counts the symptom the way the API does: trimmed, in characters (code points), not UTF-16 units", () => {

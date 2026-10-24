@@ -645,7 +645,6 @@ export const ms: Record<string, string> = {
   "Technician confirmed the time": "Juruteknik mengesahkan masa",
   "Technician can’t make it — HQ is rebooking": "Juruteknik tidak dapat hadir — HQ sedang menempah semula",
   "Report checked by the service partner": "Laporan disemak oleh rakan kongsi perkhidmatan",
-  "Report reviewed by HQ": "Laporan disemak oleh HQ",
   "You rated the job": "Anda telah menilai kerja ini",
   "You reported a problem": "Anda melaporkan masalah",
   "New time proposed": "Masa baharu dicadangkan",

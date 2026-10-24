@@ -6909,3 +6909,10 @@ Found in the business operation review of 2026-10-15 (high-2): in an environment
 3. **Texts.** The empty register says that Add contractor creates the first company with its profile; the footnote says HQ adds the staff in Access & roles and the company's contractors in the partner app's Users (no more “organizations are created in Access & roles”). English and Malay. The screen catalog lists `organizations.save` for SCR-A06.
 4. **Tests.** E2E `admin/contractors.e2e.ts`: a new company with its profile is created and opened, the dialog passes the axe check, and the same name again is refused with no second company.
 
+## IR466 The client's history does not say who reviewed a report — 2026-10-24
+
+Found in the business operation review of 2026-10-15 (medium-2): a contractor returned a report and later accepted the new version, and the client's job history showed both as “Report reviewed by HQ” while HQ's history named contractor-a. `jobs.review` records one `job.reviewed` event for the service partner's review, HQ's review of an internal job and HQ's escalation alike; the event carries the reviewer's user, not who they review for, and the client is not shown the actor.
+
+1. **Wording.** The client's title of `job.reviewed` is “Report reviewed” (Malay “Laporan disemak”), naming neither HQ nor the service partner. HQ's and the contractor's histories keep naming the actor. The progress card of an internal job (Figma Client 07b, delivery Internal) still says the report is reviewed by HQ, which holds there.
+2. **Tests.** `customerMaintenance.test.ts`.
+
