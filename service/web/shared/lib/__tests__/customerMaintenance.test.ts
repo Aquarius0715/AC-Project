@@ -64,8 +64,11 @@ describe("customer maintenance", () => {
     expect(feedback(job({ status: "completed", completedAt: "2026-09-13T01:00:00Z" }), NOW).kind).toBe("rate");
     expect(feedback(job({ status: "completed", completedAt: "2026-09-01T01:00:00Z" }), NOW).kind).toBe("none");
     const rated = job({ status: "completed", completedAt: "2026-09-13T01:00:00Z", rating: { stars: 4, tags: ["On time"], comment: null, ratedAt: "2026-09-13T02:00:00Z", editableUntil: "2026-09-20T02:00:00Z" } });
-    expect(feedback(rated, NOW)).toEqual({ kind: "edit", stars: 4, text: " · On time · editable until 20 Sept 2026, 10:00 am MYT" });
+    expect(feedback(rated, NOW)).toEqual({ kind: "edit", stars: 4, report: true, text: " · On time · editable until 20 Sept 2026, 10:00 am MYT" });
     expect(feedback({ ...rated, rating: { ...rated.rating!, editableUntil: "2026-09-13T03:00:00Z" } }, NOW).kind).toBe("rated");
+    // a problem can be reported within 7 days of completion only, rated or not (as jobs.reportProblem allows)
+    const late = { ...rated, completedAt: "2026-09-01T01:00:00Z", rating: { ...rated.rating!, ratedAt: "2026-09-07T02:00:00Z", editableUntil: "2026-09-14T02:00:00Z" } };
+    expect([feedback(late, NOW).kind, feedback(late, NOW).report]).toEqual(["edit", false]);
   });
 
   it("checks the times, the contact window and names refusals", () => {

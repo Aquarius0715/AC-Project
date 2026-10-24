@@ -123,16 +123,17 @@ export function planVisit(j: ApiClientJob, now: number, t: T = en): { can: boole
 
 /** What a completed job offers (IR110, DD-C17): Confirm & rate for 7 days, editing the rating until editableUntil. */
 /** The feedback line under a completed job: the stars are drawn by the screen (DEC-74), `text` is what follows them. */
-export function feedback(j: ApiClientJob, now: number, i: I18n = EN): { kind: "rate" | "edit" | "rated" | "none"; text: string; stars?: number } {
+export function feedback(j: ApiClientJob, now: number, i: I18n = EN): { kind: "rate" | "edit" | "rated" | "none"; text: string; stars?: number; report: boolean } {
   const { t } = i;
-  if (j.status !== "completed") return { kind: "none", text: "" };
+  if (j.status !== "completed") return { kind: "none", text: "", report: false };
+  // jobs.reportProblem: within 7 days of completion (IR127 item 2), rated or not
+  const open = j.completedAt ? now < Date.parse(j.completedAt) + 7 * 86_400_000 : true;
   const r = j.rating;
   if (!r) {
-    const open = j.completedAt ? now < Date.parse(j.completedAt) + 7 * 86_400_000 : true;
-    return open ? { kind: "rate", text: t("Is everything working? Your confirmation closes the job.") } : { kind: "none", text: t("Confirmed automatically after 7 days.") };
+    return open ? { kind: "rate", text: t("Is everything working? Your confirmation closes the job."), report: true } : { kind: "none", text: t("Confirmed automatically after 7 days."), report: false };
   }
   const editable = now < Date.parse(r.editableUntil);
-  return { kind: editable ? "edit" : "rated", stars: r.stars, text: `${r.tags.length ? ` · ${r.tags.map((x) => t(x)).join(", ")}` : ""}${editable ? t(" · editable until {when}", { when: showTime(r.editableUntil, i.display) }) : ""}` };
+  return { kind: editable ? "edit" : "rated", stars: r.stars, report: open, text: `${r.tags.length ? ` · ${r.tags.map((x) => t(x)).join(", ")}` : ""}${editable ? t(" · editable until {when}", { when: showTime(r.editableUntil, i.display) }) : ""}` };
 }
 export const RATING_TAGS = ["On time", "Clean work", "Explained clearly", "Polite", "Fixed the problem"];
 export const PROBLEMS: { id: "same_problem" | "new_damage" | "not_completed" | "other"; label: string }[] = [
