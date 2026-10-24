@@ -40,12 +40,14 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
   const register = () => {
     setTried(true);
     if (!reg.serial.trim() || !reg.unitId) return;
-    run(() => registerDevice(reg.serial.trim(), reg.sensors, reg.unitId), t("Device registered"), (id) => { close(); setReg({ serial: "", unitId: "", sensors: [] }); nav({ deviceId: id }); });
+    run(() => registerDevice(reg.serial.trim(), reg.sensors, reg.unitId), t("Device registered — bind it to the unit once it is installed"), (id) => { close(); setReg({ serial: "", unitId: "", sensors: [] }); nav({ deviceId: id }); });
   };
+  // the first binding connects the device to its planned unit; a rebinding moves it (D05, IR467)
+  const first = !!dv && !dv.row.unitId;
   const rebind = () => {
     setTried(true);
     if (!dv || !bind.unitId || !bind.reason.trim()) return;
-    run(() => bindDevice(dv.detail.id, dv.detail.version, bind.unitId, bind.reason.trim()), t("Device bound — new sensor IDs issued"), close);
+    run(() => bindDevice(dv.detail.id, dv.detail.version, bind.unitId, bind.reason.trim()), first ? t("Device bound to the unit — it is connected now") : t("Device bound — new sensor IDs issued"), close);
   };
   const calibrate = () => {
     setTried(true);
@@ -99,9 +101,12 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
                 ))}
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
-                <div className="text-[13px]"><div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t("Bound to unit")}</div>
-                  {dv.unit ? <><b>{dv.unit.name}</b><div className="text-xs text-muted-foreground">{dv.unit.place} · {t("model {model}", { model: dv.unit.model })}</div></> : <b>{dv.row.unit}</b>}</div>
-                {live.canWrite && <Btn size="sm" disabled={pending} onClick={() => { setBind({ unitId: "", reason: "" }); setModal("bind"); }}>{t("Rebind…")}</Btn>}
+                <div className="text-[13px]"><div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t(first ? "Not bound yet" : "Bound to unit")}</div>
+                  {dv.unit ? <><b>{dv.unit.name}</b><div className="text-xs text-muted-foreground">{dv.unit.place} · {t("model {model}", { model: dv.unit.model })}</div></> : <b>{dv.row.unit}</b>}
+                  {first && <div className="text-xs text-muted-foreground">{t("Registered only: bind it once it is installed, then the unit's data and controls use it.")}</div>}</div>
+                {live.canWrite && (first
+                  ? <Btn size="sm" variant="primary" disabled={pending} onClick={() => { setBind({ unitId: dv.row.targetUnitId ?? "", reason: t("Installed on site") }); setModal("bind"); }}>{t("Bind…")}</Btn>
+                  : <Btn size="sm" disabled={pending} onClick={() => { setBind({ unitId: "", reason: "" }); setModal("bind"); }}>{t("Rebind…")}</Btn>)}
               </div>
               {live.canWrite && (
                 <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
@@ -173,13 +178,13 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
       </div>
       <Modal open={modal === "register"} onClose={close} title={t("Register device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={register}>{t("Register")}</Btn></>}>
         <Field label={t("Serial")} error={tried && !reg.serial.trim() ? t("Serial is required") : undefined}><Input value={reg.serial} onChange={(e) => setReg({ ...reg, serial: e.target.value })} placeholder="AC-DEMO-0006" /></Field>
-        <Field label={t("Bind to unit")} error={tried && !reg.unitId ? t("Choose a unit") : undefined}><Select value={reg.unitId} onChange={(e) => setReg({ ...reg, unitId: e.target.value })}><option value="">{t("Select…")}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
+        <Field label={t("Planned unit")} hint={t("Registering reserves the device for this unit; Bind connects it once it is installed.")} error={tried && !reg.unitId ? t("Choose a unit") : undefined}><Select value={reg.unitId} onChange={(e) => setReg({ ...reg, unitId: e.target.value })}><option value="">{t("Select…")}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
         <div><p className="mb-1 text-[13px] font-semibold">{t("Sensors")}</p><p className="mb-2 text-xs text-muted-foreground">{t("Each must be defined in the unit model’s capability; none is allowed.")}</p><div className="flex flex-wrap gap-x-5 gap-y-1.5">{metrics.map((m) => <Check key={m} label={`${m} (${metricUnit[m]})`} checked={reg.sensors.includes(m)} onChange={(on) => setReg({ ...reg, sensors: on ? [...reg.sensors, m] : reg.sensors.filter((x) => x !== m) })} />)}</div></div>
       </Modal>
-      <Modal open={modal === "bind"} onClose={close} title={t("Rebind device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={rebind}>{t("Rebind")}</Btn></>}>
-        <Field label={t("New unit")} error={tried && !bind.unitId ? t("Choose a unit") : undefined}><Select value={bind.unitId} onChange={(e) => setBind({ ...bind, unitId: e.target.value })}><option value="">{t("Select…")}</option>{live.units.filter((u) => u.id !== dv?.row.unitId).map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
+      <Modal open={modal === "bind"} onClose={close} title={t(first ? "Bind device" : "Rebind device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={rebind}>{t(first ? "Bind" : "Rebind")}</Btn></>}>
+        <Field label={t(first ? "Unit" : "New unit")} error={tried && !bind.unitId ? t("Choose a unit") : undefined}><Select value={bind.unitId} onChange={(e) => setBind({ ...bind, unitId: e.target.value })}><option value="">{t("Select…")}</option>{live.units.filter((u) => u.id !== dv?.row.unitId).map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
         <Field label={t("Reason")} error={tried && !bind.reason.trim() ? t("A reason is required") : undefined}><Textarea value={bind.reason} maxLength={1000} onChange={(e) => setBind({ ...bind, reason: e.target.value })} /></Field>
-        <p className="text-[11px] text-muted-foreground">{t("History stays with the previous binding; the device gets new sensor IDs on the new unit.")}</p>
+        <p className="text-[11px] text-muted-foreground">{t(first ? "The device's sensors start reporting for this unit." : "History stays with the previous binding; the device gets new sensor IDs on the new unit.")}</p>
       </Modal>
       <Modal open={modal === "calibrate"} onClose={close} title={t("Calibrate sensor")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={calibrate}>{t("Record")}</Btn></>}>
         <Field label={t("Sensor")}><Select value={cal.sensorId} onChange={(e) => setCal({ ...cal, sensorId: e.target.value })}>{dv?.detail.sensors.map((s) => <option key={s.id} value={s.id}>{s.metric} ({s.unit})</option>)}</Select></Field>

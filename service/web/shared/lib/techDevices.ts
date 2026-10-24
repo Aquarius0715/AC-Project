@@ -32,10 +32,12 @@ const ago = (iso: string | null, now: number, t: T) => {
   return s < 120 ? t("{n} s ago", { n: s }) : s < 7200 ? t("{n} min ago", { n: Math.round(s / 60) }) : t("{n} h ago", { n: Math.round(s / 3600) });
 };
 /** One device of the list (Figma Technician 03, Admin 246:2): serial, connection, unit, firmware and its sensor count. */
-export type TechDeviceRow = { id: string; serial: string; unitId: string | null; unit: string; conn: Connection; connText: string | null; fw: string; tamper: boolean; sensors: number };
+/** `unit` names the bound unit; a device not bound yet says so with its planned unit (D05, IR467). */
+export type TechDeviceRow = { id: string; serial: string; unitId: string | null; targetUnitId: string | null; unit: string; conn: Connection; connText: string | null; fw: string; tamper: boolean; sensors: number };
 export function techDeviceRows(ds: ApiDevice[], unitName: Map<string, string>, now: number, t: T = en): TechDeviceRow[] {
   return [...ds].sort((a, b) => a.serial.localeCompare(b.serial)).map((d) => ({
-    id: d.id, serial: d.serial, unitId: d.unitId, unit: d.unitId ? unitName.get(d.unitId) ?? t("unit") : t("Unbound"), conn: d.connection,
+    id: d.id, serial: d.serial, unitId: d.unitId, targetUnitId: d.targetUnitId ?? null, conn: d.connection,
+    unit: d.unitId ? unitName.get(d.unitId) ?? t("unit") : d.targetUnitId ? t("Not bound yet — planned for {unit}", { unit: unitName.get(d.targetUnitId) ?? t("unit") }) : t("Unbound"),
     connText: d.connection === "online" ? null : d.lastSeenAt ? ago(d.lastSeenAt, now, t) : null, fw: d.firmwareVersion, tamper: d.tamper === "detected", sensors: d.sensors.length,
   }));
 }

@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.336.0 / Created: 2026-09-14 / Updated: 2026-10-24 / Status: Draft for review / Language: English
+Version: 0.337.0 / Created: 2026-09-14 / Updated: 2026-10-24 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.337.0 (2026-10-24): Registering a device reserves it for its planned unit; the list and detail say it is not bound yet and the detail offers Bind (with the planned unit) for its first binding instead of Rebind (business operation review 2026-10-15, IR467).
 0.336.0 (2026-10-24): The client's job history called every report review “Report reviewed by HQ”, also the service partner's; it now says “Report reviewed” (business operation review 2026-10-15, IR466).
 0.335.0 (2026-10-24): HQ's Add contractor creates a new contractor company (name) with its profile; before, it only gave a profile to an existing organization, and no screen created one, so the first contractor could not be added (business operation review 2026-10-15, IR465).
 0.334.0 (2026-10-24): Each account added mails a set-up link to the address typed in, so a contractor or customer owner adds at most 30 accounts to their organization in 24 hours; the next is RATE_LIMITED with the time to wait, and HQ is not limited (IR464).

@@ -33,6 +33,7 @@ export type ApiUnitLite = { id: string; displayName: string; modelId: string; cu
 /** Device / DeviceDetail of service-contracts.ts. */
 export type ApiDevice = {
   id: string; version: number; unitId: string | null; serial: string; connection: Connection; lastSeenAt: string | null; firmwareVersion: string;
+  targetUnitId?: string | null; // the unit chosen at registration: devices.bind connects it (D05)
   powerSignal: "unknown" | "on" | "off"; tamper: "clear" | "detected"; sensors: { id: string; metric: Metric; unit: UnitSymbol; staleAfterSeconds: number; calibratedAt: string | null }[];
 };
 export type ApiDeviceOperation = { id: string; kind: "check" | "calibrate" | "firmware"; status: "queued" | "running" | "succeeded" | "failed"; targetVersion: string | null; failureCode: string | null; createdAt: string; finishedAt: string | null };
@@ -140,12 +141,14 @@ export function firmwareProblem(v: string, listed: string[], t: T = en): string 
   return listed.includes(x) ? t("{v} is already a candidate", { v: x }) : null;
 }
 
-export type DeviceRow = { id: string; version: number; serial: string; unitId: string | null; unit: string; conn: Connection; fw: string; tamper: boolean; power: string };
+/** `unit` names the bound unit; a device not bound yet says so with its planned unit (`targetUnitId`, D05, IR467). */
+export type DeviceRow = { id: string; version: number; serial: string; unitId: string | null; targetUnitId: string | null; unit: string; conn: Connection; fw: string; tamper: boolean; power: string };
 
 export function deviceRows(devices: ApiDevice[], units: ApiUnitLite[], t: T = en): DeviceRow[] {
   const name = new Map(units.map((u) => [u.id, u.displayName]));
   return devices.map((d) => ({
-    id: d.id, version: d.version, serial: d.serial, unitId: d.unitId, unit: d.unitId ? name.get(d.unitId) ?? t("unit") : t("Unbound"), conn: d.connection, fw: d.firmwareVersion,
+    id: d.id, version: d.version, serial: d.serial, unitId: d.unitId, targetUnitId: d.targetUnitId ?? null, conn: d.connection, fw: d.firmwareVersion,
+    unit: d.unitId ? name.get(d.unitId) ?? t("unit") : d.targetUnitId ? t("Not bound yet — planned for {unit}", { unit: name.get(d.targetUnitId) ?? t("unit") }) : t("Unbound"),
     tamper: d.tamper === "detected", power: d.powerSignal,
   }));
 }

@@ -6916,3 +6916,12 @@ Found in the business operation review of 2026-10-15 (medium-2): a contractor re
 1. **Wording.** The client's title of `job.reviewed` is “Report reviewed” (Malay “Laporan disemak”), naming neither HQ nor the service partner. HQ's and the contractor's histories keep naming the actor. The progress card of an internal job (Figma Client 07b, delivery Internal) still says the report is reviewed by HQ, which holds there.
 2. **Tests.** `customerMaintenance.test.ts`.
 
+## IR467 A registered device says it is not bound yet, and its first binding is Bind — 2026-10-24
+
+Found in the business operation review of 2026-10-15 (medium-1): Register device asked for a unit under “Bind to unit”, but `devices.register` only reserves it (`targetUnitId`, D05) and leaves the device unbound until `devices.bind`; the list showed “Unbound” and the only next step was “Rebind…”, so a device could be handed over as if it were set up. The two steps stay (installation is confirmed by binding); the screens now say what is done and what is next. Figma Admin 248:2 drew one step (“Register & bind”) and is aligned with this.
+
+1. **Register.** The field is “Planned unit”, with the hint that registering reserves the device and Bind connects it once installed; the toast says to bind it once installed.
+2. **Not bound yet.** A device without a binding reads “Not bound yet — planned for <unit>” in the list and the detail (“Unbound” only without a planned unit); the detail explains that the unit's data and controls use the device once it is bound.
+3. **Bind.** The first binding is **Bind…** (primary): the dialog “Bind device” opens with the planned unit chosen and the reason “Installed on site” prefilled (editable, required by `devices.bind`). A bound device keeps **Rebind…** (“New unit”, other units only). English and Malay.
+4. **Tests.** `techDevices.test.ts` (the planned unit); E2E `admin/devices.e2e.ts` (a registered device is not bound yet; Bind opens with the planned unit).
+

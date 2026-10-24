@@ -60,3 +60,25 @@ test("the model editor marks a draft, adds a firmware version and discards it", 
   await expect(firmware.getByRole("button", { name: "Remove v9-e2e" })).toHaveCount(0);
   await expect(main.getByRole("heading", { name: /Editing → v\d+/ })).toHaveCount(0);
 });
+
+// Registering reserves a device for its planned unit; it is bound only by Bind (D05, business operation review
+// 2026-10-15, IR467): the detail says "Not bound yet", and Bind opens with the planned unit chosen. Nothing is bound
+// here (Cancel); the registered device stays, under a serial of its own per run.
+test("a registered device is not bound yet, and Bind starts from its planned unit", async ({ page }) => {
+  await page.goto("/admin/devices?tab=devices");
+  const main = page.getByRole("main");
+  await main.getByRole("button", { name: "Register device" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("textbox", { name: /^Serial/ }).fill(`AC-E2E-${Date.now()}`);
+  const planned = dialog.getByRole("combobox", { name: /^Planned unit/ });
+  await planned.selectOption({ index: 1 });
+  const unit = (await planned.locator("option:checked").innerText()).trim();
+  await dialog.getByRole("button", { name: "Register", exact: true }).click();
+  await expect(page.getByText("Device registered — bind it to the unit once it is installed").first()).toBeVisible();
+  await page.waitForURL(/deviceId=/);
+  await expect(main).toContainText("Not bound yet");
+  await main.getByRole("button", { name: "Bind…" }).click();
+  await expect(dialog.getByRole("heading", { name: "Bind device" })).toBeVisible();
+  await expect(dialog.getByRole("combobox", { name: /^Unit/ }).locator("option:checked")).toHaveText(unit);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+});

@@ -44,6 +44,10 @@ describe("techDeviceRows / filterOf", () => {
     expect(rows[0].unit).toBe("Bedroom AC");
     expect(rows[1].unit).toBe("Unbound");
   });
+  it("says a registered device is not bound yet, with its planned unit (D05, IR467)", () => {
+    const [planned] = techDeviceRows([device({ id: "p", serial: "AC-P", unitId: null, targetUnitId: "unit-1" })], names, NOW);
+    expect([planned.unit, planned.unitId, planned.targetUnitId]).toEqual(["Not bound yet — planned for Bedroom AC", null, "unit-1"]);
+  });
   it("shows the age of the last heartbeat only while the device is not online", () => {
     expect(rows[0].connText).toBeNull();
     expect(rows[1].connText).toBe("30 s ago");
