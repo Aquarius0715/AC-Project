@@ -140,18 +140,35 @@ type fakeIdP struct {
 	updated  []idp.Account
 	setups   []string
 	switched []string
+	// failing: creating and updating accounts fail (the provider does not answer); lost: subjects the provider no longer
+	// knows (UpdateAccount is idp.ErrNoAccount); generation: a new account's subject is "sub-<email>" plus "#n" from 1 on
+	failing    bool
+	lost       map[string]bool
+	generation int
 }
 
 func (f *fakeIdP) CreateAccount(_ context.Context, a idp.Account) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.failing {
+		return "", errors.New("provider unavailable")
+	}
 	f.created = append(f.created, a)
+	if f.generation > 0 {
+		return fmt.Sprintf("sub-%s#%d", a.Email, f.generation), nil
+	}
 	return "sub-" + a.Email, nil
 }
 
-func (f *fakeIdP) UpdateAccount(_ context.Context, _ string, a idp.Account) error {
+func (f *fakeIdP) UpdateAccount(_ context.Context, subject string, a idp.Account) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.failing {
+		return errors.New("provider unavailable")
+	}
+	if f.lost[subject] {
+		return idp.ErrNoAccount
+	}
 	f.updated = append(f.updated, a)
 	return nil
 }

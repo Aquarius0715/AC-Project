@@ -201,3 +201,63 @@ func TestClientAddedAgain(t *testing.T) {
 		t.Errorf("not the same person with a new membership: %d persons, %s / %s", same, first, again)
 	}
 }
+
+// TestAccountProviderTrouble (IR461–IR463): a provider that does not answer leaves the person without an account and
+// nothing recorded; once it answers, the set-up e-mail sent again opens the account. An account the provider lost is
+// opened anew when the person is added again.
+func TestAccountProviderTrouble(t *testing.T) {
+	fake := &fakeIdP{failing: true}
+	s := serverCfg(t, func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains })
+	drain := func() {
+		t.Helper()
+		if err := s.DrainEvents(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	email := "trouble-" + uuid.NewString()[:8] + "@example.com"
+	add := func() (string, string) {
+		t.Helper()
+		code, m := write(s, &contrA, "partnerUsers.save", `{"email":"`+email+`","partnerRole":"technician","displayName":"Trouble Tech","accessUntil":"`+clock.Add(30*24*time.Hour).Format(time.RFC3339)+`"}`, 0)
+		if code != 200 {
+			t.Fatalf("add: %d %v", code, m)
+		}
+		return data(m)["id"].(string), data(m)["membershipId"].(string)
+	}
+	account := func(membership string) (sub, signIn string) {
+		t.Helper()
+		ownerScan(t, `SELECT coalesce(u.cognito_sub, ''), coalesce(u.sign_in_membership_id::text, '') FROM identity.users u JOIN identity.memberships m ON m.user_id = u.id WHERE m.id = $1`,
+			[]any{membership}, &sub, &signIn)
+		return
+	}
+	id, membership := add()
+	drain()
+	if sub, signIn := account(membership); sub != "" || signIn != "" {
+		t.Errorf("recorded although the provider did not answer: %q %q", sub, signIn)
+	}
+	fake.mu.Lock()
+	fake.failing = false
+	fake.mu.Unlock()
+	owner(t, `UPDATE identity.partner_users SET last_invite_sent_at = NULL WHERE id = $1`, id) // past the 5-minute wait (IR423)
+	if code, m := write(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 200 {
+		t.Fatalf("resend: %d %v", code, m)
+	}
+	drain()
+	if sub, signIn := account(membership); sub != "sub-"+email || signIn != membership {
+		t.Errorf("after the resend: %q %q", sub, signIn)
+	}
+
+	// removed, then added again while the provider no longer knows the account: a new one is opened
+	if code, m := write(s, &contrA, "partnerUsers.remove", `{"id":"`+id+`","reason":"left"}`, 1); code != 200 {
+		t.Fatalf("remove: %d %v", code, m)
+	}
+	drain()
+	owner(t, `UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '1 hour', valid_until = $2 WHERE id = $1`, membership, clock) // removed after the adding
+	fake.mu.Lock()
+	fake.lost, fake.generation = map[string]bool{"sub-" + email: true}, 2
+	fake.mu.Unlock()
+	_, again := add()
+	drain()
+	if sub, signIn := account(again); sub != "sub-"+email+"#2" || signIn != again {
+		t.Errorf("the lost account: %q %q", sub, signIn)
+	}
+}
