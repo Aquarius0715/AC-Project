@@ -38,6 +38,19 @@ export function totp(secret: string, at = Date.now()): string {
   return String((h.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, "0");
 }
 
+/** RFC 6238 code over a base32 key, as the identity provider shows it when a device is set up (spaces ignored). */
+export function totpBase32(key: string, at = Date.now()): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const ch of key.replace(/[\s=]/g, "").toUpperCase()) bits += alphabet.indexOf(ch).toString(2).padStart(5, "0");
+  const bytes = Buffer.from((bits.match(/.{8}/g) ?? []).map((b) => parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
+  const h = createHmac("sha1", bytes).update(counter).digest();
+  const o = h[h.length - 1] & 15;
+  return String((h.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, "0");
+}
+
 const home = (app: App) => (u: URL) => u.origin === new URL(app.url).origin && (u.pathname === app.home || u.pathname.startsWith(app.home + "/"));
 
 /** `as` signs in another account of the same role (the identity provider's username field takes it). */

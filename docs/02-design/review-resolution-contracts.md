@@ -6925,3 +6925,11 @@ Found in the business operation review of 2026-10-15 (medium-1): Register device
 3. **Bind.** The first binding is **Bind…** (primary): the dialog “Bind device” opens with the planned unit chosen and the reason “Installed on site” prefilled (editable, required by `devices.bind`). A bound device keeps **Rebind…** (“New unit”, other units only). English and Malay.
 4. **Tests.** `techDevices.test.ts` (the planned unit); E2E `admin/devices.e2e.ts` (a registered device is not bound yet; Bind opens with the planned unit).
 
+## IR468 A new HQ account sets up its one-time-code device — 2026-10-24
+
+Found in review (following the business operation review's high-1 check of every new person's first sign-in): HQ signs in with two steps (container design; IR177), but the realm's browser flow asks for a one-time code only once the user has a device. The seeded HQ users have one; an administrator added as a new person in Access & roles (IR461) had none and signed in to the admin app with a password alone.
+
+1. **The device first.** The identity provider adapter opens an HQ account (role admin) with the required action CONFIGURE_TOTP, and its set-up e-mail runs UPDATE_PASSWORD, VERIFY_EMAIL and CONFIGURE_TOTP when the account has no device yet (an account with one keeps it). After that, every sign-in asks for the password and a code. Client, contractor and technician accounts are unchanged.
+2. **Open.** The realm still asks for a code only when a device is configured: a user who removes their device in the account console would sign in with the password alone. A flow for `ac-admin-web` that always requires the code (and Cognito's required MFA in production) would close this; not done here.
+3. **Tests.** `TestKeycloakAccounts` (the required action on a new HQ account; the device step only without a device); E2E scenario `new-hq-admin.e2e.ts`: HQ adds an Admin; the set-up e-mail sets the password and a device (the key read from the page, the code computed); the admin app asks for both; the membership is revoked at the end.
+

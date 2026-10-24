@@ -170,6 +170,9 @@ func (k *Keycloak) CreateAccount(ctx context.Context, a Account) (string, error)
 		return "", errors.New("idp: no e-mail")
 	}
 	user := map[string]any{"username": a.Email, "email": a.Email, "firstName": a.DisplayName, "enabled": true, "emailVerified": false, "attributes": a.claims()}
+	if a.Role == "admin" { // HQ signs in with two steps (IR468)
+		user["requiredActions"] = []string{"CONFIGURE_TOTP"}
+	}
 	res, err := k.do(ctx, http.MethodPost, "/users", user)
 	if err != nil {
 		return "", err
@@ -253,10 +256,22 @@ func (k *Keycloak) findByEmail(ctx context.Context, email string) (string, error
 	return users[0].ID, nil
 }
 
-// SendSetup e-mails the person a link to set their password (and verify the e-mail) that returns to their app.
+// SendSetup e-mails the person a link to set their password (and verify the e-mail) that returns to their app. An HQ
+// account (role admin) without a one-time-code device also sets one up there: HQ signs in with two steps, and the
+// realm asks for the code only once a device is configured (IR468).
 func (k *Keycloak) SendSetup(ctx context.Context, subject string, a Account) error {
+	actions := []string{"UPDATE_PASSWORD", "VERIFY_EMAIL"}
+	if a.Role == "admin" {
+		has, err := k.hasOTP(ctx, subject)
+		if err != nil {
+			return err
+		}
+		if !has {
+			actions = append(actions, "CONFIGURE_TOTP")
+		}
+	}
 	q := url.Values{"client_id": {a.ClientID}, "redirect_uri": {a.RedirectURI}, "lifespan": {"259200"}} // 3 days
-	res, err := k.do(ctx, http.MethodPut, "/users/"+url.PathEscape(subject)+"/execute-actions-email?"+q.Encode(), []string{"UPDATE_PASSWORD", "VERIFY_EMAIL"})
+	res, err := k.do(ctx, http.MethodPut, "/users/"+url.PathEscape(subject)+"/execute-actions-email?"+q.Encode(), actions)
 	if err != nil {
 		return err
 	}
@@ -265,6 +280,30 @@ func (k *Keycloak) SendSetup(ctx context.Context, subject string, a Account) err
 		return fmt.Errorf("idp: set-up e-mail answered %d", res.StatusCode)
 	}
 	return nil
+}
+
+// hasOTP reports whether the user has a one-time-code device.
+func (k *Keycloak) hasOTP(ctx context.Context, subject string) (bool, error) {
+	res, err := k.do(ctx, http.MethodGet, "/users/"+url.PathEscape(subject)+"/credentials", nil)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("idp: credentials answered %d", res.StatusCode)
+	}
+	var creds []struct {
+		Type string `json:"type"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&creds); err != nil {
+		return false, err
+	}
+	for _, c := range creds {
+		if c.Type == "otp" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // SetEnabled turns the person's sign-in on or off (a removed or disabled user); a user the realm does not know has

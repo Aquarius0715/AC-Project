@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// TestKeycloakAccounts (IR461, IR462): a created account carries the claim attributes and returns the new user's ID;
+// TestKeycloakAccounts (IR461, IR462, IR468): a created account carries the claim attributes and returns the new user's ID;
 // an existing e-mail is found and updated instead (a retried provisioning is one account), keeping the user's other
 // attributes; an update of an account the realm lost is ErrNoAccount; the set-up e-mail asks for a password and the
 // e-mail check and returns to the app; an account is turned off.
@@ -40,6 +40,10 @@ func TestKeycloakAccounts(t *testing.T) {
 			_, _ = w.Write([]byte(`{"id":"old-id","username":"tech@contractor.example","email":"tech@contractor.example","enabled":false,"attributes":{"locale":["ms"],"membership_id":["m0"]}}`))
 		case r.URL.Path == "/admin/users/gone-id":
 			w.WriteHeader(http.StatusNotFound)
+		case r.Method == http.MethodGet && r.URL.Path == "/admin/users/hq-new/credentials":
+			_, _ = w.Write([]byte(`[{"type":"password"}]`))
+		case r.Method == http.MethodGet && r.URL.Path == "/admin/users/hq-otp/credentials":
+			_, _ = w.Write([]byte(`[{"type":"password"},{"type":"otp"}]`))
 		default:
 			w.WriteHeader(http.StatusNoContent)
 		}
@@ -81,6 +85,22 @@ func TestKeycloakAccounts(t *testing.T) {
 	if err := k.SendSetup(ctx, "new-id", a); err != nil || calls[0].path != "/users/new-id/execute-actions-email" ||
 		!strings.Contains(calls[0].query, "redirect_uri=http%3A%2F%2Flocalhost%3A3002%2Flogin") || calls[0].body != `["UPDATE_PASSWORD","VERIFY_EMAIL"]` {
 		t.Errorf("set-up e-mail: %v %v", err, calls)
+	}
+	// HQ (IR468): a new account must set up its one-time-code device, in the e-mail's steps and as a required action;
+	// one with a device keeps it
+	hq := a
+	hq.Role = "admin"
+	exists, calls = false, nil
+	if _, err := k.CreateAccount(ctx, hq); err != nil || !strings.Contains(calls[0].body, `"requiredActions":["CONFIGURE_TOTP"]`) {
+		t.Errorf("a new HQ account: %v %v", err, calls)
+	}
+	calls = nil
+	if err := k.SendSetup(ctx, "hq-new", hq); err != nil || calls[1].body != `["UPDATE_PASSWORD","VERIFY_EMAIL","CONFIGURE_TOTP"]` {
+		t.Errorf("the set-up e-mail of an HQ account without a device: %v %v", err, calls)
+	}
+	calls = nil
+	if err := k.SendSetup(ctx, "hq-otp", hq); err != nil || calls[1].body != `["UPDATE_PASSWORD","VERIFY_EMAIL"]` {
+		t.Errorf("the set-up e-mail of an HQ account with a device: %v %v", err, calls)
 	}
 	calls = nil
 	if err := k.SetEnabled(ctx, "new-id", false); err != nil || calls[0].body != `{"enabled":false}` {
