@@ -2,6 +2,7 @@
 // service e-mails the set-up link, which reaches Mailpit — sees them listed as not signed in yet, and removes them
 // again. Demo Customer B, so the customer app's own users spec (customer A) sees nothing of it.
 import { test, expect } from "../../fixtures/test";
+import { expectAccessible } from "../../fixtures/a11y";
 
 test("HQ adds a client user, listed as not signed in yet, and removes them", async ({ page }) => {
   await page.goto("/admin/units");
@@ -11,6 +12,7 @@ test("HQ adds a client user, listed as not signed in yet, and removes them", asy
   await main.getByRole("tab", { name: /^Users/ }).click();
   await main.getByRole("button", { name: "Add user" }).click();
   const dialog = page.getByRole("dialog");
+  await expectAccessible(page, '[role="dialog"]'); // the add dialog (IR360)
   await dialog.getByRole("button", { name: "Add user" }).click();
   await expect(dialog).toContainText("A name of 1–120 characters"); // nothing typed yet
   const email = `e2e-client-${Date.now()}@example.com`;

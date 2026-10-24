@@ -3,6 +3,7 @@
 // the technician's access end and removes the account; its booked technician offers no Disable or Remove, and its own
 // row has no actions.
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
+import { expectAccessible } from "../../fixtures/a11y";
 
 test("a contractor adds a technician, waits to resend the set-up e-mail, moves the access end and removes them, and cannot disable its booked technician", async ({ page, app }) => {
   test.skip(app.id !== "partner", "partner only");
@@ -33,6 +34,7 @@ test("a contractor adds a technician, waits to resend the set-up e-mail, moves t
 
   // the access end moves, with a reason
   await row(email).getByRole("button", { name: "Access" }).click();
+  await expectAccessible(page, '[role="dialog"]'); // the access end dialog (IR360, IR461)
   await dialog.getByLabel("Access until").fill("2026-12-31");
   await dialog.getByRole("button", { name: "Save access" }).click();
   await expect(dialog.getByText("A reason of 1–1000 characters")).toBeVisible(); // no reason yet
@@ -80,6 +82,7 @@ test("a contractor cannot give a technician access for more than a year", async 
   await dialog.getByLabel("Name").fill("Too Long");
   await dialog.getByLabel("Email").fill(`e2e-long-${Date.now()}@example.com`);
   await dialog.getByRole("combobox", { name: "Role" }).selectOption("technician");
+  await expectAccessible(page, '[role="dialog"]'); // the add dialog with the access end (IR360, IR461)
   await dialog.getByLabel("Access until").fill("2030-01-01");
   await dialog.getByRole("button", { name: "Add user" }).click();
   await expect(dialog.getByText("At most a year ahead")).toBeVisible();
