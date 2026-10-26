@@ -215,8 +215,13 @@ func (in *ClientUserInput) Validate() map[string]string {
 	return fe
 }
 
-// otherActiveOwner reports whether the customer keeps another active owner besides the given client user.
+// otherActiveOwner reports whether the customer keeps another active owner besides the given client user. The
+// customer's changes to its owners wait for each other here, so two at once — each demoting, disabling or removing
+// the other owner — cannot both see the other still active (IR471).
 func otherActiveOwner(ctx context.Context, c *ops.Call, customer, except uuid.UUID) (bool, error) {
+	if _, err := c.Tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('identity.active_owners:' || $1::text))`, customer); err != nil {
+		return false, err
+	}
 	var ok bool
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.client_users WHERE customer_id = $1 AND id <> $2 AND client_role = 'owner' AND status = 'active')`, customer, except).Scan(&ok)
 	return ok, err

@@ -239,7 +239,12 @@ func accessUntilOK(now, until time.Time) bool {
 }
 
 // otherActiveContractor reports whether the company keeps another active contractor account besides the given one.
+// The company's changes to its contractors wait for each other here, so two at once — each disabling or removing the
+// other contractor — cannot both see the other still active (IR471).
 func otherActiveContractor(ctx context.Context, c *ops.Call, org, except uuid.UUID) (bool, error) {
+	if _, err := c.Tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('identity.active_contractors:' || $1::text))`, org); err != nil {
+		return false, err
+	}
 	var ok bool
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE organization_id = $1 AND id <> $2 AND partner_role = 'contractor' AND status = 'active')`, org, except).Scan(&ok)
 	return ok, err

@@ -6947,3 +6947,9 @@ Found in review: a unit holds one active restriction (DDC-08 §3), and two RTO c
 1. **Lock.** Before the check, the schedule takes a transaction advisory lock per unit, in unit order (no deadlock between schedules), so a second schedule touching the same unit waits and then sees the first: CONFLICT `errors.restriction_exists` as before.
 2. **Tests.** `TestRestrictionOnePerUnitAtOnce`: three rounds of two contracts on one unit scheduled concurrently end with one 200 and one 409; without the lock the first round ended with two 200s.
 
+## IR471 A customer's last owner and a company's last contractor stay when two changes come at once — 2026-10-26
+
+Found in review: a customer keeps one active owner (IR417, CONFLICT `errors.last_owner`) and a contractor company keeps one active contractor account (IR416, CONFLICT `errors.last_contractor`). Each change checked for another active owner or contractor and then wrote, and only the changed account's row was locked. Two changes at the same moment, each to the other of the last two (two owners demoting or removing each other, or HQ doing both; two contractors disabling each other), both saw the other one still active, both passed, and left the customer or the company with none.
+
+1. **Lock.** Before the check, `clientUsers.save` / `clientUsers.remove` take a transaction advisory lock per customer, and `partnerUsers.save` / `partnerUsers.remove` one per contractor company. The second change waits for the first and then sees it (each statement reads what has committed): CONFLICT `errors.last_owner` / `errors.last_contractor` as before.
+2. **Tests.** `TestLastOwnerAtOnce` (HQ demotes one of the last two owners and removes the other) and `TestLastContractorAtOnce` (one of the last two contractor accounts disabled, the other removed): five rounds each end with one 200 and one 409; without the lock the first round ended with two 200s.
