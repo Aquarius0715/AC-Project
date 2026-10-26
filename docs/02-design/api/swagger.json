@@ -10183,7 +10183,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:billing.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR90 dueAt must be after now\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A08 · Input versions: contractVersion=Contract.version",
+                "description": "Authorization: admin:billing.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR90 dueAt must be after now; no period overlapping an invoice of the contract (CONFLICT errors.invoice_period_exists; IR469)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A08 · Input versions: contractVersion=Contract.version",
                 "consumes": [
                     "application/json"
                 ],

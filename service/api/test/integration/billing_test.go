@@ -140,6 +140,11 @@ func TestContractsAndInvoices(t *testing.T) {
 	if code, _ := inv(nil); code != 409 {
 		t.Error("same period twice")
 	}
+	// IR469: a period overlapping an invoiced one would bill those days twice; the next period may start where it ends
+	overlap := `{"from":"` + ts(24*10) + `","to":"` + ts(24*40) + `"}`
+	if code, m := inv(map[string]string{"period": overlap, "dueAt": `"` + ts(24*11) + `"`}); code != 409 || m["messageKey"] != "errors.invoice_period_exists" {
+		t.Errorf("overlapping period: %d %v", code, m)
+	}
 	if code, m := post(s, &customerB, "invoices.get", `{"id":"`+invoice+`"}`); code != 200 || len(data(m)["paymentRefs"].([]any)) != 0 {
 		t.Fatalf("client invoice detail: %d %v", code, m)
 	}

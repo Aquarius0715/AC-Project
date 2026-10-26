@@ -1433,7 +1433,8 @@ CREATE TABLE billing.invoices (
   updated_at        timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (contract_id, contract_version) REFERENCES billing.contracts(id, version),
   UNIQUE (tenant_id, number),
-  UNIQUE (contract_id, period)
+  -- no two invoices of a contract cover the same moment: an overlapping period would bill those days twice (IR469)
+  CONSTRAINT invoices_period_no_overlap EXCLUDE USING gist (contract_id WITH =, period WITH &&)
 );
 CREATE INDEX invoices_customer ON billing.invoices (tenant_id, customer_id, due_at DESC);
 CREATE INDEX invoices_overdue ON billing.invoices (tenant_id, due_at) WHERE status <> 'paid';

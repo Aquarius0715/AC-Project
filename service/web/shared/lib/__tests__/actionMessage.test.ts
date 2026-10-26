@@ -21,6 +21,8 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "error.rateLimited", retryAfterSeconds: 40 }))).toBe("Too many changes in a short time — try again in 40 s");
     expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "error.rateLimited" }))).toBe("Too many changes in a short time — try again shortly");
     expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "errors.invite_recently_sent", retryAfterSeconds: 241 }))).toBe("The set-up e-mail was sent a moment ago — send it again in 5 min");
+    // IR469: an invoice period overlapping an invoiced one says what to do
+    expect(actionMessage(failure({ code: "CONFLICT", messageKey: "errors.invoice_period_exists" }))).toBe("This contract already has an invoice for part of this period — choose a period after it");
     // IR464: the accounts added per day say when more can be added (rounded up to hours)
     expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "errors.too_many_accounts", retryAfterSeconds: 81060 }))).toBe("Many users were added in the last 24 hours — you can add more in 23 h");
     // IR462: an address someone with access holds says what to do; a nested field is named by its last part

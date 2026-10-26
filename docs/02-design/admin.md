@@ -380,7 +380,7 @@ Scope: FR-A08 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| contractId / period | Required | Billing period within contract period | Invoice details |
+| contractId / period | Required | Billing period within contract period; not overlapping another invoice of the contract (CONFLICT `errors.invoice_period_exists`, IR469); the next period may start where the last ends | Invoice details |
 | amountMinor / currency | Required | Positive integer; matches contract currency | Amount |
 | dueAt | datetime/required | After now only. Create overdue invoices through demoSeed or demo.advanceClock (IR90) | Deadline |
 | paymentReference | string/required on confirmation | 1–128 characters; unique within tenant | Payment reference |

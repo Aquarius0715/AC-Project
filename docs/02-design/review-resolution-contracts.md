@@ -6933,3 +6933,10 @@ Found in review (following the business operation review's high-1 check of every
 2. **Open.** The realm still asks for a code only when a device is configured: a user who removes their device in the account console would sign in with the password alone. A flow for `ac-admin-web` that always requires the code (and Cognito's required MFA in production) would close this; not done here.
 3. **Tests.** `TestKeycloakAccounts` (the required action on a new HQ account; the device step only without a device); E2E scenario `new-hq-admin.e2e.ts`: HQ adds an Admin; the set-up e-mail sets the password and a device (the key read from the page, the code computed); the admin app asks for both; the membership is revoked at the end.
 
+## IR469 No two invoices of a contract cover the same moment — 2026-10-24
+
+Found in review: HQ's Create invoice takes any start and end day, and the database refused only a second invoice with exactly the same period (`UNIQUE (contract_id, period)`). A period overlapping an invoiced one — 1–30 September, then 15 September–15 October — was created and billed those days twice.
+
+1. **Constraint.** `billing.invoices` has `EXCLUDE USING gist (contract_id WITH =, period WITH &&)` instead of the unique pair: no two invoices of a contract overlap; periods are half-open, so the next one may start where the last ends. A violation is CONFLICT `errors.invoice_period_exists` (the existing key), worded “This contract already has an invoice for part of this period — choose a period after it” (English, Malay). schema.sql = migration 000001; the dev database got the constraint with ALTER.
+2. **Tests.** `TestContractsAndInvoices`: an overlapping period is refused — it was created (200) with the old constraint.
+
