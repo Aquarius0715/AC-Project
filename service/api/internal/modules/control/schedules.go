@@ -22,13 +22,16 @@ func scheduleRef(phase string, at time.Time) string {
 // maxScheduleWindow bounds one catch-up (a long demo clock jump is processed up to this far back).
 const maxScheduleWindow = 400 * 24 * time.Hour
 
-// FireSchedules is the IR54 internal path of schedule automations, a scheduler job of the equipment domain: every
-// start / end occurrence of the tenant's schedule rules that fell in (watermark, now] is evaluated at its minute with
-// the D02 arbitration of the unit's rules, in time order (an end before a start of the same minute). The winner per
-// unit gets its Command (source automation, actor = rule owner re-authorized now) and an audit entry; a disabled
-// rule, a missing owner permission, a restriction or an offline unit suppresses it. The watermark
-// (control.schedule_watermarks, locked for the tick) starts at the first tick, so occurrences before it are never
-// replayed; automation_runs keeps one outcome per rule, unit and occurrence. Returns the Commands created.
+// FireSchedules is the IR54 internal path of schedule automations, a scheduler job of the equipment domain: the start /
+// end occurrences of the tenant's enabled schedule rules that fell in (watermark, now] are evaluated at their minute
+// with the D02 arbitration of the unit's rules, in time order (an end before a start of the same minute). A unit takes
+// only the last minute the tick passed for it (IR473): a tick that passes several — a demo clock jump, or the scheduler
+// paused — passes over the earlier ones, whose Commands would still be pending when the later one is evaluated, so the
+// unit ends in the state real time would have left. The winner per unit gets its Command (source automation, actor =
+// rule owner re-authorized now) and an audit entry; a missing owner permission, a restriction or an offline unit
+// suppresses it. The watermark (control.schedule_watermarks, locked for the tick) starts at the first tick, so
+// occurrences before it are never replayed; automation_runs keeps one outcome per rule, unit and occurrence. Returns
+// the Commands created.
 func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error) {
 	now := c.Now.UTC().Truncate(time.Minute)
 	var since time.Time
@@ -50,7 +53,7 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 	}
 	ticks := map[string]*tick{}
 	rows, err := c.Tx.Query(ctx, `SELECT a.definition, a.timezone, array_agg(u.unit_id ORDER BY u.unit_id) FROM control.automations a
-		JOIN control.automation_units u ON u.automation_id = a.id WHERE a.kind = 'schedule' GROUP BY a.id ORDER BY a.id`)
+		JOIN control.automation_units u ON u.automation_id = a.id WHERE a.kind = 'schedule' AND a.enabled GROUP BY a.id ORDER BY a.id`)
 	if err != nil {
 		return 0, err
 	}
@@ -99,10 +102,21 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 		}
 		return order[i].phase == "schedule_end" && order[j].phase != "schedule_end" // end, then the next start
 	})
+	last := map[uuid.UUID]time.Time{} // the last minute the tick passed for each unit (IR473)
+	for _, t := range order {
+		for u := range t.units {
+			if t.at.After(last[u]) {
+				last[u] = t.at
+			}
+		}
+	}
 	created := 0
 	for _, t := range order {
 		in := &EvaluationInput{EventID: uuid.NewSHA1(c.Principal.TenantID, []byte(scheduleRef(t.phase, t.at))), OccurredAt: t.at, Phase: t.phase}
 		for u := range t.units {
+			if !t.at.Equal(last[u]) {
+				continue // passed over: a later minute sets the unit's state
+			}
 			if _, found, err := m.Units.Target(ctx, c, u); err != nil {
 				return created, err
 			} else if found { // an archived or removed unit is skipped, not an error of the tick

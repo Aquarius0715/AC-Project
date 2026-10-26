@@ -123,6 +123,43 @@ func TestScheduleAutomationsFire(t *testing.T) {
 	}
 }
 
+// IR473: one tick that passes several minutes of a unit's schedules — a demo clock jump, or the scheduler paused —
+// runs only the last minute it passed, so the unit ends in the state real time would have left: past a whole window,
+// the end. Before, the start's Command was still pending when the end was evaluated in the same tick, so the end was
+// excluded as busy and the AC stayed on after its window. (Within one minute the order stays: TestScheduleBoundaries.)
+func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
+	s := server(t)
+	ctx := context.Background()
+	u := boundUnit(t, s, "online")
+	code, m := write(s, &customerB, "automations.save", scheduleRule(u, map[string]string{"weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`, "enabled": "true",
+		"startAction": `{"kind":"set_temperature","celsius":25}`}), 0)
+	if code != 200 {
+		t.Fatalf("save: %d %v", code, m)
+	}
+	id := data(m)["id"].(string)
+	t.Cleanup(func() { write(s, &customerB, "automations.delete", `{"id":"`+id+`"}`, 1) })
+	setWatermark(t, clock)
+	if _, err := schedTick(ctx, s, clock.Add(61*time.Minute)); err != nil { // past the start and the end
+		t.Fatal(err)
+	}
+	if cs := automationCommands(t, u); len(cs) != 1 || cs[0] != `{"kind": "set_power", "power": false}` {
+		t.Fatalf("past a whole window, the end only: %v", cs)
+	}
+	var runs int
+	ownerScan(t, `SELECT count(*) FROM control.automation_runs WHERE rule_id = $1`, []any{id}, &runs)
+	if runs != 1 {
+		t.Fatalf("the passed-over start leaves no run: %d", runs)
+	}
+	// a week later, two windows passed at once: still the last end only
+	setWatermark(t, clock.Add(61*time.Minute))
+	if _, err := schedTick(ctx, s, clock.Add(14*24*time.Hour+61*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if cs := automationCommands(t, u); len(cs) != 2 || cs[1] != `{"kind": "set_power", "power": false}` {
+		t.Fatalf("two windows passed, the last end only: %v", cs)
+	}
+}
+
 // IR214: automations.nextRuns previews an unsaved schedule (the C04 editor's Test) with the save rules.
 func TestScheduleDraftPreview(t *testing.T) {
 	s := server(t)
