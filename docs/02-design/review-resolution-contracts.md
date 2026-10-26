@@ -6940,3 +6940,10 @@ Found in review: HQ's Create invoice takes any start and end day, and the databa
 1. **Constraint.** `billing.invoices` has `EXCLUDE USING gist (contract_id WITH =, period WITH &&)` instead of the unique pair: no two invoices of a contract overlap; periods are half-open, so the next one may start where the last ends. A violation is CONFLICT `errors.invoice_period_exists` (the existing key), worded “This contract already has an invoice for part of this period — choose a period after it” (English, Malay). schema.sql = migration 000001; the dev database got the constraint with ALTER.
 2. **Tests.** `TestContractsAndInvoices`: an overlapping period is refused — it was created (200) with the old constraint.
 
+## IR470 Restrictions scheduled at once on one unit end as one — 2026-10-26
+
+Found in review: a unit holds one active restriction (DDC-08 §3), and two RTO contracts may cover the same unit (overlapping contracts are allowed, IR92 item 8). `restrictions.schedule` checked for an active restriction on the units and then inserted, and only the contract row was locked, so two schedules from two contracts at the same moment could both pass the check and leave the unit with two active restrictions.
+
+1. **Lock.** Before the check, the schedule takes a transaction advisory lock per unit, in unit order (no deadlock between schedules), so a second schedule touching the same unit waits and then sees the first: CONFLICT `errors.restriction_exists` as before.
+2. **Tests.** `TestRestrictionOnePerUnitAtOnce`: three rounds of two contracts on one unit scheduled concurrently end with one 200 and one 409; without the lock the first round ended with two 200s.
+

@@ -206,6 +206,12 @@ func (m Restrictions) schedule(ctx context.Context, c *ops.Call, in *ScheduleInp
 			}
 		}
 	}
+	// one active restriction per unit (DDC-08 §3): schedules touching the same unit wait for each other here, in unit
+	// order, so two contracts sharing a unit cannot both pass the check below (the contract row lock only orders
+	// schedules of one contract)
+	if _, err := c.Tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('restrictions.unit:' || u::text)) FROM unnest($1::uuid[]) AS u ORDER BY u`, in.UnitIDs); err != nil {
+		return Restriction{}, err
+	}
 	var busy bool
 	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_units ru JOIN restrictions.restrictions r ON r.id = ru.restriction_id
 			WHERE ru.unit_id = ANY($1) AND (r.state NOT IN ('released','cancelled')

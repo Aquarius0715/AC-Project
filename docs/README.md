@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.339.0 / Created: 2026-09-14 / Updated: 2026-10-24 / Status: Draft for review / Language: English
+Version: 0.340.0 / Created: 2026-09-14 / Updated: 2026-10-26 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.340.0 (2026-10-26): Two RTO contracts may cover one unit; restrictions scheduled from both at the same moment could both pass the one-active-restriction check and leave two on the unit. Schedules now lock the units first (IR470).
 0.339.0 (2026-10-24): HQ could create a second invoice of a contract whose period overlaps an invoiced one (only identical periods were refused), billing those days twice; an exclusion constraint refuses any overlap (IR469).
 0.338.0 (2026-10-24): The realm asks for a one-time code only once a device is set up, so an HQ administrator added in Access & roles signed in with a password alone; a new HQ account now sets up its device in the set-up e-mail's steps and as a required action (IR468).
 0.337.0 (2026-10-24): Registering a device reserves it for its planned unit; the list and detail say it is not bound yet and the detail offers Bind (with the planned unit) for its first binding instead of Rebind (business operation review 2026-10-15, IR467).

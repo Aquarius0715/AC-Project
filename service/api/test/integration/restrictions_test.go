@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -701,5 +702,39 @@ func TestRestrictionExplicitRelease(t *testing.T) {
 	_, m := post(s, &restrMgr, "audit.list", `{"filters":{`+day+`,"action":"restrictions.release","targetKind":"restriction","targetId":"`+id+`"},"limit":10}`)
 	if len(items(m)) != 1 {
 		t.Errorf("audit of the release: %v", items(m))
+	}
+}
+
+// TestRestrictionOnePerUnitAtOnce (DDC-08 §3): two RTO contracts may cover the same unit, but the unit holds one active
+// restriction; scheduled from both contracts at the same moment, one succeeds and the other is CONFLICT
+// errors.restriction_exists — the check and the insert of one wait for the other's.
+func TestRestrictionOnePerUnitAtOnce(t *testing.T) {
+	s := server(t)
+	for round := 0; round < 3; round++ {
+		u := boundUnit(t, s, "online")
+		k1, inv1 := overdueContract(t, s, u)
+		k2, inv2 := overdueContract(t, s, u)
+		codes := make(chan int, 2)
+		var wg sync.WaitGroup
+		for _, kv := range [][2]string{{k1, inv1}, {k2, inv2}} {
+			wg.Add(1)
+			go func(k, inv string) {
+				defer wg.Done()
+				code, m := write(s, &restrMgr, "restrictions.schedule", scheduleBody(k, inv, []string{u}, nil), 0)
+				if code == 409 && m["messageKey"] != "errors.restriction_exists" {
+					t.Errorf("round %d: refused for another reason: %v", round, m)
+				}
+				codes <- code
+			}(kv[0], kv[1])
+		}
+		wg.Wait()
+		close(codes)
+		got := map[int]int{}
+		for c := range codes {
+			got[c]++
+		}
+		if got[200] != 1 || got[409] != 1 {
+			t.Fatalf("round %d: one restriction per unit: %v", round, got)
+		}
 	}
 }
