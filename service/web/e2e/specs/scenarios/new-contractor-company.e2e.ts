@@ -54,8 +54,10 @@ test("HQ adds a contractor company and its first contractor, who signs in to the
     const me = await open(browser, app("partner"), false);
     const password = `E2e-${crypto.randomUUID()}`;
     await me.goto(link);
+    // the identity provider may list the actions first: wait for that page or the first step (isVisible does not wait)
     const proceed = me.getByRole("link", { name: /Click here to proceed/ });
-    if (await proceed.isVisible({ timeout: 5_000 }).catch(() => false)) await proceed.click();
+    await expect(proceed.or(me.locator("#password-new")).first()).toBeVisible();
+    if (await proceed.isVisible()) await proceed.click();
     await me.locator("#password-new").fill(password);
     await me.locator("#password-confirm").fill(password);
     await me.locator("#password-new").press("Enter");

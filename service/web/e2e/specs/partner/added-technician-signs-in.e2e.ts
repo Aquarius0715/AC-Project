@@ -27,8 +27,10 @@ test("a technician the contractor adds sets a password from the e-mail and signs
   const me = await own.newPage();
   const password = `E2e-${crypto.randomUUID()}`;
   await me.goto(link);
+  // the identity provider may list the actions first: wait for that page or the password step (isVisible does not wait)
   const proceed = me.getByRole("link", { name: /Click here to proceed/ });
-  if (await proceed.isVisible({ timeout: 5_000 }).catch(() => false)) await proceed.click(); // the actions are listed first
+  await expect(proceed.or(me.locator("#password-new")).first()).toBeVisible();
+  if (await proceed.isVisible()) await proceed.click();
   await me.locator("#password-new").fill(password);
   await me.locator("#password-confirm").fill(password);
   await me.locator("#password-new").press("Enter");
@@ -55,17 +57,21 @@ test("a technician the contractor adds sets a password from the e-mail and signs
   await expect(row).toContainText("Disabled");
   await me.reload();
   await expect(me.getByText("Technician — E2E Signer")).toHaveCount(0);
-  // the sign-in service turns the account off when the identity service handles the change — an event, moments later
-  // (a slower stack in CI once took longer than one try): sign in again until it says the account is disabled
+  // the sign-in service turns the account off when the identity service handles the change — an event, moments later:
+  // sign in again until it says the account is disabled. The page is waited for before it is read: isVisible does not
+  // wait, and on a slower stack (CI) the password form was not drawn yet, so it was never filled.
+  const refused = me.getByText(/disabled/i).first();
   await expect(async () => {
     await me.goto(`${tech.url}/login`);
     await me.getByRole("link", { name: /^Continue as / }).click();
-    if (await me.locator("#password").isVisible({ timeout: 5_000 }).catch(() => false)) {
+    const form = me.locator("#password");
+    await expect(form.or(refused).first()).toBeVisible({ timeout: 10_000 });
+    if (await form.isVisible()) {
       await me.locator("#username").fill(email);
-      await me.locator("#password").fill(password);
+      await form.fill(password);
       await me.locator("#kc-login").click();
     }
-    await expect(me.getByText(/disabled/i).first()).toBeVisible({ timeout: 5_000 });
+    await expect(refused).toBeVisible({ timeout: 5_000 });
   }).toPass({ timeout: 90_000, intervals: [1_000, 5_000] });
   await own.close();
 

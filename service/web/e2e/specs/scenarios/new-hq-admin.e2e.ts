@@ -41,8 +41,10 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
   const me = await open(browser, app("admin"), false);
   await test.step("the set-up e-mail sets the password and a one-time-code device", async () => {
     await me.goto(await setupLink(email));
+    // the identity provider may list the actions first: wait for that page or the first step (isVisible does not wait)
     const proceed = me.getByRole("link", { name: /Click here to proceed/ });
-    if (await proceed.isVisible({ timeout: 5_000 }).catch(() => false)) await proceed.click();
+    await expect(proceed.or(me.locator("#password-new")).or(me.locator("#totp")).first()).toBeVisible();
+    if (await proceed.isVisible()) await proceed.click();
     // the identity provider orders the steps itself (the device came first): take each page as it comes
     const done = me.getByText(/Your account has been updated/);
     for (let step = 0; step < 4 && !(await done.isVisible().catch(() => false)); step++) {

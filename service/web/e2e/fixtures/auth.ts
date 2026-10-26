@@ -58,7 +58,8 @@ const home = (app: App) => (u: URL) => u.origin === new URL(app.url).origin && (
  * The account may already be shown; the credentials stay in this file's realm reader. */
 export async function enterPassword(page: Page, user: string): Promise<void> {
   const name = page.locator("#username");
-  if (await name.isVisible().catch(() => false)) await name.fill(user);
+  await page.locator("#password").waitFor(); // the form is drawn: isVisible does not wait
+  if (await name.isVisible()) await name.fill(user);
   await page.locator("#password").fill(passwordOf(user));
   await page.locator("#kc-login").click();
 }
