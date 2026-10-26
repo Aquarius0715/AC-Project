@@ -55,14 +55,18 @@ test("a technician the contractor adds sets a password from the e-mail and signs
   await expect(row).toContainText("Disabled");
   await me.reload();
   await expect(me.getByText("Technician — E2E Signer")).toHaveCount(0);
-  await me.goto(`${tech.url}/login`);
-  await me.getByRole("link", { name: /^Continue as / }).click();
-  if (await me.locator("#password").isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await me.locator("#username").fill(email);
-    await me.locator("#password").fill(password);
-    await me.locator("#kc-login").click();
-  }
-  await expect(me.getByText(/disabled/i).first()).toBeVisible();
+  // the sign-in service turns the account off when the identity service handles the change — an event, moments later
+  // (a slower stack in CI once took longer than one try): sign in again until it says the account is disabled
+  await expect(async () => {
+    await me.goto(`${tech.url}/login`);
+    await me.getByRole("link", { name: /^Continue as / }).click();
+    if (await me.locator("#password").isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await me.locator("#username").fill(email);
+      await me.locator("#password").fill(password);
+      await me.locator("#kc-login").click();
+    }
+    await expect(me.getByText(/disabled/i).first()).toBeVisible({ timeout: 5_000 });
+  }).toPass({ timeout: 90_000, intervals: [1_000, 5_000] });
   await own.close();
 
   // the contractor removes them
