@@ -48,6 +48,7 @@ describe("actionMessage for the user management refusals (IR416–IR421)", () =>
     expect(actionMessage(r("errors.technician_booked"))).toBe("This technician still has an assigned job — reassign it first");
     expect(actionMessage(r("errors.own_account"))).toBe("You can’t change or remove your own account");
     expect(actionMessage(r("errors.last_owner"), translator("ms"))).toBe("Pemilik aktif terakhir tidak boleh diturunkan, dilumpuhkan atau dialih keluar");
+    expect(actionMessage(r("errors.last_identity_admin"))).toBe("At least one active membership must keep identity.write — give it to another HQ membership first, then change this one");
     expect(actionMessage(r("errors.some_other_rule"))).toBe("Some other rule"); // other keys are still humanized
   });
 });

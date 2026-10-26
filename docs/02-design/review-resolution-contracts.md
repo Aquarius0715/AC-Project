@@ -6953,3 +6953,14 @@ Found in review: a customer keeps one active owner (IR417, CONFLICT `errors.last
 
 1. **Lock.** Before the check, `clientUsers.save` / `clientUsers.remove` take a transaction advisory lock per customer, and `partnerUsers.save` / `partnerUsers.remove` one per contractor company. The second change waits for the first and then sees it (each statement reads what has committed): CONFLICT `errors.last_owner` / `errors.last_contractor` as before.
 2. **Tests.** `TestLastOwnerAtOnce` (HQ demotes one of the last two owners and removes the other) and `TestLastContractorAtOnce` (one of the last two contractor accounts disabled, the other removed): five rounds each end with one 200 and one 409; without the lock the first round ended with two 200s.
+
+## IR472 Someone keeps the right to manage access — 2026-10-26
+
+Found in review: HQ keeps at least one active membership with `identity.write` (FR-A03 BR-A03, CONFLICT `errors.last_identity_admin`), so no HQ locks itself out of Access & roles. Two gaps:
+
+- **Two changes at once.** The caller of `members.save` always holds `identity.write`, so the check (another active holder besides the changed membership) only refused an admin's change to the own membership. When the last two holders took the permission from each other, or ended each other, at the same moment, each change still counted its caller, both passed, and no one could manage access any more.
+- **A later start.** The check ran when the permission was dropped or the membership ended now, but not when the last holder moved its own start later, which also leaves no active holder until then.
+
+1. **Lock and rule.** `members.save` takes a transaction advisory lock per tenant before the check, so the second of two such changes waits and then sees the first. The check now also runs when the start moves after now. Refused: CONFLICT `errors.last_identity_admin` as before; the admin app says “At least one active membership must keep identity.write — give it to another HQ membership first, then change this one” (English, Malay) instead of the humanized key.
+2. **Documents.** FR-A03 BR-A03 and AT-A03-E ⑥ ⑦: the refusal is CONFLICT, as the deterministic contracts and the API already had (the AT row said FORBIDDEN). The members.save catalog row and its API annotation name the rule.
+3. **Tests.** `TestLastIdentityAdminAtOnce` (hq-operator and hq-restriction-manager, the only holders for the test, take the permission from each other at once): five rounds each end with one 200 and one 409; without the lock the first round ended with two 200s. `TestLastIdentityAdminStartLater`: the last holder's later start is refused (it was saved, 200), another holder's is saved.

@@ -1,12 +1,15 @@
 package integration
 
 import (
+	"encoding/json"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/seed"
+	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
 // race sends the two writes at once and expects one to pass and the other to be refused with the given message.
@@ -94,5 +97,92 @@ func TestLastContractorAtOnce(t *testing.T) {
 				return write(s, &contrA, "partnerUsers.remove", `{"id":"`+b+`","reason":"left the company"}`, 1)
 			})
 		owner(t, `UPDATE identity.partner_users SET status = 'disabled' WHERE id = ANY($1::uuid[])`, []string{a, b}) // the next round starts with none active
+	}
+}
+
+// identityAdmins leaves hq-operator and hq-restriction-manager the tenant's only identity.write holders for the test.
+func identityAdmins(t *testing.T) {
+	t.Helper()
+	pair := []string{seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()}
+	var others []string
+	ownerScan(t, `WITH d AS (DELETE FROM identity.membership_permissions WHERE permission = 'identity.write' AND NOT (membership_id = ANY($1::uuid[])) RETURNING membership_id)
+		SELECT COALESCE(array_agg(membership_id::text), '{}') FROM d`, []any{pair}, &others)
+	t.Cleanup(func() {
+		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
+			SELECT tenant_id, id, 'identity.write' FROM identity.memberships WHERE id = ANY($1::uuid[]) ON CONFLICT DO NOTHING`, append(others, pair...))
+	})
+}
+
+// adminSave is the members.save body that keeps an HQ membership as listed, with edit applied, and its version.
+func adminSave(t *testing.T, s *apiserver.Server, id string, edit func(map[string]any)) (string, int) {
+	t.Helper()
+	_, m := post(s, &hq, "members.list", `{"filters":{"role":"admin"},"limit":100}`)
+	for _, it := range items(m) {
+		if it["id"] != id {
+			continue
+		}
+		body := map[string]any{"id": id, "userId": it["userId"], "organizationId": it["organizationId"], "role": "admin", "employment": nil, "permissions": it["permissions"],
+			"scopes": it["scopes"], "validFrom": it["validFrom"], "validUntil": it["validUntil"], "reason": "IR472 test"}
+		edit(body)
+		b, err := json.Marshal(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b), int(it["version"].(float64))
+	}
+	t.Fatalf("membership %s not listed", id)
+	return "", 0
+}
+
+// withoutIdentityWrite takes identity.write from the body's permissions.
+func withoutIdentityWrite(b map[string]any) {
+	var kept []any
+	for _, p := range b["permissions"].([]any) {
+		if p != "identity.write" {
+			kept = append(kept, p)
+		}
+	}
+	b["permissions"] = kept
+}
+
+// TestLastIdentityAdminAtOnce (IR472): the tenant's last two identity.write holders take the permission from each other
+// at the same moment. Each caller stays a holder in its own change, so without waiting for each other both passed and
+// left no one who can manage access. The tenant's other holders lose the permission for the test.
+func TestLastIdentityAdminAtOnce(t *testing.T) {
+	s := server(t)
+	identityAdmins(t)
+	op, rm := seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()
+	for round := 0; round < 5; round++ {
+		opBody, opVer := adminSave(t, s, op, withoutIdentityWrite)
+		rmBody, rmVer := adminSave(t, s, rm, withoutIdentityWrite)
+		race(t, round, "errors.last_identity_admin",
+			func() (int, map[string]any) { return write(s, &hq, "members.save", rmBody, rmVer) },
+			func() (int, map[string]any) { return write(s, &restrMgr, "members.save", opBody, opVer) })
+		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
+			SELECT tenant_id, id, 'identity.write' FROM identity.memberships WHERE id = ANY($1::uuid[]) ON CONFLICT DO NOTHING`, []string{op, rm})
+	}
+}
+
+// TestLastIdentityAdminStartLater (IR472): the last identity.write holder cannot move its own start later — it would stop
+// being valid now, like ending it; another holder can.
+func TestLastIdentityAdminStartLater(t *testing.T) {
+	s := server(t)
+	identityAdmins(t)
+	op, rm := seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()
+	var opFrom, rmFrom time.Time
+	ownerScan(t, `SELECT (SELECT valid_from FROM identity.memberships WHERE id = $1), (SELECT valid_from FROM identity.memberships WHERE id = $2)`, []any{op, rm}, &opFrom, &rmFrom)
+	t.Cleanup(func() {
+		owner(t, `UPDATE identity.memberships SET valid_from = CASE id WHEN $1 THEN $2::timestamptz ELSE $4::timestamptz END WHERE id IN ($1, $3)`, op, opFrom, rm, rmFrom)
+	})
+	owner(t, `DELETE FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'identity.write'`, rm)
+	later := func(b map[string]any) { b["validFrom"] = clock.Add(time.Hour).Format(time.RFC3339) }
+	body, v := adminSave(t, s, op, later)
+	if code, m := write(s, &hq, "members.save", body, v); code != 409 || m["messageKey"] != "errors.last_identity_admin" {
+		t.Fatalf("the last holder starts later: %d %v", code, m)
+	}
+	owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) SELECT tenant_id, id, 'identity.write' FROM identity.memberships WHERE id = $1`, rm)
+	body, v = adminSave(t, s, rm, later)
+	if code, m := write(s, &hq, "members.save", body, v); code != 200 {
+		t.Fatalf("another holder starts later: %d %v", code, m)
 	}
 }

@@ -94,7 +94,7 @@ Assignment.validFrom/Until matches the scheduledStart/End half-open work window 
 
 submitted→on_hold→resumeHold returns to in_progress and creates a new draft while preserving the submitted version. Rework also creates a new draft. Reassignment after return keeps original authors. Repository updates authorId/observedAt only on items changed by the new assignee (SR07); do not accept authors in inputs. Expired submission returns FORBIDDEN. Cancelling on_hold/rework requires HQ job.write and reason. Escalating outsourced review without a quality reviewer requires jobs.review reviewMode=hq_escalation and reason. Same-user self-approval is also forbidden for HQ.
 
-Users are fixed demo accounts only (FR-A03). User creation/deletion is outside phase 1A; adding/updating/expiring Memberships is in scope. Removing or demoting the last active identity.write holder returns CONFLICT. Promotion through one's own other Membership is also forbidden by userId. Distinguish this from another person's business approval responsibility.
+Users are fixed demo accounts only (FR-A03). User creation/deletion is outside phase 1A; adding/updating/expiring Memberships is in scope. Removing or demoting the last active identity.write holder — taking the permission away, ending it now or moving its start later — returns CONFLICT `errors.last_identity_admin`; the tenant's changes to holders wait for each other, so two at once cannot both pass (IR472). Promotion through one's own other Membership is also forbidden by userId. Distinguish this from another person's business approval responsibility.
 
 ## D07 Sensors, Subscriptions, and Numbers
 

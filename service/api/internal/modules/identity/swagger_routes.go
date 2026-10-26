@@ -53,7 +53,7 @@ func swaggerClientUsersSaveUpdate() {}
 //	@Summary		members.save (write) — update
 //	@ID				members.save.update
 //	@Description	Authorization: admin:identity.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR84 new client membership creates initial Consent granted=false; newUser creates the person with the membership instead of userId and sends a set-up e-mail (IR461; a person this tenant removed is taken back; for an existing user whose memberships here have all ended the sign-in account is pointed at the new one; IR462)
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR84 new client membership creates initial Consent granted=false; newUser creates the person with the membership instead of userId and sends a set-up e-mail (IR461; a person this tenant removed is taken back; for an existing user whose memberships here have all ended the sign-in account is pointed at the new one; IR462); the last active identity.write holder keeps the permission and stays valid — no end now and no later start (CONFLICT errors.last_identity_admin; IR472)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-A03
 //	@Tags			members

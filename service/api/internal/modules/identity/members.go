@@ -364,7 +364,7 @@ func (in *MemberInput) Validate() map[string]string {
 // @Summary		members.save (write)
 // @ID				members.save
 // @Description	Authorization: admin:identity.write
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR84 new client membership creates initial Consent granted=false; newUser creates the person with the membership instead of userId and sends a set-up e-mail (IR461; a person this tenant removed is taken back; for an existing user whose memberships here have all ended the sign-in account is pointed at the new one; IR462)
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR84 new client membership creates initial Consent granted=false; newUser creates the person with the membership instead of userId and sends a set-up e-mail (IR461; a person this tenant removed is taken back; for an existing user whose memberships here have all ended the sign-in account is pointed at the new one; IR462); the last active identity.write holder keeps the permission and stays valid — no end now and no later start (CONFLICT errors.last_identity_admin; IR472)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A03
 // @Tags			members
@@ -527,9 +527,14 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		if x.Version != *c.ExpectedVersion {
 			return Member{}, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
-		// last active identity.write holder
-		ending := in.ValidUntil != nil && !in.ValidUntil.After(c.Now)
+		// last active identity.write holder: a membership that loses the permission or stops being valid now (ended, or
+		// its start moved later). The tenant's changes to holders wait for each other here, so two at once — each taking
+		// the permission from, or ending, the other of the last two — cannot both see the other still active (IR472).
+		ending := (in.ValidUntil != nil && !in.ValidUntil.After(c.Now)) || in.ValidFrom.After(c.Now)
 		if !slices.Contains(in.Permissions, "identity.write") || ending {
+			if _, err := c.Tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('identity.identity_admins:' || $1::text))`, c.Principal.TenantID); err != nil {
+				return Member{}, err
+			}
 			var holds bool
 			var others int
 			if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'identity.write')`, x.ID).Scan(&holds); err != nil {

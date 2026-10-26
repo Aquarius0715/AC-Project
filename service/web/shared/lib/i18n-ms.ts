@@ -5756,6 +5756,7 @@ export const ms: Record<string, string> = {
   "You can’t change or remove your own account": "Anda tidak boleh mengubah atau mengalih keluar akaun anda sendiri",
   "The last active owner can’t be demoted, disabled or removed": "Pemilik aktif terakhir tidak boleh diturunkan, dilumpuhkan atau dialih keluar",
   "Your company keeps one active contractor — this one can’t be disabled or removed": "Syarikat anda mengekalkan seorang kontraktor aktif — yang ini tidak boleh dilumpuhkan atau dialih keluar",
+  "At least one active membership must keep identity.write — give it to another HQ membership first, then change this one": "Sekurang-kurangnya satu keahlian aktif mesti mengekalkan identity.write — berikannya kepada keahlian HQ lain dahulu, kemudian ubah yang ini",
   "This contract already has an invoice for part of this period — choose a period after it": "Kontrak ini sudah mempunyai invois bagi sebahagian tempoh ini — pilih tempoh selepasnya",
   "This account’s access period has ended — set a new access end first": "Tempoh akses akaun ini telah tamat — tetapkan tarikh tamat akses yang baharu dahulu",
   "This technician still has an assigned job — reassign it first": "Juruteknik ini masih mempunyai kerja yang ditugaskan — tugaskan semula dahulu",
