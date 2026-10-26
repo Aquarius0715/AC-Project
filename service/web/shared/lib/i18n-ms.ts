@@ -3096,6 +3096,7 @@ export const ms: Record<string, string> = {
   "Choose a setting": "Pilih tetapan",
   "{label} — setting": "{label} — tetapan",
   "{label} — value": "{label} — nilai",
+  "Setting": "Tetapan",
   "Lost": "Hilang",
   "from the device's dedicated power signal": "daripada isyarat kuasa khusus peranti",
   "tamper::Clear": "Tiada gangguan",

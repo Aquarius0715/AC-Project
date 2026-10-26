@@ -1,8 +1,10 @@
 // Customer automations (FR-C04, FR-C05, IR214, IR264): a new schedule previews its next runs — start and end in the
 // rule's time zone (the end once read as "0 MYT", R257) — is saved switched off (saving sends no command). Switched on,
 // the overview names its next run (automations.nextRuns, IR312); then it is deleted. A schedule left behind by a failed
-// run is deleted in afterEach.
+// run is deleted in afterEach. The editor shows each action's Setting and Value under their own labels and passes the
+// accessibility check (NFR-01).
 import { test, expect } from "../../fixtures/test";
+import { expectAccessible } from "../../fixtures/a11y";
 import type { Page } from "@playwright/test";
 
 let leftover: string | null = null;
@@ -42,6 +44,11 @@ test("a schedule previews its next runs, is saved off and deleted", async ({ pag
   await page.getByRole("combobox", { name: /^End action .* — setting$/ }).selectOption({ label: "Power" });
   await page.getByRole("button", { name: "OFF", exact: true }).click();
   await expect(page.getByRole("button", { name: "OFF", exact: true })).toHaveAttribute("aria-pressed", "true");
+  for (const box of [page.locator("section", { has: start }), page.locator("section", { hasText: "required" })]) {
+    await expect(box.getByText("Setting", { exact: true })).toBeVisible();
+    await expect(box.getByText("Value", { exact: true })).toBeVisible();
+  }
+  await expectAccessible(page);
   await page.getByRole("button", { name: "Save automation" }).click();
   leftover = name;
   await expect(page.getByText("Automation saved").first()).toBeVisible();

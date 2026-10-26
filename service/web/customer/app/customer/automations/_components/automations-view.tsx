@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Badge, Banner, Btn, Card, Choice, cx, EmptyState, Field, Input, Modal, Page, PageHead, Select, Toggle, Plain } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import { useOp } from "@ac/web/lib/useOp";
@@ -73,7 +73,8 @@ function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive
         <div className="flex flex-col gap-3">
           {live.cards.map((c) => (
             <Card key={c.id} className={cx(c.status.tone === "warn" && "border-crit")}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              {/* the switch and the buttons beside the text on a wide card, in a row under it on a narrow one */}
+              <div className="@container"><div className="flex flex-col gap-3 @md:flex-row @md:items-start @md:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2"><b className="text-[15px]">{c.name}</b><Badge tone="primary" icon={triggerInfo[c.trigger].icon}>{t(triggerInfo[c.trigger].label)}</Badge><Badge tone={c.status.tone} icon={c.status.tone === "ok" ? "live" : c.status.tone === "warn" ? "unsupported" : "dot"}>{c.status.text}</Badge></div>
                   <p className="mt-2 text-sm"><span className="mr-1.5 font-semibold text-muted-foreground">{t("When")}</span>{c.when}</p>
@@ -82,8 +83,8 @@ function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive
                     {c.steps.map((s) => (
                       <div key={s.key} className="contents">
                         <dt className="font-semibold text-muted-foreground">{s.label}</dt>
-                        <dd className="font-semibold tabular-nums">{s.time ?? ""}</dd>
-                        <dd className="min-w-0 break-words font-medium text-ink">{s.action}</dd>
+                        {s.time !== null && <dd className="font-semibold tabular-nums">{s.time}</dd>}
+                        <dd className={cx("min-w-0 break-words font-medium text-ink", s.time === null && "col-span-2")}>{s.action}</dd>
                       </div>
                     ))}
                   </dl>
@@ -91,7 +92,7 @@ function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive
                   {c.note && <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-crit"><Icon name="unsupported" />{c.note}</p>}
                   {c.skipped && <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Icon name="info" />{c.skipped}</p>}
                 </div>
-                <div className="relative flex flex-col items-end gap-2">
+                <div className="relative flex items-center justify-between gap-2 border-t border-line pt-3 @md:flex-col @md:items-end @md:justify-start @md:border-0 @md:pt-0">
                   <span className="flex items-center gap-2 text-xs font-semibold">
                     <span className={c.enabled ? "text-ok" : c.status.tone === "warn" ? "text-warn" : "text-muted-foreground"}>{t(c.enabled ? "On" : c.status.tone === "warn" ? "Disabled" : "Off")}</span>
                     <span title={c.toggle.hint ?? undefined}><Toggle on={c.enabled} disabled={pending || !c.toggle.allowed} onChange={() => toggle(c)} label={t(c.enabled ? "Switch {name} off" : "Switch {name} on", { name: c.name })} /></span>
@@ -106,7 +107,7 @@ function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive
                     </DropdownMenu>
                   </span>
                 </div>
-              </div>
+              </div></div>
             </Card>
           ))}
         </div>
@@ -176,27 +177,33 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
       setTest([eventTest(r.decision ?? undefined, rule.id, new Map(live.rules.map((x) => [x.id, x.name])), ac?.name ?? t("the AC"), actionOf(draft.action), r.at, i18n)]));
   };
   const eventTestHint = sched ? null : draft.trigger === "routine" ? t("A routine runs at its usual time — try it with Demo controls") : dirty ? t("Save first — the test runs your saved automations for this AC") : null;
-  // the action in two parts: the setting on the left (power, temperature, mode, fan, ventilation), its value on the right
-  const actionSelect = (label: string, key: "startAction" | "endAction" | "action", hint?: string, shown_ = label) => {
+  // the action in two parts, each under its own label: the Setting (power, temperature, mode, fan, ventilation) and its
+  // Value — side by side when the box is wide enough, stacked on a narrow screen
+  const actionSelect = (label: string, key: "startAction" | "endAction" | "action", hint?: string) => {
     const value = draft[key];
     const group = options.find((g) => g.id === actionGroupOf(value));
     const pick = (v: string) => set({ [key]: v } as Partial<Draft>);
+    const part = (title: string, control: ReactNode, name?: string) => (
+      <div role={name ? "group" : undefined} aria-label={name} className="flex min-w-0 flex-col gap-1">
+        <span aria-hidden className="font-semibold">{title}</span>
+        {control}
+      </div>
+    );
     return (
-      <Field label={shown_} hint={hint} error={errors[key] ?? (shown ? unsupported(value) : undefined)}>
-        {/* side by side when the box is wide enough, stacked on a narrow screen */}
-        <div className="@container"><div className="grid grid-cols-1 items-start gap-2 @[22rem]:grid-cols-[minmax(120px,170px)_minmax(0,1fr)]">
-          <Select aria-label={t("{label} — setting", { label })} value={group?.id ?? ""} onChange={(e) => pick(firstAction(options, e.target.value))}>
-            {!group && <option value="">{supported(value) ? t("Choose a setting") : t("{action} (not supported)", { action: actionLabel(actionOf(value), t) })}</option>}
-            {options.map((g) => <option key={g.id} value={g.id}>{g.group}</option>)}
-          </Select>
-          {group && (group.id === "temp" ? (
+      <Field label={t("Action")} labelHidden hint={hint} error={errors[key] ?? (shown ? unsupported(value) : undefined)}>
+        <div className="@container"><div className="grid grid-cols-1 items-start gap-3 @[22rem]:grid-cols-[minmax(120px,170px)_minmax(0,1fr)]">
+          {part(t("Setting"), (
+            <Select aria-label={t("{label} — setting", { label })} value={group?.id ?? ""} onChange={(e) => pick(firstAction(options, e.target.value))}>
+              {!group && <option value="">{supported(value) ? t("Choose a setting") : t("{action} (not supported)", { action: actionLabel(actionOf(value), t) })}</option>}
+              {options.map((g) => <option key={g.id} value={g.id}>{g.group}</option>)}
+            </Select>
+          ))}
+          {group && (group.id === "temp" ? part(t("Value"), (
             <Select aria-label={t("{label} — value", { label })} value={value} onChange={(e) => pick(e.target.value)}>
               {!supported(value) && <option value={value}>{t("{action} (not supported)", { action: actionLabel(actionOf(value), t) })}</option>}
               {group.options.map((o) => <option key={o.key} value={o.key}>{o.short}</option>)}
             </Select>
-          ) : (
-            <Choice options={group.options.map((o) => ({ id: o.key, label: o.short }))} value={value} onChange={pick} />
-          ))}
+          )) : part(t("Value"), <Choice options={group.options.map((o) => ({ id: o.key, label: o.short }))} value={value} onChange={pick} />, t("{label} — value", { label })))}
         </div></div>
       </Field>
     );
@@ -230,11 +237,12 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
                     })}
                   </div>
                 </Field>
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3">
+                {/* start and end side by side; the time zone on its own row until all three fit unclipped */}
+                <div className="@container"><div className="grid grid-cols-2 gap-3 @xl:grid-cols-3">
                   <Field label={t("Start")} hint={t("24-hour HH:mm")} error={errors.startLocal}><Input inputMode="numeric" maxLength={5} placeholder="HH:mm" value={draft.startLocal} onChange={(e) => set({ startLocal: e.target.value })} /></Field>
                   <Field label={t("End")} hint={t("24-hour HH:mm")} error={errors.endLocal}><Input inputMode="numeric" maxLength={5} placeholder="HH:mm" value={draft.endLocal} onChange={(e) => set({ endLocal: e.target.value })} /></Field>
-                  <Field label={t("Time zone")} hint={t("From your preferences")}><Input value={draft.timezone} readOnly className="bg-surface2" /></Field>
-                </div>
+                  <Field className="col-span-2 @xl:col-span-1" label={t("Time zone")} hint={t("From your preferences")}><Input value={draft.timezone} readOnly className="bg-surface2" /></Field>
+                </div></div>
                 <label className="flex items-center gap-2 text-xs text-muted-foreground"><Checkbox checked={draft.endsNextDay} onCheckedChange={(v) => set({ endsNextDay: v === true })} />{t("Ends next day (overnight) — off: end must be later than start; equal start/end is invalid")}</label>
                 {errors.endsNextDay && <p className="-mt-2 flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{errors.endsNextDay}</p>}
               </>
@@ -281,7 +289,7 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
                       <span className="text-lg font-bold tabular-nums">{time}</span>
                       {key === "endAction" && <span className="text-xs font-semibold text-muted-foreground">{t("required")}</span>}
                     </div>
-                    {actionSelect(label, key, hint, t("Action"))}
+                    {actionSelect(label, key, hint)}
                   </section>
                 ))}
               </div>
