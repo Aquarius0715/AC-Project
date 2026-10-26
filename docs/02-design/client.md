@@ -401,7 +401,7 @@ Scope: FR-C10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 **Card Type and Payment Instruction Selection (BIZ-22)**
 
-The screen's paymentChoice is demo_credit_card/demo_debit_card/demo_instructions. Pass only the two card choices as method to payments.simulate(event=initiate). For demo_instructions, pass event=instructions with only invoiceId/demoConfirmed; do not create Payment or change Invoice method/state. Credit and debit cards use the same state flow; keep the selected type in confirmation and results. Viewing instructions alone does not set paid. notifications.preview shows invoice ID, contact channel, and selected payment method. Provide no real card or bank information fields.
+The screen's paymentChoice is demo_credit_card/demo_debit_card/demo_instructions. Pass only the two card choices as method to payments.simulate(event=initiate). For demo_instructions, pass event=instructions with only invoiceId/demoConfirmed; do not create Payment or change Invoice method/state. Credit and debit cards use the same state flow; keep the selected type in confirmation and results. An invoice takes one card attempt at a time: while one is initiated or processing, or once one is confirmed, initiate is CONFLICT `errors.invoice_has_payment`; after a failed attempt a new one starts (IR474). Viewing instructions alone does not set paid. notifications.preview shows invoice ID, contact channel, and selected payment method. Provide no real card or bank information fields.
 
 Verification: AT-C11-SRC. Reproduce processing, success, and failure for each card type. Check that history records the selected type. Opening payment instructions alone leaves the invoice unpaid.
 

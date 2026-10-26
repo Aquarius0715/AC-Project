@@ -1462,6 +1462,7 @@ CREATE TABLE billing.payments (                  -- Stripe Checkout or manual (F
 );
 CREATE INDEX payments_invoice ON billing.payments (tenant_id, invoice_id, created_at DESC);
 CREATE UNIQUE INDEX payments_reference ON billing.payments (tenant_id, payment_reference) WHERE payment_reference IS NOT NULL;   -- unique within tenant (DD-A08)
+CREATE UNIQUE INDEX payments_one_open ON billing.payments (invoice_id) WHERE status IN ('initiated','processing','confirmed');   -- one attempt in flight, or the one payment: full amount only (IR474)
 
 CREATE TABLE billing.stripe_events (             -- webhook de-duplication and evidence
   id            text PRIMARY KEY,                -- Stripe event id (evt_...)

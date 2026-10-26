@@ -27,6 +27,8 @@ const keyText: Record<string, string> = {
   // losing the permission, ending or starting later: the tenant keeps someone who can manage access (IR472)
   "errors.last_identity_admin": "At least one active membership must keep identity.write — give it to another HQ membership first, then change this one",
   "errors.access_expired": "This account’s access period has ended — set a new access end first",
+  // one card attempt at a time, and a paid invoice is not paid again (IR447, IR474)
+  "errors.invoice_has_payment": "This invoice already has a payment in progress or recorded — finish or fail that one first",
   // an invoice of the contract already covers part of the period (IR469)
   "errors.invoice_period_exists": "This contract already has an invoice for part of this period — choose a period after it",
   "errors.technician_booked": "This technician still has an assigned job — reassign it first",

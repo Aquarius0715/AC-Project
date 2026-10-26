@@ -6972,3 +6972,13 @@ Found in review: the schedule job (IR54) evaluates every occurrence that fell in
 1. **Rule.** A unit takes only the last minute the tick passed for it; the occurrences of earlier minutes are passed over (no Command, no run). Within that minute the order stays — an end before a start, the current rule of IR326 item 2, whose open question (item 4) is unchanged.
 2. **Enabled rules only.** The job builds its occurrences from enabled rules only, so a disabled rule's later minute does not pass over an enabled rule's action. A disabled rule was already never run.
 3. **Tests.** `TestScheduleCatchUpRunsTheLastMinute`: a tick past a whole window creates the end's Command only and no run for the start (before: the start's Command and the end skipped); a tick past two windows creates one more end. `TestScheduleAutomationsFire` and `TestScheduleBoundaries` are unchanged.
+
+## IR474 An invoice takes one payment at a time — 2026-10-26
+
+Found in review: payments are for the full amount (`errors.full_amount_only`), so an invoice is paid by one Payment. `payments.simulate` `initiate` checked only that the invoice was unpaid, and the invoice stays unpaid until the attempt is processing, so a second card attempt could be started while the first one was initiated; both could then be taken to processing and confirmed, recording two payments of the invoice (the second confirmation also overwrote `paid_at`). `payments.recordManual` already refused an invoice with an attempt in flight or a confirmed payment (IR447).
+
+1. **Rule.** `initiate` is CONFLICT `errors.invoice_has_payment` while the invoice has an `initiated`, `processing` or `confirmed` Payment, as `recordManual` (IR447). A `failed` or `expired` attempt does not block a new one.
+2. **Database.** `billing.payments` has the unique index `payments_one_open (invoice_id) WHERE status IN ('initiated','processing','confirmed')`, so no write path can hold two. schema.sql = migration 000001; the dev database got the index by hand (no duplicates were there).
+3. **Web.** The refusal reads “This invoice already has a payment in progress or recorded — finish or fail that one first” (English, Malay) for the customer and HQ, instead of the humanized key.
+4. **Documents.** DD-C11 and the payments.simulate catalog row (and its API annotation) name the rule.
+5. **Tests.** `TestInvoiceOnePaymentAtATime`: a second attempt while one is initiated is refused (it was saved, 200), the database refuses a second open payment, and after the first attempt fails a new one starts. `TestManualAfterFailedPayment` is unchanged.

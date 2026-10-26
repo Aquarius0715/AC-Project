@@ -131,7 +131,7 @@ func (in *SimulateInput) Validate() map[string]string {
 // @Summary		payments.simulate (write)
 // @ID				payments.simulate
 // @Description	Authorization: client:self:demo-event-only
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR59 single path for customer processing/confirm/fail; IR60 demo-only
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR59 single path for customer processing/confirm/fail; IR60 demo-only; initiate: one attempt in flight or the one confirmed payment per invoice (CONFLICT errors.invoice_has_payment; IR474)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-C11
 // @Tags			payments
@@ -162,6 +162,15 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (
 		}
 		if inv.Status != "unpaid" {
 			return nil, apperr.E(apperr.Conflict, "error.invalidState")
+		}
+		if in.Event == "initiate" { // one attempt at a time, and a paid invoice is not paid again: full amount only (IR474)
+			var open bool
+			if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.payments WHERE invoice_id = $1 AND status IN ('initiated','processing','confirmed'))`, inv.ID).Scan(&open); err != nil {
+				return nil, err
+			}
+			if open {
+				return nil, apperr.E(apperr.Conflict, "errors.invoice_has_payment")
+			}
 		}
 		if in.Event == "instructions" {
 			return map[string]any{"id": uuid.Nil, "tenantId": c.Principal.TenantID, "version": 1, "createdAt": c.Now, "updatedAt": c.Now, "sourceAlertId": nil,

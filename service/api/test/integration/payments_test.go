@@ -1,13 +1,17 @@
 package integration
 
 import (
-	apiserver "github.com/pradita/ac-project/service/api/internal/server"
+	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/pradita/ac-project/service/api/internal/seed"
+	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
 // newInvoice creates a customer-b contract (rto, restriction eligible) and an unpaid invoice; returns contract and invoice IDs.
@@ -252,5 +256,46 @@ func TestManualAfterFailedPayment(t *testing.T) {
 	}
 	if _, m := post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`); data(m)["status"] != "paid" {
 		t.Errorf("invoice after the manual payment: %v", data(m)["status"])
+	}
+}
+
+// IR474: an invoice has at most one payment in flight or confirmed (payments are for the full amount): a second card
+// attempt while one is initiated is refused, and the database refuses a second open payment too. Before, the second
+// initiate passed (the invoice stays unpaid until processing), so two attempts could both be confirmed. After the first
+// attempt fails, a new one starts.
+func TestInvoiceOnePaymentAtATime(t *testing.T) {
+	s := server(t)
+	_, inv := newInvoice(t, s)
+	sim := func(body string, v int) (int, map[string]any) {
+		return write(s, &customerB, "payments.simulate", body, v)
+	}
+	invoiceVersion := func() int {
+		_, m := post(s, &customerB, "invoices.get", `{"id":"`+inv+`"}`)
+		return ver(m)
+	}
+	initiate := `{"event":"initiate","invoiceId":"` + inv + `","method":"demo_credit_card","demoConfirmed":true}`
+	code, m := sim(initiate, invoiceVersion())
+	if code != 200 {
+		t.Fatalf("initiate: %d %v", code, m)
+	}
+	pay := data(m)["id"].(string)
+	if code, m := sim(initiate, invoiceVersion()); code != 409 || m["messageKey"] != "errors.invoice_has_payment" {
+		t.Fatalf("a second attempt while one is initiated: %d %v", code, m)
+	}
+	conn, err := pgx.Connect(context.Background(), testDB("postgres"))
+	if err != nil {
+		t.Skip(err)
+	}
+	defer conn.Close(context.Background())
+	_, err = conn.Exec(context.Background(), `INSERT INTO billing.payments (tenant_id, invoice_id, amount_minor, currency, method, channel, status, created_at, updated_at)
+		SELECT tenant_id, id, amount_minor, currency, 'demo_credit_card', 'demo', 'processing', $2, $2 FROM billing.invoices WHERE id = $1`, inv, clock)
+	if pe := (*pgconn.PgError)(nil); !errors.As(err, &pe) || pe.Code != "23505" {
+		t.Fatalf("a second open payment in the database: %v", err)
+	}
+	if code, m := sim(`{"event":"fail","paymentId":"`+pay+`","eventId":"`+uuid.NewString()+`","paymentReference":"REF-`+pay[:8]+`"}`, 1); code != 200 || data(m)["status"] != "failed" {
+		t.Fatalf("fail: %d %v", code, m)
+	}
+	if code, m := sim(initiate, invoiceVersion()); code != 200 {
+		t.Fatalf("a new attempt after a failed one: %d %v", code, m)
 	}
 }

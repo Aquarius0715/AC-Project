@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.343.0 / Created: 2026-09-14 / Updated: 2026-10-26 / Status: Draft for review / Language: English
+Version: 0.344.0 / Created: 2026-09-14 / Updated: 2026-10-26 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.344.0 (2026-10-26): A second card attempt could be started while the first was still initiated, and both could be confirmed: two payments of one invoice. Initiate now refuses while an attempt is in flight or the invoice is paid, and a unique index keeps one open payment per invoice (IR474).
 0.343.0 (2026-10-26): A schedule tick that passed a whole window (a demo clock jump, a paused scheduler) sent the start and skipped the end as busy, leaving the AC on. Each unit now takes only the last minute the tick passed (IR473).
 0.342.0 (2026-10-26): The last two HQ administrators could take identity.write from each other at the same moment, and the last one could move its own start later, leaving no one who can manage access. Changes to holders now wait for each other and a later start counts as ending (IR472).
 0.341.0 (2026-10-26): Two changes at the same moment, each to the other of a customer's last two owners or a contractor company's last two contractors, both passed the keep-one check and left none. Each customer's and each company's changes now wait for each other (IR471).

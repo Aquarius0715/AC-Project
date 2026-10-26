@@ -19374,7 +19374,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self:demo-event-only\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR59 single path for customer processing/confirm/fail; IR60 demo-only\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C11",
+                "description": "Authorization: client:self:demo-event-only\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR59 single path for customer processing/confirm/fail; IR60 demo-only; initiate: one attempt in flight or the one confirmed payment per invoice (CONFLICT errors.invoice_has_payment; IR474)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C11",
                 "consumes": [
                     "application/json"
                 ],

@@ -5758,6 +5758,7 @@ export const ms: Record<string, string> = {
   "Your company keeps one active contractor — this one can’t be disabled or removed": "Syarikat anda mengekalkan seorang kontraktor aktif — yang ini tidak boleh dilumpuhkan atau dialih keluar",
   "At least one active membership must keep identity.write — give it to another HQ membership first, then change this one": "Sekurang-kurangnya satu keahlian aktif mesti mengekalkan identity.write — berikannya kepada keahlian HQ lain dahulu, kemudian ubah yang ini",
   "This contract already has an invoice for part of this period — choose a period after it": "Kontrak ini sudah mempunyai invois bagi sebahagian tempoh ini — pilih tempoh selepasnya",
+  "This invoice already has a payment in progress or recorded — finish or fail that one first": "Invois ini sudah mempunyai pembayaran yang sedang diproses atau telah direkodkan — selesaikan atau gagalkan pembayaran itu dahulu",
   "This account’s access period has ended — set a new access end first": "Tempoh akses akaun ini telah tamat — tetapkan tarikh tamat akses yang baharu dahulu",
   "This technician still has an assigned job — reassign it first": "Juruteknik ini masih mempunyai kerja yang ditugaskan — tugaskan semula dahulu",
   "This user hasn’t signed in yet — remove them, or wait until they have": "Pengguna ini belum log masuk — alih keluar mereka, atau tunggu sehingga mereka log masuk",
