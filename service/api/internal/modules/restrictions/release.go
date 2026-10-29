@@ -121,6 +121,11 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 	if err != nil {
 		return err
 	}
+	// the restriction is locked before its unit changes: two answers for units of one restriction (or an answer beside
+	// HQ's reconcile) wait for each other, and the second judges "every unit applied" on the first one's result (IR477)
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM restrictions.restrictions WHERE id = $1 FOR UPDATE`, restriction); err != nil {
+		return err
+	}
 	if kind == "remove_restriction" { // SR26: removes of terminal restrictions only resolve recovery cases
 		if terminal, err := recoveryAcknowledged(ctx, tx, restriction, unit, command, at); err != nil || terminal {
 			return err

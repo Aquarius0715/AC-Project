@@ -6996,3 +6996,10 @@ Found in review: a restriction may cite several cause invoices, and IR35 route �
 
 1. **Lock.** On a paid invoice, the restrictions citing it are locked first, in ID order (no deadlock between payments). The second payment waits for the first, then sees its invoice paid and ends the restriction.
 2. **Tests.** `TestRestrictionEndsWhenItsInvoicesArePaidAtOnce`: in five rounds, two manual payments of a scheduled restriction's two cause invoices are sent at once, and the restriction is cancelled each time. Without the lock, the second round left it scheduled.
+
+## IR477 A restriction becomes applied when two of its units answer at once — 2026-10-29
+
+Found in review: when a unit acknowledges its apply command, the restriction becomes `applied` once every unit is applied (only from `requested`). The handler updated the unit first and the restriction row afterwards, in a statement that read the other units. Two writers for units of one restriction at the same moment — HQ's `restrictions.reconcile` (which locks the restriction first) beside a device's answer, or two answers if the events are ever applied in parallel — let the second wait on the restriction row and then judge on what it had read before the first committed. The restriction stayed `requested` with every unit applied. A remove answer was not affected: its recovery check already locks the restriction first.
+
+1. **Lock.** The acknowledgement handler locks the restriction before it changes the unit, so the second writer waits and then sees the first one's result.
+2. **Tests.** `TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce`: two units' apply answers, the second started while the first is still open, make the restriction applied. Without the lock it stayed requested.

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/control"
+	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -780,5 +781,67 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 		if state != "cancelled" {
 			t.Fatalf("round %d: both cause invoices paid, the scheduled restriction is %s", round, state)
 		}
+	}
+}
+
+// IR477: the apply answers of two units of one restriction, written at once — HQ's reconcile beside a device's answer,
+// or two answers — make it applied. The restriction row was locked only after the unit's update, so the second writer
+// waited and then judged "every unit applied" on what it had read before the first committed: its own unit applied,
+// the other not yet, and the restriction stayed requested with both units applied. (A remove answer already locked the
+// restriction first, in its recovery check.)
+func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
+	s := server(t)
+	ctx := context.Background()
+	u1, u2 := boundUnit(t, s, "online"), boundUnit(t, s, "online")
+	k, inv := overdueContract(t, s, u1, u2)
+	_, m := write(s, &restrMgr, "restrictions.schedule", scheduleBody(k, inv, []string{u1, u2}, nil), 0)
+	id := data(m)["id"].(string)
+	due(t, id)
+	code, m := write(s, &restrMgr, "restrictions.execute", `{"restrictionId":"`+id+`","confirmedRulesVersion":"rules-1"}`, 1)
+	if code != 200 || data(m)["state"] != "requested" {
+		t.Fatalf("execute: %d %v", code, m)
+	}
+	applies := []uuid.UUID{}
+	for _, u := range []string{u1, u2} {
+		applies = append(applies, uuid.MustParse(unitState(m, u)["applyCommandIds"].([]any)[0].(string)))
+	}
+	conn := func() *pgx.Conn {
+		c, err := pgx.Connect(ctx, testDB("postgres"))
+		if err != nil {
+			t.Skip(err)
+		}
+		t.Cleanup(func() { c.Close(ctx) })
+		return c
+	}
+	c1, c2 := conn(), conn()
+	at := clock.Add(time.Second)
+	tx1, err := c1.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := restrictions.CommandAcknowledged(ctx, tx1, applies[0], at); err != nil {
+		t.Fatal(err)
+	}
+	second := make(chan error, 1)
+	go func() { // starts while the first answer is still open, and waits for it
+		tx2, err := c2.Begin(ctx)
+		if err == nil {
+			if err = restrictions.CommandAcknowledged(ctx, tx2, applies[1], at); err == nil {
+				err = tx2.Commit(ctx)
+			}
+		}
+		second <- err
+	}()
+	time.Sleep(300 * time.Millisecond)
+	if err := tx1.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-second; err != nil {
+		t.Fatal(err)
+	}
+	var state string
+	ownerScan(t, `SELECT state FROM restrictions.restrictions WHERE id = $1`, []any{id}, &state)
+	if state != "applied" {
+		t.Fatalf("both units applied, the restriction is %s", state)
 	}
 }
