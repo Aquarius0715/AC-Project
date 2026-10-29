@@ -682,14 +682,11 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 		return Result{}, err
 	}
 	// one tick has one result (D02): the same input with another eventId reuses it; other input is CONFLICT
-	err = c.Tx.QueryRow(ctx, `SELECT input_hash, result FROM control.evaluation_events WHERE date_trunc('minute', occurred_at) = date_trunc('minute', $1::timestamptz)
-		ORDER BY created_at LIMIT 1`, in.OccurredAt).Scan(&storedHash, &stored)
+	var storedPhase string
+	err = c.Tx.QueryRow(ctx, `SELECT input_hash, result, phase FROM control.evaluation_events WHERE date_trunc('minute', occurred_at) = date_trunc('minute', $1::timestamptz)
+		ORDER BY created_at LIMIT 1`, in.OccurredAt).Scan(&storedHash, &stored, &storedPhase)
 	if err == nil {
-		var prev struct {
-			Phase string
-		}
-		_ = c.Tx.QueryRow(ctx, `SELECT phase FROM control.evaluation_events WHERE date_trunc('minute', occurred_at) = date_trunc('minute', $1::timestamptz) ORDER BY created_at LIMIT 1`, in.OccurredAt).Scan(&prev.Phase)
-		if storedHash != hash || prev.Phase != in.Phase {
+		if storedHash != hash || storedPhase != in.Phase {
 			return Result{}, apperr.E(apperr.Conflict, "errors.tick_already_evaluated")
 		}
 		var r Result

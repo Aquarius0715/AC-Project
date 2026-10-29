@@ -35,7 +35,9 @@ func versionedUpdate(ctx context.Context, c *ops.Call, table string, id uuid.UUI
 		return dupSibling(err)
 	}
 	var exists bool
-	_ = c.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1)", id).Scan(&exists)
+	if err := c.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1)", id).Scan(&exists); err != nil {
+		return err
+	}
 	if exists {
 		return conflict("error.versionConflict")
 	}

@@ -7068,3 +7068,14 @@ The alert notifier's read of a customer's switched-off default rules also ignore
 
 1. **Code.** Every such loop checks `rows.Err()` after it and returns the error, so the original error reaches the transaction manager and the API's error mapping. The switched-off rules are read with `pgx.CollectRows`. Three integration-test loops fail on a read error as well.
 2. **Guard.** `TestRowLoopsCheckErr` parses the service code (`internal`, `cmd`) and fails on a `for x.Next()` loop without an `x.Err()` check after it in its function. The rule is in the backend Go design (§2).
+
+## IR485 Single-row reads return their errors — 2026-10-30
+
+Found in review (code, after IR484): four single-row reads dropped every error with `_ = …QueryRow(…).Scan(…)`, to treat "no row" as a default. A server error then ran the rest of the operation on that default and surfaced as the wrong answer:
+- `jobs.proposeSlot` on an assigned job read the technician's acknowledgement; a failed read answered CONFLICT `error.invalidState`.
+- Booking a contractor from an accepted proposal read the company's latest terms version; a failed read fell back to the default terms until the next statement failed on the aborted transaction.
+- `versionedUpdate` (assets) told a version conflict from a missing row; a failed read answered NOT_FOUND.
+- `automations.fire` read the earlier result of the minute and then, in a second query, its phase; a failed second read answered CONFLICT `errors.tick_already_evaluated`.
+
+1. **Code.** The first three return any error except `pgx.ErrNoRows` (EXISTS always has a row, so `versionedUpdate` returns every error). `automations.fire` reads the hash, result and phase of the minute's earlier result in one query.
+2. **Checked.** No `_ = …QueryRow(…)` or ignored `Scan` remains in the service code; the Go suites pass.

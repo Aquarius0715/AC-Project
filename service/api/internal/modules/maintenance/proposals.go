@@ -164,8 +164,10 @@ func (m Proposals) proposeSlotJob(ctx context.Context, c *ops.Call, in *ProposeI
 		}
 		allowed = n > 0
 	case "assigned":
-		var ack string
-		_ = c.Tx.QueryRow(ctx, `SELECT acknowledgement FROM maintenance.assignments WHERE job_id = $1 AND status = 'active'`, in.JobID).Scan(&ack)
+		var ack string // no active assignment: not allowed
+		if err := c.Tx.QueryRow(ctx, `SELECT acknowledgement FROM maintenance.assignments WHERE job_id = $1 AND status = 'active'`, in.JobID).Scan(&ack); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return Job{}, err
+		}
 		allowed = ack == "cant_make"
 	}
 	if !allowed {
@@ -446,8 +448,10 @@ func (m Proposals) applyAccepted(ctx context.Context, c *ops.Call, job uuid.UUID
 		if slot.StartAt.Before(expires) {
 			expires = slot.StartAt
 		}
-		terms := DefaultTermsVersion
-		_ = c.Tx.QueryRow(ctx, `SELECT terms_version FROM maintenance.offers WHERE contractor_org_id = $1 ORDER BY offered_at DESC LIMIT 1`, *h.ContractorOrgID).Scan(&terms)
+		terms := DefaultTermsVersion // the company's first offer
+		if err := c.Tx.QueryRow(ctx, `SELECT terms_version FROM maintenance.offers WHERE contractor_org_id = $1 ORDER BY offered_at DESC LIMIT 1`, *h.ContractorOrgID).Scan(&terms); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
 		if _, err := c.Tx.Exec(ctx, `INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at,
 			access_valid_from, access_valid_until) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, tstzrange($4, $5), $6, $7, $6, $8)`,
 			job, *h.ContractorOrgID, terms, slot.StartAt, slot.EndAt, c.Now, expires, slot.EndAt.Add(24*time.Hour)); err != nil {
