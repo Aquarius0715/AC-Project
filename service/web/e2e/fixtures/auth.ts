@@ -71,11 +71,19 @@ export async function signIn(page: Page, app: App, as = app.user): Promise<void>
   await page.locator("#password").fill(passwordOf(as));
   await page.locator("#kc-login").click();
   if (app.otp) {
-    // a code is accepted once per 30 s window: if the last run used this window's code, the next window's is taken
+    // a code is accepted once per 30 s window: if the last run used this window's code, the identity provider refuses it
+    // and the next window's is taken. The app may take a while to finish the sign-in (a container just started), so its
+    // page or the refusal is waited for, not a fixed time: 8 s once ran out on a slow first page, and the retry then
+    // waited for a code field that never came.
+    const refused = page.locator("#input-error-otp, #input-error-otp-code, #input-error-totp").or(page.getByText(/invalid authenticator code/i)).first();
     for (let attempt = 0; attempt < 2; attempt++) {
       await page.locator("#otp").fill(totp(otpSecretOf(as)));
       await page.locator("#kc-login").click();
-      if (await page.waitForURL(home(app), { timeout: 8_000 }).then(() => true, () => false)) return;
+      const outcome = await Promise.race([
+        page.waitForURL(home(app), { timeout: 60_000 }).then(() => "home", () => "slow"),
+        refused.waitFor({ timeout: 60_000 }).then(() => "refused", () => "slow"),
+      ]);
+      if (outcome !== "refused") break;
       await page.waitForTimeout(31_000 - (Date.now() % 30_000));
     }
   }
