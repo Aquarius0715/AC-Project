@@ -363,6 +363,9 @@ func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
 		due = append(due, x)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return n, err
+	}
 	for _, x := range due {
 		end, _ := ParseAction(x.EndAction)
 		policy, err := m.Restrictions.UnitPolicy(ctx, c, x.UnitID)

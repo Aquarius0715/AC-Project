@@ -133,18 +133,19 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 		if !out[i].isDefault {
 			continue
 		}
-		off := map[string]bool{}
 		rs, err := c.Tx.Query(ctx, `SELECT s.rule_key FROM monitoring.default_rule_settings s JOIN assets.customers cu ON cu.id = s.customer_id
 			WHERE s.policy_id = $1 AND cu.organization_id = $2 AND NOT s.enabled`, out[i].id, org)
 		if err != nil {
 			return nil, err
 		}
-		for rs.Next() {
-			var k string
-			_ = rs.Scan(&k)
+		switchedOff, err := pgx.CollectRows(rs, pgx.RowTo[string]) // a failed read must not turn a switched-off rule back on
+		if err != nil {
+			return nil, err
+		}
+		off := map[string]bool{}
+		for _, k := range switchedOff {
 			off[k] = true
 		}
-		rs.Close()
 		var conds []AlertCondition
 		var keys []string
 		for j, k := range out[i].ruleKeys {

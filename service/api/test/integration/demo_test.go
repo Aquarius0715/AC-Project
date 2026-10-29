@@ -69,8 +69,13 @@ func TestDemoOperations(t *testing.T) {
 		}
 		for r.Next() {
 			var x row
-			_ = r.Scan(&x.quality, &x.seq, &x.value, &x.reason, &x.rawUn)
+			if err := r.Scan(&x.quality, &x.seq, &x.value, &x.reason, &x.rawUn); err != nil {
+				t.Fatal(err)
+			}
 			rows = append(rows, x)
+		}
+		if err := r.Err(); err != nil {
+			t.Fatal(err)
 		}
 	}()
 	str := func(p *string) string {

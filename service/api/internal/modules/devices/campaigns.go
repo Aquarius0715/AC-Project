@@ -183,6 +183,9 @@ func campaignsList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.P
 		ids = append(ids, id)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return paging.Page[Campaign]{}, err
+	}
 	items := []Campaign{}
 	for _, id := range ids {
 		x, err := campaignDetail(ctx, c, id)
@@ -337,6 +340,9 @@ func (m *Module) campaignsSchedule(ctx context.Context, c *ops.Call, in *Schedul
 		found[id] = x
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return Campaign{}, err
+	}
 	from := []string{}
 	for _, id := range in.DeviceIDs {
 		x, ok := found[id]

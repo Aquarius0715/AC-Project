@@ -476,6 +476,9 @@ func TestScheduleBoundaries(t *testing.T) {
 		got = append(got, r)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
 	end, start := "schedule:schedule_end:2026-09-14T02:00:00Z", "schedule:schedule_start:2026-09-14T02:00:00Z"
 	if len(got) != 2 || got[0] != (run{first, end, "command_created", ""}) || got[1] != (run{second, start, "skipped", "busy"}) {
 		t.Fatalf("same-minute end and start: %v", got)

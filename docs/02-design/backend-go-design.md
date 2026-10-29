@@ -80,7 +80,7 @@ service/api/        (IR174; under service/api since IR179; the Next.js apps are 
 - the webhook receiver (compose's `planned` profile);
 - the `test/contract` and `test/acceptance` suites, whose checks the integration and E2E suites carry.
 
-SQL stays inline with pgx. sqlc remains an option if the SQL should be type-checked at build time.
+SQL stays inline with pgx. sqlc remains an option if the SQL should be type-checked at build time. pgx reports a query's server error only through `Rows.Err` once `Next` returns false, so rows are read with `pgx.CollectRows` / `pgx.ForEachRow`, or a manual `for rows.Next()` loop is followed by a `rows.Err()` check; `TestRowLoopsCheckErr` (`internal/platform/db`) fails on a loop without one (IR484).
 
 ## 3. Code generation from the specification
 

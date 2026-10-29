@@ -284,6 +284,9 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 			evs[i].ResponseNotes = append(evs[i].ResponseNotes, n)
 		}
 		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -138,6 +138,9 @@ func (m *Module) load(ctx context.Context, c *ops.Call, where string, args []any
 			out[i].Sensors = append(out[i].Sensors, s)
 		}
 		srows.Close()
+		if err := srows.Err(); err != nil {
+			return nil, 0, err
+		}
 	}
 	return out, total, nil
 }
@@ -279,6 +282,9 @@ func (m *Module) detail(ctx context.Context, c *ops.Call, where string, args []a
 		d.CalibrationRefs = append(d.CalibrationRefs, id)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return DeviceDetail{}, err
+	}
 	var op []byte
 	err = c.Tx.QueryRow(ctx, `SELECT to_jsonb(o) FROM (SELECT id, tenant_id AS "tenantId", version, created_at AS "createdAt", updated_at AS "updatedAt",
 		device_id AS "deviceId", unit_id AS "unitId", job_id AS "jobId", kind, status, target_version AS "targetVersion", failure_code AS "failureCode",

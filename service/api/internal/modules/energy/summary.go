@@ -321,6 +321,9 @@ func ForecastFor(ctx context.Context, c *ops.Call, units []uuid.UUID, from, to t
 		ids = append(ids, id)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return f, err
+	}
 	var chosen *Baseline
 	for _, id := range ids {
 		b, err := LoadBaseline(ctx, c, id, nil)

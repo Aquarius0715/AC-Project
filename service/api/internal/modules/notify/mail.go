@@ -190,6 +190,9 @@ func DeliverAll(ctx context.Context, m *db.TxManager, s Sender, apps Apps, now t
 		tenants = append(tenants, id)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
 	total := 0
 	for _, t := range tenants {
 		err := m.Run(ctx, false, &ops.Principal{TenantID: t}, func(tx pgx.Tx) error {

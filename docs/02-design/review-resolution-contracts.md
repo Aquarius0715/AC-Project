@@ -7057,3 +7057,14 @@ Found in review: DEC-75 (2026-10-12) superseded DEC-03, but the docs still cited
    - forms stay controlled inputs with pure validators until their DEC-75 phase;
    - writes are Server Actions with the row version and an Idempotency-Key, and the route renders again (`refresh()`).
 4. **DD-T03.** The telemetry row no longer asks for a subscription through the Repository with a refetch when the stream disconnects: API mode reads the period when the page loads, and an offline unit's values say "last known · observed …" with the page saying nothing on it is real-time (IR283).
+
+## IR484 Row loops check the read's error — 2026-10-30
+
+Found in review (code): pgx v5 returns from `Query` only the errors of sending it. A server error while the rows are read — a deadlock, a cancelled query, a cast that fails on a row — ends `rows.Next()` and is reported only by `rows.Err()`. Seventeen loops of the service code never checked it, and the code went on with a short or empty result:
+- **Inside a transaction (sixteen loops).** The next statement or the commit failed on the aborted transaction, so nothing half-read was written. The error that surfaced was the wrong one, though. A deadlock, which the transaction manager runs again up to three times and the API answers UNAVAILABLE with Retry-After, became "current transaction is aborted" and was not run again. A cancelled query answered UNAVAILABLE instead of TIMEOUT. The loops read, among others, a member's permissions, scopes and qualifications, the adjustments of a payout run, the assignments that conflict with a technician's unavailable days, the SLA targets of the scorecard and the devices of a firmware campaign.
+- **Outside a transaction (one loop).** A failed read of the tenants the notification worker delivers for skipped the rest of them for that run, silently.
+
+The alert notifier's read of a customer's switched-off default rules also ignored its scan errors.
+
+1. **Code.** Every such loop checks `rows.Err()` after it and returns the error, so the original error reaches the transaction manager and the API's error mapping. The switched-off rules are read with `pgx.CollectRows`. Three integration-test loops fail on a read error as well.
+2. **Guard.** `TestRowLoopsCheckErr` parses the service code (`internal`, `cmd`) and fails on a `for x.Next()` loop without an `x.Err()` check after it in its function. The rule is in the backend Go design (§2).

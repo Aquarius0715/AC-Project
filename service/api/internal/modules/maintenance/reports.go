@@ -465,6 +465,9 @@ func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Re
 		allowed[id] = true
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return Report{}, err
+	}
 	for _, id := range in.AttachmentIDs {
 		if !allowed[id] {
 			return Report{}, apperr.Fields(map[string]string{"attachmentIds": "error.otherReportAttachment"})

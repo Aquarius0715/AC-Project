@@ -346,6 +346,9 @@ func (m Workforce) capacity(ctx context.Context, c *ops.Call, in *CapacityInput)
 			cp.AssignedSlots = append(cp.AssignedSlots, s)
 		}
 		rows.Close()
+		if err := rows.Err(); err != nil {
+			return paging.Page[Capacity]{}, err
+		}
 		if len(cp.AvailableSlots) > 0 {
 			cp.AssignedMinutes = unionMinutes(cp.AssignedSlots)
 		}
@@ -503,6 +506,9 @@ func (m Workforce) setUnavailability(ctx context.Context, c *ops.Call, in *Unava
 		conflicts = append(conflicts, id)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return Unavailability{}, err
+	}
 	u := Unavailability{TenantID: c.Principal.TenantID, Version: 1, CreatedAt: c.Now, UpdatedAt: c.Now, OrganizationID: org, MembershipID: in.MembershipID,
 		From: in.From, To: in.To, Type: in.Type, Note: in.Note, ConflictingAssignmentIDs: conflicts}
 	if err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.unavailability (tenant_id, organization_id, membership_id, days, type, note, conflicting_assignment_ids, created_at)

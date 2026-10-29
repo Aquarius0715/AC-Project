@@ -963,6 +963,9 @@ func (m Partners) scorecard(ctx context.Context, c *ops.Call, in *ScorecardInput
 		targets = append(targets, t)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return Scorecard{}, err
+	}
 	orgs := []uuid.UUID{}
 	for _, j := range jobs {
 		orgs = append(orgs, j.customerOrg)

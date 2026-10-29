@@ -184,6 +184,9 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 			r.id = id.String()
 			out = append(out, r)
 		}
+		if err := rs.Err(); err != nil {
+			t.Fatal(err)
+		}
 		return out
 	}
 	fire("1200", "valid", false)

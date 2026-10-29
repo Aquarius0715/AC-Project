@@ -117,6 +117,9 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 				x.Permissions = append(x.Permissions, p)
 			}
 			rows.Close()
+			if err := rows.Err(); err != nil {
+				return err
+			}
 			rows, err = c.Tx.Query(ctx, `SELECT kind, ref_id FROM identity.membership_scopes WHERE membership_id = $1 ORDER BY kind, ref_id`, x.ID)
 			if err != nil {
 				return err
@@ -130,6 +133,9 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 				x.Scopes = append(x.Scopes, s)
 			}
 			rows.Close()
+			if err := rows.Err(); err != nil {
+				return err
+			}
 		}
 		rows, err := c.Tx.Query(ctx, `SELECT code, valid_from, valid_until, revoked_at FROM identity.qualification_grants WHERE membership_id = $1 ORDER BY code`, x.ID)
 		if err != nil {
@@ -144,6 +150,9 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 			x.Qualifications = append(x.Qualifications, g)
 		}
 		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

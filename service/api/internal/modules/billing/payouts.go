@@ -260,6 +260,9 @@ func (m Payouts) generate(ctx context.Context, c *ops.Call, in *GenerateInput) (
 		adjs = append(adjs, a)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	for _, a := range adjs {
 		note := "adjustment from question " + a.query.String()
 		get(a.org).lines = append(get(a.org).lines, PayoutLine{ID: uuid.New(), JobID: a.job, WorkType: "repair_base", AmountMinor: a.amount, Kind: "adjustment", Note: &note})
