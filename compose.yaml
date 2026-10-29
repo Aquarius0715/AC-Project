@@ -463,7 +463,7 @@ services:
     profiles: [infra, backend, full]
 
   stripe-cli:
-    image: stripe/stripe-cli:v1.54.1@sha256:df1c6500b472a8a5d0f7bf7659784324433265cdc8e97a7b7f18cc89b226c0ed   # pinned (IR373)
+    image: stripe/stripe-cli:v1.55.1@sha256:abb51eab2607fc16375ce79da40edfc3ae92f2a7ac100e44889ba1b291b41c83   # pinned (IR373)
     command: ["listen", "--forward-to", "webhook:8080/stripe", "--api-key", "${STRIPE_TEST_SECRET_KEY:-}"]
     networks: [edge]
     profiles: [stripe]
