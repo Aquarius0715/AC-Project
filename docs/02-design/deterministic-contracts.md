@@ -220,4 +220,4 @@ In the same memory transition, append {occurrenceAt,jobId} to generatedOccurrenc
 
 SR17–19 were approved by the user on 2026-09-16. Periods use calendar days/completed minutes; offsets retry only the failed stage on the same record; contract edits during active restrictions are rejected. Follow strict-review-contracts.md for details and precedence.
 
-Additional contracts for current version 0.32.0: Read IR01–IR388 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts: every IR in the [Re-review Correction Contracts](review-resolution-contracts.md) applies, the newest included. They take priority over older text on the same topic; follow IR72 for conflict precedence.

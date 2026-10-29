@@ -6982,3 +6982,10 @@ Found in review: payments are for the full amount (`errors.full_amount_only`), s
 3. **Web.** The refusal reads “This invoice already has a payment in progress or recorded — finish or fail that one first” (English, Malay) for the customer and HQ, instead of the humanized key.
 4. **Documents.** DD-C11 and the payments.simulate catalog row (and its API annotation) name the rule.
 5. **Tests.** `TestInvoiceOnePaymentAtATime`: a second attempt while one is initiated is refused (it was saved, 200), the database refuses a second open payment, and after the first attempt fails a new one starts. `TestManualAfterFailedPayment` is unchanged.
+
+## IR475 The design documents' IR line names no range — 2026-10-29
+
+Found in review: IR333 made every design document end with "Additional contracts for current version <its version>: Read IR01–IR333". The lines then fell behind again. On 2026-10-29 the fourteen documents named ranges from IR01–IR333 to IR01–IR403, while the contracts ran to IR474 (client.md, for example, already referred to IR461–IR474 in its body).
+
+1. **Wording.** The line now reads "Additional contracts: every IR in the Re-review Correction Contracts applies, the newest included", followed by the same IR72 precedence sentence. It names neither the document's version (that stays in its front matter) nor an IR range, so a new IR cannot leave it behind. This covers the thirteen design documents and the UI/UX specification.
+2. **Checked.** validate_documents.py still flags the stale forms it knew (an old version number or an early IR range in the line); the new line has neither, so the check passes.

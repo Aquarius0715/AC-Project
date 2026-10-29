@@ -318,4 +318,4 @@ Items of the table above that are not scheduled yet:
 | OPEN-BE-08 | The scheduled items that are not built yet (§10 as built): the monthly energy report e-mail waits for a decision. Several instances per domain are decided: the advisory lock per domain and tenant (IR356) | Scheduler, worker |
 | OPEN-BE-09 | Closed by IR439: when HQ ends or shortens a booked technician's access so that it ends before an assigned visit, the maintenance scheduler releases the assignment of the job that has not started; the job returns to be assigned (accepted for a contractor, requested for HQ's own delivery) and the assigners get a job_update notice. HQ can still end access at once | Access & roles (FR-A03), assignments |
 
-Additional contracts for current version 0.49.0: Read IR01–IR386 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts: every IR in the [Re-review Correction Contracts](review-resolution-contracts.md) applies, the newest included. They take priority over older text on the same topic; follow IR72 for conflict precedence.

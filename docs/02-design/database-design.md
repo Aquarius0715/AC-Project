@@ -196,4 +196,4 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 - `identity.users.sign_in_membership_id` is the membership the provider account's claims name (IR462). A person whose sign-in membership is this tenant's and has no open membership here can be added again; another tenant's sign-in membership is invisible under RLS, so its person stays taken.
 - Personal data anonymisation (backend architecture §7) updates `identity.users` (status `anonymised`, e-mail replaced) and `identity.client_users`; audit rows keep IDs but never contact data (masked at write time).
 
-Additional contracts for current version 0.40.0: Read IR01–IR384 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts: every IR in the [Re-review Correction Contracts](review-resolution-contracts.md) applies, the newest included. They take priority over older text on the same topic; follow IR72 for conflict precedence.
