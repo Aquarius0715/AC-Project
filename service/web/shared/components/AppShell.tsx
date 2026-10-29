@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { ROLES, ROLE_KEY, Role, roleFromPath, type ShellLive } from "@ac/web/lib/nav";
+import { ROLES, ROLE_KEY, Role, roleFromPath, type ShellLive, SHARED_PAGES, documentTitle, pageLabel } from "@ac/web/lib/nav";
 import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui";
 import { Icon, type IconName } from "./Icon";
 import { useJobStore } from "@ac/web/lib/jobs";
@@ -28,10 +28,7 @@ export function useStoredRole(): Role {
 }
 
 const signOut = "flex w-full items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-crit hover:bg-crit-soft/50";
-const SHARED = [
-  { href: "/notifications", label: "Notifications", icon: "notifications" },
-  { href: "/settings/preferences", label: "Preferences", icon: "preferences" },
-] satisfies { href: string; label: string; icon: IconName }[];
+const SHARED = SHARED_PAGES.map((s) => ({ ...s, icon: (s.href === "/notifications" ? "notifications" : "preferences") as IconName }));
 
 function NavLink({ href, label, icon, badge, active }: { href: string; label: string; icon: IconName; badge?: string; active: boolean }) {
   return (
@@ -94,15 +91,11 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
   const unread = useJobStore().notes.filter((n) => n.role === role && !n.read).length;
 
   const items = (live ? cfg.nav.map((i) => ({ ...i, badge: count(i.href) })) : cfg.nav).map((i) => ({ ...i, label: t(i.label) }));
-  // longest-prefix match so /customer/units/x highlights "Units & locations"
-  const score = (href: string, match?: string[]) => {
-    const hits = [href, ...(match ?? [])].filter((h) => (h === cfg.base ? pathname === h : pathname === h || pathname.startsWith(h + "/")));
-    return hits.length ? Math.max(...hits.map((h) => h.length)) : 0;
-  };
-  const best = Math.max(0, ...items.map((i) => score(i.href, i.match)));
-  const activeHref = best ? items.find((i) => score(i.href, i.match) === best)?.href : undefined;
-  const sharedActive = SHARED.find((s) => pathname === s.href);
-  const title = sharedActive ? t(sharedActive.label) : pathname === "/customer/users" || pathname === "/partner/users" ? t("Users") : pathname === "/demo" ? t("Demo controls") : items.find((i) => i.href === activeHref)?.label ?? "AC Project";
+  // the page's name: the menu item with the longest matching path (/customer/units/x is "Units & locations")
+  const label = pageLabel(role, pathname);
+  const title = label ? t(label) : "AC Project";
+  // the tab's title names the page in the display language after a client-side navigation too (WCAG 2.4.2, IR490)
+  useEffect(() => { document.title = documentTitle(role, pathname, display.locale); }, [role, pathname, display.locale]);
   const demo = pathname === "/demo";
 
 

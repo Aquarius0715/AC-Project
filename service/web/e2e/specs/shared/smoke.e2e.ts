@@ -4,21 +4,21 @@
 // serious issues, IR359). Follows the app's own links only, navigations only. axe runs through page.evaluate, which the
 // page CSP does not govern, so the policy itself stays as strict as in production. The crawl runs again at phone width
 // in Malay, the longest words (IR487): no axe violation there either, and no page scrolls sideways. Every page declares
-// the display language as its language (IR489).
+// the display language as its language (IR489) and is titled with its name (IR490).
 import type { Page } from "@playwright/test";
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { axeViolations } from "../../fixtures/a11y";
 import type { App } from "../../fixtures/apps";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
-type Crawl = { seen: number; failed: string[]; inaccessible: string[]; wide: string[]; otherLang: string[] };
+type Crawl = { seen: number; failed: string[]; inaccessible: string[]; wide: string[]; otherLang: string[]; untitled: string[] };
 
 /** Visits up to 40 pages the app links to, from its home, and records what fails on each; `lang` is the page language
  * every page must declare (WCAG 3.1.1, IR489). */
 async function crawl(page: Page, app: App, lang = "en"): Promise<Crawl> {
   const seen = new Set<string>();
   const queue = [app.home];
-  const out: Crawl = { seen: 0, failed: [], inaccessible: [], wide: [], otherLang: [] };
+  const out: Crawl = { seen: 0, failed: [], inaccessible: [], wide: [], otherLang: [], untitled: [] };
   while (queue.length && seen.size < 40) {
     const path = queue.shift()!;
     if (seen.has(path)) continue;
@@ -31,6 +31,8 @@ async function crawl(page: Page, app: App, lang = "en"): Promise<Crawl> {
     if (sideways > 1) out.wide.push(`${path}: ${sideways}px`);
     const declared = await page.locator("html").getAttribute("lang");
     if (declared !== lang) out.otherLang.push(`${path}: ${declared}`);
+    const title = await page.title(); // the page's name, then the product (WCAG 2.4.2, IR490)
+    if (!/^.+ — AC Project$/.test(title)) out.untitled.push(`${path}: ${title}`);
     const links = await page.locator("a[href^='/']").evaluateAll((as) => as.map((a) => a.getAttribute("href") ?? ""));
     for (const href of links) {
       const p = href.split("#")[0];
@@ -54,7 +56,14 @@ test("every linked page of the app renders", async ({ page, app }) => {
   expect(refused, "CSP violations").toEqual([]);
   expect(r.inaccessible, "critical or serious accessibility violations").toEqual([]);
   expect(r.otherLang, "pages that do not declare English").toEqual([]);
+  expect(r.untitled, "pages whose title does not name them").toEqual([]);
   expect(r.seen).toBeGreaterThan(3);
+  // a client-side navigation names the new page too
+  await page.goto(app.home);
+  const link = page.locator(`aside nav a[href^="${app.home}/"]`).first(); // a menu page below the home, without a query
+  const name = (await link.locator("span.flex-1").innerText()).trim(); // the label without its badge
+  await link.click();
+  await expect(page).toHaveTitle(`${name} — AC Project`);
 });
 
 let zoneBefore: string | null = null;
@@ -72,6 +81,7 @@ test("every linked page at phone width in Malay is accessible and fits the scree
   const r = await crawl(page, app, "ms");
   expect(r.failed, "pages that did not render").toEqual([]);
   expect(r.otherLang, "pages that do not declare Malay").toEqual([]);
+  expect(r.untitled, "pages whose title does not name them").toEqual([]);
   expect(r.inaccessible, "critical or serious accessibility violations at phone width").toEqual([]);
   expect(r.wide, "pages that scroll sideways at phone width").toEqual([]);
   expect(r.seen).toBeGreaterThan(3);

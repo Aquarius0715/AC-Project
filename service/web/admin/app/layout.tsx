@@ -3,9 +3,14 @@ import { headers } from "next/headers";
 import { connection } from "next/server";
 import { UIProviders } from "@ac/web/components/Providers";
 import { coreDisplay } from "@ac/web/lib/dal";
+import { documentTitle } from "@ac/web/lib/nav";
 import "@ac/web/globals.css";
 
-export const metadata: Metadata = { title: "AC Project — Admin", description: "AC Project Admin app" };
+/** The document title names the page in the user's display language (WCAG 2.4.2, IR490); the proxy passes the path. */
+export async function generateMetadata(): Promise<Metadata> {
+  const [{ locale }, h] = await Promise.all([coreDisplay(), headers()]);
+  return { title: documentTitle("admin", h.get("x-pathname") ?? "", locale), description: "AC Project Admin app" };
+}
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

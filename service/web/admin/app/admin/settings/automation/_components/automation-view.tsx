@@ -34,7 +34,7 @@ export function AutomationView({ live }: { live: Live }) {
   const [tried, setTried] = useState(false);
   const [facts, setFacts] = useState<FactRow[]>((sel?.unitIds ?? []).map((u) => ({ unitId: u, value: "", quality: "valid" })));
   const [results, setResults] = useState<{ fired: boolean; rows: Result[] } | null>(null);
-  const [eventId, setEventId] = useState("");
+  const [event, setEvent] = useState<{ id: string; at: string } | null>(null); // the last Fire: its one-time key and tick
   const [showOff, setShowOff] = useState(true);
   if (source !== key) { // restart from each saved policy version (adjust state during render)
     setSource(key);
@@ -52,9 +52,9 @@ export function AutomationView({ live }: { live: Live }) {
   const scopeUnits = live.units.filter((u) => (!live.scope.customerId || u.customerId === live.scope.customerId) && (!live.scope.propertyId || u.propertyId === live.scope.propertyId));
   const kinds: { id: AutoCondition["type"]; label: string }[] = [{ id: "occupancy", label: t("Occupancy") }, { id: "tariff", label: t("Tariff") }, { id: "peak", label: t("Peak") }, { id: "solar", label: t("Solar") }, { id: "battery", label: t("Battery") }];
   // a changed fact makes a new evaluation: the next fire gets a new one-time event ID
-  const editFact = (i: number, patch: Partial<FactRow>) => { setEventId(""); setFacts((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x))); };
-  const addFact = () => { setEventId(""); setFacts((s) => [...s, { unitId: sel?.unitIds[0] ?? "", kind: d.type, value: "", quality: "valid" }]); };
-  const removeFact = (i: number) => { setEventId(""); setFacts((s) => s.filter((_, j) => j !== i)); };
+  const editFact = (i: number, patch: Partial<FactRow>) => { setEvent(null); setFacts((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x))); };
+  const addFact = () => { setEvent(null); setFacts((s) => [...s, { unitId: sel?.unitIds[0] ?? "", kind: d.type, value: "", quality: "valid" }]); };
+  const removeFact = (i: number) => { setEvent(null); setFacts((s) => s.filter((_, j) => j !== i)); };
   const clean = JSON.stringify(d) === JSON.stringify(autoDraft(sel ?? undefined));
   const save = () => {
     setTried(true);
@@ -63,10 +63,13 @@ export function AutomationView({ live }: { live: Live }) {
   };
   const evaluate = (fire: boolean) => {
     if (facts.length === 0) return;
-    const id = fire ? eventId || crypto.randomUUID() : crypto.randomUUID();
-    if (fire) setEventId(id);
-    const input = evaluationInput(d.type, facts, new Date(live.now), id);
-    run(() => (fire ? fireAuto(input) : simulateAuto(input)), fire ? t("Fired (demo) — commands go through the shared command rules") : t("Simulated — no commands created"), (rows) => setResults({ fired: fire, rows }));
+    // the Server Action stamps the Core API's current tick (IR491); a repeated Fire sends its event's own tick
+    const input = evaluationInput(d.type, facts, new Date(live.now), fire ? (event?.id ?? crypto.randomUUID()) : crypto.randomUUID());
+    if (!fire) return run(() => simulateAuto(input), t("Simulated — no commands created"), (rows) => setResults({ fired: false, rows }));
+    run(() => fireAuto(input, event?.id === input.eventId ? event.at : undefined), t("Fired (demo) — commands go through the shared command rules"), (v) => {
+      setEvent({ id: input.eventId, at: v.at });
+      setResults({ fired: true, rows: v.results });
+    });
   };
   const err = (k: string) => (tried ? errors[k] : undefined);
   const preview = autoInput(d);

@@ -18,6 +18,7 @@ export async function authProxy(req: NextRequest, appRole: Session["role"]) {
   const csp = contentSecurityPolicy(nonce, { dev: process.env.NODE_ENV === "development", https, formActions: idp ? [idp] : [] });
   const headers = new Headers(req.headers);
   headers.set("x-nonce", nonce);
+  headers.set("x-pathname", req.nextUrl.pathname); // the root layout names the page in the document title (IR490)
   headers.set("Content-Security-Policy", csp);
   const secure = (res: NextResponse) => {
     res.headers.set("Content-Security-Policy", csp);

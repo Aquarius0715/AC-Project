@@ -7115,3 +7115,22 @@ Found in review (accessibility, WCAG 3.1.1 Language of Page, level A): the four 
 
 1. **Web.** Each root layout sets `lang` from the user's display language (`coreDisplay`, read once per request with the page): `ms` in Malay, `en` otherwise and before sign-in. The display provider keeps it in step in the browser, for the Phase 1A demo whose language lives in the tab. The unused layout is removed.
 2. **Guard.** The smoke crawls check every page's language: `en` in the English crawl and `ms` in the Malay one (IR487).
+
+## IR490 Every page is titled with its name — 2026-10-30
+
+Found in review (accessibility, WCAG 2.4.2 Page Titled, level A): the 79 pages of the four apps shared one title per app ("AC Project — Customer"), in English whatever the display language, so a browser tab, the history and a screen reader could not tell the pages apart.
+
+1. **Web.**
+   - `lib/nav.ts` names the page at a path: the shell's menu item whose path is the longest prefix of it (a unit page is "Units & locations"), the shared pages, Users and Demo controls (`pageLabel`). The title is "<page> — AC Project" in the display language, or the app's name off the menu, as on sign-in (`documentTitle`).
+   - The root layouts title the first load on the server from the path the proxy passes (`x-pathname`). The shell titles each client-side navigation and names its header from the same function.
+   - The pages a job leads to belong to the jobs item: the partner's unit view to Jobs, the technician's unit pages to Assigned jobs. Before, they matched no item: the header said "AC Project" and nothing in the menu was marked.
+2. **Tests.**
+   - `nav.test.ts` checks the names, both languages and a Malay name for every menu item.
+   - The smoke crawls check that every page's title names it, and that a click on a menu item retitles the page (IR487).
+
+## IR491 HQ's simulation and Fire take the current tick — 2026-10-30
+
+Found in review (an E2E failure of 1da01bb, `admin/automation.e2e.ts`, also seen on b002a44): HQ's automation policies built the evaluation's `occurredAt` and the facts' `observedAt` from the time the page loaded (`live.now`). The Core API takes an evaluation only for the current tick of its clock (IR21, VALIDATION `occurredAt: errors.not_current_tick`). Once the page's minute had passed, every Run simulation and Fire (demo) was refused, and pressing again sent the same minute, until the page was loaded again. The test ran into it when a minute boundary fell between the page load and the click. The customer's test event and HQ's alert-policy test already took the Core API's clock in their Server Action.
+
+1. **Web.** The Server Actions stamp the Core API's current minute (`coreNow`). A Fire keeps its event's tick with its one-time key, so pressing Fire again with the same event sends the same tick and the Core API returns the stored result (IR152). A changed fact still makes a new event.
+2. **Checked.** A run started after the page's minute was over returns its result (a temporary E2E spec that waits for the next minute). The automation spec presses Run simulation again when an answer does not arrive, and each press now takes the current tick.

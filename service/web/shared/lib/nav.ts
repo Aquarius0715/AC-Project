@@ -1,5 +1,5 @@
 import type { IconName } from "@ac/web/components/Icon";
-import type { Display } from "@ac/web/lib/i18n";
+import { translate, type Display, type Locale } from "@ac/web/lib/i18n";
 
 export type Role = "client" | "admin" | "contractor" | "technician";
 
@@ -59,7 +59,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     loginSub: "Sign in to manage jobs and your technicians",
     nav: [
       { href: "/partner", label: "Overview", icon: "overview" },
-      { href: "/partner/jobs", label: "Jobs", icon: "jobs", badge: "1" },
+      { href: "/partner/jobs", label: "Jobs", icon: "jobs", badge: "1", match: ["/partner/units"] }, // a job's unit (IR490)
       { href: "/partner/schedule", label: "Schedule & assignments", icon: "schedule" },
       { href: "/partner/team", label: "Team & capacity", icon: "team" },
       { href: "/partner/history", label: "Job history", icon: "history" },
@@ -79,7 +79,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     loginSub: "Sign in to view assigned jobs and devices",
     nav: [
       { href: "/technician", label: "Overview", icon: "overview" },
-      { href: "/technician?tab=all", label: "Assigned jobs", icon: "jobs", match: ["/technician/jobs"] },
+      { href: "/technician?tab=all", label: "Assigned jobs", icon: "jobs", match: ["/technician/jobs", "/technician/units"] }, // a job and its unit (IR490)
       { href: "/technician/devices", label: "Devices", icon: "devices" },
     ],
   },
@@ -116,3 +116,33 @@ export const ROLES: Record<Role, RoleConfig> = {
 export const ROLE_KEY = "ac-role";
 export const roleFromPath = (p: string): Role | null =>
   p.startsWith("/customer") ? "client" : p.startsWith("/partner") ? "contractor" : p.startsWith("/technician") ? "technician" : p.startsWith("/admin") ? "admin" : null;
+
+/** The shared pages every role's shell lists below its menu (FR-X01, FR-X07). */
+export const SHARED_PAGES = [
+  { href: "/notifications", label: "Notifications" },
+  { href: "/settings/preferences", label: "Preferences" },
+] as const;
+
+/** The English name of the page at `pathname` in a role's app, for the shell header and the document title (WCAG 2.4.2,
+ * IR490): a shared page, Users, Demo controls, or the menu item whose href (or match) is the longest prefix of the path;
+ * null off the menu (sign-in). */
+export function pageLabel(role: Role, pathname: string): string | null {
+  const shared = SHARED_PAGES.find((s) => pathname === s.href);
+  if (shared) return shared.label;
+  if (pathname === "/customer/users" || pathname === "/partner/users") return "Users";
+  if (pathname === "/demo") return "Demo controls";
+  const { base, nav } = ROLES[role];
+  const score = (href: string, match?: string[]) => {
+    const hits = [href, ...(match ?? [])].filter((h) => (h === base ? pathname === h : pathname === h || pathname.startsWith(h + "/")));
+    return hits.length ? Math.max(...hits.map((h) => h.length)) : 0;
+  };
+  const best = Math.max(0, ...nav.map((i) => score(i.href, i.match)));
+  return best ? (nav.find((i) => score(i.href, i.match) === best)?.label ?? null) : null;
+}
+
+/** The document title in the display language: "<page> — AC Project", or the app's name off the menu. */
+export function documentTitle(role: Role, pathname: string, locale: Locale): string {
+  const { app, sub } = ROLES[role];
+  const label = pageLabel(role, pathname);
+  return label ? `${translate(locale, label)} — ${app}` : `${app} — ${translate(locale, sub)}`;
+}
