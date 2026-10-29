@@ -2,6 +2,7 @@
 // shared by the Server Component that reads the list and the client view that renders it (FR-X07).
 import type { Role } from "@ac/web/lib/nav";
 import { evidenceText } from "@ac/web/lib/evidence";
+import { money } from "@ac/web/lib/money";
 import { DEFAULT_DISPLAY, showDate, showTime, translate, translator, type Display } from "@ac/web/lib/i18n";
 
 type TargetKind = "unit" | "job" | "invoice" | "restriction" | "device" | "inquiry" | "client_user" | "partner_user" | "certificate";
@@ -14,7 +15,7 @@ export type ApiNotification = {
   sourceAlertId: string | null;
   target: { kind: TargetKind; id: string };
   templateKey: string;
-  params: { targetName: string; at: string; status: string; reason: string | null; message: string | null };
+  params: { targetName: string; at: string; status: string; reason: string | null; message: string | null; amountMinor?: number | null; currency?: string | null };
   channel: string;
   occurredAt: string;
   readAt: string | null;
@@ -42,10 +43,12 @@ const titles: Record<string, string> = {
 };
 
 /** Templates whose detail line comes from the params in the user's language: a certificate reminder (BR-P09) names
- * the day the certificate expires (IR336), a warranty reminder (BR-A19) the day the warranty ends (IR340). */
+ * the day the certificate expires (IR336), a warranty reminder (BR-A19) the day the warranty ends (IR340), a payment
+ * reminder the invoice's amount (IR488). */
 const details: Record<string, (n: ApiNotification, display: Display) => string> = {
   certificate_expiry: (n, display) => translate(display.locale, "Expires {date}", { date: showDate(n.params.at, display) }),
   warranty_expiring: (n, display) => translate(display.locale, "Warranty ends {date} · no maintenance contract", { date: showDate(n.params.at, display) }),
+  payment_reminder: (n, display) => (n.params.amountMinor != null && n.params.currency ? translate(display.locale, "Amount due {amount}", { amount: money(n.params.amountMinor, n.params.currency) }) : ""),
 };
 
 /** Types whose title and link come from the type rather than the template: a filter cleaning reminder (alert template,

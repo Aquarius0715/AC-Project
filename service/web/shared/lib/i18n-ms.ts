@@ -1601,6 +1601,7 @@ export const ms: Record<string, string> = {
   "Demo payment — no real money moves. No card number, CVV or expiry is collected.": "Pembayaran demo — tiada wang sebenar bergerak. Tiada nombor kad, CVV atau tarikh luput dikumpul.",
   "Amount paid": "Jumlah dibayar",
   "Amount due": "Jumlah perlu dibayar",
+  "Amount due {amount}": "Jumlah perlu dibayar {amount}",
   "Kuala Lumpur date (Asia/Kuala_Lumpur)": "tarikh Kuala Lumpur (Asia/Kuala_Lumpur)",
   "Contract": "Kontrak",
   "Contract scope": "Skop kontrak",

@@ -51,6 +51,14 @@ describe("inbox rows and alert rows", () => {
       .toBe("Firmware update from 3 Foo 2026, 02:00–04:00 local time. The AC may restart for about 2 minutes. · Requested");
   });
 
+  it("names the amount of a payment reminder (IR488)", () => {
+    const n = note({ type: "payment_reminder", templateKey: "payment_reminder", target: { kind: "invoice", id: "i1" },
+      params: { targetName: "INV-2026-09-0003", at: "2026-09-14T01:00:00Z", status: "payment_reminder", reason: null, message: null, amountMinor: 12000, currency: "MYR" } });
+    expect([inboxRow(n, "client").t, inboxRow(n, "client").d, inboxRow(n, "client").href]).toEqual(["Payment reminder — INV-2026-09-0003", "Amount due 120.00 MYR", "/customer/payments/i1"]);
+    expect(inboxRow(n, "client", { locale: "ms", timeZone: "UTC" }).d).toBe("Jumlah perlu dibayar 120.00 MYR");
+    expect(inboxRow(note({ ...n, params: { ...n.params, amountMinor: null } }), "client").d).toBe(""); // no amount, no line
+  });
+
   it("opens the certifications from a certificate reminder and names its expiry day (BR-P09, IR336)", () => {
     const n = note({ type: "certificate_expiry", templateKey: "certificate_expiry", target: { kind: "certificate", id: "c1" },
       params: { targetName: "Aisha · Indoor AC", at: "2026-10-13T20:00:00Z", status: "expiring", reason: null, message: null } });
