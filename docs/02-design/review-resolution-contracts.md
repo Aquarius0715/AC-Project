@@ -7227,3 +7227,12 @@ Found in review (a Malay crawl of every linked page of the four apps that lists 
    - The recipient's role is a role word.
    - The default policy's system name is shown in the display language; a renamed policy keeps its own name.
 2. **Tests.** `techDevices.test.ts` and `assets.test.ts` check the Malay words.
+
+## IR500 The phone crawl runs at 360 px — 2026-10-30
+
+Found in review (the UIUX specification against the smoke crawl of IR487): the specification asks for tests at 360 px width, the narrowest Figma mobile frame, but the phone crawl ran at 390 px. At 360 px in Malay, HQ's overview scrolled sideways by 6 px. An axis row's filter link ("connections=connecting,error,unknown") has no spaces, so it could not wrap.
+
+1. **Web.** The overview's axis rows wrap, and the filter link may break anywhere.
+2. **Tests and specification.**
+   - The smoke crawl's second pass runs at 360 px, in Malay. All four apps pass.
+   - The UIUX specification's accessibility section names what the crawls check: axe, sideways scroll, the page language and the title.

@@ -2,8 +2,8 @@
 // error, no failed document (the R222 smoke crawl as a test), nothing the page CSP refuses (IR354), and no critical or
 // serious axe-core violation of WCAG 2.x A / AA (NFR-01, deterministic contracts: zero unresolved axe critical /
 // serious issues, IR359). Follows the app's own links only, navigations only. axe runs through page.evaluate, which the
-// page CSP does not govern, so the policy itself stays as strict as in production. The crawl runs again at phone width
-// in Malay, the longest words (IR487): no axe violation there either, and no page scrolls sideways. Every page declares
+// page CSP does not govern, so the policy itself stays as strict as in production. The crawl runs again at 360 px, the
+// narrowest width the UIUX specification names, in Malay, the longest words (IR487, IR500): no axe violation there either, and no page scrolls sideways. Every page declares
 // the display language as its language (IR489) and is titled with its name (IR490).
 import type { Page } from "@playwright/test";
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
@@ -77,7 +77,7 @@ test("every linked page at phone width in Malay is accessible and fits the scree
   const zone = await displayZone(page);
   zoneBefore = zone;
   await setDisplay(page, MALAY, zone);
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 360, height: 800 }); // the UIUX specification's narrowest width and Figma's mobile frames
   const r = await crawl(page, app, "ms");
   expect(r.failed, "pages that did not render").toEqual([]);
   expect(r.otherLang, "pages that do not declare Malay").toEqual([]);

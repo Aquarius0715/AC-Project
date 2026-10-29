@@ -131,9 +131,10 @@ function Axis({ rows }: { rows: AxisRow[] }) {
         {rows.map((r) => (r.pct > 0 ? <div key={r.key} className={barTone[r.tone]} style={{ width: `${r.pct}%` }} /> : null))}
       </div>
       {rows.map((r) => (
-        <div key={r.key} className="flex items-center justify-between gap-2 py-1 text-[13px]">
+        <div key={r.key} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 py-1 text-[13px]">
           <span className="flex items-center gap-2"><i className={cx("inline-block h-2 w-2 rounded-full", barTone[r.tone])} />{r.label}</span>
-          <span className="flex items-center gap-3"><Link href={r.href} className="text-[11px] text-primary hover:underline">{r.key} <Icon name="arrowRight" /></Link><b>{r.count}</b></span>
+          {/* the filter key has no spaces ("connections=connecting,error,unknown"): it breaks anywhere at phone width (IR500) */}
+          <span className="flex min-w-0 items-center gap-3"><Link href={r.href} className="min-w-0 text-[11px] text-primary [overflow-wrap:anywhere] hover:underline">{r.key} <Icon name="arrowRight" /></Link><b>{r.count}</b></span>
         </div>
       ))}
     </>
