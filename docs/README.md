@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.351.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
+Version: 0.352.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.352.0 (2026-10-30): A restriction unit waiting for a check or firmware update (pending reason `device_operation_running`) showed the code on HQ's screen and nothing on the customer's notice. Both now word it, and HQ's progress line counts such units (IR482).
 0.351.0 (2026-10-30): The inbox detail line showed stored codes ("in_progress", "technician_access_ended", a type filled in as the status) and the firmware notice and the system's resolution reasons stayed English in Malay. They are now worded in the display language; a person's own text stays as written (IR481).
 0.350.0 (2026-10-29): In Malay, alert evidence (stored as English by the seed, filter-care reminders, policy rules, tamper and reconciliation alerts) and the not-found screens stayed English. The web now shows the texts those sources write in the display language, keeping their values (IR480).
 0.349.0 (2026-10-29): Since IR461 the identity provider sends a new account's set-up e-mail, but the old invitation e-mail queue and its branches stayed (never run, 0 % covered) and the persistence map still named it. They are removed, and every user-list row must have its account (IR479).

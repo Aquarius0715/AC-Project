@@ -65,6 +65,11 @@ describe("HQ restrictions in Malay with the display time zone (IR301)", () => {
     const t = translator("ms");
     expect([progressText(restriction({ state: "scheduled" }), MS), progressText(restriction({}), MS)]).toEqual(["dilaksanakan selepas 13 Sep 2026, 9:00 PG GMT+9", "1/2 dikenakan · 1 luar talian"]);
     expect(unitRows(restriction({}), new Map(), new Map(), MS).map((u) => [u.apply, u.release, u.pending])).toEqual([["dikenakan", "tiada", null], ["tidak dikenakan", "tiada", "luar talian"]]);
+    // a unit waiting for a check or firmware update to end (D03 device_operation_running) is worded too
+    const busy = restriction({ state: "requested", perUnit: [unit({ applyState: "not_sent", pendingReason: "device_operation_running" }), unit({ unitId: "u2", applyState: "not_sent", pendingReason: "offline" })] });
+    expect([progressText(busy), progressText(busy, MS)]).toEqual(["0/2 applied · 1 offline · 1 waiting for a device operation", "0/2 dikenakan · 1 luar talian · 1 menunggu operasi peranti"]);
+    expect([unitRows(busy, new Map(), new Map()).map((u) => u.pending), unitRows(busy, new Map(), new Map(), MS).map((u) => u.pending)])
+      .toEqual([["a device operation is running", "offline"], ["operasi peranti sedang berjalan", "luar talian"]]);
     expect([executeBlocker(restriction({ state: "scheduled", executeAfter: "2026-09-16T00:00:00Z" }), NOW, MS), releaseBlocker(restriction({ state: "cancelled" }), false, NOW, MS)])
       .toEqual(["Dilaksanakan selepas 16 Sep 2026, 9:00 PG GMT+9", "Hanya sekatan yang diminta atau dikenakan boleh dilepaskan"]);
     expect([actionOutcome("override", "requested", t).result, actionOutcome("cancel", "cancelled", t).result]).toEqual(["Diminta → Pelepasan diminta (sumber: pelepasan manual); invois kekal belum dibayar", "Tidak boleh — sekatan ini dibatalkan"]);

@@ -7037,3 +7037,11 @@ Found in review (continuing the IR480 sweep): the inbox detail line showed the c
 2. **Resolution reasons.** `lib/evidence.ts` `resolutionText` words the reasons the system writes when it resolves an alert — a cleaned filter, a resolved recovery case, a policy's sustained recovery (D08), keeping its metric, value and threshold. A reason a person typed stays as written. It is used wherever a resolution is shown: the customer alerts, HQ's alert history, the technician's alert and unit timeline.
 3. **Energy boundary.** The energy summary's fixed boundary text (the API's, IR480 follow-up) is shown in the display language too.
 4. **Dictionary.** Four Malay entries; `notifications.test.ts` and `evidence.test.ts` check that every word the inbox and the reasons use has one.
+
+## IR482 A restriction unit waiting for a device operation, worded — 2026-10-30
+
+Found in review: IR140 gives an undelivered restriction Command one of two pending reasons, `offline` or `device_operation_running` (a check or firmware update is queued or running on the unit, D03). IR301 words the pending reasons on HQ's restriction screen, but only `offline` was worded: a unit waiting for a device operation showed the code, the progress line counted only offline units, and the customer's notice said nothing about such a unit.
+
+1. **HQ.** The unit row reads "a device operation is running", and the progress line adds "<n> waiting for a device operation" beside "<n> offline".
+2. **Customer.** The notice's unit line reads "the unit is busy with a device update", as it reads "the unit is offline" for an offline one.
+3. **Dictionary.** Three Malay entries; `restrictions.test.ts` and `clientBilling.test.ts` check both languages.

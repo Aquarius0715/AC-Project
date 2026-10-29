@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.351.0
+version: 0.352.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -275,6 +275,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.352.0: A restriction unit waiting for a device operation is worded for HQ and the customer (IR482). Phase 1A unchanged.
 0.351.0: The inbox details (status, release reason, firmware notice), the system's resolution reasons and the energy boundary are shown in the display language (IR481). Phase 1A unchanged.
 0.350.0: Alert and observation evidence and the not-found screens are shown in the display language (IR480). Phase 1A unchanged.
 0.349.0: The invitation e-mail queue from before the accounts were created with the users is removed; every user-list row has its account (IR479). Phase 1A unchanged.

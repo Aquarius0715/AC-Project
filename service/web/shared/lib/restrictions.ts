@@ -54,7 +54,8 @@ export function progressText(r: ApiRestriction, i: I18n = EN): string {
   const applied = r.perUnit.filter((u) => u.applyState === "applied").length;
   const released = r.perUnit.filter((u) => u.releaseState === "released" || u.releaseState === "not_required").length;
   const offline = r.perUnit.filter((u) => u.pendingReason === "offline").length;
-  const tail = offline ? ` · ${t("{n} offline", { n: offline })}` : "";
+  const busy = r.perUnit.filter((u) => u.pendingReason === "device_operation_running").length; // waiting for a check or firmware update (D03)
+  const tail = [offline && t("{n} offline", { n: offline }), busy && t("{n} waiting for a device operation", { n: busy })].filter(Boolean).map((x) => ` · ${x}`).join("");
   if (r.state === "scheduled") return t("executes after {time}", { time: showTime(r.executeAfter, i.display) });
   if (r.state === "requested" || r.state === "applied") return `${t("{done}/{n} applied", { done: applied, n })}${tail}`;
   if (r.state === "release_requested") return `${t("{done}/{n} released", { done: released, n })}${tail}`;
@@ -74,7 +75,7 @@ export function unitRows(r: ApiRestriction, names: Map<string, string>, commands
     none: t("none"), waiting_reconcile: t("waiting for reconciliation"), requested: t("requested"), released: t("released"), not_required: t("not required"), failed: t("failed"),
   };
   const command: Record<ApiCommand["status"], string> = { requested: t("requested"), sent: t("sent"), acknowledged: t("acknowledged"), failed: t("failed"), expired: t("expired"), cancelled: t("cancelled") };
-  const pending = (p: string | null) => (p === "offline" ? t("offline") : p);
+  const pending = (p: string | null) => (p === "offline" ? t("offline") : p === "device_operation_running" ? t("a device operation is running") : p);
   return r.perUnit.map((u) => {
     const last = (ids: string[]) => (ids.length ? commands.get(ids[ids.length - 1]) : undefined);
     const a = last(u.applyCommandIds);

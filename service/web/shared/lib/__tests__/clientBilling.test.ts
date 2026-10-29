@@ -64,6 +64,8 @@ describe("customer contracts & payments in the display language (FR-C10–C12, I
     expect(noticeUnits(restriction, unit, commands, MS_TOKYO.t).map((u) => [u.apply, u.release, u.releaseTone, u.note, u.tone])).toEqual([
       ["Dikenakan", "Pelepasan dihantar", "primary", "menunggu unit mengesahkan", "warn"], ["Keputusan tidak diketahui", "Pelepasan gagal", "crit", "unit di luar talian · arahan terakhir tamat tempoh", "unknown"],
     ]);
+    const busy = { ...restriction, perUnit: [{ ...restriction.perUnit[0], releaseState: "none" as const, releaseCommandIds: [], applyCommandIds: [], pendingReason: "device_operation_running" }] };
+    expect([noticeUnits(busy, unit, commands)[0].note, noticeUnits(busy, unit, commands, MS_TOKYO.t)[0].note]).toEqual(["the unit is busy with a device update", "unit sedang sibuk dengan kemas kini peranti"]);
     expect([policyText({ kind: "power_off" }), policyText({ kind: "power_off" }, MS_TOKYO.t)]).toEqual(["Power off", "Matikan kuasa"]);
   });
 

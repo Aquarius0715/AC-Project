@@ -115,7 +115,7 @@ export function noticeUnits(r: ApiRestriction, unit: (id: string) => UnitPlace |
     const cmd = last ? commands.get(last) : undefined;
     const waiting = u.releaseState === "requested" && cmd && (cmd.status === "requested" || cmd.status === "sent");
     const note = [
-      u.pendingReason === "offline" ? t("the unit is offline") : null,
+      u.pendingReason === "offline" ? t("the unit is offline") : u.pendingReason === "device_operation_running" ? t("the unit is busy with a device update") : null,
       waiting ? t("waiting for the unit to confirm") : null,
       cmd?.status === "failed" ? t("last command failed") : cmd?.status === "expired" ? t("last command expired") : null,
     ].filter(Boolean).join(" · ");
