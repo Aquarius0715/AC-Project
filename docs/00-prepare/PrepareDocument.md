@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.348.0
+version: 0.349.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -275,6 +275,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.349.0: The invitation e-mail queue from before the accounts were created with the users is removed; every user-list row has its account (IR479). Phase 1A unchanged.
 0.348.0: Archiving a property or space and adding a unit or space to it at the same moment cannot both pass (IR478). Phase 1A unchanged.
 0.347.0: A restriction becomes applied when two of its units answer at the same moment (IR477). Phase 1A unchanged.
 0.346.0: A restriction ends when its cause invoices are paid at the same moment (IR476). Phase 1A unchanged.

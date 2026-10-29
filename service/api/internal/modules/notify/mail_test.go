@@ -8,8 +8,7 @@ import (
 	"testing"
 )
 
-// TestMailTexts: a notification e-mail names its template and target and links to the recipient's app; an invite
-// names the organization, the role and the app's sign-in page.
+// TestMailTexts: a notification e-mail names its template and target and links to the recipient's app.
 func TestMailTexts(t *testing.T) {
 	apps := Apps{Customer: "http://c", Partner: "http://p", Technician: "http://t", Admin: "http://a"}
 	subject, body := notificationMail("alert", map[string]any{"targetName": "Bedroom AC", "status": "open"}, "client", apps)
@@ -21,10 +20,6 @@ func TestMailTexts(t *testing.T) {
 	}
 	if s, _ := notificationMail("unknown", nil, "admin", apps); s != "Notification: unknown" {
 		t.Errorf("unknown template: %q", s)
-	}
-	subject, body = inviteMail(map[string]any{"organization": "Demo Customer B", "role": "owner", "app": "customer"}, apps)
-	if subject != "You are invited to Demo Customer B on AC Project" || !strings.Contains(body, "as owner") || !strings.Contains(body, "http://c/login") {
-		t.Errorf("invite: %q %q", subject, body)
 	}
 }
 

@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
@@ -270,19 +269,6 @@ func inviteResendWait(ctx context.Context, c *ops.Call, table string, id uuid.UU
 	return nil
 }
 
-// reinvite sends the invitation of a pending invite whose e-mail changed to the new address: the e-mails not yet sent
-// to the old one are cancelled, and the resend pause counts from now (IR426).
-func reinvite(ctx context.Context, c *ops.Call, table string, id uuid.UUID, queue func() error) error {
-	if err := notify.CancelInvites(ctx, c.Tx, id); err != nil {
-		return err
-	}
-	if err := queue(); err != nil {
-		return err
-	}
-	_, err := c.Tx.Exec(ctx, `UPDATE identity.`+table+` SET last_invite_sent_at = $2 WHERE id = $1`, id, c.Now)
-	return err
-}
-
 // notSelfOrLast refuses a change to the caller's own account, one that would leave the company without an active
 // contractor, and closing a technician who still holds an active assignment (IR421: reassign the job first).
 func notSelfOrLast(ctx context.Context, c *ops.Call, x PartnerUser) error {
@@ -517,9 +503,6 @@ func partnerUsersRemove(ctx context.Context, c *ops.Call, in *PartnerRemoveInput
 	if err := notSelfOrLast(ctx, c, x); err != nil {
 		return Deleted{}, err
 	}
-	if err := notify.CancelInvites(ctx, c.Tx, x.ID); err != nil { // nothing more goes to a removed invite (IR426)
-		return Deleted{}, err
-	}
 	if _, err := c.Tx.Exec(ctx, `DELETE FROM identity.partner_users WHERE id = $1`, x.ID); err != nil {
 		return Deleted{}, err
 	}
@@ -586,17 +569,11 @@ func partnerUsersResend(ctx context.Context, c *ops.Call, in *PartnerResendInput
 	if err := inviteResendWait(ctx, c, "partner_users", x.ID); err != nil {
 		return InvitePreview{}, err
 	}
-	if x.MembershipID == nil { // an invite from before IR461: HQ creates its account
-		if err := queuePartnerInvite(ctx, c, x.ID, x.Email, x.PartnerRole); err != nil {
-			return InvitePreview{}, err
-		}
-	} else { // the set-up e-mail again (IR461)
-		var user uuid.UUID
-		if err := c.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *x.MembershipID).Scan(&user); err != nil {
-			return InvitePreview{}, err
-		}
-		requestAccount(c, user, *x.MembershipID, x.PartnerRole)
+	var user uuid.UUID // the set-up e-mail again (IR461)
+	if err := c.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *x.MembershipID).Scan(&user); err != nil {
+		return InvitePreview{}, err
 	}
+	requestAccount(c, user, *x.MembershipID, x.PartnerRole)
 	if _, err := c.Tx.Exec(ctx, `UPDATE identity.partner_users SET last_invite_sent_at = $2 WHERE id = $1`, x.ID, c.Now); err != nil {
 		return InvitePreview{}, err
 	}
@@ -604,20 +581,6 @@ func partnerUsersResend(ctx context.Context, c *ops.Call, in *PartnerResendInput
 	return InvitePreview{ID: uuid.New(), TenantID: x.TenantID, Version: 1, CreatedAt: c.Now, UpdatedAt: c.Now, Type: "invite", Target: map[string]string{"kind": "partner_user", "id": x.ID.String()},
 		TemplateKey: "invite", Params: map[string]any{"targetName": x.Email, "at": c.Now, "status": "invited", "reason": nil, "amountMinor": nil, "currency": nil, "method": nil, "message": nil},
 		Channel: "email", DeliveryState: "queued", Severity: "normal", OccurredAt: c.Now}, nil
-}
-
-// queuePartnerInvite queues the invitation e-mail to the partner app (IR418); a technician's account opens the
-// technician app, which HQ creates with the membership.
-func queuePartnerInvite(ctx context.Context, c *ops.Call, invite uuid.UUID, email, role string) error {
-	var org string
-	if err := c.Tx.QueryRow(ctx, `SELECT name FROM identity.organizations WHERE id = $1`, c.Principal.OrgID).Scan(&org); err != nil {
-		return err
-	}
-	app := "partner"
-	if role == "technician" {
-		app = "technician"
-	}
-	return notify.QueueInvite(ctx, c.Tx, invite, email, org, role, app)
 }
 
 // RegisterPartnerUsers binds partnerUsers.*.

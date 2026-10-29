@@ -459,12 +459,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	account := false // the sign-in account is opened or pointed at this new membership (IR461, IR462)
 	if in.ID == nil {
 		var clientRole *string
-		if in.Role == "client" { // a member, or the role a pending invite for the user's e-mail gives (IR417)
+		if in.Role == "client" { // HQ adds a member; a customer owner adds owners in the customer app (IR417)
 			cr := "member"
-			if err := c.Tx.QueryRow(ctx, `SELECT x.client_role FROM identity.client_users x JOIN notify.ref_customers cu ON cu.id = x.customer_id
-				JOIN identity.users u ON u.email = x.email WHERE cu.organization_id = $1 AND u.id = $2 AND x.membership_id IS NULL`, in.OrganizationID, in.UserID).Scan(&cr); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-				return Member{}, err
-			}
 			clientRole = &cr
 		}
 		if err := c.Tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, employment, client_role, valid_from, valid_until, created_at, updated_at)
@@ -490,26 +486,22 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES (current_setting('app.tenant_id')::uuid, $1, 'location_automation', false)`, id); err != nil {
 				return Member{}, err
 			}
-			// IR144: the customer's user list includes the new member; a pending invite for the same e-mail becomes this
-			// account (IR417); a person created with the membership is listed as not signed in yet (IR461)
+			// IR144: the customer's user list includes the new member, listed as not signed in yet when the person was
+			// created with it (IR461); an address already on the list keeps its row
 			if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.client_users (tenant_id, customer_id, membership_id, email, display_name, client_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
 				SELECT current_setting('app.tenant_id')::uuid, cu.id, $1, u.email, u.display_name, $6, $7, $3, $4, $3, $3
 				FROM notify.ref_customers cu, identity.users u WHERE cu.organization_id = $2 AND u.id = $5
-				ON CONFLICT (tenant_id, customer_id, email) DO UPDATE SET membership_id = EXCLUDED.membership_id, display_name = EXCLUDED.display_name,
-					status = EXCLUDED.status, version = identity.client_users.version + 1, updated_at = EXCLUDED.updated_at
-				WHERE identity.client_users.membership_id IS NULL`, id, in.OrganizationID, c.Now, c.Principal.MembershipID, in.UserID, *clientRole, listed); err != nil {
+				ON CONFLICT (tenant_id, customer_id, email) DO NOTHING`, id, in.OrganizationID, c.Now, c.Principal.MembershipID, in.UserID, *clientRole, listed); err != nil {
 				return Member{}, err
 			}
 		}
-		// FR-P11: the contractor company's user list includes the new account; a pending invite for the same email
-		// becomes this account; a person created with the membership is listed as not signed in yet (IR461)
+		// FR-P11: the contractor company's user list includes the new account, listed as not signed in yet when the
+		// person was created with it (IR461); an address already on the list keeps its row
 		if in.Role == "contractor" || in.Role == "technician" {
 			if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
 				SELECT current_setting('app.tenant_id')::uuid, o.id, $1, u.email, u.display_name, $5, $7, $3, $4, $3, $3
 				FROM identity.organizations o, identity.users u WHERE o.id = $2 AND o.kind = 'contractor' AND u.id = $6
-				ON CONFLICT (tenant_id, organization_id, email) DO UPDATE SET membership_id = EXCLUDED.membership_id, display_name = EXCLUDED.display_name,
-					partner_role = EXCLUDED.partner_role, status = EXCLUDED.status, version = identity.partner_users.version + 1, updated_at = EXCLUDED.updated_at
-				WHERE identity.partner_users.membership_id IS NULL`, id, in.OrganizationID, c.Now, c.Principal.MembershipID, in.Role, in.UserID, listed); err != nil {
+				ON CONFLICT (tenant_id, organization_id, email) DO NOTHING`, id, in.OrganizationID, c.Now, c.Principal.MembershipID, in.Role, in.UserID, listed); err != nil {
 				return Member{}, err
 			}
 		}

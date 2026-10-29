@@ -12,6 +12,19 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
+// accountMembership opens a membership of a new person for a user-list row of a test: every row has its account
+// since IR461 (IR479). It is ended when the test ends.
+func accountMembership(t *testing.T, org uuid.UUID, role string, clientRole any) string {
+	t.Helper()
+	id := uuid.NewString()
+	owner(t, `INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		id, seed.ID("tenant-a"), newUser(t), org, role, clientRole, clock.Add(-time.Hour))
+	t.Cleanup(func() {
+		owner(t, `UPDATE identity.memberships SET valid_until = $2 WHERE id = $1 AND (valid_until IS NULL OR valid_until > $2)`, id, clock.Add(-time.Minute))
+	})
+	return id
+}
+
 // race sends the two writes at once and expects one to pass and the other to be refused with the given message.
 func race(t *testing.T, round int, want string, writes ...func() (int, map[string]any)) {
 	t.Helper()
@@ -54,8 +67,9 @@ func TestLastOwnerAtOnce(t *testing.T) {
 	for round := 0; round < 5; round++ {
 		a, b := uuid.NewString(), uuid.NewString()
 		for _, id := range []string{a, b} {
-			owner(t, `INSERT INTO identity.client_users (id, tenant_id, customer_id, email, client_role, status, invited_at, invited_by_membership_id)
-				VALUES ($1, $2, $3, $4, 'owner', 'active', $5, $6)`, id, seed.ID("tenant-a"), cust, "owner-"+id[:8]+"@example.com", clock, seed.ID("customer-b"))
+			owner(t, `INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, client_role, status, invited_at, invited_by_membership_id)
+				VALUES ($1, $2, $3, $4, $5, 'owner', 'active', $6, $7)`, id, seed.ID("tenant-a"), cust, accountMembership(t, seed.ID("org-customer-b"), "client", "owner"),
+				"owner-"+id[:8]+"@example.com", clock, seed.ID("customer-b"))
 		}
 		t.Cleanup(func() { owner(t, `DELETE FROM identity.client_users WHERE id = ANY($1::uuid[])`, []string{a, b}) })
 		race(t, round, "errors.last_owner",
@@ -85,8 +99,9 @@ func TestLastContractorAtOnce(t *testing.T) {
 	for round := 0; round < 5; round++ {
 		a, b := uuid.NewString(), uuid.NewString()
 		for _, id := range []string{a, b} {
-			owner(t, `INSERT INTO identity.partner_users (id, tenant_id, organization_id, email, partner_role, status, invited_at, invited_by_membership_id)
-				VALUES ($1, $2, $3, $4, 'contractor', 'active', $5, $6)`, id, seed.ID("tenant-a"), org, "boss-"+id[:8]+"@example.com", clock, seed.ID("contractor-a"))
+			owner(t, `INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, partner_role, status, invited_at, invited_by_membership_id)
+				VALUES ($1, $2, $3, $4, $5, 'contractor', 'active', $6, $7)`, id, seed.ID("tenant-a"), org, accountMembership(t, org, "contractor", nil),
+				"boss-"+id[:8]+"@example.com", clock, seed.ID("contractor-a"))
 		}
 		t.Cleanup(func() { owner(t, `DELETE FROM identity.partner_users WHERE id = ANY($1::uuid[])`, []string{a, b}) })
 		race(t, round, "errors.last_contractor",

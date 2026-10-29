@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.348.0 / Created: 2026-09-14 / Updated: 2026-10-29 / Status: Draft for review / Language: English
+Version: 0.349.0 / Created: 2026-09-14 / Updated: 2026-10-29 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.349.0 (2026-10-29): Since IR461 the identity provider sends a new account's set-up e-mail, but the old invitation e-mail queue and its branches stayed (never run, 0 % covered) and the persistence map still named it. They are removed, and every user-list row must have its account (IR479).
 0.348.0 (2026-10-29): A space archived while a unit was added to it could take both, leaving an active unit in an archived space; the archive now locks the location and the saves read it with a share lock (IR478).
 0.347.0 (2026-10-29): Two units of a restriction answering their apply commands at the same moment (or an answer beside HQ's reconcile) left it requested with every unit applied; the answer now locks the restriction first (IR477).
 0.346.0 (2026-10-29): Two payments of a restriction's two cause invoices at the same moment each saw the other invoice unpaid, so the restriction stayed after everything was paid. The payment now locks the restrictions it may end first (IR476).

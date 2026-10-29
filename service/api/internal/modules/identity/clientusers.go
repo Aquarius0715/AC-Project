@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
@@ -301,13 +300,11 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 	if c.Principal.Role == "client" && x.MembershipID != nil && *x.MembershipID == c.Principal.MembershipID { // an owner never changes the own account (IR417)
 		return x, apperr.E(apperr.Conflict, "errors.own_account")
 	}
-	// an accepted user's e-mail is the sign-in identity's, where the e-mails go: it stays, for HQ too (IR422)
-	if x.Status != "invited" || x.MembershipID != nil { // an account created with the user has its e-mail from the start (IR461)
-		if !strings.EqualFold(in.Email, x.Email) {
-			return x, apperr.Fields(map[string]string{"email": "error.immutable"})
-		}
-		in.Email = x.Email // the same address in other letter case keeps the stored spelling
+	// the e-mail is the sign-in account's, created with the user (IR461): it stays, for HQ too (IR422)
+	if !strings.EqualFold(in.Email, x.Email) {
+		return x, apperr.Fields(map[string]string{"email": "error.immutable"})
 	}
+	in.Email = x.Email // the same address in other letter case keeps the stored spelling
 	if x.CustomerID != in.CustomerID {
 		return x, apperr.Fields(map[string]string{"customerId": "error.immutable"})
 	}
@@ -333,11 +330,6 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 	if _, err := c.Tx.Exec(ctx, `UPDATE identity.client_users SET email = $2, client_role = $3, status = $4, version = version + 1, updated_at = $5 WHERE id = $1`,
 		x.ID, in.Email, in.ClientRole, status, c.Now); err != nil {
 		return x, err
-	}
-	if x.Status == "invited" && !strings.EqualFold(in.Email, x.Email) { // a corrected address gets the invitation (IR426)
-		if err := reinvite(ctx, c, "client_users", x.ID, func() error { return queueClientInvite(ctx, c, x.ID, x.CustomerID, in.Email, in.ClientRole) }); err != nil {
-			return x, err
-		}
 	}
 	if x.MembershipID != nil { // keep the membership in step: role and access window
 		// $4 is cast: inside CASE … ELSE NULL the parameter's type would be taken as text
@@ -427,9 +419,6 @@ func clientUsersRemove(ctx context.Context, c *ops.Call, in *RemoveInput) (Delet
 			return Deleted{}, apperr.E(apperr.Conflict, "errors.last_owner")
 		}
 	}
-	if err := notify.CancelInvites(ctx, c.Tx, x.ID); err != nil { // nothing more goes to a removed invite (IR426)
-		return Deleted{}, err
-	}
 	if _, err := c.Tx.Exec(ctx, `DELETE FROM identity.client_users WHERE id = $1`, x.ID); err != nil {
 		return Deleted{}, err
 	}
@@ -516,17 +505,11 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 	if err := inviteResendWait(ctx, c, "client_users", x.ID); err != nil {
 		return InvitePreview{}, err
 	}
-	if x.MembershipID == nil { // an invite from before IR461
-		if err := queueClientInvite(ctx, c, x.ID, x.CustomerID, x.Email, x.ClientRole); err != nil {
-			return InvitePreview{}, err
-		}
-	} else { // the set-up e-mail again (IR461)
-		var user uuid.UUID
-		if err := c.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *x.MembershipID).Scan(&user); err != nil {
-			return InvitePreview{}, err
-		}
-		requestAccount(c, user, *x.MembershipID, "client")
+	var user uuid.UUID // the set-up e-mail again (IR461)
+	if err := c.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *x.MembershipID).Scan(&user); err != nil {
+		return InvitePreview{}, err
 	}
+	requestAccount(c, user, *x.MembershipID, "client")
 	if _, err := c.Tx.Exec(ctx, `UPDATE identity.client_users SET last_invite_sent_at = $2 WHERE id = $1`, x.ID, c.Now); err != nil {
 		return InvitePreview{}, err
 	}
@@ -534,15 +517,6 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 	return InvitePreview{ID: uuid.New(), TenantID: x.TenantID, Version: 1, CreatedAt: c.Now, UpdatedAt: c.Now, Type: "invite", Target: map[string]string{"kind": "client_user", "id": x.ID.String()},
 		TemplateKey: "invite", Params: map[string]any{"targetName": x.Email, "at": c.Now, "status": "invited", "reason": nil, "amountMinor": nil, "currency": nil, "method": nil, "message": nil},
 		Channel: "email", DeliveryState: "queued", Severity: "normal", OccurredAt: c.Now}, nil
-}
-
-// queueClientInvite queues the invitation e-mail to the customer's app (IR418).
-func queueClientInvite(ctx context.Context, c *ops.Call, invite, customer uuid.UUID, email, role string) error {
-	var org string
-	if err := c.Tx.QueryRow(ctx, `SELECT o.name FROM notify.ref_customers cu JOIN identity.organizations o ON o.id = cu.organization_id WHERE cu.id = $1`, customer).Scan(&org); err != nil {
-		return err
-	}
-	return notify.QueueInvite(ctx, c.Tx, invite, email, org, role, "customer")
 }
 
 // RegisterClientUsers binds clientUsers.*.

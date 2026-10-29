@@ -228,8 +228,9 @@ func TestPartnerUserAccess(t *testing.T) {
 	var active []string
 	ownerScan(t, `SELECT COALESCE(array_agg(id::text), '{}') FROM identity.partner_users WHERE organization_id = $1 AND partner_role = 'contractor' AND status = 'active'`,
 		[]any{seed.ID("org-contractor-a")}, &active)
-	owner(t, `INSERT INTO identity.partner_users (id, tenant_id, organization_id, email, partner_role, status, invited_at, invited_by_membership_id)
-		VALUES ($1, $2, $3, $4, 'contractor', 'active', $5, $6)`, other, seed.ID("tenant-a"), seed.ID("org-contractor-a"), "boss-"+other[:8]+"@example.com", clock, seed.ID("contractor-a"))
+	owner(t, `INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, partner_role, status, invited_at, invited_by_membership_id)
+		VALUES ($1, $2, $3, $4, $5, 'contractor', 'active', $6, $7)`, other, seed.ID("tenant-a"), seed.ID("org-contractor-a"),
+		accountMembership(t, seed.ID("org-contractor-a"), "contractor", nil), "boss-"+other[:8]+"@example.com", clock, seed.ID("contractor-a"))
 	owner(t, `UPDATE identity.partner_users SET status = 'disabled' WHERE id = ANY($1::uuid[])`, active)
 	t.Cleanup(func() {
 		owner(t, `UPDATE identity.partner_users SET status = 'active' WHERE id = ANY($1::uuid[])`, active)
@@ -289,11 +290,6 @@ func TestPartnerAccountCreated(t *testing.T) {
 	ownerScan(t, `SELECT u.cognito_sub, u.id::text FROM identity.users u JOIN identity.memberships m ON m.user_id = u.id WHERE m.id = $1`, []any{membership}, &sub, &user)
 	if sub != "sub-"+email {
 		t.Errorf("subject stored: %q", sub)
-	}
-	var queued int
-	ownerScan(t, `SELECT count(*) FROM notify.outbound_mail WHERE to_email = $1`, []any{email}, &queued)
-	if queued != 0 {
-		t.Errorf("an invitation e-mail besides the provider's set-up e-mail: %d", queued)
 	}
 	// the first sign-in makes the account active
 	(&auth.Authenticator{DB: s.DB, Now: clockFunc}).RecordSignIn(context.Background(), &ops.Principal{TenantID: seed.ID("tenant-a"), UserID: uuid.MustParse(user), MembershipID: uuid.MustParse(membership)}, clock)
@@ -394,58 +390,46 @@ func TestPartnerUserInputs(t *testing.T) {
 	}
 }
 
-// TestInviteMail (IR418): an invite and a resend queue an invitation e-mail to the invited address, and the
-// notification worker's Deliver sends the queued mail and records it as sent.
-func TestInviteMail(t *testing.T) {
+// TestNotificationMailRetry (IR425): a failed e-mail notification keeps its reason and is retried a minute after the
+// failed attempt, not before; then it is sent and recorded. (Until IR479 the invitation e-mails showed this.)
+func TestNotificationMailRetry(t *testing.T) {
 	s := server(t)
-	email := "mail-" + uuid.NewString()[:8] + "@example.com"
-	// invitations queued before IR461 (an invite without an account): the worker still delivers them
-	for range 2 {
-		owner(t, `INSERT INTO notify.outbound_mail (tenant_id, kind, invite_id, to_email, params) VALUES ($1, 'invite', $2, $3, '{"organization":"Demo Contractor A","role":"technician","app":"technician"}')`,
-			seed.ID("tenant-a"), uuid.New(), email)
+	membership, id, name := uuid.NewString(), uuid.NewString(), "Retry AC "+uuid.NewString()[:8]
+	owner(t, `INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from)
+		VALUES ($1, $2, $3, $4, 'client', 'member', $5)`, membership, seed.ID("tenant-a"), newUser(t), seed.ID("org-customer-a"), clock.Add(-time.Hour))
+	owner(t, `INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel, template_key, target, params, severity, occurred_at)
+		VALUES ($1, $2, $3, 1, 'fault', 'email', 'alert', '{"kind":"unit","id":"`+seed.ID("unit-online-rto").String()+`"}', $4, 'warning', $5)`,
+		id, seed.ID("tenant-a"), membership, `{"targetName":"`+name+`","status":"open"}`, clock)
+	state := func() (st, reason string) {
+		ownerScan(t, `SELECT state, COALESCE(failure_reason, '') FROM notify.deliveries WHERE notification_id = $1 AND channel = 'email'`, []any{id}, &st, &reason)
+		return
 	}
-	var queued int
-	var params string
-	ownerScan(t, `SELECT count(*), max(params::text) FROM notify.outbound_mail WHERE to_email = $1 AND state = 'queued'`, []any{email}, &queued, &params)
-	if queued != 2 || !strings.Contains(params, `"app": "technician"`) || !strings.Contains(params, `"role": "technician"`) {
-		t.Fatalf("queued mail: %d %s", queued, params)
-	}
-	// the worker's delivery: the queued mail goes to the sender and is recorded as sent; a failing sender leaves it for
-	// a later retry with the reason
-	failing := &fakeMail{err: errors.New("smtp down")}
-	if _, err := notify.DeliverAll(context.Background(), s.DB, failing, notify.Apps{Technician: "http://tech"}, clock, 500); err != nil {
-		t.Fatal(err)
-	}
-	var state, reason string
-	ownerScan(t, `SELECT state, COALESCE(failure_reason, '') FROM notify.outbound_mail WHERE to_email = $1 ORDER BY created_at LIMIT 1`, []any{email}, &state, &reason)
-	if state != "failed" || reason != "smtp down" {
-		t.Errorf("after a failing send: %s %s", state, reason)
-	}
-	// the retry waits a minute after the failed attempt (IR425): nothing goes out at once
-	sender := &fakeMail{}
-	if _, err := notify.DeliverAll(context.Background(), s.DB, sender, notify.Apps{Technician: "http://tech"}, clock.Add(59*time.Second), 500); err != nil {
-		t.Fatal(err)
-	}
-	for _, m := range sender.sent {
-		if m.to == email {
-			t.Fatalf("retried before the pause: %+v", m)
+	deliver := func(sender *fakeMail, at time.Time) int {
+		t.Helper()
+		if _, err := notify.DeliverAll(context.Background(), s.DB, sender, notify.Apps{Customer: "http://c"}, at, 500); err != nil {
+			t.Fatal(err)
 		}
-	}
-	if _, err := notify.DeliverAll(context.Background(), s.DB, sender, notify.Apps{Technician: "http://tech"}, clock.Add(time.Minute), 500); err != nil {
-		t.Fatal(err)
-	}
-	mine := 0
-	for _, m := range sender.sent {
-		if m.to == email {
-			mine++
-			if !strings.Contains(m.subject, "Demo Contractor A") || !strings.Contains(m.body, "http://tech/login") {
-				t.Errorf("invite mail: %+v", m)
+		n := 0
+		for _, m := range sender.sent {
+			if strings.Contains(m.subject, name) {
+				n++
 			}
 		}
+		return n
 	}
-	ownerScan(t, `SELECT count(*) FROM notify.outbound_mail WHERE to_email = $1 AND state = 'sent' AND provider_message_id IS NOT NULL`, []any{email}, &queued)
-	if mine != 2 || queued != 2 {
-		t.Errorf("sent %d, recorded %d", mine, queued)
+	deliver(&fakeMail{err: errors.New("smtp down")}, clock)
+	if st, reason := state(); st != "failed" || reason != "smtp down" {
+		t.Fatalf("after a failing send: %s %s", st, reason)
+	}
+	sender := &fakeMail{}
+	if n := deliver(sender, clock.Add(59*time.Second)); n != 0 {
+		t.Fatalf("retried before the pause: %d", n)
+	}
+	if n := deliver(sender, clock.Add(time.Minute)); n != 1 {
+		t.Fatalf("retried after the pause: %d", n)
+	}
+	if st, _ := state(); st != "sent" {
+		t.Errorf("after the retry: %s", st)
 	}
 }
 

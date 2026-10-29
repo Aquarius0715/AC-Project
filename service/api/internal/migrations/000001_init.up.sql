@@ -278,7 +278,7 @@ CREATE TABLE identity.client_users (           -- customer-side user list and in
   id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id                uuid NOT NULL,
   customer_id              uuid NOT NULL,
-  membership_id            uuid,
+  membership_id            uuid NOT NULL,   -- the account, created with the user (IR461, IR479)
   email                    citext NOT NULL,
   display_name             text,
   client_role              text NOT NULL CHECK (client_role IN ('owner','member')),
@@ -297,7 +297,7 @@ CREATE TABLE identity.partner_users (          -- contractor company accounts an
   id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id                uuid NOT NULL,
   organization_id          uuid NOT NULL,
-  membership_id            uuid,
+  membership_id            uuid NOT NULL,   -- the account, created with the user (IR461, IR479)
   email                    citext NOT NULL,
   display_name             text,
   partner_role             text NOT NULL CHECK (partner_role IN ('contractor','technician')),
@@ -1760,23 +1760,6 @@ CREATE TABLE notify.deliveries (
   updated_at       timestamptz NOT NULL DEFAULT platform.app_now(),
   UNIQUE (notification_id, channel)
 );
-
-CREATE TABLE notify.outbound_mail (            -- e-mails to an address that is not yet a membership: invites (IR418)
-  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id           uuid NOT NULL,
-  kind                text NOT NULL CHECK (kind IN ('invite')),
-  invite_id           uuid,               -- the client or partner user invited: its unsent e-mails are cancelled when it is removed or its address changes (IR426)
-  to_email            citext NOT NULL,
-  params              jsonb NOT NULL,     -- {organization, role, app}: rendered when sent
-  state               text NOT NULL DEFAULT 'queued' CHECK (state IN ('queued','sent','failed','cancelled')),
-  attempts            int NOT NULL DEFAULT 0,
-  provider_message_id text,
-  failure_reason      text,
-  created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
-  last_attempt_at     timestamptz,        -- a failed e-mail is retried 1, 2, 4 and 8 minutes after it (IR425)
-  sent_at             timestamptz
-);
-CREATE INDEX outbound_mail_queued ON notify.outbound_mail (tenant_id, created_at) WHERE state = 'queued';
 
 CREATE TABLE notify.templates (
   key        text NOT NULL,

@@ -97,20 +97,6 @@ func notificationMail(templateKey string, params map[string]any, role string, ap
 	return subject, b.String()
 }
 
-// inviteMail renders an invitation to sign in to an organization's app.
-func inviteMail(params map[string]any, apps Apps) (string, string) {
-	org, _ := params["organization"].(string)
-	role, _ := params["role"].(string)
-	app, _ := params["app"].(string)
-	if org == "" {
-		org = "AC Project"
-	}
-	subject := oneLine("You are invited to " + org + " on AC Project")
-	body := fmt.Sprintf("Hello,\n\nYou have been invited to %s on AC Project as %s.\nSign in here: %s/login\n\nYour account is opened when HQ creates it for this e-mail address; until then the invitation stays pending.",
-		org, role, apps.of(app))
-	return subject, body + footer
-}
-
 // oneLine keeps a subject on one line: a name with a line break (a unit or organization name) must not fail the send.
 func oneLine(s string) string {
 	return strings.Join(strings.Fields(strings.NewReplacer("\r", " ", "\n", " ").Replace(s)), " ")
@@ -124,8 +110,8 @@ const maxAttempts = 5
 const retryDue = `%[1]s.attempts < $1 AND %[1]s.%[2]s <= $3::timestamptz - interval '1 minute' * power(2, %[1]s.attempts - 1)`
 
 // Deliver sends the tenant's pending e-mails in tx (the tenant is set on the transaction): the e-mail notifications
-// without a sent delivery, and the queued outbound mail (invites). Each attempt is recorded; a failure is retried on
-// a growing pause (retryDue) up to maxAttempts. It answers how many were sent.
+// without a sent delivery. Each attempt is recorded; a failure is retried on a growing pause (retryDue) up to
+// maxAttempts. It answers how many were sent. A new account's set-up e-mail is the identity provider's (IR461, IR479).
 func Deliver(ctx context.Context, tx pgx.Tx, s Sender, apps Apps, now time.Time, limit int) (int, error) {
 	sent := 0
 	type pending struct {
@@ -182,42 +168,6 @@ func Deliver(ctx context.Context, tx pgx.Tx, s Sender, apps Apps, now time.Time,
 			return sent, err
 		}
 	}
-	rows, err = tx.Query(ctx, `SELECT id, to_email::text, kind, params, attempts FROM notify.outbound_mail o
-		WHERE state = 'queued' OR (state = 'failed' AND `+fmt.Sprintf(retryDue, "o", "last_attempt_at")+`) ORDER BY created_at LIMIT $2
-		FOR UPDATE SKIP LOCKED`, maxAttempts, limit, now)
-	if err != nil {
-		return sent, err
-	}
-	var ms []pending
-	for rows.Next() {
-		var p pending
-		if err := rows.Scan(&p.id, &p.to, &p.key, &p.params, &p.attempts); err != nil {
-			rows.Close()
-			return sent, err
-		}
-		ms = append(ms, p)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return sent, err
-	}
-	for _, p := range ms {
-		var params map[string]any
-		_ = json.Unmarshal(p.params, &params)
-		subject, body := inviteMail(params, apps)
-		msgID, err := s.Send(ctx, p.to, subject, body)
-		if err != nil {
-			if _, err := tx.Exec(ctx, `UPDATE notify.outbound_mail SET state = 'failed', attempts = attempts + 1, failure_reason = $2, last_attempt_at = $3 WHERE id = $1`, p.id, err.Error(), now); err != nil {
-				return sent, err
-			}
-			continue
-		}
-		sent++
-		if _, err := tx.Exec(ctx, `UPDATE notify.outbound_mail SET state = 'sent', attempts = attempts + 1, provider_message_id = $2, failure_reason = NULL, sent_at = $3, last_attempt_at = $3 WHERE id = $1`,
-			p.id, msgID, now); err != nil {
-			return sent, err
-		}
-	}
 	return sent, nil
 }
 
@@ -253,34 +203,17 @@ func DeliverAll(ctx context.Context, m *db.TxManager, s Sender, apps Apps, now t
 	return total, nil
 }
 
-// QueueInvite queues an invitation e-mail to an address (IR418); the notification worker sends it. invite is the
-// client or partner user it invites; app is the app the invitee signs in to: customer, partner or technician.
-func QueueInvite(ctx context.Context, tx pgx.Tx, invite uuid.UUID, to, organization, role, app string) error {
-	params, _ := json.Marshal(map[string]string{"organization": organization, "role": role, "app": app})
-	_, err := tx.Exec(ctx, `INSERT INTO notify.outbound_mail (tenant_id, kind, invite_id, to_email, params) VALUES (current_setting('app.tenant_id')::uuid, 'invite', $1, $2, $3)`, invite, to, params)
-	return err
-}
-
-// CancelInvites cancels the invitation e-mails of an invite that have not gone out yet (queued, or failed and waiting
-// for a retry): the invite was removed or its address changed (IR426).
-func CancelInvites(ctx context.Context, tx pgx.Tx, invite uuid.UUID) error {
-	_, err := tx.Exec(ctx, `UPDATE notify.outbound_mail SET state = 'cancelled' WHERE invite_id = $1 AND state IN ('queued', 'failed')`, invite)
-	return err
-}
-
-// Retention is how long the notifications, their deliveries and the sent invitation e-mails are kept (database design
-// §6, IR428).
+// Retention is how long the notifications and their deliveries are kept (database design §6, IR428).
 const Retention = 2 * 365 * 24 * time.Hour
 
-// Sweep deletes, in the tenant of tx, the notifications older than Retention with their deliveries, and the outbound
-// e-mails created before then that are no longer waiting to be sent. It answers how many rows went.
+// Sweep deletes, in the tenant of tx, the notifications older than Retention with their deliveries. It answers how
+// many rows went.
 func Sweep(ctx context.Context, tx pgx.Tx, now time.Time) (int64, error) {
 	cut := now.Add(-Retention)
 	var n int64
 	for _, q := range []string{
 		`DELETE FROM notify.deliveries d USING notify.notifications x WHERE x.id = d.notification_id AND x.occurred_at < $1`,
 		`DELETE FROM notify.notifications WHERE occurred_at < $1`,
-		`DELETE FROM notify.outbound_mail WHERE created_at < $1 AND state <> 'queued'`,
 	} {
 		tag, err := tx.Exec(ctx, q, cut)
 		if err != nil {
