@@ -269,26 +269,32 @@ type jsonRaw []byte
 
 func (j jsonRaw) MarshalJSON() ([]byte, error) { return j, nil }
 
+// withNotes reads the response notes of a page of events in one query, not one per event (IR497).
 func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) error {
+	if len(evs) == 0 {
+		return nil
+	}
+	ids, at := make([]uuid.UUID, len(evs)), make(map[uuid.UUID]int, len(evs))
 	for i := range evs {
-		rows, err := c.Tx.Query(ctx, `SELECT actor_id, message, created_at FROM devices.device_event_notes WHERE event_id = $1 ORDER BY created_at, id`, evs[i].ID)
-		if err != nil {
+		ids[i], at[evs[i].ID] = evs[i].ID, i
+	}
+	rows, err := c.Tx.Query(ctx, `SELECT event_id, actor_id, message, created_at FROM devices.device_event_notes WHERE event_id = ANY($1) ORDER BY event_id, created_at, id`, ids)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var event uuid.UUID
+		var n ResponseNote
+		if err := rows.Scan(&event, &n.ActorID, &n.Message, &n.At); err != nil {
+			rows.Close()
 			return err
 		}
-		for rows.Next() {
-			var n ResponseNote
-			if err := rows.Scan(&n.ActorID, &n.Message, &n.At); err != nil {
-				rows.Close()
-				return err
-			}
+		if i, ok := at[event]; ok {
 			evs[i].ResponseNotes = append(evs[i].ResponseNotes, n)
 		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return err
-		}
 	}
-	return nil
+	rows.Close()
+	return rows.Err()
 }
 
 // @Summary		devices.events (read)

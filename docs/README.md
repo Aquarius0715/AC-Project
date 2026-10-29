@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.366.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
+Version: 0.367.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.367.0 (2026-10-30): The device list read each device's sensors, the event list each event's notes and the plan list each plan's jobs with a query of their own. Each now reads them once per page (IR497).
 0.366.0 (2026-10-30): members.list filled each membership with three queries of its own, 300 round trips for a page of 100. It now reads the three tables once per call (IR496).
 0.365.0 (2026-10-30): Ten HQ pages read their units, customers, properties and other lookups as one page of 100, so past 100 units the rest could not be chosen or named. They now read the whole list (IR495).
 0.364.0 (2026-10-30): Past 100 jobs the partner's history showed the oldest jobs while saying "the latest 100", and the schedule could not show or assign open jobs beyond the first 100. The history now reads the newest 100 and the schedule every open job (IR494).

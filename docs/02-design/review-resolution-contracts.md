@@ -7183,3 +7183,17 @@ Found in review (code, N+1 reads): `members.list` and `members.get` filled each 
 
 1. **Code.** `fillMembers` reads each of the three tables once for all the members of the call (`membership_id = ANY($1)`, `pgx.ForEachRow`), in the same order as before, and hands every row to its member. A grant's revocation time is copied per grant, since the scan target is shared by the rows.
 2. **Tests.** `TestMembersListCarriesEachMembersOwn` gives two technicians a grant each, revoked at different times, and checks that each member lists only its own with its own time. The Go suites pass.
+
+## IR497 Device, event and plan lists read their details at once — 2026-10-30
+
+Found in review (after IR496, every loop that queries per item): three list reads still ran one query per item of the page:
+- the sensors of each device (`devices.list` / `devices.get`, HQ's device registry);
+- the response notes of each device event (`devices.events`);
+- the generated jobs of each maintenance plan (`plans.list`).
+
+1. **Code.** Each reads its details for the whole page in one query (`= ANY($1)`, ordered as before) and hands every row to its item.
+2. **Left as they are.**
+   - Loops in writes and scheduler jobs, which act on a few items.
+   - The default-rule settings, which concern the one default policy.
+   - The partner's eligible technicians and capacity (`members.eligible`, `members.capacity`). They apply the qualification, scope, unavailability and booking rules per technician of one company, so they are bounded by its team. Batching them would rework those rules, and nothing calls for it at that size.
+3. **Tests.** The Go suites pass.

@@ -56,27 +56,33 @@ func scanPlan(r pgx.Row) (Plan, error) {
 	return p, err
 }
 
+// occurrences reads the jobs generated for the plans in one query, not one per plan (IR497).
 func (m Plans) occurrences(ctx context.Context, c *ops.Call, ps []Plan) error {
+	if len(ps) == 0 {
+		return nil
+	}
+	ids, at := make([]uuid.UUID, len(ps)), make(map[uuid.UUID]int, len(ps))
 	for i := range ps {
-		rows, err := c.Tx.Query(ctx, `SELECT occurrence_at, id FROM maintenance.jobs WHERE plan_id = $1 ORDER BY occurrence_at`, ps[i].ID)
-		if err != nil {
+		ps[i].GeneratedOccurrences = []Occurrence{}
+		ids[i], at[ps[i].ID] = ps[i].ID, i
+	}
+	rows, err := c.Tx.Query(ctx, `SELECT plan_id, occurrence_at, id FROM maintenance.jobs WHERE plan_id = ANY($1) ORDER BY plan_id, occurrence_at`, ids)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var plan uuid.UUID
+		var o Occurrence
+		if err := rows.Scan(&plan, &o.OccurrenceAt, &o.JobID); err != nil {
+			rows.Close()
 			return err
 		}
-		ps[i].GeneratedOccurrences = []Occurrence{}
-		for rows.Next() {
-			var o Occurrence
-			if err := rows.Scan(&o.OccurrenceAt, &o.JobID); err != nil {
-				rows.Close()
-				return err
-			}
+		if i, ok := at[plan]; ok {
 			ps[i].GeneratedOccurrences = append(ps[i].GeneratedOccurrences, o)
 		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return err
-		}
 	}
-	return nil
+	rows.Close()
+	return rows.Err()
 }
 
 func (m Plans) load(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Plan, error) {

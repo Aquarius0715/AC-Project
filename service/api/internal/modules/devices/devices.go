@@ -124,23 +124,32 @@ func (m *Module) load(ctx context.Context, c *ops.Call, where string, args []any
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
 	}
+	if len(out) == 0 {
+		return out, total, nil
+	}
+	// the sensors of the whole page in one query, not one per device (IR497)
+	ids, at := make([]uuid.UUID, len(out)), make(map[uuid.UUID]int, len(out))
 	for i := range out {
-		srows, err := c.Tx.Query(ctx, `SELECT boundary_id, id, device_id, metric, unit, stale_after_seconds, calibrated_at FROM devices.sensors WHERE device_id = $1 ORDER BY metric`, out[i].ID)
-		if err != nil {
+		ids[i], at[out[i].ID] = out[i].ID, i
+	}
+	srows, err := c.Tx.Query(ctx, `SELECT boundary_id, id, device_id, metric, unit, stale_after_seconds, calibrated_at FROM devices.sensors
+		WHERE device_id = ANY($1) ORDER BY device_id, metric`, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+	for srows.Next() {
+		var s Sensor
+		if err := srows.Scan(&s.BoundaryID, &s.ID, &s.DeviceID, &s.Metric, &s.Unit, &s.StaleAfterSeconds, &s.CalibratedAt); err != nil {
+			srows.Close()
 			return nil, 0, err
 		}
-		for srows.Next() {
-			var s Sensor
-			if err := srows.Scan(&s.BoundaryID, &s.ID, &s.DeviceID, &s.Metric, &s.Unit, &s.StaleAfterSeconds, &s.CalibratedAt); err != nil {
-				srows.Close()
-				return nil, 0, err
-			}
+		if i, ok := at[s.DeviceID]; ok {
 			out[i].Sensors = append(out[i].Sensors, s)
 		}
-		srows.Close()
-		if err := srows.Err(); err != nil {
-			return nil, 0, err
-		}
+	}
+	srows.Close()
+	if err := srows.Err(); err != nil {
+		return nil, 0, err
 	}
 	return out, total, nil
 }
