@@ -105,7 +105,7 @@ export async function removeClientUser(id: string, version: number, reason: stri
 export async function signOutEverywhere(membershipId: string, reason: string) {
   return run(() => coreOp("members.revokeSessions", { membershipId, reason: reason.trim() }, write()).then(() => null));
 }
-/** clientUsers.resendInvite queues the invitation e-mail again (IR418). */
+/** clientUsers.resendInvite sends the set-up e-mail again, through the identity provider (IR461). */
 export async function resendInvite(id: string) {
   return run(() => coreOp("clientUsers.resendInvite", { id }, { write: true }).then(() => null));
 }

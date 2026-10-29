@@ -513,7 +513,7 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 	if _, err := c.Tx.Exec(ctx, `UPDATE identity.client_users SET last_invite_sent_at = $2 WHERE id = $1`, x.ID, c.Now); err != nil {
 		return InvitePreview{}, err
 	}
-	c.Audit(ops.AuditEntry{Action: "clientUsers.resendInvite", TargetKind: "client_user", TargetID: x.ID.String(), Reason: "invite e-mail queued"})
+	c.Audit(ops.AuditEntry{Action: "clientUsers.resendInvite", TargetKind: "client_user", TargetID: x.ID.String(), Reason: "set-up e-mail sent again"})
 	return InvitePreview{ID: uuid.New(), TenantID: x.TenantID, Version: 1, CreatedAt: c.Now, UpdatedAt: c.Now, Type: "invite", Target: map[string]string{"kind": "client_user", "id": x.ID.String()},
 		TemplateKey: "invite", Params: map[string]any{"targetName": x.Email, "at": c.Now, "status": "invited", "reason": nil, "amountMinor": nil, "currency": nil, "method": nil, "message": nil},
 		Channel: "email", DeliveryState: "queued", Severity: "normal", OccurredAt: c.Now}, nil
