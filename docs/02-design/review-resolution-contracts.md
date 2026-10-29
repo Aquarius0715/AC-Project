@@ -7197,3 +7197,19 @@ Found in review (after IR496, every loop that queries per item): three list read
    - The default-rule settings, which concern the one default policy.
    - The partner's eligible technicians and capacity (`members.eligible`, `members.capacity`). They apply the qualification, scope, unavailability and booking rules per technician of one company, so they are bounded by its team. Batching them would rework those rules, and nothing calls for it at that size.
 3. **Tests.** The Go suites pass.
+
+## IR498 Every data page has its loading and error state — 2026-10-30
+
+Found in review (route states): the web design says each route shows a loading and an error state in the user's language. Five pages that read the Core API had neither in their segments:
+- the partner's Team & capacity and Users;
+- HQ's Devices & models;
+- the shared Preferences and Demo controls in all four apps.
+
+The apps have no app-level `error.tsx`, so a failed read there fell through to Next.js' default "Application error" screen, in English and with no Try again. A slow read showed nothing until it finished.
+
+1. **Web.**
+   - Those pages get `loading.tsx` and `error.tsx` with the shared `RouteLoading` / `RouteError`.
+   - The shared shell pages keep theirs next to the screen and each app re-exports them, as the inbox does.
+   - Four Malay names: team & capacity, devices & models, preferences, demo controls.
+   - The remaining pages without route states read nothing: the sign-in and forgot-password pages, the forbidden page, and the redirects.
+2. **Tests.** The dictionary test already reads the route states' names (IR269) and passes.
