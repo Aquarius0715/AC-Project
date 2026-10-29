@@ -62,7 +62,8 @@ export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: s
     let line = "", warn = false, icon: IconName = "time";
     switch (j.displayStatus) {
       case "time_proposed": [line, warn, icon] = [t("A new visit time needs your reply — nothing is booked until you accept"), true, "swap"]; break;
-      case "requested": line = j.preferredSlots.length ? t("Preferred {slot} · +{n} more (not confirmed yet)", { slot: slot(j.preferredSlots[0]), n: j.preferredSlots.length - 1 }) : plan ? t("Plan visit {slot} · HQ is booking it", { slot: slot(j.requestedSlot) }) : t("Waiting for HQ"); break;
+      case "requested": line = j.preferredSlots.length > 1 ? t("Preferred {slot} · +{n} more (not confirmed yet)", { slot: slot(j.preferredSlots[0]), n: j.preferredSlots.length - 1 })
+        : j.preferredSlots.length ? t("Preferred {slot} (not confirmed yet)", { slot: slot(j.preferredSlots[0]) }) : plan ? t("Plan visit {slot} · HQ is booking it", { slot: slot(j.requestedSlot) }) : t("Waiting for HQ"); break;
       case "completed": icon = "success"; line = j.scheduledSlot ? t("Completed · visit {slot} · report available", { slot: slot(j.scheduledSlot) }) : t("Completed · report available"); break;
       case "cancelled": [line, icon] = [t("Cancelled"), "cancelled"]; break;
       case "offered": case "accepted": line = t(plan ? "Scheduled {slot} · booking the technician" : "Confirmed {slot} · booking the technician", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" }); break;

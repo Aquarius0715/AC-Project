@@ -17,7 +17,7 @@ const blank = (): Slot[] => [{ date: "2026-09-28", win: "14:00–16:00" }, { dat
 
 function scheduleLine(j: Job) {
   if (j.status === "time_proposed" && j.proposal) return { icon: "swap" as IconName, text: `${j.proposal.by === "contractor" ? "Service partner asks for" : "HQ proposed"} ${fmt(j.proposal.slot)} — reply by ${j.proposal.replyBy}`, warn: true };
-  if (j.status === "requested") return { icon: "time" as IconName, text: `Preferred ${fmt(j.preferred[0])} · +${Math.max(0, j.preferred.length - 1)} more (not confirmed yet)` };
+  if (j.status === "requested") return { icon: "time" as IconName, text: `Preferred ${fmt(j.preferred[0])}${j.preferred.length > 1 ? ` · +${j.preferred.length - 1} more` : ""} (not confirmed yet)` };
   if (j.status === "completed") return { icon: "success" as IconName, text: `Completed ${fmt(j.scheduled)} · report available` };
   if (j.status === "cancelled") return { icon: "cancelled" as IconName, text: "Cancelled" };
   return { icon: "time" as IconName, text: `${j.origin === "plan" ? "Scheduled" : "Confirmed"} ${fmt(j.scheduled)}${j.technician && j.techAck?.status === "accepted" ? ` · ${j.technician}` : j.status === "offered" ? " · booking the technician" : ""}` };

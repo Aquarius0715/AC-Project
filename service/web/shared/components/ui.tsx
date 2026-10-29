@@ -106,10 +106,14 @@ export function Card({ title, sub, action, children, className, pad = true, tone
   return (
     <UICard className={cn("min-w-0 overflow-visible", !pad && "pb-0", tone === "crit" && "ring-crit", tone === "warn" && "ring-[#fdba74]", tone === "ok" && "ring-[#86efac]", className)}>
       {(title || action) && (
-        <CardHeader>
-          {title && <CardTitle><h2>{title}</h2></CardTitle>}
-          {sub && <CardDescription className="text-xs">{sub}</CardDescription>}
-          {action && <CardAction>{action}</CardAction>}
+        // the title keeps at least 12rem: a wide action (a row of filters) goes below it on a narrow card instead of
+        // squeezing it into a column; a small one stays beside it
+        <CardHeader className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+          <div className="flex min-w-0 flex-[1_1_12rem] flex-col gap-1.5">
+            {title && <CardTitle><h2>{title}</h2></CardTitle>}
+            {sub && <CardDescription className="text-xs">{sub}</CardDescription>}
+          </div>
+          {action && <CardAction className="self-start">{action}</CardAction>}
         </CardHeader>
       )}
       <CardContent className={cn("min-w-0", !pad && "px-0")}>{children}</CardContent>
@@ -141,7 +145,8 @@ export function Kpi({ label, value, icon, unit, badge, sub, href, link, tone }: 
         {icon && <Icon name={icon} filled className="ml-1 text-[20px] text-warn" />}
         {unit && <span className="ml-1 text-sm font-medium text-muted-foreground">{unit}</span>}
       </div>
-      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+      {/* a long word without spaces (unknown/connecting/error) breaks instead of running out of a narrow card */}
+      {sub && <p className="break-words text-xs text-muted-foreground">{sub}</p>}
       {href && link && <TextLink href={href} className="mt-auto pt-1">{link} <Icon name="arrowRight" /></TextLink>}
     </UICard>
   );
@@ -163,7 +168,8 @@ export function Banner({ tone = "primary", icon, children, action }: { tone?: To
   return (
     <Alert role={tone === "crit" ? "alert" : "status"} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-3.5 py-2.5 text-[13px] *:[svg]:translate-y-0", bd)}>
       <Icon name={icon ?? (tone === "warn" ? "warning" : tone === "crit" ? "error" : tone === "ok" ? "success" : "info")} className="text-[15px]" />
-      <div className="min-w-0 flex-1">{children}</div>
+      {/* the text keeps at least 15rem: on a narrow screen the action goes below it instead of squeezing it */}
+      <div className="min-w-0 flex-[1_1_15rem]">{children}</div>
       {action}
     </Alert>
   );

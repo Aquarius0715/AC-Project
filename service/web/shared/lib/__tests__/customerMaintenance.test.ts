@@ -34,6 +34,8 @@ describe("customer maintenance", () => {
       ["job-plan", "scheduled", "plan", "Periodic inspection", "Scheduled 8 Dec, 10:00 – 11:00 am MYT · technician confirmed", false],
       ["job-c-done", "completed", "request", "Repair", "Completed · visit 8 Sept, 10:00 – 11:00 am MYT · report available", false],
     ]);
+    // one preferred time: no "+0 more"
+    expect(clientRows([row({ id: "job-one", preferredSlots: row({}).preferredSlots.slice(0, 1) })], () => unit)[0].line).toBe("Preferred 16 Sept, 10:00 am – 12:00 pm MYT (not confirmed yet)");
   });
 
   it("shows the detail facts, the preferred times and the technician once accepted", () => {

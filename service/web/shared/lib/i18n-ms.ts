@@ -659,6 +659,7 @@ export const ms: Record<string, string> = {
   "Repair": "Pembaikan",
   "A new visit time needs your reply — nothing is booked until you accept": "Masa lawatan baharu perlu jawapan anda — tiada apa-apa ditempah sehingga anda menerima",
   "Preferred {slot} · +{n} more (not confirmed yet)": "Pilihan {slot} · +{n} lagi (belum disahkan)",
+  "Preferred {slot} (not confirmed yet)": "Pilihan {slot} (belum disahkan)",
   "Plan visit {slot} · HQ is booking it": "Lawatan pelan {slot} · HQ sedang menempahnya",
   "Completed · visit {slot} · report available": "Selesai · lawatan {slot} · laporan tersedia",
   "Completed · report available": "Selesai · laporan tersedia",
