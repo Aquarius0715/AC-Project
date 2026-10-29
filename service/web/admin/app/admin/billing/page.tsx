@@ -37,9 +37,9 @@ export default async function AdminBillingPage({ searchParams }: PageProps<"/adm
   const [now, display, invoices, contracts, customers, properties, inquiries] = await Promise.all([
     coreNow(), coreDisplay(),
     coreOp<Page<ApiInvoice>>("invoices.list", { limit: 100, filters }),
-    coreOp<Page<ApiContract>>("contracts.list", { limit: 100 }),
-    coreOp<Page<ApiCustomer>>("customers.list", { limit: 100 }),
-    coreOp<Page<ApiProperty>>("properties.list", { limit: 100 }),
+    coreAll<ApiContract>("contracts.list").then((items) => ({ items, total: items.length })),
+    coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
+    coreAll<ApiProperty>("properties.list").then((items) => ({ items, total: items.length })),
     coreOp<Page<ApiInquiry>>("inquiries.list", { limit: 100 }),
   ]);
   const i = i18nOf(display);

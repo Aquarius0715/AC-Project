@@ -5,7 +5,7 @@
 // display language; the analysis and baseline periods are Kuala Lumpur business time and say so (IR296). The Phase 1A
 // demo keeps the fixture baselines.
 import { connection } from "next/server";
-import { apiMode, coreDisplay, coreNow, coreOp, CoreError, corePermissions } from "@ac/web/lib/dal";
+import { coreAll, apiMode, coreDisplay, coreNow, coreOp, CoreError, corePermissions } from "@ac/web/lib/dal";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { ApiCustomer, ApiProperty } from "@ac/web/lib/billing";
 import { baselineRows, klInstant, klLocal, summaryView, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
@@ -13,7 +13,6 @@ import { i18nOf } from "@ac/web/lib/i18n";
 import { EnergyDemo } from "./_components/energy-demo";
 import { EnergyView, type EnergyLive } from "./_components/energy-view";
 
-type Page<T> = { items: T[] };
 type Unit = { id: string; displayName: string; customerOrgId: string; propertyId: string; archived: boolean };
 const minute = (d: Date) => new Date(Math.floor(d.getTime() / 60000) * 60000);
 
@@ -25,10 +24,10 @@ export default async function AdminEnergyPage({ searchParams }: PageProps<"/admi
   const tab = one("tab") === "baselines" ? "baselines" : "analysis";
   const [now, perms, display, customers, properties, units, all] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
-    coreOp<Page<ApiCustomer>>("customers.list", { limit: 100 }),
-    coreOp<Page<ApiProperty>>("properties.list", { limit: 100 }),
-    coreOp<Page<Unit>>("units.list", { limit: 100 }),
-    coreOp<Page<ApiBaseline>>("baselines.list", { limit: 100 }),
+    coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
+    coreAll<ApiProperty>("properties.list").then((items) => ({ items, total: items.length })),
+    coreAll<Unit>("units.list").then((items) => ({ items, total: items.length })),
+    coreAll<ApiBaseline>("baselines.list").then((items) => ({ items, total: items.length })),
   ]);
   const i = i18nOf(display);
   const customerOfOrg = new Map(customers.items.map((c) => [c.organizationId, c.id]));
@@ -62,7 +61,7 @@ export default async function AdminEnergyPage({ searchParams }: PageProps<"/admi
       ...(scope.customerId && { customerId: scope.customerId }), ...(scope.propertyId && { propertyId: scope.propertyId }), ...(scope.unitId && { unitId: scope.unitId }),
       ...(one("from") && { from: klInstant(one("from")!) }), ...(one("to") && { to: klInstant(one("to")!) }),
     };
-    const scoped = Object.keys(filters).length ? (await coreOp<Page<ApiBaseline>>("baselines.list", { limit: 100, filters })).items : all.items;
+    const scoped = Object.keys(filters).length ? (await coreAll<ApiBaseline>("baselines.list", { filters }).then((items) => ({ items, total: items.length }))).items : all.items;
     const rows = baselineRows(scoped, i.t);
     live.list = { rows, from: one("from") ?? "", to: one("to") ?? "", selectedId: rows.find((r) => r.id === one("baselineId"))?.id ?? rows[0]?.id ?? null };
   }

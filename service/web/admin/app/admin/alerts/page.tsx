@@ -36,11 +36,11 @@ export default async function AdminAlertsPage({ searchParams }: PageProps<"/admi
   const [now, perms, display, alerts, units, customers, properties, policies, members, defaults] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
     coreOp<Page<ApiAdminAlert>>("alerts.list", { limit: 100, filters }), // every status in the scope: the tiles count them
-    coreOp<Page<ApiUnitName & { propertyId: string; archived?: boolean }>>("units.list", { limit: 100 }),
-    coreOp<Page<ApiCustomerName & { status?: "active" | "inactive" }>>("customers.list", { limit: 100 }),
+    coreAll<ApiUnitName & { propertyId: string; archived?: boolean }>("units.list").then((items) => ({ items, total: items.length })),
+    coreAll<ApiCustomerName & { status?: "active" | "inactive" }>("customers.list").then((items) => ({ items, total: items.length })),
     coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"),
-    coreOp<Page<ApiPolicy>>("policies.list", { limit: 100, filters: scope }),
-    optional(coreOp<Page<ApiMemberName>>("members.list", { limit: 100 }), { items: [] }),
+    coreAll<ApiPolicy>("policies.list", { filters: scope }).then((items) => ({ items, total: items.length })),
+    optional(coreAll<ApiMemberName>("members.list").then((items) => ({ items, total: items.length })), { items: [], total: 0 }),
     coreOp<Page<ApiPolicy>>("policies.list", { limit: 1, filters: { kind: "default_alert" } }),
   ]);
   const scoped = [...defaults.items, ...policies.items.filter((p) => p.kind !== "default_alert")];

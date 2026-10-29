@@ -7164,3 +7164,15 @@ The other single-page reads are bounded by what they read: a job's events, a day
    - The history reads the 100 newest jobs: job IDs are UUIDv7, so ID descending is newest first. The page sorts those as the user asks, as the note says.
    - The schedule reads every open job (`coreAll`, up to 1000).
 2. **Tests.** The partner jobs, language and smoke specs pass.
+
+## IR495 HQ's pages read every customer, property and unit they name — 2026-10-30
+
+Found in review (after IR494): ten HQ pages read the lists they name things from, or offer as choices, as one page of 100: units, customers, properties, organizations, contracts, capabilities, baselines, factors, policies and members (33 reads). HQ works across every customer, so once a tenant passes 100 units, the rest could not be chosen or found. Among the affected choices:
+- the units of an automation or alert policy;
+- the energy analysis and MRV;
+- an offset quote.
+
+Restrictions, billing, contracts and devices would also have shown IDs instead of names. The dev stack has 26 units, so nothing showed yet.
+
+1. **Web.** Those reads follow the list to its end (`coreAll`, up to 1000 items, the same filters and sort) and keep the page shape the screens use. Lists read for one record (a space's units, a report's versions) and the inbox stay as they are.
+2. **Tests.** The admin E2E project passes.

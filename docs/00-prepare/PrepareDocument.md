@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.364.0
+version: 0.365.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -275,6 +275,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.365.0: HQ's pages read every customer, property and unit they name or offer, not the first 100 (IR495). Phase 1A unchanged.
 0.364.0: The partner's job history shows its latest 100 jobs and the schedule reads every open job (IR494). Phase 1A unchanged.
 0.363.0: HQ's job refusals are in Malay too and name fields in words (IR493). Phase 1A unchanged.
 0.362.0: A revoked access ends when HQ confirms, not when the page loaded (IR492). Phase 1A unchanged.

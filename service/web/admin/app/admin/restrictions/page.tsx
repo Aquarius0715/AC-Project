@@ -36,11 +36,11 @@ export default async function AdminRestrictionsPage({ searchParams }: PageProps<
   const filters = { ...(scope.contractId && { contractId: scope.contractId }), ...(scope.invoiceId && { invoiceId: scope.invoiceId }), ...(status && { status }) };
   const [scoped, units] = await Promise.all([
     coreOp<Page<ApiRestriction>>("restrictions.list", { limit: 100, filters }),
-    perms.has("asset.read") ? coreOp<Page<Unit>>("units.list", { limit: 100 }) : Promise.resolve({ items: [] as Unit[] }), // override-only callers see unit IDs
+    perms.has("asset.read") ? coreAll<Unit>("units.list").then((items) => ({ items, total: items.length })) : Promise.resolve({ items: [] as Unit[] }), // override-only callers see unit IDs
   ]);
   const names = new Map(units.items.map((u) => [u.id, u.displayName]));
   const [contracts, customers] = full
-    ? await Promise.all([coreOp<Page<ApiContract & { rulesVersion: string | null }>>("contracts.list", { limit: 100 }), coreOp<Page<ApiCustomer>>("customers.list", { limit: 100 })])
+    ? await Promise.all([coreAll<ApiContract & { rulesVersion: string | null }>("contracts.list").then((items) => ({ items, total: items.length })), coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length }))])
     : [{ items: [] }, { items: [] }];
   const customerName = new Map(customers.items.map((c) => [c.id, c.name]));
   const contractLabel = (id?: string) => {
@@ -86,7 +86,7 @@ export default async function AdminRestrictionsPage({ searchParams }: PageProps<
   if (canWrite) { // the schedule form: eligible contracts, their overdue unpaid invoices, units and recipients
     const [overdue, caps, clients] = await Promise.all([
       coreOp<Page<ApiInvoice>>("invoices.list", { limit: 100, filters: { overdueOnly: true } }),
-      coreOp<Page<ApiCapability>>("capabilities.list", { limit: 100 }),
+      coreAll<ApiCapability>("capabilities.list").then((items) => ({ items, total: items.length })),
       coreOp<Page<{ customerId: string; status: string }>>("clientUsers.list", { limit: 100, filters: { status: "active" } }),
     ]);
     const busy = new Map<string, string>();

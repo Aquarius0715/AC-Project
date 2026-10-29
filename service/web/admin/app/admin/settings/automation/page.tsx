@@ -3,7 +3,7 @@
 // customers, properties and capabilities. Saving, simulating and firing are Server Actions (actions.ts). Texts in the
 // display language (IR303). The Phase 1A demo keeps the fixture policies.
 import { connection } from "next/server";
-import { apiMode, coreDisplay, coreNow, coreOp, corePermissions } from "@ac/web/lib/dal";
+import { coreAll, apiMode, coreDisplay, coreNow, coreOp, corePermissions } from "@ac/web/lib/dal";
 import { translator } from "@ac/web/lib/i18n";
 import type { ApiCustomer, ApiProperty } from "@ac/web/lib/billing";
 import type { ApiCapability } from "@ac/web/lib/devices";
@@ -11,7 +11,6 @@ import { policyGroups, type ApiAutoPolicy } from "@ac/web/lib/automation";
 import { AutomationDemo } from "./_components/automation-demo";
 import { AutomationView } from "./_components/automation-view";
 
-type Page<T> = { items: T[] };
 type Unit = { id: string; displayName: string; customerOrgId: string; propertyId: string; modelId: string; archived: boolean };
 
 export default async function AdminAutomationPage({ searchParams }: PageProps<"/admin/settings/automation">) {
@@ -23,11 +22,11 @@ export default async function AdminAutomationPage({ searchParams }: PageProps<"/
   const filters = { kind: "automation", ...(scope.customerId && { customerId: scope.customerId }), ...(scope.propertyId && { propertyId: scope.propertyId }), ...(scope.unitId && { unitId: scope.unitId }) };
   const [now, perms, display, policies, units, customers, properties, caps] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
-    coreOp<Page<ApiAutoPolicy>>("policies.list", { limit: 100, filters }),
-    coreOp<Page<Unit>>("units.list", { limit: 100 }),
-    coreOp<Page<ApiCustomer>>("customers.list", { limit: 100 }),
-    coreOp<Page<ApiProperty>>("properties.list", { limit: 100 }),
-    coreOp<Page<ApiCapability>>("capabilities.list", { limit: 100 }),
+    coreAll<ApiAutoPolicy>("policies.list", { filters }).then((items) => ({ items, total: items.length })),
+    coreAll<Unit>("units.list").then((items) => ({ items, total: items.length })),
+    coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
+    coreAll<ApiProperty>("properties.list").then((items) => ({ items, total: items.length })),
+    coreAll<ApiCapability>("capabilities.list").then((items) => ({ items, total: items.length })),
   ]);
   const customerOfOrg = new Map(customers.items.map((c) => [c.organizationId, c]));
   const t = translator(display.locale);

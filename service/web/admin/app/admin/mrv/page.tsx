@@ -5,7 +5,7 @@
 // the review times are formatted here, in the display time zone (IR282, IR297). The Phase 1A demo keeps the fixture
 // reports.
 import { connection } from "next/server";
-import { apiMode, coreDisplay, coreOp, corePermissions } from "@ac/web/lib/dal";
+import { coreAll, apiMode, coreDisplay, coreOp, corePermissions } from "@ac/web/lib/dal";
 import { baselineRows, klInstant, type ApiBaseline } from "@ac/web/lib/energy";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { mrvView, reportRows, reviewItems, type ApiFactor, type ApiMRVReport } from "@ac/web/lib/mrv";
@@ -23,10 +23,10 @@ export default async function AdminMRVPage({ searchParams }: PageProps<"/admin/m
   const tab = one("tab") === "factors" ? "factors" : "reports";
   const [perms, display, orgs, units, baselines, factors] = await Promise.all([
     corePermissions(), coreDisplay(),
-    coreOp<Page<{ id: string; name: string; kind: string; status: string }>>("organizations.list", { limit: 100, filters: { kind: "customer" } }),
-    coreOp<Page<Unit>>("units.list", { limit: 100 }),
-    coreOp<Page<ApiBaseline>>("baselines.list", { limit: 100 }),
-    coreOp<Page<ApiFactor>>("factors.list", { limit: 100 }),
+    coreAll<{ id: string; name: string; kind: string; status: string }>("organizations.list", { filters: { kind: "customer" } }).then((items) => ({ items, total: items.length })),
+    coreAll<Unit>("units.list").then((items) => ({ items, total: items.length })),
+    coreAll<ApiBaseline>("baselines.list").then((items) => ({ items, total: items.length })),
+    coreAll<ApiFactor>("factors.list").then((items) => ({ items, total: items.length })),
   ]);
   const i = i18nOf(display);
   const customers = orgs.items.map((o) => ({ id: o.id, name: o.name }));

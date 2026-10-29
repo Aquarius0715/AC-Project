@@ -4,13 +4,12 @@
 // (actions.ts). Texts in the display language; contract periods are Kuala Lumpur days (IR300). The Phase 1A demo keeps
 // the fixture rows.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, coreOp } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiCustomer, ApiProperty } from "@ac/web/lib/billing";
 import { contractRows, unitOptions, type ApiContractFull, type ApiUnitBrief, type PlanType } from "@ac/web/lib/contracts";
 import { ContractsView } from "./_components/contracts-view";
 
-type Page<T> = { items: T[] };
 const plans: PlanType[] = ["rto", "general", "energy", "environment"];
 
 export default async function AdminContractsPage({ searchParams }: PageProps<"/admin/billing/contracts">) {
@@ -26,9 +25,9 @@ export default async function AdminContractsPage({ searchParams }: PageProps<"/a
     coreAll<ApiContractFull>("contracts.list"),
     Object.keys(where).length ? coreAll<ApiContractFull>("contracts.list", { filters: where }) : null, // the plan counts of the scope
     kind ? coreAll<ApiContractFull>("contracts.list", { filters: { ...where, kind } }) : null,
-    coreOp<Page<ApiCustomer>>("customers.list", { limit: 100 }),
-    coreOp<Page<ApiProperty>>("properties.list", { limit: 100 }),
-    coreOp<Page<ApiUnitBrief>>("units.list", { limit: 100 }),
+    coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
+    coreAll<ApiProperty>("properties.list").then((items) => ({ items, total: items.length })),
+    coreAll<ApiUnitBrief>("units.list").then((items) => ({ items, total: items.length })),
   ]);
   const ofScope = inScope ?? all;
   const counts = Object.fromEntries([["all", ofScope.length], ...plans.map((p) => [p, ofScope.filter((k) => k.planType === p).length])]) as Record<PlanType | "all", number>;

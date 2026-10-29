@@ -37,8 +37,8 @@ export default async function AdminDevicesPage({ searchParams }: PageProps<"/adm
   const tab = one("tab") === "devices" ? "devices" : one("tab") === "firmware" ? "firmware" : "models";
   const [now, perms, display, caps, units, devices] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
-    coreOp<Page<ApiCapability>>("capabilities.list", { limit: 100 }),
-    coreOp<Page<ApiUnitLite>>("units.list", { limit: 100 }),
+    coreAll<ApiCapability>("capabilities.list").then((items) => ({ items, total: items.length })),
+    coreAll<ApiUnitLite>("units.list").then((items) => ({ items, total: items.length })),
     coreOp<Page<ApiDevice>>("devices.list", { limit: 100 }),
   ]);
   const i = i18nOf(display);
