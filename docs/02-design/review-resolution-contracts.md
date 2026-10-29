@@ -6989,3 +6989,10 @@ Found in review: IR333 made every design document end with "Additional contracts
 
 1. **Wording.** The line now reads "Additional contracts: every IR in the Re-review Correction Contracts applies, the newest included", followed by the same IR72 precedence sentence. It names neither the document's version (that stays in its front matter) nor an IR range, so a new IR cannot leave it behind. This covers the thirteen design documents and the UI/UX specification.
 2. **Checked.** validate_documents.py still flags the stale forms it knew (an old version number or an early IR range in the line); the new line has neither, so the check passes.
+
+## IR476 A restriction ends when its cause invoices are paid at the same moment — 2026-10-29
+
+Found in review: a restriction may cite several cause invoices, and IR35 route ① ends it (scheduled → cancelled; requested / applied → release_requested) when the last of them is paid. The release ran in the payment's transaction and checked for another unpaid cause invoice. Two payments of two cause invoices at the same moment (two manual payments, or two card payments) each saw the other invoice still unpaid, so both left the restriction. The customer stayed restricted after paying everything, and no job releases it later.
+
+1. **Lock.** On a paid invoice, the restrictions citing it are locked first, in ID order (no deadlock between payments). The second payment waits for the first, then sees its invoice paid and ends the restriction.
+2. **Tests.** `TestRestrictionEndsWhenItsInvoicesArePaidAtOnce`: in five rounds, two manual payments of a scheduled restriction's two cause invoices are sent at once, and the restriction is cancelled each time. Without the lock, the second round left it scheduled.

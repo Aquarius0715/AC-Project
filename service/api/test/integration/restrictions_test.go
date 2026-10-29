@@ -738,3 +738,47 @@ func TestRestrictionOnePerUnitAtOnce(t *testing.T) {
 		}
 	}
 }
+
+// IR476: a restriction whose two cause invoices are paid at the same moment ends. Each payment checked for another
+// unpaid cause invoice while the other payment was still open, so both saw one, both left the restriction, and the
+// customer stayed restricted after paying everything. Five rounds of two manual payments sent at once.
+func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
+	s := server(t)
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	for round := 0; round < 5; round++ {
+		u := boundUnit(t, s, "online")
+		k, inv1 := overdueContract(t, s, u)
+		code, m := write(s, &hq, "invoices.create", `{"amountMinor":5000,"currency":"MYR","contractId":"`+k+`","contractVersion":1,"period":{"from":"`+ts(24*16)+`","to":"`+ts(24*46)+`"},"dueAt":"`+ts(24*47)+`"}`, 0)
+		if code != 200 {
+			t.Fatalf("round %d: second invoice: %d %v", round, code, m)
+		}
+		inv2 := data(m)["id"].(string)
+		owner(t, `UPDATE billing.invoices SET due_at = $2 WHERE id = $1`, inv2, clock.Add(-time.Hour))
+		code, m = write(s, &restrMgr, "restrictions.schedule", scheduleBody(k, inv1, []string{u}, map[string]string{"causeInvoiceIds": `["` + inv1 + `","` + inv2 + `"]`}), 0)
+		if code != 200 {
+			t.Fatalf("round %d: schedule: %d %v", round, code, m)
+		}
+		r := data(m)["id"].(string)
+		bodies := map[string]int{}
+		for _, inv := range []string{inv1, inv2} {
+			_, m := post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`)
+			bodies[`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+inv[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"bank transfer seen"}`] = ver(m)
+		}
+		var wg sync.WaitGroup
+		for body, v := range bodies {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if code, m := write(s, &hq, "payments.recordManual", body, v); code != 200 {
+					t.Errorf("round %d: payment: %d %v", round, code, m)
+				}
+			}()
+		}
+		wg.Wait()
+		var state string
+		ownerScan(t, `SELECT state FROM restrictions.restrictions WHERE id = $1`, []any{r}, &state)
+		if state != "cancelled" {
+			t.Fatalf("round %d: both cause invoices paid, the scheduled restriction is %s", round, state)
+		}
+	}
+}

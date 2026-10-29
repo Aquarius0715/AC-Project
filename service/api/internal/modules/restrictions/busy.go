@@ -134,6 +134,12 @@ func (Busy) ForInvoice(ctx context.Context, c *ops.Call, invoice uuid.UUID) ([]u
 // OnInvoicePaid applies IR35 route ①: restrictions citing the invoice whose cause invoices are all paid move scheduled →
 // cancelled and requested/applied → release_requested with a payment release intent. It returns the changed IDs.
 func (m Restrictions) OnInvoicePaid(ctx context.Context, c *ops.Call, invoice uuid.UUID) ([]uuid.UUID, error) {
+	// the restrictions citing the invoice are locked first, in ID order, so the payments of their other cause invoices
+	// wait for each other: two at once each saw the other invoice still unpaid and both left the restriction (IR476)
+	if _, err := c.Tx.Exec(ctx, `SELECT 1 FROM restrictions.restrictions r WHERE r.state IN ('scheduled','requested','applied')
+		AND EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri WHERE ri.restriction_id = r.id AND ri.invoice_id = $1) ORDER BY r.id FOR UPDATE OF r`, invoice); err != nil {
+		return nil, err
+	}
 	rows, err := c.Tx.Query(ctx, `UPDATE restrictions.restrictions r SET
 			state = CASE WHEN r.state = 'scheduled' THEN 'cancelled' ELSE 'release_requested' END,
 			release_intent = CASE WHEN r.state = 'scheduled' THEN r.release_intent ELSE jsonb_build_object('source', 'payment', 'at', $2::timestamptz, 'actorMembershipId', $3::uuid) END,
