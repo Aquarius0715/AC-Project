@@ -6,7 +6,6 @@
 import { ms } from "@ac/web/lib/i18n-ms";
 
 export type Locale = "en" | "ms";
-export const LOCALES: Locale[] = ["en", "ms"];
 export const isLocale = (v: unknown): v is Locale => v === "en" || v === "ms";
 /** The browser demo keeps the chosen language in this browser (Preferences demo). */
 export const LOCALE_KEY = "ac-locale";

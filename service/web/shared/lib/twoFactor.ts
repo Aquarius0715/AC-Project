@@ -32,5 +32,4 @@ export function qrPath(text: string): QrPath {
 }
 
 /** The code as typed: digits only, at most six. */
-export const codeDigits = (v: string) => v.replace(/\D/g, "").slice(0, 6);
 export const codeComplete = (v: string) => /^\d{6}$/.test(v);

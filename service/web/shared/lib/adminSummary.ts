@@ -38,13 +38,6 @@ export function kpisFrom(a: AdminSummary, t: T = en): Kpis {
 }
 
 
-/** Today in Asia/Kuala_Lumpur on UTC minute boundaries, ending at the business clock (admin.summary range). */
-export function todayRange(clock: Date): { from: string; to: string } {
-  const now = new Date(Math.floor(clock.getTime() / 60000) * 60000);
-  const kl = new Date(now.getTime() + 8 * 3600000);
-  const from = new Date(Date.UTC(kl.getUTCFullYear(), kl.getUTCMonth(), kl.getUTCDate()) - 8 * 3600000);
-  return { from: from.toISOString(), to: (now > from ? now : new Date(from.getTime() + 60000)).toISOString() };
-}
 
 // ---- the HQ overview sections from the same admin.summary (DD-A01 steps 5–7, Figma Admin 01, IR244) ----
 

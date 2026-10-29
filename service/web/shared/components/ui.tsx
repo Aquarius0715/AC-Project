@@ -220,17 +220,6 @@ export function ErrorState({ title, children, onRetry }: { title: string; childr
     </Empty>
   );
 }
-export function OfflineState({ children }: { children: React.ReactNode }) {
-  return (
-    <Empty className="border bg-card">
-      <EmptyHeader>
-        <EmptyMedia variant="icon"><Icon name="offline" /></EmptyMedia>
-        <EmptyTitle><h3>Offline — data may be stale</h3></EmptyTitle>
-        <EmptyDescription>{children}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
-}
 
 export function SummaryList({ items, cols = 1 }: { items: [string, React.ReactNode][]; cols?: 1 | 2 }) {
   return (
@@ -447,11 +436,6 @@ export function Modal({ open, title, onClose, children, footer, wide }: { open: 
   );
 }
 
-/* Modal with Cancel + confirm, controlled by a single trigger */
-export function useModal() {
-  const [open, setOpen] = useState(false);
-  return { open, show: () => setOpen(true), hide: () => setOpen(false), setOpen };
-}
 
 /* ───────────── Toast ───────────── */
 const ToastCtx = createContext<(msg: string, tone?: Tone) => void>(() => {});
@@ -597,10 +581,3 @@ export function UtilBar({ pct, tone = "primary", label }: { pct: number | null; 
   );
 }
 
-/* Form-in-modal helper: required-field validation */
-export function useRequired<T extends Record<string, string>>(init: T) {
-  const [v, setV] = useState<T>(init);
-  const [submitted, setSubmitted] = useState(false);
-  const err = (k: keyof T, msg: string, min = 1) => (submitted && v[k].trim().length < min ? msg : undefined);
-  return { v, set: (k: keyof T, val: string) => setV((s) => ({ ...s, [k]: val })), submitted, submit: () => setSubmitted(true), reset: () => { setV(init); setSubmitted(false); }, err };
-}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   symptomLength,
-  clientEventTitle, clientJobRefusal, slotLong, slotShort, clientRows, contactError, declinedNotice, detailFacts, feedback, followUpText, notesOf, planVisit, preferredError, preferredLines, proposalCard, tabOf, tabOfQuery,
+  clientEventTitle, clientJobRefusal, slotLong, slotShort, clientRows, contactError, declinedNotice, detailFacts, feedback, followUpText, notesOf, planVisit, preferredError, preferredLines, proposalCard, tabOf,
   type ApiClientJob, type ApiClientRow,
 } from "@ac/web/lib/customerMaintenance";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
@@ -22,7 +22,7 @@ const unit = { name: "Bedroom AC", place: "Home A › 1F › Bedroom" };
 
 describe("customer maintenance", () => {
   it("groups the requests and says what is next", () => {
-    expect([tabOf("time_proposed"), tabOf("accepted"), tabOf("submitted"), tabOf("on_hold"), tabOfQuery("x"), tabOfQuery("reply")]).toEqual(["reply", "scheduled", "progress", "progress", "all", "reply"]);
+    expect([tabOf("time_proposed"), tabOf("accepted"), tabOf("submitted"), tabOf("on_hold")]).toEqual(["reply", "scheduled", "progress", "progress"]);
     const rows = clientRows([
       row({ id: "job-c-done", status: "completed", displayStatus: "completed", scheduledSlot: slot("2026-09-08T02:00:00Z", "2026-09-08T03:00:00Z") }),
       row({}), row({ id: "job-prop", displayStatus: "time_proposed" }),

@@ -7249,3 +7249,13 @@ Found by the E2E run of c75e6b2 (IR500): at 360 px in Malay, three pages scrolle
    - `Plain` may shrink and wrap.
    - The partner's note buttons wrap.
 2. **Guard.** The phone pass of the smoke crawl forces a wide font (Verdana, else DejaVu Sans) on every page before it measures, so a Mac finds what the Linux fonts push sideways. That pass bypasses the CSP to inject the font; the first pass still fails on any CSP violation. All four apps pass.
+
+## IR502 Unused web exports removed — 2026-10-30
+
+Found in review (a scan of what the shared web code exports against what any app, test or spec uses):
+- **Not used anywhere.** `OfflineState`, `useModal` and `useRequired` in the UI kit, `LOCALES`, `windowMs` and `iconNames`.
+- **Used only by their own tests.** `todayRange` (the HQ overview reads its range elsewhere), `tabOfQuery` (the maintenance page reads its tab another way) and `codeDigits` (the code input keeps its own digit filter).
+
+1. **Web.** The nine are removed, with their test lines.
+   - The rest of the scan's list stays. Those are types and helpers used inside their own module, the key lists the tests read (`EVIDENCE_KEYS`, `NOTIFICATION_KEYS`, `HQ_REFUSAL_KEYS`), and the demo store's test seam (`getJobState`).
+2. **Checked.** Typecheck, lint and Vitest pass.

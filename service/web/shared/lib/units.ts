@@ -108,7 +108,6 @@ export function componentGroups(keys: string[]): Record<"Indoor" | "Outdoor" | "
   return out;
 }
 
-export const windowMs = { "1h": 3600e3, "24h": 86400e3, "7d": 7 * 86400e3 } as const;
 
 /** Buckets measurements into n equal slots (latest value per slot; null where no valid measurement). */
 export function bucket(items: { value: number | null; observedAt: string; quality?: string }[], from: Date, to: Date, n = 12): (number | null)[] {

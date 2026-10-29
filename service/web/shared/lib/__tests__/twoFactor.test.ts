@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import jsQR from "jsqr";
-import { codeComplete, codeDigits, groupKey, otpauthUri, qrPath, type QrPath } from "@ac/web/lib/twoFactor";
+import { codeComplete, groupKey, otpauthUri, qrPath, type QrPath } from "@ac/web/lib/twoFactor";
 
 /** Paints the path's rectangles at `scale` pixels per module, with `pad` more white modules around, as RGBA. */
 function raster(qr: QrPath, scale = 4, pad = 2) {
@@ -30,7 +30,6 @@ describe("Two-step verification setup (FR-X08, IR247)", () => {
   });
 
   it("keeps the code to six digits", () => {
-    expect([codeDigits("12a3 4-56789"), codeDigits("")]).toEqual(["123456", ""]);
     expect([codeComplete("123456"), codeComplete("12345"), codeComplete("12345a")]).toEqual([true, false, false]);
   });
 });

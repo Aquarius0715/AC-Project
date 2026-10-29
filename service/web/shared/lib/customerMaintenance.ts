@@ -48,7 +48,6 @@ export const tabOf = (displayStatus: string): StatusTab =>
   displayStatus === "time_proposed" ? "reply" : displayStatus === "requested" ? "requested" : ["offered", "accepted", "assigned"].includes(displayStatus) ? "scheduled"
     : displayStatus === "completed" ? "completed" : displayStatus === "cancelled" ? "cancelled" : "progress";
 const ORDER = ["time_proposed", "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
-export const tabOfQuery = (v?: string): StatusTab => (STATUS_TABS.some(([t]) => t === v) ? (v as StatusTab) : "all");
 
 export type ClientRow = { id: string; short: string; unit: string; place: string; origin: "plan" | "request"; type: string; status: string; tab: StatusTab; line: string; icon: IconName; warn: boolean };
 const TYPE: Record<string, string> = { reactive: "Repair", preventive: "Preventive maintenance", periodic: "Periodic inspection" };

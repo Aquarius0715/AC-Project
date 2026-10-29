@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asOfText, axisRows, billingView, forecastView, jobRows, kpisFrom, overviewLinks, todayRange, type AdminSummary, type ApiForecast } from "@ac/web/lib/adminSummary";
+import { asOfText, axisRows, billingView, forecastView, jobRows, kpisFrom, overviewLinks, type AdminSummary, type ApiForecast } from "@ac/web/lib/adminSummary";
 import { periodRange } from "@ac/web/lib/clientEnergy";
 import { i18nOf } from "@ac/web/lib/i18n";
 
@@ -22,7 +22,6 @@ describe("HQ overview sections (DD-A01, IR244)", () => {
     const today = periodRange("today", new Date("2026-09-14T01:00:00Z"));
     expect(asOfText("2026-09-14T01:00:00Z", today.label)).toBe(`As of 9:00 am MYT · ${today.label}`);
     expect(today.label).toMatch(/\(1 day\) · Asia\/Kuala_Lumpur$/); // the period stays Kuala Lumpur days, named so
-    expect(todayRange(new Date("2026-09-14T01:00:00Z"))).toEqual({ from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:00:00.000Z" });
     const l = overviewLinks({ customerId: "c1", propertyId: null });
     expect([l.units, l.power("off"), l.connection("connecting,error,unknown"), l.jobs("assigned"), l.billing, overviewLinks({ customerId: null, propertyId: null }).units])
       .toEqual(["/admin/units?customerId=c1", "/admin/units?customerId=c1&powerState=off", "/admin/units?customerId=c1&connections=connecting%2Cerror%2Cunknown", "/admin/jobs?customerId=c1&stage=assigned", "/admin/billing?overdueOnly=true", "/admin/units"]);

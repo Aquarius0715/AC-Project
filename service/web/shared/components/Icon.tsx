@@ -123,7 +123,6 @@ const ICONS = {
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
-export const iconNames = Object.keys(ICONS) as IconName[];
 
 const cls = (...a: (string | false | undefined)[]) => a.filter(Boolean).join(" ");
 
