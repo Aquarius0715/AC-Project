@@ -25,7 +25,7 @@ Treat route parameters as untrusted input and always validate them. Service name
 |---|---|---|---|---|
 | DD-T01 / FR-T01 | `/technician` / `TechnicianOverview` | `jobs.list`, `alerts.list`, `summaries.get`, `units.list` | Filter by period and severity. Check assignments and deadlines in the service | Exclude jobs assigned to others from results and summaries |
 | DD-T02 / FR-T02 | `/technician/units/:id` / `DiagnosticUnit` | `units.get`, `devices.list`, `alerts.list`, `jobs.list`, `jobs.get` | View unit ID and supported features. Clearly identify items outside maintenance scope | Distinguish unregistered units from disconnected units |
-| DD-T03 / FR-T03 | `/technician/units/:id` / `TelemetryPanel` | `telemetry.series`, `telemetry.summary`, `devices.events` | Select metric and period. Subscribe through the Repository. Phase 1A uses only predefined events | Do not show old values as live. Refetch when the stream disconnects |
+| DD-T03 / FR-T03 | `/technician/units/:id` / `TelemetryPanel` | `telemetry.series`, `telemetry.summary`, `devices.events` | Select metric and period (1h / 24h / 7d, IR283). API mode reads the period when the page loads; Phase 1A uses only predefined events | Do not show old values as live: an offline unit's values say “last known · observed …” and the page says nothing on it is real-time (IR283) |
 | DD-T04 / FR-T04 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Select normal/needs attention/not inspected/not applicable for each component. Record findings and measurement evidence. Do not default to normal | Require reasons for not applicable or not inspected. Do not replace actual measurements with demo diagnosis results |
 | DD-T05 / FR-T05 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Outdoor units use the shared schema with a separate component group | Do not claim detection of tiny leaks without a selected sensor |
 | DD-T06 / FR-T06 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Record each measurement's value, unit, observation time, and inspector. Operating procedures and installation instructions are outside this design | Do not save an unmeasured value as 0 or normal |
@@ -42,10 +42,10 @@ Treat route parameters as untrusted input and always validate them. Service name
 ## Shared Implementation Steps
 
 1. Check the session and permission scope. Validate IDs and URL filters against schemas.
-2. Call mock services through Queries and receive screen models.
-3. Build forms with controlled inputs and a pure validator per form in `shared/lib`; also validate capabilities and periods, and the Core API checks again (DEC-03, decided 2026-10-10).
+2. Read in the route's Server Component through the DAL (API mode) or from the demo fixtures (Phase 1A); pure mappers in `shared/lib` turn the results into screen models.
+3. Forms use controlled inputs with a pure validator per form in `shared/lib`; the validators also check unit capabilities and periods, and the Core API checks again. Forms move to React Hook Form with Zod in their DEC-75 phase.
 4. Immediately before a mutation, check the target version, permissions, and current state. For major actions, also confirm the target and reason.
-5. Change shared demo state through the Repository. Emit events with a correlation ID for tracking. Invalidate related Queries so they can be refetched.
+5. Write through the route's Server Action with the row version and an Idempotency-Key; the Core API records the event and audit with a correlation ID, and the route renders again with the latest state (`refresh()`). The Phase 1A demo changes the tab's shared demo store instead.
 6. Keep a waiting indicator visible while awaiting a response. Show success, denial, and failure separately. Keep form inputs when submission fails.
 
 ## Handoff to Testing

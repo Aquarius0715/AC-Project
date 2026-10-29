@@ -23,7 +23,7 @@ Implement the agreed design as frontend code and clearly labeled mock data and b
 | Skill | Expected ability |
 |---|---|
 | react-typescript | Implement in React while respecting type boundaries and component responsibilities |
-| library-composition | Use the shared components (`shared/components/ui.tsx`), the per-form validators and the DAL; add no UI kit, icon set, or form, schema, query or translation library (DEC-03, decided 2026-10-10) |
+| library-composition | Use the shadcn/ui components (`shared/components/ui/`) and the product components built on them (`shared/components/ui.tsx`), the per-form validators and the DAL. Use the established library DEC-75 names for a need (forms, tables, charts, toasts, dates, one-time codes); for any other library, record the required feature, the cost and impact first (UIUX specification) |
 | mock-api-adapters | Provide reproducible seeds, clocks, and events, and implement replaceable Repositories |
 | debug-and-verify | Isolate causes of failure and run type checks, lint, builds, and required tests for the assigned scope |
 

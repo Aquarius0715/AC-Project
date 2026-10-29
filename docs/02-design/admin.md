@@ -70,10 +70,10 @@ Show retry only for recoverable errors. For forbidden and not-found, follow IR57
 ## Shared Implementation Steps
 
 1. Check the session and assigned scope; validate IDs and URL filters against schemas.
-2. Call mock services through Queries and receive display data.
-3. Forms use controlled inputs with a pure validator per form in `shared/lib`, including capability and period validation; the Core API checks again (DEC-03, decided 2026-10-10).
+2. Read in the route's Server Component through the DAL (API mode) or from the demo fixtures (Phase 1A); pure mappers in `shared/lib` turn the results into display data.
+3. Forms use controlled inputs with a pure validator per form in `shared/lib`; the validators also check unit capabilities and periods, and the Core API checks again. Forms move to React Hook Form with Zod in their DEC-75 phase.
 4. Immediately before a change, check the target version, permissions, and current state. Confirm the target and reason before major actions.
-5. Change shared demo state through the Repository and emit an event with a correlation ID. Invalidate related Queries and fetch the latest state.
+5. Write through the route's Server Action with the row version and an Idempotency-Key; the Core API records the event and audit with a correlation ID, and the route renders again with the latest state (`refresh()`). The Phase 1A demo changes the tab's shared demo store instead.
 6. Keep the display visible while awaiting a response. Show success, denial, and failure separately. Keep form inputs after submission failure.
 
 ## Handoff to Testing

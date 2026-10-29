@@ -7045,3 +7045,15 @@ Found in review: IR140 gives an undelivered restriction Command one of two pendi
 1. **HQ.** The unit row reads "a device operation is running", and the progress line adds "<n> waiting for a device operation" beside "<n> offline".
 2. **Customer.** The notice's unit line reads "the unit is busy with a device update", as it reads "the unit is offline" for an offline one.
 3. **Dictionary.** Three Malay entries; `restrictions.test.ts` and `clientBilling.test.ts` check both languages.
+
+## IR483 The design docs follow DEC-75 and the API-mode data path — 2026-10-30
+
+Found in review: DEC-75 (2026-10-12) superseded DEC-03, but the docs still cited DEC-03 as current in several places. The web design's "UI and forms" paragraph was headed DEC-03 and ended "No UI kit, icon set, or form, schema, query or translation library is added", below its own list of shadcn/ui, Lucide, TanStack Table, Recharts and Sonner. The implementation agent's library-composition skill still said to add none of those. The four role designs' shared implementation steps still called "mock services through Queries" and changed "shared demo state through the Repository", the Phase 1A path, not the Server Components and Server Actions of API mode.
+
+1. **Web design (common.md).** The paragraph is headed DEC-75 (supersedes DEC-03). Forms and translation are still the build's own and move to React Hook Form with Zod and to a translation library in their DEC-75 phases; no query library is added (TanStack Query only where a client component needs a cache, polling or optimistic updates).
+2. **Implementation agent.** library-composition uses the shadcn/ui components and the product components built on them, and the libraries DEC-75 names; any other library first records the required feature, cost and impact, as the UIUX specification asks.
+3. **Role designs.** Steps 2, 3 and 5 of the admin, contractor, client and technician designs:
+   - reads go through the DAL in the route's Server Component (the demo fixtures in Phase 1A);
+   - forms stay controlled inputs with pure validators until their DEC-75 phase;
+   - writes are Server Actions with the row version and an Idempotency-Key, and the route renders again (`refresh()`).
+4. **DD-T03.** The telemetry row no longer asks for a subscription through the Repository with a refetch when the stream disconnects: API mode reads the period when the page loads, and an offline unit's values say "last known · observed …" with the page saying nothing on it is real-time (IR283).
