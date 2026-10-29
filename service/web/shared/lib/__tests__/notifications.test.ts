@@ -14,6 +14,7 @@ describe("inbox rows and alert rows", () => {
     const r = inboxRow(note({}), "client");
     expect([r.t, r.d, r.href, r.read]).toEqual(["Job update — job-1", "Requested", "/customer/maintenance?jobId=job-1", false]);
     expect(inboxRow(note({ channel: "email" }), "client").d).toBe("Requested · email");
+    expect(inboxRow(note({ channel: "email" }), "client", { locale: "ms", timeZone: "UTC" }).d).toBe("Diminta · e-mel"); // the channel in words too (IR488)
     expect(inboxRow(note({ type: "fault", templateKey: "alert", sourceAlertId: "a1", target: { kind: "unit", id: "u1" }, params: { ...note({}).params, targetName: "Bedroom AC", status: "open" } }), "client"))
       .toMatchObject({ t: "Alert on Bedroom AC", href: "/customer/alerts" });
   });

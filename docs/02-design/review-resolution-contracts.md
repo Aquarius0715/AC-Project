@@ -7101,9 +7101,10 @@ Found in review (an axe crawl of every linked page at 390 px in Malay; the smoke
    - The UIUX specification says so.
 2. **Guard.** The smoke crawl (`shared/smoke.e2e.ts`) runs a second time per app at 390 px in Malay, restoring the language afterwards: no critical or serious axe violation, and no page that scrolls sideways. The four apps pass both crawls.
 
-## IR488 A payment reminder in the inbox names its amount — 2026-10-30
+## IR488 A payment reminder in the inbox names its amount; the channel in words — 2026-10-30
 
 Found in review (after IR481): a payment reminder (`contracts.sendReminder`, BR-A08) stores no status, so since IR481 its inbox row had an empty detail line ("Payment reminder — <invoice>" alone; before, the type stood there as the status). The API projects the reminder's amount and currency into the canonical params (IR142).
 
 1. **Web.** The row reads "Amount due 120.00 MYR" in the display language, as the invoice page words it; a reminder without an amount keeps an empty line. It still opens the invoice.
-2. **Tests.** `notifications.test.ts` checks English, Malay and the missing amount.
+2. **Channel.** A row sent by e-mail ends with its channel; it read the code "email" in Malay too and now reads it in words ("e-mel"), as the partner's history does.
+3. **Tests.** `notifications.test.ts` checks English, Malay, the missing amount and the channel.

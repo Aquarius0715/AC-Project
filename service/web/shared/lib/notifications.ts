@@ -3,6 +3,7 @@
 import type { Role } from "@ac/web/lib/nav";
 import { evidenceText } from "@ac/web/lib/evidence";
 import { money } from "@ac/web/lib/money";
+import { channelText } from "@ac/web/lib/partnerHistory";
 import { DEFAULT_DISPLAY, showDate, showTime, translate, translator, type Display } from "@ac/web/lib/i18n";
 
 type TargetKind = "unit" | "job" | "invoice" | "restriction" | "device" | "inquiry" | "client_user" | "partner_user" | "certificate";
@@ -106,7 +107,7 @@ export function inboxRow(n: ApiNotification, role: Role, display: Display = DEFA
   const status = n.params.status === n.type ? null : word(statusWords, n.params.status);
   const message = n.params.message ? messageText(n.params.message, display) : word(reasonWords, n.params.reason);
   const text = details[n.templateKey]?.(n, display) ?? [message, status].filter(Boolean).join(" · ");
-  const detail = [text, n.channel === "inApp" ? null : n.channel].filter(Boolean).join(" · ");
+  const detail = [text, n.channel === "inApp" ? null : channelText(n.channel, translator(display.locale))].filter(Boolean).join(" · "); // "e-mail" in words (IR488)
   const href = typeRoutes[role]?.[n.type] ?? (n.sourceAlertId && alertsPage[role] ? alertsPage[role] : (routes[role][n.target.kind]?.(n.target.id) ?? ""));
   return { id: n.id, version: n.version, t: translate(display.locale, title, { name: n.params.targetName }), d: detail, w: showTime(n.occurredAt, display), read: n.readAt !== null, href };
 }
