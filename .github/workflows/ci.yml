@@ -67,7 +67,13 @@ jobs:
           make testdb
       - name: go test
         working-directory: service/api
-        run: go test -count=1 -timeout 30m ./...
+        # a failing test's lines also become annotations, readable on the run without the logs (like the E2E's reporter)
+        run: |
+          set -o pipefail
+          go test -count=1 -timeout 30m ./... 2>&1 | tee go-test.log || {
+            grep -E -- '--- FAIL|_test\.go:[0-9]+:|panic:' go-test.log | head -40 | sed 's/%/%25/g; s/^/::error title=go test::/'
+            exit 1
+          }
 
   go-test-cluster:
     name: Go integration tests (split services)
@@ -92,7 +98,13 @@ jobs:
           make testdb-cluster
       - name: go test (cluster)
         working-directory: service/api
-        run: AC_TEST_DB=ac_test_cluster AC_TEST_CLUSTER=1 go test -count=1 -timeout 30m ./test/...
+        # a failing test's lines also become annotations, readable on the run without the logs (like the E2E's reporter)
+        run: |
+          set -o pipefail
+          AC_TEST_DB=ac_test_cluster AC_TEST_CLUSTER=1 go test -count=1 -timeout 30m ./test/... 2>&1 | tee go-test.log || {
+            grep -E -- '--- FAIL|_test\.go:[0-9]+:|panic:' go-test.log | head -40 | sed 's/%/%25/g; s/^/::error title=go test (cluster)::/'
+            exit 1
+          }
 
   web-lint:
     name: Web lint (ESLint)
