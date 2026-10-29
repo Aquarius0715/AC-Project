@@ -3,20 +3,22 @@
 // serious axe-core violation of WCAG 2.x A / AA (NFR-01, deterministic contracts: zero unresolved axe critical /
 // serious issues, IR359). Follows the app's own links only, navigations only. axe runs through page.evaluate, which the
 // page CSP does not govern, so the policy itself stays as strict as in production. The crawl runs again at phone width
-// in Malay, the longest words (IR487): no axe violation there either, and no page scrolls sideways.
+// in Malay, the longest words (IR487): no axe violation there either, and no page scrolls sideways. Every page declares
+// the display language as its language (IR489).
 import type { Page } from "@playwright/test";
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { axeViolations } from "../../fixtures/a11y";
 import type { App } from "../../fixtures/apps";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
-type Crawl = { seen: number; failed: string[]; inaccessible: string[]; wide: string[] };
+type Crawl = { seen: number; failed: string[]; inaccessible: string[]; wide: string[]; otherLang: string[] };
 
-/** Visits up to 40 pages the app links to, from its home, and records what fails on each. */
-async function crawl(page: Page, app: App): Promise<Crawl> {
+/** Visits up to 40 pages the app links to, from its home, and records what fails on each; `lang` is the page language
+ * every page must declare (WCAG 3.1.1, IR489). */
+async function crawl(page: Page, app: App, lang = "en"): Promise<Crawl> {
   const seen = new Set<string>();
   const queue = [app.home];
-  const out: Crawl = { seen: 0, failed: [], inaccessible: [], wide: [] };
+  const out: Crawl = { seen: 0, failed: [], inaccessible: [], wide: [], otherLang: [] };
   while (queue.length && seen.size < 40) {
     const path = queue.shift()!;
     if (seen.has(path)) continue;
@@ -27,6 +29,8 @@ async function crawl(page: Page, app: App): Promise<Crawl> {
     for (const v of await axeViolations(page)) out.inaccessible.push(`${path}: ${v}`);
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (sideways > 1) out.wide.push(`${path}: ${sideways}px`);
+    const declared = await page.locator("html").getAttribute("lang");
+    if (declared !== lang) out.otherLang.push(`${path}: ${declared}`);
     const links = await page.locator("a[href^='/']").evaluateAll((as) => as.map((a) => a.getAttribute("href") ?? ""));
     for (const href of links) {
       const p = href.split("#")[0];
@@ -49,6 +53,7 @@ test("every linked page of the app renders", async ({ page, app }) => {
   expect(errors, "page errors").toEqual([]);
   expect(refused, "CSP violations").toEqual([]);
   expect(r.inaccessible, "critical or serious accessibility violations").toEqual([]);
+  expect(r.otherLang, "pages that do not declare English").toEqual([]);
   expect(r.seen).toBeGreaterThan(3);
 });
 
@@ -64,8 +69,9 @@ test("every linked page at phone width in Malay is accessible and fits the scree
   zoneBefore = zone;
   await setDisplay(page, MALAY, zone);
   await page.setViewportSize({ width: 390, height: 844 });
-  const r = await crawl(page, app);
+  const r = await crawl(page, app, "ms");
   expect(r.failed, "pages that did not render").toEqual([]);
+  expect(r.otherLang, "pages that do not declare Malay").toEqual([]);
   expect(r.inaccessible, "critical or serious accessibility violations at phone width").toEqual([]);
   expect(r.wide, "pages that scroll sideways at phone width").toEqual([]);
   expect(r.seen).toBeGreaterThan(3);

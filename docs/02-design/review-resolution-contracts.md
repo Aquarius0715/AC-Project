@@ -7108,3 +7108,10 @@ Found in review (after IR481): a payment reminder (`contracts.sendReminder`, BR-
 1. **Web.** The row reads "Amount due 120.00 MYR" in the display language, as the invoice page words it; a reminder without an amount keeps an empty line. It still opens the invoice.
 2. **Channel.** A row sent by e-mail ends with its channel; it read the code "email" in Malay too and now reads it in words ("e-mel"), as the partner's history does.
 3. **Tests.** `notifications.test.ts` checks English, Malay, the missing amount and the channel.
+
+## IR489 The page declares the display language — 2026-10-30
+
+Found in review (accessibility, WCAG 3.1.1 Language of Page, level A): the four apps' root layouts said `<html lang="en">` whatever the display language, so a screen reader read a Malay page with English pronunciation. A shared root layout left over from before the apps were split (IR178) was also still in the tree: nothing used it, and the style sheet it imported does not exist.
+
+1. **Web.** Each root layout sets `lang` from the user's display language (`coreDisplay`, read once per request with the page): `ms` in Malay, `en` otherwise and before sign-in. The display provider keeps it in step in the browser, for the Phase 1A demo whose language lives in the tab. The unused layout is removed.
+2. **Guard.** The smoke crawls check every page's language: `en` in the English crawl and `ms` in the Malay one (IR487).

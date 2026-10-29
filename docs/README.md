@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.358.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
+Version: 0.359.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.359.0 (2026-10-30): The apps declared `<html lang="en">` in Malay too, so screen readers read Malay with English pronunciation (WCAG 3.1.1). The page now declares the display language, the smoke crawls check it, and an unused shared root layout is removed (IR489).
 0.358.0 (2026-10-30): A payment reminder's inbox row had an empty detail line after IR481. It now reads "Amount due <amount>" in the display language, and an e-mailed row names its channel in words (IR488).
 0.357.0 (2026-10-30): At phone width two header buttons had no name, tables and boards that scroll sideways could not be reached by keyboard, and the customer's unit page scrolled sideways in Malay. The buttons are labelled, the shared ScrollX takes the focus while it overflows, the header wraps, and the smoke crawl runs again at 390 px in Malay (IR487).
 0.356.0 (2026-10-30): A QR check-in with another unit's label showed the humanized key ("Qr unit id — qr unit mismatch") or "This item no longer exists". It now says the label is not this job's unit and to scan this AC's label or check in manually, in English and Malay (IR486).

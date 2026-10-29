@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.358.0
+version: 0.359.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -275,6 +275,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.359.0: Every page declares the display language as its language (IR489). Phase 1A unchanged.
 0.358.0: A payment reminder in the inbox names its amount (IR488). Phase 1A unchanged.
 0.357.0: Every page at phone width in Malay is accessible and fits the screen, with a smoke crawl that checks it (IR487). Phase 1A unchanged.
 0.356.0: A QR check-in with another unit's label says what to do (IR486). Phase 1A unchanged.
