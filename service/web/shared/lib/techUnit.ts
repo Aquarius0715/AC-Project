@@ -5,6 +5,7 @@
 // the other metrics and the events of that period. Pure code shared by the server loader and the view; Vitest covers
 // it. Texts in the display language (`i`, IR283); instants in the user's display time zone (IR44).
 import { EN, relativeTime, showClock, showDate, showDayMonth, showSpan, type I18n, type T } from "@ac/web/lib/i18n";
+import { evidenceText } from "@ac/web/lib/evidence";
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 import { airNumber } from "@ac/web/lib/air";
@@ -171,7 +172,7 @@ export function windowEvents(alerts: ApiAlert[], events: ApiDeviceEventFull[], p
   const out: Omit<WindowEvent, "time">[] = [];
   for (const a of alerts) {
     const title = alertTitle(a, t), sev = SEVERITY[a.severity] ?? SEVERITY.normal;
-    if (inside(a.detectedAt)) out.push({ id: `${a.id}:raised`, at: a.detectedAt, title: t("Alert raised — {title}", { title }), sub: a.evidenceText, badge: { text: t(sev.text), tone: sev.tone } });
+    if (inside(a.detectedAt)) out.push({ id: `${a.id}:raised`, at: a.detectedAt, title: t("Alert raised — {title}", { title }), sub: evidenceText(a.evidenceText, t), badge: { text: t(sev.text), tone: sev.tone } });
     if (inside(a.acknowledgedAt)) out.push({ id: `${a.id}:acknowledged`, at: a.acknowledgedAt, title: t("Alert acknowledged — {title}", { title }), sub: "", badge: { text: t("Acknowledged"), tone: "primary" } });
     if (inside(a.resolvedAt)) out.push({ id: `${a.id}:resolved`, at: a.resolvedAt, title: t("Alert resolved — {title}", { title }), sub: a.resolutionReason ?? "", badge: { text: t("Resolved"), tone: "ok" } });
   }
@@ -219,7 +220,7 @@ const RANK: Record<string, number> = { critical: 0, warning: 1, normal: 2 };
 export function openAlerts(alerts: ApiAlert[], nowMs: number, i: I18n = EN): OpenAlert[] {
   const { t } = i;
   return alerts.filter((a) => a.status !== "resolved").sort((a, b) => RANK[a.severity] - RANK[b.severity] || b.detectedAt.localeCompare(a.detectedAt)).map((a) => ({
-    id: a.id, title: alertTitle(a, t), severity: a.severity, sub: `${a.evidenceText} · ${relativeTime(a.detectedAt, nowMs, i)}`,
+    id: a.id, title: alertTitle(a, t), severity: a.severity, sub: `${evidenceText(a.evidenceText, t)} · ${relativeTime(a.detectedAt, nowMs, i)}`,
     ack: `${a.acknowledgedAt ? t("Acknowledged {time}.", { time: relativeTime(a.acknowledgedAt, nowMs, i) }) : t("Acknowledged by nobody yet.")} ${t("Completing the job does not resolve it.")}`,
   }));
 }

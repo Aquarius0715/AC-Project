@@ -7020,3 +7020,11 @@ Found in review (coverage): since IR461 every customer or contractor user is add
 2. **Schema.** `identity.client_users.membership_id` and `identity.partner_users.membership_id` are NOT NULL, so an account-less invite cannot come back. `notify.outbound_mail` is dropped. schema.sql = migration 000001; the dev database got the change by hand.
 3. **Documents.** The persistence map, the notification worker in the backend Go design and the retention table no longer name the queue. IR418's SMTP sender and retry (IR425) and the notification e-mails are unchanged.
 4. **Tests.** `TestInviteMail` became `TestNotificationMailRetry`: a failed e-mail notification keeps its reason, is not retried before a minute and is sent after it. The tests that wrote account-less list rows (IR471 races, the last-contractor check) give each row its membership.
+
+## IR480 Alert and observation evidence in the display language — 2026-10-29
+
+Found in review (a Malay sweep of the customer pages): an alert's evidence stayed English in Malay ("Bukti (disimpulkan): Cleaning due (54 days since the last cleaning, run time unknown). Not a fault."). The API keeps the evidence as English text, written by a few sources: the seed's demo observations, the filter-care reminders (four forms with hours or days), the policy rules ("Demo event: <metric> <operator> threshold"), tamper alerts (with the device serial) and reconciliation alerts. IR258 translates the texts the web writes; stored texts were shown as stored.
+
+1. **Web.** `lib/evidence.ts` turns the texts those sources write into the display language — a fixed text by the dictionary, a text with values by its form, keeping the values (hours, days, serial, metric) as they are. Any other text (a future source, a device's own words) stays as stored, like names and IDs. It is used wherever evidence is shown: the customer alerts, the technician's alert evidence and unit timeline, the partner's unit and review, HQ's alerts and the job created from an alert, and air-quality observations.
+2. **Dictionary.** Sixteen Malay entries; `evidence.test.ts` checks that every text the module knows has one and that values are kept.
+3. **Not-found screens.** The same sweep found the not-found and forbidden screens English-only; they now read the user's display language on the server (English when nobody is signed in).

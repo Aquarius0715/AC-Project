@@ -7,6 +7,7 @@
 // photos through attachments.getContent). The Plans tab (loadPlans) reads plans.list in the same scope, plans.get for
 // the selected plan and jobs.list (the unit's periodic jobs) for the status of each generated occurrence.
 import "server-only";
+import { evidenceText } from "@ac/web/lib/evidence";
 import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { i18nOf, showTime } from "@ac/web/lib/i18n";
 import { alertTitle } from "@ac/web/lib/alerts";
@@ -83,7 +84,7 @@ export async function loadJobs(sp: SP) {
   // ?new=<unitId>[&alertId=] opens New job for that unit, its symptom taken from the alert (DD-A05 item 11, IR318)
   const newUnit = one(sp.new), fromAlert = one(sp.alertId);
   const alert = newUnit && fromAlert ? await optional(coreOp<{ id: string; type: string; causeCode: string; evidenceText: string }>("alerts.get", { id: fromAlert }), null) : null;
-  const newJob = newUnit ? { unitId: newUnit, symptom: alert ? t("Alert {id}: {title} — {evidence}", { id: alert.id.slice(0, 8), title: alertTitle(alert, t), evidence: alert.evidenceText }).slice(0, 2000) : "" } : null;
+  const newJob = newUnit ? { unitId: newUnit, symptom: alert ? t("Alert {id}: {title} — {evidence}", { id: alert.id.slice(0, 8), title: alertTitle(alert, t), evidence: evidenceText(alert.evidenceText, t) }).slice(0, 2000) : "" } : null;
   // the job the new-job dialog just created: ?jobId=<id>&created=book|requested (its detail opens step 2, or says it was saved as requested)
   const createdKind = one(sp.created);
   const created = createdKind === "book" || createdKind === "requested" ? { id: one(sp.jobId) ?? "", book: createdKind === "book" } : null;

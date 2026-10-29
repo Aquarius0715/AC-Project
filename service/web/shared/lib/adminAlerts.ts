@@ -3,6 +3,7 @@
 // Vitest covers it. Texts in the display language (`i` / `t`, IR292); times IR44 in the user's display time zone, with
 // "today / yesterday" for the days next to now. Cause codes and evidence texts stay as the Core API records them.
 import { EN, relativeTime, showDate, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { evidenceText } from "@ac/web/lib/evidence";
 import { alertTitle } from "@ac/web/lib/alerts";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
@@ -104,7 +105,7 @@ export function adminAlertRows(alerts: ApiAdminAlert[], units: ApiUnitName[], cu
       const u = unit.get(a.unitId);
       const customer = (u && custByOrg.get(u.customerOrgId)) ?? t("unknown customer");
       const pol = a.policyId ? policy.get(a.policyId) ?? t("policy") : t("no policy");
-      const timeline: AdminAlert["timeline"] = [{ time: when(a.detectedAt), title: t("Alert detected"), detail: a.evidenceText, tone: "warn" }];
+      const timeline: AdminAlert["timeline"] = [{ time: when(a.detectedAt), title: t("Alert detected"), detail: evidenceText(a.evidenceText, t), tone: "warn" }];
       if (a.acknowledgedAt) timeline.push({ time: when(a.acknowledgedAt), title: t("Acknowledged"), detail: t("Acknowledging does not resolve the alert") });
       timeline.push(a.resolvedAt
         ? { time: when(a.resolvedAt), title: t("Resolved"), detail: a.resolutionReason ?? "", tone: "ok" }
@@ -114,7 +115,7 @@ export function adminAlertRows(alerts: ApiAdminAlert[], units: ApiUnitName[], cu
         meta: `${customer} · ${u?.displayName ?? a.unitId} · ${pol}`, state: a.status, st: t(stLabel[a.status]),
         unitId: a.unitId, customerId: (u && custIdByOrg.get(u.customerOrgId)) ?? null, policyless: !a.policyId, inferred: a.evidenceKind === "inferred",
         unit: `${u?.displayName ?? t("Unit")} · ${a.unitId}`, context: customer,
-        evidence: `${evidenceKind[a.evidenceKind] ? t(evidenceKind[a.evidenceKind]) : a.evidenceKind} — “${a.evidenceText}”`,
+        evidence: `${evidenceKind[a.evidenceKind] ? t(evidenceKind[a.evidenceKind]) : a.evidenceKind} — “${evidenceText(a.evidenceText, t)}”`,
         cause: a.causeCode === "unknown" ? t("not determined") : t("{cause} (suspected)", { cause: a.causeCode }),
         observed: showTime(a.observedAt, display), detected: showTime(a.detectedAt, display),
         evidenceRecords: a.evidenceIds.length ? t(a.evidenceIds.length === 1 ? "1 attached" : "{n} attached", { n: a.evidenceIds.length }) : t("none attached"), timeline,

@@ -4,6 +4,7 @@
 // the delegation, the job's history snapshot. Pure code shared by the server loader and the view; Vitest covers it.
 // Texts in the display language (`t` / `i`, IR280); every time in the user's display time zone (IR44).
 import { EN, showClock, showDate, showSpan, showTime, type I18n, type T } from "@ac/web/lib/i18n";
+import { evidenceText } from "@ac/web/lib/evidence";
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 import { airNumber } from "@ac/web/lib/air";
@@ -76,7 +77,7 @@ export function evidenceRows(alerts: ApiAlert[], i: I18n = EN) {
   const { t, display } = i;
   return [...alerts].sort((a, b) => b.detectedAt.localeCompare(a.detectedAt)).map((a) => ({
     id: a.id, title: alertTitle(a, t), severity: a.severity, resolved: a.status === "resolved",
-    sub: `${t(EVIDENCE[a.evidenceKind] ?? "Evidence")} — ${a.evidenceText} · ${showTime(a.detectedAt, display)}`,
+    sub: `${t(EVIDENCE[a.evidenceKind] ?? "Evidence")} — ${evidenceText(a.evidenceText, t)} · ${showTime(a.detectedAt, display)}`,
   }));
 }
 

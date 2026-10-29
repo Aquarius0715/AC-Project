@@ -3,6 +3,7 @@
 // the Server Component and the client view. Texts in the display language (`t` / `i`) and times in the user's display
 // time zone, formatted by the loader on the server (IR274).
 import { EN, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { evidenceText } from "@ac/web/lib/evidence";
 
 const en = translator("en");
 
@@ -144,7 +145,7 @@ export function versionRows(job: ApiReviewJob, r: ApiWorkReport, author: string,
 export function alertRows(alerts: ApiAlertLite[], i: I18n = EN): VersionRow[] {
   const { t, display } = i;
   return alerts.map((a) => ({
-    title: t("{text} (alert)", { text: a.evidenceText || a.type }), sub: `${showTime(a.detectedAt, display)} · ${t(a.status === "resolved" ? "resolved" : "stays open after completion")}`,
+    title: t("{text} (alert)", { text: a.evidenceText ? evidenceText(a.evidenceText, t) : a.type }), sub: `${showTime(a.detectedAt, display)} · ${t(a.status === "resolved" ? "resolved" : "stays open after completion")}`,
     badge: { label: t(a.status === "resolved" ? "Resolved" : a.status === "acknowledged" ? "Acknowledged" : "Open"), tone: a.status === "resolved" ? "ok" : a.severity === "critical" ? "crit" : "warn" },
   }));
 }

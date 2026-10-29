@@ -5,6 +5,7 @@
 // the server loader and the view; Vitest covers it. Texts in the display language; instants in the user's display time
 // zone (IR44).
 import { EN, relativeTime, showDate, type I18n, type T } from "@ac/web/lib/i18n";
+import { evidenceText } from "@ac/web/lib/evidence";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { alertTitle } from "@ac/web/lib/alerts";
 import { metricLabel, metricUnit } from "@ac/web/lib/adminAlerts";
@@ -60,7 +61,7 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
   const rule = a.rule ?? null, words = rule ? ruleWords(rule, t) : null;
   const title = rule?.name ?? alertTitle(a, t);
   const [state, tone] = STATE[a.status] ?? STATE.open;
-  const cards: EvidenceCard[] = [{ kind: t(KIND[a.evidenceKind] ?? "Evidence"), title: t("Evidence at detection"), value: a.evidenceText, sub: t("observed {time}", { time: when(a.observedAt) }) }];
+  const cards: EvidenceCard[] = [{ kind: t(KIND[a.evidenceKind] ?? "Evidence"), title: t("Evidence at detection"), value: evidenceText(a.evidenceText, t), sub: t("observed {time}", { time: when(a.observedAt) }) }];
   const m = rule ? ctx.unit?.latestMeasurements.find((x) => x.metric === rule.metric) : undefined;
   if (m) {
     cards.push({
@@ -71,7 +72,7 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
   const history: AlertView["history"] = [];
   if (a.resolvedAt) history.push({ id: "resolved", time: when(a.resolvedAt), title: t("Resolved"), sub: a.resolutionReason ?? "", badge: { text: t("Resolved"), tone: "ok" } });
   if (a.acknowledgedAt) history.push({ id: "acknowledged", time: when(a.acknowledgedAt), title: t("Acknowledged"), sub: "", badge: { text: t("Acknowledged"), tone: "primary" } });
-  history.push({ id: "raised", time: when(a.detectedAt), title: t("Raised"), sub: [a.evidenceText, words && t("{condition} for {duration}", { condition: words.raise, duration: durationText(rule!.durationSeconds, t) })].filter(Boolean).join(" · "), badge: { text: t(KIND[a.evidenceKind] ?? "Evidence"), tone: "primary" } });
+  history.push({ id: "raised", time: when(a.detectedAt), title: t("Raised"), sub: [evidenceText(a.evidenceText, t), words && t("{condition} for {duration}", { condition: words.raise, duration: durationText(rule!.durationSeconds, t) })].filter(Boolean).join(" · "), badge: { text: t(KIND[a.evidenceKind] ?? "Evidence"), tone: "primary" } });
   const prev = a.previousAlertId ? ctx.alerts.find((x) => x.id === a.previousAlertId) : undefined;
   const unit = ctx.unit ? `${ctx.unit.displayName}${ctx.unit.location.pathLabels.length ? ` · ${ctx.unit.location.pathLabels.join(" › ")}` : ""}` : a.unitId.slice(0, 8);
   const resolver = a.status === "resolved" ? t("done {time}", { time: when(a.resolvedAt ?? a.detectedAt) }) : ctx.canResolve ? t(rule ? "with a reason, or by a remeasurement" : "with a reason") : rule ? t("with a remeasurement only") : t("no — ask a user with alert.resolve");

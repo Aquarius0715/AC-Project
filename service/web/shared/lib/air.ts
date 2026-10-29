@@ -4,6 +4,7 @@
 // the Server Component and the client view. Texts in the display language (`t` / `i`); every instant in the user's
 // display time zone, the 7-day window's start a Kuala Lumpur calendar day that the chart names (IR266).
 import { periodRange } from "@ac/web/lib/clientEnergy";
+import { evidenceText } from "@ac/web/lib/evidence";
 import { roundAway } from "@ac/web/lib/energy";
 import { spacePath, type ApiPropertyRow, type ApiSpaceRow, type ApiUnitRow } from "@ac/web/lib/assets";
 import { DEFAULT_DISPLAY, EN, relativeTime, showClock, showDate, showDay, showSpan, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
@@ -166,7 +167,7 @@ export function allergenView(a: ApiAllergen | null, i: I18n = EN): { title: stri
   const value = a.value === null ? [] : [a.unit ? `${a.value} ${a.unit}` : t("Value unknown (no unit)")];
   return {
     title: t("Allergen ({substance})", { substance: a.substance }), badge: { text: t("Detected"), tone: "warn", icon: "warning" },
-    text: [...value, t("Source: {source}", { source: a.sourceLabel }), showClock(a.observedAt, display), a.evidenceText].join(" · "),
+    text: [...value, t("Source: {source}", { source: a.sourceLabel }), showClock(a.observedAt, display), evidenceText(a.evidenceText, t)].join(" · "),
   };
 }
 

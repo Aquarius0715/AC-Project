@@ -2,6 +2,7 @@
 // unresolved critical / warning alerts need attention, the rest are information; DD-C08 read state on the
 // notifications). Pure code shared by server and client.
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { evidenceText } from "@ac/web/lib/evidence";
 import type { IconName } from "@ac/web/components/Icon";
 export type Alert = { id: string; title: string; sev: "warning" | "normal"; kind: string; kindIcon: IconName; icon: IconName; where: string; ev: string; group: "attn" | "info"; read: boolean };
 
@@ -62,7 +63,7 @@ export function inboxAlerts(alerts: ApiAlert[], notes: AlertNote[], unit: (id: s
       id: a.id, unitId: a.unitId, type: a.type, title: alertTitle(a, t), severity: a.severity,
       cause: kindOf(a), kind: t(kindLabel[kindOf(a)]), kindIcon: kindIcon[kindOf(a)],
       where: t("{where} · detected {when}", { where: u ? `${u.name}${u.place ? ` · ${u.place}` : ""}` : "AC", when: stamp(a.detectedAt) }),
-      evidence: `${t(evidenceLabel[a.evidenceKind] ?? "Evidence")}: ${a.evidenceText}`,
+      evidence: `${t(evidenceLabel[a.evidenceKind] ?? "Evidence")}: ${evidenceText(a.evidenceText, t)}`,
       group: attn(a) ? "attn" : "info", status,
       unread: mine.filter((n) => n.readAt === null).map((n) => ({ id: n.id, version: n.version })), notes: mine.length,
     };
