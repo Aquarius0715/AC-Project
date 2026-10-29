@@ -7,7 +7,7 @@ import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
 
 test("the team shows the technicians, the week and the qualifications", async ({ page }) => {
-  await page.goto("/partner/team");
+  await page.goto("/partner/team?date=2026-09-16"); // a weekday: on a weekend of the demo clock the week reads "hours (Sat … selected)"
   const main = page.getByRole("main");
   await expect(main.getByRole("heading", { name: /^Technicians — .+ · \d+ active$/ })).toBeVisible();
   await expect(main.getByRole("heading", { name: /^Week of \d{1,2} \S+ — assigned \/ available hours$/ })).toBeVisible();

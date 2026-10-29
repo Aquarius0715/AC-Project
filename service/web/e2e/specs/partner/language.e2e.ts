@@ -49,7 +49,7 @@ test("the contractor screens in Malay keep Kuala Lumpur days and show instants i
     const week = main.getByRole("heading", { name: /^Jadual pasukan — minggu \d{1,2} \S+$/ });
     if (await week.count()) await expect(main).toContainText("Hari dan masa dalam waktu Kuala Lumpur (Asia/Kuala_Lumpur).");
   }
-  await page.goto("/partner/team");
+  await page.goto("/partner/team?date=2026-09-16"); // a weekday, whatever day the demo clock is on
   await expect(main.getByRole("heading", { name: /^Juruteknik — .+ · \d+ aktif$/ })).toBeVisible();
   await expect(main.getByRole("heading", { name: /^Minggu \d{1,2} \S+ — jam ditugaskan \/ tersedia$/ })).toBeVisible();
   await expect(main.getByRole("heading", { name: "Kelayakan", exact: true })).toBeVisible();
