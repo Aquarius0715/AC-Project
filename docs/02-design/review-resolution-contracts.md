@@ -7003,3 +7003,11 @@ Found in review: when a unit acknowledges its apply command, the restriction bec
 
 1. **Lock.** The acknowledgement handler locks the restriction before it changes the unit, so the second writer waits and then sees the first one's result.
 2. **Tests.** `TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce`: two units' apply answers, the second started while the first is still open, make the restriction applied. Without the lock it stayed requested.
+
+## IR478 Archiving a location and adding to it at the same moment cannot both pass — 2026-10-29
+
+Found in review: `properties.archive` and `spaces.archive` are refused while the location has active units or spaces (`error.notEmpty`, IR62). The archive checked for them and then archived; `units.save` and `spaces.save` checked that the property or parent space was not archived and then wrote. Neither locked the location, so an archive and an add at the same moment could both pass and leave an active unit (or space) in an archived location, out of the tree.
+
+1. **Locks.** The archive locks the location's row before it checks for active children. The unit and space saves read the property and the space with a share lock, so whichever comes second waits and then sees the first: the archive is `error.notEmpty`, or the add finds the location archived (NOT_FOUND / `error.otherProperty` as before).
+2. **Scope.** `units.archive` is unchanged: its checks ask other services (jobs, devices, restrictions), whose rows it cannot lock.
+3. **Tests.** `TestSpaceArchiveRacesAUnitAdd`: in eight rounds, a space's archive and a unit added to it are sent at once, and exactly one of the two passes. Without the locks the second round passed both.

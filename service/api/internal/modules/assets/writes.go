@@ -256,15 +256,14 @@ func (in *SpaceSave) Validate() map[string]string {
 	return fe
 }
 
+// activeProperty requires an active property, read with a share lock: an archive of it waits, or is waited for and seen
+// (IR478).
 func (m *Module) activeProperty(ctx context.Context, c *ops.Call, id uuid.UUID) error {
-	var ok bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.properties WHERE id = $1 AND NOT archived)`, id).Scan(&ok); err != nil {
-		return err
-	}
-	if !ok {
+	err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.properties WHERE id = $1 AND NOT archived FOR SHARE`, id).Scan(new(int))
+	if errors.Is(err, pgx.ErrNoRows) {
 		return notFound()
 	}
-	return nil
+	return err
 }
 
 // checkParent requires the parent to be an active space of the same property and, for an existing space, not one
@@ -273,12 +272,12 @@ func (m *Module) checkParent(ctx context.Context, c *ops.Call, self *uuid.UUID, 
 	if parent == nil {
 		return nil
 	}
-	var same bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived)`, *parent, property).Scan(&same); err != nil {
-		return err
-	}
-	if !same {
+	err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived FOR SHARE`, *parent, property).Scan(new(int)) // IR478
+	if errors.Is(err, pgx.ErrNoRows) {
 		return apperr.Fields(map[string]string{"parentSpaceId": "error.otherProperty"})
+	}
+	if err != nil {
+		return err
 	}
 	if self == nil {
 		return nil
@@ -454,7 +453,8 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		return Unit{}, apperr.Fields(map[string]string{"installedAt": "error.future"})
 	}
 	var propOrg uuid.UUID
-	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.properties WHERE id = $1 AND NOT archived`, in.PropertyID).Scan(&propOrg)
+	// the property and the space are read with a share lock: their archive waits, or is waited for and seen (IR478)
+	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.properties WHERE id = $1 AND NOT archived FOR SHARE`, in.PropertyID).Scan(&propOrg)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Unit{}, notFound()
 	}
@@ -465,12 +465,12 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		return Unit{}, apperr.Fields(map[string]string{"propertyId": "error.otherCustomer"})
 	}
 	if in.SpaceID != nil {
-		var ok bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived)`, *in.SpaceID, in.PropertyID).Scan(&ok); err != nil {
-			return Unit{}, err
-		}
-		if !ok {
+		err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived FOR SHARE`, *in.SpaceID, in.PropertyID).Scan(new(int))
+		if errors.Is(err, pgx.ErrNoRows) {
 			return Unit{}, apperr.Fields(map[string]string{"spaceId": "error.otherProperty"})
+		}
+		if err != nil {
+			return Unit{}, err
 		}
 	}
 	capVer, ok, err := m.Models.CurrentVersion(ctx, c, in.ModelID)
@@ -651,6 +651,11 @@ func (m *Module) spacesArchive(ctx context.Context, c *ops.Call, in *ArchiveInpu
 
 func (m *Module) archive(kind, table, busySQL string) func(context.Context, *ops.Call, *ArchiveInput) (ArchivedResource, error) {
 	return func(ctx context.Context, c *ops.Call, in *ArchiveInput) (ArchivedResource, error) {
+		// the row is locked before the check for active children: a unit or space added at the same moment reads its
+		// parent with a share lock, so one of the two waits and then sees the other (IR478)
+		if _, err := c.Tx.Exec(ctx, "SELECT 1 FROM "+table+" WHERE id = $1 FOR UPDATE", in.ID); err != nil {
+			return ArchivedResource{}, err
+		}
 		if busySQL != "" {
 			var busy bool
 			if err := c.Tx.QueryRow(ctx, busySQL, in.ID).Scan(&busy); err != nil {
