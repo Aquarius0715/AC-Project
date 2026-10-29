@@ -57,6 +57,9 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
     expect([v.conditions[0][1], v.conditions[2][1], v.conditions[6][1]]).toEqual([
       "2026-09-08 00:00 → 2026-09-14 09:30 (Asia/Kuala_Lumpur)", "v2 · demo_period_comparison · 2026-09-01 00:00 → 2026-09-08 00:00 · 2 unit", "98.8% daripada bacaan yang dijangka",
     ]);
+    // the API's fixed boundary text is shown in Malay; another text (a user's) stays as written (IR480)
+    const api = summaryView({ ...summary, boundary: "AC equipment input electricity (excludes shared equipment, solar and batteries)" }, i);
+    expect([api.conditions[1][1], v.conditions[1][1]]).toEqual(["ac_input_electricity — Elektrik input peralatan AC (tidak termasuk peralatan dikongsi, solar dan bateri)", "ac_input_electricity — AC input"]);
     const none = summaryView(empty, i);
     expect([none.actual, none.baseline, none.difference, none.cost, none.savedCost, none.coverage, none.comparable]).toEqual(["Tiada bacaan sah", "Tiada garis dasar", "Tidak dapat dikira", "—", "Tidak dapat dikira", "—", false]);
     expect([none.conditions[2][1], none.conditions[3], none.warnings]).toEqual(["tiada yang dipilih", ["Faktor pelepasan", "tiada"], ["Faktor pelepasan tiada — pelepasan tidak dapat dikira"]]);

@@ -8,6 +8,10 @@ const en = translator("en");
 
 /** Round half away from zero to `digits` decimals of the value as written (1.005 → 1.01; IR44: never
  * Number.prototype.toFixed for rounding). Never -0, which Intl shows as "-0.0" (IR265). */
+/** The API's fixed explanation of the actual-data boundary (IR11), shown in the display language like stored evidence
+ * (IR480); a baseline's own boundary text is the user's and stays as written. */
+const BOUNDARY_TEXT = "AC equipment input electricity (excludes shared equipment, solar and batteries)";
+
 export function roundAway(x: number, digits: number): number {
   if (!Number.isFinite(x)) return x;
   const a = String(Math.abs(x));
@@ -90,7 +94,7 @@ export function summaryView(s: ApiEnergySummary, i: I18n = EN): SummaryView {
     coverage: s.coverage === null ? "—" : `${coveragePct(s.coverage)}%`, comparable: t.savedKWh !== null, increase: (t.savedKWh ?? 0) < 0,
     conditions: [
       [tr("Period"), `${klStamp(s.period.from)} → ${klStamp(s.period.to)} (Asia/Kuala_Lumpur)`],
-      [tr("Boundary"), `${s.boundaryId} — ${s.boundary}`],
+      [tr("Boundary"), `${s.boundaryId} — ${s.boundary === BOUNDARY_TEXT ? tr(BOUNDARY_TEXT) : s.boundary}`],
       [tr("Baseline"), b ? tr("v{version} · {method} · {from} → {to} · {n} units", { version: b.version, method: b.method, from: klStamp(b.period.from), to: klStamp(b.period.to), n: b.unitIds.length }) : tr("none selected")],
       ...(b ? [[tr("Baseline assumptions"), b.assumptions] as [string, string]] : []),
       [tr("Emission factor"), f ? `${f.region} ${f.year} v${f.version} · ${f.kgCO2ePerKWh} kgCO₂e/kWh · ${f.source}` : tr("missing")],

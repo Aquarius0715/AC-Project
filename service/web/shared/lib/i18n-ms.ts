@@ -4793,6 +4793,7 @@ export const ms: Record<string, string> = {
   "Demo — unverified": "Demo — belum disahkan",
   "Preview first: saving stores the conditions and the result computed at save time.": "Pratonton dahulu: menyimpan merekodkan syarat dan keputusan yang dikira semasa menyimpan.",
   "Demo (fictional)": "Demo (rekaan)",
+  "AC equipment input electricity (excludes shared equipment, solar and batteries)": "Elektrik input peralatan AC (tidak termasuk peralatan dikongsi, solar dan bateri)",
   // stored evidence texts the sources write (lib/evidence.ts, IR480)
   "Cleaning due. Not a fault.": "Pembersihan diperlukan. Bukan kerosakan.",
   "Device still reports an ended restriction; reconcile it from HQ": "Peranti masih melaporkan sekatan yang telah tamat; selaraskannya dari HQ",
