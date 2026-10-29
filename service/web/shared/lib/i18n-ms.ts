@@ -4794,7 +4794,12 @@ export const ms: Record<string, string> = {
   "Preview first: saving stores the conditions and the result computed at save time.": "Pratonton dahulu: menyimpan merekodkan syarat dan keputusan yang dikira semasa menyimpan.",
   "Demo (fictional)": "Demo (rekaan)",
   "AC equipment input electricity (excludes shared equipment, solar and batteries)": "Elektrik input peralatan AC (tidak termasuk peralatan dikongsi, solar dan bateri)",
+  // the firmware campaign's advance notice (lib/notifications.ts, IR481)
+  "Firmware update from {date}, {from}–{to} local time. The AC may restart for about 2 minutes.": "Kemas kini perisian tegar dari {date}, {from}–{to} waktu tempatan. AC mungkin dimulakan semula selama kira-kira 2 minit.",
   // stored evidence texts the sources write (lib/evidence.ts, IR480)
+  "filter cleaned": "penapis dibersihkan",
+  "recovery resolved": "pemulihan diselesaikan",
+  "Recovered: {metric} {value} {dir} {threshold} for {seconds} s (D08)": "Pulih: {metric} {value} {dir} {threshold} selama {seconds} s (D08)",
   "Cleaning due. Not a fault.": "Pembersihan diperlukan. Bukan kerosakan.",
   "Device still reports an ended restriction; reconcile it from HQ": "Peranti masih melaporkan sekatan yang telah tamat; selaraskannya dari HQ",
   "Demo insulation": "Penebat demo",

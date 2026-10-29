@@ -5,7 +5,7 @@
 // the other metrics and the events of that period. Pure code shared by the server loader and the view; Vitest covers
 // it. Texts in the display language (`i`, IR283); instants in the user's display time zone (IR44).
 import { EN, relativeTime, showClock, showDate, showDayMonth, showSpan, type I18n, type T } from "@ac/web/lib/i18n";
-import { evidenceText } from "@ac/web/lib/evidence";
+import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 import { airNumber } from "@ac/web/lib/air";
@@ -174,7 +174,7 @@ export function windowEvents(alerts: ApiAlert[], events: ApiDeviceEventFull[], p
     const title = alertTitle(a, t), sev = SEVERITY[a.severity] ?? SEVERITY.normal;
     if (inside(a.detectedAt)) out.push({ id: `${a.id}:raised`, at: a.detectedAt, title: t("Alert raised — {title}", { title }), sub: evidenceText(a.evidenceText, t), badge: { text: t(sev.text), tone: sev.tone } });
     if (inside(a.acknowledgedAt)) out.push({ id: `${a.id}:acknowledged`, at: a.acknowledgedAt, title: t("Alert acknowledged — {title}", { title }), sub: "", badge: { text: t("Acknowledged"), tone: "primary" } });
-    if (inside(a.resolvedAt)) out.push({ id: `${a.id}:resolved`, at: a.resolvedAt, title: t("Alert resolved — {title}", { title }), sub: a.resolutionReason ?? "", badge: { text: t("Resolved"), tone: "ok" } });
+    if (inside(a.resolvedAt)) out.push({ id: `${a.id}:resolved`, at: a.resolvedAt, title: t("Alert resolved — {title}", { title }), sub: a.resolutionReason ? resolutionText(a.resolutionReason, t) : "", badge: { text: t("Resolved"), tone: "ok" } });
   }
   for (const e of events.filter((x) => inside(x.occurredAt))) {
     const back = e.eventType === "restored" && e.recovery ? RESTORED[e.recovery.axis] : undefined;

@@ -2483,7 +2483,7 @@ IR257 item 6 left FR-X01's language open: a change to Bahasa Melayu was stored b
    - Preferences, both the API view and the browser demo, with the two-step dialogs and the consent line;
    - Demo controls (API and browser demo, with the refusals);
    - the notifications inbox, whose titles come from the templates.
-   Inbox times follow the IR44 rule: `Intl.DateTimeFormat(en-MY | ms-MY, { timeZone: Preferences.timezone, dateStyle: medium, timeStyle: short })` with the zone's abbreviation, for example “14 Sept 2026, 9:00 am MYT”. A notification's reason, message and status are shown as the Core API recorded them.
+   Inbox times follow the IR44 rule: `Intl.DateTimeFormat(en-MY | ms-MY, { timeZone: Preferences.timezone, dateStyle: medium, timeStyle: short })` with the zone's abbreviation, for example “14 Sept 2026, 9:00 am MYT”. A notification's reason, message and status are shown as the Core API recorded them (superseded by IR481: the codes and texts the sources write are worded in the display language).
 5. **Still English (open).**
    - The other business screens, the sign-in page (no user is known before sign-in) and the error pages.
    - Dates on the other screens: they still use en-MY in Asia/Kuala_Lumpur without the abbreviation, not the user's display time zone.
@@ -2557,7 +2557,7 @@ After the unit screen (IR259), the customer's home screen `/customer` (FR-C01, D
    - Needs attention and Reminders & information;
    - each alert's title, kind, status, read state and links;
    - the alert dialog.
-   Times follow IR44 in the user's display time zone with the zone's abbreviation: detected, acknowledged, resolved and the read time. The evidence text and the resolution reason are shown as the Core API recorded them.
+   Times follow IR44 in the user's display time zone with the zone's abbreviation: detected, acknowledged, resolved and the read time. The evidence text and the resolution reason are shown as the Core API recorded them (superseded by IR480 and IR481: the texts the sources write are worded in the display language).
 2. **Status by state, not by words.** An inbox row now carries `status.state` (open / acknowledged / resolved) beside its text. The view used to compare the English text ("Resolved") to hide Book cleaning and to word the dialog; it now uses the state, so the screen behaves the same in Malay.
 3. **Alert policies.** These are translated:
    - the default policy: its conditions, types, the turned-off note with its day (`showDate`, IR44 date in the display time zone) and the owner-only notice;
@@ -7028,3 +7028,12 @@ Found in review (a Malay sweep of the customer pages): an alert's evidence staye
 1. **Web.** `lib/evidence.ts` turns the texts those sources write into the display language — a fixed text by the dictionary, a text with values by its form, keeping the values (hours, days, serial, metric) as they are. Any other text (a future source, a device's own words) stays as stored, like names and IDs. It is used wherever evidence is shown: the customer alerts, the technician's alert evidence and unit timeline, the partner's unit and review, HQ's alerts and the job created from an alert, and air-quality observations.
 2. **Dictionary.** Sixteen Malay entries; `evidence.test.ts` checks that every text the module knows has one and that values are kept.
 3. **Not-found screens.** The same sweep found the not-found and forbidden screens English-only; they now read the user's display language on the server (English when nobody is signed in).
+
+## IR481 Inbox details and resolution reasons in the display language — 2026-10-30
+
+Found in review (continuing the IR480 sweep): the inbox detail line showed the codes the sources store — the status ("in_progress", "on_hold", "accepted"), an access-release notice's reason ("technician_access_ended", IR439) and, for a notification stored without a status, the type the API fills in ("fault", "restriction", "payment_reminder", IR142). The firmware campaign's notice (IR339) and the resolution reasons the system writes ("filter cleaned", "recovery resolved", "Recovered: <metric> <value> <dir> <threshold> for <n> s (D08)") stayed English in Malay.
+
+1. **Inbox.** `lib/notifications.ts` words a status and an access-release reason in the display language and leaves out a status the API filled in from the type. A code it does not know stays as stored. The firmware notice is worded by its form, with its day dated again in the display language; a filter reminder's message is its evidence (IR480).
+2. **Resolution reasons.** `lib/evidence.ts` `resolutionText` words the reasons the system writes when it resolves an alert — a cleaned filter, a resolved recovery case, a policy's sustained recovery (D08), keeping its metric, value and threshold. A reason a person typed stays as written. It is used wherever a resolution is shown: the customer alerts, HQ's alert history, the technician's alert and unit timeline.
+3. **Energy boundary.** The energy summary's fixed boundary text (the API's, IR480 follow-up) is shown in the display language too.
+4. **Dictionary.** Four Malay entries; `notifications.test.ts` and `evidence.test.ts` check that every word the inbox and the reasons use has one.

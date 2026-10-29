@@ -5,7 +5,7 @@
 // the server loader and the view; Vitest covers it. Texts in the display language; instants in the user's display time
 // zone (IR44).
 import { EN, relativeTime, showDate, type I18n, type T } from "@ac/web/lib/i18n";
-import { evidenceText } from "@ac/web/lib/evidence";
+import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { alertTitle } from "@ac/web/lib/alerts";
 import { metricLabel, metricUnit } from "@ac/web/lib/adminAlerts";
@@ -70,7 +70,7 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
     });
   }
   const history: AlertView["history"] = [];
-  if (a.resolvedAt) history.push({ id: "resolved", time: when(a.resolvedAt), title: t("Resolved"), sub: a.resolutionReason ?? "", badge: { text: t("Resolved"), tone: "ok" } });
+  if (a.resolvedAt) history.push({ id: "resolved", time: when(a.resolvedAt), title: t("Resolved"), sub: a.resolutionReason ? resolutionText(a.resolutionReason, t) : "", badge: { text: t("Resolved"), tone: "ok" } });
   if (a.acknowledgedAt) history.push({ id: "acknowledged", time: when(a.acknowledgedAt), title: t("Acknowledged"), sub: "", badge: { text: t("Acknowledged"), tone: "primary" } });
   history.push({ id: "raised", time: when(a.detectedAt), title: t("Raised"), sub: [evidenceText(a.evidenceText, t), words && t("{condition} for {duration}", { condition: words.raise, duration: durationText(rule!.durationSeconds, t) })].filter(Boolean).join(" · "), badge: { text: t(KIND[a.evidenceKind] ?? "Evidence"), tone: "primary" } });
   const prev = a.previousAlertId ? ctx.alerts.find((x) => x.id === a.previousAlertId) : undefined;
@@ -86,7 +86,7 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
     resolution: {
       info: a.status === "resolved" ? null : words ? t("Automatic resolution needs a remeasurement {recovery} — or a reason below with alert.resolve.", { recovery: words.recovery })
         : t("No remeasurement resolves this alert — it has no policy. Resolve it with a reason below with alert.resolve (IR66)."),
-      done: a.status !== "resolved" ? null : [t("Resolved {time} — {reason}.", { time: when(a.resolvedAt ?? a.detectedAt), reason: a.resolutionReason ?? t("no reason recorded") }), a.acknowledgedAt ? t("Acknowledged {time}.", { time: when(a.acknowledgedAt) }) : ""].filter(Boolean).join(" "),
+      done: a.status !== "resolved" ? null : [t("Resolved {time} — {reason}.", { time: when(a.resolvedAt ?? a.detectedAt), reason: a.resolutionReason ? resolutionText(a.resolutionReason, t) : t("no reason recorded") }), a.acknowledgedAt ? t("Acknowledged {time}.", { time: when(a.acknowledgedAt) }) : ""].filter(Boolean).join(" "),
       note: a.status === "resolved" ? t("Completing the job alone never resolves an alert. If the condition returns, a new alert is created with previousAlertId = {id}.", { id: a.id.slice(0, 8) })
         : t("Recurrence after resolution creates a new alert with previousAlertId linking back to this one."),
       forbidden: words ? t("Not resolved (FORBIDDEN) — you don’t have alert.resolve. The alert resolves automatically once a remeasurement stays {recovery}, or ask a permitted user.", { recovery: words.recovery })

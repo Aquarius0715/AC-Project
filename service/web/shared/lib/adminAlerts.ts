@@ -3,7 +3,7 @@
 // Vitest covers it. Texts in the display language (`i` / `t`, IR292); times IR44 in the user's display time zone, with
 // "today / yesterday" for the days next to now. Cause codes and evidence texts stay as the Core API records them.
 import { EN, relativeTime, showDate, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
-import { evidenceText } from "@ac/web/lib/evidence";
+import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import { alertTitle } from "@ac/web/lib/alerts";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
@@ -108,7 +108,7 @@ export function adminAlertRows(alerts: ApiAdminAlert[], units: ApiUnitName[], cu
       const timeline: AdminAlert["timeline"] = [{ time: when(a.detectedAt), title: t("Alert detected"), detail: evidenceText(a.evidenceText, t), tone: "warn" }];
       if (a.acknowledgedAt) timeline.push({ time: when(a.acknowledgedAt), title: t("Acknowledged"), detail: t("Acknowledging does not resolve the alert") });
       timeline.push(a.resolvedAt
-        ? { time: when(a.resolvedAt), title: t("Resolved"), detail: a.resolutionReason ?? "", tone: "ok" }
+        ? { time: when(a.resolvedAt), title: t("Resolved"), detail: a.resolutionReason ? resolutionText(a.resolutionReason, t) : "", tone: "ok" }
         : { time: "—", title: t(a.acknowledgedAt ? "Acknowledged — waiting for resolution" : "Waiting for acknowledgement"), detail: "" });
       return {
         id: a.id, version: a.version, title: alertTitle(a, t), time: when(a.detectedAt), sev: a.severity,

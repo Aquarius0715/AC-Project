@@ -2,7 +2,7 @@
 // unresolved critical / warning alerts need attention, the rest are information; DD-C08 read state on the
 // notifications). Pure code shared by server and client.
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
-import { evidenceText } from "@ac/web/lib/evidence";
+import { evidenceText, resolutionText } from "@ac/web/lib/evidence";
 import type { IconName } from "@ac/web/components/Icon";
 export type Alert = { id: string; title: string; sev: "warning" | "normal"; kind: string; kindIcon: IconName; icon: IconName; where: string; ev: string; group: "attn" | "info"; read: boolean };
 
@@ -56,7 +56,7 @@ export function inboxAlerts(alerts: ApiAlert[], notes: AlertNote[], unit: (id: s
     const u = unit(a.unitId);
     const mine = notes.filter((n) => n.sourceAlertId === a.id);
     const resolved = a.status === "resolved";
-    const status = resolved ? { state: "resolved" as const, text: t("Resolved"), tone: "ok" as const, detail: [a.resolvedAt ? t("Resolved {when}", { when: stamp(a.resolvedAt) }) : t("Resolved"), a.resolutionReason].filter(Boolean).join(" · ") }
+    const status = resolved ? { state: "resolved" as const, text: t("Resolved"), tone: "ok" as const, detail: [a.resolvedAt ? t("Resolved {when}", { when: stamp(a.resolvedAt) }) : t("Resolved"), a.resolutionReason && resolutionText(a.resolutionReason, t)].filter(Boolean).join(" · ") }
       : a.status === "acknowledged" ? { state: "acknowledged" as const, text: t("Acknowledged"), tone: "primary" as const, detail: a.acknowledgedAt ? t("Acknowledged {when} · still unresolved", { when: stamp(a.acknowledgedAt) }) : t("Acknowledged · still unresolved") }
       : { state: "open" as const, text: t("Unresolved"), tone: a.severity === "normal" ? "muted" as const : "warn" as const, detail: t("Open — not resolved yet") };
     return {

@@ -1,7 +1,8 @@
 // Notification rows (DATA_SOURCE=api): notifications.list items projected into the inbox row shape. Pure code,
 // shared by the Server Component that reads the list and the client view that renders it (FR-X07).
 import type { Role } from "@ac/web/lib/nav";
-import { DEFAULT_DISPLAY, showDate, showTime, translate, type Display } from "@ac/web/lib/i18n";
+import { evidenceText } from "@ac/web/lib/evidence";
+import { DEFAULT_DISPLAY, showDate, showTime, translate, translator, type Display } from "@ac/web/lib/i18n";
 
 type TargetKind = "unit" | "job" | "invoice" | "restriction" | "device" | "inquiry" | "client_user" | "partner_user" | "certificate";
 
@@ -64,11 +65,44 @@ const routes: Record<Role, Partial<Record<TargetKind, (id: string) => string>>> 
 
 const alertsPage: Record<Role, string> = { client: "/customer/alerts", admin: "/admin/alerts", contractor: "", technician: "" };
 
-/** One inbox row in the user's display language and time zone (FR-X01, IR258); the reason or message and the status
- * are shown as the Core API recorded them. */
+/** The status codes the sources store (IR95 events, the job status after a cancel, hold or resume, a restriction's state, an
+ * inquiry's state), in words: English keys of the display-language dictionary (IR481). */
+const statusWords: Record<string, string> = {
+  open: "Unresolved", requested: "Requested", time_proposed: "Time proposed", offered: "Offered", accepted: "Accepted", declined: "Declined", assigned: "Assigned",
+  in_progress: "In progress", submitted: "Submitted", returned: "Returned for rework", rework_requested: "Rework requested", completed: "Completed", cancelled: "Cancelled",
+  on_hold: "On hold", scheduled: "Scheduled", applied: "Applied", release_requested: "Release requested", released: "Released", received: "Received", answered: "Answered",
+  confirmed: "Payment confirmed",
+};
+/** Why an assignment was released (the access-release notice, IR439). */
+const reasonWords: Record<string, string> = {
+  technician_access_ended: "Technician’s access ended — to be reassigned",
+  technician_qualification_ended: "Technician’s qualification ended — to be reassigned",
+};
+/** The firmware campaign's advance notice (IR339): its day is dated again in the display language. */
+const FIRMWARE_NOTICE = "Firmware update from {date}, {from}–{to} local time. The AC may restart for about 2 minutes.";
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const firmwareNotice = /^Firmware update from (\d{1,2}) ([A-Z][a-z]{2}) (\d{4}), (\S+)–(\S+) local time\. The AC may restart for about 2 minutes\.$/;
+
+/** The dictionary keys of the detail line (the key check of the tests). */
+export const NOTIFICATION_KEYS = [...Object.values(statusWords), ...Object.values(reasonWords), FIRMWARE_NOTICE];
+
+function messageText(message: string, display: Display): string {
+  const m = message.match(firmwareNotice);
+  const month = m ? MONTHS.indexOf(m[2]) : -1;
+  if (!m || month < 0) return evidenceText(message, translator(display.locale)); // a filter reminder's message is its evidence (IR480)
+  const day = `${m[3]}-${String(month + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}T00:00:00Z`;
+  return translate(display.locale, FIRMWARE_NOTICE, { date: showDate(day, { locale: display.locale, timeZone: "UTC" }), from: m[4], to: m[5] });
+}
+
+/** One inbox row in the user's display language and time zone (FR-X01, IR258). The message, the reason and the status
+ * are worded in that language when a source above wrote them (IR481); a status the API filled in from the type (the
+ * notification had none) is left out, and any other text stays as recorded. */
 export function inboxRow(n: ApiNotification, role: Role, display: Display = DEFAULT_DISPLAY): InboxRow {
   const title = typeTitles[n.type] ?? titles[n.templateKey] ?? "Notification — {name}";
-  const text = details[n.templateKey]?.(n, display) ?? [n.params.message ?? n.params.reason, n.params.status].filter(Boolean).join(" · ");
+  const word = (words: Record<string, string>, code: string | null) => (code && words[code] ? translate(display.locale, words[code]) : code);
+  const status = n.params.status === n.type ? null : word(statusWords, n.params.status);
+  const message = n.params.message ? messageText(n.params.message, display) : word(reasonWords, n.params.reason);
+  const text = details[n.templateKey]?.(n, display) ?? [message, status].filter(Boolean).join(" · ");
   const detail = [text, n.channel === "inApp" ? null : n.channel].filter(Boolean).join(" · ");
   const href = typeRoutes[role]?.[n.type] ?? (n.sourceAlertId && alertsPage[role] ? alertsPage[role] : (routes[role][n.target.kind]?.(n.target.id) ?? ""));
   return { id: n.id, version: n.version, t: translate(display.locale, title, { name: n.params.targetName }), d: detail, w: showTime(n.occurredAt, display), read: n.readAt !== null, href };

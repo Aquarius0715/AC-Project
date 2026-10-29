@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { inboxAlerts, type ApiAlert } from "@ac/web/lib/alerts";
-import { inboxRow, type ApiNotification } from "@ac/web/lib/notifications";
+import { inboxRow, NOTIFICATION_KEYS, type ApiNotification } from "@ac/web/lib/notifications";
 import { i18nOf } from "@ac/web/lib/i18n";
+import { ms } from "@ac/web/lib/i18n-ms";
 
 const note = (over: Partial<ApiNotification>): ApiNotification => ({
   id: "n1", version: 1, type: "job_update", sourceAlertId: null, target: { kind: "job", id: "job-1" }, templateKey: "job_update",
@@ -11,8 +12,8 @@ const note = (over: Partial<ApiNotification>): ApiNotification => ({
 describe("inbox rows and alert rows", () => {
   it("titles by template, links the target and hides the in-app channel", () => {
     const r = inboxRow(note({}), "client");
-    expect([r.t, r.d, r.href, r.read]).toEqual(["Job update — job-1", "requested", "/customer/maintenance?jobId=job-1", false]);
-    expect(inboxRow(note({ channel: "email" }), "client").d).toBe("requested · email");
+    expect([r.t, r.d, r.href, r.read]).toEqual(["Job update — job-1", "Requested", "/customer/maintenance?jobId=job-1", false]);
+    expect(inboxRow(note({ channel: "email" }), "client").d).toBe("Requested · email");
     expect(inboxRow(note({ type: "fault", templateKey: "alert", sourceAlertId: "a1", target: { kind: "unit", id: "u1" }, params: { ...note({}).params, targetName: "Bedroom AC", status: "open" } }), "client"))
       .toMatchObject({ t: "Alert on Bedroom AC", href: "/customer/alerts" });
   });
@@ -20,14 +21,34 @@ describe("inbox rows and alert rows", () => {
   it("titles and times a row in the user's display language and time zone (FR-X01, IR258)", () => {
     expect(inboxRow(note({}), "client").w).toBe("14 Sept 2026, 9:00 am MYT");
     const r = inboxRow(note({}), "client", { locale: "ms", timeZone: "Asia/Tokyo" });
-    expect([r.t, r.d, r.w]).toEqual(["Kemas kini kerja — job-1", "requested", "14 Sep 2026, 10:00 PG GMT+9"]);
+    expect([r.t, r.d, r.w]).toEqual(["Kemas kini kerja — job-1", "Diminta", "14 Sep 2026, 10:00 PG GMT+9"]);
     expect(inboxRow(note({ templateKey: "unknown" }), "technician", { locale: "ms", timeZone: "UTC" }).t).toBe("Pemberitahuan — job-1");
   });
 
   it("opens Filter care from a cleaning reminder (IR239)", () => {
     const r = inboxRow(note({ type: "cleaning_due", templateKey: "alert", sourceAlertId: "a1", target: { kind: "unit", id: "u1" },
       params: { targetName: "Bedroom AC", at: "2026-09-14T01:00:00Z", status: "open", reason: null, message: "Cleaning due (268 h of run time since the last cleaning). Not a fault." } }), "client");
-    expect([r.t, r.d, r.href]).toEqual(["Filter cleaning due on Bedroom AC", "Cleaning due (268 h of run time since the last cleaning). Not a fault. · open", "/customer/maintenance?tab=filter-care"]);
+    expect([r.t, r.d, r.href]).toEqual(["Filter cleaning due on Bedroom AC", "Cleaning due (268 h of run time since the last cleaning). Not a fault. · Unresolved", "/customer/maintenance?tab=filter-care"]);
+  });
+
+  it("words the status, the reason and the message in the display language (IR481)", () => {
+    expect(NOTIFICATION_KEYS.filter((key) => !(key in ms))).toEqual([]);
+    const malay = { locale: "ms" as const, timeZone: "UTC" };
+    // an access-release notice (IR439): the job is back to accepted and the reason is a code
+    const released = note({ params: { ...note({}).params, status: "accepted", reason: "technician_access_ended" } });
+    expect(inboxRow(released, "contractor").d).toBe("Technician’s access ended — to be reassigned · Accepted");
+    expect(inboxRow(released, "contractor", malay).d).toBe(`${ms["Technician’s access ended — to be reassigned"]} · ${ms["Accepted"]}`);
+    expect(inboxRow(note({ params: { ...note({}).params, status: "in_progress" } }), "technician").d).toBe("In progress");
+    // a status the API filled in from the type (a seeded alert notification has none) is left out; an unknown one stays
+    expect(inboxRow(note({ type: "fault", templateKey: "alert", params: { ...note({}).params, status: "fault" } }), "client").d).toBe("");
+    expect(inboxRow(note({ params: { ...note({}).params, status: "paused_by_device" } }), "client").d).toBe("paused_by_device");
+    // the firmware campaign's advance notice (IR339) is dated again in the display language
+    const firmware = note({ type: "device_operation", templateKey: "device_operation", target: { kind: "unit", id: "u1" },
+      params: { ...note({}).params, status: "scheduled", message: "Firmware update from 3 Nov 2026, 02:00–04:00 local time. The AC may restart for about 2 minutes." } });
+    expect(inboxRow(firmware, "client").d).toBe("Firmware update from 3 Nov 2026, 02:00–04:00 local time. The AC may restart for about 2 minutes. · Scheduled");
+    expect(inboxRow(firmware, "client", malay).d).toBe("Kemas kini perisian tegar dari 3 Nov 2026, 02:00–04:00 waktu tempatan. AC mungkin dimulakan semula selama kira-kira 2 minit. · Dijadualkan");
+    expect(inboxRow(note({ params: { ...note({}).params, message: "Firmware update from 3 Foo 2026, 02:00–04:00 local time. The AC may restart for about 2 minutes." } }), "client").d)
+      .toBe("Firmware update from 3 Foo 2026, 02:00–04:00 local time. The AC may restart for about 2 minutes. · Requested");
   });
 
   it("opens the certifications from a certificate reminder and names its expiry day (BR-P09, IR336)", () => {
@@ -65,11 +86,11 @@ describe("inbox rows and alert rows", () => {
     expect(rows.map((r) => r.kind)).toEqual(["Fault", "Load cause (possible)", "Fault", "Maintenance reminder"]);
     expect(inboxAlerts([alert("ins", "normal", "open", { causeCode: "insulation_loss", evidenceKind: "inspection" }), alert("loss", "warning", "open", { causeCode: "insulation_loss" })], [], () => undefined).map((r) => r.kind))
       .toEqual(["Load cause (possible)", "Inspection record"]);
-    // the user's language and display time zone (IR261); the evidence text and resolution reason stay as recorded
+    // the user's language and display time zone (IR261); a resolution reason the system wrote is worded too (IR481)
     const [, win, old] = inboxAlerts([alert("hot", "critical", "open"), alert("win", "warning", "acknowledged", { causeCode: "window_open", acknowledgedAt: "2026-09-14T01:30:00Z" }), alert("old", "critical", "resolved", { resolvedAt: "2026-09-14T02:00:00Z", resolutionReason: "filter cleaned" })],
       [], () => ({ name: "Bedroom AC", place: "" }), i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" }));
     expect([win.title, win.kind, win.status.text, win.status.detail, old.status.detail, old.where, old.evidence.split(":")[0]]).toEqual([
-      "Kemungkinan tingkap terbuka", "Punca beban (mungkin)", "Diakui", "Diakui 14 Sep 2026, 10:30 PG GMT+9 · masih belum selesai", "Diselesaikan 14 Sep 2026, 11:00 PG GMT+9 · filter cleaned", "Bedroom AC · dikesan 14 Sep 2026, 10:00 PG GMT+9", "Bukti (disimpulkan)",
+      "Kemungkinan tingkap terbuka", "Punca beban (mungkin)", "Diakui", "Diakui 14 Sep 2026, 10:30 PG GMT+9 · masih belum selesai", "Diselesaikan 14 Sep 2026, 11:00 PG GMT+9 · penapis dibersihkan", "Bedroom AC · dikesan 14 Sep 2026, 10:00 PG GMT+9", "Bukti (disimpulkan)",
     ]);
   });
 });
