@@ -310,14 +310,15 @@ export function conditionText(p: { metric?: string; operator?: Operator; thresho
 }
 export type PolicyLine = { id: string; version: number; kind: "alert" | "default_alert"; name: string; type: string; condition: string; madeBy: string; units: number; enabled: boolean };
 export type RuleLine = { ruleKey: string; name: string; condition: string; enabled: boolean; version: number; note: string | null };
-/** The customer's policies (default first) with the units of this customer that carry each one. */
+/** The customer's policies (default first) with the units of this customer that carry each one; the default policy's
+ * system name in the display language (IR499). */
 export function policyLines(ps: ApiCustomerPolicy[], customerUnits: string[], owner: (membershipId: string) => string, i: I18n = EN): PolicyLine[] {
   const { t } = i;
   const mine = new Set(customerUnits);
   return ps.filter((p): p is ApiCustomerPolicy & { kind: "alert" | "default_alert" } => p.kind === "alert" || p.kind === "default_alert")
     .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "default_alert" ? -1 : 1))
     .map((p) => p.kind === "default_alert"
-      ? { id: p.id, version: p.version, kind: p.kind, name: p.name, type: t("Default"), condition: t((p.rules?.length ?? 0) === 1 ? "1 rule · {on} on for this customer" : "{n} rules · {on} on for this customer", { n: p.rules?.length ?? 0, on: defaultRules(p, i).filter((r) => r.enabled).length }), madeBy: t("HQ (template)"), units: mine.size, enabled: p.enabled }
+      ? { id: p.id, version: p.version, kind: p.kind, name: p.name === "Default policy" ? t("Default policy") : p.name, type: t("Default"), condition: t((p.rules?.length ?? 0) === 1 ? "1 rule · {on} on for this customer" : "{n} rules · {on} on for this customer", { n: p.rules?.length ?? 0, on: defaultRules(p, i).filter((r) => r.enabled).length }), madeBy: t("HQ (template)"), units: mine.size, enabled: p.enabled }
       : { id: p.id, version: p.version, kind: p.kind, name: p.name, type: metricLabel[p.metric ?? ""] ? t(metricLabel[p.metric ?? ""]) : p.metric ?? "", condition: conditionText(p, i), madeBy: owner(p.ownerMembershipId), units: p.unitIds.filter((u) => mine.has(u)).length, enabled: p.enabled });
 }
 /** The default policy's rules with this customer's on/off settings (no setting = on). */

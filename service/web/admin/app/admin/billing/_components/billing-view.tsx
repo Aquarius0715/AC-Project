@@ -17,6 +17,9 @@ import {
 } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 
+/** A recipient's role in words (IR499). */
+const ROLE_WORD: Record<string, string> = { client: "Client", admin: "Admin", contractor: "Contractor", technician: "Technician" };
+
 type Tab = "invoices" | "inquiries" | "payouts";
 export type BillingLive = {
   tab: Tab; scope: { customerId?: string; propertyId?: string; contractId?: string; overdueOnly: boolean; from?: string; to?: string };
@@ -217,7 +220,7 @@ export function BillingView({ live }: { live?: BillingLive }) {
                 </Card>
                 {sel.st === "Overdue" && <Card title={t("Payment reminder")} sub={t("Only overdue unpaid invoices can be reminded. If payment arrives first, the reminder is stopped. Delivery is simulated.")}>
                   {live && recipients.length === 0 ? <p className="text-xs text-muted-foreground">{t("No client of this customer can receive the reminder.")}</p> : <>
-                    <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Recipient")}>{live ? <Select value={recipient?.id ?? ""} onChange={(e) => setReminder({ ...reminder, recipient: e.target.value, preview: "" })}>{recipients.map((r) => <option key={r.id} value={r.id}>{r.displayLabel} · {r.role}</option>)}</Select> : <Select><option>customer-a · Client</option></Select>}</Field><Field label={t("Channel")}><Select value={channel} onChange={(e) => setReminder({ ...reminder, channel: e.target.value, preview: "" })}>{channels.map((c) => <option key={c} value={c}>{channelName(c)}</option>)}</Select></Field></div>
+                    <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Recipient")}>{live ? <Select value={recipient?.id ?? ""} onChange={(e) => setReminder({ ...reminder, recipient: e.target.value, preview: "" })}>{recipients.map((r) => <option key={r.id} value={r.id}>{r.displayLabel} · {t(ROLE_WORD[r.role] ?? r.role)}</option>)}</Select> : <Select><option>customer-a · Client</option></Select>}</Field><Field label={t("Channel")}><Select value={channel} onChange={(e) => setReminder({ ...reminder, channel: e.target.value, preview: "" })}>{channels.map((c) => <option key={c} value={c}>{channelName(c)}</option>)}</Select></Field></div>
                     <Field label={t("Reason · e.g. “2nd reminder after due date”")}><Input value={reminder.reason} onChange={(e) => setReminder({ ...reminder, reason: e.target.value, preview: "" })} /></Field>
                     {message && <div className="my-3 rounded-xl bg-surface2 p-3 text-xs"><b>{t("Preview · {channel}", { channel: channelName(channel) })}</b> <span className="text-muted-foreground">{t("nothing is sent yet")}</span><br />{message.subject && <><b>{message.subject}</b><br /></>}{message.body}</div>}
                     <div className="mt-3 flex justify-end gap-2">{live && <Btn disabled={pending || !reminder.reason.trim()} onClick={preview}>{t("Preview")}</Btn>}<Btn variant="primary" disabled={pending || !reminder.reason.trim() || (live && !reminder.preview)} onClick={send}>{t("Send reminder")}</Btn></div>

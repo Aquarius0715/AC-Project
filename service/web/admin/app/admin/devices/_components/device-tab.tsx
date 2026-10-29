@@ -6,7 +6,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { metrics, metricUnit, type Metric } from "@ac/web/lib/devices";
-import { filterOf, HQ_FILTERS, type Filter } from "@ac/web/lib/techDevices";
+import { filterOf, HQ_FILTERS, type Filter, metricText } from "@ac/web/lib/techDevices";
 import { bindDevice, calibrateSensor, checkDevice, registerDevice, updateFirmware } from "../actions";
 import type { DevicesLive } from "./devices-view";
 import { Icon } from "@ac/web/components/Icon";
@@ -187,7 +187,7 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
         <p className="text-[11px] text-muted-foreground">{t(first ? "The device's sensors start reporting for this unit." : "History stays with the previous binding; the device gets new sensor IDs on the new unit.")}</p>
       </Modal>
       <Modal open={modal === "calibrate"} onClose={close} title={t("Calibrate sensor")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={calibrate}>{t("Record")}</Btn></>}>
-        <Field label={t("Sensor")}><Select value={cal.sensorId} onChange={(e) => setCal({ ...cal, sensorId: e.target.value })}>{dv?.detail.sensors.map((s) => <option key={s.id} value={s.id}>{s.metric} ({s.unit})</option>)}</Select></Field>
+        <Field label={t("Sensor")}><Select value={cal.sensorId} onChange={(e) => setCal({ ...cal, sensorId: e.target.value })}>{dv?.detail.sensors.map((s) => <option key={s.id} value={s.id}>{metricText(s.metric, t)} ({s.unit})</option>)}</Select></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}><Field label={t("Reference")} error={tried && (cal.reference.trim() === "" || !Number.isFinite(+cal.reference)) ? t("A number") : undefined}><Input type="number" value={cal.reference} onChange={(e) => setCal({ ...cal, reference: e.target.value })} /></Field><Field label={t("Measured")} error={tried && (cal.measured.trim() === "" || !Number.isFinite(+cal.measured)) ? t("A number") : undefined}><Input type="number" value={cal.measured} onChange={(e) => setCal({ ...cal, measured: e.target.value })} /></Field></div>
         <p className="text-[11px] text-muted-foreground">{t("Recorded at the current time as a demo calibration.")}</p>
       </Modal>

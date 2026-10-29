@@ -54,6 +54,8 @@ describe("HQ customers & units", () => {
     expect(policyLines([policy({}), def], ["u1"], () => "customer-a").map((p) => [p.name, p.type, p.condition, p.madeBy])).toEqual([
       ["Default policy", "Default", "1 rule · 0 on for this customer", "HQ (template)"], ["Bedroom too hot", "Temperature", "Temperature ≥ 30 °C for 60 s → Warning", "customer-a"],
     ]);
+    // the default policy's system name in the display language; a policy's own name as written (IR499)
+    expect(policyLines([policy({}), def], ["u1"], () => "customer-a", i18nOf({ locale: "ms", timeZone: "UTC" })).map((p) => p.name)).toEqual(["Polisi lalai", "Bedroom too hot"]);
   });
 
   it("shows coverage with Kuala Lumpur warranty days and the import messages", () => {

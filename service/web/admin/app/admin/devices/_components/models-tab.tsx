@@ -6,6 +6,7 @@ import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { showTime } from "@ac/web/lib/i18n";
 import { capabilityChanges, capabilityDraft, capabilityErrors, capabilityInput, fans, firmwareProblem, metrics, metricUnit, modes, type CapabilityDraft, type Fan, type Metric, type Mode } from "@ac/web/lib/devices";
+import { metricText } from "@ac/web/lib/techDevices";
 import { capabilityHistory, saveCapability, type HistoryEntry } from "../actions";
 import type { DevicesLive } from "./devices-view";
 import { Icon } from "@ac/web/components/Icon";
@@ -89,8 +90,8 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
           </section>
           <section>
             <h3 className="mb-2 text-[13px] font-bold">{t("Sensors")}</h3>
-            <ScrollX><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after (s)")}</th><th>{t("Boundary")}</th><th /></tr></thead><tbody>{d.sensors.map((s, n) => <tr key={s.metric} className="border-t border-line"><td className="py-1.5">{s.metric}</td><td>{metricUnit[s.metric]}</td><td><Input type="number" className="w-28" aria-label={t("Stale after (s)")} value={s.staleAfterSeconds} onChange={(e) => set({ sensors: d.sensors.map((x, j) => (j === n ? { ...x, staleAfterSeconds: e.target.value } : x)) })} /></td><td className="text-xs text-muted-foreground">{s.metric === "power" ? "ac_input_electricity" : "—"}</td><td><Plain type="button" className="text-xs text-crit" onClick={() => set({ sensors: d.sensors.filter((_, j) => j !== n) })}>{t("Remove")}</Plain></td></tr>)}</tbody></table></ScrollX>
-            {available.length > 0 && <div className="mt-2 flex items-end gap-2"><Field label={t("Add sensor")}><Select value={pick} onChange={(e) => setNewSensor(e.target.value as Metric)}>{available.map((m) => <option key={m} value={m}>{m} ({metricUnit[m]})</option>)}</Select></Field><Btn size="sm" onClick={() => set({ sensors: [...d.sensors, { metric: pick, staleAfterSeconds: "120" }] })}>{t("Add")}</Btn></div>}
+            <ScrollX><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after (s)")}</th><th>{t("Boundary")}</th><th /></tr></thead><tbody>{d.sensors.map((s, n) => <tr key={s.metric} className="border-t border-line"><td className="py-1.5">{metricText(s.metric, t)}</td><td>{metricUnit[s.metric]}</td><td><Input type="number" className="w-28" aria-label={t("Stale after (s)")} value={s.staleAfterSeconds} onChange={(e) => set({ sensors: d.sensors.map((x, j) => (j === n ? { ...x, staleAfterSeconds: e.target.value } : x)) })} /></td><td className="text-xs text-muted-foreground">{s.metric === "power" ? "ac_input_electricity" : "—"}</td><td><Plain type="button" className="text-xs text-crit" onClick={() => set({ sensors: d.sensors.filter((_, j) => j !== n) })}>{t("Remove")}</Plain></td></tr>)}</tbody></table></ScrollX>
+            {available.length > 0 && <div className="mt-2 flex items-end gap-2"><Field label={t("Add sensor")}><Select value={pick} onChange={(e) => setNewSensor(e.target.value as Metric)}>{available.map((m) => <option key={m} value={m}>{metricText(m, t)} ({metricUnit[m]})</option>)}</Select></Field><Btn size="sm" onClick={() => set({ sensors: [...d.sensors, { metric: pick, staleAfterSeconds: "120" }] })}>{t("Add")}</Btn></div>}
             {err("sensors") && <p className="mt-1 text-xs text-crit">{err("sensors")}</p>}
           </section>
           <section aria-label={t("Firmware candidates")}>

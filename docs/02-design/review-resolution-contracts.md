@@ -7213,3 +7213,17 @@ The apps have no app-level `error.tsx`, so a failed read there fell through to N
    - Four Malay names: team & capacity, devices & models, preferences, demo controls.
    - The remaining pages without route states read nothing: the sign-in and forgot-password pages, the forbidden page, and the redirects.
 2. **Tests.** The dictionary test already reads the route states' names (IR269) and passes.
+
+## IR499 Sensor metrics, recipient roles and the default policy's name in Malay — 2026-10-30
+
+Found in review (a Malay crawl of every linked page of the four apps that lists the dictionary's English texts left on a Malay page):
+- **Sensor metrics.** The device views showed a sensor's metric code ("temperature", "humidity", "power"): the technician's devices, HQ's device registry and model editor, their calibration dialogs and the calibration history line.
+- **Recipient roles.** HQ's payment-reminder recipient list read "customer-a · client".
+- **Default policy.** HQ's unit page listed the default alert policy by its stored English name, "Default policy", which the customer's alerts page already words.
+- **Audit log.** It shows target kinds ("contract", "policy", …) as codes. That is the design (IR304, IR320) and stays.
+
+1. **Web.**
+   - `metricText` words a metric through the alert metric names ("Temperature"), and every sensor display uses it.
+   - The recipient's role is a role word.
+   - The default policy's system name is shown in the display language; a renamed policy keeps its own name.
+2. **Tests.** `techDevices.test.ts` and `assets.test.ts` check the Malay words.

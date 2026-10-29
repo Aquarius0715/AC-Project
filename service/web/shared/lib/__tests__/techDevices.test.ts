@@ -129,7 +129,7 @@ describe("operation history", () => {
   });
   it("prints a calibration with the signed offset reference − measured", () => {
     const base = { id: "c", sensorId: "s", metric: "temperature" as const, unit: "°C" as const, calibratedAt: "2026-09-14T01:04:00Z", actorId: "u" };
-    expect(calibrationText({ ...base, referenceValue: 25, measuredValue: 25.4 })).toBe("temperature · ref 25.0 °C / measured 25.4 °C · offset −0.4 °C · 14 Sept 2026, 9:04 am MYT — appended; earlier readings unchanged.");
+    expect(calibrationText({ ...base, referenceValue: 25, measuredValue: 25.4 })).toBe("Temperature · ref 25.0 °C / measured 25.4 °C · offset −0.4 °C · 14 Sept 2026, 9:04 am MYT — appended; earlier readings unchanged.");
     expect(calibrationText({ ...base, referenceValue: 25.5, measuredValue: 25 })).toContain("offset 0.5 °C");
   });
 });
@@ -180,7 +180,7 @@ describe("the device screens in Malay with the display time zone (IR287)", () =>
     expect(operationRows([op()], "v1", MS)[0]).toMatchObject({ kind: "Semakan sambungan", statusText: "Berjaya", detail: "denyutan disahkan" });
     expect(eventRows([event()], new Map(), NOW, MS)[0]).toMatchObject({ time: "hari ini 10:00 PG GMT+9", detail: "Denyutan terlepas (bukan bukti kehilangan kuasa) · heartbeat", recovery: "terbuka" });
     expect(failureText("TIMEOUT", MS.t)).toBe("TIMEOUT — tiada pengesahan dalam 60 s");
-    expect(sensorRows(device({ sensors: [{ id: "s1", metric: "temperature", unit: "°C", staleAfterSeconds: 120, calibratedAt: null }] }), MS)).toEqual([{ id: "s1", metric: "temperature", unit: "°C", stale: "120 s", calibrated: "Tidak pernah" }]);
+    expect(sensorRows(device({ sensors: [{ id: "s1", metric: "temperature", unit: "°C", staleAfterSeconds: 120, calibratedAt: null }] }), MS)).toEqual([{ id: "s1", metric: "Suhu", unit: "°C", stale: "120 s", calibrated: "Tidak pernah" }]); // the metric in words (IR499)
   });
   it("words a refused write and its fields", () => {
     expect(deviceRefusal({ code: "CONFLICT", messageKey: "errors.duplicate_serial", fieldErrors: {} })).toBe("CONFLICT — this serial is already registered.");

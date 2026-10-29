@@ -8,7 +8,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { ApiDeviceDetail, Metric } from "@ac/web/lib/devices";
-import { deviceFieldText, deviceRefusal, FILTERS, filterOf, openAlerts, type EventRow, type Filter, type OperationRow, type TechDeviceRow } from "@ac/web/lib/techDevices";
+import { deviceFieldText, deviceRefusal, FILTERS, filterOf, openAlerts, type EventRow, type Filter, type OperationRow, type TechDeviceRow, metricText } from "@ac/web/lib/techDevices";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { acknowledgeAlert, addResponseNote, bindDevice, calibrateSensor, checkDevice, registerDevice, updateFirmware } from "../actions";
 import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
@@ -21,7 +21,7 @@ export type TechDevicesLive = {
   device: null | {
     detail: ApiDeviceDetail; row: TechDeviceRow; jobId: string | null;
     tiles: { label: string; value: string; dot: string | null; sub: string; warn?: boolean }[];
-    sensors: { id: string; metric: Metric; unit: UnitSymbol; stale: string; calibrated: string }[];
+    sensors: { id: string; metric: string; unit: UnitSymbol; stale: string; calibrated: string }[]; // the metric in words (IR499)
     unit: { name: string; place: string; model: string } | null; firmware: string[];
     firmwareCard: { tone: "primary" | "crit" | "ok"; title: string; status: string; text: string } | null;
     operations: OperationRow[]; calibrations: string[];
@@ -251,7 +251,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
           </Select>
         </Field>
         <div><p className="mb-1 flex justify-between text-xs font-semibold"><span>{t("Sensor types")}</span><span className="font-normal text-muted-foreground">{t("Only metrics in the unit’s capability")}</span></p>
-          <div className="flex flex-wrap gap-2">{(regUnit?.sensors ?? []).map((m) => <Check key={m} label={m} checked={reg.sensors.includes(m)} onChange={(v) => setReg({ ...reg, sensors: v ? [...reg.sensors, m] : reg.sensors.filter((x) => x !== m) })} />)}{regUnit && regUnit.sensors.length === 0 && <span className="text-xs text-muted-foreground">{t("The model defines no sensors.")}</span>}</div>
+          <div className="flex flex-wrap gap-2">{(regUnit?.sensors ?? []).map((m) => <Check key={m} label={metricText(m, t)} checked={reg.sensors.includes(m)} onChange={(v) => setReg({ ...reg, sensors: v ? [...reg.sensors, m] : reg.sensors.filter((x) => x !== m) })} />)}{regUnit && regUnit.sensors.length === 0 && <span className="text-xs text-muted-foreground">{t("The model defines no sensors.")}</span>}</div>
           {errors.sensorTypes && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{errors.sensorTypes}</p>}</div>
         <Field label={t("Job · required")} error={errors.jobId}><Select value={reg.jobId} onChange={(e) => setReg({ ...reg, jobId: e.target.value })}>{(regUnit?.jobs ?? []).map((j) => <option key={j.id} value={j.id}>{j.label}</option>)}</Select></Field>
         <Banner>{t("After registering, run “Check connection”. The device stays Unknown until its first heartbeat.")}</Banner>
@@ -262,7 +262,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
         <p className="text-[11px] text-muted-foreground">{t("History stays with the previous binding; the device gets new sensor IDs on the new unit (SR24).")}</p>
       </Modal>
       <Modal open={modal === "calibrate"} onClose={close} title={t("Calibrate sensor")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={calibrate}>{t("Record calibration")}</Btn></>}>
-        <Field label={t("Sensor")} error={errors.sensorId ?? errors.unit ?? errors.metric}><Select value={cal.sensorId} onChange={(e) => setCal({ ...cal, sensorId: e.target.value })}>{dv?.detail.sensors.map((s) => <option key={s.id} value={s.id}>{s.metric} ({s.unit})</option>)}</Select></Field>
+        <Field label={t("Sensor")} error={errors.sensorId ?? errors.unit ?? errors.metric}><Select value={cal.sensorId} onChange={(e) => setCal({ ...cal, sensorId: e.target.value })}>{dv?.detail.sensors.map((s) => <option key={s.id} value={s.id}>{metricText(s.metric, t)} ({s.unit})</option>)}</Select></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
           <Field label={t("Reference value")} error={errors.referenceValue}><Input inputMode="decimal" value={cal.reference} onChange={(e) => setCal({ ...cal, reference: e.target.value })} /></Field>
           <Field label={t("Measured value")} error={errors.measuredValue}><Input inputMode="decimal" value={cal.measured} onChange={(e) => setCal({ ...cal, measured: e.target.value })} /></Field>

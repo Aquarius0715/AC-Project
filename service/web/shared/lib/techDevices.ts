@@ -5,6 +5,7 @@
 // time zone (IR44). Event types, evidence sources and versions stay codes, as in Figma.
 import { EN, relativeTime, showClock, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import type { ApiCalibration, ApiDevice, ApiDeviceDetail, ApiDeviceOperation, Connection } from "@ac/web/lib/devices";
+import { metricLabel } from "@ac/web/lib/adminAlerts";
 
 const en = translator("en");
 
@@ -128,11 +129,13 @@ const signed = (n: number) => (n < 0 ? `−${Math.abs(n).toFixed(1)}` : n.toFixe
 /** One calibration of the T11 history: reference, measured and the offset to apply (reference − measured). */
 export const calibrationText = (c: ApiCalibration, i: I18n = EN) =>
   i.t("{metric} · ref {reference} / measured {measured} · offset {offset} · {time} — appended; earlier readings unchanged.", {
-    metric: c.metric, reference: `${c.referenceValue.toFixed(1)} ${c.unit}`, measured: `${c.measuredValue.toFixed(1)} ${c.unit}`, offset: `${signed(c.referenceValue - c.measuredValue)} ${c.unit}`, time: showTime(c.calibratedAt, i.display),
+    metric: metricText(c.metric, i.t), reference: `${c.referenceValue.toFixed(1)} ${c.unit}`, measured: `${c.measuredValue.toFixed(1)} ${c.unit}`, offset: `${signed(c.referenceValue - c.measuredValue)} ${c.unit}`, time: showTime(c.calibratedAt, i.display),
   });
+/** A sensor's metric in words ("temperature" → "Temperature", in the display language); an unknown one as stored (IR499). */
+export const metricText = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]) : metric);
 /** The sensors of the device for the T11 table: metric, unit, stale limit and the last calibration. */
 export const sensorRows = (d: ApiDevice, i: I18n = EN) =>
-  d.sensors.map((s) => ({ id: s.id, metric: s.metric, unit: s.unit, stale: i.t("{n} s", { n: s.staleAfterSeconds }), calibrated: s.calibratedAt ? showTime(s.calibratedAt, i.display) : i.t("Never") }));
+  d.sensors.map((s) => ({ id: s.id, metric: metricText(s.metric, i.t), unit: s.unit, stale: i.t("{n} s", { n: s.staleAfterSeconds }), calibrated: s.calibratedAt ? showTime(s.calibratedAt, i.display) : i.t("Never") }));
 
 const eventDetail: Record<ApiDeviceEventFull["eventType"], string> = {
   tamper: "Cover opened while powered", power_lost: "Dedicated demo power signal lost", communication_lost: "Missed heartbeats (not proof of power loss)",
