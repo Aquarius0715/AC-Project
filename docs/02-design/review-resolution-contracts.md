@@ -7141,3 +7141,13 @@ Found in review (after IR491, every place that sends the page's load time): HQ's
 
 1. **Web.** A revoke goes through its own Server Action, which sets `validUntil` to the Core API's clock when HQ confirms (`coreNow`). The new revoke in the dev database ends 5 ms before its save. The other uses of the page's time only check or show times on the page; the Core API checks them again with its clock.
 2. **Tests.** The access E2E (add a person, then revoke) passes.
+
+## IR493 HQ's job refusals in Malay, fields in words — 2026-10-30
+
+Found in review (a scan of the texts the web translates through a table, `t(TABLE[key])`, which the dictionary test cannot see: it checks literal `t("…")` only): 22 of the 30 refusal texts of HQ's maintenance jobs (`hqRefusal`) had no Malay entry, so booking, proposals, assignments, reviews and access extensions refused in English to a Malay user. Examples are a time outside the client's preferred times, a technician not qualified or already booked, a newer report version, and a contractor's suspended offers. Their field errors named the field by its key ("contactWindow: …").
+
+1. **Web.**
+   - The 22 texts have Malay entries.
+   - A field is named in words, as the shared refusal line names it ("Contact window: …", `fieldName` of `actionMessage`).
+   - The tables are module constants with an exported key list.
+2. **Tests.** `adminJobs.test.ts` checks a Malay refusal, a field in words and that every text of the tables has a Malay entry. The scan found no other table without its entries (the air-quality units stay as written).

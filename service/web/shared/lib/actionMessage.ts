@@ -52,10 +52,13 @@ const humanize = (s: string) => {
   return t.charAt(0).toUpperCase() + t.slice(1);
 };
 
+/** A field of a refusal in words: its last part, humanized ("newUser.email" → "Email"). */
+export const fieldName = (field: string) => humanize(field.split(".").pop() ?? field);
+
 export function actionMessage(r: ActionFailure, t: T = translator("en")): string {
   const [field, key] = Object.entries(r.fieldErrors)[0] ?? [];
   if (field && key) {
-    const name = humanize(field.split(".").pop() ?? field);
+    const name = fieldName(field);
     return fieldText[key] ? t(fieldText[key], { field: name }) : t("{field} — {problem}", { field: name, problem: humanize(key).toLowerCase() });
   }
   if (r.messageKey === "error.versionConflict") return t("Someone changed this in the meantime — the screen now shows the latest version");

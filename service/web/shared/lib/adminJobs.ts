@@ -8,7 +8,7 @@
 // times HQ types are read in it too (NFR-08). Business days (a follow-up's classify-by day, "from tomorrow") stay
 // Kuala Lumpur days.
 import { EN, showSpan, showTime, translator, zonedInstant, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
-import { actionMessage } from "@ac/web/lib/actionMessage";
+import { actionMessage, fieldName } from "@ac/web/lib/actionMessage";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import { inspectionRows, readingRows, resultText, type ApiWorkReport } from "@ac/web/lib/partnerReview";
@@ -209,37 +209,42 @@ export function classifyBy(createdAt: string, i: I18n = EN): string {
   return showTime(new Date(d.getTime() - 8 * 3600_000).toISOString(), i.display);
 }
 
-/** Readable refusals of the HQ job actions. */
+/** The HQ job refusals in words, by message key (English keys of the display-language dictionary). */
+const HQ_REFUSAL_TEXT: Record<string, string> = {
+  "errors.slot_not_agreed": "only one of the client’s preferred times (or an accepted proposal) can be booked",
+  "errors.slot_is_preferred": "that is one of the client’s own times — book it directly instead",
+  "errors.proposal_pending": "a proposal is already waiting for the client — withdraw it first",
+  "errors.assignment_overlap": "the technician has a confirmed job at that time",
+  "errors.qualification_missing": "the technician is not qualified for this unit at that time",
+  "errors.technician_out_of_scope": "the technician’s scope does not include this unit",
+  "errors.contractor_suspended": "offers to this contractor are suspended",
+  "errors.reschedule_too_late": "too late to change the time",
+  "error.invalidState": "not allowed in the job’s current state",
+  "error.versionConflict": "the job changed meanwhile — the latest state is shown",
+  "errors.review_mode": "HQ reviews its internal jobs, and a contractor's jobs only by escalation with a reason",
+  "errors.self_review": "you contributed to this report version, so another reviewer must decide (self-approval is rejected)",
+  "errors.report_version_changed": "a newer report version exists — the latest one is shown",
+  "errors.no_accepted_offer": "only the access of an accepted offer can be extended",
+  "error.mustExtend": "the new end must be later than the current end and in the future",
+  "error.unitArchived": "the unit is archived",
+  "error.slotRules": "each time is 1–4 hours, starts on a later day than today, and the times differ",
+  "error.beforeRequestedEnd": "the due time cannot be before the end of the 1st preferred time",
+  "errors.contact_details_forbidden": "no e-mail addresses or phone numbers in the contact window (IR64)",
+  "error.count": "too many entries", "error.invalid": "not a valid value",
+  "error.length": "1–1000 characters", "error.required": "required", "error.range": "the end must be after the start", "error.past": "must be in the future",
+  "error.afterAccess": "must not be after the access ends", "error.afterVisit": "must not be after the visit starts (IR457)",
+};
+/** A field's own limit where it differs from the general one. */
+const HQ_FIELD_TEXT: Record<string, string> = { "symptom:error.length": "10–2000 characters", "contactWindow:error.length": "up to 200 characters", "alternativeSlots:error.count": "up to two more times" };
+/** The dictionary keys of the refusals (the key check of the tests, IR493). */
+export const HQ_REFUSAL_KEYS = [...Object.values(HQ_REFUSAL_TEXT), ...Object.values(HQ_FIELD_TEXT)];
+
+/** Readable refusals of the HQ job actions, in the display language; a field is named in words (IR493). */
 export function hqRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
-  const keys: Record<string, string> = {
-    "errors.slot_not_agreed": "only one of the client’s preferred times (or an accepted proposal) can be booked",
-    "errors.slot_is_preferred": "that is one of the client’s own times — book it directly instead",
-    "errors.proposal_pending": "a proposal is already waiting for the client — withdraw it first",
-    "errors.assignment_overlap": "the technician has a confirmed job at that time",
-    "errors.qualification_missing": "the technician is not qualified for this unit at that time",
-    "errors.technician_out_of_scope": "the technician’s scope does not include this unit",
-    "errors.contractor_suspended": "offers to this contractor are suspended",
-    "errors.reschedule_too_late": "too late to change the time",
-    "error.invalidState": "not allowed in the job’s current state",
-    "error.versionConflict": "the job changed meanwhile — the latest state is shown",
-    "errors.review_mode": "HQ reviews its internal jobs, and a contractor's jobs only by escalation with a reason",
-    "errors.self_review": "you contributed to this report version, so another reviewer must decide (self-approval is rejected)",
-    "errors.report_version_changed": "a newer report version exists — the latest one is shown",
-    "errors.no_accepted_offer": "only the access of an accepted offer can be extended",
-    "error.mustExtend": "the new end must be later than the current end and in the future",
-    "error.unitArchived": "the unit is archived",
-    "error.slotRules": "each time is 1–4 hours, starts on a later day than today, and the times differ",
-    "error.beforeRequestedEnd": "the due time cannot be before the end of the 1st preferred time",
-    "errors.contact_details_forbidden": "no e-mail addresses or phone numbers in the contact window (IR64)",
-    "error.count": "too many entries", "error.invalid": "not a valid value",
-    "error.length": "1–1000 characters", "error.required": "required", "error.range": "the end must be after the start", "error.past": "must be in the future",
-    "error.afterAccess": "must not be after the access ends", "error.afterVisit": "must not be after the visit starts (IR457)",
-  };
-  const byField: Record<string, string> = { "symptom:error.length": "10–2000 characters", "contactWindow:error.length": "up to 200 characters", "alternativeSlots:error.count": "up to two more times" };
   const word = (k: string | undefined) => (k ? t(k) : undefined);
-  const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${word(byField[`${k}:${v}`]) ?? word(keys[v]) ?? v}`);
+  const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${fieldName(k)}: ${word(HQ_FIELD_TEXT[`${k}:${v}`]) ?? word(HQ_REFUSAL_TEXT[v]) ?? v}`);
   if (fields.length) return fields.join(" · ");
-  if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved (CONFLICT): {reason}.", { reason: t(keys[f.messageKey]) }) : `${t(keys[f.messageKey])}.`;
+  if (HQ_REFUSAL_TEXT[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved (CONFLICT): {reason}.", { reason: t(HQ_REFUSAL_TEXT[f.messageKey]) }) : `${t(HQ_REFUSAL_TEXT[f.messageKey])}.`;
   if (f.code === "NOT_FOUND") return t("The job no longer exists in your scope.");
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { agreedSlots, classifyBy, controls, costLineOf, costTotals, delivery, extendDefault, fromZonedInput, LISTED, money, newJobErrors, periodChip, reportCard, returnReason, reviewModeOf, facts, filtersOf, hqRefusal, hqRow, longSlot, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, tomorrowIn, zonedInput, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
-import { i18nOf } from "@ac/web/lib/i18n";
+import { ms } from "@ac/web/lib/i18n-ms";
+import { agreedSlots, classifyBy, controls, costLineOf, costTotals, delivery, extendDefault, fromZonedInput, LISTED, money, newJobErrors, periodChip, reportCard, returnReason, reviewModeOf, facts, filtersOf, hqRefusal, HQ_REFUSAL_KEYS, hqRow, longSlot, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, tomorrowIn, zonedInput, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
+import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
@@ -76,7 +77,11 @@ describe("HQ maintenance jobs", () => {
   });
 
   it("names the refusals", () => {
-    expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { startAt: "errors.slot_not_agreed" } })).toBe("startAt: only one of the client’s preferred times (or an accepted proposal) can be booked");
+    expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { startAt: "errors.slot_not_agreed" } })).toBe("Start at: only one of the client’s preferred times (or an accepted proposal) can be booked");
+    // in Malay, with the field named in words; every refusal text has a Malay entry (IR493)
+    expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { contactWindow: "error.length" } }, translator("ms"))).toBe("Contact window: sehingga 200 aksara");
+    expect(hqRefusal({ code: "CONFLICT", messageKey: "errors.proposal_pending", fieldErrors: {} }, translator("ms"))).toBe(`${ms["Not saved (CONFLICT): {reason}."].replace("{reason}", ms["a proposal is already waiting for the client — withdraw it first"])}`);
+    expect(HQ_REFUSAL_KEYS.filter((k) => !(k in ms))).toEqual([]);
     expect(hqRefusal({ code: "CONFLICT", messageKey: "errors.proposal_pending", fieldErrors: {} })).toBe("Not saved (CONFLICT): a proposal is already waiting for the client — withdraw it first.");
     expect(hqRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} })).toBe("The job no longer exists in your scope.");
   });
@@ -150,8 +155,8 @@ describe("HQ maintenance jobs", () => {
 
   it("names the refusals of the review, cost and create actions", () => {
     expect(hqRefusal({ code: "FORBIDDEN", messageKey: "errors.self_review", fieldErrors: {} })).toBe("you contributed to this report version, so another reviewer must decide (self-approval is rejected).");
-    expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { symptom: "error.length", alternativeSlots: "error.count" } })).toBe("symptom: 10–2000 characters · alternativeSlots: up to two more times");
-    expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { accessValidUntil: "error.mustExtend" } })).toBe("accessValidUntil: the new end must be later than the current end and in the future");
+    expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { symptom: "error.length", alternativeSlots: "error.count" } })).toBe("Symptom: 10–2000 characters · Alternative slots: up to two more times");
+    expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { accessValidUntil: "error.mustExtend" } })).toBe("Access valid until: the new end must be later than the current end and in the future");
   });
 
   it("books a plan's job at its occurrence when it has no preferred times", () => {
