@@ -28,15 +28,16 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   const i = i18nOf(display);
   const { t } = i;
   const sort = sortOf(sp.sort);
-  const [list, members, units] = await Promise.all([
-    coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: { statuses: [...SCHEDULE_STATUSES] }, sort: { field: sort, direction: "asc" }, limit: 100 }),
+  const [jobs, members, units] = await Promise.all([
+    // every open job: the schedule assigns them all, so a busy company sees past the first page too (IR494)
+    coreAll<ApiPartnerJob>("jobs.list", { filters: { statuses: [...SCHEDULE_STATUSES] }, sort: { field: sort, direction: "asc" } }),
     optional(coreAll<ApiMember>("members.list"), []),
     optional(coreAll<{ id: string; displayName: string }>("units.list"), []),
   ]);
   const names = new Map(members.map((m) => [m.id, m.displayName]));
   const unitNames = new Map(units.map((u) => [u.id, u.displayName]));
-  const rows = list.items.map((j) => scheduleRow(j, nowMs, unitNames, names, i)).filter((r): r is ScheduleRow => !!r);
-  const base = { now: now.toISOString(), sort, sorts: SORTS.map((s) => ({ id: s.id, text: t(s.text) })), rows, total: list.total, members, zone: display.timeZone, otherZone: display.timeZone !== KL };
+  const rows = jobs.map((j) => scheduleRow(j, nowMs, unitNames, names, i)).filter((r): r is ScheduleRow => !!r);
+  const base = { now: now.toISOString(), sort, sorts: SORTS.map((s) => ({ id: s.id, text: t(s.text) })), rows, total: jobs.length, members, zone: display.timeZone, otherZone: display.timeZone !== KL };
   const picked = rows.find((r) => r.id === sp.jobId) ?? rows[0];
   if (!picked) return { ...base, selected: null, week: null };
   const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId: picked.id }).catch((e) => {

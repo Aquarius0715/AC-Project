@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.363.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
+Version: 0.364.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.364.0 (2026-10-30): Past 100 jobs the partner's history showed the oldest jobs while saying "the latest 100", and the schedule could not show or assign open jobs beyond the first 100. The history now reads the newest 100 and the schedule every open job (IR494).
 0.363.0 (2026-10-30): 22 of the 30 refusal texts of HQ's maintenance jobs had no Malay entry (they are translated through a table the dictionary test does not see), and field errors named the field by its key. All have Malay entries, fields are named in words, and a test checks the table (IR493).
 0.362.0 (2026-10-30): HQ's Revoke access recorded the access as ended at the minute the page loaded, not when HQ confirmed. It now takes the Core API's clock at the confirmation (IR492).
 0.361.0 (2026-10-30): HQ's automation Run simulation and Fire sent the minute the page loaded, so after a minute every run was refused (not the current tick) until a reload. The Server Actions now take the Core API's current minute, and a repeated Fire keeps its event's tick (IR491).

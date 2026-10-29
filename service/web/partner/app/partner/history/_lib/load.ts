@@ -29,7 +29,8 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
   const unitNames = new Map(units.map((u) => [u.id, u.displayName]));
   const collect = async (withPeriod: boolean) => {
     const filters = { statuses: [...HISTORY_STATUSES], ...(withPeriod ? { from: new Date(nowMs - 90 * 86_400_000).toISOString() } : {}) };
-    const list = await coreOp<Page<ApiPartnerJob>>("jobs.list", { filters, sort: { field: "status", direction: "asc" }, limit: 100 });
+    // the latest 100 jobs: IDs are UUIDv7, so the newest first by ID; the page then sorts them as asked (IR494)
+    const list = await coreOp<Page<ApiPartnerJob>>("jobs.list", { filters, sort: { field: "id", direction: "desc" }, limit: 100 });
     const jobs = list.items.filter((j) => j.projection !== "offer");
     const events = await Promise.all(jobs.map((j) => optional(coreOp<Page<ApiEvent>>("jobs.events", { jobId: jobId(j), query: { limit: 100 } }).then((r) => r.items), [] as ApiEvent[])));
     const rows = jobs.map((j, k) => ({ row: historyRow(j, events[k], nowMs, unitNames, names, i), events: events[k] })).filter((x): x is { row: HistoryRow; events: ApiEvent[] } => !!x.row);

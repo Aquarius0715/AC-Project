@@ -7151,3 +7151,16 @@ Found in review (a scan of the texts the web translates through a table, `t(TABL
    - A field is named in words, as the shared refusal line names it ("Contact window: …", `fieldName` of `actionMessage`).
    - The tables are module constants with an exported key list.
 2. **Tests.** `adminJobs.test.ts` checks a Malay refusal, a field in words and that every text of the tables has a Malay entry. The scan found no other table without its entries (the air-quality units stay as written).
+
+## IR494 The partner's history shows its latest jobs; the schedule reads every open job — 2026-10-30
+
+Found in review (list reads cut at one page of 100):
+- **Job history (FR-P08).** The page says "Showing <n> of <total> (the latest 100)", but it read the first 100 by status (`jobs.list` sorts by status rank, then ID ascending). Past 100 jobs it showed the oldest of each status, not the latest.
+- **Schedule & assignments (FR-P06).** It read one page of the open jobs, so a company with more than 100 could not see or assign the rest; the page said only "Showing 100 of <total>".
+
+The other single-page reads are bounded by what they read: a job's events, a day's capacity, one technician's jobs. The technician's list says "Showing <n> of <total>" and is sorted as the user asked. The inbox reads the newest 100 notifications.
+
+1. **Web.**
+   - The history reads the 100 newest jobs: job IDs are UUIDv7, so ID descending is newest first. The page sorts those as the user asks, as the note says.
+   - The schedule reads every open job (`coreAll`, up to 1000).
+2. **Tests.** The partner jobs, language and smoke specs pass.
