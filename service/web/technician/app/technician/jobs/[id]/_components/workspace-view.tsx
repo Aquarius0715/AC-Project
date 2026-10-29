@@ -38,7 +38,6 @@ const statusText: Record<string, string> = { assigned: "assigned", in_progress: 
 const sources: { id: DraftPart["source"]; label: string }[] = [{ id: "van_stock", label: "Van stock" }, { id: "hq_warehouse", label: "HQ warehouse" }, { id: "bought_locally", label: "Bought locally" }];
 const FORBIDDEN: Record<string, string> = {
   "errors.assignment_not_started": "your work window has not started", "errors.assignment_ended": "your work window has ended", "errors.assignment_required": "you are not assigned to this job",
-  "errors.qr_unit_mismatch": "the scanned QR label is not this job's unit",
 };
 const refusal = (f: ActionFailure, t: T): string =>
   f.messageKey === "errors.report_version_changed" || f.messageKey === "error.versionConflict" ? t("CONFLICT — the report or job changed elsewhere; reload the page to continue from the latest version.")

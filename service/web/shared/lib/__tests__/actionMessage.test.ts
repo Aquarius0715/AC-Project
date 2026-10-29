@@ -27,6 +27,12 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "errors.too_many_accounts", retryAfterSeconds: 81060 }))).toBe("Many users were added in the last 24 hours — you can add more in 23 h");
     // IR462: an address someone with access holds says what to do; a nested field is named by its last part
     expect(actionMessage(failure({ fieldErrors: { "newUser.email": "errors.email_taken" } }))).toBe("Email belongs to someone who still has access — use another address or ask HQ");
+    // IR486: a QR check-in with another unit's label says what to do, in the display language
+    const qr = failure({ fieldErrors: { qrUnitId: "errors.qr_unit_mismatch" } });
+    expect([actionMessage(qr), actionMessage(qr, translator("ms"))]).toEqual([
+      "The scanned QR label is not this job's unit — scan the label on this AC, or check in manually with a reason",
+      "Label QR yang diimbas bukan unit kerja ini — imbas label pada AC ini, atau daftar masuk secara manual dengan sebab",
+    ]);
   });
   it("words the line in the display language; field names and domain keys stay humanized English (IR269)", () => {
     const t = translator("ms");

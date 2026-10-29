@@ -7079,3 +7079,10 @@ Found in review (code, after IR484): four single-row reads dropped every error w
 
 1. **Code.** The first three return any error except `pgx.ErrNoRows` (EXISTS always has a row, so `versionedUpdate` returns every error). `automations.fire` reads the hash, result and phase of the minute's earlier result in one query.
 2. **Checked.** No `_ = …QueryRow(…)` or ignored `Scan` remains in the service code; the Go suites pass.
+
+## IR486 A QR check-in with another unit's label says what to do — 2026-10-30
+
+Found in review (refusal texts): a location check-in reads the scanned label with `units.resolveQr`, then `jobs.checkIn` refuses another unit's label with VALIDATION `qrUnitId: errors.qr_unit_mismatch` (IR111). That is the usual way a QR check-in fails, but the technician saw "Qr unit id — qr unit mismatch" in the toast, the humanized key, in English in Malay too. A label `units.resolveQr` does not find among the technician's assigned units answered NOT_FOUND: "This item no longer exists or is outside your scope". The workspace had a text for the key, but only for a FORBIDDEN answer, which this refusal never is.
+
+1. **Web.** Both cases read "The scanned QR label is not this job's unit — scan the label on this AC, or check in manually with a reason" (English, Malay), in the toast and on the page. The check-in Server Action turns the label lookup's NOT_FOUND into the check-in's own refusal; the text is the shared wording of the key (`actionMessage`).
+2. **Tests.** `actionMessage.test.ts` checks both languages.

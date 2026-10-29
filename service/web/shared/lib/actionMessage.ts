@@ -18,6 +18,8 @@ const fieldText: Record<string, string> = {
   "error.invalidFile": "{field} is not an accepted file — check its type and size", // the bytes, the type or the size (IR308)
   // the address belongs to someone who still has access, here or elsewhere (IR461, IR462)
   "errors.email_taken": "{field} belongs to someone who still has access — use another address or ask HQ",
+  // a QR check-in with another unit's label, or one the technician's units do not have (jobs.checkIn, IR486)
+  "errors.qr_unit_mismatch": "The scanned QR label is not this job's unit — scan the label on this AC, or check in manually with a reason",
 };
 // the refusals of the user management and assignment (IR416, IR417, IR420, IR421, IR433) say what to do
 const keyText: Record<string, string> = {

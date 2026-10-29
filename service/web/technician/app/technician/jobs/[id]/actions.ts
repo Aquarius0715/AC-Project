@@ -34,13 +34,19 @@ export async function acknowledge(jobId: string, version: number, decision: "acc
 }
 
 /** jobs.checkIn (IR111): location ≤ 200 m with the scanned unit QR, or manual with a reason; checking in starts the
- * work. The QR code is resolved with units.resolveQr first (the label's unit must be the job's unit). */
-export async function checkIn(jobId: string, version: number, method: "location_qr" | "manual", distanceMeters: number | null, qrCode: string | null, reason: string | null) {
-  return run(async () => {
-    let qrUnitId: string | null = null;
-    if (method === "location_qr" && qrCode) qrUnitId = (await coreOp<{ unitId: string }>("units.resolveQr", { code: qrCode })).unitId;
-    return coreOp("jobs.checkIn", { jobId, method, distanceMeters: method === "location_qr" ? distanceMeters : null, qrUnitId, ...(method === "manual" && reason !== null ? { reason } : {}) }, { write: true, expectedVersion: version });
-  }, true);
+ * work. The QR code is resolved with units.resolveQr first (the label's unit must be the job's unit): a label it does
+ * not find among the technician's assigned units is refused as the check-in refuses another unit's label (IR486). */
+export async function checkIn(jobId: string, version: number, method: "location_qr" | "manual", distanceMeters: number | null, qrCode: string | null, reason: string | null): Promise<Result<unknown>> {
+  let qrUnitId: string | null = null;
+  if (method === "location_qr" && qrCode) {
+    try {
+      qrUnitId = (await coreOp<{ unitId: string }>("units.resolveQr", { code: qrCode })).unitId;
+    } catch (e) {
+      if (e instanceof CoreError && e.error.code === "NOT_FOUND") return { ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { qrUnitId: "errors.qr_unit_mismatch" } };
+      return failed(e);
+    }
+  }
+  return run(() => coreOp("jobs.checkIn", { jobId, method, distanceMeters: method === "location_qr" ? distanceMeters : null, qrUnitId, ...(method === "manual" && reason !== null ? { reason } : {}) }, { write: true, expectedVersion: version }), true);
 }
 
 /** jobs.pauseWork: pause or resume the time on site. */

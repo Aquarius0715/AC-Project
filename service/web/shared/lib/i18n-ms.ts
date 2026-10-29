@@ -2709,7 +2709,7 @@ export const ms: Record<string, string> = {
   "your work window has not started": "tetingkap kerja anda belum bermula",
   "your work window has ended": "tetingkap kerja anda telah tamat",
   "you are not assigned to this job": "anda tidak ditugaskan untuk kerja ini",
-  "the scanned QR label is not this job's unit": "label QR yang diimbas bukan unit kerja ini",
+  "The scanned QR label is not this job's unit — scan the label on this AC, or check in manually with a reason": "Label QR yang diimbas bukan unit kerja ini — imbas label pada AC ini, atau daftar masuk secara manual dengan sebab",
   "CONFLICT — the report or job changed elsewhere; reload the page to continue from the latest version.": "CONFLICT — laporan atau kerja telah berubah di tempat lain; muat semula halaman untuk meneruskan daripada versi terkini.",
   "CONFLICT — the job is not in a state that allows this (on hold, submitted or cancelled); the page shows the latest state.": "CONFLICT — kerja tidak berada dalam keadaan yang membenarkan ini (ditangguhkan, dihantar atau dibatalkan); halaman ini menunjukkan keadaan terkini.",
   "FORBIDDEN — {reason} (outside your work window or assignment).": "FORBIDDEN — {reason} (di luar tetingkap kerja atau tugasan anda).",
