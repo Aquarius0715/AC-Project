@@ -35,7 +35,7 @@ describe("HQ access & roles (FR-A03, BR-A03, IR107)", () => {
     expect([tokyo.validFrom, tokyo.validUntil, memberDraft(member({})).validFrom]).toEqual(["2026-09-01T09:00", "2027-01-01T01:00", "2026-09-01T08:00"]);
     expect(memberInput({ ...tokyo, reason: " Rotation " }, "m1", "Asia/Tokyo")).toMatchObject({ id: "m1", employment: "external", validFrom: "2026-09-01T00:00:00.000Z", validUntil: "2026-12-31T16:00:00.000Z", reason: "Rotation" });
     expect(memberInput(draft({ role: "admin", validUntil: "" })).employment).toBeNull();
-    expect(zonedLocal("2026-09-15T01:00:00Z", "Asia/Tokyo")).toBe("2026-09-15T10:00"); // a revoke ends the access now
+    expect(zonedLocal("2026-09-15T01:00:00Z", "Asia/Tokyo")).toBe("2026-09-15T10:00"); // a saved instant in the form's zone
     expect(memberDraft().role).toBe("contractor");
   });
 

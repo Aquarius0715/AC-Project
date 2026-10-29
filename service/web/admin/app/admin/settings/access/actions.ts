@@ -2,10 +2,10 @@
 
 // Server Action of the HQ access manager (FR-A03): members.save. A public endpoint: the DAL verifies the session and the
 // Core API authorizes it (identity.write), rejects self-grants of identity.write / restriction.override and checks the
-// membership version. Revoking access is a save with validUntil at the business clock, never a delete. Signing a user
+// membership version. Revoking access is a save with validUntil at the business clock when HQ confirms (IR492), never a delete. Signing a user
 // out everywhere is members.revokeSessions: every session ends, the access stays (IR384, IR385).
 import { refresh } from "next/cache";
-import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
@@ -20,6 +20,12 @@ export async function saveMember(input: OpInput<"members.save">, version?: numbe
   } finally {
     refresh();
   }
+}
+
+/** Revoke access: members.save with the access ending now — the Core API's clock when HQ confirms, not the time the
+ * page loaded, so the record says when the access really ended (IR492). */
+export async function revokeMember(input: OpInput<"members.save">, version: number): Promise<ActionResult<{ id: string; version: number }>> {
+  return saveMember({ ...input, validUntil: (await coreNow()).toISOString() }, version);
 }
 
 /** members.revokeSessions: ends every session of the membership's user in this tenant at once (Figma Admin 03-8). */

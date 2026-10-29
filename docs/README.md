@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.361.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
+Version: 0.362.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.362.0 (2026-10-30): HQ's Revoke access recorded the access as ended at the minute the page loaded, not when HQ confirmed. It now takes the Core API's clock at the confirmation (IR492).
 0.361.0 (2026-10-30): HQ's automation Run simulation and Fire sent the minute the page loaded, so after a minute every run was refused (not the current tick) until a reload. The Server Actions now take the Core API's current minute, and a repeated Fire keeps its event's tick (IR491).
 0.360.0 (2026-10-30): The 79 pages shared one English title per app (WCAG 2.4.2). Each page is now titled "<page> — AC Project" in the display language, on the first load and after a client-side navigation, and the smoke crawls check it (IR490).
 0.359.0 (2026-10-30): The apps declared `<html lang="en">` in Malay too, so screen readers read Malay with English pronunciation (WCAG 3.1.1). The page now declares the display language, the smoke crawls check it, and an unused shared root layout is removed (IR489).

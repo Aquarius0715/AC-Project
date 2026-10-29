@@ -7134,3 +7134,10 @@ Found in review (an E2E failure of 1da01bb, `admin/automation.e2e.ts`, also seen
 
 1. **Web.** The Server Actions stamp the Core API's current minute (`coreNow`). A Fire keeps its event's tick with its one-time key, so pressing Fire again with the same event sends the same tick and the Core API returns the stored result (IR152). A changed fact still makes a new event.
 2. **Checked.** A run started after the page's minute was over returns its result (a temporary E2E spec that waits for the next minute). The automation spec presses Run simulation again when an answer does not arrive, and each press now takes the current tick.
+
+## IR492 A revoked access ends when HQ confirms — 2026-10-30
+
+Found in review (after IR491, every place that sends the page's load time): HQ's Revoke access saved the membership with `validUntil` set to the minute the page had loaded (`live.now`). The membership became inactive as it should, but the record said the access ended then. Revoke an hour after opening the page, and the membership showed as ended an hour before it really did, while the user could still act in between. That misleads "who had access when". In the dev database the previous revoke shows the end ten seconds before the save, cut to the page's minute.
+
+1. **Web.** A revoke goes through its own Server Action, which sets `validUntil` to the Core API's clock when HQ confirms (`coreNow`). The new revoke in the dev database ends 5 ms before its save. The other uses of the page's time only check or show times on the page; the Core API checks them again with its clock.
+2. **Tests.** The access E2E (add a person, then revoke) passes.

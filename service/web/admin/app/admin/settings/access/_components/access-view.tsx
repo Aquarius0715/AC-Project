@@ -6,10 +6,10 @@ import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import {
-  allowedFor, allPermissions, memberDraft, memberErrors, memberInput, orgKind, permissionRows, resourceWord, roleDefaults, roleWord, selfBlocked, zonedLocal,
+  allowedFor, allPermissions, memberDraft, memberErrors, memberInput, orgKind, permissionRows, resourceWord, roleDefaults, roleWord, selfBlocked,
   type ApiOrganization, type MemberDraft, type MemberRow, type PermissionRow, type Role, type ScopeRef,
 } from "@ac/web/lib/members";
-import { saveMember, signOutEverywhere } from "../actions";
+import { revokeMember, saveMember, signOutEverywhere } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 
 type Live = {
@@ -69,7 +69,7 @@ export function AccessView({ live }: { live: Live }) {
     run(() => saveMember(memberInput(d, sel?.id, zone), sel?.version), sel ? t("Access saved — scopeVersion updated") : t("Membership created"), (m) => nav({ membershipId: m.id }));
   };
   const doRevoke = () => sel && revoke !== null && revoke.trim() && run(
-    () => saveMember(memberInput({ ...d, permissions: sel.m.permissions, scopes: sel.m.scopes, validUntil: zonedLocal(live.now, zone), reason: revoke.trim() }, sel.id, zone), sel.version),
+    () => revokeMember(memberInput({ ...d, permissions: sel.m.permissions, scopes: sel.m.scopes, reason: revoke.trim() }, sel.id, zone), sel.version), // ends now (IR492)
     t("Access revoked — the membership is now inactive"), () => setRevoke(null));
   const doSignOut = () => sel && signOut !== null && signOut.trim() && run(() => signOutEverywhere(sel.id, signOut), t("Signed out everywhere — every session of {name} has ended", { name: sel.name }), () => setSignOut(null));
   const err = (k: string) => (tried ? errors[k] : undefined);
