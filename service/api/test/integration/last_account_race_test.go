@@ -28,6 +28,14 @@ func accountMembership(t *testing.T, org uuid.UUID, role string, clientRole any)
 // race sends the two writes at once and expects one to pass and the other to be refused with the given message.
 func race(t *testing.T, round int, want string, writes ...func() (int, map[string]any)) {
 	t.Helper()
+	raceRefused(t, round, want, false, writes...)
+}
+
+// raceRefused is race where the refused write may also be FORBIDDEN, when forbidden is true: a caller whose own right
+// the other write took away is refused before the rule is reached (the split services authorize the second request
+// after the first committed).
+func raceRefused(t *testing.T, round int, want string, forbidden bool, writes ...func() (int, map[string]any)) {
+	t.Helper()
 	codes := make(chan int, len(writes))
 	var wg sync.WaitGroup
 	for _, w := range writes {
@@ -47,7 +55,11 @@ func race(t *testing.T, round int, want string, writes ...func() (int, map[strin
 	for c := range codes {
 		got[c]++
 	}
-	if got[200] != 1 || got[409] != 1 {
+	refused := got[409]
+	if forbidden {
+		refused += got[403]
+	}
+	if got[200] != 1 || refused != 1 {
 		t.Fatalf("round %d: one change passes, the other keeps the last one (%s): %v", round, want, got)
 	}
 }
@@ -170,9 +182,14 @@ func TestLastIdentityAdminAtOnce(t *testing.T) {
 	for round := 0; round < 5; round++ {
 		opBody, opVer := adminSave(t, s, op, withoutIdentityWrite)
 		rmBody, rmVer := adminSave(t, s, rm, withoutIdentityWrite)
-		race(t, round, "errors.last_identity_admin",
+		raceRefused(t, round, "errors.last_identity_admin", true, // each caller is one of the two: the second may have lost its right already
 			func() (int, map[string]any) { return write(s, &hq, "members.save", rmBody, rmVer) },
 			func() (int, map[string]any) { return write(s, &restrMgr, "members.save", opBody, opVer) })
+		var holders int
+		ownerScan(t, `SELECT count(*) FROM identity.membership_permissions WHERE membership_id = ANY($1::uuid[]) AND permission = 'identity.write'`, []any{[]string{op, rm}}, &holders)
+		if holders != 1 {
+			t.Fatalf("round %d: one of the two keeps identity.write: %d", round, holders)
+		}
 		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
 			SELECT tenant_id, id, 'identity.write' FROM identity.memberships WHERE id = ANY($1::uuid[]) ON CONFLICT DO NOTHING`, []string{op, rm})
 	}
