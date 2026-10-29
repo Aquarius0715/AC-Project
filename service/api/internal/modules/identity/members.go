@@ -99,62 +99,57 @@ func loadMembers(ctx context.Context, c *ops.Call, in *LoadMembersInput) ([]Memb
 	return ms, fillMembers(ctx, c, ms)
 }
 
+// fillMembers loads the permissions, scopes and qualification grants of the members with one query per table for all
+// of them (IR496: a query per member and table made a page of 100 members 300 round trips).
 func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
+	if len(ms) == 0 {
+		return nil
+	}
+	ids := make([]uuid.UUID, 0, len(ms))
+	at := map[uuid.UUID][]int{}
 	for i := range ms {
-		x := &ms[i]
-		x.Permissions, x.Scopes, x.Qualifications = []string{}, []ScopeRef{}, []Grant{}
-		if c.Principal.Role != "contractor" {
-			rows, err := c.Tx.Query(ctx, `SELECT permission FROM identity.membership_permissions WHERE membership_id = $1 ORDER BY permission`, x.ID)
-			if err != nil {
-				return err
-			}
-			for rows.Next() {
-				var p string
-				if err := rows.Scan(&p); err != nil {
-					rows.Close()
-					return err
-				}
-				x.Permissions = append(x.Permissions, p)
-			}
-			rows.Close()
-			if err := rows.Err(); err != nil {
-				return err
-			}
-			rows, err = c.Tx.Query(ctx, `SELECT kind, ref_id FROM identity.membership_scopes WHERE membership_id = $1 ORDER BY kind, ref_id`, x.ID)
-			if err != nil {
-				return err
-			}
-			for rows.Next() {
-				var s ScopeRef
-				if err := rows.Scan(&s.Kind, &s.ID); err != nil {
-					rows.Close()
-					return err
-				}
-				x.Scopes = append(x.Scopes, s)
-			}
-			rows.Close()
-			if err := rows.Err(); err != nil {
-				return err
-			}
+		ms[i].Permissions, ms[i].Scopes, ms[i].Qualifications = []string{}, []ScopeRef{}, []Grant{}
+		if _, seen := at[ms[i].ID]; !seen {
+			ids = append(ids, ms[i].ID)
 		}
-		rows, err := c.Tx.Query(ctx, `SELECT code, valid_from, valid_until, revoked_at FROM identity.qualification_grants WHERE membership_id = $1 ORDER BY code`, x.ID)
+		at[ms[i].ID] = append(at[ms[i].ID], i)
+	}
+	var id uuid.UUID
+	each := func(sql string, scans []any, add func(x *Member)) error {
+		rows, err := c.Tx.Query(ctx, sql, ids)
 		if err != nil {
 			return err
 		}
-		for rows.Next() {
-			var g Grant
-			if err := rows.Scan(&g.Code, &g.ValidFrom, &g.ValidUntil, &g.RevokedAt); err != nil {
-				rows.Close()
-				return err
+		_, err = pgx.ForEachRow(rows, append([]any{&id}, scans...), func() error {
+			for _, i := range at[id] {
+				add(&ms[i])
 			}
-			x.Qualifications = append(x.Qualifications, g)
+			return nil
+		})
+		return err
+	}
+	if c.Principal.Role != "contractor" {
+		var p string
+		if err := each(`SELECT membership_id, permission FROM identity.membership_permissions WHERE membership_id = ANY($1) ORDER BY membership_id, permission`,
+			[]any{&p}, func(x *Member) { x.Permissions = append(x.Permissions, p) }); err != nil {
+			return err
 		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
+		var s ScopeRef
+		if err := each(`SELECT membership_id, kind, ref_id FROM identity.membership_scopes WHERE membership_id = ANY($1) ORDER BY membership_id, kind, ref_id`,
+			[]any{&s.Kind, &s.ID}, func(x *Member) { x.Scopes = append(x.Scopes, s) }); err != nil {
 			return err
 		}
 	}
-	return nil
+	var g Grant
+	return each(`SELECT membership_id, code, valid_from, valid_until, revoked_at FROM identity.qualification_grants WHERE membership_id = ANY($1) ORDER BY membership_id, code`,
+		[]any{&g.Code, &g.ValidFrom, &g.ValidUntil, &g.RevokedAt}, func(x *Member) {
+			grant := g
+			if g.RevokedAt != nil { // the scan target is shared by every row: each grant keeps its own revocation time
+				at := *g.RevokedAt
+				grant.RevokedAt = &at
+			}
+			x.Qualifications = append(x.Qualifications, grant)
+		})
 }
 
 // ---- members.list ----

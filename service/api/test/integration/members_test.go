@@ -197,3 +197,41 @@ func TestMembersList(t *testing.T) {
 		t.Error("client lists members")
 	}
 }
+
+// TestMembersListCarriesEachMembersOwn (IR496): members.list reads the permissions, scopes and qualification grants of a
+// page of members in one query per table; each member still gets only its own, and each revoked grant keeps its own
+// revocation time.
+func TestMembersListCarriesEachMembersOwn(t *testing.T) {
+	s := server(t)
+	var a, b string
+	ownerScan(t, `SELECT (array_agg(id::text ORDER BY id))[1], (array_agg(id::text ORDER BY id))[2] FROM identity.memberships
+		WHERE tenant_id = $1 AND role = 'technician'`, []any{seed.ID("tenant-a")}, &a, &b)
+	if a == "" || b == "" {
+		t.Skip("the seed has fewer than two technicians")
+	}
+	revokedA, revokedB := time.Date(2026, 9, 1, 1, 0, 0, 0, time.UTC), time.Date(2026, 9, 2, 2, 0, 0, 0, time.UTC)
+	owner(t, `INSERT INTO identity.qualification_grants (tenant_id, membership_id, code, valid_from, valid_until, revoked_at) VALUES
+		($1, $2, 'test.ir496.a', '2026-01-01Z', '2027-01-01Z', $4), ($1, $3, 'test.ir496.b', '2026-01-01Z', '2027-01-01Z', $5)`,
+		seed.ID("tenant-a"), a, b, revokedA, revokedB)
+	t.Cleanup(func() {
+		owner(t, `DELETE FROM identity.qualification_grants WHERE code IN ('test.ir496.a', 'test.ir496.b')`)
+	})
+	_, m := post(s, &hq, "members.list", `{"filters":{"role":"technician","activeOnly":false},"limit":100}`)
+	grants := map[string]map[string]string{} // member → test grant code → revokedAt
+	for _, it := range items(m) {
+		id := it["id"].(string)
+		for _, q := range it["qualifications"].([]any) {
+			g := q.(map[string]any)
+			if code := g["code"].(string); strings.HasPrefix(code, "test.ir496.") {
+				if grants[id] == nil {
+					grants[id] = map[string]string{}
+				}
+				grants[id][code], _ = g["revokedAt"].(string)
+			}
+		}
+	}
+	at := func(v time.Time) string { return v.Format(time.RFC3339) }
+	if len(grants[a]) != 1 || grants[a]["test.ir496.a"] != at(revokedA) || len(grants[b]) != 1 || grants[b]["test.ir496.b"] != at(revokedB) {
+		t.Fatalf("each member carries only its own grant with its own revocation: %v", grants)
+	}
+}

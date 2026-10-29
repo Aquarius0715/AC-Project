@@ -7176,3 +7176,10 @@ Restrictions, billing, contracts and devices would also have shown IDs instead o
 
 1. **Web.** Those reads follow the list to its end (`coreAll`, up to 1000 items, the same filters and sort) and keep the page shape the screens use. Lists read for one record (a space's units, a report's versions) and the inbox stay as they are.
 2. **Tests.** The admin E2E project passes.
+
+## IR496 A page of members reads its permissions, scopes and grants at once — 2026-10-30
+
+Found in review (code, N+1 reads): `members.list` and `members.get` filled each membership with three queries of its own — its permissions, its scopes and its qualification grants. A page of 100 members made 300 round trips in the request's transaction, and HQ's access page, which reads every membership (IR495), up to 3000.
+
+1. **Code.** `fillMembers` reads each of the three tables once for all the members of the call (`membership_id = ANY($1)`, `pgx.ForEachRow`), in the same order as before, and hands every row to its member. A grant's revocation time is copied per grant, since the scan target is shared by the rows.
+2. **Tests.** `TestMembersListCarriesEachMembersOwn` gives two technicians a grant each, revoked at different times, and checks that each member lists only its own with its own time. The Go suites pass.
