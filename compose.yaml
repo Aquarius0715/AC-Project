@@ -414,7 +414,7 @@ services:
     profiles: [infra, backend, full]
 
   mosquitto:           # AWS IoT Core stand-in (MQTT 3.1.1/5); mutual TLS is verified in staging against IoT Core
-    image: eclipse-mosquitto:2@sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408   # pinned by digest (IR373)
+    image: eclipse-mosquitto:2@sha256:860aeb5d63ce509508f6dcfb2bc8a1c1dd2bc60555b562b45ce90e52d8dabb0f   # pinned by digest (IR373)
     user: "1883:1883"              # the image's mosquitto user, not root (security loop, IR414)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
