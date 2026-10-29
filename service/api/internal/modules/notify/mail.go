@@ -50,11 +50,12 @@ func (s SMTP) Send(_ context.Context, to, subject, body string) (string, error) 
 // Apps are the sign-in addresses of the web apps that e-mails link to.
 type Apps struct{ Customer, Partner, Technician, Admin string }
 
+// of is the app of a membership role: a client's customer app, a contractor's partner app, a technician's app, HQ's.
 func (a Apps) of(role string) string {
 	switch role {
-	case "client", "customer":
+	case "client":
 		return a.Customer
-	case "contractor", "partner":
+	case "contractor":
 		return a.Partner
 	case "technician":
 		return a.Technician

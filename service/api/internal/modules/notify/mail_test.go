@@ -21,6 +21,11 @@ func TestMailTexts(t *testing.T) {
 	if s, _ := notificationMail("unknown", nil, "admin", apps); s != "Notification: unknown" {
 		t.Errorf("unknown template: %q", s)
 	}
+	for role, app := range map[string]string{"client": "http://c", "contractor": "http://p", "technician": "http://t", "admin": "http://a"} { // each role's own app
+		if _, body := notificationMail("alert", nil, role, apps); !strings.Contains(body, app+"/notifications") {
+			t.Errorf("%s links to %q", role, body)
+		}
+	}
 }
 
 // TestSMTPRefusesHeaderBreaks: an address or subject with a line break never reaches the SMTP server.
