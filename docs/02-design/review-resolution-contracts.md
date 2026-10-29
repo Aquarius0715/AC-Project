@@ -7236,3 +7236,16 @@ Found in review (the UIUX specification against the smoke crawl of IR487): the s
 2. **Tests and specification.**
    - The smoke crawl's second pass runs at 360 px, in Malay. All four apps pass.
    - The UIUX specification's accessibility section names what the crawls check: axe, sideways scroll, the page language and the title.
+
+## IR501 Three pages that scrolled sideways at 360 px on the Linux runners — 2026-10-30
+
+Found by the E2E run of c75e6b2 (IR500): at 360 px in Malay, three pages scrolled sideways on the CI runner while they fit on a Mac. Linux's fonts are wider, and the crawl reached URLs the local data does not link to. A crawl with a wide font forced on every page found the same three pages on a Mac:
+- **Customer, Filter care (+2–12 px).** The table's visually hidden "Actions" header (`sr-only`, absolutely positioned) had no positioned ancestor. It was laid out against the page, not inside the scrolling table, so it widened the page.
+- **HQ, maintenance jobs with a period (+28 px).** The period chip ("Requested time 20 Sep, 12:00–6:36 am MYT") kept the shadcn button's `shrink-0`. In a row of filters it took its full width and did not wrap.
+- **Partner, job history with a job (+17 px).** "Save note & create preview" in Malay did not wrap.
+
+1. **Web.**
+   - `ScrollX` and `.scroll-x` are positioned (`relative`), so absolutely positioned content inside is clipped with the table. That covers every scrolling table.
+   - `Plain` may shrink and wrap.
+   - The partner's note buttons wrap.
+2. **Guard.** The phone pass of the smoke crawl forces a wide font (Verdana, else DejaVu Sans) on every page before it measures, so a Mac finds what the Linux fonts push sideways. That pass bypasses the CSP to inject the font; the first pass still fails on any CSP violation. All four apps pass.

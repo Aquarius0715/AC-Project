@@ -149,7 +149,9 @@ export function ScrollX({ label, className, children }: { label?: string; classN
     for (const child of el.children) observer.observe(child);
     return () => observer.disconnect();
   }, []);
-  return <div ref={ref} className={cx("scroll-x", className)} tabIndex={overflows ? 0 : undefined} role={label ? "region" : undefined} aria-label={label}>{children}</div>;
+  // relative: an absolutely positioned descendant (a visually hidden column header) is clipped with the table instead
+  // of widening the page (IR501)
+  return <div ref={ref} className={cx("scroll-x relative", className)} tabIndex={overflows ? 0 : undefined} role={label ? "region" : undefined} aria-label={label}>{children}</div>;
 }
 export function Kpi({ label, value, icon, unit, badge, sub, href, link, tone }: { label: string; value: React.ReactNode; icon?: IconName; unit?: string; badge?: React.ReactNode; sub?: React.ReactNode; href?: string; link?: string; tone?: "crit" | "warn" | "ok" }) {
   return (
@@ -332,7 +334,7 @@ export const Textarea = ({ className, ...p }: React.TextareaHTMLAttributes<HTMLT
  * its parent and its classes. A screen uses it for a selectable card, a chip or a text action, so the shadcn Button's
  * height, padding, radius and weight are reset here rather than in each screen. */
 export const Plain = ({ className, ...p }: React.ComponentProps<typeof Button>) => (
-  <Button {...p} variant="ghost" className={cn("inline-block h-auto gap-0 rounded-none p-0 font-[inherit] whitespace-normal justify-start leading-[inherit] [font-size:inherit] [letter-spacing:inherit] active:translate-y-0 disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto", className)} />
+  <Button {...p} variant="ghost" className={cn("inline-block h-auto min-w-0 shrink gap-0 rounded-none p-0 font-[inherit] whitespace-normal justify-start leading-[inherit] [font-size:inherit] [letter-spacing:inherit] active:translate-y-0 disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto", className)} />
 );
 /** A one-time code as separate boxes (Figma 10g): one transparent input over the boxes, so typing, pasting and the
  * browser's one-time-code autofill all work; the box for the next digit is outlined while the input has focus. */

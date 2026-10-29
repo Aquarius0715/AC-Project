@@ -14,8 +14,9 @@ import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display"
 type Crawl = { seen: number; failed: string[]; inaccessible: string[]; wide: string[]; otherLang: string[]; untitled: string[] };
 
 /** Visits up to 40 pages the app links to, from its home, and records what fails on each; `lang` is the page language
- * every page must declare (WCAG 3.1.1, IR489). */
-async function crawl(page: Page, app: App, lang = "en"): Promise<Crawl> {
+ * every page must declare (WCAG 3.1.1, IR489). `wideFont` sets a wide font on every page before it is measured, so a
+ * Mac finds what the wider fonts of the Linux runners push sideways (IR501). */
+async function crawl(page: Page, app: App, lang = "en", wideFont = false): Promise<Crawl> {
   const seen = new Set<string>();
   const queue = [app.home];
   const out: Crawl = { seen: 0, failed: [], inaccessible: [], wide: [], otherLang: [], untitled: [] };
@@ -24,6 +25,7 @@ async function crawl(page: Page, app: App, lang = "en"): Promise<Crawl> {
     if (seen.has(path)) continue;
     seen.add(path);
     const res = await page.goto(path, { waitUntil: "networkidle" });
+    if (wideFont) await page.addStyleTag({ content: "*{font-family: Verdana, 'DejaVu Sans', sans-serif !important}" });
     const text = await page.locator("body").innerText();
     if (!res || res.status() >= 400 || FAILED_PAGE.test(text)) out.failed.push(`${path} (${res?.status() ?? "no response"})`);
     for (const v of await axeViolations(page)) out.inaccessible.push(`${path}: ${v}`);
@@ -72,17 +74,21 @@ test.afterEach(async ({ page }) => {
   zoneBefore = null;
 });
 
-test("every linked page at phone width in Malay is accessible and fits the screen", async ({ page, app }) => {
-  test.setTimeout(300_000);
-  const zone = await displayZone(page);
-  zoneBefore = zone;
-  await setDisplay(page, MALAY, zone);
-  await page.setViewportSize({ width: 360, height: 800 }); // the UIUX specification's narrowest width and Figma's mobile frames
-  const r = await crawl(page, app, "ms");
-  expect(r.failed, "pages that did not render").toEqual([]);
-  expect(r.otherLang, "pages that do not declare Malay").toEqual([]);
-  expect(r.untitled, "pages whose title does not name them").toEqual([]);
-  expect(r.inaccessible, "critical or serious accessibility violations at phone width").toEqual([]);
-  expect(r.wide, "pages that scroll sideways at phone width").toEqual([]);
-  expect(r.seen).toBeGreaterThan(3);
+test.describe("phone width", () => {
+  test.use({ bypassCSP: true }); // the wide test font is an injected style; the first crawl checks the CSP itself
+
+  test("every linked page at phone width in Malay is accessible and fits the screen", async ({ page, app }) => {
+    test.setTimeout(300_000);
+    const zone = await displayZone(page);
+    zoneBefore = zone;
+    await setDisplay(page, MALAY, zone);
+    await page.setViewportSize({ width: 360, height: 800 }); // the UIUX specification's narrowest width and Figma's mobile frames
+    const r = await crawl(page, app, "ms", true);
+    expect(r.failed, "pages that did not render").toEqual([]);
+    expect(r.otherLang, "pages that do not declare Malay").toEqual([]);
+    expect(r.untitled, "pages whose title does not name them").toEqual([]);
+    expect(r.inaccessible, "critical or serious accessibility violations at phone width").toEqual([]);
+    expect(r.wide, "pages that scroll sideways at phone width").toEqual([]);
+    expect(r.seen).toBeGreaterThan(3);
+  });
 });

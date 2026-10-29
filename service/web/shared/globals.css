@@ -133,4 +133,4 @@
   .split-even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .page { container-type: inline-size; }
-.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.scroll-x { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; } /* clips absolute descendants too (IR501) */

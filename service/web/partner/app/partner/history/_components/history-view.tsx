@@ -177,7 +177,7 @@ function Compose({ detail, onPreview }: { detail: Extract<Detail, { missing: fal
         <Field label={t("Message (1–2000 chars)")} error={tried && !message.trim() ? t("A message is required (VALIDATION) — nothing was saved") : tooLong ? t("At most 2000 characters") : undefined}>
           <Textarea value={message} disabled={closed} onChange={(e) => setMessage(e.target.value)} placeholder={t("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.")} />
         </Field>
-        <div className="flex gap-2"><Btn disabled={pending || closed} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || closed || !chosen} onClick={send}>{mode.add && <Icon name="add" />}{mode.button}</Btn></div>
+        <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || closed} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || closed || !chosen} onClick={send} className="h-auto min-h-8 max-w-full whitespace-normal text-left">{mode.add && <Icon name="add" />}{mode.button}</Btn></div>
         <p className="text-[11px] text-muted-foreground">{t("No real sending. Only people involved in this job are offered; free-form external recipients and other jobs’ recipients are rejected. Internal notes stay hidden from customers.")}</p>
       </div>
     </Card>
