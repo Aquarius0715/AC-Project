@@ -143,9 +143,10 @@ function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: C
             {sel.candidates.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet — add them in Team & capacity.")}</p>}
             {sel.candidates.map((c) => (
               <Plain key={c.id} type="button" role="radio" aria-checked={tech === c.id} disabled={!c.eligible} onClick={() => setTech(c.id)}
-                className={cx("flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left", tech === c.id ? "border-primary bg-primary-soft/60" : "border-line bg-surface", !c.eligible && "cursor-not-allowed opacity-70")}>
-                <span className="min-w-0"><b className={cx("block text-[13px]", tech === c.id && "text-primary")}>{c.name}</b><span className="block text-[11px] text-muted-foreground">{c.sub}</span></span>
-                <Badge tone={c.badge.tone === "muted" ? "muted" : c.badge.tone}>{c.badge.text}</Badge>
+                className={cx("flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left", tech === c.id ? "border-primary bg-primary-soft/60" : "border-line bg-surface", !c.eligible && "cursor-not-allowed opacity-70")}>
+                {/* the name keeps at least 10rem; a long reason (the missing qualifications) goes below it and wraps */}
+                <span className="min-w-0 flex-[1_1_10rem]"><b className={cx("block text-[13px]", tech === c.id && "text-primary")}>{c.name}</b><span className="block text-[11px] text-muted-foreground">{c.sub}</span></span>
+                <Badge tone={c.badge.tone === "muted" ? "muted" : c.badge.tone} className="h-auto min-h-5 max-w-full whitespace-normal text-left">{c.badge.text}</Badge>
               </Plain>
             ))}
           </div>
