@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Children, createContext, isValidElement, useCallback, useContext, useRef, useState } from "react";
+import { Children, createContext, isValidElement, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useT } from "@ac/web/components/I18n";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { Alert } from "@ac/web/components/ui/alert";
@@ -133,6 +133,24 @@ export function PageHead({ title, sub, action }: { title: React.ReactNode; sub?:
   );
 }
 
+/** A part that scrolls sideways when the screen is narrower than its content (a wide table, a board). While it overflows
+ * it can take the focus, so a keyboard can scroll it (WCAG 2.1.1, axe scrollable-region-focusable); with a label it is a
+ * named region. On a wide screen nothing overflows and it adds no tab stop. */
+export function ScrollX({ label, className, children }: { label?: string; className?: string; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setOverflows(el.scrollWidth > el.clientWidth + 1);
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    for (const child of el.children) observer.observe(child);
+    return () => observer.disconnect();
+  }, []);
+  return <div ref={ref} className={cx("scroll-x", className)} tabIndex={overflows ? 0 : undefined} role={label ? "region" : undefined} aria-label={label}>{children}</div>;
+}
 export function Kpi({ label, value, icon, unit, badge, sub, href, link, tone }: { label: string; value: React.ReactNode; icon?: IconName; unit?: string; badge?: React.ReactNode; sub?: React.ReactNode; href?: string; link?: string; tone?: "crit" | "warn" | "ok" }) {
   return (
     <UICard className="min-w-0 gap-1 px-4">

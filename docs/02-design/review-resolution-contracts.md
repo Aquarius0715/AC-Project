@@ -7086,3 +7086,17 @@ Found in review (refusal texts): a location check-in reads the scanned label wit
 
 1. **Web.** Both cases read "The scanned QR label is not this job's unit — scan the label on this AC, or check in manually with a reason" (English, Malay), in the toast and on the page. The check-in Server Action turns the label lookup's NOT_FOUND into the check-in's own refusal; the text is the shared wording of the key (`actionMessage`).
 2. **Tests.** `actionMessage.test.ts` checks both languages.
+
+## IR487 Phone width in Malay: accessible and no sideways scroll — 2026-10-30
+
+Found in review (an axe crawl of every linked page at 390 px in Malay; the smoke crawl of IR359 runs at 1920 px in English only):
+- **A button without a name (critical).** The customer's Assistant and the technician's Scan QR buttons in the header hide their text at phone width and had no label, on every page of the two apps.
+- **Scroll regions a keyboard cannot reach (serious).** The tables and the board that scroll sideways at phone width — the partner's schedule and team, the technician's overview and devices, HQ's jobs, contractors and SLA — could not be focused when they held nothing focusable.
+- **A page wider than the screen.** The customer's unit page scrolled sideways by 19–29 px: the header's Rename button and power and connection badges did not wrap in Malay.
+
+1. **Web.**
+   - The two header buttons carry their text as their label.
+   - The shared `ScrollX` wraps the sideways-scrolling parts of the API-mode screens (24). While its content overflows it takes the focus, and with a label it is a named region; on a wide screen it adds no tab stop.
+   - The unit header's actions wrap.
+   - The UIUX specification says so.
+2. **Guard.** The smoke crawl (`shared/smoke.e2e.ts`) runs a second time per app at 390 px in Malay, restoring the language afterwards: no critical or serious axe violation, and no page that scrolls sideways. The four apps pass both crawls.

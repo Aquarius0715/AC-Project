@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Banner, Card, cx, EmptyState, Kpi, LinkBtn, Page, Select, TextLink, UtilBar } from "@ac/web/components/ui";
+import { Badge, Banner, Card, cx, EmptyState, Kpi, LinkBtn, Page, Select, TextLink, UtilBar, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { BUCKETS, DAY_END, DAY_START, type ActionRow } from "@ac/web/lib/partnerOverview";
@@ -69,7 +69,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={live.today.title} action={<TextLink href="/partner/schedule">{t("Open schedule")} <Icon name="arrowRight" /></TextLink>}>
-            <div className="scroll-x"><div className="min-w-[320px]">
+            <ScrollX><div className="min-w-[320px]">
               <div className="grid grid-cols-[104px_1fr] text-[11px] text-muted-foreground"><span /><div className="flex justify-between">{hours.map((h) => <span key={h}>{String(h).padStart(2, "0")}</span>)}</div></div>
               {live.timeline.length === 0 && <p className="py-2 text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p>}
               {live.timeline.map((r) => (
@@ -82,7 +82,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
                   </div>
                 </div>
               ))}
-            </div></div>
+            </div></ScrollX>
             <p className="mt-2 text-[11px] text-muted-foreground">
               {t("Red line = now ({time}).", { time: live.today.now })} {t(anyBlock ? "Blue = assigned work windows (members.capacity)." : "No assignments today.")}
               {live.otherZone && ` ${t("The timeline is in Kuala Lumpur time (Asia/Kuala_Lumpur).")}`}

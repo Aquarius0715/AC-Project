@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, EmptyState, Field, Input, ListRow, Page, Select, Textarea, cx, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, EmptyState, Field, Input, ListRow, Page, Select, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -194,7 +194,7 @@ function WeekCard({ week, members, sel, choice, zone }: { week: NonNullable<Sche
   return (
     <Card title={week.title} action={<Link href="/partner/team" className="text-xs font-semibold text-primary">{t("Team & capacity")} <Icon name="arrowRight" /></Link>}>
       {rows.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : (
-        <div className="scroll-x">
+        <ScrollX>
           <table className="w-full min-w-[720px] text-[11px]">
             <thead><tr><th className="p-1 text-left" />{week.dates.map((d, k) => <th key={d} className={cx("p-1 text-center font-semibold", d === week.today ? "text-primary" : "text-muted-foreground")}>{week.days[k]}</th>)}</tr></thead>
             <tbody>
@@ -206,7 +206,7 @@ function WeekCard({ week, members, sel, choice, zone }: { week: NonNullable<Sche
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollX>
       )}
       <p className="mt-2 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
         <span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-primary" />{t("Confirmed assignment")}</span>

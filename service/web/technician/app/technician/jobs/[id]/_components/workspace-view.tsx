@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useEffectEvent } from "react";
-import { Badge, Banner, Btn, Card, Choice, cx, DataTable, EmptyState, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilBar, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, cx, DataTable, EmptyState, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilBar, Plain, ScrollX } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { metricUnit, type Metric } from "@ac/web/lib/devices";
@@ -255,7 +255,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
             action={view === "readings" && editable ? <Btn size="sm" onClick={() => addReading(tab === "outdoor" ? "refrigerant_pipe" : live.components[0]?.key ?? "filter")}><Icon name="add" /> {t("Add reading")}</Btn>
               : view === "parts" && editable ? <span className="flex gap-2"><Btn size="sm" onClick={() => setModal("part")}><Icon name="add" /> {t("Add part")}</Btn><Btn size="sm" onClick={() => setModal("refrigerant")}><Icon name="add" /> {t("Refrigerant")}</Btn></span> : null}>
             {view === "readings" && (draft.readings.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No readings yet. Record each measurement with its unit and the component it belongs to — an unmeasured value is left empty, never 0.")}</p> : (
-              <div className="scroll-x"><table className="w-full min-w-[560px] text-[13px]">
+              <ScrollX><table className="w-full min-w-[560px] text-[13px]">
                 <thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th className="py-1">{t("Metric")}</th><th>{t("Value")}</th><th>{t("Unit")}</th><th>{t("Linked item")}</th><th>{t("Observed")}</th><th /></tr></thead>
                 <tbody>{draft.readings.map((m, i) => (
                   <tr key={i} className="border-t border-line align-middle">
@@ -267,7 +267,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                     <td>{editable && <Plain type="button" className="text-xs font-semibold text-primary" onClick={() => edit((d) => ({ ...d, readings: d.readings.filter((_, k) => k !== i) }))}>{t("Remove")}</Plain>}</td>
                   </tr>
                 ))}</tbody>
-              </table></div>
+              </table></ScrollX>
             ))}
             {view === "parts" && (
               <div className="flex flex-col gap-3">

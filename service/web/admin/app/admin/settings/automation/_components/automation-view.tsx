@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, EmptyState, Field, Input, ListRow, Page, Select, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, EmptyState, Field, Input, ListRow, Page, Select, Plain, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -133,7 +133,7 @@ export function AutomationView({ live }: { live: Live }) {
           </Card>
           {sel && (
             <Card title={t("Simulate")} sub={t("Evaluates all enabled HQ policies and customer rules for these units with synthetic facts at the current minute.")}>
-              <div className="scroll-x"><table className="w-full min-w-[560px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Unit")}</th><th>{t("Fact")}</th><th>{t("Value")}</th><th>{t("Quality")}</th><th /></tr></thead><tbody>{facts.map((f, i) => {
+              <ScrollX><table className="w-full min-w-[560px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Unit")}</th><th>{t("Fact")}</th><th>{t("Value")}</th><th>{t("Quality")}</th><th /></tr></thead><tbody>{facts.map((f, i) => {
                 const fact = factOf[f.kind ?? d.type];
                 return (
                   <tr key={i} className="border-t border-line">
@@ -144,7 +144,7 @@ export function AutomationView({ live }: { live: Live }) {
                     <td><Plain aria-label={t("Remove the fact")} className="text-muted-foreground hover:text-crit" onClick={() => removeFact(i)}><Icon name="close" /></Plain></td>
                   </tr>
                 );
-              })}</tbody></table></div>
+              })}</tbody></table></ScrollX>
               <div className="mt-3 flex flex-wrap gap-2"><Btn disabled={pending || sel.unitIds.length === 0} onClick={addFact}><Icon name="add" /> {t("Add fact")}</Btn><Btn variant="primary" disabled={pending || facts.length === 0} onClick={() => evaluate(false)}>{t("Run simulation")}</Btn></div>
               {results && <div className="mt-3"><div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{results.fired ? t("Fire result per unit") : t("Result per unit")}</div><DataTable rows={results.rows} rowKey={(r) => r.unitId} cols={[{ key: "u", label: t("Unit"), render: (r) => <b>{name(r.unitId)}</b> }, { key: "d", label: t("Decision"), render: (r) => <Badge tone={r.decision === "selected" || r.decision === "requested" ? "ok" : r.decision === "failed" ? "crit" : "warn"}>{decisionWord(r.decision, t)}</Badge> }, { key: "r", label: t("Rule / reason"), render: (r) => <span className="text-xs">{r.ruleId ? (r.ruleId === sel.id ? t("this policy") : t("rule {id}", { id: r.ruleId.slice(0, 8) })) : r.reason ? reasonWord(r.reason, t) : "—"}{r.commandId ? ` · ${t("command {id}", { id: r.commandId.slice(0, 8) })}` : ""}</span> }]} /></div>}
               {live.canWrite && <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3"><p className="max-w-xl text-xs text-muted-foreground"><DemoBadge /> {t("Fire runs the same evaluation for real: selected units get a command through the shared command rules. The event ID is a one-time key, so repeating it returns the same result without new commands.")}</p><Btn variant="danger" disabled={pending || !results || facts.length === 0} onClick={() => evaluate(true)}>{t("Fire (demo)")}</Btn></div>}

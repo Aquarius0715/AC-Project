@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, EmptyState, Field, Input, Kpi, ListRow, Modal, Page, Select, SummaryList, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, EmptyState, Field, Input, Kpi, ListRow, Modal, Page, Select, SummaryList, Textarea, ScrollX } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { businessDay, KL } from "@ac/web/lib/clientBilling";
@@ -73,10 +73,10 @@ function ContractorDetail({ d, open }: { d: Detail; open: (m: ModalState) => voi
           {d.facts && <SummaryList items={d.facts} />}
           <p className="mt-3 text-[13px] font-bold">{r.current ? r.current.title : t("No rate card in effect")}</p>
           {r.current && (
-            <div className="scroll-x mt-1"><table className="w-full min-w-[420px] text-[13px]">
+            <ScrollX className="mt-1"><table className="w-full min-w-[420px] text-[13px]">
               <thead><tr className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><th className="px-2 py-1.5">{t("Work type")}</th><th className="px-2 text-right">{r.current.currency}</th></tr></thead>
               <tbody>{r.current.lines.map((l) => <tr key={l.workType} className="border-t border-line"><td className="px-2 py-1.5 font-semibold">{l.label}{l.note && <span className="block text-[11px] font-normal text-muted-foreground">{l.note}</span>}</td><td className="px-2 text-right">{l.amount}</td></tr>)}</tbody>
-            </table></div>
+            </table></ScrollX>
           )}
           {r.scheduled.map((s) => <p key={s.id} className="mt-2 text-xs text-muted-foreground">{t("Next: {title} — {lines}", { title: s.title, lines: s.lines.map((l) => `${l.label} ${l.amount}`).join(" · ") })}</p>)}
           <div className="mt-3"><Btn size="sm" onClick={() => open({ kind: "rates" })}>{t("Edit rate card")}</Btn></div>

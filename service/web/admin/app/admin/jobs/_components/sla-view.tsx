@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, EmptyState, Field, Input, Kpi, Modal, Page, Select } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, EmptyState, Field, Input, Kpi, Modal, Page, Select, ScrollX } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -41,7 +41,7 @@ export function SlaView({ live }: { live: SlaLive }) {
       <div className="split">
         <Card title={t("Customers")} action={<Btn size="sm" disabled={!live.rows.length} onClick={exportCsv}>{t("Export CSV")}</Btn>}>
           {live.rows.length === 0 ? <EmptyState title={t("No jobs in this period")}>{t(live.contractorId ? "The scorecard counts jobs created in the period and delivered by the contractor." : "The scorecard counts jobs created in the period.")}</EmptyState> : (
-            <div className="scroll-x"><table className="w-full min-w-[760px] text-[13px]">
+            <ScrollX><table className="w-full min-w-[760px] text-[13px]">
               <thead><tr className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><th className="px-2 py-1.5">{t("Customer")}</th><th>{t("Plan")}</th><th>{t("Jobs")}</th><th>{t("Response")}</th><th>{t("Arrival")}</th><th>{t("First-time fix")}</th><th>{t("Rating")}</th><th>{t("Overdue")}</th><th>{t("Status")}</th></tr></thead>
               <tbody>{live.rows.map((r) => (
                 <tr key={r.id} className="border-t border-line">
@@ -49,7 +49,7 @@ export function SlaView({ live }: { live: SlaLive }) {
                   <td>{r.overdue ? <Badge tone="crit">{r.overdue}</Badge> : "0"}</td><td><Badge tone={r.status.tone}>{r.status.label}</Badge></td>
                 </tr>
               ))}</tbody>
-            </table></div>
+            </table></ScrollX>
           )}
           <p className="mt-2 text-[11px] text-muted-foreground">{t("Response = request → offer accepted (contractor) or first assignment (internal). Arrival = technician check-in inside the scheduled slot. First-time fix = report accepted without rework and no repeat job on the unit within 30 days. Status compares each customer with its plan’s targets; metrics without data show “—”.")}</p>
         </Card>

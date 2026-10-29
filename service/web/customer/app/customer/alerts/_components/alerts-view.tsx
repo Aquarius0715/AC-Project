@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CURRENT_CLIENT } from "@ac/web/lib/clientUsers";
-import { Badge, Btn, Card, Check, Choice, ErrorState, Field, Input, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Toggle, cx, useToast, Plain } from "@ac/web/components/ui";
+import { Badge, Btn, Card, Check, Choice, ErrorState, Field, Input, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Toggle, cx, useToast, Plain, ScrollX } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { type Alert } from "@ac/web/lib/alerts";
 import { Icon } from "@ac/web/components/Icon";
@@ -85,7 +85,7 @@ export function PoliciesPanel() {
           <Card title="Default policy" sub="Limits set by HQ · on / off is set by the account owner">
             <p className="mb-3 text-xs text-muted-foreground">Covers ventilation and the usual causes of breakdowns. It is attached to every AC and cannot be detached or edited, but the account owner can switch each rule on or off for your account (all your ACs). Ask HQ if a limit should change.</p>
             {!isOwner && <p className="mb-3 text-xs text-warn">Only the account owner can change this.</p>}
-            <div className="scroll-x"><table className="w-full text-left text-[13px]"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">Rule</th><th className="pr-3">Condition</th><th className="pr-3">Severity</th><th>On</th></tr></thead><tbody>{defaultRules.map((r, i) => <tr key={r[0]} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{r[0]}</td><td className="pr-3">{r[1]}</td><td className="pr-3"><SeverityBadge s={(r[2] === "Info" ? "normal" : r[2].toLowerCase()) as "warning"} /></td><td><Toggle on={rules[i]} disabled={!isOwner} onChange={(v) => setRules((s) => s.map((x, j) => (j === i ? v : x)))} label={r[0]} /></td></tr>)}</tbody></table></div>
+            <ScrollX><table className="w-full text-left text-[13px]"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">Rule</th><th className="pr-3">Condition</th><th className="pr-3">Severity</th><th>On</th></tr></thead><tbody>{defaultRules.map((r, i) => <tr key={r[0]} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{r[0]}</td><td className="pr-3">{r[1]}</td><td className="pr-3"><SeverityBadge s={(r[2] === "Info" ? "normal" : r[2].toLowerCase()) as "warning"} /></td><td><Toggle on={rules[i]} disabled={!isOwner} onChange={(v) => setRules((s) => s.map((x, j) => (j === i ? v : x)))} label={r[0]} /></td></tr>)}</tbody></table></ScrollX>
             {!rules[5] && <p className="mt-2 text-xs text-warn">Turned off: “AC offline” — no alerts for heartbeat loss on any of your ACs. HQ still sees device status.</p>}
           </Card>
           <div className="text-[13px] font-bold">Your policies <span className="text-xs font-normal text-muted-foreground">{policies.length} · added on top of the default policy · a policy belongs to your account and can be attached to many ACs</span></div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Btn, Card, Check, ConnBadge, cx, EmptyState, Field, Input, ListRow, Modal, Search, Select, Textarea, Plain } from "@ac/web/components/ui";
+import { Badge, Btn, Card, Check, ConnBadge, cx, EmptyState, Field, Input, ListRow, Modal, Search, Select, Textarea, Plain, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -132,25 +132,25 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
               <div>
                 <h3 className="text-[15px] font-bold">{t("Sensors ({n}) · from the unit’s capability", { n: dv.sensors.length })}</h3>
                 {dv.sensors.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("This device has no sensors.")}</p> : (
-                  <div className="scroll-x mt-2 rounded-xl border border-line"><table className="w-full min-w-[420px] text-[13px]">
+                  <ScrollX className="mt-2 rounded-xl border border-line"><table className="w-full min-w-[420px] text-[13px]">
                     <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><th /></tr></thead>
                     <tbody>{dv.sensors.map((x) => (
                       <tr key={x.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{x.metric}</td><td>{x.unit}</td><td>{x.stale}</td><td className="text-xs">{x.calibrated}</td>
                         <td className="pr-3 text-right">{live.canWrite && <Plain type="button" disabled={pending || busy} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => calibrateOf(x.id)}>{t("Calibrate")} <Icon name="arrowRight" /></Plain>}</td></tr>
                     ))}</tbody>
-                  </table></div>
+                  </table></ScrollX>
                 )}
               </div>
               <div>
                 <h3 className="text-[15px] font-bold">{t("Operation history")}</h3>
                 {dv.operations.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No operations yet.")}</p> : (
-                  <div className="scroll-x mt-2 rounded-xl border border-line"><table className="w-full min-w-[420px] text-[13px]">
+                  <ScrollX className="mt-2 rounded-xl border border-line"><table className="w-full min-w-[420px] text-[13px]">
                     <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Kind")}</th><th>{t("Started")}</th><th>{t("Detail")}</th><th>{t("Status")}</th></tr></thead>
                     <tbody>{dv.operations.map((o) => (
                       <tr key={o.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{o.kind}</td><td className="text-xs">{o.time}</td><td className="text-xs">{o.detail}</td>
                         <td className="pr-3"><Badge tone={o.status === "succeeded" ? "ok" : o.status === "failed" ? "crit" : "primary"}>{o.statusText}</Badge></td></tr>
                     ))}</tbody>
-                  </table></div>
+                  </table></ScrollX>
                 )}
               </div>
               <div>
@@ -160,7 +160,7 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
               <div>
                 <div className="mb-2 flex items-baseline gap-2"><h3 className="text-[15px] font-bold">{t("Device events")}</h3><span className="text-xs text-muted-foreground">{t("connection, power and tamper are separate events")}</span></div>
                 {dv.events.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No device events.")}</p> : (
-                  <div className="scroll-x rounded-xl border border-line"><table className="w-full min-w-[560px] text-[13px]">
+                  <ScrollX className="rounded-xl border border-line"><table className="w-full min-w-[560px] text-[13px]">
                     <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Time")}</th><th>{t("Event")}</th><th>{t("Detail")}</th><th>{t("Recovery / response")}</th></tr></thead>
                     <tbody>{dv.events.map((e) => (
                       <tr key={e.id} className="border-t border-line align-top">
@@ -169,7 +169,7 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
                         <td className="py-2 pr-3 text-xs">{e.recovery}</td>
                       </tr>
                     ))}</tbody>
-                  </table></div>
+                  </table></ScrollX>
                 )}
               </div>
             </div>

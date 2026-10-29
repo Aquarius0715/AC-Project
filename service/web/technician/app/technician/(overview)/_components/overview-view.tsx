@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Banner, Card, EmptyState, Kpi, LinkBtn, Page, Select, SeverityBadge, TextLink, cx, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Card, EmptyState, Kpi, LinkBtn, Page, Select, SeverityBadge, TextLink, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -54,7 +54,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
       {live.tab === "today" && live.readOnly.map((r) => <Banner key={r.id}>{t("{id} shows read-only until its work window opens {time} — actions are disabled until then (IR76).", { id: r.short, time: r.opens ?? "" })}</Banner>)}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <Card title={live.day} sub={t("Sort by time")}>
-          <div className="scroll-x">
+          <ScrollX>
             <div className="relative min-w-[480px]">
               <div className="flex justify-between text-[11px] text-muted-foreground">{live.timeline.hours.map((h) => <span key={h}>{h}</span>)}</div>
               <div className="relative mt-1 h-10 rounded-lg bg-surface2">
@@ -62,7 +62,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
                 {live.timeline.nowPct !== null && <span className="absolute inset-y-0 w-0.5 bg-crit" style={{ left: `${live.timeline.nowPct}%` }} />}
               </div>
             </div>
-          </div>
+          </ScrollX>
           <div className="mt-2 flex flex-col">
             {live.todayRows.length === 0 && <p className="text-[13px] text-muted-foreground">{t("Nothing scheduled today.")}</p>}
             {live.todayRows.map((j) => <Link key={j.id} href={`/technician/jobs/${j.id}`} className="flex items-center justify-between gap-2 border-t border-line py-2 first:border-0"><span className="min-w-0"><b className="text-[13px]">{j.slotText} · {j.short} · {j.title}</b><span className="block truncate text-[11px] text-muted-foreground">{j.line}</span></span><Badge tone={j.badge.tone}>{j.badge.text}</Badge></Link>)}

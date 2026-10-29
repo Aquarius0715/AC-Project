@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, LinkBtn, Modal, Select, SeverityBadge, Toggle, cx, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, LinkBtn, Modal, Select, SeverityBadge, Toggle, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
@@ -43,7 +43,7 @@ function PolicyList({ p, onDone, onFail }: Props) {
         <Card title={<span className="flex flex-wrap items-center gap-2">{t("Default policy")} <Badge tone="primary">{t("Default · set by HQ")}</Badge><Badge tone="primary">{t("{on} of {n} rules on", { on: d.on, n: d.rows.length })}</Badge></span>} action={<span className="text-[11px] text-muted-foreground">{t("Limits set by HQ · on / off is set by the account owner")}</span>}>
           <p className="mb-3 text-xs text-muted-foreground">{t("Covers ventilation and the usual causes of breakdowns. It is attached to every AC and cannot be detached or edited, but the account owner can switch each rule on or off for your account (all your ACs); members see the rules read-only. Ask HQ if a limit should change.")}</p>
           {!p.owner && <p className="mb-3 text-xs text-warn">{t("Only the account owner can change this.")}</p>}
-          <div className="scroll-x"><table className="w-full text-left text-[13px]">
+          <ScrollX><table className="w-full text-left text-[13px]">
             <thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">{t("Rule")}</th><th className="pr-3">{t("Condition")}</th><th className="pr-3">{t("Type")}</th><th className="pr-3">{t("Severity")}</th><th>{t("On")}</th></tr></thead>
             <tbody>{d.rows.map((r) => (
               <tr key={r.ruleKey} className={cx("border-t border-line", !r.enabled && "text-muted-foreground")}>
@@ -52,7 +52,7 @@ function PolicyList({ p, onDone, onFail }: Props) {
                 <td><Toggle on={r.enabled} disabled={!p.owner || pending} onChange={(v) => toggleRule(r.ruleKey, r.name, v, r.version)} label={r.name} /></td>
               </tr>
             ))}</tbody>
-          </table></div>
+          </table></ScrollX>
           {d.notes.map((n) => <p key={n} className="mt-2 text-xs text-muted-foreground">{n}</p>)}
         </Card>
       )}

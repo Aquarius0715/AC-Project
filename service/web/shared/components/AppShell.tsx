@@ -152,9 +152,9 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
               <h1 className={cx("flex min-w-0 items-center gap-2 text-[15px] font-bold", demo && "text-warn")}>{demo && <Icon name="demo" />}<span className="truncate">{title}</span>{demo && <Badge tone="warn" className="uppercase tracking-wide max-sm:hidden">{t("Always labelled demo")}</Badge>}</h1>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {role === "technician" && <Btn size="sm" onClick={() => setQr(true)} className="gap-1.5 font-bold"><Icon name="qr" /> <span className="max-sm:hidden">{t("Scan QR")}</span></Btn>}
+              {role === "technician" && <Btn size="sm" onClick={() => setQr(true)} aria-label={t("Scan QR")} className="gap-1.5 font-bold"><Icon name="qr" /> <span className="max-sm:hidden">{t("Scan QR")}</span></Btn>}
               {role === "client" && (
-                <Button variant="outline" size="sm" onClick={() => setAssistant(true)} className="gap-1.5 rounded-full border-primary bg-primary-soft/50 font-bold text-primary hover:bg-primary-soft"><Icon name="mic" /> <span className="max-sm:hidden">{t("Assistant")}</span></Button>
+                <Button variant="outline" size="sm" onClick={() => setAssistant(true)} aria-label={t("Assistant")} className="gap-1.5 rounded-full border-primary bg-primary-soft/50 font-bold text-primary hover:bg-primary-soft"><Icon name="mic" /> <span className="max-sm:hidden">{t("Assistant")}</span></Button>
               )}
               <span className="inline-flex items-center gap-1.5 rounded-control bg-surface2 px-3 py-1.5 text-xs font-semibold"><Icon name="account" /> <span className="max-sm:hidden">{chip}</span><span className="sm:hidden">{chip.split(" — ")[0]}</span></span>
             </div>

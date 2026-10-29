@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Banner, Btn, Card, EmptyState, Field, Input, ListRow, Modal, Page, Select } from "@ac/web/components/ui";
+import { Banner, Btn, Card, EmptyState, Field, Input, ListRow, Modal, Page, Select, ScrollX } from "@ac/web/components/ui";
 import { JobStatusBadge } from "@ac/web/components/JobBits";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -99,7 +99,7 @@ function PlanDetail({ d, now, notice, setNotice }: { d: Detail; now: number; not
         {box.why && <p className="mt-1 text-right text-[11px] text-muted-foreground">{box.why}</p>}
         <h3 className="mt-4 mb-1.5 text-[13px] font-bold">{t("Generated occurrences")}</h3>
         {d.occurrences.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("None yet.")}</p> : (
-          <div className="scroll-x"><table className="w-full min-w-[520px] text-[13px]">
+          <ScrollX><table className="w-full min-w-[520px] text-[13px]">
             <thead><tr className="text-left text-[11px] uppercase text-muted-foreground"><th className="py-1.5">{t("Occurrence")}</th><th>{t("Job")}</th><th>{t("Status")}</th><th className="text-right"><span className="sr-only">{t("Open")}</span></th></tr></thead>
             <tbody>{d.occurrences.map((o) => (
               <tr key={o.jobId} className="border-t border-line">
@@ -108,7 +108,7 @@ function PlanDetail({ d, now, notice, setNotice }: { d: Detail; now: number; not
                 <td className="text-right"><Link className="text-xs font-semibold text-primary hover:underline" href={`/admin/jobs?jobId=${o.jobId}`}>{t("Open job")} <Icon name="arrowRight" /></Link></td>
               </tr>
             ))}</tbody>
-          </table></div>
+          </table></ScrollX>
         )}
         <div className="mt-4 flex items-center justify-end gap-2">
           {dirty && <Btn disabled={pending} onClick={() => { setEvery(p.recurrence.intervalMonths); setNext(zonedInput(p.nextDueAt, zone)); }}>{t("Discard")}</Btn>}

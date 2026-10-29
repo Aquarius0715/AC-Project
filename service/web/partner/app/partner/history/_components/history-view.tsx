@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Page, Select, Textarea, cx, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Page, Select, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -41,7 +41,7 @@ function List({ live }: { live: HistoryLive }) {
       </div>
       <Card title={t("Your jobs — {company} only · choose a job to open its history", { company: live.company })}>
         {live.rows.length === 0 ? <EmptyState title={t(all ? "No jobs in this view" : "No jobs yet")}>{t("Jobs appear here once your company accepts an offer.")}</EmptyState> : (
-          <div className="scroll-x">
+          <ScrollX>
             <table className="w-full min-w-[880px] text-[13px]">
               <thead><tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="py-2 font-semibold">{t("Job")}</th><th className="py-2 font-semibold">{t("Technician")}</th><th className="py-2 font-semibold">{t("Last event")}</th><th className="py-2 font-semibold">{t("Status")}</th><th /></tr></thead>
               <tbody>
@@ -56,7 +56,7 @@ function List({ live }: { live: HistoryLive }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
         )}
         <p className="mt-3 text-[11px] text-muted-foreground">{t(live.total > 100 ? "Showing {shown} of {total} (the latest 100) · own company only (FR-P08) · offers appear here after acceptance." : "Showing {shown} of {total} · own company only (FR-P08) · offers appear here after acceptance.", { shown: live.rows.length, total: all })}</p>
       </Card>

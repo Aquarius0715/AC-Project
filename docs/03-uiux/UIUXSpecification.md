@@ -57,7 +57,7 @@ Validate each screen's cases that add detail to the source (AT-*-SRC) together w
   - A row's actions menu is `ActionMenu` (the `more` icon over a native select).
   - Sort hints are words ("most severe first").
   - A native `<option>` cannot hold an icon, so its text is words.
-- **Accessibility.** An icon next to text is aria-hidden. An icon-only button or menu always has a label.
+- **Accessibility.** An icon next to text is aria-hidden. An icon-only button or menu always has a label, and so does a button whose text is hidden at phone width (IR487).
 - **The guard.** `shared/lib/__tests__/icons.test.ts` reads every UI string of the four apps and the Malay dictionary. It fails on:
   - a symbol character;
   - an arrow at the start or end of a text;
@@ -211,7 +211,7 @@ Define reusable composition rules without creating wireframes. Each role's detai
 | UI-ANALYSIS | Shared KPIs, units/period, charts and numeric tables, evidence/data-quality cards | Power, air quality, and MRV analysis |
 | UI-TIMELINE | White card; each row has py12px, event/time on the left, result badge on the right. Wrap long IDs | Audit logs and job history |
 
-At widths of 1280px and above, fix desktop navigation to the left. Below that, use a top header and Sheet. While the drawer is open, stop background scrolling. Support Esc to close it; after selection, close it and focus the destination heading. Keep the same color and font systems across roles. Distinguish roles through menus, permissions, and key metrics.
+At widths of 1280px and above, fix desktop navigation to the left. Below that, use a top header and Sheet. A table or board wider than a phone scrolls sideways inside its card through the shared `ScrollX`, which a keyboard can focus while it overflows; the page itself never scrolls sideways (IR487). While the drawer is open, stop background scrolling. Support Esc to close it; after selection, close it and focus the destination heading. Keep the same color and font systems across roles. Distinguish roles through menus, permissions, and key metrics.
 
 Record readability and interaction adjustments for business screens as ADAPT. Test layout width, wrapping, and navigation switch boundaries at 360px, 768px, 1024px, 1279px, 1280px, and 1440px. On business screens with input, prioritize 44px touch areas instead of copying the reference page's 28px controls.
 

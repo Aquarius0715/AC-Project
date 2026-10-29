@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Select, SummaryList, Textarea, cx, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Select, SummaryList, Textarea, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -55,9 +55,9 @@ function JobsTab({ live, patch, fresh, onFresh }: { live: JobsLive; patch: (p: R
   return (
     <>
       <ScopeBar scope={live.scope} q={q} text={`${t(inScope === 1 ? "1 job in scope" : "{n} jobs in scope", { n: inScope })}${live.period ? ` · ${t("in the period")}` : ""}`} clear="jobId" />
-      <div className="scroll-x"><div className="grid min-w-[980px] grid-cols-10 overflow-hidden rounded-2xl border border-line bg-surface">
+      <ScrollX><div className="grid min-w-[980px] grid-cols-10 overflow-hidden rounded-2xl border border-line bg-surface">
         {live.stages.map((s) => <Plain key={s.id} type="button" aria-pressed={q.stage === s.id} onClick={() => patch({ stage: q.stage === s.id ? null : s.id, jobId: null })} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", q.stage === s.id && "bg-primary-soft")}><div className="text-[11px] text-muted-foreground">{s.label}</div><div className={cx("text-lg font-bold", s.id === "time_proposed" && s.count > 0 && "text-warn", s.count === 0 && "text-muted-foreground")}>{s.count}</div></Plain>)}
-      </div></div>
+      </div></ScrollX>
       <div className="flex flex-wrap items-center gap-2">
         <Select aria-label={t("Type")} className="w-auto" value={q.type ?? ""} onChange={(e) => patch({ type: e.target.value || null })}>{TYPES.map((x) => <option key={x.id} value={x.id}>{t("Type: {value}", { value: t(x.label) })}</option>)}</Select>
         <Select aria-label={t("Origin")} className="w-auto" value={q.origin ?? ""} onChange={(e) => patch({ origin: e.target.value || null })}><option value="">{t("Origin: All")}</option><option value="client_request">{t("Origin: Client request")}</option><option value="periodic_plan">{t("Origin: Periodic plan")}</option></Select>
@@ -139,10 +139,10 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
           {sp?.status === "declined" && <Banner tone="crit" icon="error"><b>{t("The client declined the proposed time")}{d.texts.declinedAt ? ` · ${d.texts.declinedAt}` : ""}</b> — {sp.declineReason?.replace(/_/g, " ")}{sp.declineComment ? `: “${sp.declineComment}”` : ""}. {t("Held capacity was released; the client sent new preferred times (round {round}).", { round: j.preferenceRound })}</Banner>}
           {d.preferred.length > 0 ? (
             <Card title={d.preferred[0].plan ? t("Plan occurrence — book this time") : j.preferenceRound > 1 ? t("Client’s preferred times (round {round}) — book one of these", { round: j.preferenceRound }) : t("Client’s preferred times — book one of these")} sub={t("HQ technicians free and qualified for each time (members.eligible)")}>
-              <div className="scroll-x"><table className="w-full min-w-[640px] text-[13px]">
+              <ScrollX><table className="w-full min-w-[640px] text-[13px]">
                 <thead><tr className="text-left text-[11px] uppercase text-muted-foreground"><th className="py-1.5">{t("Rank")}</th><th>{t("Time")}</th><th>{t("HQ technicians")}</th><th>{t("Contractors")}</th><th>{t("Action")}</th></tr></thead>
                 <tbody>{d.preferred.map((r) => <tr key={r.rank} className="border-t border-line"><td className="py-2"><span className="rounded-lg bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">{r.plan ? t("Plan") : t(RANK[r.rank - 1] ?? "{n}th", { n: r.rank })}</span></td><td className="font-semibold">{r.text}</td><td className={cx("text-xs", r.fits ? "text-ok" : "text-muted-foreground")}>{r.hq}</td><td className="text-xs text-muted-foreground">{t("{names} — confirm in the offer", { names: live.contractors.filter((x) => x.status === "active").map((x) => x.name).join(", ") || "—" })}</td><td><Btn size="sm" variant="primary" disabled={pending || Date.parse(r.slot.startAt) <= now} onClick={() => setModal({ kind: "book", row: r })}>{t("Use this time")}</Btn></td></tr>)}</tbody>
-              </table></div>
+              </table></ScrollX>
               <p className="mt-2 text-[11px] text-muted-foreground">{t(d.preferred[0].plan ? "“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside the plan occurrence without the client’s approval (IR113)." : "“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside these without the client’s approval (IR113).")}</p>
             </Card>
           ) : <Banner>{t("No agreed time on this job (HQ request without alternatives) — propose a time to the client.")}</Banner>}
@@ -203,11 +203,11 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
 
       <Card title={t("Costs")} action={<Btn size="sm" disabled={pending || j.status === "cancelled"} title={j.status === "cancelled" ? t("A cancelled job’s costs cannot change.") : undefined} onClick={() => setModal({ kind: "cost" })}><Icon name="add" /> {t("Add cost line")}</Btn>}>
         {d.costs.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No cost lines yet — add estimates before the work and actuals after it.")}</p> : (
-          <div className="scroll-x"><table className="w-full min-w-[560px] text-[13px]">
+          <ScrollX><table className="w-full min-w-[560px] text-[13px]">
             <thead><tr className="text-left text-[11px] uppercase text-muted-foreground"><th className="py-1.5">{t("Kind")}</th><th>{t("Description")}</th><th>{t("Visibility")}</th><th className="text-right">{t("Amount")}</th><th className="w-8"><span className="sr-only">{t("Remove")}</span></th></tr></thead>
             <tbody>{d.costs.map((l, i) => <tr key={i} className="border-t border-line"><td className="py-1.5">{t(l.kind === "estimate" ? "Estimate" : "Actual")}</td><td>{l.description}</td><td className="text-xs text-muted-foreground">{t(l.visibility === "customer" ? "Customer" : "Internal")}</td><td className="text-right font-semibold">{money(l.amountMinor, l.currency)}</td>
               <td className="text-right"><Plain type="button" aria-label={t("Remove {name}", { name: l.description })} disabled={pending || j.status === "cancelled"} className="rounded px-1.5 text-muted-foreground hover:bg-surface2 hover:text-crit disabled:opacity-40" onClick={() => run(() => saveCosts(j.id, j.version, d.costs.filter((_, k) => k !== i)), t("Cost line removed"), () => close(t("Removed “{name}”.", { name: l.description })), failed)}><Icon name="close" /></Plain></td></tr>)}</tbody>
-          </table></div>
+          </table></ScrollX>
         )}
         <div className="mt-3 grid-fluid" style={{ ["--min" as string]: "180px" }}>
           <div className="rounded-xl border border-line p-3"><div className="text-[11px] text-muted-foreground">{t("Estimate total")}</div><div className="text-[13px] font-semibold">{d.totals.estimate}</div></div>

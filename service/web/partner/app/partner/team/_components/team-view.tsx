@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, cx, EmptyState, Field, Input, LinkBtn, Modal, Page, Select, Tabs, TextLink, UtilBar } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, cx, EmptyState, Field, Input, LinkBtn, Modal, Page, Select, Tabs, TextLink, UtilBar, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -118,7 +118,7 @@ function WeekCard({ live }: { live: Live }) {
   const w = live.week;
   return (
     <Card title={w.title} action={<TextLink href="/partner/schedule">{t("Open schedule")} <Icon name="arrowRight" /></TextLink>}>
-      <div className="scroll-x">
+      <ScrollX>
         <table className="w-full min-w-[560px] text-xs">
           <thead><tr><th />{w.days.map((d, k) => <th key={w.dates[k]} className={cx("p-1 text-center font-semibold", k === w.dayIndex ? "text-primary" : "text-muted-foreground")}>{d}</th>)}</tr></thead>
           <tbody>{w.rows.map((r) => (
@@ -128,7 +128,7 @@ function WeekCard({ live }: { live: Live }) {
             </tr>
           ))}</tbody>
         </table>
-      </div>
+      </ScrollX>
       <dl className="mt-3 flex flex-wrap gap-6 text-xs">
         {([[t("Assigned"), w.stats.assigned], [t("Available"), w.stats.available], [t("Team utilization"), w.stats.utilization], [w.freeLabel, w.stats.free]] as const).map(([k, v]) => (
           <div key={k}><dt className="text-[11px] text-muted-foreground">{k}</dt><dd className="text-[15px] font-bold">{v}</dd></div>

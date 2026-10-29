@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, Modal, SummaryList, UtilBar, cx, Plain } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, Modal, SummaryList, UtilBar, cx, Plain, ScrollX } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { cleaningSymptom, DEFAULT_FILTER_HOURS, filterStatus, reminderErrors, reminderInput, type FilterGroup, type FilterRow, type ReminderForm } from "@ac/web/lib/customerFilterCare";
@@ -60,7 +60,7 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
       <Card title={t("Filters by AC")} sub={t("Run time since the last cleaning, from telemetry · reminder at {hours}", { hours: f.settings.thresholdHours ? `${f.settings.thresholdHours} h` : t("{n} h (model default)", { n: DEFAULT_FILTER_HOURS }) })}>
-        <div className="scroll-x rounded-xl border border-line">
+        <ScrollX className="rounded-xl border border-line">
           <table className="w-full border-collapse text-left text-[13px]">
             <thead>
               <tr className="bg-surface2 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -73,7 +73,7 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
               {f.lines.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">{t("No ACs in your account yet.")}</td></tr>}
             </tbody>
           </table>
-        </div>
+        </ScrollX>
         <p className="mt-2 text-[11px] text-muted-foreground">{t("Run time counts hours the AC was running (from telemetry). “Mark cleaned” is for cleaning you did yourself — it resets the counter and is shown to your technician. A technician visit that cleans the filter resets it too.")}</p>
       </Card>
       <Card title={t("Reminders")} sub={t(f.settings.version === 0 ? "Default settings" : "Set by the account owner")} className="self-start">

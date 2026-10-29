@@ -149,7 +149,7 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
         </Card>
 
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={unit.name} sub={api ? unit.loc : `${unit.loc} · ${unit.id}`} action={<span className="flex items-center gap-2"><Btn size="sm" variant="ghost" onClick={() => setRenaming(true)}><Icon name="edit" />{t("Rename")}</Btn><PowerBadge s={unit.state} /><ConnBadge s={unit.conn} /></span>}>
+          <Card title={unit.name} sub={api ? unit.loc : `${unit.loc} · ${unit.id}`} action={<span className="flex flex-wrap items-center justify-end gap-2"><Btn size="sm" variant="ghost" onClick={() => setRenaming(true)}><Icon name="edit" />{t("Rename")}</Btn><PowerBadge s={unit.state} /><ConnBadge s={unit.conn} /></span>}>
             {offline ? <Banner tone="warn">{t("This AC is offline. Remote actions are disabled until the connection returns. Last seen {when}.", { when: unit.obs })}</Banner> : (
               <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
                 <Stat label={t("Room temperature (measured)")} value={room?.text ?? "—"} sub={room ? t("observed {at}", { at: room.at }) : t("no recent measurement")} />
