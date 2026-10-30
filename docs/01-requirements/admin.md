@@ -130,9 +130,15 @@ Design: [DD-A02](../02-design/admin.md#dd-a02-details). Assess parent AT-A02 usi
 
 | Acceptance ID | Given / When | Then |
 |---|---|---|
-| AT-A03-R01 | identity.write. When: Open "New user" (no id) → save organizationId=contractor-a, role=contractor, employment=null, no permissions beyond default, validFrom=now, validUntil=null → list refreshes → select the new row → revoke by setting validUntil=now with a reason → open "New user" again with New person (name, e-mail) and save | ① New Membership version=1, appears in the list ② Revoked row still listed with status derived from validUntil (e.g. "Inactive since …"), never removed ③ Old open screens for that Membership are rejected on next action (D01), consistent with AT-A03-N's cache-clear behavior ④ The new person, their Membership and sign-in account exist, the set-up e-mail is sent, and contractor-a's Users lists them as “Not signed in yet” (IR461); the same e-mail again → VALIDATION `newUser.email=errors.email_taken` |
+| AT-A03-R01 | identity.write. When: Open "New user" (no id) → save organizationId=contractor-a, role=contractor, employment=null, no permissions beyond default, validFrom=now, validUntil=null → list refreshes → select the new row → revoke by setting validUntil=now with a reason → as contractor-a, give the revoked account a new access end, enable it, or add the person again → as HQ, save a later validUntil → open "New user" again with New person (name, e-mail) and save | ① New Membership version=1, appears in the list ② Revoked row still listed, marked Revoked (`revokedAt`), never removed; the person's sign-in account is turned off (DEC-83, IR508) ③ Old open screens for that Membership are rejected on next action (D01), consistent with AT-A03-N's cache-clear behavior ④ The new person, their Membership and sign-in account exist, the set-up e-mail is sent, and contractor-a's Users lists them as “Not signed in yet” (IR461); the same e-mail again → VALIDATION `newUser.email=errors.email_taken` ⑤ contractor-a's new access end and enabling are CONFLICT `errors.revoked_by_hq`, and adding the person again is VALIDATION `email=errors.revoked_by_hq` ⑥ HQ's later validUntil clears the revoke and turns the sign-in on again (IR508) |
 
-Design: [DD-A03](../02-design/admin.md#dd-a03-details). Assess parent AT-A03 using all N/E/B/R01 and applicable SRC/R01 cases in traceability.
+**Additional acceptance AT-A03-R02 (first administrator in an empty environment, DEC-84)**
+
+| Acceptance ID | Given / When | Then |
+|---|---|---|
+| AT-A03-R02 | An environment without the demo fixture. When: run `migrate bootstrap-admin -tenant "AC Project" -email first.admin@example.com -name "First Admin"`, sign in with the set-up e-mail's link, then run the command again | ① The tenant, its HQ organization and an admin membership with every HQ permission over the tenant exist, with the audit entry `bootstrap.admin` ② The set-up e-mail arrives; the first sign-in sets the password and a one-time-code device (IR468), and the HQ app opens with Access & roles ③ The second run is refused: the tenant already has an active identity administrator (IR509) |
+
+Design: [DD-A03](../02-design/admin.md#dd-a03-details). Assess parent AT-A03 using all N/E/B/R01/R02 and applicable SRC/R01 cases in traceability.
 
 ### FR-A04 Model and IoT capability register
 

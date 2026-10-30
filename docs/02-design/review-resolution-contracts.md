@@ -7469,3 +7469,17 @@ Found in the loop's review of IR508 against Figma. The contractor's Users row (0
 2. **Figma, User Flows.** The contractor's Users lane gets the state card 08-6, "Set by HQ's revoke · only Remove".
 3. **Not added.** No customer-side frame: HQ's screens revoke HQ, contractor and technician memberships only (Access & roles lists no clients). A client membership is revoked through `members.save` alone, and the customer's list then shows the same badge.
 
+## IR518 HQ's acceptance cases follow IR508 and IR509 — 2026-10-30
+
+Found in the loop's review of the HQ requirements against IR508 and IR509. AT-A03-R01 still expected a revoked membership listed as "Inactive since …", and named neither the sign-in turned off nor the contractor's refusals. No acceptance case covered the first administrator of an empty environment (DEC-84).
+
+1. **AT-A03-R01.**
+   - ② The revoked row stays listed, marked Revoked (`revokedAt`), and the person's sign-in is turned off.
+   - ⑤ (new) contractor-a's new access end and enabling are CONFLICT `errors.revoked_by_hq`, and adding the person again is VALIDATION `email=errors.revoked_by_hq`.
+   - ⑥ (new) HQ's later `validUntil` clears the revoke and turns the sign-in on again.
+2. **AT-A03-R02 (new).** In an environment without the demo fixture, run `migrate bootstrap-admin`:
+   - The tenant, its HQ organization, the admin membership with every HQ permission and the audit entry exist.
+   - The set-up e-mail's first sign-in sets the password and a one-time-code device, and opens the HQ app.
+   - A second run is refused. Parent AT-A03 is assessed with N/E/B/R01/R02.
+3. **Coverage.** The Go tests `TestHQRevokeTurnsSignInOff`, `TestHQRevokeOfAClientUser`, `TestHQSaveOfAnEndedAccessIsNoRevoke` and `TestBootstrapAdmin` cover these cases, and the end-to-end scenario `new-hq-admin` covers a new HQ administrator's first sign-in with the code.
+
