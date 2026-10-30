@@ -7520,3 +7520,9 @@ Found in the loop's review of the System Architecture page against today's chang
 
 Every edited line keeps its height, so no board moves.
 
+## IR522 Figma's frontend board names today's test counts — 2026-10-30
+
+Found in the loop's review of the System Architecture page. Board 02 (Frontend as built) still said "77 suites, 458 tests incl. the web's 371 literal Core API calls". `npm test` now runs 94 test files and 529 tests, and `contract.test.ts` checks 352 literal Core API calls: IR494, IR502 and IR506 removed calls.
+
+1. **Figma, board 02.** "94 suites, 529 tests incl. the web's 352 literal Core API calls". The line keeps its height.
+

@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.391.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
+Version: 0.392.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.392.0 (2026-10-30): Board 02 of the System Architecture page names 94 Vitest suites, 529 tests and 352 checked Core API calls (IR522).
 0.391.0 (2026-10-30): The System Architecture boards say that HQ's two-step is required with an HQ Cognito pool, that identity-accounts applies the sign-in account events, and that Keycloak is 26.8 (IR521).
 0.390.0 (2026-10-30): AT-X08-B expects HQ's Preferences to show two-step verification as Required, with no dialog; the dialog case uses contractor-a (IR520).
 0.389.0 (2026-10-30): AT-C04-B covers two schedules meeting in the same minute (DEC-80), and AT-P07-B the company's own handling events as not customer-visible (IR519).
