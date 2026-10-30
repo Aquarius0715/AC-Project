@@ -412,10 +412,19 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 		}
 		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1 AND unit_id IS NOT NULL)`, *in.DeviceID, func(tx pgx.Tx, _ uuid.UUID) error {
 			st := in.State
-			state, _ := json.Marshal(map[string]any{"power": st.Power, "celsius": st.Celsius, "mode": st.Mode, "fanLevel": st.FanLevel, "observedAt": in.OccurredAt.UTC()})
-			if _, err := tx.Exec(ctx, `UPDATE assets.units u SET observed_state = $2, last_seen_at = GREATEST(COALESCE(u.last_seen_at, $3), $3)
-				FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`, *in.DeviceID, state, in.OccurredAt); err != nil {
-				return err
+			if st.Power == nil && st.Celsius == nil && st.Mode == nil && st.FanLevel == nil {
+				// a report with no settings (a module that reports none, IR528) is heard only: the settings that acknowledged
+				// commands set stay
+				if _, err := tx.Exec(ctx, `UPDATE assets.units u SET last_seen_at = GREATEST(COALESCE(u.last_seen_at, $2), $2)
+					FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`, *in.DeviceID, in.OccurredAt); err != nil {
+					return err
+				}
+			} else {
+				state, _ := json.Marshal(map[string]any{"power": st.Power, "celsius": st.Celsius, "mode": st.Mode, "fanLevel": st.FanLevel, "observedAt": in.OccurredAt.UTC()})
+				if _, err := tx.Exec(ctx, `UPDATE assets.units u SET observed_state = $2, last_seen_at = GREATEST(COALESCE(u.last_seen_at, $3), $3)
+					FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`, *in.DeviceID, state, in.OccurredAt); err != nil {
+					return err
+				}
 			}
 			_, err := tx.Exec(ctx, `UPDATE devices.devices SET last_seen_at = GREATEST(COALESCE(last_seen_at, $2), $2) WHERE id = $1`, *in.DeviceID, in.OccurredAt)
 			return err

@@ -13,8 +13,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-// LiveField is one field of a real sensor node's message and the sensor of the node's live-site module it is recorded
-// as (DEC-86, IR524; one module per node, DEC-88).
+// LiveField is one field of a real sensor node's message and the sensor of the live module it is recorded as (DEC-86,
+// IR524).
 type LiveField struct {
 	Field  string  // the field of the node's JSON message
 	Sensor string  // fixture-style name of the live site's sensor (seed.LiveSite)
@@ -48,16 +48,15 @@ func LiveNode(topic string) string {
 	return parts[len(parts)-2]
 }
 
-// LiveTriggers converts one node message received at `at` on the scenario clock into readings of the node's own unit
-// and module (seed.LiveSite). Each reading is stamped at the start of its scenario minute (the slot energy counts,
-// D07), and its event ID is the node, field and minute, so the API keeps one reading per sensor and minute. The
-// module's heartbeat comes with them: a state report with no settings (the nodes report none) that keeps its unit's
-// last seen time current. A node the bridge does not know is an error; a message with nothing measured gives no
-// triggers.
+// LiveTriggers converts one node message received at `at` on the scenario clock into readings of the live unit and
+// module (seed.LiveSite: both nodes are one module, DEC-89). Each reading is stamped at the start of its scenario
+// minute (the slot energy counts, D07), and its event ID is the node, field and minute, so the API keeps one reading
+// per sensor and minute. The module's heartbeat comes with them: a state report with no settings (the nodes report
+// none), which the API takes as heard only (IR528) and which keeps the unit's last seen time current. A node the
+// bridge does not know is an error; a message with nothing measured gives no triggers.
 func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) {
 	fields, ok := LiveNodes[node]
-	site, onSite := seed.LiveNodeNamed(node)
-	if !ok || !onSite {
+	if !ok {
 		return nil, fmt.Errorf("node %q is not a live-site node", node)
 	}
 	var msg map[string]any
@@ -71,7 +70,7 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 	at = at.UTC()
 	slot := at.Truncate(time.Minute)
 	units := map[string]seed.LiveSensor{}
-	for _, s := range site.Sensors {
+	for _, s := range seed.LiveSite.Sensors {
 		units[s.Name] = s
 	}
 	var out []Trigger
@@ -83,7 +82,7 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 		}
 		s, ok := units[f.Sensor]
 		if !ok {
-			return nil, fmt.Errorf("node %s: its module has no sensor %s", node, f.Sensor)
+			return nil, fmt.Errorf("node %s: the live module has no sensor %s", node, f.Sensor)
 		}
 		value := v * f.Scale
 		event := uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("live/%s/%s/%s", node, f.Field, slot.Format(time.RFC3339))))
@@ -93,7 +92,7 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 			OccurredAt: slot,
 			EventType:  "telemetry",
 			Measurement: &Measurement{
-				UnitID: seed.ID(site.Unit), SensorID: seed.ID(s.Name), Metric: s.Metric, Value: &value, Unit: s.Unit,
+				UnitID: seed.ID(seed.LiveSite.Unit), SensorID: seed.ID(s.Name), Metric: s.Metric, Value: &value, Unit: s.Unit,
 				ObservedAt: slot, ReceivedAt: at, Origin: "measured", Quality: "valid", EventID: event,
 			},
 		})
@@ -101,10 +100,11 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 	if len(out) == 0 {
 		return nil, nil
 	}
-	dev := seed.ID(site.Device)
+	dev := seed.ID(seed.LiveSite.Device)
 	out = append(out, Trigger{
 		ScenarioID: Scenario,
-		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/state/%s", dev, slot.Format(time.RFC3339)))), // one a minute
+		// one a minute for the module, whichever node is heard first: both nodes send the same body
+		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/state/%s", dev, slot.Format(time.RFC3339)))),
 		OccurredAt: slot,
 		EventType:  "state",
 		DeviceID:   &dev,
@@ -140,5 +140,74 @@ func (g *LiveGate) Release(node string, slot time.Time) {
 	defer g.mu.Unlock()
 	if g.sent[node].Equal(slot) {
 		delete(g.sent, node)
+	}
+}
+
+// LiveCommandNode is the node whose infrared LED sends the commands by default (REAL_MQTT_COMMAND_NODE): both nodes have
+// one, and only one sends, so a command does not reach the air conditioner twice.
+const LiveCommandNode = "node_1"
+
+// LiveCommandTopic is a node's command topic, as its firmware subscribes to it.
+func LiveCommandTopic(node string) string { return "smarthome/ac/" + node + "/command" }
+
+// LiveCommand is the nodes' firmware command for a requested unit action, and the air conditioner's settings after it.
+// The firmware takes ON, OFF and COOL24 (on, cooling, 24 °C, fan auto). Power on sends COOL24: ON resumes whatever the
+// board sent last, after a restart the infrared library's default, which need not be cooling. Power off sends OFF and
+// leaves the other settings as they were (state nil). Any other action is one the firmware does not take (ok false).
+func LiveCommand(action json.RawMessage) (payload string, state *devicesim.ReportedState, ok bool, err error) {
+	var a struct {
+		Kind  string `json:"kind"`
+		Power *bool  `json:"power"`
+	}
+	if err := json.Unmarshal(action, &a); err != nil {
+		return "", nil, false, fmt.Errorf("live command action: %w", err)
+	}
+	if a.Kind != "set_power" || a.Power == nil {
+		return "", nil, false, nil
+	}
+	if !*a.Power {
+		return "OFF", nil, true, nil
+	}
+	on, celsius, cool := true, 24.0, "cool"
+	return "COOL24", &devicesim.ReportedState{Power: &on, Celsius: &celsius, Mode: &cool}, true, nil // fan auto has no level
+}
+
+// LiveSentTriggers report a command the bridge published to the command node at `at`: sent, then acknowledged at once
+// (infrared is one-way: the node answers nothing, so the acknowledgement means the broker took the command), then,
+// when the command sets more than its own action (COOL24), the module's state report with those settings at stateAt
+// (no later than the API's clock, which refuses a report from its future).
+func LiveSentTriggers(w Waiting, at, stateAt time.Time, state *devicesim.ReportedState) []Trigger {
+	at = at.UTC()
+	cmd, dev := w.ID, seed.ID(seed.LiveSite.Device)
+	out := []Trigger{SentTrigger(w, at), {
+		ScenarioID: Scenario,
+		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/%s/command_ack", dev, cmd))),
+		OccurredAt: at,
+		EventType:  "command_ack",
+		CommandID:  &cmd,
+	}}
+	if state != nil {
+		out = append(out, Trigger{
+			ScenarioID: Scenario,
+			EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/state/%s", dev, cmd))),
+			OccurredAt: stateAt.UTC(),
+			EventType:  "state",
+			DeviceID:   &dev,
+			State:      state,
+		})
+	}
+	return out
+}
+
+// LiveRefusedTrigger fails a command the live module cannot carry out: an action the firmware does not take, or any
+// command while sending to the nodes is off (REAL_MQTT_COMMANDS).
+func LiveRefusedTrigger(w Waiting, at time.Time) Trigger {
+	cmd := w.ID
+	return Trigger{
+		ScenarioID: Scenario,
+		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/%s/command_fail", seed.ID(seed.LiveSite.Device), cmd))),
+		OccurredAt: at.UTC(),
+		EventType:  "command_fail",
+		CommandID:  &cmd,
 	}
 }

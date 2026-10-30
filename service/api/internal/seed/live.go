@@ -27,26 +27,19 @@ type LiveOwner struct {
 	Email, Name                  string
 }
 
-// LiveNode is one real sensor node of the live site: its own monitoring-only model, air conditioner (unit) and
-// module, by fixture-style names, with the sensors it reports. A unit has at most one active module, so each node is
-// a unit of its own (DEC-88).
-type LiveNode struct {
-	Node                    string // the node's name on its broker (the topic level, its device_id)
-	UnitName, Serial, Model string // the unit's display name, the module's serial and the model's name
-	Capability              string
-	Unit, Device, Binding   string
-	Sensors                 []LiveSensor
-}
-
 // LiveSite is where the readings of real sensor nodes land (DEC-86, IR524): a customer of its own (DEC-87, IR525)
-// with one monitoring-only air conditioner per node (DEC-88, IR526), whose module's sensors take that node's
-// readings. The IoT bridge subscribes to the nodes' broker (REAL_MQTT_URL) and sends their readings to these sensors.
+// with one Daikin air conditioner (DEC-89, IR528). The two nodes in front of it make one module: node_1 measures the
+// room, node_2 the air conditioner's supply, and node_1's infrared LED switches it on and off. The model offers the
+// power only, the one setting the nodes' firmware takes (ON, OFF and a cooling preset). The IoT bridge subscribes to
+// the nodes' broker (REAL_MQTT_URL), sends their readings to these sensors and the power commands to node_1.
 // Development only.
 var LiveSite = struct {
-	Tenant, CustomerOrgID, Customer, CustomerName string
-	Owner                                         LiveOwner
-	Property, Floor, Room                         string
-	Nodes                                         []LiveNode
+	Tenant, CustomerOrgID, Customer, CustomerName     string
+	Owner                                             LiveOwner
+	Property, Floor, Room                             string
+	Capability, Manufacturer, Model, UnitName, Serial string
+	Unit, Device, Binding                             string
+	Sensors                                           []LiveSensor
 }{
 	Tenant:        "tenant-a",
 	CustomerOrgID: "org-customer-live",
@@ -56,30 +49,24 @@ var LiveSite = struct {
 	Property:      "property-live-sensors",
 	Floor:         "space-live-1f",
 	Room:          "space-live-room",
-	Nodes: []LiveNode{
-		{Node: "node_1", UnitName: "Live · node_1 room sensor", Serial: "node_1", Model: "Room sensor", Capability: "cap-live-room-sensor",
-			Unit: "unit-live-ac", Device: "device-live-ac", Binding: "binding-live-ac",
-			Sensors: []LiveSensor{{Name: "sensor-live-temperature", Metric: "temperature", Unit: "°C"}, {Name: "sensor-live-humidity", Metric: "humidity", Unit: "%"}}},
-		{Node: "node_2", UnitName: "Live · node_2 power meter", Serial: "node_2", Model: "Power meter", Capability: "cap-live-power-meter",
-			Unit: "unit-live-node-2", Device: "device-live-node-2", Binding: "binding-live-node-2",
-			Sensors: []LiveSensor{{Name: "sensor-live-power", Metric: "power", Unit: "kW", Boundary: "ac_input_electricity"}}},
+	Capability:    "cap-live-daikin",
+	Manufacturer:  "Daikin",
+	Model:         "IR via node_1",
+	UnitName:      "Live · Daikin AC",
+	Serial:        "node_1+node_2",
+	Unit:          "unit-live-ac",
+	Device:        "device-live-ac",
+	Binding:       "binding-live-ac",
+	Sensors: []LiveSensor{
+		{Name: "sensor-live-temperature", Metric: "temperature", Unit: "°C"},
+		{Name: "sensor-live-humidity", Metric: "humidity", Unit: "%"},
+		{Name: "sensor-live-power", Metric: "power", Unit: "kW", Boundary: "ac_input_electricity"},
 	},
 }
 
-// LiveNodeNamed is the live site's node of that broker name.
-func LiveNodeNamed(node string) (LiveNode, bool) {
-	for _, n := range LiveSite.Nodes {
-		if n.Node == node {
-			return n, true
-		}
-	}
-	return LiveNode{}, false
-}
-
-// ApplyLive adds the live site to a seeded database: the live customer and its owner (liveOwner), a property with one
-// room and, per node, a monitoring-only model (no remote control: the nodes only measure), the air conditioner and its
-// module, online since at. Records that exist are kept (ON CONFLICT DO NOTHING), so it can run on every start.
-// Development only: tests and production never load it.
+// ApplyLive adds the live site to a seeded database: the live customer and its owner (liveOwner), the model (remote
+// power only), a property with one room, the air conditioner and its module, online since at. Records that exist are
+// kept (ON CONFLICT DO NOTHING), so it can run on every start. Development only: tests and production never load it.
 func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 	s := LiveSite
 	tenant := ID(s.Tenant)
@@ -101,6 +88,31 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 	if err := liveOwner(ctx, tx, tenant, at); err != nil {
 		return err
 	}
+	type capSensor struct {
+		Metric            string  `json:"metric"`
+		Unit              string  `json:"unit"`
+		StaleAfterSeconds int     `json:"staleAfterSeconds"`
+		BoundaryID        *string `json:"boundaryId"`
+	}
+	var sensors []capSensor
+	for _, x := range s.Sensors {
+		cs := capSensor{Metric: x.Metric, Unit: x.Unit, StaleAfterSeconds: 120}
+		if x.Boundary != "" {
+			cs.BoundaryID = &x.Boundary
+		}
+		sensors = append(sensors, cs)
+	}
+	capSensors, err := json.Marshal(sensors)
+	if err != nil {
+		return err
+	}
+	// remote power only: no mode, fan or temperature setting (deterministic contracts: empty lists, null temperature)
+	if err := ex("model", `INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control, temperature,
+		modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
+		VALUES ($1,1,$2,$3,$4,true,false,false,NULL,'{}','{}',false,'{}',$5,'{}',true) ON CONFLICT DO NOTHING`,
+		ID(s.Capability), tenant, s.Manufacturer, s.Model, capSensors); err != nil {
+		return err
+	}
 	if err := ex("property", `INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, access_instructions, archived)
 		VALUES ($1,$2,$3,'office','Live sensors',NULL,NULL,false) ON CONFLICT DO NOTHING`, ID(s.Property), tenant, ID(s.CustomerOrgID)); err != nil {
 		return err
@@ -113,64 +125,23 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 		ID(s.Room), tenant, ID(s.Property), ID(s.Floor)); err != nil {
 		return err
 	}
-	for _, n := range s.Nodes {
-		if err := liveNode(ctx, tx, tenant, n, at); err != nil {
-			return fmt.Errorf("live site %s: %w", n.Node, err)
-		}
-	}
-	return nil
-}
-
-// liveNode adds one node: its model with the node's sensors, the unit in the site's room and its online module, bound.
-func liveNode(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, n LiveNode, at time.Time) error {
-	s := LiveSite
-	ex := func(what, sql string, args ...any) error {
-		if _, err := tx.Exec(ctx, sql, args...); err != nil {
-			return fmt.Errorf("%s: %w", what, err)
-		}
-		return nil
-	}
-	type capSensor struct {
-		Metric            string  `json:"metric"`
-		Unit              string  `json:"unit"`
-		StaleAfterSeconds int     `json:"staleAfterSeconds"`
-		BoundaryID        *string `json:"boundaryId"`
-	}
-	var sensors []capSensor
-	for _, x := range n.Sensors {
-		cs := capSensor{Metric: x.Metric, Unit: x.Unit, StaleAfterSeconds: 120}
-		if x.Boundary != "" {
-			cs.BoundaryID = &x.Boundary
-		}
-		sensors = append(sensors, cs)
-	}
-	capSensors, err := json.Marshal(sensors)
-	if err != nil {
-		return err
-	}
-	if err := ex("model", `INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control, temperature,
-		modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
-		VALUES ($1,1,$2,'Live',$3,false,false,false,NULL,'{}','{}',false,'{}',$4,'{}',true) ON CONFLICT DO NOTHING`,
-		ID(n.Capability), tenant, n.Model, capSensors); err != nil {
-		return err
-	}
-	// the nodes report no settings of the air conditioner: its observed state stays unknown
+	// the air conditioner's settings are unknown until a command sets them (the nodes report none)
 	state, _ := json.Marshal(map[string]any{"power": nil, "celsius": nil, "mode": nil, "fanLevel": nil, "observedAt": at.UTC()})
-	unit := ID(n.Unit)
+	unit := ID(s.Unit)
 	if err := ex("unit", `INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, installed_at,
 		service_scope, archived, capability_version, observed_state, observed_restriction, version, warranty_ends_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,'{indoor,outdoor,electrical}',false,1,$8,NULL,1,NULL) ON CONFLICT DO NOTHING`,
-		unit, tenant, ID(s.CustomerOrgID), ID(s.Property), ID(s.Room), n.UnitName, ID(n.Capability), state); err != nil {
+		unit, tenant, ID(s.CustomerOrgID), ID(s.Property), ID(s.Room), s.UnitName, ID(s.Capability), state); err != nil {
 		return err
 	}
-	device, binding := ID(n.Device), ID(n.Binding)
+	device, binding := ID(s.Device), ID(s.Binding)
 	added, err := tx.Exec(ctx, `INSERT INTO devices.devices (id, tenant_id, serial, binding_id, unit_id, target_unit_id, created_by_membership_id, connection, last_seen_at,
 		firmware_version, power_signal, tamper) VALUES ($1,$2,$3,$4,$5,$5,$6,'online',$7,'external','unknown','clear') ON CONFLICT DO NOTHING`,
-		device, tenant, n.Serial, binding, unit, ID("system-demo"), at)
+		device, tenant, s.Serial, binding, unit, ID("system-demo"), at)
 	if err != nil {
-		return fmt.Errorf("module: %w", err)
+		return fmt.Errorf("live site module: %w", err)
 	}
-	for _, x := range n.Sensors {
+	for _, x := range s.Sensors {
 		var boundary *string
 		if x.Boundary != "" {
 			boundary = &x.Boundary

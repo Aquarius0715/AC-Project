@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.397.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
+Version: 0.398.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.398.0 (2026-10-30): The live Daikin air conditioner is one unit again, and the app switches it on and off through node_1's infrared LED (power on sends COOL24, power off OFF). A state report with no settings keeps the observed state (DEC-89, IR528).
 0.397.0 (2026-10-30): The client's unit page lists each room unit's latest readings instead of its setting, and Air quality tells a monitoring-only model's user to set the temperature on the AC itself (IR527).
 0.396.0 (2026-10-30): Each real sensor node is a device of its own on its own unit: node_1 (room temperature and humidity) and node_2 (power), both monitoring-only, in Live Sensor Customer's Sensor room (DEC-88, IR526).
 0.395.0 (2026-10-30): The real sensor nodes report to a client of their own, "Live Sensor Customer"; its owner `live-sensors@example.com` sets the password from the set-up e-mail, and customer-b keeps the mock fleet (DEC-87, IR525).

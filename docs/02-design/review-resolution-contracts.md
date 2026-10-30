@@ -7596,3 +7596,21 @@ Follow-ups of IR524, found on the live units.
 1. **Devices in this room (Figma 02e).** The list labelled each unit's setting as its room temperature ("24°C room"): the rows came from `units.list` through `unitRowFromApi`, which took `observedState.celsius`. The row now takes the room temperature, humidity and power (W) from the unit's latest valid readings (`UnitSummary.latestMeasurements`, IR213), as the overview already does. A stale, suspect or missing reading shows no value, and a unit without readings shows "—°C room" instead of its setting.
 2. **Air quality (Figma 05a).** The temperature card's advice, "Setpoint is on Unit Control", pointed a monitoring-only unit (control=false) to a remote control it does not have. `metricCard` takes the model's control: without it the advice is "Set on the AC itself", the same as the unit page's note (IR524).
 3. **Tests.** `client.test.ts` checks the readings, the setting not used as a reading, and no value for stale, suspect or missing readings. `air.test.ts` checks the advice of a model without control.
+
+## IR528 The live Daikin air conditioner is switched on and off from the app (DEC-89) — 2026-10-30
+
+The user shared the nodes' firmware and answered three questions. Both nodes are in front of one Daikin air conditioner, and sending to it is allowed. Each node is an ESP32 with the same firmware: a BME680 (working on node_1), a PZEM-004T (working on node_2) and an infrared LED driving the Daikin protocol. The firmware listens on `smarthome/ac/<node>/command` for three plain-text commands: `ON` (the settings the board sent last), `OFF`, and `COOL24` (on, cooling, 24 °C, fan auto). It reports nothing after sending.
+
+1. **One unit again (`seed.LiveSite`).** A unit has at most one active device (IR526), and both nodes serve one air conditioner, so they are one module again ("node_1+node_2") on one unit, "Live · Daikin AC". It has the room temperature and humidity from node_1 and the power from node_2. This replaces IR526's two units.
+2. **Model.** "Daikin IR via node_1" offers the remote power only: control on, no mode or fan control, no temperature range. These are the settings the firmware takes. The client's unit page (IR524) then shows only the power switch.
+3. **Commands (`cmd/iotbridge`, `internal/iotbridge/live.go`).** A requested command of the live unit goes to the command node's topic (`REAL_MQTT_COMMAND_NODE`, node_1 by default), and only with `REAL_MQTT_COMMANDS=1`. Only one node sends, so the air conditioner does not get a command twice.
+   - Power on sends `COOL24`: `ON` would resume whatever the board sent last, which after a restart is the infrared library's default and need not be cooling. Power off sends `OFF`.
+   - After the broker takes the message (QoS 1), the bridge reports the command sent and acknowledged at once, because infrared is one-way and the node answers nothing. For `COOL24` it also sends the module's state report: power on, 24 °C, cooling, and no fan level, because auto has none.
+   - An action the firmware does not take, and any command while sending is off, fails (DEVICE_REJECTED). While the broker is out of reach the command stays requested until it expires.
+   - The bridge publishes nothing else to the nodes' broker.
+4. **Heard-only state reports (API).** The module's heartbeat (IR524) carries no settings. A state report whose settings are all null now moves only the last-seen time and keeps the observed state. Otherwise the minute's heartbeat would wipe the setting that an acknowledged command recorded. `TestDemoStateReport` checks this.
+5. **Development stack.** IR526's two units were merged by hand:
+   - The power sensor and its readings, energy's power samples included, went back to node_1's former unit and module, which took the new name, model and serial.
+   - node_2's unit, module and binding were deleted, and change capture removed their replicas. The two node models were removed.
+   - The bridge restarted with sending on; no command was sent by the change itself.
+6. **Tests.** `live_test.go` covers the command mapping (COOL24 with its settings, OFF, refused actions), the sent, acknowledged and state triggers and the refusal, and that commands go to a node the bridge listens to. `TestLiveSiteSeeds` checks the model that offers the power only, the one unit and the module's serial.

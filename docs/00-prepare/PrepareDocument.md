@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.397.0
+version: 0.398.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -183,7 +183,8 @@ Small text and controls are adjusted for readability and usability in work scree
 | DEC-85 | HQ two-step verification is enforced by the identity provider: in production HQ signs in through its own Amazon Cognito user pool with MFA required; locally the Keycloak realm's HQ app flow asks for the password and the one-time code at every sign-in; the Core API takes HQ memberships only from the HQ app's tokens | User decision in this conversation, 2026-10-30 (“全て推奨で修正してください”, business review question 5); reflected in IR510 |
 | DEC-86 | Real sensor nodes feed the development stack: the IoT bridge subscribes to the broker named in `.env.local` (`REAL_MQTT_URL` and its login) and never publishes there. It records the nodes' room temperature, humidity and power draw, one reading per sensor and minute on the scenario clock, on a monitoring-only air conditioner ("Live sensors"; its customer since DEC-87: a client of its own). The broker's address and login stay out of the repository; production devices keep AWS IoT Core | User request in this conversation, 2026-10-30 (“このデータをシステムに取り込んでください”); reflected in IR524 |
 | DEC-87 | The real device belongs to a client of its own, not to customer-b (which keeps the mock fleet): "Live Sensor Customer" with the owner `live-sensors@example.com`, whose sign-in account is opened as HQ adds a customer owner, and who sets the password from the set-up e-mail (Mailpit in development) | User request in this conversation, 2026-10-30 (“リアルデバイスと繋げるのは、別ユーザーにしてください（クライアント”); reflected in IR525 |
-| DEC-88 | Each real sensor node is a device of its own on a unit of its own, because a unit has at most one active device: node_1 (room temperature and humidity) and node_2 (power), each with its own monitoring-only model, both in Live Sensor Customer's Sensor room | User request in this conversation, 2026-10-30 (“もう一つデバイスがあるはずなので、それも同じ組織に入れてください”); reflected in IR526 |
+| DEC-88 | (Superseded by DEC-89.) Each real sensor node is a device of its own on a unit of its own, because a unit has at most one active device: node_1 (room temperature and humidity) and node_2 (power), each with its own monitoring-only model, both in Live Sensor Customer's Sensor room | User request in this conversation, 2026-10-30 (“もう一つデバイスがあるはずなので、それも同じ組織に入れてください”); reflected in IR526 |
+| DEC-89 | Both real nodes serve one Daikin air conditioner: they are one module on one unit ("Live · Daikin AC"). The app switches it on and off through node_1's infrared LED, and sending to the nodes' broker is on (`REAL_MQTT_COMMANDS=1`). Power on sends the firmware's COOL24 and power off sends OFF; the other settings wait for a firmware that takes them | User answers in this conversation, 2026-10-30 (“同じエアコン（1台）”, “有効にしてよい”, the firmware and “DAIKINです”); reflected in IR528 |
 
 **DEC-10 (design proposal)**: Preserve work status on reassignment. Release restrictions only after all cause invoices fixed at notice time are paid. Release does not automatically power units on or restore previous set temperatures. Manual payment recording, test-run end confirmation, and viewing saved reports are specified for the 1A demo. This does not mean company approval of commercial rules. See [input/output contract DDC-08](../02-design/implementation-contracts.md#ddc-08-multi-resource-revisit-and-cross-role-contracts).
 
@@ -285,6 +286,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.398.0: The live Daikin air conditioner is one unit again and is switched on and off from the app through node_1's infrared LED (COOL24 / OFF); a state report with no settings keeps the observed state (DEC-89, IR528). Phase 1A unchanged.
 0.397.0: The client's unit page lists each room unit's readings instead of its setting, and a monitoring-only model's temperature advice says it is set on the AC itself (IR527). Phase 1A unchanged.
 0.396.0: Each real sensor node is a device of its own: node_1 (room sensor) and node_2 (power meter) are two monitoring-only units of Live Sensor Customer (DEC-88, IR526). Phase 1A unchanged.
 0.395.0: The real sensor nodes report to a client of their own, "Live Sensor Customer", whose owner sets the password from the set-up e-mail (DEC-87, IR525). Phase 1A unchanged.

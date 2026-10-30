@@ -4,7 +4,9 @@
 //
 // With REAL_MQTT_URL set it also listens to real sensor nodes on another broker (DEC-86, IR524): it subscribes to
 // REAL_MQTT_TOPIC (smarthome/ac/# by default) with REAL_MQTT_USER / REAL_MQTT_PASSWORD and records one reading per
-// node and minute on the live site (seed.LiveSite). It never publishes there: the nodes' broker may reach real equipment.
+// node and minute on the live site (seed.LiveSite). The only thing it publishes there is the live unit's power command
+// to the command node (REAL_MQTT_COMMAND_NODE, node_1 by default), and only with REAL_MQTT_COMMANDS=1 (DEC-89, IR528):
+// the nodes switch a real air conditioner.
 package main
 
 import (
@@ -67,14 +69,16 @@ func main() {
 		log.Fatalf("connect %s: %v", *broker, tok.Error())
 	}
 	defer client.Disconnect(500)
-	if live := os.Getenv("REAL_MQTT_URL"); live != "" {
-		lc := listenLive(live, envOr("REAL_MQTT_TOPIC", "smarthome/ac/#"), clock, httpc, endpoint)
+	var live *liveControl
+	if url := os.Getenv("REAL_MQTT_URL"); url != "" {
+		lc := listenLive(url, envOr("REAL_MQTT_TOPIC", "smarthome/ac/#"), clock, httpc, endpoint)
 		defer lc.Disconnect(500)
+		live = newLiveControl(lc, envOr("REAL_MQTT_COMMAND_NODE", iotbridge.LiveCommandNode), os.Getenv("REAL_MQTT_COMMANDS") == "1")
 	}
 	// commands: poll the API for the requested commands of the demo tenant, send each to its device on its command topic,
 	// then report it sent (command_sent). The API moves it requested → sent; the module's acknowledgement comes back on
 	// cmd/ack (above) and moves it on.
-	go pollCommands(ctx, client, httpc, *equipment, endpoint, internalToken(), clock, *tenant)
+	go pollCommands(ctx, client, httpc, *equipment, endpoint, internalToken(), clock, *tenant, live)
 	log.Printf("iot-bridge: %s → %s", *broker, endpoint)
 	<-ctx.Done()
 	log.Print("iot-bridge: stopping")
@@ -150,7 +154,7 @@ func subscribeDemo(client mqtt.Client, resolver *iotbridge.Resolver, clock *demo
 }
 
 // listenLive connects to the real sensor nodes' broker and records their readings on the live site (DEC-86, IR524).
-// It only subscribes: the client publishes nothing and leaves no will message. The connection is not waited for — the
+// The client leaves no will message, and its only publishes are liveControl's commands. The connection is not waited for — the
 // broker may be out of reach (another network) and the client keeps trying — and the subscription is made on every
 // connect. Retained messages are old readings and are skipped; one message per node and scenario minute is recorded.
 func listenLive(raw, topic string, clock *demoClock, httpc *http.Client, endpoint string) mqtt.Client {
@@ -208,7 +212,7 @@ func listenLive(raw, topic string, clock *demoClock, httpc *http.Client, endpoin
 		SetConnectionLostHandler(func(_ mqtt.Client, err error) { log.Printf("live broker %s: connection lost: %v", host, err) })
 	c := mqtt.NewClient(opts)
 	c.Connect() // not waited for: the client keeps trying while the broker is out of reach
-	log.Printf("iot-bridge: live sensors from %s (%s) → %d nodes of %s", host, topic, len(seed.LiveSite.Nodes), seed.LiveSite.CustomerName)
+	log.Printf("iot-bridge: live sensors from %s (%s) → %s of %s", host, topic, seed.LiveSite.UnitName, seed.LiveSite.CustomerName)
 	return c
 }
 
@@ -297,8 +301,9 @@ const clockMargin = 2 * time.Second
 // internalToken is the service token of the internal queries (INTERNAL_API_TOKEN, the same as the Core API's).
 func internalToken() string { return os.Getenv("INTERNAL_API_TOKEN") }
 
-// pollCommands sends the commands the API lists as requested, every two seconds, until the context ends.
-func pollCommands(ctx context.Context, mc mqtt.Client, httpc *http.Client, api, endpoint, token string, clock *demoClock, tenant string) {
+// pollCommands sends the commands the API lists as requested, every two seconds, until the context ends: the live
+// unit's to its command node (live, when the nodes' broker is configured), the others to the simulated modules.
+func pollCommands(ctx context.Context, mc mqtt.Client, httpc *http.Client, api, endpoint, token string, clock *demoClock, tenant string, live *liveControl) {
 	t := time.NewTicker(2 * time.Second)
 	defer t.Stop()
 	rep := &logging.Repeats{Logf: log.Printf} // while the API is away, once a minute instead of every poll (IR429)
@@ -314,7 +319,13 @@ func pollCommands(ctx context.Context, mc mqtt.Client, httpc *http.Client, api, 
 			}
 			rep.OK("requested commands")
 			for _, w := range waiting {
-				if err := sendCommand(mc, httpc, endpoint, tenant, w, clock.offset()); err != nil {
+				var err error
+				if live != nil && w.DeviceID == live.device {
+					err = live.send(httpc, endpoint, w, clock.offset())
+				} else {
+					err = sendCommand(mc, httpc, endpoint, tenant, w, clock.offset())
+				}
+				if err != nil {
 					log.Printf("command %s: %v", w.ID, err)
 				}
 			}
@@ -365,4 +376,57 @@ func sendCommand(mc mqtt.Client, httpc *http.Client, endpoint, tenant string, w 
 		return tok.Error()
 	}
 	return send(httpc, endpoint, iotbridge.SentTrigger(w, time.Now().Add(off)))
+}
+
+// liveControl carries the live unit's commands to the nodes' broker (DEC-89): the firmware command, on the command
+// node's topic only. Sending is on only with REAL_MQTT_COMMANDS=1; without it a command of the live unit fails.
+type liveControl struct {
+	client  mqtt.Client
+	node    string
+	enabled bool
+	device  uuid.UUID
+}
+
+func newLiveControl(c mqtt.Client, node string, enabled bool) *liveControl {
+	if _, ok := iotbridge.LiveNodes[node]; !ok {
+		log.Printf("live commands: %q is not a live node; sending is off", node)
+		enabled = false
+	}
+	if enabled {
+		log.Printf("live commands: power on/off of %s goes to %s", seed.LiveSite.UnitName, iotbridge.LiveCommandTopic(node))
+	} else {
+		log.Printf("live commands: off (REAL_MQTT_COMMANDS); commands of %s fail", seed.LiveSite.UnitName)
+	}
+	return &liveControl{client: c, node: node, enabled: enabled, device: seed.ID(seed.LiveSite.Device)}
+}
+
+// send carries one requested command of the live unit: the firmware command to the command node (QoS 1), then sent,
+// acknowledged and the settings it runs with. An action the firmware does not take, or any while sending is off,
+// fails. While the broker is out of reach the command stays requested, and the API ends it at its expiry.
+func (l *liveControl) send(httpc *http.Client, endpoint string, w iotbridge.Waiting, off time.Duration) error {
+	payload, state, ok, err := iotbridge.LiveCommand(w.Action)
+	if err != nil {
+		return err
+	}
+	at := time.Now().Add(off)
+	if !ok || !l.enabled {
+		return send(httpc, endpoint, iotbridge.LiveRefusedTrigger(w, at))
+	}
+	if !l.client.IsConnectionOpen() {
+		return errors.New("the nodes' broker is not connected")
+	}
+	tok := l.client.Publish(iotbridge.LiveCommandTopic(l.node), 1, false, payload)
+	if !tok.WaitTimeout(5 * time.Second) {
+		return errors.New("the nodes' broker did not take the command in 5 s")
+	}
+	if err := tok.Error(); err != nil {
+		return err
+	}
+	log.Printf("live command %s: %s → %s", w.ID, payload, iotbridge.LiveCommandTopic(l.node))
+	for _, tr := range iotbridge.LiveSentTriggers(w, at, at.Add(-clockMargin), state) {
+		if err := send(httpc, endpoint, tr); err != nil {
+			return err
+		}
+	}
+	return nil
 }

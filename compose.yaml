@@ -352,11 +352,14 @@ services:
       EQUIPMENT_API_URL: http://equipment-api:8080     # the control domain's internal queries (requested commands)
       INTERNAL_API_TOKEN: local-internal-token-change-me   # the same dev value as the Core API services (backend-env)
       # real sensor nodes (DEC-86): with REAL_MQTT_URL and its login in .env.local the bridge also subscribes to their
-      # broker (never publishes there) and records their readings on the live site; empty keeps it off
+      # broker and records their readings on the live site; empty keeps it off. REAL_MQTT_COMMANDS=1 lets it send the
+      # live unit's power on/off to the command node's topic, its only publish there (DEC-89)
       REAL_MQTT_URL: ${REAL_MQTT_URL:-}
       REAL_MQTT_TOPIC: ${REAL_MQTT_TOPIC:-smarthome/ac/#}
       REAL_MQTT_USER: ${REAL_MQTT_USER:-}
       REAL_MQTT_PASSWORD: ${REAL_MQTT_PASSWORD:-}
+      REAL_MQTT_COMMANDS: ${REAL_MQTT_COMMANDS:-}
+      REAL_MQTT_COMMAND_NODE: ${REAL_MQTT_COMMAND_NODE:-node_1}
     networks: [data, app]
     depends_on: { mosquitto: { condition: service_started }, gateway: { condition: service_healthy }, equipment-api: { condition: service_healthy } }
     profiles: [iot]

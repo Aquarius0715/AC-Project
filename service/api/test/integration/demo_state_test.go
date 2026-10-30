@@ -10,8 +10,9 @@ import (
 )
 
 // TestDemoStateReport: a device's state report (DemoTrigger state, sent with each heartbeat) becomes its unit's observed
-// state, observed at the report time, and moves the unit's last-seen time; a report without a state, with a mode the
-// air conditioner has no word for, or from after the scenario clock is refused.
+// state, observed at the report time, and moves the unit's last-seen time; a report with no settings moves only the
+// last-seen time (IR528); a report without a state, with a mode the air conditioner has no word for, or from after the
+// scenario clock is refused.
 func TestDemoStateReport(t *testing.T) {
 	s := serverWith(t, true)
 	unit, device := seed.ID("unit-limited"), seed.ID("device-limited")
@@ -37,6 +38,19 @@ func TestDemoStateReport(t *testing.T) {
 	ownerScan(t, `SELECT last_seen_at FROM assets.units WHERE id = $1`, []any{unit}, &last)
 	if !last.Equal(at) && last.Before(at) {
 		t.Errorf("last seen %v, want at least %v", last, at)
+	}
+	// a report with no settings (a module that reports none, IR528) is heard only: the observed state stays
+	later := clock.Add(-10 * time.Second)
+	if code, m := report(later, `,"state":{"power":null,"celsius":null,"mode":null,"fanLevel":null}`); code != 200 {
+		t.Fatalf("heard-only report: %d %v", code, m)
+	}
+	_, m = post(s, &hq, "units.get", `{"id":"`+unit.String()+`"}`)
+	if o := data(m)["observedState"].(map[string]any); o["power"] != false || o["celsius"] != 27.0 || o["mode"] != "dry" || o["observedAt"] != at.Format(time.RFC3339) {
+		t.Errorf("a report with no settings changed the observed state: %v", o)
+	}
+	ownerScan(t, `SELECT last_seen_at FROM assets.units WHERE id = $1`, []any{unit}, &last)
+	if last.Before(later) {
+		t.Errorf("last seen %v after a report at %v", last, later)
 	}
 	for name, c := range map[string]struct {
 		at    time.Time
