@@ -183,7 +183,9 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
               </div>}
               {showMode && <div><div className="mb-1 font-semibold">{t("Mode")}</div><Choice value={mode} disabled={disabled} onChange={(m) => { setMode(m); setEdited((e) => ({ ...e, mode: true })); }} options={modes.map((m) => ({ id: m, label: t(MODE_LABEL[m]) }))} /></div>}
               {showFan && <div><div className="mb-1 font-semibold">{t("Fan speed")}</div><Choice value={fan} disabled={disabled} onChange={(f) => { setFan(f); setEdited((e) => ({ ...e, fan: true })); }} options={fans.map((f) => ({ id: f, label: t(FAN_LABEL[f]) }))} /></div>}
+              {(tempRange || showMode || showFan) && ( // a model with the power only sends it at once: nothing to review (Figma 02o)
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t((d ? changes().length : 1) === 1 ? "{n} change:" : "{n} changes:", { n: d ? changes().length : 1 })}</b> {d ? changes().map(changeText).join(" · ") || t("No change yet") : t("Set temperature {from}°C → {to}°C", { from: 26, to: temp })}<br /><span className="text-muted-foreground">{t("Target: {name} only · you will confirm before sending", { name: unit.name })}</span></span><Btn variant="primary" disabled={disabled || waiting || (d !== null && changes().length === 0)} onClick={() => setConfirm(true)}>{waiting ? t("Waiting for device…") : t("Review & send")}</Btn></div>
+              )}
               {waiting && <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>}
               {offline && ( // Figma 02h: nothing is sent to an offline AC; a repair request is the way forward (IR243, IR315)
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs">

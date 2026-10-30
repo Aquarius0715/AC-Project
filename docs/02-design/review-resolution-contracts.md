@@ -7630,3 +7630,12 @@ After ON/OFF worked, the user asked to do what is possible without changing the 
    - The default rule `ac_offline` opens "AC offline" at 15 minutes without the nodes and resolves under 1 minute, so a stopped node or an unreachable broker is noticed and notified (the owner's in-app notification and e-mail, Mailpit in development).
 4. **What the user does.** Alerts › Alert policies in the customer app, for example "room temperature ≥ 30 °C" on Live · Daikin AC. In the demo evaluation a fact counts as sustained for the policy's duration, so one minute over the threshold alerts, and the cooldown keeps repeats apart. Policies alert only; nothing switches the air conditioner automatically.
 5. **Swagger.** The demo.trigger validation in the operation catalog names IR528 and IR529, and `make swagger` rebuilt the API description.
+
+## IR530 Figma's Unit Control shows the models that offer less, and the power-only page has no review bar — 2026-10-30
+
+A follow-up of IR524 and IR528. The client's unit page follows the model's capabilities, but Figma row 02 showed only a model that takes every setting (02e).
+
+1. **Figma, Client row 02.** Two state screens follow 02n, cloned from 02e:
+   - **02o (x 30240): a model with the remote power only.** An example is an IR controller: the remote control card keeps only the power switch ("Sent as its own command · the only setting this model takes"). The confirmed setting is what the last power-on set (24°C · Cool · —), the command history holds power commands only, and Device information says "Remote power only · no mode, fan or temperature setting".
+   - **02p (x 32400): a model without remote control (monitoring only).** The card says "No remote control on this model" and that the module only measures, with settings changed on the AC itself (IR524). The power state badges say Unknown, the confirmed setting is "—°C · — · —", the history says "No commands for this AC yet", and Device information says the modes and fan are none, with no temperature setting and remote control not supported.
+2. **Web.** On a model with no temperature, mode or fan setting, the unit page no longer shows the change summary and "Review & send" bar, as in 02o. The power is sent at once as its own command, so the bar only ever said "0 changes" with a disabled button.
