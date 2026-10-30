@@ -7588,3 +7588,11 @@ After signing in as the live customer's owner, the user expected a second device
    - The former "Live Sensor kit" model, used by no unit any more, was removed.
    - Both units then received a reading a minute again.
 4. **Tests.** `TestLiveSiteSeeds` checks each node's model (its sensors only, no control), unit, module serial, sensors and binding, and that the second start keeps a changed connection and adds nothing.
+
+## IR527 The client's unit page shows each room unit's readings, and a monitoring-only model's temperature advice — 2026-10-30
+
+Follow-ups of IR524, found on the live units.
+
+1. **Devices in this room (Figma 02e).** The list labelled each unit's setting as its room temperature ("24°C room"): the rows came from `units.list` through `unitRowFromApi`, which took `observedState.celsius`. The row now takes the room temperature, humidity and power (W) from the unit's latest valid readings (`UnitSummary.latestMeasurements`, IR213), as the overview already does. A stale, suspect or missing reading shows no value, and a unit without readings shows "—°C room" instead of its setting.
+2. **Air quality (Figma 05a).** The temperature card's advice, "Setpoint is on Unit Control", pointed a monitoring-only unit (control=false) to a remote control it does not have. `metricCard` takes the model's control: without it the advice is "Set on the AC itself", the same as the unit page's note (IR524).
+3. **Tests.** `client.test.ts` checks the readings, the setting not used as a reading, and no value for stale, suspect or missing readings. `air.test.ts` checks the advice of a model without control.

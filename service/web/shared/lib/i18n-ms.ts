@@ -271,6 +271,7 @@ export const ms: Record<string, string> = {
   "PM2.5": "PM2.5",
   "Temperature": "Suhu",
   "Setpoint is on Unit Control": "Suhu tetapan ada di Kawalan Unit",
+  "Set on the AC itself": "Ditetapkan pada AC itu sendiri",
   "Not enough data for advice": "Data tidak mencukupi untuk nasihat",
   "Not enough data for {metric} advice": "Data tidak mencukupi untuk nasihat {metric}",
   "Unavailable": "Tidak tersedia",

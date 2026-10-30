@@ -67,7 +67,7 @@ export default async function CustomerAirQualityPage({ searchParams }: PageProps
   const live: AirLive = {
     rooms: rooms.map((r) => ({ key: r.key, spaceId: r.spaceId, label: r.label, units: r.units })), roomKey: sel.room.key, unitId: d.id, unitName: d.displayName,
     path: sel.room.path, spaceId: sel.room.spaceId, connection: d.connection, updated: showClock(now.toISOString(), display), freshAir,
-    cards: (["co2", "pm25", "temperature", "humidity"] as const).map((m) => metricCard(m, latest(m), sensors.has(m), i)),
+    cards: (["co2", "pm25", "temperature", "humidity"] as const).map((m) => metricCard(m, latest(m), sensors.has(m), i, d.capabilities.control)),
     strip: ventStrip(guidance, latest("co2"), roomName, d.displayName, freshAir, i.t),
     clean: cleanNote(guidance, latest("pm25"), roomName, i.t),
     allergen: allergenView(series.allergen, i), metric, period,

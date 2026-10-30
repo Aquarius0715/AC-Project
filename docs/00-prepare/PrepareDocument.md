@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.396.0
+version: 0.397.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -285,6 +285,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.397.0: The client's unit page lists each room unit's readings instead of its setting, and a monitoring-only model's temperature advice says it is set on the AC itself (IR527). Phase 1A unchanged.
 0.396.0: Each real sensor node is a device of its own: node_1 (room sensor) and node_2 (power meter) are two monitoring-only units of Live Sensor Customer (DEC-88, IR526). Phase 1A unchanged.
 0.395.0: The real sensor nodes report to a client of their own, "Live Sensor Customer", whose owner sets the password from the set-up e-mail (DEC-87, IR525). Phase 1A unchanged.
 0.394.0: Real sensor nodes feed the development stack: the IoT bridge subscribes to their broker and records room temperature, humidity and power on a monitoring-only unit of customer-b, and the client's unit screen follows the model's capabilities (DEC-86, IR524). Phase 1A unchanged.

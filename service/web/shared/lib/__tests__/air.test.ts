@@ -17,6 +17,8 @@ describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
     expect(metricCard("co2", m("co2", 1180), true)).toMatchObject({ value: "1180", feed: { text: "Live" }, status: { text: "High", tone: "warn" }, sub: "Observed 9:12 am MYT", advice: "Ventilation recommended (≥ 1000 ppm)", warn: true });
     expect(metricCard("pm25", m("pm25", 12, { origin: "estimated" }), true)).toMatchObject({ status: { text: "Within guide" }, sub: "Observed 9:12 am MYT · estimated", advice: "No current advice", warn: false });
     expect(metricCard("temperature", m("temperature", 26), true)).toMatchObject({ status: { text: "Measured" }, advice: "Setpoint is on Unit Control" });
+    expect(metricCard("temperature", m("temperature", 26), true, undefined, false).advice).toBe("Set on the AC itself"); // a model without remote control
+    expect(metricCard("temperature", undefined, true, undefined, false).advice).toBe("Set on the AC itself");
   });
 
   it("never shows a stale, suspect, null or unsupported reading as a current value", () => {

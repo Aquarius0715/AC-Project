@@ -89,11 +89,13 @@ export type MetricCard = {
 const reasonText: Record<string, string> = { unit_mismatch: "unit mismatch", non_finite: "not a number", out_of_range: "out of range", invalid_time: "invalid time" };
 const originText: Record<string, string> = { estimated: "estimated", inspection: "inspection" };
 /** The card in the display language; reading times are the IR44 time of day in the user's display time zone (IR260). */
-export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, hasSensor: boolean, i: I18n = EN): MetricCard {
+export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, hasSensor: boolean, i: I18n = EN, control = true): MetricCard {
   const { t, display } = i;
   const { unit, guide } = metricInfo[metric];
   const label = t(metricInfo[metric].label);
-  const noAdvice = t(metric === "temperature" ? "Setpoint is on Unit Control" : metric === "humidity" ? "Not enough data for advice" : "Not enough data for {metric} advice", { metric: label });
+  // the temperature points to the unit's remote control; a model without one (monitoring only) is set on the AC itself
+  const setpoint = control ? "Setpoint is on Unit Control" : "Set on the AC itself";
+  const noAdvice = t(metric === "temperature" ? setpoint : metric === "humidity" ? "Not enough data for advice" : "Not enough data for {metric} advice", { metric: label });
   const unavailable = (sub: string, feed = { text: t("Unavailable"), tone: "unknown" as Tone, icon: "offline" as IconName }): MetricCard =>
     ({ metric, label, unit, value: null, feed, status: { text: t("Not measured"), tone: "muted", icon: "dot" }, sub, advice: noAdvice, warn: false });
   if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: "unsupported" });
@@ -111,7 +113,7 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
   const status = guide === null ? { text: t("Measured"), tone: "muted" as Tone, icon: "live" as IconName } : high ? { text: t("High"), tone: "warn" as Tone, icon: "warning" as IconName } : { text: t("Within guide"), tone: "ok" as Tone, icon: "check" as IconName };
   const advice = t(metric === "co2" ? (high ? "Ventilation recommended (≥ 1000 ppm)" : "No current advice")
     : metric === "pm25" ? (high ? "Filter cleaning recommended (≥ 35 µg/m³)" : "No current advice")
-    : metric === "temperature" ? "Setpoint is on Unit Control" : "No current advice");
+    : metric === "temperature" ? setpoint : "No current advice");
   return {
     metric, label, unit, value: airNumber(metric, m.value), feed: { text: t("Live"), tone: "ok", icon: "live" }, status,
     sub: `${t("Observed {time}", { time: at })}${m.origin === "measured" ? "" : ` · ${t(originText[m.origin] ?? m.origin)}`}`, advice, warn: high,
