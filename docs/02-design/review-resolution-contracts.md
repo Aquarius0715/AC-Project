@@ -4552,7 +4552,7 @@ The second coverage round (IR325) adds Core API tests where business rules had n
 4. **Open question — back-to-back schedules (for the product owner).**
    - **Today.** With the rule in item 2, a schedule that starts as another ends on the same unit does not run its start action: the unit keeps the earlier schedule's end state. IR54 names the order "an end before a start of the same minute", which suggests that the start was meant to take effect.
    - **Proposal.** When another schedule starts on the same unit in the same minute, its start wins: the earlier schedule's end is not sent for that unit. The run would be recorded as superseded, a new suppression reason.
-   - **Status.** Nothing changes until the product owner decides.
+   - **Status.** Decided on 2026-10-30: the start wins when it would run (IR504).
 5. **Open question — plan recurrence in UTC (for production).** D16 computes the monthly recurrence in UTC for Phase 1A, and the plan form says so.
    - **Effect.** A Kuala Lumpur plan due at 00:00 on the 1st is anchored to the UTC day, the 30th or 31st. Some of its later occurrences therefore fall on the last day of the previous month in Kuala Lumpur. The form shows the next occurrence before saving.
    - **Decision.** Computing the recurrence in the property's time zone is a production decision; nothing changes in 1A.
@@ -7270,4 +7270,23 @@ Found in the security loop (dependency advisories), and decided by the user on 2
 1. **Go.** `golang.org/x/net` 0.62.0, with `x/sync` 0.24.0, `x/sys` 0.49.0, `x/text` 0.43.0 and `x/tools` 0.51.0 that it needs. The `go.mod` toolchain, the three Dockerfiles (`GO_VERSION`), and the staticcheck runs of CI and `scripts/check.sh` use Go 1.26.10.
 2. **`make vuln`** runs govulncheck with `GOTOOLCHAIN` set to the module's `toolchain` line. It now reports no vulnerabilities.
 3. **Docs.** The container design, the backend Go design and the backend architecture name Go 1.26.10 and the scan's toolchain.
+
+## IR504 Back-to-back schedules: a start of the same minute wins over the end — 2026-10-30
+
+Decided by the user on 2026-10-30 (IR326 item 4, the recommended option). Until now, when one schedule ended and another started on the same unit in the same minute, the end was evaluated first. Its Command made the unit busy (D04), so the next schedule's start was excluded as `busy`, and the unit kept the end state.
+
+1. **Rule (D02, IR54).** Within a minute an end is still evaluated before a start. But when a schedule of the same unit starts in that minute and its start would run, the end yields:
+   - The end is not sent for that unit, and each enabled rule ending there records the run as `superseded`, a new `DecisionReason`.
+   - Only a start that would run supersedes the end. When the start would be excluded (owner, consent, restriction, capability, offline, busy), the end is sent as before, so the unit is not left in the earlier schedule's state.
+   - The same check answers `automations.simulate` and `automations.fire` for `schedule_end`, so a simulation of the end shows what the scheduler will do.
+2. **Contract.** `DecisionReason` gains `superseded` (`service-contracts.ts`, `contracts.gen.ts`).
+3. **Web.**
+   - HQ words it "superseded by a schedule starting in the same minute".
+   - The customer's rule card says "Last evaluation skipped … — another schedule starts at the same time and takes over".
+   - Both have Malay texts.
+4. **Docs.** The deterministic contracts and the customer's automation design (DD-C04) state the rule, and IR326 item 4 is marked decided.
+5. **Tests.**
+   - `TestScheduleBoundaries` checks the new rule. At 10:00 the first rule's end is `superseded` and the second rule's start creates the only Command.
+   - At 10:15 the next start would not run, because the model lost its temperature setpoint. So the end is sent, and the start is recorded as `invalid_capability`.
+   - Vitest checks both texts in English and Malay.
 

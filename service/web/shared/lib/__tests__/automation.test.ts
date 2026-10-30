@@ -69,5 +69,6 @@ describe("HQ automation policies in Malay (IR303)", () => {
     expect(policyGroups([policy({ unitIds: ["u1", "u2"] })], customerOf, t)[0].label).toBe("Merentas pelanggan");
     expect(autoErrors({ ...autoDraft(), name: "", unitIds: [] }, null, t)).toEqual({ name: "1–120 aksara", unitIds: "Pilih sekurang-kurangnya satu unit" });
     expect([reasonWord("restricted", t), decisionWord("selected", t), decisionWord("requested", t), disabledReasonWord("consent_revoked", t)]).toEqual(["disekat oleh sekatan aktif", "dipilih", "diminta", "persetujuan ditarik balik"]);
+    expect([reasonWord("superseded"), reasonWord("superseded", t)]).toEqual(["superseded by a schedule starting in the same minute", "digantikan oleh jadual yang bermula pada minit yang sama"]); // IR504
   });
 });

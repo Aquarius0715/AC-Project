@@ -415,10 +415,10 @@ func TestAutomationExtraConditions(t *testing.T) {
 	}
 }
 
-// IR54: rules whose unit was archived, or whose time zone cannot be loaded, are skipped without failing the tick; at a
-// minute where one schedule ends and another starts on the same unit, the end is evaluated first. Its Command then
-// makes the unit busy (D04), so D02 excludes the next schedule's start — the current rule, recorded here; whether the
-// start should win instead is an open product question (IR326). clock is Monday 2026-09-14 09:00 Kuala Lumpur.
+// IR54: rules whose unit was archived, or whose time zone cannot be loaded, are skipped without failing the tick. At a
+// minute where one schedule ends and another starts on the same unit, the start wins when it would run: the end is
+// not sent and is recorded as superseded (IR326 item 4, IR504). A start that would not run leaves the end, whose
+// Command then makes the unit busy (D04). clock is Monday 2026-09-14 09:00 Kuala Lumpur.
 func TestScheduleBoundaries(t *testing.T) {
 	s := server(t)
 	ctx := context.Background()
@@ -450,40 +450,62 @@ func TestScheduleBoundaries(t *testing.T) {
 		t.Fatalf("skipped rules sent commands: archived %d, unknown zone %d", a, b)
 	}
 
-	// 10:00: the first schedule ends and the second starts on the same unit — the end is evaluated first
+	type run struct{ rule, trigger, outcome, reason string }
+	runs := func(u string, rules ...string) []run {
+		t.Helper()
+		conn, err := pgx.Connect(ctx, testDB("postgres"))
+		if err != nil {
+			t.Skip(err)
+		}
+		defer conn.Close(ctx)
+		rows, err := conn.Query(ctx, `SELECT rule_id::text, trigger_ref, outcome, COALESCE(skip_reason, '') FROM control.automation_runs WHERE rule_id = ANY($1) AND unit_id = $2 ORDER BY seq`,
+			rules, u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (run, error) {
+			var x run
+			return x, r.Scan(&x.rule, &x.trigger, &x.outcome, &x.reason)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+
+	// 10:00: the first schedule ends and the second starts on the same unit — the start wins, the end is superseded
 	u := boundUnit(t, s, "online")
 	first := save(u, "09:30", "10:00", `{"kind":"set_temperature","celsius":25}`)
 	second := save(u, "10:00", "10:30", `{"kind":"set_temperature","celsius":22}`)
 	setWatermark(t, clock.Add(59*time.Minute))
 	tick(clock.Add(61 * time.Minute))
-	type run struct{ rule, trigger, outcome, reason string }
-	var got []run
-	conn, err := pgx.Connect(ctx, testDB("postgres"))
-	if err != nil {
-		t.Skip(err)
-	}
-	defer conn.Close(ctx)
-	rows, err := conn.Query(ctx, `SELECT rule_id::text, trigger_ref, outcome, COALESCE(skip_reason, '') FROM control.automation_runs WHERE rule_id = ANY($1) AND unit_id = $2 ORDER BY seq`,
-		[]string{first, second}, u)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for rows.Next() {
-		var r run
-		if err := rows.Scan(&r.rule, &r.trigger, &r.outcome, &r.reason); err != nil {
-			t.Fatal(err)
-		}
-		got = append(got, r)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		t.Fatal(err)
-	}
 	end, start := "schedule:schedule_end:2026-09-14T02:00:00Z", "schedule:schedule_start:2026-09-14T02:00:00Z"
-	if len(got) != 2 || got[0] != (run{first, end, "command_created", ""}) || got[1] != (run{second, start, "skipped", "busy"}) {
+	if got := runs(u, first, second); len(got) != 2 || got[0] != (run{first, end, "skipped", "superseded"}) || got[1] != (run{second, start, "command_created", ""}) {
 		t.Fatalf("same-minute end and start: %v", got)
 	}
-	if cs := automationCommands(t, u); len(cs) != 1 || cs[0] != `{"kind": "set_power", "power": false}` {
+	if cs := automationCommands(t, u); len(cs) != 1 || cs[0] != `{"kind": "set_temperature", "celsius": 22}` {
 		t.Fatalf("commands at 10:00: %v", cs)
+	}
+
+	// 10:15: the next start would not run (the model lost its temperature setpoint), so the end is sent as before
+	v := boundUnit(t, s, "online")
+	first = save(v, "09:30", "10:15", `{"kind":"set_temperature","celsius":25}`)
+	second = save(v, "10:15", "10:45", `{"kind":"set_temperature","celsius":22}`)
+	var model string
+	var capVersion int
+	ownerScan(t, `SELECT model_id::text, capability_version FROM assets.units WHERE id = $1`, []any{v}, &model, &capVersion)
+	fanOnly := uuid.NewString()
+	owner(t, `INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control, temperature)
+		VALUES ($1, 1, $2, 'Demo', $3, true, false, true, NULL)`, fanOnly, seed.ID("tenant-a"), "Fan only "+fanOnly)
+	owner(t, `UPDATE assets.units SET model_id = $2, capability_version = 1 WHERE id = $1`, v, fanOnly)
+	setWatermark(t, clock.Add(74*time.Minute))
+	tick(clock.Add(76 * time.Minute))
+	owner(t, `UPDATE assets.units SET model_id = $2, capability_version = $3 WHERE id = $1`, v, model, capVersion)
+	end, start = "schedule:schedule_end:2026-09-14T02:15:00Z", "schedule:schedule_start:2026-09-14T02:15:00Z"
+	if got := runs(v, first, second); len(got) != 2 || got[0] != (run{first, end, "command_created", ""}) || got[1] != (run{second, start, "skipped", "invalid_capability"}) {
+		t.Fatalf("an end before a start that would not run: %v", got)
+	}
+	if cs := automationCommands(t, v); len(cs) != 1 || cs[0] != `{"kind": "set_power", "power": false}` {
+		t.Fatalf("commands at 10:15: %v", cs)
 	}
 }

@@ -24,7 +24,8 @@ const maxScheduleWindow = 400 * 24 * time.Hour
 
 // FireSchedules is the IR54 internal path of schedule automations, a scheduler job of the equipment domain: the start /
 // end occurrences of the tenant's enabled schedule rules that fell in (watermark, now] are evaluated at their minute
-// with the D02 arbitration of the unit's rules, in time order (an end before a start of the same minute). A unit takes
+// with the D02 arbitration of the unit's rules, in time order (an end before a start of the same minute; the end yields
+// to a start of the same minute that would run, IR504). A unit takes
 // only the last minute the tick passed for it (IR473): a tick that passes several — a demo clock jump, or the scheduler
 // paused — passes over the earlier ones, whose Commands would still be pending when the later one is evaluated, so the
 // unit ends in the state real time would have left. The winner per unit gets its Command (source automation, actor =

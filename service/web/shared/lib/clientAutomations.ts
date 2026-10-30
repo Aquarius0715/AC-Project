@@ -379,6 +379,7 @@ const decisionText: Record<string, string> = {
   consent_revoked: "location consent is withdrawn", owner_forbidden: "your permission to control this AC has ended", restricted: "an active restriction blocks this action",
   disabled: "the automation is off", busy: "the AC is busy with another command", offline: "the AC is offline", invalid_capability: "the AC does not support the action",
   no_control_action: "only a notification would be sent", reconciliation_required: "the AC must be reconciled first",
+  superseded: "another schedule starts at the same time and takes over",
 };
 /** The event test: what automations.simulate decided for the AC at the current tick (all the AC's rules arbitrated). */
 export function eventTest(dec: ApiDecision | undefined, ruleId: string | null, names: Map<string, string>, unit: string, action: UnitAction, at: string, i: I18n = EN): TestRow {

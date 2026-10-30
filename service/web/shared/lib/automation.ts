@@ -136,6 +136,7 @@ export function reasonWord(reason: string, t: T = en): string {
     missing_data: t("missing data — skipped"), stale: t("stale data — skipped"), no_match: t("no rule matched"), consent_revoked: t("consent revoked"), owner_forbidden: t("owner not allowed"),
     restricted: t("blocked by an active restriction"), disabled: t("policy disabled"), busy: t("another operation is running"), offline: t("unit offline"),
     invalid_capability: t("not supported by the unit"), no_control_action: t("no control action"), reconciliation_required: t("reconciliation required"),
+    superseded: t("superseded by a schedule starting in the same minute"),
   };
   return words[reason] ?? reason;
 }

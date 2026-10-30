@@ -353,6 +353,7 @@ export const ms: Record<string, string> = {
   "the AC does not support the action": "AC tidak menyokong tindakan ini",
   "only a notification would be sent": "hanya pemberitahuan akan dihantar",
   "the AC must be reconciled first": "AC mesti disesuaikan dahulu",
+  "another schedule starts at the same time and takes over": "jadual lain bermula pada masa yang sama dan mengambil alih",
   " · next run {when}": " · larian seterusnya {when}",
   "Grant location consent first": "Berikan persetujuan lokasi dahulu",
   "The AC is no longer available": "AC tidak lagi tersedia",
@@ -5376,6 +5377,7 @@ export const ms: Record<string, string> = {
   "not supported by the unit": "tidak disokong oleh unit",
   "no control action": "tiada tindakan kawalan",
   "reconciliation required": "penyelarasan diperlukan",
+  "superseded by a schedule starting in the same minute": "digantikan oleh jadual yang bermula pada minit yang sama",
   "selected": "dipilih",
   "suppressed": "ditahan",
 

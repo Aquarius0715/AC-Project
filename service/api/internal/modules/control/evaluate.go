@@ -385,6 +385,27 @@ func (m Automations) decide(ctx context.Context, c *ops.Call, unit uuid.UUID, in
 	if err != nil {
 		return Decision{}, nil, nil, err
 	}
+	if in.Phase == "schedule_end" && slices.ContainsFunc(cands, func(x candidate) bool { return x.enabled }) {
+		// a schedule that starts on the unit in the same minute wins over the end (IR326 item 4, IR504): when its
+		// start would run, the end is not sent and each enabled end rule records superseded. A start that would not
+		// run (owner, restriction, capability, offline …) leaves the end as before.
+		start := *in
+		start.Phase = "schedule_start"
+		sd, _, _, err := m.decide(ctx, c, unit, &start, facts)
+		if err != nil {
+			return Decision{}, nil, nil, err
+		}
+		if sd.Decision == "selected" {
+			r := "superseded"
+			var skips []skip
+			for i := range cands {
+				if cands[i].enabled {
+					skips = append(skips, skip{cand: &cands[i], reason: r, recorded: true})
+				}
+			}
+			return Decision{UnitID: unit, Decision: "suppressed", Reason: &r}, nil, skips, nil
+		}
+	}
 	reasons := map[uuid.UUID]string{}
 	var skips []skip
 	for i := range cands {
