@@ -7444,3 +7444,9 @@ When HQ saved other changes, such as permissions, to a membership whose access h
 1. **Rule.** The new end is compared with the stored one at whole minutes. An end HQ did not move is no revoke. Moving it to now or earlier still revokes, as IR508 says.
 2. **Test.** `TestHQSaveOfAnEndedAccessIsNoRevoke` saves new permissions for a technician whose access ended at a minute's last second, with the form's whole minute. Nothing is revoked, the sign-in is not switched, and the contractor gives a new access end. With the exact comparison the test fails.
 
+## IR515 The screen catalog notes HQ's Required two-step — 2026-10-30
+
+Found in the loop's review of IR510 against the UIUX documents. The screen catalog's `SCR-X-settings-preferences` row described the Security section as the two-step verification dialog for every app. IR510 shows it in the HQ app as Required, with no dialog.
+
+1. **Docs.** The row's behaviour notes say that the HQ app shows two-step verification as Required, with no dialog (IR510, DEC-85). The other apps keep the FR-X08 demo dialog.
+
