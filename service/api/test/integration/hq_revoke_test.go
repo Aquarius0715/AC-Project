@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -181,5 +182,46 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 	ownerScan(t, `SELECT valid_until FROM identity.memberships WHERE id = $1`, []any{membership}, &end)
 	if end.After(clock) {
 		t.Errorf("the membership opened again: %v", end)
+	}
+}
+
+// TestHQSaveOfAnEndedAccessIsNoRevoke (IR514): HQ's form sends whole minutes. Saving other changes to a technician
+// whose access ended by itself (the contractor's end is the day's last second) is no revoke: the sign-in is not
+// touched and the contractor can still give a new access end.
+func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
+	fake := &fakeIdP{}
+	s := serverCfg(t, func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains })
+	email := "ended-" + uuid.NewString()[:8] + "@example.com"
+	code, m := write(s, &contrA, "partnerUsers.save", `{"email":"`+email+`","partnerRole":"technician","displayName":"Ended Tech","accessUntil":"`+clock.Add(30*24*time.Hour).Format(time.RFC3339)+`"}`, 0)
+	if code != 200 {
+		t.Fatalf("add: %d %v", code, m)
+	}
+	id, membership := data(m)["id"].(string), data(m)["membershipId"].(string)
+	if err := s.DrainEvents(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	ended := clock.Add(-time.Hour).Truncate(time.Minute).Add(59 * time.Second) // the last second of a minute, an hour ago
+	owner(t, `UPDATE identity.partner_users SET status = 'active' WHERE id = $1`, id)
+	owner(t, `UPDATE identity.memberships SET valid_from = $2, valid_until = $3 WHERE id = $1`, membership, clock.Add(-48*time.Hour), ended)
+	var user string
+	var v int
+	ownerScan(t, `SELECT user_id::text, version FROM identity.memberships WHERE id = $1`, []any{membership}, &user, &v)
+	code, m = write(s, &hq, "members.save", `{"id":"`+membership+`","userId":"`+user+`","organizationId":"`+seed.ID("org-contractor-a").String()+`","role":"technician","employment":"external",`+
+		`"permissions":["alert.read"],"scopes":[],"validFrom":"`+clock.Add(-48*time.Hour).Format(time.RFC3339)+`","validUntil":"`+ended.Truncate(time.Minute).Format(time.RFC3339)+`","reason":"fewer permissions"}`, v)
+	if code != 200 || data(m)["revokedAt"] != nil {
+		t.Fatalf("HQ's save of an ended access: %d %v", code, m)
+	}
+	if err := s.DrainEvents(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	fake.mu.Lock()
+	switched := slices.ContainsFunc(fake.switched, func(x string) bool { return strings.HasPrefix(x, "sub-"+email+"=") })
+	fake.mu.Unlock()
+	if switched {
+		t.Errorf("the sign-in was switched: %v", fake.switched)
+	}
+	ownerScan(t, `SELECT version FROM identity.partner_users WHERE id = $1`, []any{id}, &v)
+	if code, m := write(s, &contrA, "partnerUsers.save", `{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+clock.Add(20*24*time.Hour).Format(time.RFC3339)+`","reason":"back"}`, v); code != 200 {
+		t.Errorf("the contractor's new access end: %d %v", code, m)
 	}
 }

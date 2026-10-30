@@ -564,8 +564,11 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		// customer disabled — turns the sign-in off, and only HQ gives the access back. The first revoke keeps its time.
 		// A later end (or none) clears it and turns the sign-in on, unless the company or the customer disabled it.
 		revoked := x.RevokedAt
+		// HQ's form sends whole minutes: an end it did not move (an access that ended by itself, or the time the company
+		// disabled the account) is no revoke when HQ saves other changes (IR514)
+		moved := in.ValidUntil != nil && (x.ValidUntil == nil || !in.ValidUntil.Truncate(time.Minute).Equal(x.ValidUntil.Truncate(time.Minute)))
 		switch {
-		case in.ValidUntil != nil && !in.ValidUntil.After(c.Now) && (x.ValidUntil == nil || !in.ValidUntil.Equal(*x.ValidUntil)):
+		case moved && !in.ValidUntil.After(c.Now):
 			if revoked == nil {
 				revoked, revoke = &c.Now, true
 			}

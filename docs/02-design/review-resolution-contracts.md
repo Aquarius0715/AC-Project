@@ -7434,3 +7434,13 @@ Found by the end-to-end suite against the rebuilt development stack: on HQ the t
 2. **Docs.** The common design's `/settings/preferences` row says that the HQ app shows two-step verification as Required, with nothing to turn on or off.
 3. **Not code.** On the same run, two tests failed on the development data only: the partner users test expects tech-external-a to hold an assigned job, and the technician report test expects a job to start. That technician's assignments in the development database are all revoked (their jobs cancelled), so neither test finds one. CI's end-to-end run on fresh data passes them.
 
+## IR514 HQ's save of an access that ended by itself is no revoke — 2026-10-30
+
+Found in review of IR508 (authorization). `members.save` took an end at or before now that differs from the stored one as a revoke. HQ's form sends whole minutes, while stored ends carry seconds:
+- a contractor's access end is the day's last second (IR461);
+- a disabled account's end is the time it was disabled.
+When HQ saved other changes, such as permissions, to a membership whose access had ended by itself, the form sent the end back without its seconds, and the save counted as a revoke. The sign-in was turned off, and the contractor could no longer give a new access end (`errors.revoked_by_hq`).
+
+1. **Rule.** The new end is compared with the stored one at whole minutes. An end HQ did not move is no revoke. Moving it to now or earlier still revokes, as IR508 says.
+2. **Test.** `TestHQSaveOfAnEndedAccessIsNoRevoke` saves new permissions for a technician whose access ended at a minute's last second, with the form's whole minute. Nothing is revoked, the sign-in is not switched, and the contractor gives a new access end. With the exact comparison the test fails.
+

@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.383.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
+Version: 0.384.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.384.0 (2026-10-30): Saving other changes in Access & roles to a membership whose access ended by itself no longer counts as HQ's revoke; the end is compared at whole minutes (IR514).
 0.383.0 (2026-10-30): The end-to-end test of HQ's Preferences checks two-step verification as Required, and the common design says so (IR513).
 0.382.0 (2026-10-30): Figma's HQ Preferences (15-4) show two-step verification as Required like the app, the HQ setup dialog 15-7 and its flow card are removed, and UC-X08 lists no HQ screen (IR512).
 0.381.0 (2026-10-30): The identity service's sign-in account and session events moved to their own consumer, `identity-accounts`, which counts the events the old consumer applied as applied; a failing notification, audit or copy event no longer holds back turning an account off (IR511).
