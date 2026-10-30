@@ -7290,3 +7290,13 @@ Decided by the user on 2026-10-30 (IR326 item 4, the recommended option). Until 
    - At 10:15 the next start would not run, because the model lost its temperature setpoint. So the end is sent, and the start is recorded as `invalid_capability`.
    - Vitest checks both texts in English and Malay.
 
+## IR505 `scripts/check.sh` stops on a failing document validator — 2026-10-30
+
+Found by CI on be99605 (IR503): the design document validators failed with "Baseline drift" while `sh scripts/check.sh` had passed locally.
+- **Cause.** The docs step was one line, `validate_documents.py && check_review_regressions.py`. Under `set -e` a failure on the left of `&&` does not stop a POSIX shell, so the script printed "all checks passed".
+- **Also.** CI runs `validate_documents.py --tsc` (the contract's TypeScript check), and the script did not.
+- IR503 and IR504 changed design documents without rewriting the baseline (`validate_documents.py --write-baseline`), so both commits carried the drift.
+
+1. **Script.** The docs step runs each validator on its own line, so either failure stops the script. `validate_documents.py` gets `--tsc` with the web workspace's TypeScript (6.0.3, the version CI installs).
+2. **Baseline.** The specification manifest is rewritten after reviewing the diff of IR503–IR505 (the IR log, the version notes, and the container, backend, deterministic and customer designs).
+

@@ -19,5 +19,9 @@ step "generated files are current (catalog, routes, contracts, Swagger)"
 before=$(gen_state)
 (cd service/api && GOTOOLCHAIN=auto go run ./cmd/gen/ops >/dev/null && make swagger >/dev/null 2>&1) || { echo "generation failed: run make swagger in service/api"; exit 1; }
 [ "$before" = "$(gen_state)" ] || { echo "regenerated files changed: review and stage them"; git status --short -- $gen_paths; exit 1; }
-step "docs";         python3 docs/tools/validate_documents.py >/dev/null && python3 docs/tools/check_review_regressions.py >/dev/null
+# one command per line: under set -e a failure on the left of && does not stop the script (IR505); the contract check
+# uses the workspace's TypeScript, as CI's validator job does
+step "docs"
+python3 docs/tools/validate_documents.py --tsc service/web/node_modules/typescript/lib/tsc.js >/dev/null
+python3 docs/tools/check_review_regressions.py >/dev/null
 printf '\nall checks passed\n'

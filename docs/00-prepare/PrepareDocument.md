@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.374.0
+version: 0.375.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -275,6 +275,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.375.0: `scripts/check.sh` stops on a failing document validator and runs its TypeScript check; the baseline is rewritten (IR505). Phase 1A unchanged.
 0.374.0: Back-to-back schedules: a start of the same minute that would run wins over the end, recorded as superseded (IR504, IR326 item 4 decided). Phase 1A unchanged.
 0.373.0: Go 1.26.10 and golang.org/x/net 0.62.0; `make vuln` checks the standard library of the module's own Go (IR503). Phase 1A unchanged.
 0.372.0: Nine unused web exports are removed (IR502). Phase 1A unchanged.
