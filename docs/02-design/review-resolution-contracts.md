@@ -7493,3 +7493,13 @@ Found in the loop's review of the requirements against the decisions of 2026-10-
    - `TestScheduleBoundaries` covers both.
 2. **AT-P07-B ⑤ (new).** The company's time-change proposal on the job is counted and badged as internal, not customer-visible. `partnerHistory.test.ts` covers it.
 
+## IR520 AT-X08-B follows IR510 — 2026-10-30
+
+Found in the loop's review of the common requirements against IR510. AT-X08-B ① had hq-operator turn two-step verification on with the same dialog as every role. Since IR510 the HQ app shows it as Required, with no dialog, because HQ's sign-in always asks for the code.
+
+1. **AT-X08-B.**
+   - ① contractor-a turns it on with the same dialog as customers and technicians.
+   - ② The demo picker's sign-in is unchanged.
+   - ③ (new) hq-operator's Preferences show Required, with nothing to turn on or off, and the HQ app's sign-in asks for the password and the code every time.
+2. **Coverage.** The end-to-end test "HQ's two-step verification is required" (IR513) checks ③ on HQ, and the turn-on-and-off test the other apps.
+

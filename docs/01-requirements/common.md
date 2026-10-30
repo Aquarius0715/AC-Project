@@ -175,7 +175,7 @@ The table below governs Given/When/Then for AT-X01–X08 (IR101). Unstated setup
 | AT-X07-B | customer-a calls commands.create → signOut → hq-operator calls audit.list | Audit actorId, actorRoleAtTime=client, correlationId, and result=success remain unchanged after sign-out |
 | AT-X08-N | customer-a Preferences › Security › Turn on → enter any 6 digits | twoFactor.enable returns enabled=true and 8 recovery codes shown once; status “On · 8 recovery codes left” |
 | AT-X08-E | ① Enter 5 digits ② Turn off without a code | ① VALIDATION, stays Off ② VALIDATION, stays On |
-| AT-X08-B | ① hq-operator turns it on ② Sign out and sign in on the demo picker | ① Same dialog for every role ② Demo picker still signs in (real sign-in out of scope); status remains On |
+| AT-X08-B | ① contractor-a turns it on ② Sign out and sign in on the demo picker ③ hq-operator opens Preferences › Security | ① Same dialog for customers, contractors and technicians ② Demo picker still signs in (real sign-in out of scope); status remains On ③ Required, with nothing to turn on or off: the HQ app's sign-in asks for the password and the one-time code every time (DEC-85, IR510) |
 
 See [frontend input/output contracts](../02-design/implementation-contracts.md) for detailed interactions. Assess non-functional requirements with numerical targets and the measured environment; adding a library alone does not meet them.
 
