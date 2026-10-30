@@ -757,28 +757,29 @@ type listFilters struct {
 
 // Summary is JobSummary of service-contracts.ts.
 type Summary struct {
-	Projection                string     `json:"projection"`
-	ID                        uuid.UUID  `json:"id"`
-	Version                   int        `json:"version"`
-	CreatedAt                 time.Time  `json:"createdAt"`
-	UnitID                    uuid.UUID  `json:"unitId"`
-	Type                      string     `json:"type"`
-	Status                    string     `json:"status"`
-	DueAt                     time.Time  `json:"dueAt"`
-	RequestedSlot             Slot       `json:"requestedSlot"`
-	ScheduledSlot             *Slot      `json:"scheduledSlot"`
-	AssignmentID              *uuid.UUID `json:"assignmentId"`
-	Origin                    string     `json:"origin"`
-	PreferredSlots            []Slot     `json:"preferredSlots"`
-	Severity                  string     `json:"severity"`
-	IsDemo                    bool       `json:"isDemo"`
-	DisplayStatus             string     `json:"displayStatus"`
-	AssignmentAcknowledgement *string    `json:"assignmentAcknowledgement"`
-	TechnicianMembershipID    *uuid.UUID `json:"technicianMembershipId"` // the active Assignment's technician (IR225)
-	AccessValidFrom           *time.Time `json:"accessValidFrom"`        // the accepted Offer's access window (IR227)
-	AccessValidUntil          *time.Time `json:"accessValidUntil"`
-	FollowUpOfJobID           *uuid.UUID `json:"followUpOfJobId"` // a client's follow-up and its classification (IR114, IR338)
-	FollowUpClass             *string    `json:"followUpClass"`
+	Projection                string       `json:"projection"`
+	ID                        uuid.UUID    `json:"id"`
+	Version                   int          `json:"version"`
+	CreatedAt                 time.Time    `json:"createdAt"`
+	UnitID                    uuid.UUID    `json:"unitId"`
+	Type                      string       `json:"type"`
+	Status                    string       `json:"status"`
+	DueAt                     time.Time    `json:"dueAt"`
+	RequestedSlot             Slot         `json:"requestedSlot"`
+	ScheduledSlot             *Slot        `json:"scheduledSlot"`
+	AssignmentID              *uuid.UUID   `json:"assignmentId"`
+	Origin                    string       `json:"origin"`
+	PreferredSlots            []Slot       `json:"preferredSlots"`
+	Severity                  string       `json:"severity"`
+	IsDemo                    bool         `json:"isDemo"`
+	DisplayStatus             string       `json:"displayStatus"`
+	AssignmentAcknowledgement *string      `json:"assignmentAcknowledgement"`
+	TechnicianMembershipID    *uuid.UUID   `json:"technicianMembershipId"` // the active Assignment's technician (IR225)
+	AccessValidFrom           *time.Time   `json:"accessValidFrom"`        // the accepted Offer's access window (IR227)
+	AccessValidUntil          *time.Time   `json:"accessValidUntil"`
+	FollowUpOfJobID           *uuid.UUID   `json:"followUpOfJobId"` // a client's follow-up and its classification (IR114, IR338)
+	FollowUpClass             *string      `json:"followUpClass"`
+	EventSummary              EventSummary `json:"eventSummary"` // jobs.list fills it for the page (IR506)
 }
 
 var jobStatuses = []string{"requested", "offered", "accepted", "assigned", "in_progress", "on_hold", "submitted", "rework_requested", "completed", "cancelled"}
@@ -854,9 +855,24 @@ func (m Jobs) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.P
 	}
 	sortItems(merged, sortField, desc)
 	total := len(merged)
+	page := merged[min(w.Offset, total):min(w.Offset+w.Limit, total)]
+	var jobs []uuid.UUID
+	for _, x := range page {
+		if s, ok := x.item.(Summary); ok {
+			jobs = append(jobs, s.ID)
+		}
+	}
+	sums, err := eventSummaries(ctx, c, jobs) // the page's event counts in one query (IR506)
+	if err != nil {
+		return paging.Page[any]{}, err
+	}
 	items := []any{}
-	for i := w.Offset; i < total && i < w.Offset+w.Limit; i++ {
-		items = append(items, merged[i].item)
+	for _, x := range page {
+		if s, ok := x.item.(Summary); ok {
+			s.EventSummary = sums[s.ID]
+			x.item = s
+		}
+		items = append(items, x.item)
 	}
 	return paging.Page[any]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}, nil
 }
@@ -1105,9 +1121,61 @@ type Event struct {
 // on it (the change sent to the client shows as the client's proposal). Constants, so the query lists them inline.
 var clientHiddenActions = []string{"job.costs_saved", "job.warranty_claim_filed", "partner_proposal.sent", "partner_proposal.withdrawn", "partner_proposal.kept"}
 
-// clientEventFilter is the condition on job_events e (joined to job_notes n) of what a client may see: no internal note
-// (IR42) and no hidden action.
-var clientEventFilter = " AND (n.id IS NULL OR n.visibility = 'customer') AND e.action NOT IN ('" + strings.Join(clientHiddenActions, "','") + "')"
+// clientEventCond is the condition on job_events e (joined to job_notes n) of what a client may see: no internal note
+// (IR42) and no hidden action. clientEventFilter appends it to a WHERE clause.
+var clientEventCond = "(n.id IS NULL OR n.visibility = 'customer') AND e.action NOT IN ('" + strings.Join(clientHiddenActions, "','") + "')"
+
+var clientEventFilter = " AND " + clientEventCond
+
+// EventSummary is JobEventSummary of service-contracts.ts (IR506): the job's events the caller reads with jobs.events,
+// counted for a list. customerVisible counts those the client reads (IR42, IR442), notes those with a note.
+type EventSummary struct {
+	Count           int          `json:"count"`
+	CustomerVisible int          `json:"customerVisible"`
+	Notes           int          `json:"notes"`
+	Latest          *LatestEvent `json:"latest"`
+}
+
+// LatestEvent is the newest event of an EventSummary (occurredAt desc, then id desc).
+type LatestEvent struct {
+	Action     string    `json:"action"`
+	OccurredAt time.Time `json:"occurredAt"`
+}
+
+// eventSummaries counts the events of the jobs in one query, with the caller's jobs.events visibility: a client's
+// lists leave out internal notes and hidden actions; the other roles read the summaries of their summary projections,
+// whose jobs.events lists every event (IR124 item 5).
+func eventSummaries(ctx context.Context, c *ops.Call, jobs []uuid.UUID) (map[uuid.UUID]EventSummary, error) {
+	out := map[uuid.UUID]EventSummary{}
+	if len(jobs) == 0 {
+		return out, nil
+	}
+	visible := "true"
+	if c.Principal.Role == "client" {
+		visible = clientEventCond
+	}
+	rows, err := c.Tx.Query(ctx, `SELECT e.job_id, count(*) FILTER (WHERE `+visible+`), count(*) FILTER (WHERE `+clientEventCond+`), count(n.id) FILTER (WHERE `+visible+`),
+		(array_agg(e.action ORDER BY e.occurred_at DESC, e.id DESC) FILTER (WHERE `+visible+`))[1], max(e.occurred_at) FILTER (WHERE `+visible+`)
+		FROM maintenance.job_events e LEFT JOIN maintenance.job_notes n ON n.id = e.note_id WHERE e.job_id = ANY($1) GROUP BY e.job_id`, jobs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var job uuid.UUID
+		var s EventSummary
+		var action *string
+		var at *time.Time
+		if err := rows.Scan(&job, &s.Count, &s.CustomerVisible, &s.Notes, &action, &at); err != nil {
+			return nil, err
+		}
+		if action != nil && at != nil {
+			s.Latest = &LatestEvent{Action: *action, OccurredAt: *at}
+		}
+		out[job] = s
+	}
+	return out, rows.Err()
+}
 
 // @Summary		jobs.events (read)
 // @ID				jobs.events
@@ -1142,7 +1210,7 @@ func (m Jobs) events(ctx context.Context, c *ops.Call, in *EventsInput) (paging.
 		if err != nil {
 			return paging.Page[Event]{}, err
 		}
-		ownOnly = kind != "detail" // offer / history: only the caller's own decision events (IR124 item 5)
+		ownOnly = kind != "detail" // offer / history: only the decision events of the caller's side (IR124 item 5)
 	} else if _, err := m.detail(ctx, c, in.JobID); err != nil {
 		return paging.Page[Event]{}, err
 	}
@@ -1176,9 +1244,15 @@ func (m Jobs) events(ctx context.Context, c *ops.Call, in *EventsInput) (paging.
 	if c.Principal.Role == "client" {
 		where += clientEventFilter
 	}
-	if ownOnly {
-		args = append(args, c.Principal.UserID)
-		where += fmt.Sprintf(" AND e.actor_user_id = $%d AND e.action IN ('offer.accepted','offer.declined')", len(args))
+	if ownOnly { // the decision events of the caller's side: a contractor's organization, as its history snapshot stores them (IR506)
+		where += " AND e.action IN ('offer.accepted','offer.declined')"
+		if c.Principal.Role == "contractor" {
+			args = append(args, c.Principal.OrgID)
+			where += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM maintenance.ref_memberships mb WHERE mb.user_id = e.actor_user_id AND mb.organization_id = $%d)", len(args))
+		} else {
+			args = append(args, c.Principal.UserID)
+			where += fmt.Sprintf(" AND e.actor_user_id = $%d", len(args))
+		}
 	}
 	if f.From != nil {
 		args = append(args, *f.From)

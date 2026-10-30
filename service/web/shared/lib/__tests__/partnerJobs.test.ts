@@ -57,7 +57,7 @@ describe("partner job list", () => {
   });
 
   it("keeps only the history after the delegation", () => {
-    expect(jobRow({ projection: "history", jobId: "33333333-cccc", type: "reactive", status: "completed", completedAt: "2026-09-10T06:00:00Z" }, NOW, units, names)).toEqual({
+    expect(jobRow({ projection: "history", jobId: "33333333-cccc", type: "reactive", status: "completed", completedAt: "2026-09-10T06:00:00Z", ownDecisionEvents: [] }, NOW, units, names)).toEqual({
       id: "33333333-cccc", title: "33333333 · Repair", origin: null, href: "/partner/history?jobId=33333333-cccc", line: "Completed · delegation ended, history only",
       tech: { name: "—", sub: "history only" }, slot: { main: "Completed 10 Sept 2026, 2:00 pm MYT", sub: "access closed" }, badge: { text: "Completed", tone: "ok" },
     });
@@ -74,7 +74,7 @@ describe("partner job list", () => {
       line: "Ditugaskan tech-external-a · 21 Sep, 11:00 PG – 1:00 PTG GMT+9", tech: { sub: "tidak dapat hadir — tugaskan semula", subTone: "warn" },
       slot: { sub: "Tarikh akhir 25 Sep 2026, 7:00 PTG GMT+9" }, badge: { text: "Ditugaskan" },
     });
-    expect(jobRow({ projection: "history", jobId: "33333333-cccc", type: "reactive", status: "completed", completedAt: "2026-09-10T06:00:00Z" }, NOW, units, names, MS_TOKYO))
+    expect(jobRow({ projection: "history", jobId: "33333333-cccc", type: "reactive", status: "completed", completedAt: "2026-09-10T06:00:00Z", ownDecisionEvents: [] }, NOW, units, names, MS_TOKYO))
       .toMatchObject({ title: "33333333 · Pembaikan", line: "Selesai · delegasi tamat, sejarah sahaja", slot: { main: "Selesai 10 Sep 2026, 3:00 PTG GMT+9", sub: "akses ditutup" } });
     expect(jobRow(summary("accepted"), NOW, units, names, MS_TOKYO).tech).toEqual({ name: "Belum ditugaskan", sub: "tugaskan sebelum delegasi tamat", tone: "warn" }); // no subTone: only the name is coloured
   });

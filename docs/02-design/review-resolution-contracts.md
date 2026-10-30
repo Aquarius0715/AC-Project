@@ -7300,3 +7300,24 @@ Found by CI on be99605 (IR503): the design document validators failed with "Base
 1. **Script.** The docs step runs each validator on its own line, so either failure stops the script. `validate_documents.py` gets `--tsc` with the web workspace's TypeScript (6.0.3, the version CI installs).
 2. **Baseline.** The specification manifest is rewritten after reviewing the diff of IR503–IR505 (the IR log, the version notes, and the container, backend, deterministic and customer designs).
 
+## IR506 The contractor's job history reads its counts with the list — 2026-10-30
+
+Decided by the user on 2026-10-30 (the recommended option a). The partner's job history read `jobs.list`, then called `jobs.events` once per job for the event, customer-visible and note counts and the latest event. That was up to 100 calls per page, and another round for a job outside the period. Review also found:
+- **Customer-visible count.** The web counted every event without an internal note as customer-visible, and the timeline badged them "customer". It missed the actions a client never reads (IR442: costs, warranty claims, the contractor's time-change proposals).
+- **Decision events.** For the offer and history projections, `jobs.events` returned the caller user's own decisions. The history snapshot stores the decisions of any member of the contractor's organization (IR124 item 1), so the list and the timeline could disagree when a colleague accepted.
+- **Event cap.** Counts stopped at 100 events per job, and the snapshots' decision events were read one query per snapshot.
+
+1. **Contract.** `JobSummary.eventSummary: JobEventSummary` `{count, customerVisible, notes, latest: {action, occurredAt} | null}` (`service-contracts.ts`, `contracts.gen.ts`).
+   - It counts the events the caller reads with `jobs.events`: a client's lists leave out internal notes and the hidden actions, and the other roles read every event of their summaries.
+   - `customerVisible` counts what the client reads. `latest` is the newest (`occurredAt` desc, then `id` desc).
+   - `jobs.list` fills it for the page only, in one grouped query. No operation is added (210 operations).
+2. **Decision events.** Under the offer and history projections, a contractor's `jobs.events` returns the `offer.accepted` / `offer.declined` events of any member of its organization, as the snapshot stores them. A technician's stay its own. The snapshots' decision events are read in one query.
+3. **Web (DD-P07).** The history rows come from `jobs.list` alone: a summary's `eventSummary`, and a history's `ownDecisionEvents`.
+   - Only the open job reads `jobs.events`, its newest 100, newest first.
+   - `customerVisible` leaves out the hidden actions (`CLIENT_HIDDEN_ACTIONS`), so the counts and the timeline badges match what the customer reads.
+   - A Vitest check keeps that list equal to the Core API's `clientHiddenActions`.
+4. **Docs.** The contractor design (DD-P07) and the implementation contracts' JobSummary row.
+5. **Tests.**
+   - Go: `TestContractorAndTechnicianProjections` adds an internal note by HQ, then checks the contractor's `eventSummary` against what the contractor and the customer read with `jobs.events`, and the customer's own summary.
+   - Vitest: `partnerHistory.test.ts` builds the rows from summaries and snapshots, counts a hidden action as internal, and compares the hidden actions with the Go list.
+

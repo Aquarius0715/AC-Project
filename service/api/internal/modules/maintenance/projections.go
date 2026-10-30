@@ -228,18 +228,28 @@ func (m Jobs) histories(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]His
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	for i := range out {
-		out[i].OwnDecisionEvents = []Event{}
-		if len(evIDs[i]) == 0 {
-			continue
-		}
-		evs, err := m.eventRows(ctx, c, "e.id = ANY($1)", []any{evIDs[i]}, "e.occurred_at ASC, e.id ASC", 1000, 0)
+	// the decision events of every snapshot in one query (IR506), then each snapshot's own in time order
+	var all []uuid.UUID
+	for _, ids := range evIDs {
+		all = append(all, ids...)
+	}
+	byID := map[uuid.UUID]Event{}
+	if len(all) > 0 {
+		evs, err := m.eventRows(ctx, c, "e.id = ANY($1)", []any{all}, "e.occurred_at ASC, e.id ASC", len(all), 0)
 		if err != nil {
 			return nil, err
 		}
 		for _, e := range evs {
 			e.Note, e.ReportRef = nil, nil
-			out[i].OwnDecisionEvents = append(out[i].OwnDecisionEvents, e)
+			byID[e.ID] = e
+		}
+	}
+	for i := range out {
+		out[i].OwnDecisionEvents = []Event{}
+		for _, id := range evIDs[i] { // stored in time order (FreezeEnded)
+			if e, ok := byID[id]; ok {
+				out[i].OwnDecisionEvents = append(out[i].OwnDecisionEvents, e)
+			}
 		}
 	}
 	return out, nil

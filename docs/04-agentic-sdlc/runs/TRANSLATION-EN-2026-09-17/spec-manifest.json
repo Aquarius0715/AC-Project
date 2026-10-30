@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "3b244f414fa044dd46b72a1e78fcab0111918642e148cc2ecbc9518155f773dd",
+  "spec_baseline_id": "2752f6afb38d44ce638487409b2f725e35a32e3a0edc166d867fa50fc6509e80",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "c8829c717049deb83487f6f90f97b02fe3724e550880358d170502f71665f79d"
+      "sha256": "c3649b9a56a604df2c5d98decabb44cdb56aefb25360485bf3439e109a901864"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -126,7 +126,7 @@
     },
     {
       "path": "02-design/contractor.md",
-      "sha256": "0d3b5765cc3841105c4404392bd6e077e1497ade685e3044bd08c0ea60762947"
+      "sha256": "6aa414345b31ecc4f0a6bc8849513add1121e9e0ac20e35d79ecf13ee99c4cdf"
     },
     {
       "path": "02-design/database-design.md",
@@ -138,7 +138,7 @@
     },
     {
       "path": "02-design/implementation-contracts.md",
-      "sha256": "75c29e7df7339dcc65111e39fba7295e73c40b47370a84ef8003562bf1d54a31"
+      "sha256": "20a6572d2b4f90e33e40e98343f4137c2ce7003e2a9feb790097458c2c99e142"
     },
     {
       "path": "02-design/network-architecture.md",
@@ -158,11 +158,11 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "e4175b5386105ccfec30cbd58cc8727a92436af1593dfdf6622aaf619b8b6444"
+      "sha256": "6d65fc113447419b729e164450e43371e74c2c237e1e62e75ee678389a064bb4"
     },
     {
       "path": "02-design/service-contracts.ts",
-      "sha256": "9d41b4583507c2102d9342f8aa0ed5dcd1f80f0949492243f17a2d165641b00f"
+      "sha256": "83ddf8a80319b22d8bb925ae6b3f98cdc622b133acad9d2026c352d6df13798a"
     },
     {
       "path": "02-design/strict-review-contracts.md",
@@ -286,7 +286,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "9f95a71b8178767e5f66c85866c37399c36bf0180eeebcae9d11884254a3446c"
+      "sha256": "67a5c9fd34c3b05f49d1b517c9c4c4df370473e5525ebdab9eaf3150cb0ad8da"
     },
     {
       "path": "tools/check_review_regressions.py",

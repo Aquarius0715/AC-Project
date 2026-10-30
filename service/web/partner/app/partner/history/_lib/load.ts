@@ -1,8 +1,9 @@
 // The reads of the contractor's job history (FR-P07, FR-P08, DD-P07, SCR-P07) through the DAL: jobs.list of the jobs
-// after acceptance (the period filter reads the requested slot, histories their completion), jobs.events of each
-// (the counts, the latest event and the timeline — only the company's own decisions after the delegation),
-// units.list and members.list for the names, and for the open job notifications.recipients of the job (who may get
-// a preview: HQ, the assigned technician, the customer contact). A job outside the period is looked up without it.
+// after acceptance (the period filter reads the requested slot, histories their completion) with each job's event
+// counts and latest event (eventSummary; a history's own decision events, IR506), units.list and members.list for the
+// names, and for the open job its timeline (jobs.events, newest first — only the company's own decisions after the
+// delegation) and notifications.recipients (who may get a preview: HQ, the assigned technician, the customer contact).
+// A job outside the period is looked up without it.
 // Texts in the user's display language; every time is formatted here, in their display time zone (IR278).
 import "server-only";
 import { coreAll, coreDisplay, coreIdentity, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
@@ -16,8 +17,6 @@ const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => 
   if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
   throw e;
 });
-const jobId = (j: ApiPartnerJob) => (j.projection === "summary" ? j.id : j.jobId);
-
 export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: string; period?: string }) {
   const [now, display, who] = await Promise.all([coreNow(), coreDisplay(), coreIdentity()]);
   const nowMs = now.getTime();
@@ -31,28 +30,30 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
     const filters = { statuses: [...HISTORY_STATUSES], ...(withPeriod ? { from: new Date(nowMs - 90 * 86_400_000).toISOString() } : {}) };
     // the latest 100 jobs: IDs are UUIDv7, so the newest first by ID; the page then sorts them as asked (IR494)
     const list = await coreOp<Page<ApiPartnerJob>>("jobs.list", { filters, sort: { field: "id", direction: "desc" }, limit: 100 });
-    const jobs = list.items.filter((j) => j.projection !== "offer");
-    const events = await Promise.all(jobs.map((j) => optional(coreOp<Page<ApiEvent>>("jobs.events", { jobId: jobId(j), query: { limit: 100 } }).then((r) => r.items), [] as ApiEvent[])));
-    const rows = jobs.map((j, k) => ({ row: historyRow(j, events[k], nowMs, unitNames, names, i), events: events[k] })).filter((x): x is { row: HistoryRow; events: ApiEvent[] } => !!x.row);
+    const rows = list.items.map((j) => historyRow(j, nowMs, unitNames, names, i)).filter((r): r is HistoryRow => !!r); // offers drop out
     return { rows, total: list.total };
   };
   const listed = await collect(period === "90d");
-  const counts = tabCounts(listed.rows.map((r) => r.row));
+  const counts = tabCounts(listed.rows);
   const base = {
     now: now.toISOString(), tab, sort, period, company: who.organizationName || t("your company"),
     sorts: SORTS.map((s) => ({ id: s.id, text: t("Sort: {sort}", { sort: t(s.text) }) })), periods: PERIODS.map((p) => ({ id: p.id, text: t("Period: {period}", { period: t(p.label) }) })),
-    tabs: TABS.map((x) => ({ id: x.id, label: t(x.label), count: counts[x.id] })), rows: visibleRows(listed.rows.map((r) => r.row), tab, sort), total: listed.total,
-    options: listed.rows.map((r) => ({ id: r.row.id, label: `${r.row.short} · ${r.row.title}` })),
+    tabs: TABS.map((x) => ({ id: x.id, label: t(x.label), count: counts[x.id] })), rows: visibleRows(listed.rows, tab, sort), total: listed.total,
+    options: listed.rows.map((r) => ({ id: r.id, label: `${r.short} · ${r.title}` })),
   };
   if (!sp.jobId) return { ...base, detail: null };
-  let hit = listed.rows.find((r) => r.row.id === sp.jobId);
-  if (!hit && period === "90d") hit = (await collect(false)).rows.find((r) => r.row.id === sp.jobId); // older than the period
+  let hit = listed.rows.find((r) => r.id === sp.jobId);
+  if (!hit && period === "90d") hit = (await collect(false)).rows.find((r) => r.id === sp.jobId); // older than the period
   if (!hit) return { ...base, detail: { missing: true as const, id: sp.jobId } };
-  const users = byUser(members, (await corePrincipal()).userId, t);
-  const items = [...hit.events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id)).map((e) => eventItem(e, users, i));
-  const mode = noteMode(hit.row, t);
-  const recipients = mode.kind === "closed" ? [] : await optional(coreOp<Page<ApiRecipient>>("notifications.recipients", { target: { kind: "job", id: hit.row.id }, templateKey: "schedule_change", channel: "inApp", query: { limit: 100 } }).then((r) => r.items.filter((x) => x.role !== "contractor")), []);
-  return { ...base, detail: { missing: false as const, row: hit.row, items, mode, recipients } };
+  const [principal, events] = await Promise.all([ // the job's newest 100 events, newest first
+    corePrincipal(),
+    optional(coreOp<Page<ApiEvent>>("jobs.events", { jobId: hit.id, query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } }).then((r) => r.items), [] as ApiEvent[]),
+  ]);
+  const users = byUser(members, principal.userId, t);
+  const items = [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id)).map((e) => eventItem(e, users, i));
+  const mode = noteMode(hit, t);
+  const recipients = mode.kind === "closed" ? [] : await optional(coreOp<Page<ApiRecipient>>("notifications.recipients", { target: { kind: "job", id: hit.id }, templateKey: "schedule_change", channel: "inApp", query: { limit: 100 } }).then((r) => r.items.filter((x) => x.role !== "contractor")), []);
+  return { ...base, detail: { missing: false as const, row: hit, items, mode, recipients } };
 }
 
 export type HistoryLive = Awaited<ReturnType<typeof loadHistory>>;

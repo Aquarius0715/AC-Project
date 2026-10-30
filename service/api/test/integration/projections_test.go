@@ -124,6 +124,22 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	if _, m := post(s, &contrA, "jobs.events", `{"jobId":"`+job+`","query":{}}`); len(items(m)) < 3 {
 		t.Fatalf("all events in window: %v", m)
 	}
+	// the list counts the events the caller reads and those the customer reads, with the newest (IR506); HQ's
+	// internal note is the contractor's to read, not the customer's
+	if code, _ := write(s, &hq, "jobs.addNote", `{"jobId":"`+job+`","message":"Check parts stock","visibility":"internal"}`, int(listJob(s, &contrA, job)["version"].(float64))); code != 200 {
+		t.Fatalf("internal note: %d", code)
+	}
+	_, all := post(s, &contrA, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
+	_, seen := post(s, &customerA, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
+	es := listJob(s, &contrA, job)["eventSummary"].(map[string]any)
+	newest := items(all)[len(items(all))-1]
+	if es["count"] != float64(len(items(all))) || es["customerVisible"] != float64(len(items(seen))) || es["customerVisible"] == es["count"] || es["notes"] != float64(1) ||
+		es["latest"].(map[string]any)["action"] != newest["action"] || es["latest"].(map[string]any)["occurredAt"] != newest["occurredAt"] {
+		t.Fatalf("event summary: %v (contractor reads %d, customer %d)", es, len(items(all)), len(items(seen)))
+	}
+	if cs := listJob(s, &customerA, job)["eventSummary"].(map[string]any); cs["count"] != float64(len(items(seen))) || cs["count"] != cs["customerVisible"] || cs["notes"] != float64(0) {
+		t.Fatalf("the customer's own summary counts what it reads: %v", cs)
+	}
 	// after the window: nothing until the worker freezes, then history
 	owner(t, `UPDATE maintenance.offers SET access_valid_until = $2 WHERE id = $1`, offer, clock.Add(-time.Minute))
 	if code, _ := post(s, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {

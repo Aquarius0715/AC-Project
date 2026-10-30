@@ -46,7 +46,7 @@ describe("partner schedule", () => {
     ]);
     expect([rows[0].windowText, rows[0].left, rows[0].leftTone, rows[0].elapsedPct, rows[0].ended]).toEqual(["20 Sept, 9:30 am – 22 Sept, 9:30 am MYT", "1 d left", "primary", 50, false]);
     expect([rows[3].left, rows[3].leftTone, rows[3].ended]).toEqual(["Ended", "crit", true]);
-    expect(scheduleRow({ projection: "history", jobId: "h", type: "reactive", status: "completed", completedAt: null }, NOW, units, names)).toBeNull();
+    expect(scheduleRow({ projection: "history", jobId: "h", type: "reactive", status: "completed", completedAt: null, ownDecisionEvents: [] }, NOW, units, names)).toBeNull();
     expect(sortOf("dueAt")).toBe("dueAt");
     expect(sortOf("nope")).toBe("status");
   });

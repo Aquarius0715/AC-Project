@@ -2075,6 +2075,7 @@
    "createdAt",
    "displayStatus",
    "dueAt",
+   "eventSummary",
    "followUpClass",
    "followUpOfJobId",
    "id",

@@ -4,7 +4,7 @@
 // sent, deliveryState stays preview). Pure code shared by the server loader and the client view; Vitest covers it.
 // Texts in the display language (`t` / `i`, IR278); every instant is formatted for the user's display time zone.
 import { EN, relativeTime, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
-import { jobEventTitle, type ApiJobEvent, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
+import { jobEventTitle, type ApiEventSummary, type ApiJobEvent, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 
 const en = translator("en");
@@ -25,8 +25,17 @@ export const periodOf = (v?: string): HistoryPeriod => (v === "all" ? "all" : "9
 
 export type ApiEvent = ApiJobEvent & { note: { visibility: "internal" | "customer"; message: string } | null };
 type Tone = "ok" | "warn" | "crit" | "primary" | "muted";
-/** The customer reads every event except internal notes (jobs.events for clients). */
-export const customerVisible = (e: ApiEvent) => !(e.note && e.note.visibility === "internal");
+/** The events of HQ's and the contractor's own handling that a client's jobs.events leaves out (IR442), as the Core
+ * API's clientHiddenActions (maintenance/jobs.go) lists them; partnerHistory.test.ts keeps the two in step. */
+export const CLIENT_HIDDEN_ACTIONS = ["job.costs_saved", "job.warranty_claim_filed", "partner_proposal.sent", "partner_proposal.withdrawn", "partner_proposal.kept"];
+/** The customer reads every event except internal notes and the hidden actions (jobs.events for clients, IR42, IR442). */
+export const customerVisible = (e: ApiJobEvent & { note?: ApiEvent["note"] }) => !(e.note && e.note.visibility === "internal") && !CLIENT_HIDDEN_ACTIONS.includes(e.action);
+/** The counts of a list of events as jobs.list gives them for a summary (IR506); a history's own decision events are
+ * counted this way. */
+export function eventSummary(events: (ApiJobEvent & { note?: ApiEvent["note"] })[]): ApiEventSummary {
+  const latest = [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id))[0];
+  return { count: events.length, customerVisible: events.filter(customerVisible).length, notes: events.filter((e) => e.note).length, latest: latest ? { action: latest.action, occurredAt: latest.occurredAt } : null };
+}
 const ACTIVE = ["accepted", "assigned", "in_progress", "on_hold", "rework_requested"];
 const STATUS_LABEL: Record<string, string> = {
   accepted: "Accepted", assigned: "Assigned", in_progress: "In progress", on_hold: "On hold", rework_requested: "Rework requested", submitted: "Submitted", completed: "Completed", cancelled: "Cancelled",
@@ -41,19 +50,17 @@ export type HistoryRow = {
   sub: string; tech: { name: string; sub: string; tone?: Tone }; last: { title: string; at: string; when: string } | null; lastAt: number;
   badge: { text: string; tone: Tone }; overdue: boolean; delegation: string; unit: string | null;
 };
-/** One job of the list with its events (newest first): counts, the latest event (“today 5:20 pm MYT”), the technician
- * and the badge. */
-export function historyRow(j: ApiPartnerJob, events: ApiEvent[], now: number, units: Map<string, string>, names: Map<string, string>, i: I18n = EN): HistoryRow | null {
+/** One job of the list from jobs.list alone (IR506): the counts and the latest event (“today 5:20 pm MYT”) of its
+ * eventSummary — a history's own decision events —, the technician and the badge. */
+export function historyRow(j: ApiPartnerJob, now: number, units: Map<string, string>, names: Map<string, string>, i: I18n = EN): HistoryRow | null {
   const { t, display } = i;
   if (j.projection === "offer") return null; // offers are answered in Jobs; history starts at acceptance
-  const latest = [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id))[0];
-  const notes = events.filter((e) => e.note).length;
-  const visible = events.filter(customerVisible).length;
-  const last = latest ? { title: eventTitle(latest.action, t), at: latest.occurredAt, when: relativeTime(latest.occurredAt, now, i) } : null;
+  const s = j.projection === "history" ? eventSummary(j.ownDecisionEvents) : j.eventSummary;
+  const last = s.latest ? { title: eventTitle(s.latest.action, t), at: s.latest.occurredAt, when: relativeTime(s.latest.occurredAt, now, i) } : null;
   if (j.projection === "history") {
     return {
       id: j.jobId, short: j.jobId.slice(0, 8), title: typeLabel(j.type, t), origin: null, version: null, ended: true, status: j.status, tab: "ended", unit: null,
-      sub: t(events.length === 1 ? "1 own decision event · delegation ended (read-only snapshot)" : "{n} own decision events · delegation ended (read-only snapshot)", { n: events.length }),
+      sub: t(s.count === 1 ? "1 own decision event · delegation ended (read-only snapshot)" : "{n} own decision events · delegation ended (read-only snapshot)", { n: s.count }),
       delegation: t("ended — history only"), tech: { name: "—", sub: t("not shown after the delegation") }, last, lastAt: last ? Date.parse(last.at) : 0,
       badge: { text: statusLabel(j.status, t), tone: STATUS_TONE[j.status] ?? "muted" }, overdue: false,
     };
@@ -66,7 +73,7 @@ export function historyRow(j: ApiPartnerJob, events: ApiEvent[], now: number, un
   const tab = ACTIVE.includes(j.status) ? "active" : j.status === "submitted" ? "review" : j.status === "completed" ? "completed" : null;
   return {
     id: j.id, short: j.id.slice(0, 8), title: units.get(j.unitId) ?? typeLabel(j.type, t), origin: j.origin ?? null, version: j.version, ended: false, status: j.status, tab, unit: units.get(j.unitId) ?? null,
-    sub: [t(events.length === 1 ? "1 event" : "{n} events", { n: events.length }), t("{n} customer-visible", { n: visible }), t(notes === 1 ? "1 note" : "{n} notes", { n: notes }), t("delegation {state}", { state: delegation })].join(" · "),
+    sub: [t(s.count === 1 ? "1 event" : "{n} events", { n: s.count }), t("{n} customer-visible", { n: s.customerVisible }), t(s.notes === 1 ? "1 note" : "{n} notes", { n: s.notes }), t("delegation {state}", { state: delegation })].join(" · "),
     delegation, tech: tech ? { name: tech, sub: ack ? t(ack) : t("assigned") } : { name: t("Unassigned"), sub: j.status === "accepted" ? t("assign in Schedule") : "—", tone: j.status === "accepted" ? "crit" : undefined },
     last, lastAt: last ? Date.parse(last.at) : 0, overdue,
     badge: overdue ? { text: t("Overdue"), tone: "crit" } : { text: statusLabel(j.status, t), tone: STATUS_TONE[j.status] ?? "muted" },
