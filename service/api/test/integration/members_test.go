@@ -143,8 +143,9 @@ func TestMembersSave(t *testing.T) {
 	t.Cleanup(func() {
 		owner(t, `UPDATE identity.memberships SET valid_until = NULL WHERE id = $1`, seed.ID("hq-restriction-manager"))
 	})
+	// tenant-a's own: other tenants' administrators (TestBootstrapAdmin's) are not this test's
 	owner(t, `UPDATE identity.memberships SET valid_until = $2 WHERE id <> $1 AND role = 'admin' AND id IN (SELECT membership_id FROM identity.membership_permissions WHERE permission = 'identity.write')
-		AND created_at > $3`, seed.ID("hq-operator"), clock.Add(-time.Minute), clock.Add(-24*time.Hour))
+		AND created_at > $3 AND tenant_id = $4`, seed.ID("hq-operator"), clock.Add(-time.Minute), clock.Add(-24*time.Hour), seed.ID("tenant-a"))
 	withoutIdentity := strings.Replace(strings.Replace(string(perms), `"identity.write",`, ``, 1), `,"identity.write"`, ``, 1)
 	if code, m := write(s, &hq, "members.save", selfBody(withoutIdentity), int(me["version"].(float64))); code != 409 {
 		t.Errorf("last identity.write holder: %d %v", code, m)

@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.378.0
+version: 0.379.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -179,6 +179,7 @@ Small text and controls are adjusted for readability and usability in work scree
 | DEC-81 | A contractor or a customer owner adds at most 30 accounts to the organization in 24 hours (IR464 kept); HQ is not limited, and `ACCOUNTS_PER_ORG_PER_DAY` sets another value per environment | User decision in this conversation, 2026-10-30 (“全て推奨で修正してください”, business review question 3); reflected in IR507 |
 | DEC-82 | Ending a contract early — its unpaid invoices, removing the units, releasing restrictions and the contractor's payout — is outside Phase 1A and is designed before production (OPEN-07) | User decision in this conversation, 2026-10-30 (“全て推奨で修正してください”, business review question 4); reflected in IR507 |
 | DEC-83 | HQ's revoke in Access & roles also turns the person's sign-in off, and only HQ gives the access back: a contractor or customer owner cannot extend the access end, enable the account again or add the person as a new account; a later end set by HQ clears the revoke and turns the sign-in on, unless the company or customer disabled the account | User decision in this conversation, 2026-10-30 (“全て推奨で修正してください”, business review question 2); reflected in IR508 |
+| DEC-84 | The completion criteria include starting from one HQ administrator in an empty environment: a bootstrap command creates a tenant's first administrator (the tenant and its HQ organization when missing, the sign-in account with the two-step set-up and the set-up e-mail) and is refused once the tenant has an active identity administrator; everything else is added in the apps | User decision in this conversation, 2026-10-30 (“全て推奨で修正してください”, business review question 1); reflected in IR509 |
 
 **DEC-10 (design proposal)**: Preserve work status on reassignment. Release restrictions only after all cause invoices fixed at notice time are paid. Release does not automatically power units on or restore previous set temperatures. Manual payment recording, test-run end confirmation, and viewing saved reports are specified for the 1A demo. This does not mean company approval of commercial rules. See [input/output contract DDC-08](../02-design/implementation-contracts.md#ddc-08-multi-resource-revisit-and-cross-role-contracts).
 
@@ -280,6 +281,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.379.0: An empty environment starts from one HQ administrator: `migrate bootstrap-admin` creates a tenant's first administrator with the sign-in account and is refused once it has one (DEC-84, IR509). Phase 1A unchanged.
 0.378.0: HQ's revoke turns the sign-in off, and only HQ gives the access back; contractors and customer owners cannot extend, enable or re-add a revoked person (DEC-83, IR508). Phase 1A unchanged.
 0.377.0: The user's decisions of 2026-10-30 are recorded: back-to-back schedules (DEC-80), the account cap kept at 30 a day (DEC-81), ending a contract early outside Phase 1A (DEC-82, OPEN-07) (IR507). Phase 1A unchanged.
 0.376.0: The contractor's job history reads its event counts with `jobs.list` (`JobSummary.eventSummary`), not one `jobs.events` call per job; hidden actions are not customer-visible; decision events are the organization's (IR506). Phase 1A unchanged.

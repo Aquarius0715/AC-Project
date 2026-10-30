@@ -7351,3 +7351,26 @@ Decided by the user on 2026-10-30 (business review question 2, the recommended o
    - `TestHQRevokeOfAClientUser` checks that the owner's role change and enabling are refused, disabling works, and the membership stays closed.
    - Vitest checks the rows' actions, HQ's "Revoked" row and the refusal texts in English and Malay.
 
+## IR509 An empty environment starts from one HQ administrator: `migrate bootstrap-admin` (DEC-84) — 2026-10-30
+
+Decided by the user on 2026-10-30 (business review question 1, the recommended option). Until now every environment started from the demo fixture: no path made the first HQ administrator of an empty tenant, and HQ's Access & roles needs an administrator to add one.
+
+1. **Command.** `migrate bootstrap-admin -tenant NAME -email ADDRESS -name NAME [-organization NAME]` (`internal/bootstrap`, run as the schema owner from the migrate image). In one transaction it:
+   - uses the tenant of that name or creates it, and uses its HQ (operator) organization or creates one ("HQ" by default);
+   - creates the person and an admin membership from the business time (the wall clock plus a demo clock's offset) with every HQ permission (every `Permission` except the contractor's `partner.*`) over the tenant (scope `tenant`);
+   - writes the audit entry `bootstrap.admin` (actor `system-bootstrap`) and the identity consumer's `AccountRequested` event.
+   - The consumer then opens the sign-in account with role admin, so the first sign-in sets up a one-time-code device (IR468), and e-mails the set-up link (IR461; locally to Mailpit). The change capture copies the new rows to the other domains (IR188).
+2. **Refusals.**
+   - A tenant that already has an active `identity.write` membership is refused. The identity administrators are locked as `members.save` locks them (IR472), so the two cannot both pass.
+   - An address another person holds is refused, and so are a name of the wrong length, two tenants of the same name and a malformed address.
+   - From then on HQ adds people in Access & roles.
+3. **Docs.**
+   - DEC-84 and the completion criteria of the HQ requirements: start from one administrator in an empty environment.
+   - The repository README shows the command for the compose stack.
+4. **Test.** `TestBootstrapAdmin` checks the following on a new tenant:
+   - the refusals of bad input, and the tenant, organization, permissions, tenant scope, account event and audit entry;
+   - the refusal of a second run and of a held address;
+   - the fake identity provider's admin account for the tenant and membership;
+   - the new administrator listing the tenant's memberships with `identity.write` through the API.
+   - The new tenant stays in the test database. `TestMembersSave` and `TestWarrantyReminders` counted every tenant's administrators in their owner queries, and now count tenant-a's only.
+

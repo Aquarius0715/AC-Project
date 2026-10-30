@@ -65,6 +65,7 @@ Real device control, external notifications, payments, and API authentication be
 - Map acceptance criteria to screens, services, and failure behavior in the [detailed design](../02-design/admin.md).
 - Follow the [verification plan](../04-agentic-sdlc/verification.md) and retain evidence for every AT-A and applicable scenario.
 - Return open business decisions to PrepareDocument’s OPEN register. Report provisional mock decisions.
+- Start from one HQ administrator in an empty environment (DEC-84): `migrate bootstrap-admin` creates the tenant's first administrator, with the sign-in account and its set-up e-mail, and everything else is added in the apps (IR509).
 
 ## Feature use cases and business rules (0.6.0)
 

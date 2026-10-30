@@ -33,6 +33,15 @@ from `.env.local.example`) holds local keys; `docker/iot-demo.sh` generates the 
 Profiles: `infra` (PostgreSQL, Valkey, LocalStack, Mosquitto, Keycloak, Mailpit, mocks), `backend` (+ API services and
 workers), `full` (+ the four apps), `iot` (bridge, simulator, mock history), `obs`, `stripe`.
 
+An environment without the demo fixture starts from one HQ administrator (DEC-84). Create them once per tenant; the
+identity service opens their sign-in account, which sets up a one-time-code device at the first sign-in, and e-mails
+the set-up link. HQ adds everyone else in Access & roles; a tenant that already has an administrator is refused.
+
+```sh
+docker compose --env-file .env.local --profile full run --rm migrate \
+  /app/migrate bootstrap-admin -tenant "AC Project" -email first.admin@example.com -name "First Admin"
+```
+
 ## Checks
 
 ```sh

@@ -60,7 +60,7 @@ func TestWarrantyReminders(t *testing.T) {
 	evaluate()
 	var admins int
 	ownerScan(t, `SELECT count(*) FROM identity.memberships m WHERE m.role = 'admin' AND m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until > $1)
-		AND EXISTS (SELECT 1 FROM identity.membership_permissions p WHERE p.membership_id = m.id AND p.permission = 'asset.read')`, []any{clock.Add(time.Minute)}, &admins)
+		AND EXISTS (SELECT 1 FROM identity.membership_permissions p WHERE p.membership_id = m.id AND p.permission = 'asset.read') AND m.tenant_id = $2`, []any{clock.Add(time.Minute), seed.ID("tenant-a")}, &admins)
 	if r := sent(soon); admins == 0 || len(r) != 1 || r[0].days != 90 || r[0].notifications != admins || r[0].severity != "normal" {
 		t.Fatalf("90 days: %d admins, %+v", admins, r)
 	}

@@ -3,6 +3,8 @@
 //	migrate up          apply pending migrations
 //	migrate version     print the applied version
 //	migrate force N     record version N as clean without running SQL
+//	migrate bootstrap-admin -tenant NAME -email ADDRESS -name NAME [-organization NAME]
+//	                    create the first HQ administrator of a tenant (DEC-84, IR509); refused once it has one
 //
 // Local and CI only: APP_LOGIN_PASSWORD creates or updates the ac_app_login role and the domain service logins
 // ac_<domain>_login (IR194), and SEED_FIXTURE loads the demo fixture once (skipped when identity.users already has
@@ -11,6 +13,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -18,6 +21,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/bootstrap"
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
 	"github.com/pradita/ac-project/service/api/internal/migrate"
 	"github.com/pradita/ac-project/service/api/internal/migrations"
@@ -77,8 +81,36 @@ func run(ctx context.Context, args []string) error {
 			return err
 		}
 		return migrate.Force(ctx, conn, v)
+	case "bootstrap-admin":
+		return bootstrapAdmin(ctx, conn, args[1:])
 	}
-	return fmt.Errorf("unknown command %q (want up, version or force)", cmd)
+	return fmt.Errorf("unknown command %q (want up, version, force or bootstrap-admin)", cmd)
+}
+
+// bootstrapAdmin creates the first HQ administrator of a tenant (DEC-84, IR509). The identity service's consumer then
+// opens the sign-in account, which asks for a one-time-code device at the first sign-in (IR468), and e-mails the
+// set-up link (in development to the local Mailpit inbox).
+func bootstrapAdmin(ctx context.Context, conn *pgx.Conn, args []string) error {
+	fs := flag.NewFlagSet("bootstrap-admin", flag.ContinueOnError)
+	var in bootstrap.Input
+	fs.StringVar(&in.Tenant, "tenant", "", "the tenant's name (an existing tenant of that name, or a new one)")
+	fs.StringVar(&in.Organization, "organization", "HQ", "the HQ organization's name, when the tenant has none")
+	fs.StringVar(&in.Email, "email", "", "the administrator's e-mail address (the set-up link goes there)")
+	fs.StringVar(&in.Name, "name", "", "the administrator's display name")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	var r bootstrap.Result
+	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+		var err error
+		r, err = bootstrap.Admin(ctx, tx, in)
+		return err
+	}); err != nil {
+		return fmt.Errorf("bootstrap-admin: %w", err)
+	}
+	log.Printf("bootstrap-admin: tenant %s (new %t), HQ organization %s (new %t), administrator %s, membership %s; the set-up e-mail goes to %s",
+		r.TenantID, r.NewTenant, r.OrganizationID, r.NewOrganization, r.UserID, r.MembershipID, in.Email)
+	return nil
 }
 
 // local applies the development-only steps controlled by environment variables.
