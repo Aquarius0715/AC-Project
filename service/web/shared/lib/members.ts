@@ -14,6 +14,8 @@ export type ScopeRef = { kind: "tenant" | "organization" | "property" | "unit"; 
 export type ApiMember = {
   id: string; version: number; updatedAt: string; userId: string; displayName: string; organizationId: string; role: Role | "client"; employment: "internal" | "external" | null;
   permissions: string[]; scopes: ScopeRef[]; scopeVersion: number; validFrom: string; validUntil: string | null;
+  /** HQ revoked the access: the sign-in is off until HQ gives the access back (IR508) */
+  revokedAt?: string | null;
 };
 export type ApiOrganization = { id: string; name: string; kind: "customer" | "contractor" | "operator"; status: string };
 
@@ -63,7 +65,7 @@ export const selfBlocked = ["identity.write", "restriction.override"];
 
 export const isActive = (m: Pick<ApiMember, "validFrom" | "validUntil">, now: Date) => Date.parse(m.validFrom) <= now.getTime() && (!m.validUntil || Date.parse(m.validUntil) > now.getTime());
 
-export type MemberRow = { id: string; version: number; name: string; role: Role; label: string; org: string; active: boolean; validity: string; m: ApiMember };
+export type MemberRow = { id: string; version: number; name: string; role: Role; label: string; org: string; active: boolean; revoked: boolean; validity: string; m: ApiMember };
 /** The memberships (clients are managed elsewhere), with the valid period in the display time zone. */
 export function memberRows(ms: ApiMember[], orgs: ApiOrganization[], now: Date, i: I18n = EN): MemberRow[] {
   const { t } = i;
@@ -71,7 +73,7 @@ export function memberRows(ms: ApiMember[], orgs: ApiOrganization[], now: Date, 
   return ms.filter((m): m is ApiMember & { role: Role } => m.role !== "client").map((m) => {
     const orgName = org.get(m.organizationId) ?? t("organization");
     return {
-      id: m.id, version: m.version, name: m.displayName, role: m.role, m, org: orgName, active: isActive(m, now), validity: validity(m, i),
+      id: m.id, version: m.version, name: m.displayName, role: m.role, m, org: orgName, active: isActive(m, now), revoked: !!m.revokedAt, validity: validity(m, i),
       label: `${roleWord(m.role, m.employment, t)} · ${orgName}`,
     };
   });

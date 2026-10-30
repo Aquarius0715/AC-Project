@@ -25,7 +25,8 @@ export type Permission = 'dashboard.read'|'asset.read'|'asset.write'|'identity.r
 export type Session = Context & {userId:ID;role:Role;clientRole:ClientRole|null;displayName:string;organizationName:string;organizationId:ID;customerId:ID|null;permissions:Permission[];generation:number;viewEpoch:number;issuedAt:Instant;expiresAt:Instant};
 export type Preferences = {locale:Locale;timezone:string;currency:'MYR';monthlyReportEmail:boolean;twoFactorEnabled:boolean};
 export type User = {id:ID;displayName:string};
-export type Membership = Entity & {userId:ID;displayName:string;organizationId:ID;role:Role;employment:'internal'|'external'|null;permissions:Permission[];scopes:ScopeRef[];scopeVersion:number;qualifications:QualificationGrant[];validFrom:Instant;validUntil:Instant|null;clientRole:ClientRole|null};
+/** revokedAt (IR508): HQ ended the access in Access & roles — the sign-in is off, and only HQ gives the access back (a later validUntil clears it). */
+export type Membership = Entity & {userId:ID;displayName:string;organizationId:ID;role:Role;employment:'internal'|'external'|null;permissions:Permission[];scopes:ScopeRef[];scopeVersion:number;qualifications:QualificationGrant[];validFrom:Instant;validUntil:Instant|null;clientRole:ClientRole|null;revokedAt:Instant|null};
 export type Organization = Entity & {name:string;kind:'customer'|'contractor'|'operator';status:'active'|'inactive'};
 export type Customer = Entity & {name:string;status:'active'|'inactive';organizationId:ID;serviceProfile:'rto'|'general'|'energy'|'environment'};
 export type Property = Entity & {customerOrgId:ID;kind:'home'|'office';name:string;address:string|null;accessInstructions:string|null;archived:boolean};
@@ -218,9 +219,9 @@ export type InvoiceReminderReceipt = {invoiceId:ID;invoiceVersion:number;notific
 /** IR107–IR112: Figma-confirmed screens (2026-10-01). */
 export type ClientRole = 'owner'|'member';
 export type SessionsRevoked = {membershipId:ID;userId:ID;revokedAt:Instant;membershipIds:ID[]};
-export type ClientUser = Entity & {customerId:ID;membershipId:ID|null;email:string;displayName:string|null;clientRole:ClientRole;status:'invited'|'active'|'disabled';lastSignInAt:Instant|null;allowedChannels:Channel[];invitedAt:Instant;invitedByMembershipId:ID};
+export type ClientUser = Entity & {customerId:ID;membershipId:ID|null;email:string;displayName:string|null;clientRole:ClientRole;status:'invited'|'active'|'disabled';lastSignInAt:Instant|null;allowedChannels:Channel[];invitedAt:Instant;invitedByMembershipId:ID;revokedAt:Instant|null};
 export type PartnerRole = 'contractor'|'technician';
-export type PartnerUser = Entity & {organizationId:ID;membershipId:ID|null;email:string;displayName:string|null;partnerRole:PartnerRole;status:'invited'|'active'|'disabled';lastSignInAt:Instant|null;accessUntil:Instant|null;invitedAt:Instant;invitedByMembershipId:ID;booked:boolean};
+export type PartnerUser = Entity & {organizationId:ID;membershipId:ID|null;email:string;displayName:string|null;partnerRole:PartnerRole;status:'invited'|'active'|'disabled';lastSignInAt:Instant|null;accessUntil:Instant|null;invitedAt:Instant;invitedByMembershipId:ID;booked:boolean;revokedAt:Instant|null};
 export type LocationTarget = {kind:'property'|'space'|'unit';id:ID};
 export type VentilationLog = Entity & {spaceId:ID;unitId:ID|null;method:'window_opened'|'door_opened'|'ventilation_fan'|'other';durationMinutes:number;co2AtLog:{value:number;unit:'ppm';observedAt:Instant}|null;loggedByMembershipId:ID;loggedAt:Instant};
 export type ImportRow = {rowNumber:number;propertyName:string;floorName:string|null;roomName:string|null;unitName:string;modelCode:string;serial:string|null;installedOn:string|null;warrantyEnd:string|null;result:'ready'|'warning'|'error';messageKey:string|null};

@@ -7329,3 +7329,25 @@ On 2026-10-30 the user answered the open questions with "全て推奨で修正�
 2. **DEC-81, the account cap.** A contractor or a customer owner adds at most 30 accounts to the organization in 24 hours (IR464 kept). HQ is not limited, and `ACCOUNTS_PER_ORG_PER_DAY` sets another value per environment (the local stack uses 500). Nothing changes in the code.
 3. **DEC-82, ending a contract early.** Unpaid invoices, removing the units, releasing restrictions and the contractor's payout are outside Phase 1A. They are designed before production (OPEN-07 in the preparation document).
 
+## IR508 HQ's revoke turns the sign-in off; only HQ gives the access back (DEC-83) — 2026-10-30
+
+Decided by the user on 2026-10-30 (business review question 2, the recommended option). Until now HQ's revoke in Access & roles only ended the membership: the API refused the person at once, but the sign-in account stayed on. A contractor could also undo the revoke with a new access end (IR461), by enabling a disabled account, or by removing the person and adding them again (IR462). A customer owner's next save of the user reopened the membership.
+
+1. **Rule (DEC-83).** A `members.save` by HQ that moves `validUntil` to now or earlier — on an open membership, or on one its company or customer disabled — is a revoke.
+   - `Membership.revokedAt` keeps the first revoke's time (new column `identity.memberships.revoked_at`), and the identity consumer turns the sign-in account off (`AccountEnabled`, IR461).
+   - A later `validUntil` (or none) set by HQ clears it and turns the sign-in on again. While the company or customer keeps the account disabled, the account stays off, and HQ's end comes back when they enable it (IR420).
+2. **The contractor and the customer owner.**
+   - `partnerUsers.save` refuses a new access end and enabling a revoked account (CONFLICT `errors.revoked_by_hq`).
+   - `clientUsers.save` refuses every change but disabling, because its save would reopen the membership.
+   - Adding a person who holds a revoked membership is VALIDATION `email` `errors.revoked_by_hq`, for any company or customer. HQ may still add them.
+   - Disabling and removing stay theirs. `PartnerUser.revokedAt` and `ClientUser.revokedAt` show the revoke.
+3. **Web.**
+   - HQ's list marks the membership "Revoked". The editor says when, that only HQ gives the access back and how, and the revoke dialog says that the sign-in goes off.
+   - The contractor's and the customer owner's user lists show "Access ended by HQ" and offer only Remove, with "Only HQ can give the access back".
+   - The refusals are worded, with Malay texts.
+4. **Docs.** The requirements FR-A03, BR-P11 and BR-C19, the HQ access design (DD-A03), DEC-83 in the preparation document, the contracts (`service-contracts.ts`) and the schema (`revoked_at`, migration 000001; the development database was altered by hand).
+5. **Tests.**
+   - `TestHQRevokeTurnsSignInOff` (Go) checks the revoke and the account turned off. The contractor's new end and enabling are refused, while disabling still works. Saving again keeps the first revoke time. HQ's later end clears the revoke but keeps the disabled account off, and the account comes back on when the company enables it, with HQ's end. Re-adding after a second revoke and a removal is refused for the same company and for another one.
+   - `TestHQRevokeOfAClientUser` checks that the owner's role change and enabling are refused, disabling works, and the membership stays closed.
+   - Vitest checks the rows' actions, HQ's "Revoked" row and the refusal texts in English and Malay.
+

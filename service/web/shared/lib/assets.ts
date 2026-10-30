@@ -338,11 +338,14 @@ export type Channel = "inApp" | "email" | "whatsapp";
 export type ApiClientUser = {
   id: string; version: number; customerId: string; membershipId: string | null; email: string; displayName: string | null; clientRole: "owner" | "member";
   status: "invited" | "active" | "disabled"; lastSignInAt: string | null; allowedChannels: Channel[]; invitedAt: string; invitedByMembershipId: string;
+  /** HQ ended the access in Access & roles: only HQ gives it back (IR508) */
+  revokedAt?: string | null;
 };
 export type ClientUserRow = {
   id: string; version: number; email: string; name: string | null; role: "owner" | "member"; status: ApiClientUser["status"]; sub: string; lastSignIn: string; channels: string;
   lastOwner: boolean; you: boolean;
   membershipId: string | null; // the membership Sign out everywhere ends the sessions of (IR385); null only for an invite from before IR461, which has no account yet
+  revoked: boolean; // HQ ended the access: the owner cannot change, enable or re-add the user (IR508)
 };
 const channelLabel: Record<Channel, string> = { inApp: "In-app", email: "Email", whatsapp: "WhatsApp" };
 /** Rows by name; the last active owner is marked because it cannot be demoted, disabled or removed (CONFLICT). The
@@ -356,7 +359,7 @@ export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) 
     sub: u.displayName ? u.email : t("invited {date} by {who}", { date: i ? showDate(u.invitedAt, i.display) : klDate(u.invitedAt), who: who(u.invitedByMembershipId) }),
     lastSignIn: u.lastSignInAt ? (i ? showTime(u.lastSignInAt, i.display) : klStamp(u.lastSignInAt)) : "—",
     channels: u.status === "active" && u.allowedChannels.length ? u.allowedChannels.map((c) => t(channelLabel[c])).join(" · ") : "—",
-    lastOwner: u.clientRole === "owner" && u.status === "active" && owners === 1, you: !!self && u.membershipId === self, membershipId: u.membershipId,
+    lastOwner: u.clientRole === "owner" && u.status === "active" && owners === 1, you: !!self && u.membershipId === self, membershipId: u.membershipId, revoked: !!u.revokedAt,
   }));
 }
 /** A plain address up to 254 characters, not yet a user of this customer (case-insensitive). */

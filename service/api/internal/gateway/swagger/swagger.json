@@ -31171,6 +31171,10 @@
                 "membershipId": {
                     "type": "string"
                 },
+                "revokedAt": {
+                    "description": "HQ ended the access: only HQ gives it back (IR508)",
+                    "type": "string"
+                },
                 "status": {
                     "type": "string"
                 },
@@ -31408,6 +31412,10 @@
                         "$ref": "#/definitions/identity.Grant"
                     }
                 },
+                "revokedAt": {
+                    "description": "HQ ended the access: the sign-in is off, only HQ gives it back (IR508)",
+                    "type": "string"
+                },
                 "role": {
                     "type": "string"
                 },
@@ -31632,6 +31640,10 @@
                     "type": "string"
                 },
                 "partnerRole": {
+                    "type": "string"
+                },
+                "revokedAt": {
+                    "description": "HQ ended the access: only HQ gives it back (IR508)",
                     "type": "string"
                 },
                 "status": {

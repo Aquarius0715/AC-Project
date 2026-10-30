@@ -36,19 +36,20 @@ type ClientUser struct {
 	AllowedChannels       []string   `json:"allowedChannels"`
 	InvitedAt             time.Time  `json:"invitedAt"`
 	InvitedByMembershipID uuid.UUID  `json:"invitedByMembershipId"`
+	RevokedAt             *time.Time `json:"revokedAt"` // HQ ended the access: only HQ gives it back (IR508)
 	customerOrg           uuid.UUID
 }
 
 const clientUserCols = `x.id, x.tenant_id, x.version, x.created_at, x.updated_at, x.customer_id, x.membership_id, x.email::text, x.display_name, x.client_role, x.status,
 	(SELECT u.last_sign_in_at FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id WHERE m.id = x.membership_id), x.allowed_channels, x.invited_at,
-	x.invited_by_membership_id, cu.organization_id`
+	x.invited_by_membership_id, (SELECT m.revoked_at FROM identity.memberships m WHERE m.id = x.membership_id), cu.organization_id`
 
 const clientUserFrom = `identity.client_users x JOIN notify.ref_customers cu ON cu.id = x.customer_id`
 
 func scanClientUser(r pgx.Row) (ClientUser, error) {
 	var x ClientUser
 	err := r.Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.CustomerID, &x.MembershipID, &x.Email, &x.DisplayName, &x.ClientRole, &x.Status,
-		&x.LastSignInAt, &x.AllowedChannels, &x.InvitedAt, &x.InvitedByMembershipID, &x.customerOrg)
+		&x.LastSignInAt, &x.AllowedChannels, &x.InvitedAt, &x.InvitedByMembershipID, &x.RevokedAt, &x.customerOrg)
 	return x, err
 }
 
@@ -317,6 +318,9 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 	}
 	if status == "active" && x.Status == "invited" || status == "active" && x.Status != "active" && x.MembershipID == nil { // an invite becomes active only on first sign-in
 		return x, apperr.E(apperr.Conflict, "errors.invite_pending")
+	}
+	if x.RevokedAt != nil && status != "disabled" { // HQ ended the access: a save would open the membership again, only HQ gives it back (IR508)
+		return x, apperr.E(apperr.Conflict, "errors.revoked_by_hq")
 	}
 	if x.ClientRole == "owner" && x.Status == "active" && (in.ClientRole != "owner" || status != "active") {
 		ok, err := otherActiveOwner(ctx, c, x.CustomerID, x.ID)

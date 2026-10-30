@@ -196,6 +196,7 @@ CREATE TABLE identity.memberships (
   valid_from      timestamptz NOT NULL,
   valid_until     timestamptz,
   sessions_revoked_at timestamptz,   -- members.revokeSessions: tokens signed in before it are refused (wall clock, IR384)
+  revoked_at      timestamptz,       -- HQ ended the access in Access & roles: the sign-in is off, and only HQ gives the access back (IR508)
   version         int NOT NULL DEFAULT 1,
   created_at      timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at      timestamptz NOT NULL DEFAULT platform.app_now(),

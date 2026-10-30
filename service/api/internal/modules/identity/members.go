@@ -53,15 +53,16 @@ type Member struct {
 	ValidFrom      time.Time  `json:"validFrom"`
 	ValidUntil     *time.Time `json:"validUntil"`
 	ClientRole     *string    `json:"clientRole"`
+	RevokedAt      *time.Time `json:"revokedAt"` // HQ ended the access: the sign-in is off, only HQ gives it back (IR508)
 }
 
 const memberCols = `m.id, m.tenant_id, m.version, m.created_at, m.updated_at, m.user_id, m.organization_id, m.role, m.employment, m.scope_version, m.valid_from,
-	m.valid_until, m.client_role, COALESCE((SELECT u.display_name FROM identity.users u WHERE u.id = m.user_id), '')`
+	m.valid_until, m.client_role, m.revoked_at, COALESCE((SELECT u.display_name FROM identity.users u WHERE u.id = m.user_id), '')`
 
 func scanMember(r pgx.Row) (Member, error) {
 	var x Member
 	err := r.Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.UserID, &x.OrganizationID, &x.Role, &x.Employment, &x.ScopeVersion,
-		&x.ValidFrom, &x.ValidUntil, &x.ClientRole, &x.DisplayName)
+		&x.ValidFrom, &x.ValidUntil, &x.ClientRole, &x.RevokedAt, &x.DisplayName)
 	return x, err
 }
 
@@ -460,7 +461,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	}
 	var id uuid.UUID
 	var prev *int
-	account := false // the sign-in account is opened or pointed at this new membership (IR461, IR462)
+	account := false                // the sign-in account is opened or pointed at this new membership (IR461, IR462)
+	revoke, restore := false, false // HQ turns the sign-in off with the access, or on when it gives the access back (IR508)
 	if in.ID == nil {
 		var clientRole *string
 		if in.Role == "client" { // HQ adds a member; a customer owner adds owners in the customer app (IR417)
@@ -558,8 +560,20 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			}
 			until = x.ValidUntil
 		}
-		if _, err := c.Tx.Exec(ctx, `UPDATE identity.memberships SET employment = $2, valid_from = $3, valid_until = $4, version = version + 1, updated_at = $5 WHERE id = $1`,
-			x.ID, in.Employment, in.ValidFrom, until, c.Now); err != nil {
+		// HQ's revoke (IR508, DEC-83): a new end at or before now — on an open membership, or on one its company or
+		// customer disabled — turns the sign-in off, and only HQ gives the access back. The first revoke keeps its time.
+		// A later end (or none) clears it and turns the sign-in on, unless the company or the customer disabled it.
+		revoked := x.RevokedAt
+		switch {
+		case in.ValidUntil != nil && !in.ValidUntil.After(c.Now) && (x.ValidUntil == nil || !in.ValidUntil.Equal(*x.ValidUntil)):
+			if revoked == nil {
+				revoked, revoke = &c.Now, true
+			}
+		case x.RevokedAt != nil && (in.ValidUntil == nil || in.ValidUntil.After(c.Now)):
+			revoked, restore = nil, !disabled
+		}
+		if _, err := c.Tx.Exec(ctx, `UPDATE identity.memberships SET employment = $2, valid_from = $3, valid_until = $4, revoked_at = $6, version = version + 1, updated_at = $5 WHERE id = $1`,
+			x.ID, in.Employment, in.ValidFrom, until, c.Now, revoked); err != nil {
 			return Member{}, err
 		}
 		id, prev = x.ID, c.ExpectedVersion
@@ -615,6 +629,9 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	c.Emit(ops.Event{AggregateType: "membership", AggregateID: id, Type: "MembershipSaved", Payload: map[string]any{"role": in.Role}})
 	if account {
 		requestAccount(c, in.UserID, id, in.Role)
+	}
+	if revoke || restore {
+		setAccountEnabled(c, id, restore)
 	}
 	c.Audit(ops.AuditEntry{Action: "members.save", TargetKind: "membership", TargetID: id.String(), PreviousVersion: prev, NextVersion: &ms[0].Version, Reason: in.Reason})
 	return ms[0], nil

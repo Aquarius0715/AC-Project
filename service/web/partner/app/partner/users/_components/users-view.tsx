@@ -74,7 +74,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersD
   }[dialog.kind];
   const action = !dialog ? "" : { invite: t("Add user"), access: t("Save access"), disable: t("Disable"), enable: t("Enable"), remove: t("Remove") }[dialog.kind];
   const roleBadge = (u: PartnerUserRow) => <Badge tone={u.role === "contractor" ? "primary" : "muted"}>{t(roleLabel[u.role])}</Badge>;
-  const statusBadge = (u: PartnerUserRow) => <Badge tone={u.ended ? "muted" : u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{u.ended ? t("Access ended") : t(statusLabel[u.status])}</Badge>;
+  const statusBadge = (u: PartnerUserRow) => <Badge tone={u.revoked ? "crit" : u.ended ? "muted" : u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{u.revoked ? t("Access ended by HQ") : u.ended ? t("Access ended") : t(statusLabel[u.status])}</Badge>;
   return (
     <Page>
       <PageHead title={data.company ? t("Users of {company}", { company: data.company }) : t("Users")} sub={t("Contractors and technicians of your company who can sign in. You can add, disable and remove them.")}
@@ -98,7 +98,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersD
             { key: "a", label: t("Actions"), render: (u) => {
               const a = u.actions;
               // why Disable or Remove is missing, next to what is still offered (a technician's access end, IR461)
-              const hint = u.you ? t("Your account") : u.lastContractor ? t("Last active contractor") : u.booked ? t("Has an assigned job — reassign it first") : null;
+              const hint = u.you ? t("Your account") : u.revoked ? t("Only HQ can give the access back") : u.lastContractor ? t("Last active contractor") : u.booked ? t("Has an assigned job — reassign it first") : null;
               if (!a.resend && !a.access && !a.disable && !a.enable && !a.remove) return <span className="text-xs text-muted-foreground">{hint ?? "—"}</span>;
               return (
                 <div className="flex flex-wrap items-center gap-1">

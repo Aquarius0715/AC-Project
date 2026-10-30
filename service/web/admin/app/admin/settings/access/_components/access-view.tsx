@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Search, SearchSelect, Select, Textarea, Plain, ScrollX } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
+import { showTime } from "@ac/web/lib/i18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import {
@@ -85,7 +86,7 @@ export function AccessView({ live }: { live: Live }) {
       <div className="split-rev">
         <Card title={t("Memberships")} sub={t("{n} · HQ, contractor and technician", { n: live.rows.length })} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => nav({ membershipId: "new" })}><Icon name="add" /> {t("New membership")}</Btn>} className="self-start">
           <div className="mb-2"><Search placeholder={t("Search name or organization…")} value={q} onChange={setQ} /></div>
-          {shown.length === 0 ? <EmptyState title={t("No memberships")}>{t("No membership matches these filters.")}</EmptyState> : <div className="flex flex-col gap-1.5">{shown.map((u) => <ListRow key={u.id} selected={sel?.id === u.id} onClick={() => nav({ membershipId: u.id })}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{u.name}</b><Badge tone={u.active ? "ok" : "muted"}>{u.active ? t("Active") : t("Inactive")}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{u.label}</div></div></ListRow>)}</div>}
+          {shown.length === 0 ? <EmptyState title={t("No memberships")}>{t("No membership matches these filters.")}</EmptyState> : <div className="flex flex-col gap-1.5">{shown.map((u) => <ListRow key={u.id} selected={sel?.id === u.id} onClick={() => nav({ membershipId: u.id })}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{u.name}</b><Badge tone={u.active ? "ok" : u.revoked ? "crit" : "muted"}>{u.active ? t("Active") : u.revoked ? t("Revoked") : t("Inactive")}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{u.label}</div></div></ListRow>)}</div>}
           <p className="mt-3 text-[11px] text-muted-foreground">{t("Client accounts are not listed here — they are managed per customer in Customers & units › Users.")}</p>
         </Card>
         {missing ? (
@@ -96,6 +97,7 @@ export function AccessView({ live }: { live: Live }) {
         <Card title={sel ? sel.name : t("New membership")} sub={sel ? t("{validity} · scopeVersion {scope} · version {v}", { validity: sel.validity, scope: sel.m.scopeVersion, v: sel.version }) : t("For an existing user, or a new person whose account is created with it")}>
           <div className="flex flex-col gap-5">
             {!live.canWrite && <Banner>{t("Read only — editing needs identity.write.")}</Banner>}
+            {sel?.m.revokedAt && <Banner tone="warn">{t("Access revoked {date}: the sign-in is off, and their company or customer cannot extend or enable it again. Saving a later “Valid until” gives the access back and turns the sign-in on.", { date: showTime(sel.m.revokedAt, i.display) })}</Banner>}
             <section>
               <h3 className="mb-2 text-[13px] font-bold">{t("Identity & role")}</h3>
               <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
@@ -146,7 +148,7 @@ export function AccessView({ live }: { live: Live }) {
         )}
       </div>
       <Modal open={revoke !== null} onClose={() => setRevoke(null)} title={t("Revoke access — {name}", { name: sel?.name ?? "" })} footer={<><Btn onClick={() => setRevoke(null)}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !revoke?.trim()} onClick={doRevoke}>{t("Revoke")}</Btn></>}>
-        <p className="text-[13px]">{t("Revoking sets “Valid until” to now. The membership stays listed as inactive; nothing is deleted.")}</p>
+        <p className="text-[13px]">{t("Revoking sets “Valid until” to now and turns their sign-in off. Only HQ can give the access back — their company or customer cannot extend, enable or add them again. The membership stays listed; nothing is deleted.")}</p>
         {sel?.role === "technician" && <p className="mt-2 text-[11px] text-muted-foreground">{t("A job assigned to this technician that has not started is released and returns to be assigned; its assigners are notified.")}</p>}
         <Field label={t("Reason")}><Textarea value={revoke ?? ""} maxLength={1000} onChange={(e) => setRevoke(e.target.value)} /></Field>
       </Modal>

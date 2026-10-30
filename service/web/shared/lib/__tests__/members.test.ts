@@ -28,6 +28,7 @@ describe("HQ access & roles (FR-A03, BR-A03, IR107)", () => {
       ["m1", "Technician · external · CoolFix", true, "1 Sept 2026, 8:00 am MYT → 1 Jan 2027, 12:00 am MYT"], ["m3", "Admin · organization", true, "1 Sept 2026, 8:00 am MYT → open-ended"],
     ]);
     expect([isActive(member({ validUntil: "2026-09-15T00:00:00Z" }), NOW), isActive(member({ validFrom: "2026-09-16T00:00:00Z" }), NOW)]).toEqual([false, false]);
+    expect(memberRows([member({ validUntil: "2026-09-15T00:00:00Z", revokedAt: "2026-09-15T00:00:00Z" })], [], NOW).map((r) => [r.active, r.revoked])).toEqual([[false, true]]); // IR508
   });
 
   it("types the valid period in the display time zone and saves the same instants", () => {

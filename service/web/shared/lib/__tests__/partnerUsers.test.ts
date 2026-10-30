@@ -34,6 +34,11 @@ describe("partnerUserRows (FR-P11)", () => {
     expect(r.actions).toEqual({ resend: false, access: true, disable: false, enable: false, remove: true });
     expect(partnerUserRows([user({ id: "e", displayName: "Old", status: "active", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-09-15T00:00:00Z"))[0].ended).toBe(false);
   });
+  it("leaves only removing to an account whose access HQ ended (IR508)", () => {
+    const revoked = (status: "active" | "disabled") => partnerUserRows([user({ id: "r", displayName: "Gone", status, membershipId: "m", accessUntil: "2026-10-01T00:00:00Z", revokedAt: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-10-02T00:00:00Z"))[0];
+    expect([revoked("active").revoked, revoked("active").actions, revoked("disabled").actions]).toEqual([
+      true, { resend: false, access: false, disable: false, enable: false, remove: true }, { resend: false, access: false, disable: false, enable: false, remove: true }]);
+  });
   it("reads a technician not signed in yet whose access end has passed as ended: no resend until the end moves (IR461)", () => {
     const [r] = partnerUserRows([user({ id: "n", displayName: "Late", membershipId: "m", accessUntil: "2026-10-01T00:00:00Z" })], null, undefined, new Date("2026-10-02T00:00:00Z"));
     expect(r.ended).toBe(true);

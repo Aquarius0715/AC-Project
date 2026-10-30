@@ -37,20 +37,21 @@ type PartnerUser struct {
 	AccessUntil           *time.Time `json:"accessUntil"`
 	InvitedAt             time.Time  `json:"invitedAt"`
 	InvitedByMembershipID uuid.UUID  `json:"invitedByMembershipId"`
-	Booked                bool       `json:"booked"` // an active technician who holds an assigned job: not disabled or removed until reassigned (IR421, IR432)
+	Booked                bool       `json:"booked"`    // an active technician who holds an assigned job: not disabled or removed until reassigned (IR421, IR432)
+	RevokedAt             *time.Time `json:"revokedAt"` // HQ ended the access: only HQ gives it back (IR508)
 	accessKept            *time.Time // the access end kept while disabled
 }
 
 // accessUntil: the membership's access end, or the one kept while the account is disabled
 const partnerUserCols = `x.id, x.tenant_id, x.version, x.created_at, x.updated_at, x.organization_id, x.membership_id, x.email::text, x.display_name, x.partner_role, x.status,
-	u.last_sign_in_at, CASE WHEN x.status = 'disabled' THEN x.access_until ELSE m.valid_until END, x.invited_at, x.invited_by_membership_id, x.access_until`
+	u.last_sign_in_at, CASE WHEN x.status = 'disabled' THEN x.access_until ELSE m.valid_until END, x.invited_at, x.invited_by_membership_id, m.revoked_at, x.access_until`
 
 const partnerUserFrom = `identity.partner_users x LEFT JOIN identity.memberships m ON m.id = x.membership_id LEFT JOIN identity.users u ON u.id = m.user_id`
 
 func scanPartnerUser(r pgx.Row) (PartnerUser, error) {
 	var x PartnerUser
 	err := r.Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.OrganizationID, &x.MembershipID, &x.Email, &x.DisplayName, &x.PartnerRole, &x.Status,
-		&x.LastSignInAt, &x.AccessUntil, &x.InvitedAt, &x.InvitedByMembershipID, &x.accessKept)
+		&x.LastSignInAt, &x.AccessUntil, &x.InvitedAt, &x.InvitedByMembershipID, &x.RevokedAt, &x.accessKept)
 	return x, err
 }
 
@@ -379,6 +380,9 @@ func partnerUsersSave(ctx context.Context, c *ops.Call, in *PartnerUserInput) (P
 	}
 	if x.Status == "invited" && status != "invited" && in.Status != nil { // active at the first sign-in (IR461)
 		return x, apperr.E(apperr.Conflict, "errors.invite_pending")
+	}
+	if x.RevokedAt != nil && (x.Status == "disabled" && status != "disabled" || in.AccessUntil != nil) { // HQ ended the access: only HQ gives it back (IR508)
+		return x, apperr.E(apperr.Conflict, "errors.revoked_by_hq")
 	}
 	// the account exists from the start (IR461): its e-mail and role are fixed; remove the user and add them again
 	if !strings.EqualFold(in.Email, x.Email) {

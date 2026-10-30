@@ -59,7 +59,7 @@ export function UsersView({ live }: { live: { customerId: string; customer: stri
     : t({ role: "Change role of {name}", disable: "Disable {name}", enable: "Enable {name}", remove: "Remove {name}" }[dialog.kind], { name: name(dialog.row) });
   const action = !dialog ? "" : t({ invite: "Add user", role: "Change role", disable: "Disable", enable: "Enable", remove: "Remove" }[dialog.kind]);
   const roleBadge = (u: ClientUserRow) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{t(u.role === "owner" ? "Owner" : "Member")}</Badge>;
-  const statusBadge = (u: ClientUserRow) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{t(u.status === "active" ? "Active" : u.status === "invited" ? "Not signed in yet" : "Disabled")}</Badge>;
+  const statusBadge = (u: ClientUserRow) => u.revoked ? <Badge tone="crit">{t("Access ended by HQ")}</Badge> : <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{t(u.status === "active" ? "Active" : u.status === "invited" ? "Not signed in yet" : "Disabled")}</Badge>;
   return (
     <Page>
       <PageHead title={live.customer ? t("Users of {customer}", { customer: live.customer }) : t("Users")} sub={t("People who can sign in to this customer app. As an owner you add users, change their role and access, and remove them.")} action={<Btn variant="primary" onClick={() => open({ kind: "invite" })}><Icon name="add" /> {t("Add user")}</Btn>} />
@@ -72,6 +72,12 @@ export function UsersView({ live }: { live: { customerId: string; customer: stri
           { key: "l", label: t("Last sign-in"), render: (u) => u.lastSignIn, hideBelow: "sm" },
           { key: "a", label: t("Actions"), render: (u) => {
             if (u.you) return <span className="text-xs text-muted-foreground">{t("Your account")}</span>;
+            if (u.revoked) return ( // HQ ended the access (IR508): only removing the user is left here
+              <div className="flex flex-wrap items-center gap-1">
+                {!u.lastOwner && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "remove", row: u })}><Icon name="delete" />{t("Remove")}</Btn>}
+                <span className="text-xs text-muted-foreground">{t("Only HQ can give the access back")}</span>
+              </div>
+            );
             const invited = u.status === "invited";
             return (
               <div className="flex flex-wrap gap-1">

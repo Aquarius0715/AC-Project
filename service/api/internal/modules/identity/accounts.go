@@ -142,6 +142,15 @@ func createAccount(ctx context.Context, c *ops.Call, a newAccount) (user, member
 	if err != nil {
 		return user, membership, err
 	}
+	if c.Principal.Role != "admin" { // a person whose access HQ ended comes back only through HQ (IR508), not as a new account
+		var revoked bool
+		if err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships WHERE user_id = $1 AND revoked_at IS NOT NULL)`, user).Scan(&revoked); err != nil {
+			return user, membership, err
+		}
+		if revoked {
+			return user, membership, apperr.Fields(map[string]string{"email": "errors.revoked_by_hq"})
+		}
+	}
 	if err = c.Tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, employment, client_role, valid_from, valid_until, created_at, updated_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $6, $6) RETURNING id`,
 		user, a.OrgID, a.Role, a.Employment, a.ClientRole, c.Now, a.ValidUntil).Scan(&membership); err != nil {

@@ -18,6 +18,8 @@ const fieldText: Record<string, string> = {
   "error.invalidFile": "{field} is not an accepted file — check its type and size", // the bytes, the type or the size (IR308)
   // the address belongs to someone who still has access, here or elsewhere (IR461, IR462)
   "errors.email_taken": "{field} belongs to someone who still has access — use another address or ask HQ",
+  // HQ ended this person's access: only HQ gives it back, not a new account (IR508)
+  "errors.revoked_by_hq": "HQ ended this person's access — only HQ can give it back",
   // a QR check-in with another unit's label, or one the technician's units do not have (jobs.checkIn, IR486)
   "errors.qr_unit_mismatch": "The scanned QR label is not this job's unit — scan the label on this AC, or check in manually with a reason",
 };
@@ -29,6 +31,8 @@ const keyText: Record<string, string> = {
   // losing the permission, ending or starting later: the tenant keeps someone who can manage access (IR472)
   "errors.last_identity_admin": "At least one active membership must keep identity.write — give it to another HQ membership first, then change this one",
   "errors.access_expired": "This account’s access period has ended — set a new access end first",
+  // HQ ended the access in Access & roles: no access end, enabling or role change brings it back (IR508)
+  "errors.revoked_by_hq": "HQ ended this account's access — only HQ can give it back",
   // one card attempt at a time, and a paid invoice is not paid again (IR447, IR474)
   "errors.invoice_has_payment": "This invoice already has a payment in progress or recorded — finish or fail that one first",
   // an invoice of the contract already covers part of the period (IR469)
