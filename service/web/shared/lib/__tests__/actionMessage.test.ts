@@ -30,6 +30,8 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     // IR508: HQ ended the access — only HQ gives it back, in the display language
     expect([actionMessage(failure({ code: "CONFLICT", messageKey: "errors.revoked_by_hq" })), actionMessage(failure({ fieldErrors: { email: "errors.revoked_by_hq" } }), translator("ms"))]).toEqual([
       "HQ ended this account's access — only HQ can give it back", "HQ telah menamatkan akses orang ini — hanya HQ boleh memulihkannya"]);
+    // IR510: an HQ membership on another app's token
+    expect(actionMessage(failure({ code: "FORBIDDEN", messageKey: "errors.hq_app_required" }))).toBe("An HQ account works in the HQ app — sign in there");
     // IR486: a QR check-in with another unit's label says what to do, in the display language
     const qr = failure({ fieldErrors: { qrUnitId: "errors.qr_unit_mismatch" } });
     expect([actionMessage(qr), actionMessage(qr, translator("ms"))]).toEqual([

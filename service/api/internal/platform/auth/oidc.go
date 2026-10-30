@@ -18,9 +18,10 @@ import (
 // (one of the app clients), expiry, the token type and the signature against the JWKS (container design §4:
 // OIDC_ISSUER, OIDC_JWKS_URL, OIDC_APP_CLIENT_ID, OIDC_ADMIN_CLIENT_ID).
 type OIDCVerifier struct {
-	Issuer    string
-	Audiences []string
-	Keyfunc   jwt.Keyfunc
+	Issuer      string
+	Audiences   []string
+	AdminClient string // HQ's app client (OIDC_ADMIN_CLIENT_ID): its tokens alone carry HQ's memberships (IR510)
+	Keyfunc     jwt.Keyfunc
 }
 
 // Verify implements Verifier and returns the `sub` claim with the `auth_time` claim, which Cognito and Keycloak put
@@ -42,7 +43,11 @@ func (v *OIDCVerifier) Verify(_ context.Context, token string) (Identity, error)
 	if sub == "" {
 		return Identity{}, errors.New("no subject")
 	}
-	return Identity{Subject: sub, SignedIn: authTime(claims)}, nil
+	client, _ := claims["azp"].(string) // Keycloak; Cognito's access tokens name it client_id
+	if client == "" {
+		client, _ = claims["client_id"].(string)
+	}
+	return Identity{Subject: sub, SignedIn: authTime(claims), Client: client, AdminApp: client != "" && client == v.AdminClient}, nil
 }
 
 // authTime reads the `auth_time` claim (seconds since the epoch); zero when it is missing or not a number.
@@ -113,5 +118,6 @@ func NewVerifierFromEnv(ctx context.Context) (Verifier, error) {
 	if err != nil {
 		return nil, fmt.Errorf("jwks: %w", err)
 	}
-	return &OIDCVerifier{Issuer: iss, Audiences: []string{os.Getenv("OIDC_APP_CLIENT_ID"), os.Getenv("OIDC_ADMIN_CLIENT_ID")}, Keyfunc: k.Keyfunc}, nil
+	admin := os.Getenv("OIDC_ADMIN_CLIENT_ID")
+	return &OIDCVerifier{Issuer: iss, Audiences: []string{os.Getenv("OIDC_APP_CLIENT_ID"), admin}, AdminClient: admin, Keyfunc: k.Keyfunc}, nil
 }

@@ -26,5 +26,5 @@ export default async function PreferencesPage() {
     coreIdentity(),
   ]);
   const qr = !twoFactor.enabled && twoFactor.setupKey ? qrPath(otpauthUri(twoFactor.setupKey, identity.displayName || "account")) : null;
-  return <PreferencesView live={{ prefs, twoFactor, consent, client, zones: zoneOptions(prefs.timezone, now), qr }} />;
+  return <PreferencesView live={{ prefs, twoFactor, consent, client, hq: session?.role === "admin", zones: zoneOptions(prefs.timezone, now), qr }} />;
 }

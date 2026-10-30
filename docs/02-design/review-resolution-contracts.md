@@ -7374,3 +7374,20 @@ Decided by the user on 2026-10-30 (business review question 1, the recommended o
    - the new administrator listing the tenant's memberships with `identity.write` through the API.
    - The new tenant stays in the test database. `TestMembersSave` and `TestWarrantyReminders` counted every tenant's administrators in their owner queries, and now count tenant-a's only.
 
+## IR510 HQ two-step verification is enforced (DEC-85) — 2026-10-30
+
+Decided by the user on 2026-10-30 (business review question 5, the recommended option). Until now the realm asked for a code only from users who had a device (Keycloak's default conditional 2FA). An HQ user who removed the device in the account console signed in to the HQ app with the password alone. A session of another app (the customer, partner or technician app, same realm) also opened the HQ app, and the Core API took an HQ membership from a token of any app.
+
+1. **Local realm (`docker/keycloak/realm-ac.json`).**
+   - The HQ app's client `ac-admin-web` signs in through the new top-level flow `hq browser`: the username-and-password form, then the OTP form, both REQUIRED, with no cookie step. A user without a device is sent to set one up before any code is issued, and another app's session does not open it.
+   - A realm file that names any flow must name all of them, so the realm also lists Keycloak 26.8's default flows, configurations and required actions, taken from the running realm's partial export.
+   - The running development Keycloak got the same flow and binding through its admin API, without a re-import: users and sessions stay.
+   - Checked on a throwaway Keycloak with the file. With the old realm, a user without a device got a code from the HQ app with the password alone. With the flow, they are sent to set up a device. A user with a device gives the password, then the code, and gets in. A session of the customer app gets the HQ login form, not a code.
+2. **Core API.** The verifier names the app a token was issued to (`azp`, Cognito's `client_id`). An admin membership with a token of another app is FORBIDDEN (`errors.hq_app_required`); `OIDC_ADMIN_CLIENT_ID` is HQ's app. The static test tokens name no app and are not judged.
+3. **Production design.** HQ signs in through its own Amazon Cognito user pool with MFA required, so no HQ user can turn it off. Customers, contractors and technicians use the other pool (backend architecture: identity provider, two-step verification). The Cognito adapter that verifies both pools is still to be built.
+4. **Web.** The HQ app's Preferences › Security shows two-step verification as Required, with no demo switch. The other apps keep the FR-X08 demo.
+5. **Tests.**
+   - `TestHQThroughItsApp` (auth): an HQ membership with another app's token is FORBIDDEN, a customer's is accepted, and HQ's own app is accepted.
+   - `TestOIDCVerifier` checks the app from `azp` and from `client_id`.
+   - The admin end-to-end suite signs in with the code as before.
+

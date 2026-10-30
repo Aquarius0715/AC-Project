@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.379.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
+Version: 0.380.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.380.0 (2026-10-30): HQ two-step verification is enforced (DEC-85, IR510). The HQ app signs in through the realm flow `hq browser` (password and one-time code every time, never another app's session), the Core API refuses an HQ membership on another app's token (`errors.hq_app_required`), and production gives HQ its own Cognito pool with MFA required.
 0.379.0 (2026-10-30): The completion criteria now include starting from one HQ administrator in an empty environment: `migrate bootstrap-admin -tenant … -email … -name …` creates the tenant's first administrator, whose sign-in account and set-up e-mail follow, and refuses a tenant that already has one (DEC-84, IR509).
 0.378.0 (2026-10-30): HQ's revoke in Access & roles now also turns the person's sign-in off (`Membership.revokedAt`), and only HQ gives the access back: a contractor or customer owner can no longer extend, enable or re-add the person (DEC-83, IR508).
 0.377.0 (2026-10-30): The user's answers of 2026-10-30 are recorded as decisions: the start of the same minute wins (DEC-80), a contractor or customer owner adds at most 30 accounts a day (DEC-81), and ending a contract early is outside Phase 1A, designed before production (DEC-82, OPEN-07) (IR507).

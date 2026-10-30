@@ -26,6 +26,10 @@ import (
 type Identity struct {
 	Subject  string
 	SignedIn time.Time // zero when the token does not say
+	// Client is the app the token was issued to (azp / client_id), empty when the verifier does not say. AdminApp says
+	// it is HQ's app, whose sign-in asks for the one-time code every time (DEC-85, IR510).
+	Client   string
+	AdminApp bool
 }
 
 // Verifier checks a bearer token and returns who holds it.
@@ -121,6 +125,9 @@ func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 			}
 			if Revoked(p, id.SignedIn) { // HQ signed this user out everywhere after this sign-in (IR384)
 				return unauth(c, "errors.session_revoked")
+			}
+			if p.Role == "admin" && id.Client != "" && !id.AdminApp { // HQ works through its own app, signed in with the code (DEC-85, IR510)
+				return apperr.E(apperr.Forbidden, "errors.hq_app_required")
 			}
 			c.SetRequest(c.Request().WithContext(ops.WithPrincipal(c.Request().Context(), p)))
 			return next(c)

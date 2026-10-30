@@ -103,6 +103,41 @@ func TestMiddleware(t *testing.T) {
 	a.Now = nil
 }
 
+// clientVerifier says which app each token was issued to, as the OIDC verifier does (IR510).
+type clientVerifier struct {
+	Verifier
+	client string
+	admin  bool
+}
+
+func (v clientVerifier) Verify(ctx context.Context, token string) (Identity, error) {
+	id, err := v.Verifier.Verify(ctx, token)
+	id.Client, id.AdminApp = v.client, v.admin
+	return id, err
+}
+
+// TestHQThroughItsApp (DEC-85, IR510): an HQ membership works only with a token of HQ's app, whose sign-in asks for
+// the one-time code every time; the other apps' tokens carry the other roles, and a verifier that does not name the
+// app (the static test tokens) is not judged.
+func TestHQThroughItsApp(t *testing.T) {
+	a := setup(t)
+	static := a.Verifier
+	tenant := seed.ID("tenant-a").String()
+	hq := map[string]string{"Authorization": "Bearer tok-hq", "X-Tenant-Id": tenant, "X-Membership-Id": seed.ID("hq-operator").String()}
+	customer := map[string]string{"Authorization": "Bearer tok-cust", "X-Tenant-Id": tenant, "X-Membership-Id": seed.ID("customer-a").String()}
+	a.Verifier = clientVerifier{static, "ac-web", false}
+	if w, _ := call(a, hq); w.Code != http.StatusForbidden {
+		t.Errorf("HQ through another app: %d", w.Code)
+	}
+	if w, _ := call(a, customer); w.Code != 204 {
+		t.Errorf("a customer through the customer app: %d", w.Code)
+	}
+	a.Verifier = clientVerifier{static, "ac-admin-web", true}
+	if w, p := call(a, hq); w.Code != 204 || p.Role != "admin" {
+		t.Errorf("HQ through its app: %d", w.Code)
+	}
+}
+
 func TestStaticVerifier(t *testing.T) {
 	if _, err := (StaticVerifier{}).Verify(context.Background(), "x"); err == nil {
 		t.Fatal("unknown token")

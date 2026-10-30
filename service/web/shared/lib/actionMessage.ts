@@ -33,6 +33,8 @@ const keyText: Record<string, string> = {
   "errors.access_expired": "This account’s access period has ended — set a new access end first",
   // HQ ended the access in Access & roles: no access end, enabling or role change brings it back (IR508)
   "errors.revoked_by_hq": "HQ ended this account's access — only HQ can give it back",
+  // an HQ account works only in the HQ app, signed in with the one-time code (DEC-85, IR510)
+  "errors.hq_app_required": "An HQ account works in the HQ app — sign in there",
   // one card attempt at a time, and a paid invoice is not paid again (IR447, IR474)
   "errors.invoice_has_payment": "This invoice already has a payment in progress or recorded — finish or fail that one first",
   // an invoice of the contract already covers part of the period (IR469)

@@ -17,6 +17,7 @@ export type PreferencesLive = {
   twoFactor: { enabled: boolean; enabledAt: string | null; recoveryCodesLeft: number | null; setupKey: string | null };
   consent: Consent | null;
   client: boolean;
+  hq: boolean; // HQ's sign-in always asks for the one-time code (DEC-85, IR510): nothing to turn on or off here
   zones: { id: string; label: string }[];
   qr: QrPath | null; // the setup key as an authenticator QR code while two-step verification is off
 };
@@ -63,11 +64,20 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
             <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Email me the monthly energy report (1st of each month)")}</div><div className="text-xs text-muted-foreground">{t("Last month's report, to your account e-mail · also set from Energy & cost › Export report")}</div></div><Toggle on={monthly} onChange={setMonthly} label={t("Monthly energy report e-mail")} /></div>
           </div>
         )}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <div><div className="text-[13px] font-semibold">{t("Security · Two-step verification")}</div><div className="text-xs text-muted-foreground">{t("Ask for a 6-digit code from an authenticator app when signing in on a new device")}{tf.enabled && tf.recoveryCodesLeft !== null ? t(" · {n} recovery codes left", { n: tf.recoveryCodesLeft }) : ""}.</div></div>
-          <span className="flex items-center gap-2">{tf.enabled ? <><Badge tone="ok">{t("On")}</Badge><Btn size="sm" onClick={() => setModal("off")}>{t("Turn off")}</Btn></> : <><Badge>{t("Off")}</Badge><Btn size="sm" variant="primary" onClick={() => setModal("on")}>{t("Turn on")}</Btn></>}</span>
-        </div>
-        <p className="mt-1 text-[11px] text-muted-foreground">{t("Demo only — any 6 digits are accepted and the demo sign-in is unchanged (FR-X08).")}</p>
+        {live.hq ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div><div className="text-[13px] font-semibold">{t("Security · Two-step verification")}</div><div className="text-xs text-muted-foreground">{t("Required for HQ: every sign-in to the HQ app asks for the 6-digit code from your authenticator app.")}</div></div>
+            <Badge tone="ok">{t("Required")}</Badge>
+          </div>
+        ) : (
+          <>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <div><div className="text-[13px] font-semibold">{t("Security · Two-step verification")}</div><div className="text-xs text-muted-foreground">{t("Ask for a 6-digit code from an authenticator app when signing in on a new device")}{tf.enabled && tf.recoveryCodesLeft !== null ? t(" · {n} recovery codes left", { n: tf.recoveryCodesLeft }) : ""}.</div></div>
+              <span className="flex items-center gap-2">{tf.enabled ? <><Badge tone="ok">{t("On")}</Badge><Btn size="sm" onClick={() => setModal("off")}>{t("Turn off")}</Btn></> : <><Badge>{t("Off")}</Badge><Btn size="sm" variant="primary" onClick={() => setModal("on")}>{t("Turn on")}</Btn></>}</span>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">{t("Demo only — any 6 digits are accepted and the demo sign-in is unchanged (FR-X08).")}</p>
+          </>
+        )}
         <div className="mt-5 flex justify-end gap-2"><Btn disabled={!dirty || pending} onClick={reset}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!dirty || pending} onClick={save}><Icon name="check" />{t("Save preferences")}</Btn></div>
       </Card>
       {modal === "on" && <TurnOn setupKey={tf.setupKey} qr={live.qr} onClose={() => setModal(null)} />}

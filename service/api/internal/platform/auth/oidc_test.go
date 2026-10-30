@@ -22,8 +22,20 @@ func TestOIDCVerifier(t *testing.T) {
 	base := func() jwt.MapClaims {
 		return jwt.MapClaims{"iss": v.Issuer, "sub": "user-1", "azp": "ac-web", "typ": "Bearer", "exp": time.Now().Add(time.Hour).Unix()}
 	}
-	if id, err := v.Verify(context.Background(), sign(key, base())); err != nil || id.Subject != "user-1" || !id.SignedIn.IsZero() {
+	if id, err := v.Verify(context.Background(), sign(key, base())); err != nil || id.Subject != "user-1" || !id.SignedIn.IsZero() || id.Client != "ac-web" || id.AdminApp {
 		t.Fatalf("valid token: %+v %v", id, err)
+	}
+	// IR510: the token names its app; HQ's app is the admin client (Keycloak azp, Cognito client_id)
+	v.AdminClient = "ac-admin-web"
+	for name, c := range map[string]jwt.MapClaims{"azp": {"azp": "ac-admin-web"}, "client_id": {"client_id": "ac-admin-web", "token_use": "access"}} {
+		claims := base()
+		delete(claims, "azp")
+		for k, x := range c {
+			claims[k] = x
+		}
+		if id, err := v.Verify(context.Background(), sign(key, claims)); err != nil || id.Client != "ac-admin-web" || !id.AdminApp {
+			t.Errorf("HQ's app by %s: %+v %v", name, id, err)
+		}
 	}
 	signedIn := time.Date(2026, 9, 14, 0, 55, 0, 0, time.UTC) // IR268: auth_time is the sign-in time
 	c := base()
