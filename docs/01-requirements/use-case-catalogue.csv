@@ -6,7 +6,7 @@ UC-X04,Sign out,Signed-in user,—,—,FR-X01,account menu (all screens)
 UC-X05,Switch membership / role (demo),Signed-in user,—,«include» X10,FR-X01 · FR-X05,role picker
 UC-X06,Read notifications,Signed-in user,—,«include» X10,FR-X07,C 10c · A 15-3 · P 07-3 · T 04-3
 UC-X07,Set preferences (language; channels; consent),Signed-in user,—,«include» X10,FR-X01,C 10d · A 15-4 · P 07-4 · T 04-4
-UC-X08,Turn two-step verification on / off,—,—,«extend» X07,FR-X08,C 10g · A 15-7 · P 07-7 · T 04-7
+UC-X08,Turn two-step verification on / off,—,—,«extend» X07,FR-X08,C 10g · P 07-7 · T 04-7 (HQ: required at sign-in, DEC-85)
 UC-X09,Use demo controls (reset · trigger · clock),Signed-in user,—,«include» X10,FR-X05,C 10e · A 15-5 · P 07-5 · T 04-5
 UC-X10,Check access (tenant · role · scope · period · capability),—,—,included by every use case,FR-X04 · IR112,C 10f · A 15-6 · P 01-4; 02-12; 07-6 · T 02-9; 04-6
 UC-C01,View monitoring dashboard,Client,—,—,FR-C01,01a; 01b

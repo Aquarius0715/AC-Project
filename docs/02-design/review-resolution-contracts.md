@@ -7411,3 +7411,18 @@ Found in the loop's review (identity), and taken up with the user's decisions of
    - an `AccountEnabled` (off).
    The drain reports the failure, the account is turned off, and the event from before the split is not applied again.
 
+## IR512 Figma and the use-case catalogue follow IR510: HQ's two-step is Required — 2026-10-30
+
+Found in the loop's review of IR510 against Figma (the user's final specification since 2026-10-01).
+- Admin 15-4 (Preferences) still offered "Off · Turn on" for HQ.
+- Admin 15-7 (the "Turn on two-step verification" dialog) showed a path the HQ app no longer has.
+- The use-case catalogue listed A 15-7 for UC-X08.
+
+1. **Figma, Admin page.**
+   - 15-4's Security row says "Required for HQ: every sign-in to the HQ app asks for the 6-digit code from your authenticator app." with a green Required badge, as the web does, and has no button.
+   - The Turn-on hotspot and ClickMap item 4 are removed, and so are screen 15-7, its tag, its ClickMap and its hotspots.
+2. **Figma, User Flows and Use Cases.**
+   - The HQ lane loses the 15-7 card with its arrow and label. Lane 15 is one column wide now.
+   - The UC-X08 catalogue row and trace list no HQ screen and say "HQ: required at sign-in" (DEC-85).
+3. **Docs.** FR-X08's basis names the HQ Preferences 15-4 with the IR510 rule, and `use-case-catalogue.csv` drops A 15-7. The client, contractor and technician screens (10g, 07-7, 04-7) are unchanged.
+

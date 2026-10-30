@@ -142,7 +142,7 @@ Choose recipients from the event and current business scope. Publish only qualit
 
 ### FR-X08 Two-step verification (demo)
 
-- **Company request basis**: SRC-06 BIZ-01, BIZ-04; Figma-confirmed Preferences › Security (Client 10g, Admin 15-7, Contractor 07-7, Technician 04-7, 2026-10-01).
+- **Company request basis**: SRC-06 BIZ-01, BIZ-04; Figma-confirmed Preferences › Security (Client 10g, Contractor 07-7, Technician 04-7, 2026-10-01; HQ's Preferences 15-4 shows it as Required and has no setup dialog since IR510, DEC-85).
 
 Preferences gains a Security section with the status (Off / On · n recovery codes left) and Turn on / Turn off. The setup dialog shows a setup key (QR in production), a 6-digit code field, and, after verifying, 8 recovery codes once (`twoFactor.get/enable/disable`). In the demo any 6 digits are accepted and no authenticator is called; real sign-in remains out of scope. Turning off asks for a current code. HQ's sign-in always asks for the code (DEC-85, IR510): the HQ app's Preferences show it as Required, with nothing to turn on or off.
 
