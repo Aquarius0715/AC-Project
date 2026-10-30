@@ -7614,3 +7614,19 @@ The user shared the nodes' firmware and answered three questions. Both nodes are
    - node_2's unit, module and binding were deleted, and change capture removed their replicas. The two node models were removed.
    - The bridge restarted with sending on; no command was sent by the change itself.
 6. **Tests.** `live_test.go` covers the command mapping (COOL24 with its settings, OFF, refused actions), the sent, acknowledged and state triggers and the refusal, and that commands go to a node the bridge listens to. `TestLiveSiteSeeds` checks the model that offers the power only, the one unit and the module's serial.
+
+## IR529 The live readings feed the alert policies, and a silent module raises "AC offline" — 2026-10-30
+
+After ON/OFF worked, the user asked to do what is possible without changing the devices. The recommended items were threshold notifications on the live readings and noticing when the nodes stop. Alert policies were evaluated only through `automations.fire` / `simulate`, which need a person's session, take one tick per tenant and minute (IR21) and also decide automations. So no reading ever reached them.
+
+1. **`demo.trigger` automation.** The contract's `DemoTrigger` already had `{eventType: 'automation', event: EvaluationInput}`, the last of the browser demo's types (IR391). The API now serves it for a device gateway:
+   - The event must have phase `condition` (schedules come from the clock, IR54) and pass `EvaluationInput` validation. A missing event is `event` required; an event after the scenario clock is `event.occurredAt` out of range.
+   - It runs in the units' tenant as the system, like a scheduler job, and its alerts' and notifications' events and audits are recorded the same way.
+   - `control.Automations.Notify` evaluates only the units' alert policies (`monitoring.Notifier`, with `fire`): a matching policy opens or reuses its Alert and notifies, and a recovered reading resolves it (D08).
+   - No automation is decided, so no command and no automation run come from a report, and no tick is taken. `TestDemoAutomationNotifiesOnly` checks this against `automations.fire` with the same facts, which leaves a run.
+2. **Fact metrics.** `EvaluationInput` facts refused `compressor_cycles`, `airflow_drop` and `heartbeat_gap`. The contract's `Metric` has them, and three default rules (IR120) watch them. They are taken now, with their D07 units (cycles/h, %, min) and 120 s freshness.
+3. **Bridge.** Each node message that passes the minute gate also sends its readings as facts of the live unit, at the minute (`LiveTriggers`: readings, evaluation, then heartbeat).
+   - Once a scenario minute the bridge sends `heartbeat_gap`: the longest time in minutes, floored to a tenth, since a node was last heard. A node not heard since the bridge started counts from its start.
+   - The default rule `ac_offline` opens "AC offline" at 15 minutes without the nodes and resolves under 1 minute, so a stopped node or an unreachable broker is noticed and notified (the owner's in-app notification and e-mail, Mailpit in development).
+4. **What the user does.** Alerts › Alert policies in the customer app, for example "room temperature ≥ 30 °C" on Live · Daikin AC. In the demo evaluation a fact counts as sustained for the policy's duration, so one minute over the threshold alerts, and the cooldown keeps repeats apart. Policies alert only; nothing switches the air conditioner automatically.
+5. **Swagger.** The demo.trigger validation in the operation catalog names IR528 and IR529, and `make swagger` rebuilt the API description.

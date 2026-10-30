@@ -71,6 +71,27 @@ type Trigger struct {
 	Measurement *Measurement             `json:"measurement,omitempty"`
 	DeviceID    *uuid.UUID               `json:"deviceId,omitempty"` // state
 	State       *devicesim.ReportedState `json:"state,omitempty"`    // state
+	Event       *Evaluation              `json:"event,omitempty"`    // automation: the facts against the alert policies (IR529)
+}
+
+// Evaluation is the EvaluationInput a demo automation trigger carries: the facts a gateway reports, which the API
+// evaluates against the units' alert policies only (IR529).
+type Evaluation struct {
+	EventID    uuid.UUID   `json:"eventId"`
+	OccurredAt time.Time   `json:"occurredAt"`
+	UnitIDs    []uuid.UUID `json:"unitIds"`
+	Facts      []Fact      `json:"facts"`
+	Phase      string      `json:"phase"`
+}
+
+// Fact is one reading of a unit as an evaluation takes it (the contract's Fact, a number).
+type Fact struct {
+	UnitID     uuid.UUID `json:"unitId"`
+	Metric     string    `json:"metric"`
+	Value      float64   `json:"value"`
+	Unit       string    `json:"unit"`
+	ObservedAt time.Time `json:"observedAt"`
+	Quality    string    `json:"quality"`
 }
 
 // Measurement is the RawMeasurement the trigger carries.

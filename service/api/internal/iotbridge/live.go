@@ -3,6 +3,7 @@ package iotbridge
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -51,9 +52,10 @@ func LiveNode(topic string) string {
 // LiveTriggers converts one node message received at `at` on the scenario clock into readings of the live unit and
 // module (seed.LiveSite: both nodes are one module, DEC-89). Each reading is stamped at the start of its scenario
 // minute (the slot energy counts, D07), and its event ID is the node, field and minute, so the API keeps one reading
-// per sensor and minute. The module's heartbeat comes with them: a state report with no settings (the nodes report
-// none), which the API takes as heard only (IR528) and which keeps the unit's last seen time current. A node the
-// bridge does not know is an error; a message with nothing measured gives no triggers.
+// per sensor and minute. The same readings then go to the unit's alert policies as facts (a demo automation trigger,
+// IR529), and the module's heartbeat comes last: a state report with no settings (the nodes report none), which the
+// API takes as heard only (IR528) and which keeps the unit's last seen time current. A node the bridge does not know is
+// an error; a message with nothing measured gives no triggers.
 func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) {
 	fields, ok := LiveNodes[node]
 	if !ok {
@@ -100,6 +102,13 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 	if len(out) == 0 {
 		return nil, nil
 	}
+	// the same readings as facts of the unit's alert policies (IR529): a rule over a threshold alerts and notifies
+	facts := make([]Fact, 0, len(out))
+	for _, tr := range out {
+		m := tr.Measurement
+		facts = append(facts, Fact{UnitID: m.UnitID, Metric: m.Metric, Value: *m.Value, Unit: m.Unit, ObservedAt: slot, Quality: "valid"})
+	}
+	out = append(out, liveEvaluation(fmt.Sprintf("live/%s/automation/%s", node, slot.Format(time.RFC3339)), slot, facts))
 	dev := seed.ID(seed.LiveSite.Device)
 	out = append(out, Trigger{
 		ScenarioID: Scenario,
@@ -111,6 +120,67 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 		State:      &devicesim.ReportedState{},
 	})
 	return out, nil
+}
+
+// liveEvaluation is a demo automation trigger of the live unit's facts, with an event ID from key.
+func liveEvaluation(key string, at time.Time, facts []Fact) Trigger {
+	event := uuid.NewSHA1(seed.Namespace, []byte(key))
+	return Trigger{
+		ScenarioID: Scenario,
+		EventID:    event,
+		OccurredAt: at,
+		EventType:  "automation",
+		Event:      &Evaluation{EventID: event, OccurredAt: at, UnitIDs: []uuid.UUID{seed.ID(seed.LiveSite.Unit)}, Facts: facts, Phase: "condition"},
+	}
+}
+
+// LiveGapTrigger reports, at the scenario minute slot, how long the live module has gone unheard: the longest time in
+// minutes since a node's last message (heartbeat_gap). The default rule ac_offline alerts at 15 minutes and resolves
+// under 1 (IR120), so a node that stops, or a broker out of reach, is noticed without the nodes' help (IR529).
+func LiveGapTrigger(gap time.Duration, slot time.Time) Trigger {
+	slot = slot.UTC()
+	minutes := math.Floor(gap.Minutes()*10) / 10
+	return liveEvaluation("live/gap/"+slot.Format(time.RFC3339), slot,
+		[]Fact{{UnitID: seed.ID(seed.LiveSite.Unit), Metric: "heartbeat_gap", Value: minutes, Unit: "min", ObservedAt: slot, Quality: "valid"}})
+}
+
+// LiveHeard keeps when each live node was last heard, for the heartbeat gap. A node not heard since the bridge started
+// counts from its start.
+type LiveHeard struct {
+	mu    sync.Mutex
+	start time.Time
+	last  map[string]time.Time
+}
+
+// NewLiveHeard starts counting at start.
+func NewLiveHeard(start time.Time) *LiveHeard {
+	return &LiveHeard{start: start, last: map[string]time.Time{}}
+}
+
+// Heard notes a message of node at.
+func (h *LiveHeard) Heard(node string, at time.Time) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if at.After(h.last[node]) {
+		h.last[node] = at
+	}
+}
+
+// Gap is the longest time any live node has gone unheard at now.
+func (h *LiveHeard) Gap(now time.Time) time.Duration {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	var gap time.Duration
+	for node := range LiveNodes {
+		last, ok := h.last[node]
+		if !ok {
+			last = h.start
+		}
+		if d := now.Sub(last); d > gap {
+			gap = d
+		}
+	}
+	return gap
 }
 
 // LiveGate lets one message per node and scenario minute through: the nodes report every 5 seconds, the platform keeps

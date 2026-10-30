@@ -6087,7 +6087,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: public:demo-panel-only\nValidation: D01; IR37 includes transport/network injection; IR45 simulator on/off; IR59 payment branch removed; IR77 telemetry sequence optional (latest+1); IR98 allergen/load_alert events; IR213 telemetry causes unit_mismatch → non_finite → out_of_range → invalid_time; IR217 device faults/recoveries (sequence per device/binding/axis; eventId repeat; current binding; tamper Alert) and operation results (running only)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
+                "description": "Authorization: public:demo-panel-only\nValidation: D01; IR37 includes transport/network injection; IR45 simulator on/off; IR59 payment branch removed; IR77 telemetry sequence optional (latest+1); IR98 allergen/load_alert events; IR213 telemetry causes unit_mismatch → non_finite → out_of_range → invalid_time; IR217 device faults/recoveries (sequence per device/binding/axis; eventId repeat; current binding; tamper Alert) and operation results (running only); IR528 a state report with no settings moves last seen only; IR529 automation evaluates the event's facts (phase condition) against the alert policies only, deciding no automation\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DDC-07",
                 "consumes": [
                     "application/json"
                 ],
@@ -35798,7 +35798,14 @@
                 "enabled": {
                     "type": "boolean"
                 },
-                "event": {},
+                "event": {
+                    "description": "automation: the facts a device gateway reports, evaluated against the alert policies only (IR529)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/control.EvaluationInput"
+                        }
+                    ]
+                },
                 "eventId": {
                     "type": "string"
                 },
@@ -35818,7 +35825,7 @@
                     "$ref": "#/definitions/server.RawMeasurement"
                 },
                 "membershipId": {
-                    "description": "The other event types of DemoTrigger (qualification_revoked, automation, network, simulator, allergen, load_alert,\nsession_expired, microphone_denied, transport) are the browser demo's. Their fields are read here only so that a\ntrigger shaped by the contract is refused as errors.trigger_unsupported, not as malformed input (IR391).",
+                    "description": "The other event types of DemoTrigger (qualification_revoked, network, simulator, allergen, load_alert,\nsession_expired, microphone_denied, transport) are the browser demo's. Their fields are read here only so that a\ntrigger shaped by the contract is refused as errors.trigger_unsupported, not as malformed input (IR391).",
                     "type": "string"
                 },
                 "observation": {},

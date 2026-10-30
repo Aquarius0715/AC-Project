@@ -34,8 +34,8 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(out) != 3 {
-		t.Fatalf("%d triggers, want temperature, humidity and the heartbeat", len(out))
+	if len(out) != 4 {
+		t.Fatalf("%d triggers, want temperature, humidity, their alert evaluation and the heartbeat", len(out))
 	}
 	slot := liveAt.Truncate(time.Minute)
 	want := map[string]struct {
@@ -58,7 +58,18 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 			t.Errorf("%s origin, quality, event or sequence: %+v", m.Metric, m)
 		}
 	}
-	hb := out[2]
+	ev := out[2] // the readings as facts of the unit's alert policies (IR529)
+	if ev.EventType != "automation" || ev.Event == nil || ev.Event.EventID != ev.EventID || ev.Event.Phase != "condition" || !ev.Event.OccurredAt.Equal(slot) ||
+		len(ev.Event.UnitIDs) != 1 || ev.Event.UnitIDs[0] != seed.ID("unit-live-ac") || len(ev.Event.Facts) != 2 {
+		t.Fatalf("alert evaluation %+v", ev)
+	}
+	for i, want := range []Fact{{UnitID: seed.ID("unit-live-ac"), Metric: "temperature", Value: 27.2, Unit: "°C", ObservedAt: slot, Quality: "valid"},
+		{UnitID: seed.ID("unit-live-ac"), Metric: "humidity", Value: 50.9, Unit: "%", ObservedAt: slot, Quality: "valid"}} {
+		if f := ev.Event.Facts[i]; f.UnitID != want.UnitID || f.Metric != want.Metric || f.Value != want.Value || f.Unit != want.Unit || !f.ObservedAt.Equal(slot) || f.Quality != "valid" {
+			t.Errorf("fact %d %+v, want %+v", i, f, want)
+		}
+	}
+	hb := out[3]
 	if hb.EventType != "state" || hb.DeviceID == nil || *hb.DeviceID != seed.ID("device-live-ac") || !hb.OccurredAt.Equal(slot) {
 		t.Errorf("heartbeat %+v", hb)
 	}
@@ -80,17 +91,20 @@ func TestLiveTriggersPowerNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(out) != 2 || out[0].Measurement == nil || out[0].Measurement.Metric != "power" || out[1].EventType != "state" {
+	if len(out) != 3 || out[0].Measurement == nil || out[0].Measurement.Metric != "power" || out[1].EventType != "automation" || out[2].EventType != "state" {
 		t.Fatalf("triggers %+v", out)
+	}
+	if f := out[1].Event.Facts; len(f) != 1 || f[0].Metric != "power" || f[0].Value != 0.742 || f[0].Unit != "kW" {
+		t.Errorf("power fact %+v", f)
 	}
 	if m := out[0].Measurement; m.UnitID != seed.ID("unit-live-ac") || m.SensorID != seed.ID("sensor-live-power") || m.Unit != "kW" || *m.Value != 0.742 {
 		t.Errorf("power reading %+v (value %v)", m, *m.Value)
 	}
-	if hb := out[1]; hb.DeviceID == nil || *hb.DeviceID != seed.ID("device-live-ac") {
+	if hb := out[2]; hb.DeviceID == nil || *hb.DeviceID != seed.ID("device-live-ac") {
 		t.Errorf("node_2's heartbeat names module %v", hb.DeviceID)
 	}
 	off, err := LiveTriggers("node_2", []byte(`{"voltage":230.1,"power":0.0}`), liveAt)
-	if err != nil || len(off) != 2 || *off[0].Measurement.Value != 0 {
+	if err != nil || len(off) != 3 || *off[0].Measurement.Value != 0 {
 		t.Errorf("an air conditioner drawing nothing: %+v, %v", off, err)
 	}
 	none, err := LiveTriggers("node_2", []byte(`{"voltage":0.0,"current":0.0,"power":0.0}`), liveAt)
@@ -103,7 +117,7 @@ func TestLiveTriggersPowerNode(t *testing.T) {
 // nothing measured sends nothing, not even the heartbeat.
 func TestLiveTriggersSkipWhatIsNotMeasured(t *testing.T) {
 	out, err := LiveTriggers("node_1", []byte(`{"temp":26.4,"humidity":0.0}`), liveAt)
-	if err != nil || len(out) != 2 || out[0].Measurement.Metric != "temperature" {
+	if err != nil || len(out) != 3 || out[0].Measurement.Metric != "temperature" || len(out[1].Event.Facts) != 1 {
 		t.Errorf("temperature only: %+v, %v", out, err)
 	}
 	out, err = LiveTriggers("node_1", []byte(`{"temp":0.0,"humidity":0.0,"pressure":0.0}`), liveAt)
@@ -138,6 +152,9 @@ func TestLiveEventIDIsOnePerMinute(t *testing.T) {
 	}
 	if a[0].EventID == c[0].EventID || a[0].EventID == a[1].EventID {
 		t.Error("the next minute or another field shares an event ID")
+	}
+	if a[2].EventID != b[2].EventID || a[2].EventID == c[2].EventID { // one alert evaluation per node and minute
+		t.Error("the alert evaluations of one minute differ, or two minutes share one")
 	}
 	p, _ := LiveTriggers("node_2", []byte(node2Message), liveAt.Add(10*time.Second))
 	h1, _ := json.Marshal(a[len(a)-1])
@@ -216,6 +233,32 @@ func TestLiveSentTriggers(t *testing.T) {
 	}
 	if f := LiveRefusedTrigger(w, liveAt); f.EventType != "command_fail" || *f.CommandID != w.ID || !f.OccurredAt.Equal(liveAt) {
 		t.Errorf("refusal %+v", f)
+	}
+}
+
+// TestLiveHeartbeatGap: the gap is the longest time a node has gone unheard, counted from the bridge's start for a node
+// never heard; it is sent as heartbeat_gap in minutes (floored to a tenth) on the minute, one evaluation a minute.
+func TestLiveHeartbeatGap(t *testing.T) {
+	start := liveAt.Add(-20 * time.Minute)
+	h := NewLiveHeard(start)
+	if g := h.Gap(liveAt); g != 20*time.Minute {
+		t.Errorf("no node heard since the start: gap %s, want 20m", g)
+	}
+	h.Heard("node_1", liveAt.Add(-5*time.Second))
+	h.Heard("node_2", liveAt.Add(-3*time.Minute))
+	h.Heard("node_2", liveAt.Add(-4*time.Minute)) // an older message changes nothing
+	if g := h.Gap(liveAt); g != 3*time.Minute {
+		t.Errorf("gap %s, want node_2's 3m", g)
+	}
+	slot := liveAt.Truncate(time.Minute)
+	tr := LiveGapTrigger(17*time.Minute+50*time.Second, slot)
+	f := tr.Event.Facts
+	if tr.EventType != "automation" || len(f) != 1 || f[0].Metric != "heartbeat_gap" || f[0].Unit != "min" || f[0].Value != 17.8 || !f[0].ObservedAt.Equal(slot) ||
+		f[0].UnitID != seed.ID("unit-live-ac") || tr.Event.Phase != "condition" {
+		t.Errorf("gap trigger %+v %+v", tr, f)
+	}
+	if again := LiveGapTrigger(time.Minute, slot); again.EventID != tr.EventID || LiveGapTrigger(time.Minute, slot.Add(time.Minute)).EventID == tr.EventID {
+		t.Error("the gap evaluation is not one a minute")
 	}
 }
 

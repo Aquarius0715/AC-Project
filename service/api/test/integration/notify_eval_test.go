@@ -222,3 +222,99 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 		t.Errorf("alerts.get shows the link: %v", data(m)["previousAlertId"])
 	}
 }
+
+// TestDemoAutomationNotifiesOnly: a gateway's facts (demo.trigger automation, IR529) open the unit's matching alert
+// policy and notify, and a recovered reading resolves it, as the UI's fire does; but no automation is decided, so HQ's
+// automation policy whose tariff condition holds sends nothing. heartbeat_gap, a contract Metric the default rule ac_offline
+// watches (IR120), is taken. A schedule phase, an empty event and a report from the future are refused.
+func TestDemoAutomationNotifiesOnly(t *testing.T) {
+	s := serverWith(t, true)
+	u := newUnit(t, s, "Gateway AC")
+	_, sess := post(s, &customerB, "session.get", `{}`) // the business time of the server (a shared demo cluster may run ahead of clock)
+	now, _ := time.Parse(time.RFC3339Nano, sess["meta"].(map[string]any)["snapshotAt"].(string))
+	tenant, cust := seed.ID("tenant-a"), seed.ID("cust-b")
+	pol := uuid.NewString()
+	cond, _ := json.Marshal(map[string]any{"metric": "temperature", "operator": "gte", "threshold": 30, "recoveryThreshold": 28, "durationSeconds": 60, "activeWindow": nil, "severity": "warning"})
+	owner(t, `INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id, created_by_user_id, timezone, enabled, priority, condition,
+		recipient_membership_ids, channels, escalate_after_minutes, cooldown_minutes) VALUES ($1,$2,'alert',$3,'Too hot',$4,$5,'Asia/Kuala_Lumpur',true,50,$6,$7,'{inApp,email}',60,30)`,
+		pol, tenant, cust, seed.ID("customer-b"), seed.ID("user-customer-b"), cond, []uuid.UUID{seed.ID("customer-b")})
+	owner(t, `INSERT INTO assets.unit_alert_policies (tenant_id, unit_id, policy_id) VALUES ($1,$2,$3)`, tenant, u, pol)
+	// HQ's automation on the same unit sets it to 26 °C while the tariff is 0.5 MYR/kWh or more (reported below)
+	if code, m := write(s, &hq, "policies.save", autoPolicyBody(map[string]string{"unitIds": `["` + u + `"]`}), 0); code != 200 {
+		t.Fatalf("automation policy: %d %v", code, m)
+	}
+	// the default rule ac_offline is on for the customer while the test runs
+	def := defaultPolicyID(t)
+	var was *bool
+	ownerScan(t, `SELECT (SELECT enabled FROM monitoring.default_rule_settings WHERE policy_id = $1 AND rule_key = 'ac_offline' AND customer_id = $2)`, []any{def, cust}, &was)
+	owner(t, `INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id, enabled, changed_by_membership_id) VALUES ($1,$2,'ac_offline',$3,true,$4)
+		ON CONFLICT (policy_id, rule_key, customer_id) DO UPDATE SET enabled = true`, tenant, def, cust, seed.ID("customer-b"))
+	t.Cleanup(func() {
+		if was == nil {
+			owner(t, `DELETE FROM monitoring.default_rule_settings WHERE policy_id = $1 AND rule_key = 'ac_offline' AND customer_id = $2`, def, cust)
+		} else {
+			owner(t, `UPDATE monitoring.default_rule_settings SET enabled = $3 WHERE policy_id = $1 AND rule_key = 'ac_offline' AND customer_id = $2`, def, cust, *was)
+		}
+	})
+	report := func(phase, facts string, at time.Time) (int, map[string]any) {
+		ev := `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + at.Format(time.RFC3339) + `","unitIds":["` + u + `"],"facts":[` + facts + `],"phase":"` + phase + `"}`
+		return write(s, &customerB, "demo.trigger", `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at.Format(time.RFC3339)+`","eventType":"automation","event":`+ev+`}`, 0)
+	}
+	fact := func(metric, value, unit string, at time.Time) string {
+		return `{"unitId":"` + u + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unit + `","observedAt":"` + at.Format(time.RFC3339) + `","quality":"valid"}`
+	}
+	alerts := func(rule string, status string) int {
+		var n int
+		if rule == "" {
+			ownerScan(t, `SELECT count(*) FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND status = $3`, []any{u, pol, status}, &n)
+		} else {
+			ownerScan(t, `SELECT count(*) FROM monitoring.alerts WHERE unit_id = $1 AND rule_key = $2 AND status = $3`, []any{u, rule, status}, &n)
+		}
+		return n
+	}
+	at := now.Add(-30 * time.Second)
+	if code, m := report("condition", fact("temperature", "31.5", "°C", at)+","+fact("tariff", "0.6", "MYR_per_kWh", at), at); code != 200 {
+		t.Fatalf("hot report: %d %v", code, m)
+	}
+	if alerts("", "open") != 1 {
+		t.Error("the matching policy opened no alert")
+	}
+	var notes, commands, runs int
+	ownerScan(t, `SELECT count(*) FROM notify.notifications WHERE target->>'id' = $1`, []any{u}, &notes)
+	ownerScan(t, `SELECT count(*) FROM control.commands WHERE unit_id = $1`, []any{u}, &commands)
+	ownerScan(t, `SELECT count(*) FROM control.automation_runs WHERE unit_id = $1`, []any{u}, &runs)
+	if notes == 0 || commands != 0 || runs != 0 {
+		t.Errorf("%d notifications, %d commands, %d automation runs; want notifications and no automation decided", notes, commands, runs)
+	}
+	later := now.Add(-10 * time.Second)
+	if code, m := report("condition", fact("temperature", "27", "°C", later), later); code != 200 {
+		t.Fatalf("cool report: %d %v", code, m)
+	}
+	if alerts("", "open") != 0 || alerts("", "resolved") != 1 {
+		t.Errorf("a recovered reading left %d alerts open, %d resolved", alerts("", "open"), alerts("", "resolved"))
+	}
+	if code, m := report("condition", fact("heartbeat_gap", "20", "min", later), later); code != 200 {
+		t.Fatalf("gap report: %d %v", code, m)
+	}
+	if alerts("ac_offline", "open") != 1 {
+		t.Error("20 minutes without a heartbeat opened no AC offline alert")
+	}
+	code, m := report("schedule_start", fact("temperature", "31", "°C", at), at)
+	refusal(t, "schedule phase", code, m, "event.phase=error.invalid")
+	code, m = write(s, &customerB, "demo.trigger", `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at.Format(time.RFC3339)+`","eventType":"automation"}`, 0)
+	refusal(t, "no event", code, m, "event=error.required")
+	future := now.Add(time.Hour)
+	code, m = report("condition", fact("temperature", "31", "°C", future), future)
+	refusal(t, "future", code, m, "event.occurredAt=error.range")
+	// the UI's fire of the same facts decides the automation (here skipped: the unit has no module), so the runs check
+	// above tells the two apart
+	owner(t, `DELETE FROM control.evaluation_events`)
+	if code, m := write(s, &hq, "automations.fire", `{"eventId":"`+uuid.NewString()+`","occurredAt":"`+now.Format(time.RFC3339)+`","unitIds":["`+u+`"],"facts":[`+
+		fact("tariff", "0.6", "MYR_per_kWh", now)+`],"phase":"condition"}`, 0); code != 200 {
+		t.Fatalf("fire: %d %v", code, m)
+	}
+	ownerScan(t, `SELECT count(*) FROM control.automation_runs WHERE unit_id = $1`, []any{u}, &runs)
+	if runs == 0 {
+		t.Error("the UI's fire left no automation run, so the check above proves nothing")
+	}
+}

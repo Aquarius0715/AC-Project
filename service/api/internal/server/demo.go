@@ -18,8 +18,10 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 	"github.com/pradita/ac-project/service/api/internal/scheduler"
+	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
 // ScenarioClock is the demo scenario clock: democlock.Clock (shared through platform.demo_clock, IR168) when the
@@ -61,6 +63,8 @@ type demoOps struct {
 	m       *db.TxManager
 	clock   ScenarioClock
 	reg     *ops.Registry // the modules' scheduler jobs (IR54 schedule automations)
+	// notify evaluates a gateway's facts against the alert policies (control.Automations.Notify, IR529)
+	notify func(context.Context, *ops.Call, *control.EvaluationInput) ([]json.RawMessage, error)
 }
 
 func demoOnly() error { return apperr.E(apperr.Unavailable, "errors.demo_only") }
@@ -189,15 +193,16 @@ type TriggerInput struct {
 	Recovery  *devices.Recovery `json:"recovery,omitempty"`
 	// state: the device reports its air conditioner's settings with each heartbeat (deviceId, state)
 	State *ReportedState `json:"state,omitempty"`
+	// automation: the facts a device gateway reports, evaluated against the alert policies only (IR529)
+	Event *control.EvaluationInput `json:"event,omitempty"`
 	// operation (IR67): the device's result for a running check / firmware operation
 	OperationID *uuid.UUID `json:"operationId,omitempty"`
 	Result      string     `json:"result,omitempty"`
-	// The other event types of DemoTrigger (qualification_revoked, automation, network, simulator, allergen, load_alert,
+	// The other event types of DemoTrigger (qualification_revoked, network, simulator, allergen, load_alert,
 	// session_expired, microphone_denied, transport) are the browser demo's. Their fields are read here only so that a
 	// trigger shaped by the contract is refused as errors.trigger_unsupported, not as malformed input (IR391).
 	MembershipID      *uuid.UUID `json:"membershipId,omitempty"`
 	Qualification     *string    `json:"qualification,omitempty"`
-	Event             any        `json:"event,omitempty"`
 	Connected         *bool      `json:"connected,omitempty"`
 	Enabled           *bool      `json:"enabled,omitempty"`
 	Observation       any        `json:"observation,omitempty"`
@@ -287,6 +292,17 @@ func (in *TriggerInput) Validate() map[string]string {
 		case st.Celsius != nil && (*st.Celsius < 10 || *st.Celsius > 40):
 			fe["state.celsius"] = "error.range"
 		}
+	case "automation":
+		switch ev := in.Event; {
+		case ev == nil || in.CommandID != nil || in.Measurement != nil:
+			fe["event"] = "error.required"
+		case ev.Phase != "condition": // a gateway reports conditions; schedules come from the clock (IR54)
+			fe["event.phase"] = "error.invalid"
+		default:
+			for k, v := range ev.Validate() {
+				fe["event."+k] = v
+			}
+		}
 	case "operation":
 		if in.OperationID == nil {
 			fe["operationId"] = "error.required"
@@ -348,7 +364,7 @@ func (d *demoOps) inTenant(ctx context.Context, now time.Time, probe string, id 
 // @Summary		demo.trigger (write)
 // @ID				demo.trigger
 // @Description	Authorization: public:demo-panel-only
-// @Description	Validation: D01; IR37 includes transport/network injection; IR45 simulator on/off; IR59 payment branch removed; IR77 telemetry sequence optional (latest+1); IR98 allergen/load_alert events; IR213 telemetry causes unit_mismatch → non_finite → out_of_range → invalid_time; IR217 device faults/recoveries (sequence per device/binding/axis; eventId repeat; current binding; tamper Alert) and operation results (running only)
+// @Description	Validation: D01; IR37 includes transport/network injection; IR45 simulator on/off; IR59 payment branch removed; IR77 telemetry sequence optional (latest+1); IR98 allergen/load_alert events; IR213 telemetry causes unit_mismatch → non_finite → out_of_range → invalid_time; IR217 device faults/recoveries (sequence per device/binding/axis; eventId repeat; current binding; tamper Alert) and operation results (running only); IR528 a state report with no settings moves last seen only; IR529 automation evaluates the event's facts (phase condition) against the alert policies only, deciding no automation
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DDC-07
 // @Tags			demo
@@ -404,6 +420,26 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 	case "operation": // IR67: the result of a running check / firmware operation
 		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE id = $1)`, *in.OperationID, func(tx pgx.Tx, _ uuid.UUID) error {
 			return devices.FinishOperation(ctx, tx, *in.OperationID, in.Result == "succeeded", in.OccurredAt, c.Now)
+		})
+	}
+	if in.EventType == "automation" { // a gateway's facts: the alert policies of the units, never an automation (IR529)
+		ev := in.Event
+		if ev.OccurredAt.After(c.Now) {
+			return out, apperr.Fields(map[string]string{"event.occurredAt": "error.range"})
+		}
+		if d.notify == nil {
+			return out, apperr.E(apperr.Unavailable, "errors.demo_only")
+		}
+		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`, ev.UnitIDs[0], func(tx pgx.Tx, t uuid.UUID) error {
+			ic := &ops.Call{Tx: tx, Now: c.Now, CorrelationID: uuid.NewString(), Queries: d.reg,
+				Principal: &ops.Principal{Principal: authz.Principal{Role: "system"}, TenantID: t, UserID: seed.ID("system-demo")}}
+			if _, err := d.notify(ctx, ic, ev); err != nil {
+				return err
+			}
+			if d.reg != nil && d.reg.Rec != nil { // the alerts' and notifications' events and audits, as a scheduler job's
+				return d.reg.Rec.Record(ctx, tx, ic, "demo.trigger")
+			}
+			return nil
 		})
 	}
 	if in.EventType == "state" { // the device's state report: the unit's observed settings and when the device was last heard

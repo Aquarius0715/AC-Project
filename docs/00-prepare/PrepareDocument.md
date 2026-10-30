@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.398.0
+version: 0.399.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -286,6 +286,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.399.0: The live readings feed the customer's alert policies through demo.trigger automation (alert policies only, no automation), the contract's heartbeat_gap, compressor_cycles and airflow_drop facts are taken, and a silent live module raises AC offline (IR529). Phase 1A unchanged.
 0.398.0: The live Daikin air conditioner is one unit again and is switched on and off from the app through node_1's infrared LED (COOL24 / OFF); a state report with no settings keeps the observed state (DEC-89, IR528). Phase 1A unchanged.
 0.397.0: The client's unit page lists each room unit's readings instead of its setting, and a monitoring-only model's temperature advice says it is set on the AC itself (IR527). Phase 1A unchanged.
 0.396.0: Each real sensor node is a device of its own: node_1 (room sensor) and node_2 (power meter) are two monitoring-only units of Live Sensor Customer (DEC-88, IR526). Phase 1A unchanged.

@@ -48,7 +48,9 @@ var factSpec = map[string]struct {
 	"temperature": {"°C", "number", 120 * time.Second}, "humidity": {"%", "number", 120 * time.Second}, "co2": {"ppm", "number", 120 * time.Second},
 	"pm25": {"µg/m³", "number", 120 * time.Second}, "power": {"kW", "number", 120 * time.Second}, "vibration": {"mm/s", "number", 120 * time.Second},
 	"refrigerant_pressure": {"kPa", "number", 120 * time.Second},
-	"weather_temperature":  {"°C", "number", 1800 * time.Second}, "tariff": {"MYR_per_kWh", "number", 300 * time.Second},
+	// the contract's other Metric values (D07 units), which default rules watch (IR120, IR529)
+	"compressor_cycles": {"cycles/h", "number", 120 * time.Second}, "airflow_drop": {"%", "number", 120 * time.Second}, "heartbeat_gap": {"min", "number", 120 * time.Second},
+	"weather_temperature": {"°C", "number", 1800 * time.Second}, "tariff": {"MYR_per_kWh", "number", 300 * time.Second},
 	"solar": {"kW", "number", 120 * time.Second}, "battery": {"kW", "number", 120 * time.Second},
 	"occupied": {"boolean", "boolean", 120 * time.Second}, "peak": {"boolean", "boolean", 120 * time.Second}, "location": {"event", "location", 0},
 }
@@ -729,6 +731,31 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 	}
 	c.Audit(ops.AuditEntry{Action: "automations.fire", TargetKind: "evaluation", TargetID: in.EventID.String(), Reason: strings.ToLower(in.Phase)})
 	return r, nil
+}
+
+// Notify evaluates only the alert policies of the units against facts a device gateway reports (DemoTrigger
+// automation, IR529): a matching policy opens or reuses its Alert and notifies, a recovered one resolves it (D08). No
+// automation rule is decided, so a sensor report never switches an air conditioner by itself, and no tick is taken
+// (the gateway reports every minute beside the UI's fire). It returns the notification outcomes.
+func (m Automations) Notify(ctx context.Context, c *ops.Call, in *EvaluationInput) ([]json.RawMessage, error) {
+	if _, err := m.prepare(ctx, c, in); err != nil {
+		return nil, err
+	}
+	out := []json.RawMessage{}
+	if m.Notifier == nil {
+		return out, nil
+	}
+	units := append([]uuid.UUID{}, in.UnitIDs...)
+	sort.Slice(units, func(i, j int) bool { return units[i].String() < units[j].String() })
+	facts, _ := json.Marshal(in.Facts)
+	for _, u := range units {
+		ns, err := m.Notifier.Evaluate(ctx, c, u, facts, in.OccurredAt, in.EventID, true)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ns...)
+	}
+	return out, nil
 }
 
 // RegisterEvaluation binds automations.simulate / fire.

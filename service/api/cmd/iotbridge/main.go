@@ -71,7 +71,7 @@ func main() {
 	defer client.Disconnect(500)
 	var live *liveControl
 	if url := os.Getenv("REAL_MQTT_URL"); url != "" {
-		lc := listenLive(url, envOr("REAL_MQTT_TOPIC", "smarthome/ac/#"), clock, httpc, endpoint)
+		lc := listenLive(ctx, url, envOr("REAL_MQTT_TOPIC", "smarthome/ac/#"), clock, httpc, endpoint)
 		defer lc.Disconnect(500)
 		live = newLiveControl(lc, envOr("REAL_MQTT_COMMAND_NODE", iotbridge.LiveCommandNode), os.Getenv("REAL_MQTT_COMMANDS") == "1")
 	}
@@ -157,14 +157,16 @@ func subscribeDemo(client mqtt.Client, resolver *iotbridge.Resolver, clock *demo
 // The client leaves no will message, and its only publishes are liveControl's commands. The connection is not waited for — the
 // broker may be out of reach (another network) and the client keeps trying — and the subscription is made on every
 // connect. Retained messages are old readings and are skipped; one message per node and scenario minute is recorded.
-func listenLive(raw, topic string, clock *demoClock, httpc *http.Client, endpoint string) mqtt.Client {
+func listenLive(ctx context.Context, raw, topic string, clock *demoClock, httpc *http.Client, endpoint string) mqtt.Client {
 	host := raw
 	if u, err := url.Parse(raw); err == nil && u.Host != "" {
 		host = u.Host // never the credentials a URL may carry
 	}
 	gate := &iotbridge.LiveGate{}
+	heard := iotbridge.NewLiveHeard(time.Now())
 	rep := &logging.Repeats{Logf: log.Printf} // while the API is away, once a minute
-	var warned sync.Map                       // nodes and errors already logged
+	go reportGap(ctx, heard, clock, httpc, endpoint)
+	var warned sync.Map // nodes and errors already logged
 	once := func(key, msg string) {
 		if _, seen := warned.LoadOrStore(key, true); !seen {
 			log.Print(msg)
@@ -175,6 +177,7 @@ func listenLive(raw, topic string, clock *demoClock, httpc *http.Client, endpoin
 		if node == "" || msg.Retained() {
 			return
 		}
+		heard.Heard(node, time.Now())
 		at := time.Now().Add(clock.offset() - clockMargin).UTC()
 		slot := at.Truncate(time.Minute)
 		if !gate.Claim(node, slot) {
@@ -376,6 +379,28 @@ func sendCommand(mc mqtt.Client, httpc *http.Client, endpoint, tenant string, w 
 		return tok.Error()
 	}
 	return send(httpc, endpoint, iotbridge.SentTrigger(w, time.Now().Add(off)))
+}
+
+// reportGap sends, once a scenario minute, how long the live module has gone unheard (heartbeat_gap), so the default
+// rule ac_offline alerts when the nodes stop or their broker is out of reach and resolves when they are back (IR529).
+func reportGap(ctx context.Context, heard *iotbridge.LiveHeard, clock *demoClock, httpc *http.Client, endpoint string) {
+	t := time.NewTicker(time.Minute)
+	defer t.Stop()
+	rep := &logging.Repeats{Logf: log.Printf}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-t.C:
+			slot := now.Add(clock.offset() - clockMargin).UTC().Truncate(time.Minute)
+			var se *statusError
+			if err := send(httpc, endpoint, iotbridge.LiveGapTrigger(heard.Gap(now), slot)); err != nil && !(errors.As(err, &se) && se.code == http.StatusConflict) {
+				rep.Failed(fmt.Sprintf("live heartbeat gap: %v", err))
+				continue
+			}
+			rep.OK("live heartbeat gap")
+		}
+	}
 }
 
 // liveControl carries the live unit's commands to the nodes' broker (DEC-89): the firmware command, on the command

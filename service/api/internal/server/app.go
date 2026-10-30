@@ -117,7 +117,8 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		}
 		reg.Clock = dc.Now
 	}
-	registerDemo(reg, &demoOps{inline: len(cfg.Domains) == 0, enabled: cfg.DemoOps, m: m, clock: dc, reg: reg})
+	demo := &demoOps{inline: len(cfg.Domains) == 0, enabled: cfg.DemoOps, m: m, clock: dc, reg: reg}
+	registerDemo(reg, demo)
 	identity.Register(reg)
 	identity.RegisterMembers(reg)
 	am := &assets.Module{Mon: monitorReads{alerts: monitoring.Alerts{}, telemetry: monitoring.Telemetry{Sensors: devices.Models{}}}, Models: devices.Models{}, Policies: monitoring.Policies{},
@@ -151,6 +152,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	control.RegisterQueries(reg) // internal: the commands the IoT gateway sends (IR195 system query)
 	automations := control.Automations{Units: controlTargets{am}, Cmd: cmds, Notifier: monitoring.Notifier{}}
 	control.RegisterAutomations(reg, automations)
+	demo.notify = automations.Notify                           // demo.trigger automation: a gateway's facts against the alert policies (IR529)
 	reg.AddJob(ops.DomainEquipment, automations.FireSchedules) // IR54: schedule occurrences fire from the equipment scheduler
 	control.RegisterDiagnostics(reg, control.Diagnostics{Commands: cmds, Jobs: maintenance.Access{}})
 	identity.RegisterPreferences(reg)
