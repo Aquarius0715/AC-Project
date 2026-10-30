@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.394.0
+version: 0.395.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -181,7 +181,8 @@ Small text and controls are adjusted for readability and usability in work scree
 | DEC-83 | HQ's revoke in Access & roles also turns the person's sign-in off, and only HQ gives the access back: a contractor or customer owner cannot extend the access end, enable the account again or add the person as a new account; a later end set by HQ clears the revoke and turns the sign-in on, unless the company or customer disabled the account | User decision in this conversation, 2026-10-30 (“全て推奨で修正してください”, business review question 2); reflected in IR508 |
 | DEC-84 | The completion criteria include starting from one HQ administrator in an empty environment: a bootstrap command creates a tenant's first administrator (the tenant and its HQ organization when missing, the sign-in account with the two-step set-up and the set-up e-mail) and is refused once the tenant has an active identity administrator; everything else is added in the apps | User decision in this conversation, 2026-10-30 (“全て推奨で修正してください”, business review question 1); reflected in IR509 |
 | DEC-85 | HQ two-step verification is enforced by the identity provider: in production HQ signs in through its own Amazon Cognito user pool with MFA required; locally the Keycloak realm's HQ app flow asks for the password and the one-time code at every sign-in; the Core API takes HQ memberships only from the HQ app's tokens | User decision in this conversation, 2026-10-30 (“全て推奨で修正してください”, business review question 5); reflected in IR510 |
-| DEC-86 | Real sensor nodes feed the development stack: the IoT bridge subscribes to the broker named in `.env.local` (`REAL_MQTT_URL` and its login) and never publishes there. It records the nodes' room temperature, humidity and power draw, one reading per sensor and minute on the scenario clock, on a monitoring-only air conditioner of customer-b ("Live sensors"). The broker's address and login stay out of the repository; production devices keep AWS IoT Core | User request in this conversation, 2026-10-30 (“このデータをシステムに取り込んでください”); reflected in IR524 |
+| DEC-86 | Real sensor nodes feed the development stack: the IoT bridge subscribes to the broker named in `.env.local` (`REAL_MQTT_URL` and its login) and never publishes there. It records the nodes' room temperature, humidity and power draw, one reading per sensor and minute on the scenario clock, on a monitoring-only air conditioner ("Live sensors"; its customer since DEC-87: a client of its own). The broker's address and login stay out of the repository; production devices keep AWS IoT Core | User request in this conversation, 2026-10-30 (“このデータをシステムに取り込んでください”); reflected in IR524 |
+| DEC-87 | The real device belongs to a client of its own, not to customer-b (which keeps the mock fleet): "Live Sensor Customer" with the owner `live-sensors@example.com`, whose sign-in account is opened as HQ adds a customer owner, and who sets the password from the set-up e-mail (Mailpit in development) | User request in this conversation, 2026-10-30 (“リアルデバイスと繋げるのは、別ユーザーにしてください（クライアント”); reflected in IR525 |
 
 **DEC-10 (design proposal)**: Preserve work status on reassignment. Release restrictions only after all cause invoices fixed at notice time are paid. Release does not automatically power units on or restore previous set temperatures. Manual payment recording, test-run end confirmation, and viewing saved reports are specified for the 1A demo. This does not mean company approval of commercial rules. See [input/output contract DDC-08](../02-design/implementation-contracts.md#ddc-08-multi-resource-revisit-and-cross-role-contracts).
 
@@ -283,6 +284,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.395.0: The real sensor nodes report to a client of their own, "Live Sensor Customer", whose owner sets the password from the set-up e-mail (DEC-87, IR525). Phase 1A unchanged.
 0.394.0: Real sensor nodes feed the development stack: the IoT bridge subscribes to their broker and records room temperature, humidity and power on a monitoring-only unit of customer-b, and the client's unit screen follows the model's capabilities (DEC-86, IR524). Phase 1A unchanged.
 0.393.0: Figma's Use Cases note that HQ's revoke turns the sign-in off (UC-A11, IR523). Phase 1A unchanged.
 0.392.0: Figma's frontend board names today's Vitest counts (IR522). Phase 1A unchanged.

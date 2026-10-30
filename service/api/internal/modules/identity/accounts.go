@@ -58,6 +58,12 @@ var defaultPermissions = map[string][]string{
 	"technician": {"alert.read", "alert.resolve", "control.diagnose", "device.maintain"},
 }
 
+// DefaultPermissions are the permissions an account of the role gets when it is added (a copy): the development seed
+// gives the live site's owner a client's (seed.ApplyLive).
+func DefaultPermissions(role string) []string {
+	return append([]string(nil), defaultPermissions[role]...)
+}
+
 // newAccount is a person with one membership to create.
 type newAccount struct {
 	Email, DisplayName, Role string

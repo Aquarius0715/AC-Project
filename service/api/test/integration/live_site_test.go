@@ -10,10 +10,11 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-// TestLiveSiteSeeds: the live site (DEC-86) adds a monitoring-only model and, on its own property and room of
-// customer-b, one air conditioner whose online module has the live sensors and an active binding; the unit mirrors the
-// module. A second run adds nothing and leaves a connection that changed since alone. It runs in a transaction that is
-// rolled back, so the shared test database keeps only the fixture.
+// TestLiveSiteSeeds: the live site (DEC-86, DEC-87) adds a customer of its own with an invited owner whose sign-in
+// account is asked for once, a monitoring-only model and, on the customer's property and room, one air conditioner
+// whose online module has the live sensors and an active binding; the unit mirrors the module. A second run adds
+// nothing, asks for no second account and leaves a connection that changed since alone. It runs in a transaction that
+// is rolled back, so the shared test database keeps only the fixture.
 func TestLiveSiteSeeds(t *testing.T) {
 	server(t) // the test database with the fixture
 	ctx := context.Background()
@@ -38,6 +39,34 @@ func TestLiveSiteSeeds(t *testing.T) {
 			t.Fatal(err)
 		}
 		return n
+	}
+	org, owner := seed.ID(s.CustomerOrgID), seed.ID(s.Owner.Membership)
+	if n := count(`SELECT count(*) FROM identity.organizations o JOIN assets.customers c ON c.organization_id = o.id
+		WHERE o.id = $1 AND o.kind = 'customer' AND o.status = 'active' AND c.id = $2 AND c.name = $3 AND o.tenant_id = $4`,
+		org, seed.ID(s.Customer), s.CustomerName, seed.ID(s.Tenant)); n != 1 {
+		t.Errorf("the live customer is missing (%d)", n)
+	}
+	if n := count(`SELECT count(*) FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id
+		JOIN identity.client_users x ON x.membership_id = m.id AND x.customer_id = $3 AND x.client_role = 'owner' AND x.status = 'invited'
+		WHERE m.id = $1 AND m.organization_id = $2 AND m.role = 'client' AND m.client_role = 'owner' AND m.valid_until IS NULL AND u.email = $4`,
+		owner, org, seed.ID(s.Customer), s.Owner.Email); n != 1 {
+		t.Errorf("the live customer's invited owner is missing (%d)", n)
+	}
+	if n := count(`SELECT count(*) FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'control.execute'`, owner); n != 1 {
+		t.Error("the owner lacks a client's permissions")
+	}
+	if n := count(`SELECT count(*) FROM identity.membership_scopes WHERE membership_id = $1 AND kind = 'organization' AND ref_id = $2`, owner, org); n != 1 {
+		t.Error("the owner is not scoped to the live customer")
+	}
+	if n := count(`SELECT count(*) FROM identity.consents WHERE membership_id = $1 AND purpose = 'location_automation' AND NOT granted`, owner); n != 1 {
+		t.Error("the owner has no initial location consent")
+	}
+	accounts := func() int {
+		return count(`SELECT count(*) FROM platform.outbox WHERE aggregate_id = $1 AND event_type = 'AccountRequested'
+			AND payload->>'role' = 'client' AND payload->>'userId' = $2`, owner, seed.ID(s.Owner.User).String())
+	}
+	if n := accounts(); n != 1 {
+		t.Errorf("%d sign-in accounts asked for, want 1", n)
 	}
 	var control, modeControl, fanControl bool
 	if err := tx.QueryRow(ctx, `SELECT control, mode_control, fan_control FROM devices.capabilities WHERE id = $1 AND is_current`, seed.ID(s.Capability)).
@@ -100,5 +129,34 @@ func TestLiveSiteSeeds(t *testing.T) {
 	}
 	if n := count(`SELECT count(*) FROM devices.capabilities WHERE id = $1`, seed.ID(s.Capability)); n != 1 {
 		t.Errorf("%d versions of the live model, want 1", n)
+	}
+	if n := accounts(); n != 1 {
+		t.Errorf("the second start asked for the sign-in account again (%d)", n)
+	}
+	if n := count(`SELECT count(*) FROM identity.client_users WHERE customer_id = $1`, seed.ID(s.Customer)); n != 1 {
+		t.Errorf("%d users on the live customer's list, want 1", n)
+	}
+}
+
+// TestLiveSiteRefusesATakenAddress: the owner's address held by another person stops the seed instead of giving the
+// live customer someone else's account.
+func TestLiveSiteRefusesATakenAddress(t *testing.T) {
+	server(t)
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, testDB("postgres"))
+	if err != nil {
+		t.Skip(err)
+	}
+	defer conn.Close(ctx)
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // the test never commits
+	if _, err := tx.Exec(ctx, `INSERT INTO identity.users (email, display_name) VALUES ($1, 'Someone else')`, seed.LiveSite.Owner.Email); err != nil {
+		t.Fatal(err)
+	}
+	if err := seed.ApplyLive(ctx, tx, clock); err == nil {
+		t.Fatal("the seed took an address another person holds")
 	}
 }

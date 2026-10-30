@@ -7560,3 +7560,16 @@ The user's sensor nodes report to their own MQTT broker on the office network: `
    - The mode and fan choices and the power switch are disabled while control is.
 5. **Checked on the development stack.** After `migrate` and a restart of the IoT services, the live unit received one temperature, humidity and power reading a minute (27.5 °C, 49 %, 0.0078 kW in the first minutes), and energy's power samples followed. The customer app showed the readings on the unit and in Air quality (Live, with the chart), and the remote-control note.
 6. **Configuration and tests.** `.env.local.example` lists `REAL_MQTT_URL`, `REAL_MQTT_USER` and `REAL_MQTT_PASSWORD` empty; the broker's address and login stay in the git-ignored `.env.local`. `internal/iotbridge/live_test.go` covers the topic, the conversion, the gates and event IDs, and the site's sensors. `test/integration/live_site_test.go` checks that the site is seeded once and keeps a connection that changed since.
+
+## IR525 The real sensor nodes report to a client of their own (DEC-87) — 2026-10-30
+
+The user asked for the real device to be connected to a separate client user instead of customer-b, which keeps the mock fleet.
+
+1. **Live customer (`seed.LiveSite`, `SEED_LIVE_SENSORS`).** The live site's property, unit and binding belong to "Live Sensor Customer" (fixture-style names `org-customer-live` and `cust-live`, service profile environment). The seed creates them as HQ adds a customer (organizations.save, customers.save).
+2. **Owner account.** Its owner, "Live Sensor Owner" (`live-sensors@example.com`), is added as clientUsers.save adds one for HQ (IR461):
+   - the person, and a client owner membership with a client's permissions (`identity.DefaultPermissions`) over the organization;
+   - the initial location consent (IR84) and the invited entry in the customer's user list.
+   - A new membership asks for the sign-in account as bootstrap-admin does (`AccountRequested`, IR509). The identity-accounts consumer opens it with the address as the username and e-mails the set-up link (in development to Mailpit), where the owner chooses a password.
+   - A membership that exists asks for nothing, and an address another person holds stops the seed.
+3. **Development stack.** The site that IR524 seeded under customer-b was moved, readings included: the property, unit and binding now name the new organization, and the replicas followed through change capture. No alert, job or reminder referred to it. The account was opened, and the set-up e-mail arrived in Mailpit.
+4. **Tests.** `TestLiveSiteSeeds` also checks the customer, the invited owner with their permissions, scope and consent, and that the account is asked for once over two starts. `TestLiveSiteRefusesATakenAddress` checks that a taken address stops the seed.

@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 )
 
 // LiveSensor is one sensor of the live site's module, by its fixture-style name.
@@ -17,14 +20,28 @@ type LiveSensor struct {
 	Boundary string // energy boundary ("" for none)
 }
 
-// LiveSite is where the readings of real sensor nodes land (DEC-86, IR524): one monitoring-only air conditioner of
-// customer-b with one module whose sensors take the nodes' room temperature, humidity and power draw. The IoT bridge
-// subscribes to the nodes' broker (REAL_MQTT_URL) and sends their readings to these sensors. Development only.
+// LiveOwner is the live customer's first owner by fixture-style names (the person, the client membership and the
+// entry in the customer's user list), with the address the sign-in account takes as its username.
+type LiveOwner struct {
+	User, Membership, ClientUser string
+	Email, Name                  string
+}
+
+// LiveSite is where the readings of real sensor nodes land (DEC-86, IR524): a customer of its own (DEC-87, IR525)
+// with one monitoring-only air conditioner, whose module's sensors take the nodes' room temperature, humidity and
+// power draw. The IoT bridge subscribes to the nodes' broker (REAL_MQTT_URL) and sends their readings to these
+// sensors. Development only.
 var LiveSite = struct {
-	CustomerOrgID, Capability, Property, Floor, Room, Unit, Device, Binding string
-	Sensors                                                                 []LiveSensor
+	Tenant, CustomerOrgID, Customer, CustomerName            string
+	Owner                                                    LiveOwner
+	Capability, Property, Floor, Room, Unit, Device, Binding string
+	Sensors                                                  []LiveSensor
 }{
-	CustomerOrgID: "org-customer-b",
+	Tenant:        "tenant-a",
+	CustomerOrgID: "org-customer-live",
+	Customer:      "cust-live",
+	CustomerName:  "Live Sensor Customer",
+	Owner:         LiveOwner{User: "user-live-owner", Membership: "live-owner", ClientUser: "client-user-live-owner", Email: "live-sensors@example.com", Name: "Live Sensor Owner"},
 	Capability:    "cap-live-sensor-kit",
 	Property:      "property-live-sensors",
 	Floor:         "space-live-1f",
@@ -39,20 +56,30 @@ var LiveSite = struct {
 	},
 }
 
-// ApplyLive adds the live site to a seeded database: a monitoring-only model (no remote control: the nodes only
-// measure), a property with one room, the air conditioner and its module, online since at. Records that exist are
-// kept (ON CONFLICT DO NOTHING), so it can run on every start. Development only: tests and production never load it.
+// ApplyLive adds the live site to a seeded database: the live customer and its owner (liveOwner), a monitoring-only
+// model (no remote control: the nodes only measure), a property with one room, the air conditioner and its module,
+// online since at. Records that exist are kept (ON CONFLICT DO NOTHING), so it can run on every start. Development
+// only: tests and production never load it.
 func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 	s := LiveSite
-	var tenant string
-	if err := tx.QueryRow(ctx, `SELECT tenant_id::text FROM assets.customers WHERE organization_id = $1`, ID(s.CustomerOrgID)).Scan(&tenant); err != nil {
-		return fmt.Errorf("live site customer %s: %w", s.CustomerOrgID, err)
-	}
+	tenant := ID(s.Tenant)
 	ex := func(what, sql string, args ...any) error {
 		if _, err := tx.Exec(ctx, sql, args...); err != nil {
 			return fmt.Errorf("live site %s: %w", what, err)
 		}
 		return nil
+	}
+	// the customer as HQ adds one: its organization, then the customer (organizations.save, customers.save)
+	if err := ex("customer organization", `INSERT INTO identity.organizations (id, tenant_id, name, kind, status, created_at, updated_at)
+		VALUES ($1,$2,$3,'customer','active',$4,$4) ON CONFLICT DO NOTHING`, ID(s.CustomerOrgID), tenant, s.CustomerName, at); err != nil {
+		return err
+	}
+	if err := ex("customer", `INSERT INTO assets.customers (id, tenant_id, organization_id, name, status, service_profile, created_at, updated_at)
+		VALUES ($1,$2,$3,$4,'active','environment',$5,$5) ON CONFLICT DO NOTHING`, ID(s.Customer), tenant, ID(s.CustomerOrgID), s.CustomerName, at); err != nil {
+		return err
+	}
+	if err := liveOwner(ctx, tx, tenant, at); err != nil {
+		return err
 	}
 	type capSensor struct {
 		Metric            string  `json:"metric"`
@@ -125,4 +152,58 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 	}
 	// the unit mirrors its new module's connection and last seen (IR47)
 	return ex("unit connection", `UPDATE assets.units SET connection = 'online', last_seen_at = $2 WHERE id = $1`, unit, at)
+}
+
+// liveOwner adds the live customer's owner as clientUsers.save adds one for HQ (IR461): the person, a client owner
+// membership with a client's permissions over the organization, the initial location consent (IR84) and the invited
+// entry in the customer's user list. A new membership asks for the sign-in account as bootstrap-admin does (IR509): on
+// AccountRequested the identity-accounts consumer opens it, with the address as its username, and e-mails the set-up
+// link (in development to Mailpit), where the owner chooses a password. A membership that exists asks for nothing.
+func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) error {
+	o, org, customer := LiveSite.Owner, ID(LiveSite.CustomerOrgID), ID(LiveSite.Customer)
+	user, membership := ID(o.User), ID(o.Membership)
+	if _, err := tx.Exec(ctx, `INSERT INTO identity.users (id, email, display_name, status, created_at, updated_at) VALUES ($1,$2,$3,'active',$4,$4)
+		ON CONFLICT DO NOTHING`, user, o.Email, o.Name, at); err != nil {
+		return fmt.Errorf("live owner: %w", err)
+	}
+	var holder uuid.UUID
+	if err := tx.QueryRow(ctx, `SELECT id FROM identity.users WHERE email = $1`, o.Email).Scan(&holder); err != nil {
+		return fmt.Errorf("live owner: %w", err)
+	}
+	if holder != user {
+		return fmt.Errorf("live owner: %s belongs to another person", o.Email)
+	}
+	added, err := tx.Exec(ctx, `INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from, created_at, updated_at)
+		VALUES ($1,$2,$3,$4,'client','owner',$5,$5,$5) ON CONFLICT DO NOTHING`, membership, tenant, user, org, at)
+	if err != nil {
+		return fmt.Errorf("live owner membership: %w", err)
+	}
+	for _, p := range identity.DefaultPermissions("client") {
+		if _, err := tx.Exec(ctx, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, tenant, membership, p); err != nil {
+			return fmt.Errorf("live owner permission %s: %w", p, err)
+		}
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'organization',$3) ON CONFLICT DO NOTHING`,
+		tenant, membership, org); err != nil {
+		return fmt.Errorf("live owner scope: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted, created_at, updated_at) VALUES ($1,$2,'location_automation',false,$3,$3)
+		ON CONFLICT DO NOTHING`, tenant, membership, at); err != nil {
+		return fmt.Errorf("live owner consent: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role, status, invited_at,
+		invited_by_membership_id, last_invite_sent_at, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,'owner','invited',$7,$4,$7,$7,$7) ON CONFLICT DO NOTHING`,
+		ID(o.ClientUser), tenant, customer, membership, o.Email, o.Name, at); err != nil {
+		return fmt.Errorf("live owner user list: %w", err)
+	}
+	if added.RowsAffected() == 0 {
+		return nil
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id, occurred_at)
+		VALUES ($1, 'membership', $2, $3, jsonb_build_object('userId', $4::uuid::text, 'membershipId', $2::uuid::text, 'role', 'client'), 'seed-live-site', $5)`,
+		tenant, membership, identity.EventAccountRequested, user, at)
+	if err != nil {
+		return fmt.Errorf("live owner account: %w", err)
+	}
+	return nil
 }
