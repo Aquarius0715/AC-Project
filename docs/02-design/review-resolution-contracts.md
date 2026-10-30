@@ -7538,3 +7538,25 @@ Found in the loop's review of the Use Cases page against IR508. Board 05 (HQ · 
    - Board 01 (Common): UC-X08 is a demo for clients, contractors and technicians; HQ's sign-in always asks for the one-time code, so the HQ app shows it as Required (DEC-85, IR510).
    - Board 05 (HQ): an empty environment gets its first HQ user from `migrate bootstrap-admin`, which is refused once the tenant has one; from then on UC-A10 adds people (DEC-84, IR509).
 
+## IR524 Real sensor nodes feed the development stack (DEC-86) — 2026-10-30
+
+The user's sensor nodes report to their own MQTT broker on the office network: `smarthome/ac/<node>/sensors`, one JSON message per node every 5 seconds. node_1 measures the room (temperature °C and humidity %, also pressure, gas resistance and altitude); node_2 measures the air conditioner's supply (voltage, current, power in W and cumulative energy in kWh). A node sends 0 for the fields it does not measure. The user asked to take this data into the system.
+
+1. **Live site (`seed.LiveSite`, `migrate` with `SEED_LIVE_SENSORS=1`).** customer-b gets the property "Live sensors" (1F › Sensor room) with one air conditioner, "Live · AC sensors", on a monitoring-only model, "Live Sensor kit" (no control, mode or fan control, no temperature range). Its online module, AC-LIVE-0001 (firmware "external"), has three sensors: temperature °C, humidity %, and power kW on the boundary `ac_input_electricity`. Records that exist are kept, and a module added earlier keeps its connection and last seen. Compose sets the flag when `.env.local` names the broker (`${REAL_MQTT_URL:+1}`). Tests and production never load the site.
+2. **Bridge (`cmd/iotbridge`, `internal/iotbridge/live.go`).** With `REAL_MQTT_URL` set, the bridge opens a second MQTT client. It logs in with `REAL_MQTT_USER` / `REAL_MQTT_PASSWORD` and subscribes to `REAL_MQTT_TOPIC` (default `smarthome/ac/#`, QoS 0).
+   - It only subscribes: it publishes nothing and leaves no will message. The connection is not waited for, because the broker may be out of reach, and the client keeps trying.
+   - The node is the topic level before `sensors`. node_1's `temp` and `humidity` and node_2's `power` (W → kW) become telemetry triggers.
+   - A value counts only when its gate field is non-zero: the field itself for the room readings, the voltage for power. So an air conditioner that draws 0 W still gives a reading.
+   - Retained messages are skipped. One message per node and scenario minute passes (`LiveGate`); a failed send gives the minute back for the next message.
+   - Readings are stamped at the start of the scenario minute, and their event IDs come from the node, field and minute, so the API keeps one reading a minute. A CONFLICT answer means the minute is already recorded.
+   - Each passing message also sends the module's heartbeat: a state report with no settings, stamped at the minute. It keeps last seen current, which telemetry alone does not move.
+   - Pressure, gas resistance, altitude, voltage, current and cumulative energy have no platform metric and are not recorded; energy comes from power (D07).
+3. **Reconnects.** The bridge and the simulator now subscribe in the MQTT client's on-connect handler. With a clean session the broker forgets subscriptions when it restarts; before this change the bridge stopped receiving after a broker restart, and the simulated modules stopped hearing commands.
+4. **Client unit screen (Figma 02e).** The remote control follows the model's capabilities (deterministic contracts: control=false forbids ordinary actions, temperature=null forbids temperature changes; AT-X06):
+   - A model without remote control shows "No remote control on this model" and that settings are changed on the AC itself.
+   - The temperature row needs a temperature range. The mode and fan rows need their control and list only the model's own modes and fan levels.
+   - The Device information line says "no temperature setting" instead of a made-up range.
+   - A change is only what the user changed. Before, a unit with no reported setting showed "1 change: Set temperature 26°C → 24°C" from the defaults.
+   - The mode and fan choices and the power switch are disabled while control is.
+5. **Checked on the development stack.** After `migrate` and a restart of the IoT services, the live unit received one temperature, humidity and power reading a minute (27.5 °C, 49 %, 0.0078 kW in the first minutes), and energy's power samples followed. The customer app showed the readings on the unit and in Air quality (Live, with the chart), and the remote-control note.
+6. **Configuration and tests.** `.env.local.example` lists `REAL_MQTT_URL`, `REAL_MQTT_USER` and `REAL_MQTT_PASSWORD` empty; the broker's address and login stay in the git-ignored `.env.local`. `internal/iotbridge/live_test.go` covers the topic, the conversion, the gates and event IDs, and the site's sensors. `test/integration/live_site_test.go` checks that the site is seeded once and keeps a connection that changed since.

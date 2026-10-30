@@ -8,7 +8,8 @@
 //
 // Local and CI only: APP_LOGIN_PASSWORD creates or updates the ac_app_login role and the domain service logins
 // ac_<domain>_login (IR194), and SEED_FIXTURE loads the demo fixture once (skipped when identity.users already has
-// rows).
+// rows). With the fixture, SEED_MOCK_FLEET=1 adds the mock fleet and SEED_LIVE_SENSORS=1 the live sensor site
+// (DEC-86); both keep what exists, so they run on every start.
 package main
 
 import (
@@ -148,21 +149,27 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 		log.Printf("migrate: seeded %d actors, %d units", len(f.Actors), len(f.DemoSeed.Units))
 	}
 	// SEED_MOCK_FLEET=1 (development only): one air conditioner and IoT module per state pattern, on the fixture's clock
-	if os.Getenv("SEED_MOCK_FLEET") != "1" {
-		return nil
+	if os.Getenv("SEED_MOCK_FLEET") == "1" {
+		fleet, err := devicesim.MockFleet()
+		if err != nil {
+			return err
+		}
+		var n int
+		if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+			var err error
+			n, err = seed.ApplyFleet(ctx, tx, fleet, f.SeedCreatedAt)
+			return err
+		}); err != nil {
+			return err
+		}
+		log.Printf("migrate: mock fleet of %d units ready", n)
 	}
-	fleet, err := devicesim.MockFleet()
-	if err != nil {
-		return err
+	// SEED_LIVE_SENSORS=1 (development only): the live site that real sensor nodes report to (DEC-86, IR524)
+	if os.Getenv("SEED_LIVE_SENSORS") == "1" {
+		if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error { return seed.ApplyLive(ctx, tx, f.SeedCreatedAt) }); err != nil {
+			return err
+		}
+		log.Printf("migrate: live sensor site ready (%s)", seed.LiveSite.Unit)
 	}
-	var n int
-	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		var err error
-		n, err = seed.ApplyFleet(ctx, tx, fleet, f.SeedCreatedAt)
-		return err
-	}); err != nil {
-		return err
-	}
-	log.Printf("migrate: mock fleet of %d units ready", n)
 	return nil
 }

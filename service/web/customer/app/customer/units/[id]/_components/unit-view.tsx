@@ -42,6 +42,7 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
   const [temp, setTemp] = useState(24);
   const [mode, setMode] = useState<"cool" | "dry" | "fan">("cool");
   const [fan, setFan] = useState<"low" | "mid" | "high">("mid");
+  const [edited, setEdited] = useState<{ temp?: boolean; mode?: boolean; fan?: boolean }>({}); // settings the user changed since the last report
   const [confirm, setConfirm] = useState(false);
   const [renaming, setRenaming] = useState(false); // Rename of the AC (Figma 02e, DD-C03, IR315)
   // api mode: start the controls from the device-reported setting when another unit or a newer report arrives
@@ -50,6 +51,7 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
   const [seenReport, setSeenReport] = useState<string | null>(null);
   if (d && reported !== seenReport) {
     setSeenReport(reported);
+    setEdited({});
     if (d.observedState.celsius !== null) setTemp(d.observedState.celsius);
     if (d.observedState.mode) setMode(d.observedState.mode);
     if (d.observedState.fanLevel) setFan(d.observedState.fanLevel);
@@ -78,10 +80,18 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
   // this screen's sends (live status) over the stored history (commands.list, IR216), newest first
   const hist: Cmd[] = d ? [...sent, ...[...history, ...d.pendingCommands].filter((p, i, all) => !sent.some((x) => x.id === p.id) && all.findIndex((x) => x.id === p.id) === i)]
     .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt)).map((c) => historyRow(c, t, display)) : mockHist;
-  const cap = d?.capabilities.temperature ?? { min: 16, max: 30, step: 1 };
+  // the model's capabilities decide what can be set (deterministic contracts: control=false forbids ordinary actions,
+  // temperature=null temperature changes; AT-X06); the demo screen shows a full model
+  const controllable = !d || d.capabilities.control;
+  const tempRange = d ? d.capabilities.temperature : { min: 16, max: 30, step: 1 };
+  const cap = tempRange ?? { min: 16, max: 30, step: 1 };
+  const modes = d ? d.capabilities.modes : (["cool", "dry", "fan"] as const);
+  const fans = d ? d.capabilities.fanLevels : (["low", "mid", "high"] as const);
+  const showMode = !d || (d.capabilities.modeControl && modes.length > 0);
+  const showFan = !d || (d.capabilities.fanControl && fans.length > 0);
   const min = policy?.kind === "temperature_limit" ? Math.max(cap.min, policy.minimumCoolingSetpoint) : restricted ? 24 : cap.min;
   const max = cap.max;
-  const confirmed = d?.observedState.celsius ?? 26;
+  const confirmed = d ? d.observedState.celsius ?? "—" : 26;
   const room = d ? latest(d, "temperature", t, display) : { text: "28.0 °C", at: "09:12:30" };
   const hum = d ? latest(d, "humidity", t, display) : { text: "60 %", at: "09:12:30" };
   const pow = d ? latest(d, "power", t, display) : { text: "742 W", at: "09:12:30" };
@@ -95,9 +105,11 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
   const changes = (): UnitAction[] => {
     if (!d) return [];
     const a: UnitAction[] = [];
-    if (temp !== d.observedState.celsius) a.push({ kind: "set_temperature", celsius: temp });
-    if (d.capabilities.modeControl && mode !== d.observedState.mode) a.push({ kind: "set_mode", mode });
-    if (d.capabilities.fanControl && fan !== d.observedState.fanLevel) a.push({ kind: "set_fan", fanLevel: fan });
+    if (!d.capabilities.control) return a;
+    // only what the user changed: a setting the AC has not reported starts from a default that is no change
+    if (d.capabilities.temperature && edited.temp && temp !== d.observedState.celsius) a.push({ kind: "set_temperature", celsius: temp });
+    if (showMode && edited.mode && mode !== d.observedState.mode) a.push({ kind: "set_mode", mode });
+    if (showFan && edited.fan && fan !== d.observedState.fanLevel) a.push({ kind: "set_fan", fanLevel: fan });
     return a;
   };
   const sendApi = async (actions: UnitAction[]) => {
@@ -161,15 +173,16 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
           {blocked && <Banner tone="warn">{t("Remote control is paused while HQ checks this AC’s restriction state. Try again later.")}</Banner>}
           {policy?.kind === "power_off" && <Banner tone="warn">{t("Service restriction active — this AC is kept off.")} <Link className="font-semibold text-primary" href="/customer/payments">{t("View details")} <Icon name="arrowRight" /></Link></Banner>}
           {restricted && <Banner tone="warn">{t("Cooling restriction active — minimum {min} °C.", { min })} <Link className="font-semibold text-primary" href={d ? "/customer/payments" : "/customer/payments/invoice-overdue-a?tab=restriction"}>{t("View details")} <Icon name="arrowRight" /></Link></Banner>}
-          <Card title={t("REMOTE CONTROL")} sub={t("Controls apply to this AC only; you confirm before sending")}>
+          <Card title={t("REMOTE CONTROL")} sub={t(controllable ? "Controls apply to this AC only; you confirm before sending" : "No remote control on this model")}>
+            {!controllable ? <p className="text-[13px] text-muted-foreground">{t("This AC’s module only measures: its readings are shown below, and settings are changed on the AC itself.")}</p> : (
             <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-semibold">{t("Power")}</div><div className="text-xs text-muted-foreground">{t("Sent as its own command")}</div></div><Toggle on={on} onChange={(v) => (!disabled && !waiting && policy?.kind !== "power_off" ? togglePower(v) : undefined)} label={t("Power")} /></div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-semibold">{t("Power")}</div><div className="text-xs text-muted-foreground">{t("Sent as its own command")}</div></div><Toggle on={on} disabled={disabled || waiting || policy?.kind === "power_off"} onChange={(v) => (!disabled && !waiting && policy?.kind !== "power_off" ? togglePower(v) : undefined)} label={t("Power")} /></div>
+              {tempRange && <div className="flex flex-wrap items-center justify-between gap-2">
                 <div><div className="font-semibold">{t("Set temperature")}</div><div className="text-xs text-muted-foreground">{t("{min}–{max}°C · step {step}°C · confirmed {confirmed}°C", { min, max, step: cap.step, confirmed })}</div></div>
-                <div className="flex items-center gap-2"><Btn disabled={disabled || temp - cap.step < min} onClick={() => setTemp((t) => t - cap.step)} aria-label={t("Lower the temperature")}><Icon name="remove" /></Btn><span className="w-14 text-center text-lg font-bold">{temp}°C</span><Btn disabled={disabled || temp + cap.step > max} onClick={() => setTemp((t) => t + cap.step)} aria-label={t("Raise the temperature")}><Icon name="add" /></Btn></div>
-              </div>
-              <div><div className="mb-1 font-semibold">{t("Mode")}</div><Choice value={mode} onChange={setMode} options={(["cool", "dry", "fan"] as const).map((m) => ({ id: m, label: t(MODE_LABEL[m]) }))} /></div>
-              <div><div className="mb-1 font-semibold">{t("Fan speed")}</div><Choice value={fan} onChange={setFan} options={(["low", "mid", "high"] as const).map((f) => ({ id: f, label: t(FAN_LABEL[f]) }))} /></div>
+                <div className="flex items-center gap-2"><Btn disabled={disabled || temp - cap.step < min} onClick={() => { setTemp((t) => t - cap.step); setEdited((e) => ({ ...e, temp: true })); }} aria-label={t("Lower the temperature")}><Icon name="remove" /></Btn><span className="w-14 text-center text-lg font-bold">{temp}°C</span><Btn disabled={disabled || temp + cap.step > max} onClick={() => { setTemp((t) => t + cap.step); setEdited((e) => ({ ...e, temp: true })); }} aria-label={t("Raise the temperature")}><Icon name="add" /></Btn></div>
+              </div>}
+              {showMode && <div><div className="mb-1 font-semibold">{t("Mode")}</div><Choice value={mode} disabled={disabled} onChange={(m) => { setMode(m); setEdited((e) => ({ ...e, mode: true })); }} options={modes.map((m) => ({ id: m, label: t(MODE_LABEL[m]) }))} /></div>}
+              {showFan && <div><div className="mb-1 font-semibold">{t("Fan speed")}</div><Choice value={fan} disabled={disabled} onChange={(f) => { setFan(f); setEdited((e) => ({ ...e, fan: true })); }} options={fans.map((f) => ({ id: f, label: t(FAN_LABEL[f]) }))} /></div>}
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t((d ? changes().length : 1) === 1 ? "{n} change:" : "{n} changes:", { n: d ? changes().length : 1 })}</b> {d ? changes().map(changeText).join(" · ") || t("No change yet") : t("Set temperature {from}°C → {to}°C", { from: 26, to: temp })}<br /><span className="text-muted-foreground">{t("Target: {name} only · you will confirm before sending", { name: unit.name })}</span></span><Btn variant="primary" disabled={disabled || waiting || (d !== null && changes().length === 0)} onClick={() => setConfirm(true)}>{waiting ? t("Waiting for device…") : t("Review & send")}</Btn></div>
               {waiting && <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>}
               {offline && ( // Figma 02h: nothing is sent to an offline AC; a repair request is the way forward (IR243, IR315)
@@ -179,10 +192,11 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
                 </div>
               )}
             </div>
+            )}
           </Card>
           <div className="split-even">
             <Card title={t("Live telemetry")}><SummaryList items={d ? [[t("Power draw"), pow ? `${pow.text} · ${pow.at}` : "—"], [t("Connection"), CONNECTION[d.connection] ? t(CONNECTION[d.connection]) : d.connection], [t("Last seen"), showTime(d.lastSeenAt, display)], [t("Room temp"), room ? `${room.text} · ${room.at}` : "—"], [t("Humidity"), hum ? `${hum.text} · ${hum.at}` : "—"]] : [[t("Power draw"), "742 W · 09:12:30"], ["Wi-Fi", "RSSI −52 dBm (strong)"], [t("Last heartbeat"), "2 s ago"], [t("Room temp"), "28.0 °C · 09:12:30"], [t("Humidity"), "60 % · 09:12:30"]]} /></Card>
-            <Card title={t("Device information")}><SummaryList items={d ? [[t("Model"), `${d.capabilities.manufacturer} ${d.capabilities.model}`], [t("Remote control"), t(d.capabilities.control ? "supported" : "not supported")], [t("Capabilities"), t("Modes {modes} · fan {fans} · {min}–{max}°C step {step}", { modes: d.capabilities.modes.map(modeWord).join("/") || "—", fans: d.capabilities.fanLevels.map(fanWord).join("/") || "—", min: cap.min, max: cap.max, step: cap.step })]] : [[t("Model"), "Split 1.5HP (demo)"], [t("Firmware"), "v2.4.1"], [t("Protocol"), "MQTT/TLS"], [t("Uptime"), "14d 8h"], [t("Capabilities"), "Modes cool/dry/fan · fan low/mid/high · 16–30°C step 1"]]} /></Card>
+            <Card title={t("Device information")}><SummaryList items={d ? [[t("Model"), `${d.capabilities.manufacturer} ${d.capabilities.model}`], [t("Remote control"), t(d.capabilities.control ? "supported" : "not supported")], [t("Capabilities"), tempRange ? t("Modes {modes} · fan {fans} · {min}–{max}°C step {step}", { modes: d.capabilities.modes.map(modeWord).join("/") || "—", fans: d.capabilities.fanLevels.map(fanWord).join("/") || "—", min: tempRange.min, max: tempRange.max, step: tempRange.step }) : t("Modes {modes} · fan {fans} · no temperature setting", { modes: d.capabilities.modes.map(modeWord).join("/") || "—", fans: d.capabilities.fanLevels.map(fanWord).join("/") || "—" })]] : [[t("Model"), "Split 1.5HP (demo)"], [t("Firmware"), "v2.4.1"], [t("Protocol"), "MQTT/TLS"], [t("Uptime"), "14d 8h"], [t("Capabilities"), "Modes cool/dry/fan · fan low/mid/high · 16–30°C step 1"]]} /></Card>
           </div>
           <Card title={t("Alert policies on this AC")} sub={t("Limits that raise alerts for this AC. Policies are made in Alerts › Alert policies.")}>
             <div className="flex flex-col gap-2 text-[13px]"><div className="rounded-xl border border-line p-3"><b>{t("Default policy")}</b><div className="text-xs text-muted-foreground">{t("6 rules · ventilation (CO₂, PM2.5) + fault causes · Always attached · 5 of 6 rules on")}</div></div>{customerPolicies.filter((pl) => attached.includes(pl.id)).map((pl) => <div key={pl.id} className="rounded-xl border border-line p-3"><b>{pl.name}</b><div className="text-xs text-muted-foreground">{pl.rule}</div><Btn size="sm" className="mt-2" onClick={() => savePolicies(attached.filter((y) => y !== pl.id), t("Detached from this AC only"), "warn")}>{t("Detach")}</Btn></div>)}<Btn size="sm" variant="ghost" onClick={() => { setPicked([]); setAttachOpen(true); }}><Icon name="add" /> {t("Attach policy")}</Btn></div>

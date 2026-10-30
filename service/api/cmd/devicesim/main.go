@@ -37,15 +37,6 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	opts := mqtt.NewClientOptions().AddBroker(*broker).SetClientID("devicesim-" + clientTag(*tenant)).
-		SetUsername(os.Getenv("MQTT_USER")).SetPassword(os.Getenv("MQTT_PASSWORD")).
-		SetAutoReconnect(true).SetConnectRetry(true).SetKeepAlive(60 * time.Second)
-	client := mqtt.NewClient(opts)
-	if tok := client.Connect(); tok.Wait() && tok.Error() != nil {
-		log.Fatalf("connect %s: %v", *broker, tok.Error())
-	}
-	defer client.Disconnect(500)
-
 	var modules []*devicesim.Module
 	beats := map[*devicesim.Module]bool{} // modules that send heartbeats (a module that is not online sends none)
 	for _, name := range strings.Split(*names, ",") {
@@ -75,47 +66,18 @@ func main() {
 			beats[m] = p.Connection == "online"
 		}
 	}
+	// the subscriptions are made on every connect: a clean session loses them when the broker restarts
+	opts := mqtt.NewClientOptions().AddBroker(*broker).SetClientID("devicesim-" + clientTag(*tenant)).
+		SetUsername(os.Getenv("MQTT_USER")).SetPassword(os.Getenv("MQTT_PASSWORD")).
+		SetAutoReconnect(true).SetConnectRetry(true).SetKeepAlive(60 * time.Second).
+		SetOnConnectHandler(func(c mqtt.Client) { subscribe(c, modules) }).
+		SetConnectionLostHandler(func(_ mqtt.Client, err error) { log.Printf("broker %s: connection lost: %v", *broker, err) })
+	client := mqtt.NewClient(opts)
+	if tok := client.Connect(); tok.Wait() && tok.Error() != nil {
+		log.Fatalf("connect %s: %v", *broker, tok.Error())
+	}
+	defer client.Disconnect(500)
 	log.Printf("devicesim: %d modules on %s", len(modules), *broker)
-	// each module first reads back its kept state (a retained message; none on the first run), so a restart keeps the
-	// setpoint its last command set
-	for _, m := range modules {
-		m := m
-		tok := client.Subscribe(m.KeptTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
-			if err := m.Restore(msg.Payload()); err != nil {
-				log.Printf("kept %s: %v", m.DeviceID, err)
-			}
-		})
-		if tok.Wait() && tok.Error() != nil {
-			log.Fatalf("subscribe %s: %v", m.KeptTopic(), tok.Error())
-		}
-	}
-	// each module hears its own command topic and answers on the acknowledgement topic (QoS 1, as the design says)
-	for _, m := range modules {
-		m := m
-		tok := client.Subscribe(m.CommandTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
-			raw, sendAt, err := m.Acknowledge(msg.Payload(), time.Now())
-			if err != nil {
-				log.Printf("command %s: %v", m.DeviceID, err)
-				return
-			}
-			if kept, err := m.Keep(); err == nil { // retained, so the next start reads it back
-				if tok := client.Publish(m.KeptTopic(), 1, true, kept); tok.Wait() && tok.Error() != nil {
-					log.Printf("publish %s: %v", m.KeptTopic(), tok.Error())
-				}
-			}
-			if raw == nil { // the pattern never answers
-				return
-			}
-			if wait := time.Until(sendAt); wait > 0 { // the pattern answers after the command expired
-				time.AfterFunc(wait, func() { publish(client, m.AckTopic(), raw) })
-				return
-			}
-			publish(client, m.AckTopic(), raw)
-		})
-		if tok.Wait() && tok.Error() != nil {
-			log.Fatalf("subscribe %s: %v", m.CommandTopic(), tok.Error())
-		}
-	}
 
 	telemetry := time.NewTicker(*interval)
 	heartbeat := time.NewTicker(*beat)
@@ -206,4 +168,48 @@ func envOr(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// subscribe makes the modules' subscriptions; it runs on every connect. Each module first reads back its kept state (a
+// retained message; none on the first run), so a restart keeps the setpoint its last command set, then hears its own
+// command topic and answers on the acknowledgement topic (QoS 1, as the design says). A subscription that fails is
+// logged, and the next reconnect tries again.
+func subscribe(client mqtt.Client, modules []*devicesim.Module) {
+	for _, m := range modules {
+		m := m
+		tok := client.Subscribe(m.KeptTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
+			if err := m.Restore(msg.Payload()); err != nil {
+				log.Printf("kept %s: %v", m.DeviceID, err)
+			}
+		})
+		if tok.Wait() && tok.Error() != nil {
+			log.Printf("subscribe %s: %v", m.KeptTopic(), tok.Error())
+		}
+	}
+	for _, m := range modules {
+		m := m
+		tok := client.Subscribe(m.CommandTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
+			raw, sendAt, err := m.Acknowledge(msg.Payload(), time.Now())
+			if err != nil {
+				log.Printf("command %s: %v", m.DeviceID, err)
+				return
+			}
+			if kept, err := m.Keep(); err == nil { // retained, so the next start reads it back
+				if tok := client.Publish(m.KeptTopic(), 1, true, kept); tok.Wait() && tok.Error() != nil {
+					log.Printf("publish %s: %v", m.KeptTopic(), tok.Error())
+				}
+			}
+			if raw == nil { // the pattern never answers
+				return
+			}
+			if wait := time.Until(sendAt); wait > 0 { // the pattern answers after the command expired
+				time.AfterFunc(wait, func() { publish(client, m.AckTopic(), raw) })
+				return
+			}
+			publish(client, m.AckTopic(), raw)
+		})
+		if tok.Wait() && tok.Error() != nil {
+			log.Printf("subscribe %s: %v", m.CommandTopic(), tok.Error())
+		}
+	}
 }

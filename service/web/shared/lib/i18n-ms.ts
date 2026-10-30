@@ -223,6 +223,8 @@ export const ms: Record<string, string> = {
   "not supported": "tidak disokong",
   "Capabilities": "Keupayaan",
   "Modes {modes} · fan {fans} · {min}–{max}°C step {step}": "Mod {modes} · kipas {fans} · {min}–{max}°C langkah {step}",
+  "Modes {modes} · fan {fans} · no temperature setting": "Mod {modes} · kipas {fans} · tiada tetapan suhu",
+  "This AC’s module only measures: its readings are shown below, and settings are changed on the AC itself.": "Modul AC ini hanya mengukur: bacaannya ditunjukkan di bawah, dan tetapan ditukar pada AC itu sendiri.",
   "Firmware": "Perisian tegar",
   "Protocol": "Protokol",
   "Uptime": "Masa operasi",
