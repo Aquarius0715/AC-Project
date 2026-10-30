@@ -7450,3 +7450,12 @@ Found in the loop's review of IR510 against the UIUX documents. The screen catal
 
 1. **Docs.** The row's behaviour notes say that the HQ app shows two-step verification as Required, with no dialog (IR510, DEC-85). The other apps keep the FR-X08 demo dialog.
 
+## IR516 Figma's Access & roles revoke texts follow IR508 — 2026-10-30
+
+Found in the loop's review of IR508 against Figma. The Access & roles frames still said that revoking only sets "Valid until" to now, and that the user stays listed as Inactive. Since IR508 a revoke also turns the sign-in off, and only HQ gives the access back.
+
+1. **Figma, Admin page.**
+   - The revoke modal (AT-A03-R01) says that the revoke sets "Valid until" to now and turns the sign-in off, and that only HQ can give the access back: the company or customer cannot extend, enable or add the person again. The membership stays listed as Revoked; nothing is deleted.
+   - The "Valid period" note of the seven Access & roles frames says the same in one line.
+2. **Not changed.** The example lists keep an "Inactive since …" member, whose access ended by itself (IR514). The web marks a revoked membership "Revoked".
+

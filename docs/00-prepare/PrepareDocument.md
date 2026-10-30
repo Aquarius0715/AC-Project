@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.385.0
+version: 0.386.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -282,6 +282,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.386.0: Figma's Access & roles revoke texts follow IR508: the sign-in goes off and only HQ gives the access back (IR516). Phase 1A unchanged.
 0.385.0: The screen catalog notes that the HQ app shows two-step verification as Required (IR515). Phase 1A unchanged.
 0.384.0: HQ's save of an access that ended by itself is no revoke: the end is compared at whole minutes, as the form sends it (IR514). Phase 1A unchanged.
 0.383.0: The preferences end-to-end test and the common design follow IR510 (IR513). Phase 1A unchanged.
