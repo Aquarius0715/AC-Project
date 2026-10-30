@@ -66,7 +66,8 @@ test("Sign out everywhere asks for a reason and ends the member's sessions", asy
 });
 
 // IR461: a membership for a new person — the account is created at once and the sign-in service e-mails the set-up
-// link, which reaches Mailpit — then revoking ends the membership again.
+// link, which reaches Mailpit — then revoking ends the membership again, turns the sign-in off and lists it as Revoked
+// (IR508).
 test("HQ adds a new person with a membership, and revoking it ends the membership", async ({ page }) => {
   await page.goto("/admin/settings/access");
   const main = page.getByRole("main");
@@ -90,7 +91,10 @@ test("HQ adds a new person with a membership, and revoking it ends the membershi
   }
   await main.getByRole("button", { name: "Revoke access…" }).click();
   const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("turns their sign-in off. Only HQ can give the access back");
   await dialog.getByRole("textbox", { name: /^Reason/ }).fill("E2E: not joining after all");
   await dialog.getByRole("button", { name: "Revoke", exact: true }).click();
   await expect(page.getByText("Access revoked — the membership is now inactive").first()).toBeVisible();
+  await expect(main.locator('button[aria-pressed="true"]', { hasText: "E2E Colleague" })).toContainText("Revoked");
+  await expect(main).toContainText("the sign-in is off, and their company or customer cannot extend or enable it again");
 });
