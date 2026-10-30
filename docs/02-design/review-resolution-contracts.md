@@ -7526,3 +7526,10 @@ Found in the loop's review of the System Architecture page. Board 02 (Frontend a
 
 1. **Figma, board 02.** "94 suites, 529 tests incl. the web's 352 literal Core API calls". The line keeps its height.
 
+## IR523 Figma's Use Cases note what HQ's revoke does (UC-A11) — 2026-10-30
+
+Found in the loop's review of the Use Cases page against IR508. Board 05 (HQ · customers, access & devices) listed UC-A11 "Revoke access" with no note that the revoke now turns the person's sign-in off, and that only HQ gives the access back.
+
+1. **Figma, Use Cases board 05.** A note after UC-A10's: "UC-A11 also turns the person's sign-in off: only HQ gives the access back, and the contractor or customer owner cannot extend, enable or add them again (DEC-83, IR508)." The board grows by 40 px so the notes stay inside it, and the next board is still 224 px below.
+2. **The edit.** The Figma connection dropped while the note was being added. A read-back found it once, so nothing was added twice.
+
