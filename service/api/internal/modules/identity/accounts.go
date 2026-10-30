@@ -41,7 +41,7 @@ func (a AccountApps) of(role string) (url, client string) {
 	return a.Admin, "ac-admin-web"
 }
 
-// Events of IR461, handled by the identity consumer.
+// Events of IR461, handled by the identity-accounts consumer (IR511).
 const (
 	EventAccountRequested = "AccountRequested" // create the provider account if missing, then send the set-up e-mail
 	EventAccountEnabled   = "AccountEnabled"   // turn the provider account on or off
@@ -129,8 +129,8 @@ func personFor(ctx context.Context, c *ops.Call, email, name string) (uuid.UUID,
 }
 
 // createAccount creates the person (or takes back one removed before, personFor), the membership with its permissions
-// and scopes, and asks the identity consumer to open or re-point the provider account and e-mail the set-up link
-// (IR461, IR462). An e-mail another person holds is a field error.
+// and scopes, and asks the identity-accounts consumer to open or re-point the provider account and e-mail the set-up
+// link (IR461, IR462, IR511). An e-mail another person holds is a field error.
 func createAccount(ctx context.Context, c *ops.Call, a newAccount) (user, membership uuid.UUID, err error) {
 	if err = addCap(ctx, c, a.OrgID); err != nil {
 		return user, membership, err
@@ -177,21 +177,21 @@ func createAccount(ctx context.Context, c *ops.Call, a newAccount) (user, member
 	return user, membership, nil
 }
 
-// requestAccount asks the identity consumer to open the provider account (if missing) or point it at this membership,
-// and send the set-up e-mail.
+// requestAccount asks the identity-accounts consumer to open the provider account (if missing) or point it at this
+// membership, and send the set-up e-mail.
 func requestAccount(c *ops.Call, user, membership uuid.UUID, role string) {
 	c.Emit(ops.Event{AggregateType: "membership", AggregateID: membership, Type: EventAccountRequested, Payload: map[string]any{"userId": user, "membershipId": membership, "role": role}})
 }
 
-// setAccountEnabled asks the identity consumer to turn the provider account of the membership's person on or off; it
-// acts only when the account signs in with this membership (IR462).
+// setAccountEnabled asks the identity-accounts consumer to turn the provider account of the membership's person on or
+// off; it acts only when the account signs in with this membership (IR462).
 func setAccountEnabled(c *ops.Call, membership uuid.UUID, enabled bool) {
 	c.Emit(ops.Event{AggregateType: "membership", AggregateID: membership, Type: EventAccountEnabled, Payload: map[string]any{"membershipId": membership, "enabled": enabled}})
 }
 
 // AccountHandlers open, e-mail and turn off the provider accounts (IR461). Like the session ending (IR386) they are
-// best effort: a provider that does not answer is logged and the event is done, so the identity consumer's other
-// events are not held up; the person's set-up e-mail is sent again with resendInvite.
+// best effort: a provider that does not answer is logged and the event is done, so the identity-accounts consumer's
+// later events are not held up (IR511); the person's set-up e-mail is sent again with resendInvite.
 func AccountHandlers(p Provider, apps AccountApps) map[string]events.Handler {
 	if p == nil {
 		return nil

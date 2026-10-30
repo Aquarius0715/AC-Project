@@ -23,8 +23,8 @@ const EventSessionsRevoked = "SessionsRevoked"
 
 // SessionHandlers ends the identity provider's sessions of the user HQ signed out everywhere: their refresh tokens
 // and single sign-on end, so the next sign-in asks for the password (IR386). It is best effort. The Core API
-// already refuses every earlier sign-in (IR384), and a retried event would hold up the identity consumer's other
-// events, so a provider that does not answer is logged and the event is done. No handler without a provider.
+// already refuses every earlier sign-in (IR384), and a retried event would hold up the identity-accounts consumer's
+// later events (IR511), so a provider that does not answer is logged and the event is done. No handler without a provider.
 func SessionHandlers(ender SessionEnder) map[string]events.Handler {
 	if ender == nil {
 		return nil

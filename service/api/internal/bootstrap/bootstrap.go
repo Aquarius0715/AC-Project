@@ -1,9 +1,10 @@
 // Package bootstrap creates the first HQ administrator of a tenant, so an empty environment starts from one admin
 // (DEC-84, IR509): the tenant and its HQ (operator) organization when they are missing, the person, an admin
-// membership with every HQ permission over the tenant, and the identity consumer's AccountRequested event, which opens
-// the sign-in account with the two-step set-up (IR468) and e-mails the set-up link (IR461). A tenant that already has
-// an active identity administrator is refused: from then on HQ adds people in Access & roles. It runs as the schema
-// owner (cmd/migrate bootstrap-admin); the change capture triggers copy the new rows to the other domains (IR188).
+// membership with every HQ permission over the tenant, and the AccountRequested event, on which the identity-accounts
+// consumer (IR511) opens the sign-in account with the two-step set-up (IR468) and e-mails the set-up link (IR461). A
+// tenant that already has an active identity administrator is refused: from then on HQ adds people in Access & roles.
+// It runs as the schema owner (cmd/migrate bootstrap-admin); the change capture triggers copy the new rows to the other
+// domains (IR188).
 package bootstrap
 
 import (
