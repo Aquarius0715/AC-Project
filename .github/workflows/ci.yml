@@ -36,7 +36,7 @@ jobs:
       - name: go vet
         run: go vet ./...
       - name: staticcheck
-        env: { GOTOOLCHAIN: go1.26.9 }
+        env: { GOTOOLCHAIN: go1.26.10 }
         run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
       - name: generated files are current (catalog, routes, contracts, Swagger)
         run: |

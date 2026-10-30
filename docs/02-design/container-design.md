@@ -38,7 +38,7 @@ One backend image with several entry commands keeps every service on the same bu
 |---|---|---|
 | Build | Multi-stage: `npm ci` → `npm run typecheck && npm run build` | Multi-stage: `go mod download` → `CGO_ENABLED=0 go build -trimpath -ldflags="-s -w"`; cross-compiled with `$BUILDPLATFORM` / `$TARGETARCH` |
 | Base | `node:26.12.1-bookworm-slim` (as built, IR441; the official image since IR409, as the distroless Node 22 line stopped at 22.22.0 without the fixes of 22.23.x). npm, npx and corepack are removed from the runtime, and the Debian packages are upgraded to their security fixes | `gcr.io/distroless/static-debian12:nonroot` |
-| Toolchain | Node 26 (26.12.1 or later; CI `setup-node` 26, `engines` >=26, IR441) | Go 1.26.9 (`go.mod` toolchain line, IR408: docker scout found standard-library CVEs fixed only from 1.26.9) |
+| Toolchain | Node 26 (26.12.1 or later; CI `setup-node` 26, `engines` >=26, IR441) | Go 1.26.10 (`go.mod` toolchain line; IR408: docker scout found standard-library CVEs fixed only from 1.26.9; IR503: govulncheck found GO-2026-6809 in `crypto/x509`, fixed in 1.26.10) |
 | User | `node` (UID 1000, as built, IR409) | `nonroot:nonroot` |
 | Filesystem | Read-only root; tmpfs `/tmp`, `/app/.next/cache` | Read-only root; tmpfs `/tmp` |
 | Privileges | No Linux capability (`cap_drop: [ALL]`) and `no-new-privileges` (as built, IR373) | same |
@@ -49,7 +49,7 @@ One backend image with several entry commands keeps every service on the same bu
 | Contents | `.dockerignore` excludes `node_modules`, `.next`, `.env*` (as built, IR369: also the E2E sign-in state, test results, reports and coverage; Next.js copies a loaded `.env` / `.env.production` into the standalone output) | `.dockerignore` excludes `bin/`, test data, `.env*` (as built, IR369: also the test-run logs) |
 | Secrets | Never in images or build args; injected at run time (ECS secrets from Secrets Manager, compose `.env.local`) | same |
 
-Backend Dockerfile (the original pattern; as built the Go images come from three files in `service/api/build/`: `service.Dockerfile` builds one service per image from `cmd/${SERVICE}` (gateway and the five domain APIs; its `dev` target adds `devicesim`, `iotbridge` and `mockhistory`), `worker.Dockerfile` the worker and `migrate.Dockerfile` the migrator, all on `golang:1.26.9` and the digest-pinned distroless runtime; `cmd/webhook` is not built yet, IR197):
+Backend Dockerfile (the original pattern; as built the Go images come from three files in `service/api/build/`: `service.Dockerfile` builds one service per image from `cmd/${SERVICE}` (gateway and the five domain APIs; its `dev` target adds `devicesim`, `iotbridge` and `mockhistory`), `worker.Dockerfile` the worker and `migrate.Dockerfile` the migrator, all on `golang:1.26.10` and the digest-pinned distroless runtime; `cmd/webhook` is not built yet, IR197):
 
 ```dockerfile
 # syntax=docker/dockerfile:1.7

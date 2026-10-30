@@ -85,8 +85,10 @@ cover: testdb-exists
 	python3 scripts/covermerge.py coverage.out .cover/*.out
 
 # vuln checks the modules against the Go vulnerability database (govulncheck reports only what the code reaches;
-# it needs the network and its own newer toolchain, which the go command fetches; IR364)
+# it needs the network; IR364). It runs on the module's own toolchain: govulncheck checks the standard library of the
+# Go it runs with, and `go run pkg@version` alone picks the newest Go 1.26 release instead (IR503).
+TOOLCHAIN := $(shell sed -n 's/^toolchain //p' go.mod)
 vuln:
-	$(GO) run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+	GOTOOLCHAIN=$(TOOLCHAIN) go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
 .PHONY: swagger gen seed test test-run test-unit test-integration test-cluster test-cluster-run test-all cover migrations resetdb testdb testdb-cluster testdb-exists test-fresh vuln

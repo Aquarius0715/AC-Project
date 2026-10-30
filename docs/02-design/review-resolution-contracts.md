@@ -7259,3 +7259,15 @@ Found in review (a scan of what the shared web code exports against what any app
 1. **Web.** The nine are removed, with their test lines.
    - The rest of the scan's list stays. Those are types and helpers used inside their own module, the key lists the tests read (`EVIDENCE_KEYS`, `NOTIFICATION_KEYS`, `HQ_REFUSAL_KEYS`), and the demo store's test seam (`getJobState`).
 2. **Checked.** Typecheck, lint and Vitest pass.
+
+## IR503 Go 1.26.10 and golang.org/x/net 0.62.0; `make vuln` checks the module's own Go — 2026-10-30
+
+Found in the security loop (dependency advisories), and decided by the user on 2026-10-30 (no wait for Dependabot):
+- **golang.org/x/net 0.60.0.** govulncheck listed GO-2026-6866 and GO-2026-6860 in its `html` package. The code does not reach them: the module comes in through the MQTT client (`golang.org/x/net/proxy`), which only the device simulator uses.
+- **Go 1.26.9.** A scan on the module's own toolchain found GO-2026-6809 (compromised intermediate certificates are not distrusted by `crypto/x509`). The code reaches it through every HTTPS call, for example `ops.HTTPQueries.Query`. It is fixed in Go 1.26.10.
+- **Why `make vuln` missed it.** `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0` ignores the module's `toolchain` line. The local Go was older than the scanner's minimum, so the go command switched to the newest Go 1.26 release (1.26.10). govulncheck checks the standard library of the Go it runs with, so it checked 1.26.10, not the 1.26.9 the images were built with.
+
+1. **Go.** `golang.org/x/net` 0.62.0, with `x/sync` 0.24.0, `x/sys` 0.49.0, `x/text` 0.43.0 and `x/tools` 0.51.0 that it needs. The `go.mod` toolchain, the three Dockerfiles (`GO_VERSION`), and the staticcheck runs of CI and `scripts/check.sh` use Go 1.26.10.
+2. **`make vuln`** runs govulncheck with `GOTOOLCHAIN` set to the module's `toolchain` line. It now reports no vulnerabilities.
+3. **Docs.** The container design, the backend Go design and the backend architecture name Go 1.26.10 and the scan's toolchain.
+

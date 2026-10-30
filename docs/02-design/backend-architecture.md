@@ -293,7 +293,7 @@ Items of the table above that are not scheduled yet:
 
 - Everything runs in Docker (IR119): the same images run in Compose locally and in CI and on ECS Fargate in staging and production; infrastructure as code for every environment; immutable image digests promoted from dev to staging to production.
 - CI runs type checks, lint, unit, contract, and end-to-end tests (NFR-07), database migration checks, and security scans; production deploys use rolling or blue-green releases with automatic rollback on health checks.
-  - As built (IR364): the dependency scans are `make vuln` (govulncheck at a pinned version) for the Go modules and `npm audit` for the web workspace (`--omit=dev` for what ships). Each development round also reviews one class of vulnerability in the code.
+  - As built (IR364): the dependency scans are `make vuln` (govulncheck at a pinned version, run on the module's own toolchain so that it checks the standard library the images build with, IR503) for the Go modules and `npm audit` for the web workspace (`--omit=dev` for what ships). Each development round also reviews one class of vulnerability in the code.
 - Database migrations are backward compatible for one release (expand, migrate, contract).
 
 ## 15. Migration from the Phase 1A mock

@@ -12,7 +12,7 @@ step "web typecheck"; (cd service/web && npm run typecheck >/dev/null)
 step "web vitest";    (cd service/web && npm test >/dev/null)   # as CI: each workspace with its own vitest.config (shared: jsdom, 30 s per test)
 step "go gofmt";      (cd service/api && test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; })
 step "go vet";        (cd service/api && GOTOOLCHAIN=auto go vet ./...)
-step "staticcheck";   (cd service/api && GOTOOLCHAIN=go1.26.9 go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...)
+step "staticcheck";   (cd service/api && GOTOOLCHAIN=go1.26.10 go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...)
 gen_paths="service/api service/web/shared/lib docs/02-design/api"
 gen_state() { git diff -- $gen_paths | shasum; git status --porcelain -- $gen_paths | shasum; }
 step "generated files are current (catalog, routes, contracts, Swagger)"
