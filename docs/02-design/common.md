@@ -73,7 +73,7 @@ The stack is TypeScript (strict mode), React 19 and Next.js 16 App Router (DEC-6
 |---|---|
 | /login | Select a fictional account and one of four roles. Show that this is not real authentication |
 | /forgot-password | Check the email format, then show a message that does not reveal whether the email exists. Sending is a preview only |
-| /settings/preferences | Language, display timezone, read-only demo currency MYR, consent settings (client only), monthly report email (client), and Security › two-step verification (demo, FR-X08, IR112) |
+| /settings/preferences | Language, display timezone, read-only demo currency MYR, consent settings (client only), monthly report email (client), and Security › two-step verification (demo, FR-X08, IR112; in the HQ app Required, with nothing to turn on or off, DEC-85, IR510) |
 | /notifications | List notifications within the user's scope and manage read status. Keep this separate from business state |
 | /demo | Switch scenarios, trigger failures, control the demo clock, and reset. Demo-only screen |
 | /forbidden | Show the shared “Page unavailable” view (same component as `*`). Do not redirect automatically; show a link to the role home (IR57, IR112) |

@@ -7426,3 +7426,11 @@ Found in the loop's review of IR510 against Figma (the user's final specificatio
    - The UC-X08 catalogue row and trace list no HQ screen and say "HQ: required at sign-in" (DEC-85).
 3. **Docs.** FR-X08's basis names the HQ Preferences 15-4 with the IR510 rule, and `use-case-catalogue.csv` drops A 15-7. The client, contractor and technician screens (10g, 07-7, 04-7) are unchanged.
 
+## IR513 The preferences end-to-end test and the common design follow IR510 — 2026-10-30
+
+Found by the end-to-end suite against the rebuilt development stack: on HQ the test "two-step verification turns on with the setup QR and off again" waited for a Turn on button, which the HQ app no longer has (IR510). The common design's Preferences row still described the demo switch for every app.
+
+1. **End-to-end.** A new HQ test checks the Required line and badge with no Turn on or Turn off; the turn-on-and-off test skips HQ. Both pass, on HQ and on the partner app.
+2. **Docs.** The common design's `/settings/preferences` row says that the HQ app shows two-step verification as Required, with nothing to turn on or off.
+3. **Not code.** On the same run, two tests failed on the development data only: the partner users test expects tech-external-a to hold an assigned job, and the technician report test expects a job to start. That technician's assignments in the development database are all revoked (their jobs cancelled), so neither test finds one. CI's end-to-end run on fresh data passes them.
+

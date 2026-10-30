@@ -55,7 +55,17 @@ test("a client's consent and monthly report e-mail are saved", async ({ page, ap
   }
 });
 
-test("two-step verification turns on with the setup QR and off again", async ({ page }) => {
+test("HQ's two-step verification is required, with nothing to turn on or off (DEC-85, IR510)", async ({ page, app }) => {
+  test.skip(app.id !== "admin", "HQ only");
+  await page.goto("/settings/preferences");
+  const main = page.getByRole("main");
+  await expect(main).toContainText("Required for HQ: every sign-in to the HQ app asks for the 6-digit code from your authenticator app.");
+  await expect(main).toContainText("Required");
+  await expect(main.getByRole("button", { name: /^Turn (on|off)$/ })).toHaveCount(0);
+});
+
+test("two-step verification turns on with the setup QR and off again", async ({ page, app }) => {
+  test.skip(app.id === "admin", "HQ's is required at sign-in (IR510)");
   await page.goto("/settings/preferences");
   await expect(page.getByRole("button", { name: "Turn on" })).toBeVisible(); // the demo users start without it
   await page.getByRole("button", { name: "Turn on" }).click();
