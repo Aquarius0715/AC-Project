@@ -169,7 +169,7 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 		if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error { return seed.ApplyLive(ctx, tx, f.SeedCreatedAt) }); err != nil {
 			return err
 		}
-		log.Printf("migrate: live sensor site ready (%s)", seed.LiveSite.Unit)
+		log.Printf("migrate: live sensor site of %s ready (%d nodes)", seed.LiveSite.CustomerName, len(seed.LiveSite.Nodes))
 	}
 	return nil
 }

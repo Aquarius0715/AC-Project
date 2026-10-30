@@ -13,7 +13,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-// LiveField is one field of a real sensor node's message and the live-site sensor it is recorded as (DEC-86, IR524).
+// LiveField is one field of a real sensor node's message and the sensor of the node's live-site module it is recorded
+// as (DEC-86, IR524; one module per node, DEC-88).
 type LiveField struct {
 	Field  string  // the field of the node's JSON message
 	Sensor string  // fixture-style name of the live site's sensor (seed.LiveSite)
@@ -47,14 +48,16 @@ func LiveNode(topic string) string {
 	return parts[len(parts)-2]
 }
 
-// LiveTriggers converts one node message received at `at` on the scenario clock. Each reading is stamped at the start
-// of its scenario minute (the slot energy counts, D07), and its event ID is the node, field and minute, so the API
-// keeps one reading per sensor and minute. The live module's heartbeat comes with them: a state report with no
-// settings (the nodes report none) that keeps the unit's last seen time current. A node the bridge does not know is
-// an error; a message with nothing measured gives no triggers.
+// LiveTriggers converts one node message received at `at` on the scenario clock into readings of the node's own unit
+// and module (seed.LiveSite). Each reading is stamped at the start of its scenario minute (the slot energy counts,
+// D07), and its event ID is the node, field and minute, so the API keeps one reading per sensor and minute. The
+// module's heartbeat comes with them: a state report with no settings (the nodes report none) that keeps its unit's
+// last seen time current. A node the bridge does not know is an error; a message with nothing measured gives no
+// triggers.
 func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) {
 	fields, ok := LiveNodes[node]
-	if !ok {
+	site, onSite := seed.LiveNodeNamed(node)
+	if !ok || !onSite {
 		return nil, fmt.Errorf("node %q is not a live-site node", node)
 	}
 	var msg map[string]any
@@ -68,7 +71,7 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 	at = at.UTC()
 	slot := at.Truncate(time.Minute)
 	units := map[string]seed.LiveSensor{}
-	for _, s := range seed.LiveSite.Sensors {
+	for _, s := range site.Sensors {
 		units[s.Name] = s
 	}
 	var out []Trigger
@@ -80,7 +83,7 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 		}
 		s, ok := units[f.Sensor]
 		if !ok {
-			return nil, fmt.Errorf("node %s: no live-site sensor %s", node, f.Sensor)
+			return nil, fmt.Errorf("node %s: its module has no sensor %s", node, f.Sensor)
 		}
 		value := v * f.Scale
 		event := uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("live/%s/%s/%s", node, f.Field, slot.Format(time.RFC3339))))
@@ -90,7 +93,7 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 			OccurredAt: slot,
 			EventType:  "telemetry",
 			Measurement: &Measurement{
-				UnitID: seed.ID(seed.LiveSite.Unit), SensorID: seed.ID(s.Name), Metric: s.Metric, Value: &value, Unit: s.Unit,
+				UnitID: seed.ID(site.Unit), SensorID: seed.ID(s.Name), Metric: s.Metric, Value: &value, Unit: s.Unit,
 				ObservedAt: slot, ReceivedAt: at, Origin: "measured", Quality: "valid", EventID: event,
 			},
 		})
@@ -98,11 +101,10 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 	if len(out) == 0 {
 		return nil, nil
 	}
-	dev := seed.ID(seed.LiveSite.Device)
+	dev := seed.ID(site.Device)
 	out = append(out, Trigger{
 		ScenarioID: Scenario,
-		// one per minute for the module, whichever node is heard first: both nodes send the same body
-		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/state/%s", dev, slot.Format(time.RFC3339)))),
+		EventID:    uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/state/%s", dev, slot.Format(time.RFC3339)))), // one a minute
 		OccurredAt: slot,
 		EventType:  "state",
 		DeviceID:   &dev,

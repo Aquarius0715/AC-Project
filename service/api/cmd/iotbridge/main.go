@@ -208,7 +208,7 @@ func listenLive(raw, topic string, clock *demoClock, httpc *http.Client, endpoin
 		SetConnectionLostHandler(func(_ mqtt.Client, err error) { log.Printf("live broker %s: connection lost: %v", host, err) })
 	c := mqtt.NewClient(opts)
 	c.Connect() // not waited for: the client keeps trying while the broker is out of reach
-	log.Printf("iot-bridge: live sensors from %s (%s) → %s", host, topic, seed.LiveSite.Unit)
+	log.Printf("iot-bridge: live sensors from %s (%s) → %d nodes of %s", host, topic, len(seed.LiveSite.Nodes), seed.LiveSite.CustomerName)
 	return c
 }
 

@@ -7573,3 +7573,18 @@ The user asked for the real device to be connected to a separate client user ins
    - A membership that exists asks for nothing, and an address another person holds stops the seed.
 3. **Development stack.** The site that IR524 seeded under customer-b was moved, readings included: the property, unit and binding now name the new organization, and the replicas followed through change capture. No alert, job or reminder referred to it. The account was opened, and the set-up e-mail arrived in Mailpit.
 4. **Tests.** `TestLiveSiteSeeds` also checks the customer, the invited owner with their permissions, scope and consent, and that the account is asked for once over two starts. `TestLiveSiteRefusesATakenAddress` checks that a taken address stops the seed.
+
+## IR526 Each real sensor node is a device of its own (DEC-88) — 2026-10-30
+
+After signing in as the live customer's owner, the user expected a second device: the broker carries two nodes, node_1 (room sensor) and node_2 (power meter), which IR524 had merged into one module. A unit has at most one active device (deterministic contracts; the unique index `device_bindings_active_unit`), so each node is now a unit of its own.
+
+1. **Site (`seed.LiveSite.Nodes`).** Each node has its own monitoring-only model, its unit in the site's Sensor room, and its module, whose serial is the node's name. The model lists only that node's sensors, so Air quality calls the other metrics unsupported:
+   - node_1: model "Live Room sensor", unit "Live · node_1 room sensor", sensors temperature °C and humidity %.
+   - node_2: model "Live Power meter", unit "Live · node_2 power meter", sensor power kW on the boundary `ac_input_electricity`.
+2. **Bridge.** `LiveTriggers` records each node's readings on its own unit and sends that node's module's heartbeat. The two nodes no longer share one. The test checks that the bridge knows the site's nodes, that every field feeds a sensor of its own node's module, and that no two nodes share a unit or module.
+3. **Development stack.** The data seeded before was split by hand:
+   - The power sensor and its 59 readings moved to node_2's module and unit. Energy's power samples were moved too, because their copies follow inserts only.
+   - node_1's unit took its new name and model, and its module the serial `node_1`.
+   - The former "Live Sensor kit" model, used by no unit any more, was removed.
+   - Both units then received a reading a minute again.
+4. **Tests.** `TestLiveSiteSeeds` checks each node's model (its sensors only, no control), unit, module serial, sensors and binding, and that the second start keeps a changed connection and adds nothing.

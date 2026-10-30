@@ -10,11 +10,12 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-// TestLiveSiteSeeds: the live site (DEC-86, DEC-87) adds a customer of its own with an invited owner whose sign-in
-// account is asked for once, a monitoring-only model and, on the customer's property and room, one air conditioner
-// whose online module has the live sensors and an active binding; the unit mirrors the module. A second run adds
-// nothing, asks for no second account and leaves a connection that changed since alone. It runs in a transaction that
-// is rolled back, so the shared test database keeps only the fixture.
+// TestLiveSiteSeeds: the live site (DEC-86 to DEC-88) adds a customer of its own with an invited owner whose sign-in
+// account is asked for once and, per node, a monitoring-only model with the node's sensors and, on the customer's
+// property and room, an air conditioner whose online module (serial: the node's name) has those sensors and an active
+// binding; each unit mirrors its module. A second run adds nothing, asks for no second account and leaves a
+// connection that changed since alone. It runs in a transaction that is rolled back, so the shared test database keeps
+// only the fixture.
 func TestLiveSiteSeeds(t *testing.T) {
 	server(t) // the test database with the fixture
 	ctx := context.Background()
@@ -68,67 +69,83 @@ func TestLiveSiteSeeds(t *testing.T) {
 	if n := accounts(); n != 1 {
 		t.Errorf("%d sign-in accounts asked for, want 1", n)
 	}
-	var control, modeControl, fanControl bool
-	if err := tx.QueryRow(ctx, `SELECT control, mode_control, fan_control FROM devices.capabilities WHERE id = $1 AND is_current`, seed.ID(s.Capability)).
-		Scan(&control, &modeControl, &fanControl); err != nil {
-		t.Fatalf("model: %v", err)
+	type state struct {
+		devConn, unitConn string
+		devSeen, unitSeen *time.Time
 	}
-	if control || modeControl || fanControl {
-		t.Errorf("the live model offers control %t/%t/%t; the nodes only measure", control, modeControl, fanControl)
-	}
-	if n := count(`SELECT count(*) FROM assets.units u JOIN assets.properties p ON p.id = u.property_id
-		WHERE u.id = $1 AND u.customer_org_id = $2 AND p.customer_org_id = $2 AND u.space_id = $3 AND u.model_id = $4 AND NOT u.archived`,
-		seed.ID(s.Unit), seed.ID(s.CustomerOrgID), seed.ID(s.Room), seed.ID(s.Capability)); n != 1 {
-		t.Errorf("the live unit is not customer-b's in its room on the live model (%d)", n)
-	}
-	var devConn, unitConn string
-	var devSeen, unitSeen *time.Time
-	read := func() {
+	read := func(n seed.LiveNode) state {
 		t.Helper()
+		var st state
 		if err := tx.QueryRow(ctx, `SELECT d.connection, d.last_seen_at, u.connection, u.last_seen_at FROM devices.devices d JOIN assets.units u ON u.id = d.unit_id
-			WHERE d.id = $1`, seed.ID(s.Device)).Scan(&devConn, &devSeen, &unitConn, &unitSeen); err != nil {
-			t.Fatalf("module: %v", err)
+			WHERE d.id = $1`, seed.ID(n.Device)).Scan(&st.devConn, &st.devSeen, &st.unitConn, &st.unitSeen); err != nil {
+			t.Fatalf("%s module: %v", n.Node, err)
+		}
+		return st
+	}
+	for _, n := range s.Nodes {
+		var control, modeControl, fanControl bool
+		var model string
+		if err := tx.QueryRow(ctx, `SELECT control, mode_control, fan_control, model FROM devices.capabilities WHERE id = $1 AND is_current`, seed.ID(n.Capability)).
+			Scan(&control, &modeControl, &fanControl, &model); err != nil {
+			t.Fatalf("%s model: %v", n.Node, err)
+		}
+		if control || modeControl || fanControl || model != n.Model {
+			t.Errorf("%s's model %q offers control %t/%t/%t; the nodes only measure", n.Node, model, control, modeControl, fanControl)
+		}
+		if c := count(`SELECT count(*) FROM devices.capabilities c, jsonb_array_elements(c.sensors) e WHERE c.id = $1`, seed.ID(n.Capability)); c != len(n.Sensors) {
+			t.Errorf("%s's model lists %d sensors, its module has %d", n.Node, c, len(n.Sensors))
+		}
+		if c := count(`SELECT count(*) FROM assets.units u JOIN assets.properties p ON p.id = u.property_id
+			WHERE u.id = $1 AND u.customer_org_id = $2 AND p.customer_org_id = $2 AND u.space_id = $3 AND u.model_id = $4 AND u.display_name = $5 AND NOT u.archived`,
+			seed.ID(n.Unit), org, seed.ID(s.Room), seed.ID(n.Capability), n.UnitName); c != 1 {
+			t.Errorf("%s's unit is not the live customer's in its room on its model (%d)", n.Node, c)
+		}
+		st := read(n)
+		if st.devConn != "online" || st.unitConn != "online" || st.devSeen == nil || st.unitSeen == nil || !st.devSeen.Equal(clock) || !st.unitSeen.Equal(clock) {
+			t.Errorf("%s: module %s seen %v, unit %s seen %v; want both online, seen at %s", n.Node, st.devConn, st.devSeen, st.unitConn, st.unitSeen, clock)
+		}
+		if c := count(`SELECT count(*) FROM devices.devices WHERE id = $1 AND serial = $2`, seed.ID(n.Device), n.Serial); c != 1 {
+			t.Errorf("%s's module is not serial %s", n.Node, n.Serial)
+		}
+		for _, x := range n.Sensors {
+			if c := count(`SELECT count(*) FROM devices.sensors WHERE id = $1 AND device_id = $2 AND metric = $3 AND unit = $4`,
+				seed.ID(x.Name), seed.ID(n.Device), x.Metric, x.Unit); c != 1 {
+				t.Errorf("%s sensor %s missing", n.Node, x.Name)
+			}
+		}
+		if c := count(`SELECT count(*) FROM devices.device_bindings WHERE device_id = $1 AND unit_id = $2 AND unbound_at IS NULL`, seed.ID(n.Device), seed.ID(n.Unit)); c != 1 {
+			t.Errorf("%s: %d active bindings, want 1", n.Node, c)
 		}
 	}
-	read()
-	if devConn != "online" || unitConn != "online" || devSeen == nil || unitSeen == nil || !devSeen.Equal(clock) || !unitSeen.Equal(clock) {
-		t.Errorf("module %s seen %v, unit %s seen %v; want both online, seen at %s", devConn, devSeen, unitConn, unitSeen, clock)
-	}
-	for _, x := range s.Sensors {
-		if n := count(`SELECT count(*) FROM devices.sensors WHERE id = $1 AND device_id = $2 AND metric = $3 AND unit = $4`,
-			seed.ID(x.Name), seed.ID(s.Device), x.Metric, x.Unit); n != 1 {
-			t.Errorf("sensor %s missing", x.Name)
-		}
-	}
-	if n := count(`SELECT count(*) FROM devices.sensors WHERE device_id = $1 AND metric = 'power' AND boundary_id = 'ac_input_electricity'`, seed.ID(s.Device)); n != 1 {
-		t.Error("the power sensor does not count the air conditioner's electricity")
-	}
-	if n := count(`SELECT count(*) FROM devices.device_bindings WHERE device_id = $1 AND unit_id = $2 AND unbound_at IS NULL`, seed.ID(s.Device), seed.ID(s.Unit)); n != 1 {
-		t.Errorf("%d active bindings, want 1", n)
+	if c := count(`SELECT count(*) FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id
+		WHERE d.unit_id = $1 AND s.metric = 'power' AND s.boundary_id = 'ac_input_electricity'`, seed.ID("unit-live-node-2")); c != 1 {
+		t.Error("node_2's power sensor does not count the air conditioner's electricity")
 	}
 
-	// the module went offline since: the next start keeps that and adds nothing
-	if _, err := tx.Exec(ctx, `UPDATE devices.devices SET connection = 'offline' WHERE id = $1`, seed.ID(s.Device)); err != nil {
+	// node_1's module went offline since: the next start keeps that and adds nothing
+	first := s.Nodes[0]
+	if _, err := tx.Exec(ctx, `UPDATE devices.devices SET connection = 'offline' WHERE id = $1`, seed.ID(first.Device)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tx.Exec(ctx, `UPDATE assets.units SET connection = 'offline' WHERE id = $1`, seed.ID(s.Unit)); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE assets.units SET connection = 'offline' WHERE id = $1`, seed.ID(first.Unit)); err != nil {
 		t.Fatal(err)
 	}
 	if err := seed.ApplyLive(ctx, tx, clock.Add(time.Hour)); err != nil {
 		t.Fatalf("second apply: %v", err)
 	}
-	read()
-	if devConn != "offline" || unitConn != "offline" || !unitSeen.Equal(clock) {
-		t.Errorf("the second start changed the module to %s, the unit to %s seen %v", devConn, unitConn, unitSeen)
+	if st := read(first); st.devConn != "offline" || st.unitConn != "offline" || !st.unitSeen.Equal(clock) {
+		t.Errorf("the second start changed node_1's module to %s, its unit to %s seen %v", st.devConn, st.unitConn, st.unitSeen)
 	}
-	if n := count(`SELECT count(*) FROM assets.units WHERE property_id = $1`, seed.ID(s.Property)); n != 1 {
-		t.Errorf("%d units on the live property, want 1", n)
+	if c := count(`SELECT count(*) FROM assets.units WHERE property_id = $1`, seed.ID(s.Property)); c != len(s.Nodes) {
+		t.Errorf("%d units on the live property, want one per node (%d)", c, len(s.Nodes))
 	}
-	if n := count(`SELECT count(*) FROM devices.sensors WHERE device_id = $1`, seed.ID(s.Device)); n != len(s.Sensors) {
-		t.Errorf("%d live sensors, want %d", n, len(s.Sensors))
-	}
-	if n := count(`SELECT count(*) FROM devices.capabilities WHERE id = $1`, seed.ID(s.Capability)); n != 1 {
-		t.Errorf("%d versions of the live model, want 1", n)
+	for _, n := range s.Nodes {
+		if c := count(`SELECT count(*) FROM devices.sensors WHERE device_id = $1`, seed.ID(n.Device)); c != len(n.Sensors) {
+			t.Errorf("%s: %d sensors, want %d", n.Node, c, len(n.Sensors))
+		}
+		if c := count(`SELECT count(*) FROM devices.capabilities WHERE id = $1`, seed.ID(n.Capability)); c != 1 {
+			t.Errorf("%s: %d versions of its model, want 1", n.Node, c)
+		}
 	}
 	if n := accounts(); n != 1 {
 		t.Errorf("the second start asked for the sign-in account again (%d)", n)

@@ -27,8 +27,8 @@ func TestLiveNode(t *testing.T) {
 	}
 }
 
-// TestLiveTriggersRoomNode: node_1 gives the room temperature and humidity on the live unit's sensors, stamped at the
-// start of the scenario minute, measured and valid, and the module's heartbeat with no settings.
+// TestLiveTriggersRoomNode: node_1 gives the room temperature and humidity on its own unit's sensors, stamped at the
+// start of the scenario minute, measured and valid, and its module's heartbeat with no settings.
 func TestLiveTriggersRoomNode(t *testing.T) {
 	out, err := LiveTriggers("node_1", []byte(node1Message), liveAt)
 	if err != nil {
@@ -59,7 +59,7 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 		}
 	}
 	hb := out[2]
-	if hb.EventType != "state" || hb.DeviceID == nil || *hb.DeviceID != seed.ID("device-live-ac") || !hb.OccurredAt.Equal(slot) {
+	if hb.EventType != "state" || hb.DeviceID == nil || *hb.DeviceID != seed.ID("device-live-ac") || !hb.OccurredAt.Equal(slot) { // node_1's module
 		t.Errorf("heartbeat %+v", hb)
 	}
 	if hb.State == nil || *hb.State != (devicesim.ReportedState{}) {
@@ -73,8 +73,8 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 	}
 }
 
-// TestLiveTriggersPowerNode: node_2's power in W is recorded in kW, a zero power is a reading while the meter sees a
-// voltage, and with no voltage the meter measured nothing.
+// TestLiveTriggersPowerNode: node_2's power in W is recorded in kW on its own unit, with its own module's heartbeat; a
+// zero power is a reading while the meter sees a voltage, and with no voltage the meter measured nothing.
 func TestLiveTriggersPowerNode(t *testing.T) {
 	out, err := LiveTriggers("node_2", []byte(node2Message), liveAt)
 	if err != nil {
@@ -83,8 +83,11 @@ func TestLiveTriggersPowerNode(t *testing.T) {
 	if len(out) != 2 || out[0].Measurement == nil || out[0].Measurement.Metric != "power" || out[1].EventType != "state" {
 		t.Fatalf("triggers %+v", out)
 	}
-	if m := out[0].Measurement; m.SensorID != seed.ID("sensor-live-power") || m.Unit != "kW" || *m.Value != 0.742 {
+	if m := out[0].Measurement; m.UnitID != seed.ID("unit-live-node-2") || m.SensorID != seed.ID("sensor-live-power") || m.Unit != "kW" || *m.Value != 0.742 {
 		t.Errorf("power reading %+v (value %v)", m, *m.Value)
+	}
+	if hb := out[1]; hb.DeviceID == nil || *hb.DeviceID != seed.ID("device-live-node-2") {
+		t.Errorf("node_2's heartbeat names module %v", hb.DeviceID)
 	}
 	off, err := LiveTriggers("node_2", []byte(`{"voltage":230.1,"power":0.0}`), liveAt)
 	if err != nil || len(off) != 2 || *off[0].Measurement.Value != 0 {
@@ -124,7 +127,7 @@ func TestLiveTriggersRefuse(t *testing.T) {
 }
 
 // TestLiveEventIDIsOnePerMinute: messages of one minute share their event IDs (the API keeps one reading a minute), the
-// next minute has others, and both nodes send the same heartbeat for a minute, so the API takes it once.
+// next minute has others, and each node's heartbeat of a minute is its own module's.
 func TestLiveEventIDIsOnePerMinute(t *testing.T) {
 	a, _ := LiveTriggers("node_1", []byte(node1Message), liveAt)
 	b, _ := LiveTriggers("node_1", []byte(`{"temp":27.4,"humidity":51.0}`), liveAt.Add(15*time.Second))
@@ -136,38 +139,51 @@ func TestLiveEventIDIsOnePerMinute(t *testing.T) {
 		t.Error("the next minute or another field shares an event ID")
 	}
 	p, _ := LiveTriggers("node_2", []byte(node2Message), liveAt.Add(10*time.Second))
+	if h1, h2 := a[len(a)-1], p[len(p)-1]; h1.EventID == h2.EventID || *h1.DeviceID == *h2.DeviceID {
+		t.Error("the nodes share a heartbeat: each is its own module")
+	}
+	again, _ := LiveTriggers("node_1", []byte(node1Message), liveAt.Add(5*time.Second))
 	h1, _ := json.Marshal(a[len(a)-1])
-	h2, _ := json.Marshal(p[len(p)-1])
-	if string(h1) != string(h2) {
-		t.Errorf("the nodes' heartbeats of one minute differ:\n%s\n%s", h1, h2)
+	h2, _ := json.Marshal(again[len(again)-1])
+	if string(h1) != string(h2) { // a repeat of the minute's heartbeat is the same request
+		t.Errorf("one node's heartbeats of one minute differ:\n%s\n%s", h1, h2)
 	}
 }
 
-// TestLiveNodesMatchTheSite: every recorded field names a sensor of the live site, whose metric and unit are the
-// platform's (the units the simulator reports, which the API checks), and the site has no sensor left unfed.
+// TestLiveNodesMatchTheSite: the bridge knows the site's nodes and no others; every recorded field names a sensor of
+// its own node's module, whose metric and unit are the platform's (the units the simulator reports, which the API
+// checks); and no sensor of the site is left unfed.
 func TestLiveNodesMatchTheSite(t *testing.T) {
 	platform := map[string]string{}
 	for _, s := range devicesim.Sensors {
 		platform[s.Metric] = s.Unit
 	}
-	site := map[string]seed.LiveSensor{}
-	for _, s := range seed.LiveSite.Sensors {
-		site[s.Name] = s
-		if platform[s.Metric] != s.Unit {
-			t.Errorf("site sensor %s is %s in %q, the platform uses %q", s.Name, s.Metric, s.Unit, platform[s.Metric])
-		}
+	if len(LiveNodes) != len(seed.LiveSite.Nodes) {
+		t.Errorf("the bridge knows %d nodes, the site has %d", len(LiveNodes), len(seed.LiveSite.Nodes))
 	}
-	fed := map[string]bool{}
-	for node, fields := range LiveNodes {
-		for _, f := range fields {
-			if _, ok := site[f.Sensor]; !ok || f.Scale == 0 || f.Gate == "" {
-				t.Errorf("%s.%s: sensor %s, scale %v, gate %q", node, f.Field, f.Sensor, f.Scale, f.Gate)
+	units, devices := map[string]bool{}, map[string]bool{}
+	for _, n := range seed.LiveSite.Nodes {
+		units[n.Unit], devices[n.Device] = true, true
+		own := map[string]bool{}
+		for _, s := range n.Sensors {
+			own[s.Name] = true
+			if platform[s.Metric] != s.Unit {
+				t.Errorf("%s sensor %s is %s in %q, the platform uses %q", n.Node, s.Name, s.Metric, s.Unit, platform[s.Metric])
+			}
+		}
+		fed := map[string]bool{}
+		for _, f := range LiveNodes[n.Node] {
+			if !own[f.Sensor] || f.Scale == 0 || f.Gate == "" {
+				t.Errorf("%s.%s: sensor %s (not its module's?), scale %v, gate %q", n.Node, f.Field, f.Sensor, f.Scale, f.Gate)
 			}
 			fed[f.Sensor] = true
 		}
+		if len(fed) != len(own) {
+			t.Errorf("%d of %s's %d sensors are fed", len(fed), n.Node, len(own))
+		}
 	}
-	if len(fed) != len(site) {
-		t.Errorf("%d of the site's %d sensors are fed", len(fed), len(site))
+	if len(units) != len(seed.LiveSite.Nodes) || len(devices) != len(seed.LiveSite.Nodes) {
+		t.Error("two nodes share a unit or a module: a unit has at most one active module")
 	}
 }
 
