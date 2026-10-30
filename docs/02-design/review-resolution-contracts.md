@@ -7321,3 +7321,11 @@ Decided by the user on 2026-10-30 (the recommended option a). The partner's job 
    - Go: `TestContractorAndTechnicianProjections` adds an internal note by HQ, then checks the contractor's `eventSummary` against what the contractor and the customer read with `jobs.events`, and the customer's own summary.
    - Vitest: `partnerHistory.test.ts` builds the rows from summaries and snapshots, counts a hidden action as internal, and compares the hidden actions with the Go list.
 
+## IR507 The user's decisions of 2026-10-30 (DEC-80–DEC-82) — 2026-10-30
+
+On 2026-10-30 the user answered the open questions with "全て推奨で修正してください": take every recommended option. Three of them are recorded here. The others are implemented in their own entries: IR503 (golang.org/x/net), IR504 (back-to-back schedules) and IR506 (the partner history's counts).
+
+1. **DEC-80, back-to-back schedules.** The start of the same minute wins when it would run (IR326 item 4), as built in IR504.
+2. **DEC-81, the account cap.** A contractor or a customer owner adds at most 30 accounts to the organization in 24 hours (IR464 kept). HQ is not limited, and `ACCOUNTS_PER_ORG_PER_DAY` sets another value per environment (the local stack uses 500). Nothing changes in the code.
+3. **DEC-82, ending a contract early.** Unpaid invoices, removing the units, releasing restrictions and the contractor's payout are outside Phase 1A. They are designed before production (OPEN-07 in the preparation document).
+
