@@ -145,7 +145,7 @@ Design: [DD-C03](../02-design/client.md#dd-c03-details). Assess parent AT-C03 us
 |---|---|---|
 | AT-C04-N | unit-online-rto, timezone=Asia/Kuala_Lumpur. When: Save weekdays=[1,3], 18:00–22:00, start=set_temperature 25°C, end=set_power OFF, enabled=true → advance to Monday 18:00 → 22:00 | ① One Automation, next=2026-09-14 18:00+08:00 ② Zero Commands on save ③ One set_temperature 25 Command at 18:00, audited reauthorization ④ One set_power false Command at 22:00 |
 | AT-C04-E | ① weekdays=[] ② Missing endAction ③ Seed clock 2026-09-14T01:00Z; save weekly America/New_York Sunday 02:30 (nonexistent 2027-03-14) / Sunday 01:30 (ambiguous 2026-11-01), D09 366-day validation/IR102 ④ Start event after enabled=false | ①② VALIDATION, zero saves ③ VALIDATION (nonexistent/ambiguous time) ④ Zero Commands |
-| AT-C04-B | ① Monday 23:00–Tuesday 01:00, endsNextDay=true ② Same times with endsNextDay=false ③ start=end=10:00 | ① Save succeeds, end shown as next day 01:00 ② VALIDATION (end<=start) ③ VALIDATION, not 24-hour operation |
+| AT-C04-B | ① Monday 23:00–Tuesday 01:00, endsNextDay=true ② Same times with endsNextDay=false ③ start=end=10:00 ④ Two schedules on the same AC, Monday 09:30–10:00 (25°C) and 10:00–10:30 (22°C) → advance through 10:00; then the same with an AC that cannot take the second start | ① Save succeeds, end shown as next day 01:00 ② VALIDATION (end<=start) ③ VALIDATION, not 24-hour operation ④ At 10:00 only the second start's Command (22°C) is sent, and the first rule's last run says another schedule took over (superseded, DEC-80, IR504); when the second start cannot run, the first end is sent |
 
 Design: [DD-C04](../02-design/client.md#dd-c04-details). Assess parent AT-C04 using all N/E/B and applicable SRC/R01 cases in traceability.
 

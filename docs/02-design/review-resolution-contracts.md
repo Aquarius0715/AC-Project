@@ -7483,3 +7483,13 @@ Found in the loop's review of the HQ requirements against IR508 and IR509. AT-A0
    - A second run is refused. Parent AT-A03 is assessed with N/E/B/R01/R02.
 3. **Coverage.** The Go tests `TestHQRevokeTurnsSignInOff`, `TestHQRevokeOfAClientUser`, `TestHQSaveOfAnEndedAccessIsNoRevoke` and `TestBootstrapAdmin` cover these cases, and the end-to-end scenario `new-hq-admin` covers a new HQ administrator's first sign-in with the code.
 
+## IR519 The client's and the contractor's acceptance cases follow IR504 and IR506 — 2026-10-30
+
+Found in the loop's review of the requirements against the decisions of 2026-10-30. AT-C04-B had no case for two schedules that meet in the same minute (DEC-80). AT-P07-B did not say that the company's own handling events (IR442) are not customer-visible, which IR506 now counts that way.
+
+1. **AT-C04-B ④ (new).** Two schedules on the same AC meet at 10:00.
+   - Only the second start's Command is sent, and the first rule's last run says another schedule took over (superseded).
+   - When the second start cannot run, the first end is sent.
+   - `TestScheduleBoundaries` covers both.
+2. **AT-P07-B ⑤ (new).** The company's time-change proposal on the job is counted and badged as internal, not customer-visible. `partnerHistory.test.ts` covers it.
+

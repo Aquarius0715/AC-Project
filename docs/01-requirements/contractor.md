@@ -205,7 +205,7 @@ Design: [DD-P06](../02-design/contractor.md#dd-p06-details). Assess parent AT-P0
 |---|---|---|
 | AT-P07-N | job-contractor-a. When: Preview template=schedule_change, recipient=hq, visibility=internal, channel=email | ① JobNote saved with authorId ② NotificationPreview deliveryState=preview ③ Note hidden from customer |
 | AT-P07-E | ① Arbitrary email recipient ② Other-job recipient ③ Billing-record reference params ④ Save failure | ①②③ One error per D01 ④ Preserve note body |
-| AT-P07-B | ① internal ② customer ③ Allowed recipient ④ Free-form external recipient | ① Hidden from customer ② Visible to customer ③ Preview created ④ Rejected |
+| AT-P07-B | ① internal ② customer ③ Allowed recipient ④ Free-form external recipient ⑤ The company's time-change proposal on the job (partner_proposal.sent) | ① Hidden from customer ② Visible to customer ③ Preview created ④ Rejected ⑤ Counted and badged as internal, not customer-visible: the client never reads it (IR442, IR506) |
 
 **Additional acceptance AT-P07-R01 (revisit, conflict, cross-role)**
 
