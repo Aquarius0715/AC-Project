@@ -53,6 +53,9 @@ type Consumer struct {
 	Batch    int                // events per poll (default 100)
 	Logf     func(string, ...any)
 	Now      func() time.Time // the wall clock of the retry pauses (default time.Now)
+	// SplitFrom names the consumer these handlers were part of before a split (IR511): the events it applied count as
+	// applied here too, so the new consumer does not apply them again (e-mails and account changes are not repeated).
+	SplitFrom string
 }
 
 // MaxAttempts bounds how often a consumer tries one event (backend architecture §8 "Dead letters", IR427). A failing
@@ -160,7 +163,8 @@ func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Ev
 			FROM platform.outbox o LEFT JOIN platform.event_failures f ON f.consumer = $2 AND f.event_id = o.id
 			WHERE o.event_type = ANY($1)
 			  AND NOT EXISTS (SELECT 1 FROM platform.processed_events p WHERE p.consumer = $2 AND p.event_id = o.id)
-			ORDER BY o.seq LIMIT $3`, types, c.Name, limit)
+			  AND NOT EXISTS (SELECT 1 FROM platform.processed_events p WHERE p.consumer = $4 AND p.event_id = o.id)
+			ORDER BY o.seq LIMIT $3`, types, c.Name, limit, c.SplitFrom)
 		if err != nil {
 			return err
 		}

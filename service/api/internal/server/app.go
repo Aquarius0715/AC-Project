@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -70,15 +71,14 @@ type Server struct {
 func (s *Server) DrainEvents(ctx context.Context) error {
 	for pass := 0; pass < 10; pass++ { // events can trigger further events: repeat until nothing is pending
 		applied := 0
-		for _, c := range s.Consumers {
+		var errs []error
+		for _, c := range s.Consumers { // each on its own, as each runs its own loop: one failing does not hold the others (IR511)
 			n, err := c.Drain(ctx)
-			if err != nil {
-				return err
-			}
+			errs = append(errs, err)
 			applied += n
 		}
-		if applied == 0 {
-			return nil
+		if err := errors.Join(errs...); err != nil || applied == 0 {
+			return err
 		}
 	}
 	return nil

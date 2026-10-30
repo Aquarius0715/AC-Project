@@ -24,16 +24,25 @@ import (
 func consumers(m *db.TxManager, domains []string, provider identity.Provider, apps identity.AccountApps) []*events.Consumer {
 	serves := func(d string) bool { return len(domains) == 0 || slices.Contains(domains, d) }
 	var out []*events.Consumer
-	add := func(domain, name string, handlers map[string]events.Handler) {
+	add := func(domain, name string, handlers map[string]events.Handler) *events.Consumer {
 		if serves(domain) && len(handlers) > 0 {
-			out = append(out, &events.Consumer{Name: name, DB: m, Handlers: handlers})
+			c := &events.Consumer{Name: name, DB: m, Handlers: handlers}
+			out = append(out, c)
+			return c
 		}
+		return nil
 	}
-	add(ops.DomainEquipment, "equipment", merge(assets.EventHandlers(), monitoring.EventHandlers(), control.EventHandlers()))                                                                                                              // IR184, IR185
-	add(ops.DomainBilling, "billing", merge(restrictions.EventHandlers(), events.Handlers(billing.Replicas...)))                                                                                                                           // IR185
-	add(ops.DomainIdentity, "identity", merge(events.Handlers(notify.Replicas...), notify.EventHandlers(), identity.GrantHandlers(), audit.EventHandlers(), identity.SessionHandlers(provider), identity.AccountHandlers(provider, apps))) // IR188, IR386, IR461
-	add(ops.DomainMaintenance, "maintenance", merge(events.Handlers(maintenance.Replicas...), maintenance.NoteHandlers()))                                                                                                                 // IR192
-	add(ops.DomainEnergy, "energy", events.Handlers(energy.Replicas...))                                                                                                                                                                   // IR189
+	add(ops.DomainEquipment, "equipment", merge(assets.EventHandlers(), monitoring.EventHandlers(), control.EventHandlers()))                                // IR184, IR185
+	add(ops.DomainBilling, "billing", merge(restrictions.EventHandlers(), events.Handlers(billing.Replicas...)))                                             // IR185
+	add(ops.DomainIdentity, "identity", merge(events.Handlers(notify.Replicas...), notify.EventHandlers(), identity.GrantHandlers(), audit.EventHandlers())) // IR188
+	// the sign-in accounts and sessions in their own consumer (IR511): a notification, audit or copy event that keeps
+	// failing holds back only "identity", not turning an account off or ending sessions (IR386, IR461); the events
+	// "identity" applied before the split count as applied, so no set-up e-mail or account change is repeated
+	if c := add(ops.DomainIdentity, "identity-accounts", merge(identity.SessionHandlers(provider), identity.AccountHandlers(provider, apps))); c != nil {
+		c.SplitFrom = "identity"
+	}
+	add(ops.DomainMaintenance, "maintenance", merge(events.Handlers(maintenance.Replicas...), maintenance.NoteHandlers())) // IR192
+	add(ops.DomainEnergy, "energy", events.Handlers(energy.Replicas...))                                                   // IR189
 	return out
 }
 

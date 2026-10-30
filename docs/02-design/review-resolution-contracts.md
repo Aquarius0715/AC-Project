@@ -7391,3 +7391,23 @@ Decided by the user on 2026-10-30 (business review question 5, the recommended o
    - `TestOIDCVerifier` checks the app from `azp` and from `client_id`.
    - The admin end-to-end suite signs in with the code as before.
 
+## IR511 The sign-in accounts and sessions have their own event consumer — 2026-10-30
+
+Found in the loop's review (identity), and taken up with the user's decisions of 2026-10-30. The identity service's one consumer applied the copies of other domains' rows, the notifications, the qualification grants, the audit entries, and the sign-in accounts and sessions (IR386, IR461), in `seq` order.
+- An event that kept failing there held the events after it back for up to about 15 minutes (retries 1, 2, 4 and 8 minutes, IR427) before it was dead-lettered. Turning a disabled or revoked person's account off at the identity provider waited the same time. The Core API refused the membership at once (IR384, IR508), but the person kept signing in at the identity provider.
+- A new consumer could not simply take the account events over. Without the old consumer's processed markers it would apply every past account event again, and send set-up e-mails and account changes again.
+
+1. **Consumers.**
+   - `identity` keeps the copies, notifications, grants and audit entries.
+   - `identity-accounts` applies `AccountRequested`, `AccountEnabled` and `SessionsRevoked`.
+   - Each consumer polls on its own, so a failing event holds back only its own consumer.
+2. **The split.** `events.Consumer.SplitFrom` names the consumer the handlers came from. The events it applied count as applied (`pending` skips them), so `identity-accounts` starts after the last account event `identity` applied, with no data migration.
+   - During a rolling deploy, an old process may still apply a new account event under `identity` while a new one applies it under `identity-accounts`. That window repeats at most that event; the account handlers are idempotent at the provider, and the set-up e-mail may go twice.
+3. **Tests' drain.** `Server.DrainEvents` drains every consumer and joins their errors, as the consumers run on their own in the services, instead of stopping at the first that fails.
+4. **Docs.** The backend Go design names the two consumers.
+5. **Test.** `TestAccountConsumerApart` sets up three events:
+   - an `AccountEnabled` (on) that `identity` applied before the split;
+   - an audit entry `identity` cannot write (an unknown actor role), so that consumer keeps failing;
+   - an `AccountEnabled` (off).
+   The drain reports the failure, the account is turned off, and the event from before the split is not applied again.
+
