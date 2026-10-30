@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.386.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
+Version: 0.387.0 / Created: 2026-09-14 / Updated: 2026-10-30 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.387.0 (2026-10-30): Figma's contractor Users row gains 08-6, a technician whose access HQ revoked: the red badge, only Remove, and the note that only HQ gives the access back; the User Flows lane has its card (IR517).
 0.386.0 (2026-10-30): Figma's revoke modal and the Access & roles notes say that a revoke turns the sign-in off and that only HQ gives the access back (IR516).
 0.385.0 (2026-10-30): The screen catalog's Preferences row notes that the HQ app shows two-step verification as Required, with no dialog (IR515).
 0.384.0 (2026-10-30): Saving other changes in Access & roles to a membership whose access ended by itself no longer counts as HQ's revoke; the end is compared at whole minutes (IR514).

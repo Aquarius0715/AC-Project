@@ -7459,3 +7459,13 @@ Found in the loop's review of IR508 against Figma. The Access & roles frames sti
    - The "Valid period" note of the seven Access & roles frames says the same in one line.
 2. **Not changed.** The example lists keep an "Inactive since …" member, whose access ended by itself (IR514). The web marks a revoked membership "Revoked".
 
+## IR517 Figma shows the contractor's user whose access HQ revoked (08-6) — 2026-10-30
+
+Found in the loop's review of IR508 against Figma. The contractor's Users row (08-1…08-5) had no frame for the state IR508 added: an account whose access HQ revoked.
+
+1. **Figma, Contractor page.** New state frame 08-6 "Users — tech-external-a2 · Access ended by HQ", cloned from 08-1.
+   - The row shows the red badge "Access ended by HQ", the access end (the revoke's day), and only Remove, with "Only HQ can give the access back".
+   - It has a screen tag, a hotspot on Remove, and ClickMap · 08-6. The ClickMap says Remove leaves the list, the access stays ended, and adding the address again is refused (`errors.revoked_by_hq`).
+2. **Figma, User Flows.** The contractor's Users lane gets the state card 08-6, "Set by HQ's revoke · only Remove".
+3. **Not added.** No customer-side frame: HQ's screens revoke HQ, contractor and technician memberships only (Access & roles lists no clients). A client membership is revoked through `members.save` alone, and the customer's list then shows the same badge.
+
