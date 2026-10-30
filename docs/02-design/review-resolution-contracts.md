@@ -7534,4 +7534,7 @@ Found in the loop's review of the Use Cases page against IR508. Board 05 (HQ · 
 2. **The edit.** The Figma connection dropped while the note was being added. A read-back found it once, so nothing was added twice.
 3. **Figma, Use Cases board 09 (Contractor).** A note for UC-P17: a user whose access HQ revoked shows “Access ended by HQ” (08-6, IR517), and the contractor can only remove them, with no new access end, enabling or adding the address again. The board grows by 40 px. Board 02 (Client) gets no note, because no HQ screen revokes a client membership.
 4. **Figma, Use Cases board 03 (Client · comfort).** A note for UC-C13: when one schedule ends and another starts on the same AC in the same minute, the start is sent and the end is recorded as superseded, and a start that cannot run leaves the end (DEC-80, IR504). The board grows by 40 px.
+5. **Figma, Use Cases boards 01 and 05.** Two more notes, each with a 40 px larger board:
+   - Board 01 (Common): UC-X08 is a demo for clients, contractors and technicians; HQ's sign-in always asks for the one-time code, so the HQ app shows it as Required (DEC-85, IR510).
+   - Board 05 (HQ): an empty environment gets its first HQ user from `migrate bootstrap-admin`, which is refused once the tenant has one; from then on UC-A10 adds people (DEC-84, IR509).
 
