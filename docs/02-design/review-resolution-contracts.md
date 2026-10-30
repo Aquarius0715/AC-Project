@@ -7503,3 +7503,20 @@ Found in the loop's review of the common requirements against IR510. AT-X08-B �
    - ③ (new) hq-operator's Preferences show Required, with nothing to turn on or off, and the HQ app's sign-in asks for the password and the code every time.
 2. **Coverage.** The end-to-end test "HQ's two-step verification is required" (IR513) checks ③ on HQ, and the turn-on-and-off test the other apps.
 
+## IR521 Figma's System Architecture follows IR510 and IR511 — 2026-10-30
+
+Found in the loop's review of the System Architecture page against today's changes:
+- Board 01 still called two-step verification a demo.
+- Boards 03 and 05 described one Cognito pool, with HQ's TOTP optional.
+- Board 07's local Keycloak did not name the HQ app's flow.
+- Board 08 listed the identity service's consumers without `identity-accounts`.
+- Board 09 named Keycloak 26.0, while compose runs 26.8.
+
+1. **Board 01.** Two-step verification is required for HQ (IR510), and a demo for the other roles (FR-X08).
+2. **Boards 03 and 05.** Amazon Cognito has an HQ pool with MFA required (DEC-85) and an app pool.
+3. **Board 07.** The local Keycloak's HQ app flow asks for the password and the code every time (IR510).
+4. **Board 08.** The services' consumers include `identity` and `identity-accounts` (IR511).
+5. **Board 09.** The Keycloak image is `quay.io/keycloak/keycloak:26.8`.
+
+Every edited line keeps its height, so no board moves.
+

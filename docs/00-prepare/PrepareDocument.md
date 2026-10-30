@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.390.0
+version: 0.391.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -282,6 +282,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.391.0: Figma's System Architecture follows IR510 and IR511: HQ two-step required, two Cognito pools, the identity-accounts consumer, Keycloak 26.8 (IR521). Phase 1A unchanged.
 0.390.0: AT-X08-B follows IR510: HQ's two-step verification is Required, with no dialog (IR520). Phase 1A unchanged.
 0.389.0: The client's and the contractor's acceptance cases follow IR504 and IR506 (IR519). Phase 1A unchanged.
 0.388.0: HQ's acceptance cases follow IR508 and IR509: AT-A03-R01 expects the revoke to turn the sign-in off, and AT-A03-R02 starts from one administrator (IR518). Phase 1A unchanged.
