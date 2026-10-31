@@ -145,7 +145,8 @@ func LiveGapTrigger(gap time.Duration, slot time.Time) Trigger {
 }
 
 // LiveHeard keeps when each live node was last heard, for the heartbeat gap. A node not heard since the bridge started
-// counts from its start.
+// counts from its start. Times are kept on the wall clock: Go's monotonic clock stops while the machine sleeps (a
+// laptop's Docker VM), and a gap measured on it stayed under 15 minutes through hours without the nodes.
 type LiveHeard struct {
 	mu    sync.Mutex
 	start time.Time
@@ -154,14 +155,14 @@ type LiveHeard struct {
 
 // NewLiveHeard starts counting at start.
 func NewLiveHeard(start time.Time) *LiveHeard {
-	return &LiveHeard{start: start, last: map[string]time.Time{}}
+	return &LiveHeard{start: start.Round(0), last: map[string]time.Time{}}
 }
 
 // Heard notes a message of node at.
 func (h *LiveHeard) Heard(node string, at time.Time) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if at.After(h.last[node]) {
+	if at = at.Round(0); at.After(h.last[node]) { // Round(0) drops the monotonic reading
 		h.last[node] = at
 	}
 }
@@ -170,6 +171,7 @@ func (h *LiveHeard) Heard(node string, at time.Time) {
 func (h *LiveHeard) Gap(now time.Time) time.Duration {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	now = now.Round(0)
 	var gap time.Duration
 	for node := range LiveNodes {
 		last, ok := h.last[node]

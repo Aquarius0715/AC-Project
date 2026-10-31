@@ -250,6 +250,13 @@ func TestLiveHeartbeatGap(t *testing.T) {
 	if g := h.Gap(liveAt); g != 3*time.Minute {
 		t.Errorf("gap %s, want node_2's 3m", g)
 	}
+	// on the wall clock: a reading of the monotonic clock (which stops while the machine sleeps) is not used
+	w := NewLiveHeard(time.Now())
+	w.Heard("node_1", time.Now())
+	w.Heard("node_2", time.Now())
+	if g := w.Gap(time.Now().Round(0).Add(2 * time.Hour)); g < 2*time.Hour-time.Second {
+		t.Errorf("two hours on the wall clock gave a gap of %s", g)
+	}
 	slot := liveAt.Truncate(time.Minute)
 	tr := LiveGapTrigger(17*time.Minute+50*time.Second, slot)
 	f := tr.Event.Facts

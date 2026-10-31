@@ -7639,3 +7639,11 @@ A follow-up of IR524 and IR528. The client's unit page follows the model's capab
    - **02o (x 30240): a model with the remote power only.** An example is an IR controller: the remote control card keeps only the power switch ("Sent as its own command · the only setting this model takes"). The confirmed setting is what the last power-on set (24°C · Cool · —), the command history holds power commands only, and Device information says "Remote power only · no mode, fan or temperature setting".
    - **02p (x 32400): a model without remote control (monitoring only).** The card says "No remote control on this model" and that the module only measures, with settings changed on the AC itself (IR524). The power state badges say Unknown, the confirmed setting is "—°C · — · —", the history says "No commands for this AC yet", and Device information says the modes and fan are none, with no temperature setting and remote control not supported.
 2. **Web.** On a model with no temperature, mode or fan setting, the unit page no longer shows the change summary and "Review & send" bar, as in 02o. The power is sent at once as its own command, so the bar only ever said "0 changes" with a disabled button.
+
+## IR531 The live heartbeat gap counts the time the machine slept — 2026-10-31
+
+Found in the loop. The live broker's connection was lost at 11:16 UTC on 2026-10-30, when the laptop left the office network and slept, and no reading came for hours, yet "AC offline" (IR529) never opened. A heartbeat_gap evaluation sent by hand opened it at once, so the API was right.
+
+1. **Cause.** The bridge measured the gap with Go's monotonic clock (`time.Now()` readings subtracted). That clock stops while the machine sleeps, here the laptop's Docker VM. Through hours without the nodes, the gap counted only the minutes the VM was awake and stayed under 15.
+2. **Fix.** `LiveHeard` keeps and compares wall-clock times (`Round(0)` drops the monotonic reading), so the time the machine slept counts as time without the nodes. After a long sleep, the first gap report alerts.
+3. **Development stack.** The hand-sent evaluation's "AC offline" alert is left open: the nodes are still unheard. It resolves on its own when they report again (gap under 1 minute, D08).
