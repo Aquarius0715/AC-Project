@@ -7726,3 +7726,7 @@ Found in the loop. The protocol between the platform and the site's real nodes w
 It also records as OPEN the two firmware changes that full remote control would need: a JSON command with temperature, mode and fan level, and a state message after each send.
 
 This corrects how IR532 ② words the trigger for going offline. The bridge measures the gap as the longest of the two nodes' silences (`LiveHeard.Gap`, `TestLiveHeartbeatGap`), so the module goes offline once either node has gone unheard for 3 minutes, not only when both have. That fits commands, which reach the AC through node_1 alone. The §9 Connection state row and the comments of `LiveConnectionTrigger` and `reportGap` now say so; the behavior is unchanged.
+
+## IR541 DEC-86 says what the bridge sends to the nodes' broker — 2026-11-01
+
+Found in the loop. DEC-86 still said that the IoT bridge never publishes to the real nodes' broker. Since DEC-89 it sends the live unit's power commands there (`COOL24` and `OFF` on the command node's topic, with `REAL_MQTT_COMMANDS=1`), as the bridge, the container design and backend architecture §9 (IR540) say. DEC-86 now says that the bridge publishes nothing there but those commands, and nothing before DEC-89.
