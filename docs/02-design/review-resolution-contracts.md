@@ -7980,3 +7980,9 @@ Found in the loop, following IR564. Two more helpers kept a Kuala Lumpur form "f
 They are removed, with the `klTime` import of `partnerJobDetail.ts`, and the header comments say what the files format now: instants in the display time zone and capacity days as Kuala Lumpur dates.
 
 `devices.klTime` stays, for the day timelines of IR564.
+
+## IR566 One definition of the component groups — 2026-11-01
+
+Found in the loop by a scan of `shared/lib` exports against the named imports of every module (the earlier name search missed IR565's helpers). One export is unused: `units.componentGroups`, with the map `groupOf` it alone used. It repeated the groups of the 18 ComponentKeys that `techJob.componentGroups` defines, the one the technician screens and tests use. The unused copy is removed, so the groups have one definition.
+
+The scan found no other unused export. Four are used by tests alone, on purpose: `HQ_REFUSAL_KEYS`, `EVIDENCE_KEYS` and `NOTIFICATION_KEYS`, whose tests check every key, and `getJobState`, the non-React read for tests.

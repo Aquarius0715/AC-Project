@@ -113,21 +113,8 @@ export function latest(d: ApiUnitDetail, metric: string, t: T = en, display: Dis
   return m && m.value !== null ? { text: `${airNumber(metric, m.value)} ${m.unit}${m.quality === "valid" ? "" : ` (${t(qualityText[m.quality] ?? m.quality)})`}`, at: showClock(m.observedAt, display) } : null;
 }
 
-// Technician unit register / monitoring (FR-T02, FR-T04): component groups of the 18 ComponentKeys and the
-// rolling series window for telemetry.series.
-const groupOf: Record<string, "Indoor" | "Outdoor" | "Electrical"> = {
-  filter: "Indoor", evaporator_coil: "Indoor", blower_motor: "Indoor", blower_fan: "Indoor", drain_pipe: "Indoor", drain_pan: "Indoor", outlet: "Indoor", louver: "Indoor",
-  condenser_coil: "Outdoor", compressor: "Outdoor", fan: "Outdoor", blade: "Outdoor", refrigerant_pipe: "Outdoor",
-  thermostat: "Electrical", sensor: "Electrical", capacitor: "Electrical", contactor: "Electrical", wiring: "Electrical",
-};
-
-export function componentGroups(keys: string[]): Record<"Indoor" | "Outdoor" | "Electrical", string[]> {
-  const out = { Indoor: [] as string[], Outdoor: [] as string[], Electrical: [] as string[] };
-  for (const k of keys) out[groupOf[k] ?? "Electrical"].push(k.replace(/_/g, " "));
-  return out;
-}
-
-
+// Technician unit monitoring (FR-T02): the rolling series window for telemetry.series. The component groups of the 18
+// ComponentKeys are techJob's componentGroups.
 /** Buckets measurements into n equal slots (latest value per slot; null where no valid measurement). */
 export function bucket(items: { value: number | null; observedAt: string; quality?: string }[], from: Date, to: Date, n = 12): (number | null)[] {
   const out: (number | null)[] = Array(n).fill(null);
