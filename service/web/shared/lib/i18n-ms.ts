@@ -4214,6 +4214,8 @@ export const ms: Record<string, string> = {
   "1 rule · ventilation and fault causes": "1 peraturan · pengudaraan dan punca kerosakan",
   "{on} of 1 rule on": "{on} daripada 1 peraturan hidup",
   "Customers & units need asset.read": "Pelanggan & unit memerlukan asset.read",
+  "{what} needs {permission}": "{what} memerlukan {permission}",
+  "Ask an identity administrator for {what} access (Access & roles).": "Minta pentadbir identiti untuk akses {what} (Akses & peranan).",
   "Ask an identity administrator for Customers & units access (Access & roles).": "Minta pentadbir identiti untuk akses Pelanggan & unit (Akses & peranan).",
   "Warranty & coverage": "Waranti & liputan",
   "Import CSV": "Import CSV",

@@ -8,6 +8,7 @@ import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/w
 import { i18nOf } from "@ac/web/lib/i18n";
 import { periodKinds, periodRange, type PeriodKind } from "@ac/web/lib/clientEnergy";
 import { asOfText, type AdminSummary } from "@ac/web/lib/adminSummary";
+import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { AdminOverviewDemo } from "./_components/overview-demo";
 import { AdminOverviewView } from "./_components/overview-view";
 
@@ -26,7 +27,16 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
   const customerId = customers?.some((c) => c.id === one("customerId")) ? one("customerId")! : null;
   const properties = customerId ? await quiet(coreAll<{ id: string; name: string }>("properties.list", { filters: { customerId } })) : null;
   const propertyId = properties?.some((p) => p.id === one("propertyId")) ? one("propertyId")! : null;
-  const summary = period.error ? null : await coreOp<AdminSummary>("admin.summary", { from: period.from, to: period.to, ...(customerId ? { customerId } : {}), ...(propertyId ? { propertyId } : {}) });
+  let summary: AdminSummary | null = null;
+  if (!period.error) {
+    try {
+      summary = await coreOp<AdminSummary>("admin.summary", { from: period.from, to: period.to, ...(customerId ? { customerId } : {}), ...(propertyId ? { propertyId } : {}) });
+    } catch (e) {
+      // a role without dashboard.read: what it needs, not a failure with Try again (IR581)
+      if (e instanceof CoreError && e.error.code === "FORBIDDEN") return <NeedsAccess what="Overview" permission="dashboard.read" />;
+      throw e;
+    }
+  }
   return (
     <AdminOverviewView live={{
       period: { kind, from: period.from, to: period.to, error: period.error ?? null, label: period.label }, custom: { from: one("from") ?? "", to: one("to") ?? "" },

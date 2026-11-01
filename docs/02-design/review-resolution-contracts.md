@@ -8169,3 +8169,15 @@ Found in the eleventh round of the UX loop (UX-11: tech-external-a opens Notific
 The round found more than the note. The technician's list was empty: "All 0 · Unread 0 · No notifications". Yet tech-external-a has 22 unread notifications, "job updated" and "schedule changed", about the jobs HQ cancelled during the loop. IR253 hides a technician's job notifications once the assignment is no longer active or its window has ended, so their links would not lead to "Page unavailable". Since IR124, however, a cancelled or reassigned job opens as its frozen history snapshot. The technician is therefore never told that a job was cancelled, which is exactly when they need to know. Changing who may read which notification is a permission rule, so it is proposed instead of changed (UX proposals, B-6).
 
 The security point held: `notifications.markRead` on another user's notification, sent through the app's relay, answers NOT_FOUND.
+
+## IR581 An HQ page the role may not read says which permission it needs — 2026-11-02
+
+Found in the twelfth round of the UX loop (UX-12: hq-operator handles a filter-cleaning alert of a mock unit at 1920 and 1280). The task worked: "View alerts" from the overview, the alert, Acknowledge (toast "Acknowledged", the tiles move from Open 17 to 16 and Acknowledged 1), and Request maintenance, which opens New job for the unit (not saved). The security point turned up the friction. hq-override-only, whose only permission is `restriction.override`, may not acknowledge an alert (FORBIDDEN, as it should be). Yet the alerts page told that user "Alerts could not be loaded · Reference … · Try again", like an outage. So did 10 more of the 13 sidebar pages, the Overview among them, which is where an HQ user lands after signing in. Only Customers & units said what it needed: "Customers & units need asset.read — Ask an identity administrator for Customers & units access (Access & roles)."
+
+1. **Component.** `NeedsAccess` (`shared/components/NeedsAccess.tsx`) shows that state for any page: "<page> needs <permission>" and "Ask an identity administrator for <page> access (Access & roles)." Malay entries are added.
+2. **Overview.** A FORBIDDEN `admin.summary` shows "Overview needs dashboard.read".
+3. **Alerts.** Each read of the page names its permission (`alert.read`, `asset.read`, `alert.policy.read`), and the first one the role lacks names the state.
+4. **Test.** `admin/overview.e2e.ts` signs in as hq-override-only. On the Overview and Alerts it expects the permission named, the request to ask an identity administrator, and no Try again.
+5. **Remaining.** Access & roles, Devices & models, Maintenance jobs, Contracts, Billing, Automation policies, Energy analysis, MRV, Offsets and Audit still fail this way. They follow in the next round with the same component.
+
+The security point held: `alerts.acknowledge` through the relay answers FORBIDDEN for hq-override-only. hq-restriction-manager holds `alert.resolve`, so its acknowledge of another mock alert succeeded, correctly. Two filter-cleaning alerts of the mock fleet are now acknowledged ("Mock · cooling, on" and "Mock · readings missing").

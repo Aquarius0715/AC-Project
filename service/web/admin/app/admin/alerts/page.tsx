@@ -8,6 +8,7 @@ import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { adminAlertRows, policyRows, type AlertState, type ApiAdminAlert, type ApiCustomerName, type ApiMemberName, type ApiPolicy, type ApiUnitName, type Severity } from "@ac/web/lib/adminAlerts";
+import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { AdminAlertsView } from "./_components/alerts-view";
 
 type Page<T> = { items: T[] };
@@ -33,16 +34,26 @@ export default async function AdminAlertsPage({ searchParams }: PageProps<"/admi
   // the policies in the same scope (DD-A05 item 8). The default policy is read on its own, without the scope: a property
   // or unit scope leaves it out though it runs on every unit (Figma 268:2), and a customer scope would keep only that
   // customer's rule settings, while its editor switches the rules for every customer (item 9)
-  const [now, perms, display, alerts, units, customers, properties, policies, members, defaults] = await Promise.all([
+  // a read the role may not make answers the permission it needs: the first one missing names the page's state, instead
+  // of a failure with Try again (IR581)
+  const need = <T,>(p: Promise<T>, permission: string): Promise<T | { missing: string }> => p.catch((e) => {
+    if (e instanceof CoreError && e.error.code === "FORBIDDEN") return { missing: permission };
+    throw e;
+  });
+  const [now, perms, display, alertsRead, unitsRead, customersRead, propertiesRead, policiesRead, members, defaultsRead] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
-    coreOp<Page<ApiAdminAlert>>("alerts.list", { limit: 100, filters }), // every status in the scope: the tiles count them
-    coreAll<ApiUnitName & { propertyId: string; archived?: boolean }>("units.list").then((items) => ({ items, total: items.length })),
-    coreAll<ApiCustomerName & { status?: "active" | "inactive" }>("customers.list").then((items) => ({ items, total: items.length })),
-    coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"),
-    coreAll<ApiPolicy>("policies.list", { filters: scope }).then((items) => ({ items, total: items.length })),
+    need(coreOp<Page<ApiAdminAlert>>("alerts.list", { limit: 100, filters }), "alert.read"), // every status in the scope: the tiles count them
+    need(coreAll<ApiUnitName & { propertyId: string; archived?: boolean }>("units.list").then((items) => ({ items, total: items.length })), "asset.read"),
+    need(coreAll<ApiCustomerName & { status?: "active" | "inactive" }>("customers.list").then((items) => ({ items, total: items.length })), "asset.read"),
+    need(coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"), "asset.read"),
+    need(coreAll<ApiPolicy>("policies.list", { filters: scope }).then((items) => ({ items, total: items.length })), "alert.policy.read"),
     optional(coreAll<ApiMemberName>("members.list").then((items) => ({ items, total: items.length })), { items: [], total: 0 }),
-    coreOp<Page<ApiPolicy>>("policies.list", { limit: 1, filters: { kind: "default_alert" } }),
+    need(coreOp<Page<ApiPolicy>>("policies.list", { limit: 1, filters: { kind: "default_alert" } }), "alert.policy.read"),
   ]);
+  const missing = [alertsRead, unitsRead, customersRead, propertiesRead, policiesRead, defaultsRead].find((r): r is { missing: string } => !!r && typeof r === "object" && "missing" in r);
+  if (missing) return <NeedsAccess what="Alert policies" permission={missing.missing} />;
+  const read = <T,>(r: T | { missing: string }) => r as T; // none is missing past this point
+  const [alerts, units, customers, properties, policies, defaults] = [read(alertsRead), read(unitsRead), read(customersRead), read(propertiesRead), read(policiesRead), read(defaultsRead)];
   const scoped = [...defaults.items, ...policies.items.filter((p) => p.kind !== "default_alert")];
   const i = i18nOf(display);
   const custOrg = customers.items.find((c) => c.id === q.customerId)?.organizationId;
