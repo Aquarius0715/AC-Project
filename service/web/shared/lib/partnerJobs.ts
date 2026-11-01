@@ -2,11 +2,9 @@
 // their counts, the sort (IR34) and the period of the overview, and one row per job with the technician, the visit
 // slot or deadline and the status badge; rows open the offer, the job detail, the schedule or the quality review.
 // Pure code shared by the server loader and the client view; Vitest covers it. Rows in the display language with the
-// slots and deadlines in the user's display time zone (IR271); `slotText` keeps the Kuala Lumpur form for the
-// screens not translated yet.
-import { klTime } from "@ac/web/lib/devices";
+// slots and deadlines in the user's display time zone (IR271).
 import { EN, showSpan, showTime, type I18n } from "@ac/web/lib/i18n";
-import { bucket, hhmm, partnerJob, until, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
+import { bucket, partnerJob, until, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 export const TABS = [
@@ -42,9 +40,6 @@ export type JobRow = {
   tech: { name: string; sub: string; tone?: Tone; subTone?: Tone }; slot: { main: string; sub: string; tone?: Tone }; badge: { text: string; tone: Tone };
 };
 
-const mmddhm = (iso: string) => klTime(iso).slice(5);
-/** A slot in Kuala Lumpur as "09-21 10:00–12:00" (schedule and job detail until they are translated). */
-export const slotText = (s: Slot) => (klTime(s.startAt).slice(0, 10) === klTime(s.endAt).slice(0, 10) ? `${mmddhm(s.startAt)}–${hhmm(s.endAt)}` : `${mmddhm(s.startAt)} → ${mmddhm(s.endAt)}`);
 const typeText: Record<string, string> = { periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance" };
 const ack: Record<string, { sub: string; tone?: Tone }> = { pending: { sub: "awaiting the technician’s acceptance" }, accepted: { sub: "accepted" }, cant_make: { sub: "can’t make it — reassign", tone: "warn" } };
 const historyStatus: Record<string, string> = { completed: "Completed", cancelled: "Cancelled" };

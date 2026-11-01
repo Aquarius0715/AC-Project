@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.433.0
+version: 0.434.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -286,6 +286,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.434.0: The contractor job list's unused Kuala Lumpur slot text is removed; the remaining Kuala Lumpur times are their screens' rules (IR564). Phase 1A unchanged.
 0.433.0: The documentation index lists the contracts and catalogs that bind the documents: service, deterministic, strict review and review resolution contracts, the write version and query catalogs, the API description and the demo fixture (IR563). Phase 1A unchanged.
 0.432.0: Network architecture §6 notes that voice input, the QR scan and location automations need their feature allowed in the app's Permissions-Policy once they are built (IR562). Phase 1A unchanged.
 0.431.0: The container design's IoT Core and SES stand-ins say what the bridge and Mailpit do as built, and the Dockerfile paragraph names the tools target (IR561). Phase 1A unchanged.

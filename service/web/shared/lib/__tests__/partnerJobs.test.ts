@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { jobRow, pages, slotText, sortOf, sortSpec, tabFilters, tabOf } from "@ac/web/lib/partnerJobs";
+import { jobRow, pages, sortOf, sortSpec, tabFilters, tabOf } from "@ac/web/lib/partnerJobs";
 import { period, periodChoice, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 import { i18nOf } from "@ac/web/lib/i18n";
 
@@ -22,8 +22,6 @@ describe("partner job list", () => {
     expect(sortSpec("severity:desc")).toEqual({ field: "severity", direction: "desc" });
     expect(pages(0, 1)).toEqual({ page: 1, of: 1 });
     expect(pages(26, 2)).toEqual({ page: 2, of: 2 });
-    expect(slotText(slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z"))).toBe("09-21 10:00–12:00"); // Kuala Lumpur, for the schedule and job detail
-    expect(slotText(slot("2026-09-21T02:00:00Z", "2026-09-22T04:00:00Z"))).toBe("09-21 10:00 → 09-22 12:00");
   });
 
   it("shows an offer with its answer deadline and an accepted offer before the window", () => {

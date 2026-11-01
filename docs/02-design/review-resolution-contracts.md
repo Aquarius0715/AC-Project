@@ -7961,3 +7961,12 @@ Found in the loop, comparing the files under `docs/` with the index table of `do
 - the demo fixture (`fixture-contract.json`).
 
 A new row 13 lists them, with what each holds. The files the index still leaves out are records, not inputs: the review rounds of `05-document-review`, the internal decision records and the acceptance review sheets of `04-agentic-sdlc`, which the agentic SDLC README covers.
+
+## IR564 The contractor job list drops its unused Kuala Lumpur slot text — 2026-11-01
+
+Found in the loop, looking for times shown in a fixed zone instead of the user's display time zone (IR271, IR282). `partnerJobs.slotText` formatted a slot in Kuala Lumpur time "for the screens not translated yet". No screen imports it any more, and only its own test called it. It is removed, with the helpers that served it alone: `mmddhm`, and the imports of `klTime` and `hhmm`.
+
+The other Kuala Lumpur times stay. They are the rules of their screens:
+- the 08:00–18:00 day timelines of the technician overview, the contractor team and the schedule (`windowText`, `partnerOverview.hhmm`);
+- the contractor's free hours, labelled in Kuala Lumpur time when the user's zone differs;
+- the energy and offset periods, on Kuala Lumpur calendar days.
