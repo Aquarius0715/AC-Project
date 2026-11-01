@@ -8158,3 +8158,14 @@ Since FR-P11 the contractor adds technicians, moves an access end and disables o
 3. **Design.** DD-P06's rule in the contractor design reads the same way.
 
 The security point held: `members.setUnavailability` for another company's technician, sent through the app's relay, answers NOT_FOUND and writes nothing. Proposed separately (B-5): unavailable days cannot be removed or shortened once saved.
+
+## IR580 The notifications note names no requirement — 2026-11-02
+
+Found in the eleventh round of the UX loop (UX-11: tech-external-a opens Notifications from the menu on a 390×844 phone, two taps, and reads the list; the same at 1920). The page's note, shared by the four apps, ended its sentences with requirement IDs: "Reading a notification is separate from resolving the linked alert (FR-X07). Maintenance scheduling events (…) appear here for the role that has to act (IR113)."
+
+1. **Text.** The note keeps its two rules without "(FR-X07)" and "(IR113)". The Malay dictionary and the notification frames of Figma's four role pages follow.
+2. **Test.** `shared/notifications.e2e.ts` expects the note's new first sentence in each app.
+
+The round found more than the note. The technician's list was empty: "All 0 · Unread 0 · No notifications". Yet tech-external-a has 22 unread notifications, "job updated" and "schedule changed", about the jobs HQ cancelled during the loop. IR253 hides a technician's job notifications once the assignment is no longer active or its window has ended, so their links would not lead to "Page unavailable". Since IR124, however, a cancelled or reassigned job opens as its frozen history snapshot. The technician is therefore never told that a job was cancelled, which is exactly when they need to know. Changing who may read which notification is a permission rule, so it is proposed instead of changed (UX proposals, B-6).
+
+The security point held: `notifications.markRead` on another user's notification, sent through the app's relay, answers NOT_FOUND.

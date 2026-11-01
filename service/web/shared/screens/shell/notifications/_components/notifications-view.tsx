@@ -77,7 +77,7 @@ export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
           {shown.length === 0 && <li className="p-6 text-center text-muted-foreground">{t(tab === "unread" ? "No unread notifications" : "No notifications")}</li>}
         </ul>
       </Card>
-      <p className="text-xs text-muted-foreground">{t("Reading a notification is separate from resolving the linked alert (FR-X07). Maintenance scheduling events (new request, time proposed, accepted/declined, new offer, new assignment) appear here for the role that has to act (IR113).")} {!api && <Badge tone="muted">{t("preview only")}</Badge>}</p>
+      <p className="text-xs text-muted-foreground">{t("Reading a notification is separate from resolving the linked alert. Maintenance scheduling events (new request, time proposed, accepted/declined, new offer, new assignment) appear here for the role that has to act.")} {!api && <Badge tone="muted">{t("preview only")}</Badge>}</p>
     </Page>
   );
 }

@@ -6,6 +6,7 @@ import { test, expect } from "../../fixtures/test";
 test("Mark all as read empties the Unread tab", async ({ page }) => {
   await page.goto("/notifications");
   const main = page.getByRole("main");
+  await expect(main).toContainText("Reading a notification is separate from resolving the linked alert."); // no requirement IDs (IR580)
   const unreadTab = main.getByRole("tab", { name: /^Unread/ });
   const button = main.getByRole("button", { name: "Mark all as read" });
   const unread = Number((await unreadTab.innerText()).match(/\d+/)?.[0] ?? "0");

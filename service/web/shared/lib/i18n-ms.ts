@@ -5657,8 +5657,8 @@ export const ms: Record<string, string> = {
   "Unread": "Belum dibaca",
   "No unread notifications": "Tiada pemberitahuan belum dibaca",
   "No notifications": "Tiada pemberitahuan",
-  "Reading a notification is separate from resolving the linked alert (FR-X07). Maintenance scheduling events (new request, time proposed, accepted/declined, new offer, new assignment) appear here for the role that has to act (IR113).":
-    "Membaca pemberitahuan tidak sama dengan menyelesaikan amaran yang berkaitan (FR-X07). Peristiwa penjadualan penyelenggaraan (permintaan baharu, masa dicadangkan, diterima/ditolak, tawaran baharu, tugasan baharu) dipaparkan di sini untuk peranan yang perlu bertindak (IR113).",
+  "Reading a notification is separate from resolving the linked alert. Maintenance scheduling events (new request, time proposed, accepted/declined, new offer, new assignment) appear here for the role that has to act.":
+    "Membaca pemberitahuan tidak sama dengan menyelesaikan amaran yang berkaitan. Peristiwa penjadualan penyelenggaraan (permintaan baharu, masa dicadangkan, diterima/ditolak, tawaran baharu, tugasan baharu) dipaparkan di sini untuk peranan yang perlu bertindak.",
   "preview only": "pratonton sahaja",
   "Alert on {name}": "Amaran pada {name}",
   "Air quality alert on {name}": "Amaran kualiti udara pada {name}",
