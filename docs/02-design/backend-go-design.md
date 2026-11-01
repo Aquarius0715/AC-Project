@@ -271,10 +271,10 @@ The webhook receiver (`cmd/webhook`, planned: not built yet, compose profile `pl
 ## 8. Security in the code
 
 - Secrets (database credentials via IAM authentication tokens or Secrets Manager, Stripe restricted key, provider keys) are loaded at start-up and refreshed on rotation; they are never logged (the slog handler masks keys named `*secret*`, `*token*`, `*password*`, `authorization`, e-mail and phone values). As built (IR369), `internal/platform/logging` builds every process's logger. It masks the value of a key naming a secret, cookie or authorization, and e-mail addresses, international phone numbers and connection-URL passwords in messages, strings and errors.
-- The database role used by the services (`ac_app` / `ac_worker`) has no `BYPASSRLS` and no DDL rights; migrations run with a separate owner role.
+- The services' database roles have no `BYPASSRLS` and no DDL rights: one role per business domain (`ac_svc_<domain>`, signed in as `ac_<domain>_login`, IR194) and `ac_app` for the single-process build and the tools. Migrations run with a separate owner role.
 - All SQL is parameterised (pgx placeholders); dynamic list filters are built from an allowlist of column names.
 - Request bodies are size-limited and strictly decoded; outbound HTTP clients have timeouts and only allowlisted hosts (enforced again by the Network Firewall).
-- `govulncheck` and image scanning run in CI; dependency updates weekly.
+- Dependabot proposes the dependency updates weekly. The scans run by hand for now, not in CI (IR556): `make vuln` (govulncheck), `npm audit` and an image scan (docker scout).
 
 ## 9. Testing strategy
 
@@ -284,9 +284,10 @@ The webhook receiver (`cmd/webhook`, planned: not built yet, compose profile `pl
 | Integration tests | a local PostgreSQL 18 test database (IR441), reset per run (`make testdb`) | The operations with their SQL, RLS isolation (a second tenant sees nothing), constraints (overlap, one pending command, append-only audit), in one process and with the split services. Authorization by target: every operation a client, contractor or technician may call, tried with another party's records and a stale version (`TestForeignTargets`, IR366) |
 | API tests | `httptest` + Echo | Status mapping, idempotency replay, version conflicts, HQ-network rule, owner-only rules; every SQL statement of a module runs in at least one test, checked on the coverage profile after `make cover` (IR311) |
 | Contract tests | generated from the catalog | Every operation registered once, mode and authorization match the catalog, inputs reject unknown fields; each operation's input type takes exactly the fields of its contract input, and its result type answers exactly its contract result (`TestInputsMatchContract`, IR391, and `TestResultsMatchContract`, IR392: against `service/web/shared/lib/contractInputs.gen.json` and `contractResults.gen.json`, which the web's `contractInputs.test.ts` derives from the contract with the TypeScript checker and keeps current); each operation's input rules answer VALIDATION before authorization (`TestRequiredInputs`, IR307) |
-| Acceptance tests | `test/acceptance` | AT-* cases from the requirement documents replayed against the API with fixture-contract.json seeds and a fixed clock (the same cases that drive the Phase 1A mock) |
-| Integration | LocalStack, Stripe CLI, IoT device simulator | Outbox → SNS → SQS flows, Stripe webhooks, MQTT command round trip in staging |
-| Load | k6 | Design capacity in backend architecture §13 |
+| Acceptance tests | `test/acceptance` (planned) | AT-* cases from the requirement documents replayed against the API with fixture-contract.json seeds and a fixed clock (the same cases that drive the Phase 1A mock). As built there is no such suite: the integration tests and the end-to-end specs cover the behaviour, a few of them by their AT IDs |
+| Integration (planned) | LocalStack, Stripe CLI, IoT device simulator | Outbox → SNS → SQS flows, Stripe webhooks, MQTT command round trip in staging; the relay, the webhook receiver and the IoT gateway service are not built yet |
+| Load (planned) | k6 | Design capacity in backend architecture §13 |
+| End-to-end tests | Playwright (`service/web/e2e`, IR252) | The four apps against the compose stack with real sign-ins: the shared specs per app, each app's own specs and the cross-app scenarios, each restoring what it changes; `e2e.yml` runs them on every code push (container design §6) |
 | Web unit tests | Vitest (`service/web/shared`, `npm run test`; config as in the Next.js docs with the React plugin and jsdom) | The pure mappers of `@ac/web/lib` that the Server Components and client views share (device tiles and events, quality review evidence check, payout lines and PDF, command history, action messages), the BFF session (signed cookie, refresh, return paths) and the DAL (headers, errors, paging) (IR307); `npm run typecheck` includes the shared package and its tests (IR219) |
 
 ## 10. Build, run, and deploy
