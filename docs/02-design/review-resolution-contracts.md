@@ -7970,3 +7970,13 @@ The other Kuala Lumpur times stay. They are the rules of their screens:
 - the 08:00–18:00 day timelines of the technician overview, the contractor team and the schedule (`windowText`, `partnerOverview.hhmm`);
 - the contractor's free hours, labelled in Kuala Lumpur time when the user's zone differs;
 - the energy and offset periods, on Kuala Lumpur calendar days.
+
+## IR565 Two more unused Kuala Lumpur time helpers go — 2026-11-01
+
+Found in the loop, following IR564. Two more helpers kept a Kuala Lumpur form "for the screens not translated yet", and no code calls them:
+- `partnerJobDetail.when` and `partnerJobDetail.range`;
+- `units.klTime` with its `kl`.
+
+They are removed, with the `klTime` import of `partnerJobDetail.ts`, and the header comments say what the files format now: instants in the display time zone and capacity days as Kuala Lumpur dates.
+
+`devices.klTime` stays, for the day timelines of IR564.

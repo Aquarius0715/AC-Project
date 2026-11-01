@@ -67,12 +67,6 @@ export function setsTemperature(cap: ApiUnitDetail["capabilities"] | null): bool
 
 export type ApiCommand = { id: string; action: CommandAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; acknowledgedAt?: string | null; expiresAt?: string; failureCode: string | null; source?: string };
 
-/** The fixed Asia/Kuala_Lumpur time of the screens not yet on the user's display time zone; screens moved to it use
- * showTime / showClock of lib/i18n (IR44, IR259). */
-const kl = (iso: string | null, withDate = false) =>
-  iso ? new Date(iso).toLocaleString("en-MY", { ...(withDate ? { dateStyle: "medium" } : {}), timeStyle: "short", hour12: false, timeZone: "Asia/Kuala_Lumpur" } as Intl.DateTimeFormatOptions) : "—";
-export const klTime = kl;
-
 const en = translator("en");
 
 /** The words for the operating modes and fan levels (the stored values stay cool / dry / fan, low / mid / high). */

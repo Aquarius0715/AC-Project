@@ -4,8 +4,7 @@
 // technicians fit the visit, the status timeline from the job events and the refusals of the decisions.
 // Pure code shared by the server loader and the client view; Vitest covers it. Texts in the display language (`t` / `i`,
 // IR272); the loader formats every time on the server — instants in the user's display time zone, the capacity days
-// as Kuala Lumpur dates — while `when` / `range` keep the Kuala Lumpur form for the screens not translated yet.
-import { klTime } from "@ac/web/lib/devices";
+// as Kuala Lumpur dates.
 import { EN, intlTag, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { jobEventTitle, klDay, until, type ApiCapacity, type ApiJobEvent, type ApiMember, type Slot } from "@ac/web/lib/partnerOverview";
@@ -44,8 +43,6 @@ const STATUS_WORDS: Record<string, string> = {
 };
 /** A job status inside a sentence (“the job is on hold”), in the display language. */
 export const statusWord = (status: string, t: T = en) => (STATUS_WORDS[status] ? t(STATUS_WORDS[status]) : status.replace(/_/g, " "));
-export const when = (iso: string) => klTime(iso); // YYYY-MM-DD HH:MM in Kuala Lumpur
-export const range = (from: string, to: string) => (when(from).slice(0, 10) === when(to).slice(0, 10) ? `${when(from)}–${when(to).slice(11)}` : `${when(from)} – ${when(to)}`);
 /** “1st”, “2nd”, “3rd”, “4th” … in English, “ke-1” in Malay. */
 export const ordinal = (n: number, locale: "en" | "ms" = "en") => (locale === "ms" ? `ke-${n}` : `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`);
 
