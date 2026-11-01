@@ -145,6 +145,11 @@ Cross-module rules that the modules must keep:
 | Files | Uploads and downloads use short-lived pre-signed object storage URLs issued by the Core API after authorization; files are scanned before they become visible. |
 | Versioning of the API | Additive changes only within `/v1`; breaking changes need a new operation name or `/v2`. |
 
+As built, three rows of the table are still the target (IR367, IR368, IR389; OPEN-CT-02):
+- **Caller context.** The BFF sends the user's own access token (`Authorization: Bearer`) with `X-Tenant-Id` and `X-Membership-Id`; there is no separate service token. The Core API verifies the token against the identity provider's keys, accepting access tokens only. It then reads the membership for that user, tenant and ID, and refuses one that is not the signed-in user's.
+- **Change notification.** No Server-Sent Events stream is built. The screens refetch after their own writes, and poll a command until its device answers.
+- **Files.** An upload travels in the Server Action's body to the Core API, which checks its type by magic bytes, its size and an image's dimensions. The Core API keeps it in the local blob store (OPEN-CT-02). The app's own routes stream a file back once the Core API has authorized the read. No pre-signed URL is issued, and no scanner runs yet.
+
 ## 6. Authentication, sessions, and authorization
 
 | Topic | Design |

@@ -7879,3 +7879,12 @@ A note under the table now lists what runs today:
 - where schedules and conditions are evaluated;
 - the IoT bridge in place of the IoT gateway;
 - what the cache holds: sessions and write-limit counters, while idempotency keys are in PostgreSQL.
+
+## IR555 Backend architecture §5 says what the API contract is as built — 2026-11-01
+
+Found in the loop, comparing §5's contract table with the BFF and the Core API. Three rows describe the target, not what runs:
+1. **Caller context.** The table says the BFF sends a short-lived signed service token plus the user context. As built, the DAL and the operation relay send the user's access token with `X-Tenant-Id` and `X-Membership-Id`. The Core API verifies the token (IR367) and reads the membership for that user. A membership of another person is UNAUTHENTICATED (`error.membershipInvalid`).
+2. **Change notification.** No Server-Sent Events stream exists in the code. The screens refetch after their writes, and poll a command (`waitForCommand`).
+3. **Files.** No pre-signed URL is issued, and no scanner runs. Uploads reach the Core API in the Server Action's body and are checked there (magic bytes, size, image dimensions; IR368, IR389). They are kept in the local blob store (OPEN-CT-02), and the apps' routes stream them back after the Core API authorizes the read.
+
+A note under the table now says so. The other rows hold: idempotency keys are kept 24 hours (`platform.idempotency_keys.expires_at`), and the error codes map to the listed statuses.
