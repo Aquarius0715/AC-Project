@@ -8206,3 +8206,12 @@ The thirteenth round of the UX loop (UX-13) finishes IR581. It crawled the sideb
 4. **Figma** has no frame of this state, so it is unchanged.
 
 Left for later: the sidebar still lists every page to every HQ role.
+
+## IR583 A restricted AC says why and links to its restriction — 2026-11-02
+
+Found in the fourteenth round of the UX loop (UX-14: customer-a wants the Lobby AC colder than its cooling restriction allows, at 1920 and 1280). The control already holds the line. The setpoint range reads 24–30 °C and Lower the temperature is disabled at 24 °C. A 22 °C command sent straight through the app's relay answers FORBIDDEN `errors.restriction_active`, so the restriction holds without the UI. The notice above the control, however, said only "Cooling restriction active — minimum 24 °C. View details". It did not say that the cause is an unpaid invoice or until when cooling stays limited, and its link opened the Contracts & payments list, where "View restriction details" had to be found and pressed again. Figma Client 02k says "Payment-related restriction …", "Setpoints below 24 °C are unavailable until the device confirms the release" and "View restriction details".
+
+1. **Words.** "Cooling restriction active — payment-related: setpoints below {min} °C are unavailable until the release is confirmed." A power-off restriction reads "Service restriction active — payment-related: this AC is kept off until the release is confirmed." Both say "View restriction details". The Malay dictionary follows, and the unused "View details" entry leaves.
+2. **Link.** When the unit is restricted, the unit page finds the restriction as Contracts & payments does: the contract with an active restriction, one of its invoices, `restrictions.forInvoice` (the customer has no restriction list). It links to `/customer/payments/<invoice>?tab=restriction&restrictionId=<id>`. If none is found, or a read fails, the link stays on Contracts & payments.
+3. **Test.** The new `customer/restriction-notice.e2e.ts` opens the seed's Lobby AC. It expects the payment-related wording, a link to the restriction's detail, and "Release condition" after following it.
+4. **Figma.** Client 02k already shows this notice, so it is unchanged.

@@ -24,7 +24,7 @@ const REASONS: Record<string, string> = { "errors.unit_busy": "another command i
 
 /** Unit detail and remote control. In API mode the Server Component passes the unit, its room and the policies; the
  * texts and times follow the user's display language and time zone (FR-X01, IR44, IR259). */
-export function UnitView({ id, detail, room: roomRows, policies, history = [] }: { id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; history?: ApiCommand[] }) {
+export function UnitView({ id, detail, room: roomRows, policies, history = [], restrictionHref = null }: { id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; history?: ApiCommand[]; restrictionHref?: string | null }) {
   const t = useT();
   const display = useDisplay();
   const toast = useToast();
@@ -171,8 +171,8 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
             )}
           </Card>
           {blocked && <Banner tone="warn">{t("Remote control is paused while HQ checks this AC’s restriction state. Try again later.")}</Banner>}
-          {policy?.kind === "power_off" && <Banner tone="warn">{t("Service restriction active — this AC is kept off.")} <Link className="font-semibold text-primary" href="/customer/payments">{t("View details")} <Icon name="arrowRight" /></Link></Banner>}
-          {restricted && <Banner tone="warn">{t("Cooling restriction active — minimum {min} °C.", { min })} <Link className="font-semibold text-primary" href={d ? "/customer/payments" : "/customer/payments/invoice-overdue-a?tab=restriction"}>{t("View details")} <Icon name="arrowRight" /></Link></Banner>}
+          {policy?.kind === "power_off" && <Banner tone="warn">{t("Service restriction active — payment-related: this AC is kept off until the release is confirmed.")} <Link className="font-semibold text-primary" href={restrictionHref ?? "/customer/payments"}>{t("View restriction details")} <Icon name="arrowRight" /></Link></Banner>}
+          {restricted && <Banner tone="warn">{t("Cooling restriction active — payment-related: setpoints below {min} °C are unavailable until the release is confirmed.", { min })} <Link className="font-semibold text-primary" href={d ? restrictionHref ?? "/customer/payments" : "/customer/payments/invoice-overdue-a?tab=restriction"}>{t("View restriction details")} <Icon name="arrowRight" /></Link></Banner>}
           <Card title={t("REMOTE CONTROL")} sub={t(controllable ? "Controls apply to this AC only; you confirm before sending" : "No remote control on this model")}>
             {!controllable ? <p className="text-[13px] text-muted-foreground">{t("This AC’s module only measures: its readings are shown below, and settings are changed on the AC itself.")}</p> : (
             <div className="flex flex-col gap-4">
