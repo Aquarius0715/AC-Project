@@ -342,8 +342,11 @@ services:
   # bridge carries the telemetry and the acknowledgements to the demo trigger of the Core API (gateway). Each logs in with
   # its own API key from .env.local (docker/mosquitto/passwd.sh writes the broker's password file from those keys).
   iot-bridge:          # local stand-in for AWS IoT rules: MQTT topics -> the Core API's demo trigger
-    image: ac-api:dev-tools
-    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: dev, args: { SERVICE: gateway } }
+    image: ac-api:tools
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: tools, args: { SERVICE: gateway } }
+    read_only: true               # distroless, non-root, no capability needed (IR539)
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     command: ["/app/iotbridge", "--broker", "tcp://mosquitto:1883", "--api", "http://gateway:8080"]
     environment:
       MQTT_USER: iot-bridge
@@ -364,8 +367,11 @@ services:
     profiles: [iot]
 
   device-sim:          # simulated IoT modules (telemetry each minute, heartbeats, command acks) for the demo fixture devices
-    image: ac-api:dev-tools
-    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: dev, args: { SERVICE: gateway } }
+    image: ac-api:tools
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: tools, args: { SERVICE: gateway } }
+    read_only: true               # distroless, non-root, no capability needed (IR539)
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     command: ["/app/devicesim", "--broker", "tcp://mosquitto:1883"]
     environment:
       MQTT_USER: device-sim
@@ -375,8 +381,11 @@ services:
     profiles: [iot]
 
   mock-history:        # one-off: 30 days of past readings for the mock fleet, up to the scenario clock (charts)
-    image: ac-api:dev-tools
-    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: dev, args: { SERVICE: gateway } }
+    image: ac-api:tools
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: tools, args: { SERVICE: gateway } }
+    read_only: true               # distroless, non-root, no capability needed (IR539)
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     command: ["/app/mockhistory", "--api", "http://gateway:8080"]
     environment:
       DATABASE_URL: postgres://postgres:local@postgres:5432/ac?sslmode=disable   # local owner login, as migrate uses

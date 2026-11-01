@@ -7707,3 +7707,11 @@ Found in the loop's secrets check. The compose anchor of the Core API services r
 
 1. **Fix.** The anchor has no `env_file`. A key reaches only the containers that use it, by interpolation: the IoT services' broker keys, and the live broker's login for `iot-bridge`. Values set in `environment` were never affected, because they win over `env_file`.
 2. **Checked.** A `docker inspect` of the recreated services shows no `REAL_MQTT_*` or `MQTT_*_KEY` outside `iot-bridge` and `device-sim`. The container design says so beside the local values.
+
+## IR539 The IoT tools run like the services: distroless, non-root, read-only — 2026-11-01
+
+Found in the loop's container check. `iot-bridge`, `device-sim` and the one-off `mock-history` ran from the `dev` target (`ac-api:dev-tools`, 1.3 GB). That is the Go toolchain image with the sources, running as root with a writable root and Docker's default capabilities. `iot-bridge` now also holds the live broker's login, which switches a real air conditioner (DEC-89, IR538).
+
+1. **Image.** `service.Dockerfile` has a `tools` target: the three static binaries from the `dev` stage on the same pinned distroless `nonroot` base as the services (`ac-api:tools`, 57.5 MB, no shell or toolchain).
+2. **Compose.** The three services use it with `read_only: true`, `cap_drop: [ALL]` and `no-new-privileges`. They write no file: the simulator keeps its state in retained MQTT messages.
+3. **Checked on the development stack.** Recreated, both IoT services run as `nonroot` with a read-only root and no capability. The bridge connected and the simulator's 22 modules kept reporting: 184 demo triggers answered 200 in two minutes. The container design says so.
