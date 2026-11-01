@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.403.0
+version: 0.404.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -286,6 +286,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.404.0: The backend architecture's IoT design says how a module's connection state is reported (device events, never derived from lastSeenAt; IR534). Phase 1A unchanged.
 0.403.0: The unit page's choice of remote controls per model is the tested helper controlLayout (IR533). Phase 1A unchanged.
 0.402.0: The live module goes offline after 3 minutes without its nodes and back online when they report, through device events whose open fault the bridge reads from the new internal query devices.connectionFault (IR532). Phase 1A unchanged.
 0.401.0: The live heartbeat gap is measured on the wall clock, so the time a sleeping machine missed the nodes counts toward AC offline (IR531). Phase 1A unchanged.

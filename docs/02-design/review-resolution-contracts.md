@@ -7672,3 +7672,10 @@ Found in the loop. The rules of IR524 and IR530, which decide which remote contr
    - the review bar only when a setting can change.
    The unit page takes its rows from it, with no change in behavior.
 2. **Tests.** `units.test.ts` covers a full model, the demo screen, a model with its own modes and fan levels and no temperature range, mode and fan control off, the power alone (no review bar) and no control.
+
+## IR534 The backend architecture says how a module's connection state is reported — 2026-11-01
+
+Found in the loop. The IoT design (backend architecture §9) said when the "AC offline" alert opens, but not how a module's connection state changes. IR532 and the SR20 rule decide it, so §9 now has a Connection state row:
+- The gateway reports device events: communication_lost when the connection ends (in production the broker's disconnect; the development bridge after 3 minutes without the live nodes, IR532), and restored, naming the open fault, when it returns.
+- The API never derives offline from lastSeenAt.
+- While offline, the unit's controls are disabled and commands are rejected.
