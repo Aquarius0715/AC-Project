@@ -8063,3 +8063,19 @@ Found in the fourth round of the UX loop (UX-04: hq-operator dispatches a new cu
 2. **Words.** The 23 texts of the Jobs, Plans and Contractors tabs, their dialogs and their messages lose the IDs and "(受領)"; the Malay dictionary follows ("{names} and {n} more" is new). The meaning of each sentence is unchanged.
 3. **Tests.** `adminJobs.test.ts` checks `contractorNames` (none, two in order, five, Malay) and expects the hold reason and the completed-assignment line without IDs.
 4. **Design and Figma.** The Jobs tab paragraph of the admin design describes the column. In Figma's Maintenance Coordinator frames, 18 screen texts lose the same IDs ("put on hold first", "Only these times are agreed", "Active partner contractors."); the captions keep theirs. Figma's table shows each contractor's availability per time with a Fit column; the app does not compute contractor capacity per time, which is proposed separately (UX proposals, B).
+
+## IR573 A failed submit takes focus to the field to fix — 2026-11-01
+
+Found in the fifth round of the UX loop (UX-05: customer-a asks for a visit with three preferred times, HQ proposes another time, and the customer accepts it, at 1920 and 1280). The flow itself reads well: "Request sent", the request first in Requested, "A new visit time needs your reply (1)" with Review, Accept this time, and "Time accepted — <time> is booked; the technician confirms it next." Submitting the new request with empty symptoms, however:
+
+- showed "Symptoms must be 10–2000 characters" under the field, but the field was not marked invalid (`aria-invalid` missing) and focus stayed on Submit request, so a keyboard or screen-reader user had to search the form for what was wrong;
+- with the mouse still on Submit request, axe found the hovered primary button below contrast: `hover:bg-primary/80` puts white text at 4.0:1 on the lighter blue.
+
+1. **Invalid field.** `Field` (`shared/components/ui.tsx`) adds `aria-invalid` to its control when it shows an error; the error stays inside the label, so it is part of the control's name. A group of choices is not marked.
+2. **Focus.** A failed submit of the new maintenance request moves focus to the first field to fix, top to bottom: unit, symptoms, the first date of the preferred times, contact window.
+3. **Preferred times.** The three times are one group, named by their title and described by their error ("The 3 times must be different."), which the group's first date reaches when focused.
+4. **Hover contrast.** The primary button, and a badge used as a link, darken less on hover (`bg-primary/90`, 4.8:1).
+5. **Tests.** `field.test.tsx` checks the invalid mark and the name. `maintenance-request.e2e.ts` expects focus on Symptoms, then on Contact window, after each failed submit, and Symptoms no longer invalid once fixed.
+6. **Design.** The accessibility paragraph of the UIUX specification states it. Figma shows no focus or hover states, so it is unchanged.
+
+The security points of the round held: a double click on Submit request created one request, and symptoms with markup (`<img src=x onerror=…>`) showed as text to the customer and to HQ, with nothing run.

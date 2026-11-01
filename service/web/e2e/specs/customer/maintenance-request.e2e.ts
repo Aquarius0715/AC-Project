@@ -1,5 +1,5 @@
 // Customer maintenance request (FR-C09, DD-C09, IR113, IR237): New request refuses short symptoms and contact details in
-// the contact window, is sent with three preferred times, takes a note to the coordinator, and is cancelled with a
+// the contact window — each time focusing the field to fix (IR573) — is sent with three preferred times, takes a note to the coordinator, and is cancelled with a
 // reason. Whatever happens, the request this test sent is cancelled at the end.
 import type { Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
@@ -25,10 +25,15 @@ test("a request is validated, sent with three preferred times, noted and cancell
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("button", { name: "Submit request" }).click();
     await expect(dialog).toContainText("Symptoms must be 10–2000 characters");
+    // a failed submit takes focus to the first field to fix and marks it invalid (IR573)
+    await expect(dialog.getByLabel(/Symptoms/)).toBeFocused();
+    await expect(dialog.getByLabel(/Symptoms/)).toHaveAttribute("aria-invalid", "true");
     await dialog.getByLabel(/Symptoms/).fill("E2E: the unit makes a rattling noise at high fan speed.");
     await dialog.getByLabel(/Contact window/).fill("call 0123456789");
     await dialog.getByRole("button", { name: "Submit request" }).click();
     await expect(dialog).toContainText("No e-mail addresses or phone numbers");
+    await expect(dialog.getByLabel(/Contact window/)).toBeFocused();
+    await expect(dialog.getByLabel(/Symptoms/)).not.toHaveAttribute("aria-invalid");
     await dialog.getByLabel(/Contact window/).fill("Weekdays 09:00-18:00");
     await dialog.getByRole("button", { name: "Submit request" }).click();
     await page.waitForURL(/jobId=/);

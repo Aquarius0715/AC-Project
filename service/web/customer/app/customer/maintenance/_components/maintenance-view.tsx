@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { Badge, Banner, Btn, Card, Choice, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, cx, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
 import { useAction } from "@ac/web/lib/useAction";
@@ -175,22 +175,25 @@ function JobDetail({ d, open, onDone, onFail }: { d: Detail; open: (m: ModalKind
 type ModalProps = { onClose: Done; onFail: (f: ActionFailure) => void };
 
 /** Three preferred times: date, from, to (each 1–4 h, from tomorrow, all different — IR113). */
-function TimesInput({ rows, onChange, error, label }: { rows: Row[]; onChange: (r: Row[]) => void; error?: string | null; label?: string }) {
+// One group for the times: its error describes the group, which names it when focus enters (IR573); `firstId` lets a
+// failed submit focus the first date.
+function TimesInput({ rows, onChange, error, label, firstId }: { rows: Row[]; onChange: (r: Row[]) => void; error?: string | null; label?: string; firstId?: string }) {
   const t = useT();
   const { timeZone } = useDisplay();
+  const titleId = useId(), errorId = useId();
   const set = (i: number, k: keyof Row, v: string) => onChange(rows.map((r, n) => (n === i ? { ...r, [k]: v } : r)));
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[13px] font-semibold">{label ?? t("Your 3 preferred times")} <span className="font-normal text-muted-foreground">{t("· each 1–4 h, from tomorrow, all different · times in {zone}", { zone: timeZone })}</span></span>
+    <div role="group" aria-labelledby={titleId} aria-describedby={error ? errorId : undefined} className="flex flex-col gap-2">
+      <span id={titleId} className="text-[13px] font-semibold">{label ?? t("Your 3 preferred times")} <span className="font-normal text-muted-foreground">{t("· each 1–4 h, from tomorrow, all different · times in {zone}", { zone: timeZone })}</span></span>
       {rows.map((r, i) => (
         <div key={i} className="flex flex-wrap items-end gap-2">
           <span className="mb-2 w-8 text-xs font-semibold text-primary">{t(["1st", "2nd", "3rd"][i])}</span>
-          <Field label={t("Date {n}", { n: i + 1 })}><Input type="date" value={r.date} onChange={(e) => set(i, "date", e.target.value)} /></Field>
+          <Field label={t("Date {n}", { n: i + 1 })}><Input id={i === 0 ? firstId : undefined} type="date" value={r.date} onChange={(e) => set(i, "date", e.target.value)} /></Field>
           <Field label={t("From {n}", { n: i + 1 })}><Input type="time" value={r.from} onChange={(e) => set(i, "from", e.target.value)} /></Field>
           <Field label={t("To {n}", { n: i + 1 })}><Input type="time" value={r.to} onChange={(e) => set(i, "to", e.target.value)} /></Field>
         </div>
       ))}
-      {error && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{error}</p>}
+      {error && <p id={errorId} className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{error}</p>}
     </div>
   );
 }
@@ -212,18 +215,24 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   const symErr = symptomLength(sym) < 10 || symptomLength(sym) > 2000 ? t("Symptoms must be 10–2000 characters") : null;
   const slotErr = preferredError(slots, now, 3, t);
   const cErr = contactError(contact, t);
+  const ids = { unit: useId(), sym: useId(), times: useId(), contact: useId() };
   const submit = () => {
     setTried(true);
-    if (!unitId || symErr || slotErr || cErr) return;
+    // a failed submit takes focus to the first field to fix, top to bottom (IR573)
+    const bad = !unitId ? ids.unit : symErr ? ids.sym : slotErr ? ids.times : cErr ? ids.contact : null;
+    if (bad) {
+      requestAnimationFrame(() => document.getElementById(bad)?.focus());
+      return;
+    }
     run(() => createRequest({ unitId, type, symptom: sym, slots, contactWindow: contact }), t("Request sent"), (v) => { onClose(t("Request {job} sent with 3 preferred times — nothing is booked until a time is confirmed.", { job: v.id.slice(0, 8) })); router.push(`/customer/maintenance?jobId=${v.id}`); }, onFail);
   };
   return (
     <Modal open wide onClose={() => onClose()} title={t("New maintenance request")} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={submit}>{t("Submit request")}</Btn></>}>
-      <Field label={t("Unit")}><Select value={unitId} onChange={(e) => setUnitId(e.target.value)}>{live.units.map((u) => <option key={u.id} value={u.id}>{u.name}{u.place ? ` · ${u.place}` : ""}</option>)}</Select></Field>
+      <Field label={t("Unit")}><Select id={ids.unit} value={unitId} onChange={(e) => setUnitId(e.target.value)}>{live.units.map((u) => <option key={u.id} value={u.id}>{u.name}{u.place ? ` · ${u.place}` : ""}</option>)}</Select></Field>
       <Field label={t("Type")}><Choice value={type} onChange={setType} options={[{ id: "reactive", label: t("Repair") }, { id: "preventive", label: t("Preventive") }]} /></Field>
-      <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symErr ?? undefined : undefined} hint={`${symptomLength(sym)} / 2000`}><Textarea value={sym} onChange={(e) => setSym(e.target.value)} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
-      <TimesInput rows={rows} onChange={setRows} error={tried ? slotErr : null} />
-      <Field label={t("Contact window (optional)")} hint={t("Use HH:mm for times (example: Weekdays 09:00-18:00) — no phone numbers or e-mail addresses")} error={tried ? cErr ?? undefined : undefined}><Input value={contact} maxLength={200} onChange={(e) => setContact(e.target.value)} /></Field>
+      <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symErr ?? undefined : undefined} hint={`${symptomLength(sym)} / 2000`}><Textarea id={ids.sym} value={sym} onChange={(e) => setSym(e.target.value)} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
+      <TimesInput rows={rows} onChange={setRows} error={tried ? slotErr : null} firstId={ids.times} />
+      <Field label={t("Contact window (optional)")} hint={t("Use HH:mm for times (example: Weekdays 09:00-18:00) — no phone numbers or e-mail addresses")} error={tried ? cErr ?? undefined : undefined}><Input id={ids.contact} value={contact} maxLength={200} onChange={(e) => setContact(e.target.value)} /></Field>
       <Banner>{t("Nothing is booked yet — you will see “Scheduled” once a time is confirmed. Any time outside your 3 options needs your approval.")}</Banner>
     </Modal>
   );

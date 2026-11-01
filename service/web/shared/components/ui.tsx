@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Children, createContext, isValidElement, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Children, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useT } from "@ac/web/components/I18n";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { Alert } from "@ac/web/components/ui/alert";
@@ -289,10 +289,13 @@ export function Field({ label, hint, error, children, className, labelHidden }: 
   const control = isValidElement(children) && (children.type === Input || children.type === Select || children.type === Textarea || ["input", "select", "textarea"].includes(children.type as string));
   const group = !control;
   const Tag = group ? "div" : "label";
+  // an error marks its control invalid, so assistive technology tells which field to fix; the error text is part of
+  // the label, and so of the control's name (IR573)
+  const field = control && error ? cloneElement(children as React.ReactElement<{ "aria-invalid"?: boolean }>, { "aria-invalid": true }) : children;
   return (
     <Tag role={group ? "group" : undefined} aria-label={group ? label : undefined} className={cx("flex min-w-0 flex-col gap-1 text-xs text-ink", className)}>
       <span aria-hidden={group || undefined} className={cx("font-semibold", labelHidden && "sr-only")}>{label}</span>
-      {children}
+      {field}
       {error ? <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{error}</span> : hint ? <span className="font-normal text-muted-foreground">{hint}</span> : null}
     </Tag>
   );
