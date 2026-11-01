@@ -188,10 +188,21 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 
 ## 6. CI pipeline
 
-1. Build both images with `docker buildx` for `linux/arm64` and `linux/amd64`; run unit tests inside the build stage.
-2. Start `docker compose --profile full up -d` (or `infra` + backend) and run contract, store, API, and acceptance tests against it; tear down.
-3. Scan images (ECR scan / Trivy), generate an SBOM, sign, push to the dev ECR.
-4. Promote the same digest to staging, run the IoT Core / Stripe test-mode integration suite, then promote to production.
+As built (GitHub Actions, IR550), every push to `main` and every pull request runs two workflows:
+- `.github/workflows/ci.yml`, seven parallel jobs:
+  - `go-lint`: gofmt, vet and staticcheck, and the generated catalog, routes, contracts and Swagger must be current;
+  - `go-test` and `go-test-cluster`: the Go suites on a fresh PostgreSQL test database, the second against the split services;
+  - `web-lint`, `web-typecheck` and `web-test`: ESLint, TypeScript and Vitest of the four apps and the shared package;
+  - `docs`: the document validators.
+- `.github/workflows/e2e.yml`: the compose stack (`--profile full`, built from the commit, with random broker keys), 30 days of mock fleet history and the Playwright suite. Changes to documentation only skip it.
+
+Actions are pinned by commit SHA, and `.github/dependabot.yml` proposes their updates weekly. Before a push, `sh scripts/check.sh` runs the checks of `ci.yml` locally.
+
+Planned for the AWS target (DEC-68):
+1. Build every image with `docker buildx` for `linux/arm64` and `linux/amd64`, with the unit tests in the build stage.
+2. Start `docker compose --profile full up -d` and run the contract, API and end-to-end tests against it, then tear it down. The E2E workflow does this today.
+3. Scan the images (ECR scan / Trivy), generate an SBOM, sign them and push them to the dev ECR.
+4. Promote the same digest to staging, run the IoT Core / Stripe test-mode integration suite, then promote it to production.
 
 ## 7. Open items
 

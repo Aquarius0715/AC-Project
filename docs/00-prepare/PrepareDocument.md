@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.419.0
+version: 0.420.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -286,6 +286,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.420.0: Container design §6 describes the GitHub Actions CI that runs (ci.yml's seven jobs, e2e.yml) above the planned production pipeline (IR550). Phase 1A unchanged.
 0.419.0: `.env.local.example` drops two keys nothing reads and lists the optional overrides compose takes from `.env.local` (IR549). Phase 1A unchanged.
 0.418.0: The README says how to connect the real sensor nodes and sign in as their client (IR548). Phase 1A unchanged.
 0.417.0: The Go design's module tree lists the IoT tools, bootstrap and what the identity provider package does (IR547). Phase 1A unchanged.

@@ -7825,3 +7825,15 @@ Found in the loop, comparing `.env.local.example` with the `${…}` interpolatio
 3. `STRIPE_TEST_SECRET_KEY` says that it is the stripe profile's Stripe CLI key.
 
 The values stay empty: the template holds no secret. The E2E workflow and `docker/iot-demo.sh`, which copy the template and generate the broker keys, are unchanged.
+
+## IR550 The container design describes the CI that runs — 2026-11-01
+
+Found in the loop. Container design §6 listed only the planned production pipeline: multi-architecture builds of "both images", scans, signing and promotion. GitHub Actions has run since 2026-10-13, and only the root README described it.
+
+§6 now says what runs, and keeps the plan below it:
+- `ci.yml` and its seven parallel jobs (Go lint and generated files, the two Go suites, web lint, typecheck and Vitest, the document validators);
+- `e2e.yml` (the compose stack, the mock fleet history and Playwright; documentation-only changes skip it);
+- actions pinned by commit SHA, with weekly Dependabot updates;
+- `scripts/check.sh` as the local run of `ci.yml`.
+
+The plan's first step builds every image, not two. Its second step is marked as what the E2E workflow already does.
