@@ -1423,6 +1423,12 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job,
 		WHERE job_id = $1 AND status = 'active'`, in.JobID, c.Now); err != nil {
 		return Job{}, err
 	}
+	// the contractor's access to the unit ends with the job, as on a reschedule: a cancelled job leaves only its history
+	// (BR-P08, IR588)
+	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.offers SET access_valid_until = GREATEST(access_valid_from, $2), version = version + 1, updated_at = platform.app_now()
+		WHERE job_id = $1 AND decision = 'accept' AND access_valid_until > $2`, in.JobID, c.Now); err != nil {
+		return Job{}, err
+	}
 	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.slot_proposals SET status = 'withdrawn', decided_at = $2 WHERE job_id = $1 AND status = 'pending'`, in.JobID, c.Now); err != nil {
 		return Job{}, err
 	}

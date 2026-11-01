@@ -299,6 +299,7 @@ Scope: FR-P08 / Main display pattern: **Guard shared by all patterns**. Service 
 2. Apply the following business rules to both reads and actions.
    - Live unit values are visible only after acceptance and within the delegation period.
    - After delegation expires, history contains only minimum records of the company's acceptance, decline, and work. Past access does not justify returning all customer data.
+   - A cancellation ends the delegation at once: HQ's `jobs.cancel` closes the accepted offer's access window at the cancellation time, as a reschedule does, so the unit leaves the company's scope and the job reads as its history (IR588).
 3. Access denial changes no business data. Audit records contain only a denial reason code, with no confidential information. Discard previous Query data when switching sessions.
 4. Queries to update: `all previous caches on scope change`.
 

@@ -454,3 +454,45 @@ func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
 		t.Errorf("offer acceptance moved from %v to %v by HQ's cancellation", before, after)
 	}
 }
+
+// TestCancelEndsContractorAccess (IR588, BR-P08): HQ's cancellation of a job the contractor accepted ends the
+// contractor's access window at once, as a reschedule does, so the unit leaves the contractor's scope through that job
+// instead of staying readable until the window's planned end; once the worker freezes it, the job reads as its history.
+// The scope's own copy of the window (assets.unit_offer_access) is checked, since other jobs of the shared database
+// may grant contractor-a the same unit.
+func TestCancelEndsContractorAccess(t *testing.T) {
+	s := server(t)
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	job := data(m)["id"].(string)
+	if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
+		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(60)+`","termsVersion":"t"}`, 1); code != 200 {
+		t.Fatalf("offer: %d %v", code, m)
+	}
+	var offer string
+	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
+	if code, m := write(s, &contrA, "jobs.accept", `{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`, 2); code != 200 {
+		t.Fatalf("accept: %d %v", code, m)
+	}
+	access := func() (until time.Time) {
+		t.Helper()
+		drainEvents(t)
+		ownerScan(t, `SELECT access_valid_until FROM assets.unit_offer_access WHERE offer_id = $1`, []any{offer}, &until)
+		return until
+	}
+	planned := clock.Add(60 * time.Hour)
+	if until := access(); !until.Equal(planned) {
+		t.Fatalf("the accepted offer's access in the unit scope: until %v, want %v", until, planned)
+	}
+	if code, m := write(s, &hq, "jobs.cancel", `{"jobId":"`+job+`","cancelReason":"the customer withdrew"}`, 3); code != 200 {
+		t.Fatalf("cancel: %d %v", code, m)
+	}
+	until := access()
+	if !until.Before(planned) { // the cancellation time (the cluster suite's server clock runs ahead of clock)
+		t.Fatalf("the cancelled job keeps the contractor's unit access until its planned end %v", until)
+	}
+	freeze(t, until)
+	if code, m := post(s, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 200 || data(m)["projection"] != "history" || data(m)["status"] != "cancelled" {
+		t.Errorf("the cancelled job for the contractor: %d %v", code, m)
+	}
+}

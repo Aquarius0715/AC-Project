@@ -34,11 +34,14 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
     return { rows, total: list.total };
   };
   const listed = await collect(period === "90d");
+  // an empty period says how many jobs lie outside it: a history counts by its completion, so a cancelled job or one
+  // whose delegation ended unfinished never falls in the 90 days (IR29, IR589)
+  const outside = period === "90d" && listed.rows.length === 0 ? (await collect(false)).rows.length : 0;
   const counts = tabCounts(listed.rows);
   const base = {
     now: now.toISOString(), tab, sort, period, company: who.organizationName || t("your company"),
     sorts: SORTS.map((s) => ({ id: s.id, text: t("Sort: {sort}", { sort: t(s.text) }) })), periods: PERIODS.map((p) => ({ id: p.id, text: t("Period: {period}", { period: t(p.label) }) })),
-    tabs: TABS.map((x) => ({ id: x.id, label: t(x.label), count: counts[x.id] })), rows: visibleRows(listed.rows, tab, sort), total: listed.total,
+    tabs: TABS.map((x) => ({ id: x.id, label: t(x.label), count: counts[x.id] })), rows: visibleRows(listed.rows, tab, sort), total: listed.total, outside,
     options: listed.rows.map((r) => ({ id: r.id, label: `${r.short} · ${r.title}` })),
   };
   if (!sp.jobId) return { ...base, detail: null };
