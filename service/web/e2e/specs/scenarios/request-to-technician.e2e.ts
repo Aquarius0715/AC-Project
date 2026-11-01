@@ -94,6 +94,9 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       await expect(partner.getByRole("main")).toContainText("The current technician accepted the assignment");
       await customer.goto(`/customer/maintenance?jobId=${jobId}`);
       await expect(customer.getByRole("main")).toContainText("tech-external-a");
+      // the client reads the booked visit as Scheduled, the word of its tab, not HQ's Assigned (IR574)
+      await expect(customer.getByRole("main").getByText("Scheduled", { exact: true }).first()).toBeVisible();
+      await expect(customer.getByRole("main").getByText("Assigned", { exact: true })).toHaveCount(0);
     });
   } finally {
     if (jobId) {

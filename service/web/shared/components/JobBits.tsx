@@ -20,8 +20,12 @@ const statusTone: Record<JobStatus, Parameters<typeof Badge>[0]["tone"]> = {
   requested: "primary", time_proposed: "warn", offered: "primary", accepted: "primary", assigned: "primary", in_progress: "warn", submitted: "primary", rework_requested: "warn", completed: "ok", cancelled: "muted", on_hold: "unknown",
 };
 const statusIcon: Record<JobStatus, IconName> = { requested: "requested", time_proposed: "proposed", offered: "offered", accepted: "accepted", assigned: "assigned", in_progress: "inProgress", submitted: "submitted", rework_requested: "rework", completed: "completed", cancelled: "cancelled", on_hold: "paused" };
-export function JobStatusBadge({ s }: { s: JobStatus }) {
+// A client sees one word for a booked visit: offered, accepted and assigned all read "Scheduled", like the tab they
+// are listed under and the request dialog's "you will see “Scheduled” once a time is confirmed" (IR574).
+const SCHEDULED: JobStatus[] = ["offered", "accepted", "assigned"];
+export function JobStatusBadge({ s, client }: { s: JobStatus; client?: boolean }) {
   const t = useT();
+  if (client && SCHEDULED.includes(s)) return <Badge tone="primary" icon="assigned">{t("Scheduled")}</Badge>;
   return <Badge tone={statusTone[s]} icon={statusIcon[s]}>{t(statusLabel[s])}</Badge>;
 }
 

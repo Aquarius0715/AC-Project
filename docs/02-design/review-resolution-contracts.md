@@ -8079,3 +8079,11 @@ Found in the fifth round of the UX loop (UX-05: customer-a asks for a visit with
 6. **Design.** The accessibility paragraph of the UIUX specification states it. Figma shows no focus or hover states, so it is unchanged.
 
 The security points of the round held: a double click on Submit request created one request, and symptoms with markup (`<img src=x onerror=…>`) showed as text to the customer and to HQ, with nothing run.
+
+## IR574 A client's booked visit reads Scheduled — 2026-11-01
+
+Found in the same round (UX-05). After customer-a accepted HQ's time, the request sat under the tab "Scheduled 1", and the request dialog had promised "you will see “Scheduled” once a time is confirmed". Its badge, however, read "Assigned", and a contractor's job reads "Offered" and then "Accepted" before that. These are the steps between HQ, the contractor and the technician. For a client who has just pressed "Accept this time", "Accepted" also reads like their own answer.
+
+1. **Badge.** `JobStatusBadge` takes `client`: offered, accepted and assigned read "Scheduled" with the assigned icon. The client's request list and detail use it. HQ and the contractor keep the stage. The row's line still says "Confirmed <time> · booking the technician" or "… · technician confirmed".
+2. **Tests.** `jobBits.test.tsx` checks the three booked stages for a client and the stage for HQ. The request-to-technician scenario expects "Scheduled" and no "Assigned" on the client's page once the technician has accepted.
+3. **Design and Figma.** The client design's maintenance list rule states it. On Figma's UI Guideline page, StatusBadge/Maintenance gains the variant Status=Scheduled. The client's maintenance frames 07a–07p switch their 18 Offered / Assigned badges to it. The detail's progress stepper in Figma (07b, 07k) keeps its step names; the app shows no stepper there. The cross-role flow diagram keeps the internal stages.

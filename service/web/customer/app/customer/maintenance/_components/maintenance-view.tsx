@@ -79,7 +79,7 @@ export function MaintenanceView({ live }: { live: MaintenanceLive }) {
                     <div className="text-xs text-muted-foreground">{r.place ? `${r.place} · ` : ""}{r.type}</div>
                     <div className={cx("flex items-center gap-1.5 text-xs", r.warn && "font-semibold text-warn")}><Icon name={r.icon} className="shrink-0" />{r.line}</div>
                   </div>
-                  <JobStatusBadge s={r.status as JobStatus} /><span className="text-muted-foreground"><Icon name="chevronRight" /></span>
+                  <JobStatusBadge s={r.status as JobStatus} client /><span className="text-muted-foreground"><Icon name="chevronRight" /></span>
                 </ListRow>
               ))}
               {shown.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted-foreground">{t(live.rows.length ? "No requests in this filter." : "No requests yet — “+ New maintenance request” asks HQ for a visit.")}</p>}
@@ -111,7 +111,7 @@ function JobDetail({ d, open, onDone, onFail }: { d: Detail; open: (m: ModalKind
   const closed = j.status === "completed" || j.status === "cancelled";
   return (
     <Card title={j.id.slice(0, 8)} sub={`${d.unit.name} — ${j.origin === "periodic_plan" ? t("periodic inspection") : j.symptom.slice(0, 48)}`} className="self-start"
-      action={<div className="flex items-center gap-2"><JobStatusBadge s={status} /><Link href="/customer/maintenance" aria-label={t("Close")} className="rounded px-2 text-muted-foreground hover:bg-surface2"><Icon name="close" /></Link></div>}>
+      action={<div className="flex items-center gap-2"><JobStatusBadge s={status} client /><Link href="/customer/maintenance" aria-label={t("Close")} className="rounded px-2 text-muted-foreground hover:bg-surface2"><Icon name="close" /></Link></div>}>
       <SummaryList items={d.facts} />
       {d.preferred.length > 0 && (
         <div className="mt-3 flex flex-col gap-1">

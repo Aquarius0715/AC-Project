@@ -62,7 +62,7 @@ export function MaintenanceDemo({ jobId, initialTab }: { jobId?: string; initial
                       <div className="text-xs text-muted-foreground">{j.loc} · {j.origin === "plan" ? "Periodic inspection" : j.type}</div>
                       <div className={cx("flex items-center gap-1.5 text-xs", l.warn && "font-semibold text-warn")}><Icon name={l.icon} className="shrink-0" />{l.text}</div>
                     </div>
-                    <JobStatusBadge s={j.status} /><span className="text-muted-foreground"><Icon name="chevronRight" /></span>
+                    <JobStatusBadge s={j.status} client /><span className="text-muted-foreground"><Icon name="chevronRight" /></span>
                   </ListRow>
                 );
               })}
@@ -89,7 +89,7 @@ function Detail({ j, onClose, open }: { j: Job; onClose: () => void; open: (m: "
   const toast = useToast();
   const p = j.proposal;
   return (
-    <Card title={j.id} sub={`${j.unit} — ${j.origin === "plan" ? "periodic inspection" : j.symptom.slice(0, 40)}`} action={<div className="flex items-center gap-2"><JobStatusBadge s={j.status} /><Btn size="sm" variant="ghost" aria-label="Close" onClick={onClose}><Icon name="close" /></Btn></div>} className="self-start">
+    <Card title={j.id} sub={`${j.unit} — ${j.origin === "plan" ? "periodic inspection" : j.symptom.slice(0, 40)}`} action={<div className="flex items-center gap-2"><JobStatusBadge s={j.status} client /><Btn size="sm" variant="ghost" aria-label="Close" onClick={onClose}><Icon name="close" /></Btn></div>} className="self-start">
       <SummaryList items={[
         ["Unit", `${j.unit} · ${j.loc}`],
         ["Origin · type", j.origin === "plan" ? `Periodic plan · ${j.planId} · visit ${j.planVisit}` : `Client request · ${j.type}`],
