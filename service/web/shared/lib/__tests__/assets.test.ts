@@ -39,7 +39,7 @@ describe("HQ customers & units", () => {
     const d = unitDraft(unit({}));
     expect([d.installedAt, d.warrantyEnd]).toEqual(["2026-01-10", "2027-01-10"]); // Kuala Lumpur days
     expect(unitErrors({ ...d, displayName: " ", installedAt: "2026-09-15", serviceScope: [] }, "2026-09-14")).toEqual({
-      displayName: "1–120 characters", installedAt: "An installation date cannot be in the future (IR44)", serviceScope: "Choose at least one inspection group",
+      displayName: "1–120 characters", installedAt: "An installation date cannot be in the future", serviceScope: "Choose at least one inspection group",
     });
     expect(changedFields(unit({}), { ...d, displayName: "Bedroom AC 2", spaceId: "" })).toEqual(["Name", "Location"]);
     expect(placeOptions([{ id: "p1", version: 1, kind: "home", name: "Home A", address: null, accessInstructions: null, updatedAt: "", units: 0, unassigned: 0, floors: 0, rooms: 0, spaces: [] }], [])[0].label).toBe("Home A (no space)");

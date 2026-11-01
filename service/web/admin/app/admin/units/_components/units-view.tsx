@@ -113,7 +113,7 @@ function CustomerList({ live }: { live: UnitsLive }) {
             { key: "x", label: "", render: () => <span className="text-muted-foreground"><Icon name="chevronRight" /></span> },
           ]} />
         )}
-        <p className="mt-2 text-[11px] text-muted-foreground">{t("{n} of {total} · sorted by name · Inactive customers appear only with Status: All and are not counted (IR40). Archived properties, spaces and units never appear in lists, summaries or KPI denominators (IR39).", { n: rows.length, total: live.rows.length })}</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">{t("{n} of {total} · sorted by name · Inactive customers appear only with Status: All and are not counted. Deleted (archived) locations and units never appear in lists, summaries or totals.", { n: rows.length, total: live.rows.length })}</p>
       </Card>
       </>}
       {importing && <ImportWizard live={live} onClose={() => setImporting(false)} />}
@@ -132,10 +132,10 @@ function CustomerModal({ row, pending, onClose, onSave }: { row?: CustomerRow; p
   return (
     <Modal open onClose={onClose} title={row ? t("Edit {name}", { name: row.name }) : t("New customer")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t(row ? "Save customer" : "Create customer")}</Btn></>}>
       <div className="flex flex-col gap-3">
-        <Field label={t("Billing name · required")} hint={t("1–120 characters · organization kind customer · tenant from the session (IR74). A second customer with the same billing name is CONFLICT.")} error={err("billingName")}><Input value={d.billingName} onChange={(x) => setD({ ...d, billingName: x.target.value })} /></Field>
+        <Field label={t("Billing name · required")} hint={t("1–120 characters. Two customers cannot share a billing name.")} error={err("billingName")}><Input value={d.billingName} onChange={(x) => setD({ ...d, billingName: x.target.value })} /></Field>
         <Field label={t("Customer display name · required")} hint={t("1–120 characters")} error={err("name")}><Input value={d.name} onChange={(x) => setD({ ...d, name: x.target.value })} /></Field>
         <Field label={t("Service profile · required")}><Choice value={d.profile} onChange={(v: Profile) => setD({ ...d, profile: v })} options={(Object.keys(profileLabel) as Profile[]).map((p) => ({ id: p, label: t(profileLabel[p]) }))} /></Field>
-        <Field label={t("Status")} hint={t(row ? "Deactivating is CONFLICT while the customer still has units, contracts or open jobs (D05)." : "Inactive customers cannot get new units.")}>
+        <Field label={t("Status")} hint={t(row ? "A customer that still has units, contracts or open jobs cannot be deactivated." : "Inactive customers cannot get new units.")}>
           <Select value={d.status} onChange={(x) => setD({ ...d, status: x.target.value as "active" | "inactive" })}><option value="active">{t("Active")}</option><option value="inactive">{t("Inactive")}</option></Select>
         </Field>
         {!row && <p className="text-[11px] text-muted-foreground">{t("Next step: add a property (home or office) for this customer.")}</p>}
@@ -276,7 +276,7 @@ function LocationMenu({ onRename, onDelete }: { onRename: () => void; onDelete: 
 function LocationCard({ c, sel, canWrite, active, setM }: { c: CustomerLive; sel: Selection; canWrite: boolean; active: boolean; setM: (m: ModalState) => void }) {
   const t = useT();
   if (sel.kind === "unassigned") {
-    return <Card title={t("Unassigned")} sub={t("{property} · units without a space (IR62)", { property: sel.property.name })}><p className="text-[13px] text-muted-foreground">{t("These units belong to the property but no floor or room. Open a unit and pick its space under Location.")}</p></Card>;
+    return <Card title={t("Unassigned")} sub={t("{property} · units without a room or floor", { property: sel.property.name })}><p className="text-[13px] text-muted-foreground">{t("These units belong to the property but no floor or room. Open a unit and pick its space under Location.")}</p></Card>;
   }
   if (sel.kind === "property") {
     const p = sel.property;
@@ -333,7 +333,7 @@ function UnitsCard({ c, sel, nav, canWrite, onNew }: { c: CustomerLive; sel: Sel
           { key: "x", label: "", render: () => <span className="text-muted-foreground"><Icon name="chevronRight" /></span> },
         ]} />
       )}
-      <p className="mt-2 text-[11px] text-muted-foreground">{t("Pick a room in the tree to list only its units; a row opens the unit edit. Power is the derived state (SR27): unknown never counts as running or stopped.")}</p>
+      <p className="mt-2 text-[11px] text-muted-foreground">{t("Pick a room in the tree to list only its units; a row opens the unit edit. Power is what the unit reports: unknown never counts as running or stopped.")}</p>
     </Card>
   );
 }
@@ -372,7 +372,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: Custo
       <Card title={<span className="flex flex-wrap items-center gap-2">{u.displayName}<PowerBadge s={u.effectivePowerState === "on" ? "running" : u.effectivePowerState === "off" ? "stopped" : "unknown"} /><ConnBadge s={u.connection} />{x.seen && <span className="text-[11px] font-normal text-muted-foreground">{t("seen {time}", { time: x.seen })}</span>}{u.activeAlertCount > 0 && <Badge tone="warn" icon="warning">{count(t, u.activeAlertCount, "1 open alert", "{n} open alerts")}</Badge>}</span>}
         sub={<>{u.id.slice(0, 8)} · {t("version {v}", { v: u.version })} · <Plain type="button" className="font-semibold text-primary" onClick={() => nav({ unitId: null, locationId: u.archived ? null : u.spaceId ?? `unassigned:${u.propertyId}` })}><Icon name="chevronLeft" /> {t("back to {place}", { place: back })}</Plain></>}
         action={live.canWrite && !u.archived && <Btn size="sm" variant="danger" onClick={() => setModal("delete")}>{t("Delete unit…")}</Btn>}>
-        {u.archived && <div className="mb-3"><Banner tone="warn">{t("Read only — {note}. Archived units are excluded from lists, summaries and KPI denominators (IR39).", { note: x.archivedNote ?? "" })}</Banner></div>}
+        {u.archived && <div className="mb-3"><Banner tone="warn">{t("Read only — {note}. Deleted (archived) units are left out of lists, summaries and totals.", { note: x.archivedNote ?? "" })}</Banner></div>}
         <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
           <Field label={t("Name")} error={err("displayName")}><Input value={d.displayName} disabled={ro} onChange={(e) => set({ displayName: e.target.value })} /></Field>
           <Field label={t("Location")} hint={t("Changing it relocates the unit — a reason is asked on save; the old location stays in the history.")} error={err("propertyId")}>
@@ -387,8 +387,8 @@ function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: Custo
               {c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
             </Select>
           </Field>
-          <Field label={t("Installed at")} hint={t("A Kuala Lumpur day · leave empty for “Not registered” (IR44)")} error={err("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={ro} onChange={(e) => set({ installedAt: e.target.value })} /></Field>
-          <Field label={t("Warranty end")} hint={t("Manufacturer warranty; coverage also counts active maintenance contracts (FR-A19)")} error={err("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={ro} onChange={(e) => set({ warrantyEnd: e.target.value })} /></Field>
+          <Field label={t("Installed at")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={err("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={ro} onChange={(e) => set({ installedAt: e.target.value })} /></Field>
+          <Field label={t("Warranty end")} hint={t("Manufacturer warranty; coverage also counts active maintenance contracts")} error={err("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={ro} onChange={(e) => set({ warrantyEnd: e.target.value })} /></Field>
           <Field label={t("IoT device")} hint={x.device ? t("Rebinding is done in Devices and keeps the command history on the unit.") : undefined}>
             <div className="flex min-h-9 items-center gap-2 text-[13px]">{x.device ? <><b>{x.device.serial}</b><ConnBadge s={x.device.connection} /><TextLink href={`/admin/devices?tab=devices&deviceId=${x.device.id}`}>{t("Devices")} <Icon name="chevronRight" /></TextLink></> : x.deviceKnown ? <span className="text-muted-foreground">{t("No device bound")}</span> : <span className="text-muted-foreground">{t("Needs device.read")}</span>}</div>
           </Field>
@@ -404,7 +404,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: Custo
           </div>
         )}
       </Card>
-      <Card title={t("Alert policies on this unit")} sub={t("Only {name}’s policies can be attached. The unit carries the policies, not the other way round (IR108).", { name: c.row.name })}
+      <Card title={t("Alert policies on this unit")} sub={t("Only {name}’s policies can be attached. The unit carries the policies, not the other way round.", { name: c.row.name })}
         action={c.canAttach && !u.archived && <Btn size="sm" onClick={() => setModal("attach")}><Icon name="add" /> {t("Attach policy")}</Btn>}>
         {c.policies === null ? <p className="text-[13px] text-muted-foreground">{t("Policies need alert.policy.read.")}</p> : (
           <div className="flex flex-col">
@@ -483,7 +483,7 @@ function PropertyModal({ p, pending, onClose, onSave }: { p?: TreeProperty; pend
       <div className="flex flex-col gap-3">
         <Field label={t("Kind · required")}><Choice value={d.kind} onChange={(v: "home" | "office") => setD({ ...d, kind: v })} options={[{ id: "home", label: t("Home") }, { id: "office", label: t("Office") }]} /></Field>
         <Field label={t("Name · required")} hint={t("1–120 characters, unique among the customer’s properties")} error={err("name")}><Input value={d.name} onChange={(x) => setD({ ...d, name: x.target.value })} /></Field>
-        <Field label={t("Address")} hint={t("0–500 characters · fictional values only; shown as the site address (IR25)")} error={err("address")}><Input value={d.address} onChange={(x) => setD({ ...d, address: x.target.value })} /></Field>
+        <Field label={t("Address")} hint={t("0–500 characters · fictional values only; shown as the site address")} error={err("address")}><Input value={d.address} onChange={(x) => setD({ ...d, address: x.target.value })} /></Field>
         <Field label={t("Access instructions")} hint={t("0–1000 characters · visible to a contractor only after acceptance, within the valid period")} error={err("accessInstructions")}><Textarea rows={3} value={d.accessInstructions} onChange={(x) => setD({ ...d, accessInstructions: x.target.value })} /></Field>
       </div>
     </Modal>
@@ -544,7 +544,7 @@ function ArchiveLocationModal({ p, s, pending, onClose, onSave }: { p?: TreeProp
     <Modal open onClose={onClose} title={t("Delete {name}?", { name })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || blocked} onClick={() => { setTried(true); if (!e) onSave(reason.trim()); }}>{t(p ? "Delete property" : deleteKind[s!.kind])}</Btn></>}>
       <div className="flex flex-col gap-3">
         <p className="text-[13px] text-muted-foreground">{t("Deleting takes the location out of the customer’s tree (archived). Its history stays in the audit log.")}</p>
-        {blocked && <Banner tone="crit">{t("CONFLICT — {name} still contains {what}. Move them (unit › Location) or delete them first.", { name, what: [children && count(t, children, "1 location", "{n} locations"), held && units(t, held)].filter(Boolean).join(t(" and ")) })}</Banner>}
+        {blocked && <Banner tone="crit">{t("{name} still contains {what}. Move or delete them first (unit › Location).", { name, what: [children && count(t, children, "1 location", "{n} locations"), held && units(t, held)].filter(Boolean).join(t(" and ")) })}</Banner>}
         <Field label={t("Reason · required")} hint={t("1–1000 characters")} error={tried ? e : undefined}><Textarea rows={2} value={reason} disabled={blocked} onChange={(x) => setReason(x.target.value)} /></Field>
       </div>
     </Modal>
@@ -562,17 +562,17 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: { live: Units
   return (
     <Modal open wide onClose={onClose} title={t("New unit")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!Object.keys(e).length) onSave(d); }}>{t("Register unit")}</Btn></>}>
       <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
-        <p className="text-[12px] text-muted-foreground sm:col-span-2">{t("customerOrgId, spaceId and modelId must agree; the tenant comes from the session (IR74).")}</p>
+        <p className="text-[12px] text-muted-foreground sm:col-span-2">{t("The location and the model must belong to this customer.")}</p>
         <Field label={t("Customer · fixed")}><Input value={c.row.name} disabled /></Field>
         <Field label={t("Location · required")} error={err("propertyId")}><Select value={d.propertyId} onChange={(x) => set({ propertyId: x.target.value, spaceId: "" })}>{c.tree.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>
-        <Field label={t("Room / space · optional")} hint={t("Same property only. Empty = not assigned (IR62).")}>
+        <Field label={t("Room / space · optional")} hint={t("Same property only. Leave empty for no room or floor.")}>
           <Select value={d.spaceId} onChange={(x) => set({ spaceId: x.target.value })}><option value="">{t("— not assigned —")}</option>{(p ? flatten(p.spaces) : []).map((x) => <option key={x.id} value={x.id}>{x.name} ({t(kindLabel[x.kind])})</option>)}</Select>
         </Field>
         <Field label={t("Model · required")} hint={t(c.models.length ? "From capabilities.list" : "Models need device.read")} error={err("modelId")}>
           <Select value={d.modelId} onChange={(x) => set({ modelId: x.target.value })}>{!c.models.length && <option value="">{t("no model available")}</option>}{c.models.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select>
         </Field>
         <Field label={t("Display name · required")} hint={t("1–120 characters, unique in its room")} error={err("displayName")}><Input value={d.displayName} onChange={(x) => set({ displayName: x.target.value })} /></Field>
-        <Field label={t("Installed at · optional")} hint={t("A Kuala Lumpur day · leave empty for “Not registered” (IR44)")} error={err("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} onChange={(x) => set({ installedAt: x.target.value })} /></Field>
+        <Field label={t("Installed at · optional")} hint={t("A Kuala Lumpur day · leave empty for “Not registered”")} error={err("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} onChange={(x) => set({ installedAt: x.target.value })} /></Field>
         <Field label={t("Warranty end · optional")} error={err("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} onChange={(x) => set({ warrantyEnd: x.target.value })} /></Field>
         <Field label={t("Service scope · required · type: split (fixed)")} error={err("serviceScope")} className="sm:col-span-2">
           <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(scopeLabel[sc])} checked={d.serviceScope.includes(sc)} onChange={(on) => set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) })} />)}</div>
@@ -608,20 +608,20 @@ function DeleteUnitModal({ x, pending, onClose, onArchive, onDelete }: { x: Unit
   return (
     <Modal open onClose={onClose} title={t("Delete unit")} footer={<><Btn onClick={onClose}>{t("Close")}</Btn><Btn variant="danger" disabled={pending || blocked} onClick={() => go(onArchive)}>{t("Delete unit")}</Btn></>}>
       <div className="flex flex-col gap-3">
-        <p className="text-[13px] text-muted-foreground">{t("Removes the unit from lists, totals and candidates. The ID and history are kept (archived); active automations are disabled with reason unit_archived (IR39).")}</p>
+        <p className="text-[13px] text-muted-foreground">{t("Removes the unit from lists, totals and candidates. Its history is kept (archived), and its active automations are switched off.")}</p>
         <SummaryList items={[[t("Unit"), `${x.u.displayName} · ${t("version {v}", { v: x.u.version })}`], [t("Location"), x.path]]} />
         {blocked && (
-          <Banner tone="crit"><b>{t("CONFLICT · this unit is still in use")}</b>
-            <ul className="mt-1 list-disc pl-4">{x.blockers!.map((b) => <li key={b.label}>{b.href ? <TextLink href={b.href}>{b.label}</TextLink> : b.label}</li>)}</ul>
+          <Banner tone="crit"><b>{t("This unit is still in use")}</b>
+            <ul className="mt-1 list-disc pl-4 [&>li]:leading-6">{x.blockers!.map((b) => <li key={b.label}>{b.href ? <TextLink href={b.href}>{b.label}</TextLink> : b.label}</li>)}</ul>
             <div className="mt-1 text-[12px]">{t("End or move these first. Ended history alone does not block deletion.")}</div>
           </Banner>
         )}
-        {x.blockers === null && <Banner>{t("The blockers (contracts, jobs, device binding) are not visible with your permissions — the Core API checks them on delete.")}</Banner>}
+        {x.blockers === null && <Banner>{t("Your permissions don’t show this unit’s contracts, jobs or device binding; they are checked when you delete.")}</Banner>}
         <Field label={t("Reason · required")} hint={t("1–1000 characters")} error={tried ? e : undefined}><Textarea rows={2} value={reason} onChange={(v) => setReason(v.target.value)} /></Field>
         <details className="text-[12px] text-muted-foreground">
           <summary className="cursor-pointer font-semibold">{t("Registered by mistake?")}</summary>
-          <p className="mt-1">{t("A unit that never had contracts, jobs or IoT can be removed completely (units.delete); otherwise this is CONFLICT and the unit has to be deleted as above.")}</p>
-          <Btn size="sm" variant="ghost" className="mt-1" disabled={pending} onClick={() => go(onDelete)}>{t("Remove permanently")}</Btn>
+          <p className="mt-1">{t("A unit that never had a contract, a job or an IoT device can be removed completely; any other unit is refused and has to be deleted as above.")}</p>
+          <Btn size="sm" variant="ghost" className="mt-1" disabled={pending || blocked} onClick={() => go(onDelete)}>{t("Remove permanently")}</Btn>
         </details>
       </div>
     </Modal>
@@ -795,7 +795,7 @@ function WarrantyTab({ live }: { live: UnitsLive }) {
             ? <TextLink href={`/admin/billing/contracts?contractId=${r.contractIds[0]}`}>{t("Open contract")}</TextLink>
             : <TextLink href={`/admin/billing/contracts?customerId=${r.customerId}&unitId=${r.unitId}`}>{t("Renewal offer")}</TextLink>) },
         ]} />
-        <p className="mt-2 text-[11px] text-muted-foreground">{t("The warranty end is set on the unit (unit edit › Warranty end) or by the CSV import. Coverage = an active maintenance contract, otherwise the warranty; fewer than 90 days left counts as ending (IR111).")}</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">{t("The warranty end is set on the unit (unit edit › Warranty end) or by the CSV import. Coverage = an active maintenance contract, otherwise the warranty; fewer than 90 days left counts as ending.")}</p>
       </Card>
       <Card title={t("Warranty on jobs")} sub={t("Jobs completed while the unit’s warranty ran whose accepted report lists replaced parts — the parts cost is claimable from the manufacturer until a claim is filed.")}>
         {w.claims === null ? <p className="text-[13px] text-muted-foreground">{t("Claimable jobs need job.read.")}</p> : w.claims.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No claimable job right now.")}</p> : (

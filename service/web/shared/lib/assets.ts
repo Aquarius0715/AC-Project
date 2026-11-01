@@ -255,7 +255,7 @@ export function unitErrors(d: UnitDraft, todayKL: string, t: T = en): Record<str
   if (!between(d.displayName, 1, 120)) e.displayName = t("1–120 characters");
   if (!d.propertyId) e.propertyId = t("Choose a location");
   if (!d.modelId) e.modelId = t("Choose a model");
-  if (d.installedAt && d.installedAt > todayKL) e.installedAt = t("An installation date cannot be in the future (IR44)");
+  if (d.installedAt && d.installedAt > todayKL) e.installedAt = t("An installation date cannot be in the future");
   if (d.warrantyEnd && d.installedAt && d.warrantyEnd < d.installedAt) e.warrantyEnd = t("A warranty cannot end before the installation");
   if (d.serviceScope.length === 0) e.serviceScope = t("Choose at least one inspection group");
   return e;
