@@ -8010,3 +8010,15 @@ Found in the first round of the UX loop (UX-01; the loop keeps its log locally i
 
    While the loading screen shows, `main` holds nothing to focus.
 3. **Docs.** The accessibility paragraph of the UIUX specification states it. Figma shows no focus states, so it is unchanged.
+
+## IR569 The offer page lists who can take the visit first — 2026-11-01
+
+Found in the second round of the UX loop (UX-02: contractor-a takes a new offer and assigns a technician). On the offer page, "Can your team take it?" lists the company's technicians in the order the API returns them. With 37 technicians, the only one who fits was 15th, between rows marked Not qualified. To decide whether to accept, the contractor had to read the whole list. The assignment screen of the same flow already puts the qualified technicians first.
+
+1. **Order.** `fits` (`shared/lib/partnerJobDetail.ts`) sorts its rows, then by name.
+   - Offer page: Fits, Busy at the visit, Not qualified.
+   - "Who can take it" of the job detail: the assigned technician first, then Best fit, Busy at the visit, Not eligible.
+2. **Test.** `partnerJobDetail.test.ts` gives the team in reverse order and expects the fitting technician first, in both modes. It also expects the assigned technician first even when not eligible.
+3. **Design.** DD-P02's offer and job detail paragraph in the contractor design states the order. Figma's frames (Contractor 02-7…02-14) already show this order: Fits before Not qualified, and Assigned, Best fit, Not eligible.
+
+The rest of UX-02 needed no change. The overview shows "Offers to answer" with a link to the offer; Accept job says what comes next ("Offer accepted — assign a technician next") and leaves an Assign technician link; the assignment shows its result. Five clicks in all. No sideways scroll at 1920 or 1280, no axe violation, no page error.

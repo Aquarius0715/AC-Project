@@ -66,7 +66,10 @@ export type FitRow = { id: string; name: string; sub: string; days: { label: str
 export function fits(members: ApiMember[], required: string[], visit: Slot, days: { date: string; capacity: ApiCapacity[] }[], mode: "offer" | "detail" = "offer", assignedId?: string, i: I18n = EN): FitRow[] {
   const { t, display: { locale } } = i;
   const hoursText = (h: number) => t("{n} h", { n: h });
-  return members.filter((m) => m.role === "technician").map((m) => {
+  // who can take the visit comes first, as on the assignment screen (IR569): assigned, fits, busy, not qualified; then
+  // by name, so a large team still shows its candidates at the top
+  const rank: Record<string, number> = {};
+  const rows = members.filter((m) => m.role === "technician").map((m): FitRow => {
     const ok = qualified(m, required, visit.startAt);
     const cap = days.map((d) => d.capacity.find((c) => c.membershipId === m.id));
     const visitDay = cap[0];
@@ -76,6 +79,7 @@ export function fits(members: ApiMember[], required: string[], visit: Slot, days
     if (mode === "detail") {
       const hours = cap.reduce((sum, c) => sum + (freeHours(c) ?? 0), 0);
       const span = days.length > 1 ? `${klDay(days[0].date, locale)} – ${klDay(days[days.length - 1].date, locale)}` : days[0] ? klDay(days[0].date, locale) : "";
+      rank[m.id] = m.id === assignedId ? 0 : !ok ? 3 : free ? 1 : 2;
       if (m.id === assignedId) return { id: m.id, name: m.displayName, days: [], sub: ok ? t("Qualified · assigned to this job") : t("Missing {list} · assigned to this job", { list: lacking }), badge: { text: t("Assigned"), tone: ok ? "ok" : "warn" } };
       return {
         id: m.id, name: m.displayName, days: [],
@@ -83,6 +87,7 @@ export function fits(members: ApiMember[], required: string[], visit: Slot, days
         badge: !ok ? { text: t("Not eligible"), tone: "muted" } : free ? { text: t("Best fit"), tone: "ok" } : { text: t("Busy at the visit"), tone: "warn" },
       };
     }
+    rank[m.id] = !ok ? 3 : free ? 1 : 2;
     return {
       id: m.id, name: m.displayName, sub: ok ? quals.join(" · ") || t("qualified") : t("missing {list}", { list: lacking }),
       days: days.map((d, k) => {
@@ -92,6 +97,7 @@ export function fits(members: ApiMember[], required: string[], visit: Slot, days
       badge: !ok ? { text: t("Not qualified"), tone: "muted" } : free ? { text: t("Fits"), tone: "ok" } : { text: t("Busy at the visit"), tone: "warn" },
     };
   });
+  return rows.sort((a, b) => rank[a.id] - rank[b.id] || a.name.localeCompare(b.name));
 }
 
 export type Step = { label: string; at: string | null; atText: string | null; sub: string; state: "done" | "current" | "todo" };
