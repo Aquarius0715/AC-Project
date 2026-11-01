@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, ConnBadge, Modal, Page, PowerBadge, Stat, SummaryList, Toggle, cx, useToast, Choice } from "@ac/web/components/ui";
 import { units, unitRowFromApi, type ApiUnit, type UnitRow } from "@ac/web/lib/client";
 import { OpError } from "@ac/web/lib/ops";
-import { FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
+import { controlLayout, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 import { waitForCommand } from "@ac/web/lib/unitCommands";
 import { showClock, showTime } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
@@ -82,13 +82,13 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
     .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt)).map((c) => historyRow(c, t, display)) : mockHist;
   // the model's capabilities decide what can be set (deterministic contracts: control=false forbids ordinary actions,
   // temperature=null temperature changes; AT-X06); the demo screen shows a full model
-  const controllable = !d || d.capabilities.control;
-  const tempRange = d ? d.capabilities.temperature : { min: 16, max: 30, step: 1 };
+  const layout = controlLayout(d?.capabilities ?? null);
+  const controllable = layout.control;
+  const tempRange = layout.temperature;
   const cap = tempRange ?? { min: 16, max: 30, step: 1 };
-  const modes = d ? d.capabilities.modes : (["cool", "dry", "fan"] as const);
-  const fans = d ? d.capabilities.fanLevels : (["low", "mid", "high"] as const);
-  const showMode = !d || (d.capabilities.modeControl && modes.length > 0);
-  const showFan = !d || (d.capabilities.fanControl && fans.length > 0);
+  const { modes, fans } = layout;
+  const showMode = modes.length > 0;
+  const showFan = fans.length > 0;
   const min = policy?.kind === "temperature_limit" ? Math.max(cap.min, policy.minimumCoolingSetpoint) : restricted ? 24 : cap.min;
   const max = cap.max;
   const confirmed = d ? d.observedState.celsius ?? "—" : 26;
@@ -183,7 +183,7 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
               </div>}
               {showMode && <div><div className="mb-1 font-semibold">{t("Mode")}</div><Choice value={mode} disabled={disabled} onChange={(m) => { setMode(m); setEdited((e) => ({ ...e, mode: true })); }} options={modes.map((m) => ({ id: m, label: t(MODE_LABEL[m]) }))} /></div>}
               {showFan && <div><div className="mb-1 font-semibold">{t("Fan speed")}</div><Choice value={fan} disabled={disabled} onChange={(f) => { setFan(f); setEdited((e) => ({ ...e, fan: true })); }} options={fans.map((f) => ({ id: f, label: t(FAN_LABEL[f]) }))} /></div>}
-              {(tempRange || showMode || showFan) && ( // a model with the power only sends it at once: nothing to review (Figma 02o)
+              {layout.review && ( // a model with the power only sends it at once: nothing to review (Figma 02o)
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t((d ? changes().length : 1) === 1 ? "{n} change:" : "{n} changes:", { n: d ? changes().length : 1 })}</b> {d ? changes().map(changeText).join(" · ") || t("No change yet") : t("Set temperature {from}°C → {to}°C", { from: 26, to: temp })}<br /><span className="text-muted-foreground">{t("Target: {name} only · you will confirm before sending", { name: unit.name })}</span></span><Btn variant="primary" disabled={disabled || waiting || (d !== null && changes().length === 0)} onClick={() => setConfirm(true)}>{waiting ? t("Waiting for device…") : t("Review & send")}</Btn></div>
               )}
               {waiting && <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>}

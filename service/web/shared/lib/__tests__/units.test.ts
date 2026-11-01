@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { translator } from "@ac/web/lib/i18n";
-import { actionText, historyRow, latest, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
+import { actionText, controlLayout, historyRow, latest, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 
 const ms = translator("ms");
 const tokyo = { locale: "en" as const, timeZone: "Asia/Tokyo" };
@@ -39,5 +39,27 @@ describe("unit commands and readings in the display language and time zone (FR-X
     expect(latest(d, "temperature")).toEqual({ text: "28.0 °C (stale)", at: "9:12 am MYT" });
     expect(latest(d, "temperature", ms, tokyo)).toEqual({ text: "28.0 °C (lapuk)", at: "10:12 am GMT+9" });
     expect([latest(d, "humidity"), latest(d, "power")]).toEqual([null, null]);
+  });
+});
+
+describe("the remote control a model offers (deterministic contracts, AT-X06; IR524, IR530)", () => {
+  const model = (over: Partial<ApiUnitDetail["capabilities"]>): ApiUnitDetail["capabilities"] => ({
+    manufacturer: "DemoAir", model: "SPL-100", control: true, modeControl: true, fanControl: true, temperature: { min: 16, max: 30, step: 1 },
+    modes: ["cool", "dry", "fan"], fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [], ...over,
+  });
+
+  it("offers every setting of a full model, and the demo screen's without a model", () => {
+    expect(controlLayout(model({}))).toEqual({ control: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry", "fan"], fans: ["low", "mid", "high"], review: true });
+    expect(controlLayout(null).review).toBe(true);
+  });
+
+  it("offers only the model's own modes and fan levels, and no temperature without a range", () => {
+    expect(controlLayout(model({ modes: ["cool"], fanLevels: ["low", "high"], temperature: null }))).toMatchObject({ temperature: null, modes: ["cool"], fans: ["low", "high"], review: true });
+    expect(controlLayout(model({ modeControl: false, fanControl: false }))).toMatchObject({ modes: [], fans: [], review: true }); // the temperature is left
+  });
+
+  it("offers the power alone without a review bar, and nothing on a model without control", () => {
+    expect(controlLayout(model({ modeControl: false, fanControl: false, temperature: null, modes: [], fanLevels: [] }))).toEqual({ control: true, temperature: null, modes: [], fans: [], review: false });
+    expect(controlLayout(model({ control: false }))).toEqual({ control: false, temperature: null, modes: [], fans: [], review: false });
   });
 });

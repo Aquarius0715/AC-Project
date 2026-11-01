@@ -7660,3 +7660,15 @@ Found in the loop. With the nodes out of reach, "AC offline" opened (IR529, IR53
    - each with the API's next sequence on the binding and an event ID from the binding and sequence, or from the fault, so a repeat is one event.
    - Reading the fault back each minute means a restarted bridge restores an outage that an earlier instance recorded.
 3. **What the user sees.** While the nodes are silent, the client's unit page says the AC is offline and disables its controls (Figma 02h, IR243), and the default rule still alerts after 15 minutes. When the nodes report again, the module and unit return to online, with last seen at the recovery.
+
+## IR533 The unit page's choice of controls is a tested helper — 2026-11-01
+
+Found in the loop. The rules of IR524 and IR530, which decide which remote controls a model offers on the client's unit page, sat inside the page component, and no test covered them.
+
+1. **`controlLayout`** (`shared/lib/units.ts`) answers control, the temperature range, the modes, the fan levels, and whether the review bar shows, for a model or for the demo screen:
+   - nothing without control;
+   - the temperature row only with a range;
+   - the mode and fan rows only with their control, listing the model's own values;
+   - the review bar only when a setting can change.
+   The unit page takes its rows from it, with no change in behavior.
+2. **Tests.** `units.test.ts` covers a full model, the demo screen, a model with its own modes and fan levels and no temperature range, mode and fan control off, the power alone (no review bar) and no control.

@@ -40,6 +40,25 @@ export type ApiUnitDetail = {
   components: string[];
 };
 
+/** What the unit page's remote control offers for a model (deterministic contracts, AT-X06; IR524, IR530): nothing
+ * without control; the temperature row needs a range, the mode and fan rows their control and list only the model's
+ * own values; the change summary and its review bar need a setting to change (the power is sent at once). Without a
+ * model (the demo screen), every control of a full model. */
+export type ControlLayout = {
+  control: boolean;
+  temperature: { min: number; max: number; step: number } | null;
+  modes: Mode[];
+  fans: Fan[];
+  review: boolean;
+};
+export function controlLayout(cap: ApiUnitDetail["capabilities"] | null): ControlLayout {
+  if (!cap) return { control: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry", "fan"], fans: ["low", "mid", "high"], review: true };
+  if (!cap.control) return { control: false, temperature: null, modes: [], fans: [], review: false };
+  const modes = cap.modeControl ? cap.modes : [];
+  const fans = cap.fanControl ? cap.fanLevels : [];
+  return { control: true, temperature: cap.temperature, modes, fans, review: cap.temperature !== null || modes.length > 0 || fans.length > 0 };
+}
+
 export type ApiCommand = { id: string; action: CommandAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; acknowledgedAt?: string | null; expiresAt?: string; failureCode: string | null; source?: string };
 
 /** The fixed Asia/Kuala_Lumpur time of the screens not yet on the user's display time zone; screens moved to it use
