@@ -44,7 +44,7 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
   const [open, setOpen] = useState(false);
   const q = live.query;
   if (live.total === 0) {
-    return <Page>{tabs}<EmptyState title={t("No technicians")}>{t("No technician membership in your company. New technicians are registered by HQ.")}</EmptyState></Page>;
+    return <Page>{tabs}<EmptyState title={t("No technicians")}>{t("No technicians in your company yet. Add them in Users.")}</EmptyState></Page>;
   }
   if (tab === "certs") return <Page>{tabs}<Certifications live={live} /></Page>;
   const none = live.rows.length === 0;
@@ -66,7 +66,7 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
         {none ? (
           <div className="py-6 text-center">
             <b className="text-[13px]">{t("No {company} technicians hold this qualification", { company: live.company })}</b>
-            <p className="mt-1 text-xs text-muted-foreground">{t("Ask HQ to update qualifications — this screen cannot change memberships.")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("Qualifications are granted by HQ: upload a renewed certificate under Certifications. Accounts are managed in Users.")}</p>
             <Btn size="sm" className="mt-3" onClick={() => patch({ qualification: null })}>{t("Clear filter")}</Btn>
           </div>
         ) : (
@@ -88,7 +88,7 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
           </ul>
         )}
       </Card>
-      <p className="text-[11px] text-muted-foreground">{t("Utilization = assigned hours ÷ configured available hours (4 h / 8 h = 50%). Undefined available hours show “—”, not 0%. Read-only — membership changes are requested from HQ.")}</p>
+      <p className="text-[11px] text-muted-foreground">{t("Utilization = assigned hours ÷ configured available hours (4 h / 8 h = 50%). Undefined available hours show “—”, not 0%. Accounts are managed in Users.")}</p>
       {!none && (
         <div className="split">
           <WeekCard live={live} />
@@ -103,7 +103,7 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
             </ul>
             <p className="mt-2 text-[11px] text-muted-foreground">
               {live.hidden > 0 && `${t(live.hidden === 1 ? "1 expired member hidden (Active only)." : "{n} expired members hidden (Active only).", { n: live.hidden })} `}
-              {live.expired.length > 0 ? t("Expired memberships ({names}) are listed but cannot be selected for assignment. Changes are requested from HQ.", { names: live.expired.join(", ") }) : t("Qualification or membership changes are requested from HQ — contractors cannot grant permissions.")}
+              {live.expired.length > 0 ? t("Expired memberships ({names}) are listed but cannot be selected for assignment. A new access end is set in Users.", { names: live.expired.join(", ") }) : t("Qualifications are granted by HQ from your technicians’ certificates; accounts are managed in Users.")}
             </p>
           </Card>
         </div>
@@ -189,7 +189,7 @@ function UnavailableDays({ live, onClose }: { live: Live; onClose: () => void })
       {conflicts.length > 0 && <Banner tone="warn">{t(conflicts.length === 1 ? "Conflicts with 1 confirmed assignment: {list}. Saving keeps the assignment — reassign it in Schedule & assignments." : "Conflicts with {n} confirmed assignments: {list}. Saving keeps the assignments — reassign them in Schedule & assignments.", { n: conflicts.length, list })}</Banner>}
       {refused && <Banner tone="crit">{refused}</Banner>}
       <p className="text-[11px] text-muted-foreground">
-        {t("Unavailable days set the technician’s available hours to 0 for those dates, so utilization and candidate lists (members.eligible) skip them. For a public holiday of the whole team choose Public holiday and All technicians.")}
+        {t("Unavailable days set the technician’s available hours to 0 for those dates, so utilization and the lists of who can take a visit skip them. For a public holiday of the whole team choose Public holiday and All technicians.")}
         {live.otherZone && ` ${t("The days are Kuala Lumpur days.")}`}
       </p>
     </Modal>

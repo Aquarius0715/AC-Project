@@ -39,7 +39,7 @@ export function MockTeam() {
               <div className="mt-2 grid-fluid text-xs" style={{ ["--min"as string]: "180px" }}><span>{t.asg}</span><span className="text-ok">{t.free}</span></div>
             </Card>;
           })}
-          <p className="text-[11px] text-muted-foreground">Utilization = assigned hours ÷ configured available hours (4 h / 8 h = 50%). Undefined available hours show “—”, not 0%. Read-only — membership changes are requested from HQ.</p>
+          <p className="text-[11px] text-muted-foreground">Utilization = assigned hours ÷ configured available hours (4 h / 8 h = 50%). Undefined available hours show “—”, not 0%. Accounts are managed in Users.</p>
           <Card title="Week of 09-14 — assigned / available hours" action={<Link className="text-xs font-semibold text-primary" href="/partner/schedule">Open schedule <Icon name="arrowRight" /></Link>}>
             <div className="scroll-x"><table className="w-full min-w-[560px] text-xs"><thead><tr className="text-left text-muted-foreground"><th /><th>Mon 14</th><th>Tue 15</th><th>Wed 16</th><th>Thu 17</th><th>Fri 18</th><th>Sat 19</th><th>Sun 20</th></tr></thead><tbody>{techs.filter((t) => t.week.length).map((t) => <tr key={t.id} className="border-t border-line"><td className="py-2 font-bold">{t.id}</td>{t.week.map((w, i) => <td key={i}>{w}</td>)}</tr>)}</tbody></table></div>
             <p className="mt-2 text-[11px] text-muted-foreground">Sat/Sun have no configured available hours, so utilization shows “—”.</p>
@@ -48,7 +48,7 @@ export function MockTeam() {
         <div className="flex min-w-0 flex-col gap-4">
           <div className="grid-fluid" style={{ ["--min"as string]: "120px" }}><Stat label="Assigned" value="18 h" /><Stat label="Available" value="80 h" /><Stat label="Team utilization" value="23%" /><Stat label="Free hours Tue" value="8 h" /></div>
           <Card title="Qualifications">{quals.map(([a, b]) => <div key={a} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px] first:border-0"><span>{a}</span><span className="text-xs text-muted-foreground">{b}</span></div>)}</Card>
-          <p className="text-[11px] text-muted-foreground">{activeOnly ? "1 expired member hidden (Active only). " : ""}Qualification or membership changes are requested from HQ — contractors cannot grant permissions.</p>
+          <p className="text-[11px] text-muted-foreground">{activeOnly ? "1 expired member hidden (Active only). " : ""}Qualifications are granted by HQ from your technicians’ certificates; accounts are managed in Users.</p>
         </div>
       </div>
       </>}

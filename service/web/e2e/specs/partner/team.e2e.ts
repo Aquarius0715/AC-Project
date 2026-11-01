@@ -14,6 +14,9 @@ test("the team shows the technicians, the week and the qualifications", async ({
   await expect(main.getByRole("heading", { name: "Qualifications", exact: true })).toBeVisible();
   await expect(main.getByRole("combobox", { name: "Qualification" })).toContainText("All qualifications");
   await expect(main.getByRole("button", { name: "Active only" })).toHaveAttribute("aria-pressed", "true");
+  // accounts are the contractor's own, in Users (FR-P11); qualifications come from HQ; no API names (IR579)
+  await expect(main).toContainText("Accounts are managed in Users.");
+  await expect(main).not.toContainText(/requested from HQ|registered by HQ|members\.\w+/);
   await main.getByRole("button", { name: "Active only" }).click();
   await page.waitForURL(/activeOnly=false/);
   await expect(main.getByRole("button", { name: "Include expired" })).toHaveAttribute("aria-pressed", "false");
@@ -43,6 +46,7 @@ test("the unavailable days form checks its days before saving", async ({ page })
   await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   const to = dialog.getByLabel(/^To/); // the label also holds the field's error once shown
   await expect(dialog.getByLabel(/^From/)).toHaveValue("2026-09-16");
+  await expect(dialog).toContainText("the lists of who can take a visit skip them"); // no API name (IR579)
   await to.fill("2026-09-15");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toContainText("The last day must be on or after the first day");

@@ -69,7 +69,7 @@ export function Certifications({ live }: { live: Live }) {
               { key: "a", label: t("Action"), render: action },
             ]} />
           )}
-          <p className="mt-2 text-[11px] text-muted-foreground">{t("Certificates are checked when you assign a technician (members.eligible). An expired certificate makes the technician ineligible for jobs that need it; nothing is revoked automatically before expiry.")}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("Certificates are checked when you assign a technician. An expired certificate makes the technician ineligible for jobs that need it; nothing is revoked automatically before expiry.")}</p>
         </Card>
         <Card title={t("Assignment impact")}>
           {c.impact ? (

@@ -8142,3 +8142,19 @@ Found in the ninth round of the UX loop (UX-09: customer-a reads the overdue inv
 4. **Design.** The channel row of the client's payment design states it. Figma shows the reminder card without this state; its buttons are unchanged.
 
 The security point held: customer-b opening customer-a's invoice by URL gets Page unavailable. Proposed separately (B-4): the customer's overview names an overdue invoice and an active restriction.
+
+## IR579 The team screen sends account changes to Users — 2026-11-02
+
+Found in the tenth round of the UX loop (UX-10: contractor-a records a day of training for a technician on Team & capacity and reads the team, at 1920 and 1280). The form checks its days in place ("The last day must be on or after the first day", the field marked invalid), and the save says what happens ("Unavailable days saved — the available hours of those days are 0."). The texts around it, however, still described the time before DEC-76, when HQ registered every account:
+
+- the empty state: "No technician membership in your company. New technicians are registered by HQ.";
+- the notes: "Read-only — membership changes are requested from HQ.", "Qualification or membership changes are requested from HQ — contractors cannot grant permissions.", "Expired memberships (…) … Changes are requested from HQ.", "Ask HQ to update qualifications — this screen cannot change memberships.";
+- the form and the Certifications tab named the API: "candidate lists (members.eligible)", "(members.eligible)".
+
+Since FR-P11 the contractor adds technicians, moves an access end and disables or removes accounts itself under Users. HQ still grants qualifications, from the certificates the contractor uploads (FR-P09). A coordinator who followed the old notes would have asked HQ for what they can do in two clicks.
+
+1. **Texts.** The empty state says "Add them in Users." The notes say "Accounts are managed in Users." and "Qualifications are granted by HQ from your technicians’ certificates." An expired membership reads "A new access end is set in Users." The form says "the lists of who can take a visit skip them". The Malay dictionary, the demo view and Figma's team frames (13 texts) follow.
+2. **Test.** `partner/team.e2e.ts` expects "Accounts are managed in Users.", no "requested from HQ" and no API name, and the form's new wording.
+3. **Design.** DD-P06's rule in the contractor design reads the same way.
+
+The security point held: `members.setUnavailability` for another company's technician, sent through the app's relay, answers NOT_FOUND and writes nothing. Proposed separately (B-5): unavailable days cannot be removed or shortened once saved.
