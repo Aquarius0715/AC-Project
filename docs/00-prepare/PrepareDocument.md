@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.430.0
+version: 0.431.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -286,6 +286,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.431.0: The container design's IoT Core and SES stand-ins say what the bridge and Mailpit do as built, and the Dockerfile paragraph names the tools target (IR561). Phase 1A unchanged.
 0.430.0: Backend Go design §8 and §9 say what is built: the per-domain database roles, the scans by hand, the planned acceptance, load and staging tests, and the Playwright suite (IR560). Phase 1A unchanged.
 0.429.0: Backend Go design §4 matches the request pipeline as built (no tracing middleware yet, current Register and MountREST) and records read-your-writes on a reader replica as OPEN-GO-03 (IR559). Phase 1A unchanged.
 0.428.0: Database design §2 lists identity.partner_users and no longer counts notify.deliveries, used since IR418, among the unused tables (IR558). Phase 1A unchanged.

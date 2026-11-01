@@ -7925,3 +7925,17 @@ Found in the loop, comparing backend Go design §8 and §9 with the repository:
 1. **Database roles.** §8 named `ac_app` / `ac_worker` as the services' role. Since IR194 each business-domain service has its own role (`ac_svc_<domain>`, signed in as `ac_<domain>_login`), and `ac_app` serves the single-process build and the tools.
 2. **Scans.** §8 said that govulncheck and image scanning run in CI. They run by hand (IR556), and Dependabot proposes the updates.
 3. **Test levels.** §9 listed an acceptance suite in `test/acceptance`, a k6 load test, and staging integration with LocalStack, the Stripe CLI and the simulator. None of them exists: `service/api/test` holds `integration` only. The rows now say "planned", and that the integration tests and end-to-end specs cover the behaviour, a few cases by AT ID. The Playwright end-to-end suite (IR252), which runs on every code push, was missing from the table and now has its row.
+
+## IR561 The container design's stand-ins say what the bridge and Mailpit do — 2026-11-01
+
+Found in the loop, comparing container design §3 and §4 with the Dockerfiles and `compose.yaml`:
+1. **IoT Core stand-in.** The row said the bridge forwards topics to Kinesis and SQS like the IoT rules. It posts the readings and acknowledgements to the API over HTTP (`demo.trigger`) and publishes the requested commands. Nothing in the stack writes to Kinesis or SQS (IR334).
+2. **SES stand-in.**
+   - The row named Mailpit `v1.31.6`; compose runs `v1.32.0` since a Dependabot update. It now points to the pin in `compose.yaml`, so the next update cannot make it stale.
+   - The row said that `worker-notification` sends the invitations. The invitation queue went with IR479. The account set-up e-mails come from Keycloak through Mailpit (IR461).
+3. **Dockerfile paragraph.** It named the `dev` target's IoT tools, but not the `tools` target that runs them (IR539).
+
+The rest of §3 matches the Dockerfiles:
+- the web build type-checks before it builds;
+- the runtime removes npm, npx and corepack, upgrades the Debian packages and runs as `node`;
+- the Go images build on `golang:1.26.10` and run on the digest-pinned distroless image.
