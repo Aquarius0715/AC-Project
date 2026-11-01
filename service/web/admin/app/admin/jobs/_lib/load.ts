@@ -40,7 +40,7 @@ async function shared(sp: SP) {
     optional(coreAll<Member>("members.list"), []),
   ]);
   const hq = orgs.find((o) => o.kind === "operator") ?? null;
-  const contractors = orgs.filter((o) => o.kind === "contractor");
+  const contractors = orgs.filter((o) => o.kind === "contractor").sort((a, b) => a.name.localeCompare(b.name)); // by name in every list and select (IR572)
   const names: Names = {
     units: new Map(units.map((u) => [u.id, u.displayName])), customers: new Map(orgs.filter((o) => o.kind === "customer").map((o) => [o.id, o.name])),
     people: new Map(members.map((m) => [m.id, m.displayName])), orgs: new Map(orgs.map((o) => [o.id, o.name])),

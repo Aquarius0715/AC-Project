@@ -153,10 +153,10 @@ export function delivery(j: ApiHqJob, n: Names, now: number, i: I18n = EN): Deli
   const tech = a ? n.people.get(a.technicianMembershipId) ?? t("technician") : "";
   const window = a ? slotText({ startAt: a.scheduledStart, endAt: a.scheduledEnd }, i) : "";
   const done = a?.status === "completed" ? ` · ${t("ended at completion")}` : "";
-  const ackLine = a?.status === "completed" ? { tone: "ok" as Tone, text: t("{name} completed the job — the assignment ended with it, so {name}’s time is free again (IR234).", { name: tech }) }
+  const ackLine = a?.status === "completed" ? { tone: "ok" as Tone, text: t("{name} completed the job — the assignment ended with it, so {name}’s time is free again.", { name: tech }) }
     : a ? (a.acknowledgement === "accepted" ? { tone: "ok" as Tone, text: t("{name} accepted the assignment", { name: tech }) }
       : a.acknowledgement === "cant_make" ? { tone: "warn" as Tone, text: `${a.cantMakeReason ? t("{name} can’t make this time: “{reason}”", { name: tech, reason: a.cantMakeReason }) : t("{name} can’t make this time", { name: tech })}${a.alternativeSlot ? ` · ${t("could do {slot}", { slot: slotText(a.alternativeSlot, i) })}` : ""}. ${t("Any new time needs the client’s approval.")}` }
-      : { tone: "primary" as Tone, text: t("Waiting for {name} to accept (受領).", { name: tech }) }) : null;
+      : { tone: "primary" as Tone, text: t("Waiting for {name} to accept.", { name: tech }) }) : null;
   if (o && j.contractorOrgId) {
     const org = n.orgs.get(o.contractorOrgId) ?? t("contractor");
     const state = o.decision === "accept" ? (o.decidedAt ? t("accepted {time}", { time: showTime(o.decidedAt, display) }) : t("accepted")) : Date.parse(o.offerExpiresAt) <= now ? t("expired") : t("offer open · expires {time}", { time: showTime(o.offerExpiresAt, display) });
@@ -187,6 +187,14 @@ export function preferredRows(j: ApiHqJob, eligible: { id: string; displayName: 
   });
 }
 
+/** The active contractors any agreed time can be offered to, by name: the first three and how many more, so the
+ * booking table keeps its times and HQ technicians readable however many companies HQ works with (IR572). */
+export function contractorNames(names: string[], t: T = en): string {
+  const sorted = [...names].sort((a, b) => a.localeCompare(b));
+  if (sorted.length > 3) return t("{names} and {n} more", { names: sorted.slice(0, 3).join(", "), n: sorted.length - 3 });
+  return sorted.join(", ") || "—";
+}
+
 /** The default windows of an HQ offer (IR141 item 2): answer within 24 h (not after the visit), access from now to a day after. */
 export function offerDefaults(slot: Slot, now: number): { offerExpiresAt: string; accessValidFrom: string; accessValidUntil: string } {
   const expires = Math.min(now + 24 * 3600_000, Date.parse(slot.startAt));
@@ -196,7 +204,7 @@ export function offerDefaults(slot: Slot, now: number): { offerExpiresAt: string
 /** Which of hold / resume / cancel HQ may use (IR56; hold only from in progress or submitted). */
 export function controls(status: string, t: T = en): { hold: boolean; resume: boolean; cancel: boolean; cancelWhy: string | null } {
   const cancel = ["requested", "offered", "accepted", "assigned", "on_hold", "rework_requested"].includes(status);
-  const cancelWhy = cancel ? null : t(status === "in_progress" || status === "submitted" ? "Put the job on hold first (IR56)." : "Completed and cancelled jobs cannot be cancelled.");
+  const cancelWhy = cancel ? null : t(status === "in_progress" || status === "submitted" ? "Put the job on hold first." : "Completed and cancelled jobs cannot be cancelled.");
   return { hold: status === "in_progress" || status === "submitted", resume: status === "on_hold", cancel, cancelWhy };
 }
 
@@ -229,10 +237,10 @@ const HQ_REFUSAL_TEXT: Record<string, string> = {
   "error.unitArchived": "the unit is archived",
   "error.slotRules": "each time is 1–4 hours, starts on a later day than today, and the times differ",
   "error.beforeRequestedEnd": "the due time cannot be before the end of the 1st preferred time",
-  "errors.contact_details_forbidden": "no e-mail addresses or phone numbers in the contact window (IR64)",
+  "errors.contact_details_forbidden": "no e-mail addresses or phone numbers in the contact window",
   "error.count": "too many entries", "error.invalid": "not a valid value",
   "error.length": "1–1000 characters", "error.required": "required", "error.range": "the end must be after the start", "error.past": "must be in the future",
-  "error.afterAccess": "must not be after the access ends", "error.afterVisit": "must not be after the visit starts (IR457)",
+  "error.afterAccess": "must not be after the access ends", "error.afterVisit": "must not be after the visit starts",
 };
 /** A field's own limit where it differs from the general one. */
 const HQ_FIELD_TEXT: Record<string, string> = { "symptom:error.length": "10–2000 characters", "contactWindow:error.length": "up to 200 characters", "alternativeSlots:error.count": "up to two more times" };
@@ -322,7 +330,7 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
     : j.status === "rework_requested" ? "Returned for rework — the technician works on the next version."
     : j.status !== "submitted" ? "The report is not under review in the job’s current state."
     : !av.allowed ? (av.reason === "self_authored" ? "You submitted this report version, so you cannot accept or return it (self-approval is rejected)." : av.reason === "not_current" ? "A newer report version exists — reload to review it." : "Reviewing needs the job.write permission.")
-    : mode === "hq_escalation" ? "The contractor reviews its own reports first. HQ may accept or return this one only by escalation, with a reason (IR31)."
+    : mode === "hq_escalation" ? "The contractor reviews its own reports first. HQ may accept or return this one only by escalation, with a reason."
     : "You did not contribute to this report, so you can review it (self-approval is rejected).");
   const rows = inspectionRows(r.items, t, r.attachmentRefs).map((it) => {
     const x = it.result ? resultText[it.result] : { label: "No result", tone: "crit" as const };

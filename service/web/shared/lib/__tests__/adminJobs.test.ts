@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ms } from "@ac/web/lib/i18n-ms";
-import { agreedSlots, classifyBy, controls, costLineOf, costTotals, delivery, extendDefault, fromZonedInput, LISTED, money, newJobErrors, periodChip, reportCard, returnReason, reviewModeOf, facts, filtersOf, hqRefusal, HQ_REFUSAL_KEYS, hqRow, longSlot, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, tomorrowIn, zonedInput, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
+import { agreedSlots, classifyBy, contractorNames, controls, costLineOf, costTotals, delivery, extendDefault, fromZonedInput, LISTED, money, newJobErrors, periodChip, reportCard, returnReason, reviewModeOf, facts, filtersOf, hqRefusal, HQ_REFUSAL_KEYS, hqRow, longSlot, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, tomorrowIn, zonedInput, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
@@ -70,7 +70,7 @@ describe("HQ maintenance jobs", () => {
     expect(slotText(slot("2026-09-14T00:00:00Z", "2026-09-20T00:00:00Z"))).toBe("14 Sept, 8:00 am – 20 Sept, 8:00 am MYT");
     expect(offerDefaults(slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), NOW)).toEqual({ offerExpiresAt: "2026-09-22T01:30:00.000Z", accessValidFrom: "2026-09-21T01:30:00.000Z", accessValidUntil: "2026-09-23T04:00:00.000Z" });
     expect(offerDefaults(slot("2026-09-21T05:00:00Z", "2026-09-21T07:00:00Z"), NOW).offerExpiresAt).toBe("2026-09-21T05:00:00.000Z");
-    expect(controls("in_progress")).toEqual({ hold: true, resume: false, cancel: false, cancelWhy: "Put the job on hold first (IR56)." });
+    expect(controls("in_progress")).toEqual({ hold: true, resume: false, cancel: false, cancelWhy: "Put the job on hold first." });
     expect(controls("on_hold")).toEqual({ hold: false, resume: true, cancel: true, cancelWhy: null });
     expect(controls("completed").cancelWhy).toBe("Completed and cancelled jobs cannot be cancelled.");
     expect(classifyBy("2026-09-18T03:05:00Z")).toBe("21 Sept 2026, 11:05 am MYT"); // Fri → Mon, a Kuala Lumpur business day
@@ -145,7 +145,7 @@ describe("HQ maintenance jobs", () => {
       nextAction: { kind: "follow_up", date: "2026-09-30T00:00:00Z", note: "Check the pump" }, signOff: { signerName: "Aiko", signedAt: "2026-09-15T03:50:00Z", absentReason: null } } as never, byUser);
     expect([full.parts, full.next, full.signOff]).toEqual([[["Drain pump × 1", "hq stock · replaces drain pan"]], "Follow-up 2026-09-30 — Check the pump", "Signed by Aiko 15 Sept 2026, 11:50 am MYT"]);
     const esc = reportCard(job({ status: "submitted", contractorOrgId: "org-c" }), report, byUser);
-    expect([esc.mode, esc.tone, esc.note]).toEqual(["hq_escalation", "warn", "The contractor reviews its own reports first. HQ may accept or return this one only by escalation, with a reason (IR31)."]);
+    expect([esc.mode, esc.tone, esc.note]).toEqual(["hq_escalation", "warn", "The contractor reviews its own reports first. HQ may accept or return this one only by escalation, with a reason."]);
     const own = reportCard(job({ status: "submitted" }), { ...(report as object), reviewAvailability: { allowed: false, reason: "self_authored" } } as never, byUser);
     expect([own.decide, own.note]).toEqual([false, "You submitted this report version, so you cannot accept or return it (self-approval is rejected)."]);
     expect(reportCard(job({ status: "completed" }), report, byUser).note).toMatch(/^Accepted/);
@@ -170,7 +170,16 @@ describe("HQ maintenance jobs", () => {
 
   it("shows a completed job's assignment as ended (IR234)", () => {
     const done = delivery(job({ status: "completed", assignment: { technicianMembershipId: "m-int", scheduledStart: "2026-09-22T02:00:00Z", scheduledEnd: "2026-09-22T04:00:00Z", status: "completed", acknowledgement: "accepted", cantMakeReason: null, alternativeSlot: null } }), names, NOW)!;
-    expect([done.lines, done.ack, done.cantMake]).toEqual([[["Technician", "tech-internal-a · assignment 22 Sept, 10:00 am – 12:00 pm MYT · ended at completion"]], { tone: "ok", text: "tech-internal-a completed the job — the assignment ended with it, so tech-internal-a’s time is free again (IR234)." }, false]);
+    expect([done.lines, done.ack, done.cantMake]).toEqual([[["Technician", "tech-internal-a · assignment 22 Sept, 10:00 am – 12:00 pm MYT · ended at completion"]], { tone: "ok", text: "tech-internal-a completed the job — the assignment ended with it, so tech-internal-a’s time is free again." }, false]);
+  });
+});
+
+describe("contractors any time can be offered to (IR572)", () => {
+  it("names the first three by name and counts the rest", () => {
+    expect(contractorNames([])).toBe("—");
+    expect(contractorNames(["Demo Contractor B", "Demo Contractor A"])).toBe("Demo Contractor A, Demo Contractor B");
+    expect(contractorNames(["E", "D", "C", "B", "A"])).toBe("A, B, C and 2 more");
+    expect(contractorNames(["D", "C", "B", "A"], MS.t)).toBe("A, B, C dan 1 lagi");
   });
 });
 
@@ -182,7 +191,7 @@ describe("HQ Jobs tab in Malay with the display time zone (IR290)", () => {
     const f = facts(job({}), names, MS);
     expect([f[0].label, f[0].sub, f[2].value]).toEqual(["Tetingkap yang diminta", "masa pilihan pertama pelanggan", "belum ditempah"]);
     expect(f[0].value).toMatch(/GMT\+9$/); // 11:00 – 1:00 in Tokyo, the client's 10:00–12:00 in Kuala Lumpur
-    expect(controls("in_progress", MS.t).cancelWhy).toBe("Tangguhkan kerja dahulu (IR56).");
+    expect(controls("in_progress", MS.t).cancelWhy).toBe("Tangguhkan kerja dahulu.");
     expect(newJobErrors({ unitId: "", symptom: "x", slots: [slot("2026-09-21T06:00:00Z", "2026-09-21T08:00:00Z")] }, NOW, MS.t)).toEqual({ unitId: "Pilih unit.", symptom: "Terangkan simptom dalam 10–2000 aksara.", slot0: "Masa bermula pada hari selepas hari ini (Kuala Lumpur)." });
     expect(hqRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} }, MS.t)).toBe("Kerja ini tidak lagi wujud dalam skop anda.");
     expect(returnReason(["Airflow — attention"], "Re-check", MS.t)).toBe("Kerja semula: Airflow — attention. Re-check");

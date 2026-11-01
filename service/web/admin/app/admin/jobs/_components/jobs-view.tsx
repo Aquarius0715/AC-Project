@@ -9,7 +9,7 @@ import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { showTime, zonedInstant } from "@ac/web/lib/i18n";
-import { costLineOf, extendDefault, fromZonedInput, hqRefusal, longSlot, money, newJobErrors, offerDefaults, returnReason, slotText, tomorrowIn, zonedInput, type CostLine, type PreferredRow } from "@ac/web/lib/adminJobs";
+import { contractorNames, costLineOf, extendDefault, fromZonedInput, hqRefusal, longSlot, money, newJobErrors, offerDefaults, returnReason, slotText, tomorrowIn, zonedInput, type CostLine, type PreferredRow } from "@ac/web/lib/adminJobs";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { JobStatus } from "@ac/web/lib/jobs";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -138,12 +138,12 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
         <>
           {sp?.status === "declined" && <Banner tone="crit" icon="error"><b>{t("The client declined the proposed time")}{d.texts.declinedAt ? ` · ${d.texts.declinedAt}` : ""}</b> — {sp.declineReason?.replace(/_/g, " ")}{sp.declineComment ? `: “${sp.declineComment}”` : ""}. {t("Held capacity was released; the client sent new preferred times (round {round}).", { round: j.preferenceRound })}</Banner>}
           {d.preferred.length > 0 ? (
-            <Card title={d.preferred[0].plan ? t("Plan occurrence — book this time") : j.preferenceRound > 1 ? t("Client’s preferred times (round {round}) — book one of these", { round: j.preferenceRound }) : t("Client’s preferred times — book one of these")} sub={t("HQ technicians free and qualified for each time (members.eligible)")}>
+            <Card title={d.preferred[0].plan ? t("Plan occurrence — book this time") : j.preferenceRound > 1 ? t("Client’s preferred times (round {round}) — book one of these", { round: j.preferenceRound }) : t("Client’s preferred times — book one of these")} sub={t("HQ technicians free and qualified for each time")}>
               <ScrollX><table className="w-full min-w-[640px] text-[13px]">
                 <thead><tr className="text-left text-[11px] uppercase text-muted-foreground"><th className="py-1.5">{t("Rank")}</th><th>{t("Time")}</th><th>{t("HQ technicians")}</th><th>{t("Contractors")}</th><th>{t("Action")}</th></tr></thead>
-                <tbody>{d.preferred.map((r) => <tr key={r.rank} className="border-t border-line"><td className="py-2"><span className="rounded-lg bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">{r.plan ? t("Plan") : t(RANK[r.rank - 1] ?? "{n}th", { n: r.rank })}</span></td><td className="font-semibold">{r.text}</td><td className={cx("text-xs", r.fits ? "text-ok" : "text-muted-foreground")}>{r.hq}</td><td className="text-xs text-muted-foreground">{t("{names} — confirm in the offer", { names: live.contractors.filter((x) => x.status === "active").map((x) => x.name).join(", ") || "—" })}</td><td><Btn size="sm" variant="primary" disabled={pending || Date.parse(r.slot.startAt) <= now} onClick={() => setModal({ kind: "book", row: r })}>{t("Use this time")}</Btn></td></tr>)}</tbody>
+                <tbody>{d.preferred.map((r) => <tr key={r.rank} className="border-t border-line"><td className="py-2"><span className="rounded-lg bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">{r.plan ? t("Plan") : t(RANK[r.rank - 1] ?? "{n}th", { n: r.rank })}</span></td><td className="font-semibold">{r.text}</td><td className={cx("text-xs", r.fits ? "text-ok" : "text-muted-foreground")}>{r.hq}</td><td className="text-xs text-muted-foreground">{t("{names} — confirm in the offer", { names: contractorNames(live.contractors.filter((x) => x.status === "active").map((x) => x.name), t) })}</td><td><Btn size="sm" variant="primary" disabled={pending || Date.parse(r.slot.startAt) <= now} onClick={() => setModal({ kind: "book", row: r })}>{t("Use this time")}</Btn></td></tr>)}</tbody>
               </table></ScrollX>
-              <p className="mt-2 text-[11px] text-muted-foreground">{t(d.preferred[0].plan ? "“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside the plan occurrence without the client’s approval (IR113)." : "“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside these without the client’s approval (IR113).")}</p>
+              <p className="mt-2 text-[11px] text-muted-foreground">{t(d.preferred[0].plan ? "“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside the plan occurrence without the client’s approval." : "“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside these without the client’s approval.")}</p>
             </Card>
           ) : <Banner>{t("No agreed time on this job (HQ request without alternatives) — propose a time to the client.")}</Banner>}
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#f5c473] bg-[#fff8ec] p-4">
@@ -262,17 +262,17 @@ function BookModal({ d, live, row: first, fresh, onClose, onFail }: ModalProps &
   };
   const [terms, setTerms] = useState("terms-demo-v1");
   const book = () => who === "internal"
-    ? run(() => assignInternal(j.id, j.version, tech, row.slot), t("Assigned — the technician must accept"), () => onClose(t("Assigned {name} for {slot}. The technician must accept (受領).", { name: row.people.find((p) => p.id === tech)?.displayName ?? "", slot: slotText(row.slot, i) })), onFail)
+    ? run(() => assignInternal(j.id, j.version, tech, row.slot), t("Assigned — the technician must accept"), () => onClose(t("Assigned {name} for {slot}. The technician must accept the assignment.", { name: row.people.find((p) => p.id === tech)?.displayName ?? "", slot: slotText(row.slot, i) })), onFail)
     : run(() => offerToContractor(j.id, j.version, { contractorOrgId: org, visitSlot: row.slot, offerExpiresAt: fromZonedInput(expires, zone), accessValidFrom: fromZonedInput(from, zone), accessValidUntil: fromZonedInput(until, zone), termsVersion: terms.trim() }), t("Offer sent"), () => onClose(t("Offered {slot} to {name}. They accept, decline or propose another time — a different time goes back to the client.", { slot: slotText(row.slot, i), name: active.find((c) => c.id === org)?.name ?? "" })), onFail);
   return (
     <Modal open onClose={() => onClose()} title={fresh ? t("New maintenance job · step 2 of 2") : t("Book {id}", { id: j.id.slice(0, 8) })} footer={<><Btn onClick={() => onClose()}>{!fresh && <Icon name="arrowLeft" />}{t(fresh ? "Leave it requested" : "Back")}</Btn><Btn variant="primary" disabled={pending || (who === "internal" ? !tech : !org || !terms.trim())} onClick={book}>{t(who === "internal" ? "Assign" : "Send offer")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{fresh ? `${t("Created {id} (requested) · choose who does the work —", { id: j.id.slice(0, 8) })} ` : ""}{d.title} · {d.customer} · {t(j.origin === "periodic_plan" ? "Periodic plan" : "Client request")}</p>
       {fresh && ahead.length > 1 ? (
-        <Field label={t("Visit time · one of the customer’s preferred times")} hint={t("Only these times are agreed (IR113); another time needs a proposal the customer accepts.")}><Select value={String(rank)} onChange={(e) => pick(Number(e.target.value))}>{ahead.map((r) => <option key={r.rank} value={r.rank}>{t(RANK[r.rank - 1] ?? "{n}th", { n: r.rank })} · {r.text}{r.fits ? "" : ` · ${t("no HQ technician free")}`}</option>)}</Select></Field>
+        <Field label={t("Visit time · one of the customer’s preferred times")} hint={t("Only these times are agreed; another time needs a proposal the customer accepts.")}><Select value={String(rank)} onChange={(e) => pick(Number(e.target.value))}>{ahead.map((r) => <option key={r.rank} value={r.rank}>{t(RANK[r.rank - 1] ?? "{n}th", { n: r.rank })} · {r.text}{r.fits ? "" : ` · ${t("no HQ technician free")}`}</option>)}</Select></Field>
       ) : <Field label={t(row.plan ? "Visit time · the plan occurrence" : "Visit time · from the client")} hint={t("Fixed here. Need another time? Use “Propose another time…” — the client must accept it.")}><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {longSlot(row.slot, i)}</div></Field>}
       <Field label={t("Who does the work")} hint={row.people.length ? undefined : t("No qualified HQ technician is free at this time — offer it to a contractor.")}><Choice value={who} onChange={setWho} options={[...(row.people.length ? [{ id: "internal" as const, label: t("Assign internally") }] : []), { id: "contractor" as const, label: t("Offer to contractor") }]} /></Field>
       {who === "internal" ? (
-        <Field label={t("Technician")} hint={t("Free and qualified for the whole slot (members.eligible)")}><Select value={tech} onChange={(e) => setTech(e.target.value)}>{row.people.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)}</Select></Field>
+        <Field label={t("Technician")} hint={t("Free and qualified for the whole slot")}><Select value={tech} onChange={(e) => setTech(e.target.value)}>{row.people.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)}</Select></Field>
       ) : (
         <>
           <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
@@ -287,7 +287,7 @@ function BookModal({ d, live, row: first, fresh, onClose, onFail }: ModalProps &
           <p className="text-[11px] text-muted-foreground">{t("Times in {zone}", { zone })}</p>
         </>
       )}
-      <Banner>{t(who === "internal" ? "The technician must accept the assignment (受領)." : "The access window must cover the visit; the offer may not expire after the visit starts.")}</Banner>
+      <Banner>{t(who === "internal" ? "The technician must accept the assignment." : "The access window must cover the visit; the offer may not expire after the visit starts.")}</Banner>
     </Modal>
   );
 }
@@ -340,7 +340,7 @@ function ReasonModal({ d, live, what, onClose, onFail }: ModalProps & { what: "h
   const [tried, setTried] = useState(false);
   const others = live.internalTechs.filter((x) => x.id !== j.assignment?.technicianMembershipId);
   const [tech, setTech] = useState(others[0]?.id ?? "");
-  const title = t({ hold: "Put on hold (IR56)", resume: "Resume the job", cancel: "Cancel {id}", reassign: "Reassign {id}" }[what], { id: j.id.slice(0, 8) });
+  const title = t({ hold: "Put on hold", resume: "Resume the job", cancel: "Cancel {id}", reassign: "Reassign {id}" }[what], { id: j.id.slice(0, 8) });
   const confirm = () => {
     setTried(true);
     if (!r.trim() || r.length > 1000 || (what === "reassign" && !tech)) return;
@@ -369,7 +369,7 @@ function ClassifyModal({ d, onClose, onFail }: Omit<ModalProps, "live">) {
       <p className="text-xs text-muted-foreground">{j.id.slice(0, 8)} · {d.customer} · {d.title} — {t("follow-up of {id}", { id: j.followUpOfJobId?.slice(0, 8) ?? "" })}</p>
       <Field label={t("Classification · required")}><Choice value={cls} onChange={setCls} options={[{ id: "rework", label: t("Rework (free)") }, { id: "new_request", label: t("New request") }]} /></Field>
       <Field label={t("Reason · required (1–1000)")} error={tried && !r.trim() ? t("A reason is required") : undefined}><Textarea value={r} maxLength={1000} onChange={(e) => setR(e.target.value)} /></Field>
-      <Banner>{t("Set once — cannot be changed later. The job stays “Requested” and is booked like any client request (IR113).")}</Banner>
+      <Banner>{t("Set once — cannot be changed later. The job stays “Requested” and is booked like any client request.")}</Banner>
     </Modal>
   );
 }
@@ -463,7 +463,7 @@ function CostModal({ d, onClose, onFail }: Omit<ModalProps, "live">) {
         <Field label={t("Currency")}><Select value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value })}><option value="MYR">MYR</option><option value="USD">USD</option></Select></Field>
       </div>
       <Field label={t("Visibility")} hint={t("Customer lines appear on the client’s job; internal lines stay with HQ.")}><Choice value={f.visibility as CostLine["visibility"]} onChange={(v) => setF({ ...f, visibility: v })} options={[{ id: "customer", label: t("Customer") }, { id: "internal", label: t("Internal") }]} /></Field>
-      <Banner>{t("Amounts are kept per currency and never converted. No payment is made (DD-A06).")}</Banner>
+      <Banner>{t("Amounts are kept per currency and never converted. No payment is made.")}</Banner>
     </Modal>
   );
 }
@@ -488,7 +488,7 @@ function ExtendModal({ d, live, until, onClose, onFail }: ModalProps & { until: 
       <p className="text-xs text-muted-foreground">{j.id.slice(0, 8)} · {d.title} · {t(Date.parse(until) <= now ? "access ended {time}" : "access now ends {time}", { time: d.texts.accessUntil ?? showTime(until, i.display) })}</p>
       <Field label={t("New end · required")} hint={t("Times in {zone}", { zone })} error={tried ? endError : undefined}><Input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} /></Field>
       <Field label={t("Reason · required (1–1000)")} error={tried && !r.trim() ? t("A reason is required") : undefined}><Textarea value={r} maxLength={1000} onChange={(e) => setR(e.target.value)} placeholder={t("The rework visit runs into the next day.")} /></Field>
-      <Banner>{t("Only the end moves; the contractor sees the access instructions until then (IR25).")}</Banner>
+      <Banner>{t("Only the end moves; the contractor sees the access instructions until then.")}</Banner>
     </Modal>
   );
 }
@@ -551,10 +551,10 @@ export function NewJobModal({ live, initial, onClose, onCreated }: { live: { now
         {times.length < 3 && <div><Btn size="sm" onClick={() => setTimes([...times, { ...times[times.length - 1], date: nextDay(times[times.length - 1].date) }])}><Icon name="add" /> {t("Add another time")}</Btn></div>}
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
-        <Field label={t("Due · optional")} hint={t("Defaults to the end of the 1st time (IR38).")} error={tried ? dueError : undefined}><Input type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
-        <Field label={t("Contact window · optional")} hint={t("When to call — no phone numbers or e-mail addresses (IR64).")}><Input value={contact} maxLength={200} onChange={(e) => setContact(e.target.value)} /></Field>
+        <Field label={t("Due · optional")} hint={t("Defaults to the end of the 1st time.")} error={tried ? dueError : undefined}><Input type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
+        <Field label={t("Contact window · optional")} hint={t("When to call — no phone numbers or e-mail addresses.")}><Input value={contact} maxLength={200} onChange={(e) => setContact(e.target.value)} /></Field>
       </div>
-      <Banner>{t("Saving creates the job as requested. Step 2 books one of these times — assign an HQ technician or offer it to a contractor (IR113).")}</Banner>
+      <Banner>{t("Saving creates the job as requested. Step 2 books one of these times — assign an HQ technician or offer it to a contractor.")}</Banner>
     </Modal>
   );
 }

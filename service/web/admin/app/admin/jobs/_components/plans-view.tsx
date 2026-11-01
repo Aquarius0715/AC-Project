@@ -152,7 +152,7 @@ function NewPlanModal({ live, onClose, onCreated, href }: { live: PlansLive; onC
         <Field label={t("Every")} hint={t("Monthly recurrence, 1–12 months")} error={tried ? errors.every : undefined}><Select value={String(every)} onChange={(e) => setEvery(Number(e.target.value))}>{MONTHS.map((m) => <option key={m} value={m}>{t(m === 1 ? "1 month" : "{n} months", { n: m })}</option>)}</Select></Field>
         <Field label={t("First visit · next due")} hint={nextIso && anchor ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: planDate(nextOccurrence(nextIso, every, anchor), i.display), zone }) : undefined} error={tried ? errors.nextDueAt : undefined}><Input type="datetime-local" value={next} onChange={(e) => setNext(e.target.value)} /></Field>
       </div>
-      <Banner>{t("Each occurrence becomes a periodic job (requested) at this time of day when HQ presses Generate job; HQ then books it like any agreed time (IR113).")}</Banner>
+      <Banner>{t("Each occurrence becomes a periodic job (requested) at this time of day when HQ presses Generate job; HQ then books it like any agreed time.")}</Banner>
     </Modal>
   );
 }

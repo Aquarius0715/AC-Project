@@ -69,7 +69,7 @@ function ContractorDetail({ d, open }: { d: Detail; open: (m: ModalState) => voi
         <Card title={d.org.name} sub={p ? undefined : t("No contractor profile yet — offers still work; add one to record its registration, areas and insurance")}
           action={p ? <span className="flex gap-2"><Btn size="sm" onClick={() => open({ kind: "profile", organizationId: p.organizationId })}>{t("Edit")}</Btn><Btn size="sm" variant={p.status === "active" ? "danger" : "primary"} onClick={() => open({ kind: "status" })}>{t(p.status === "active" ? "Suspend offers" : "Resume offers")}</Btn></span>
             : <Btn size="sm" variant="primary" onClick={() => open({ kind: "profile", organizationId: d.org.id })}><Icon name="add" /> {t("Add profile")}</Btn>}>
-          {p?.status === "suspended" && <div className="mb-3"><Banner tone="crit">{p.suspendedReason ? t("Offers suspended — “{reason}”. New offers to {name} are refused; open offers and jobs continue (IR111).", { reason: p.suspendedReason, name: p.name }) : t("Offers suspended. New offers to {name} are refused; open offers and jobs continue (IR111).", { name: p.name })}</Banner></div>}
+          {p?.status === "suspended" && <div className="mb-3"><Banner tone="crit">{p.suspendedReason ? t("Offers suspended — “{reason}”. New offers to {name} are refused; open offers and jobs continue.", { reason: p.suspendedReason, name: p.name }) : t("Offers suspended. New offers to {name} are refused; open offers and jobs continue.", { name: p.name })}</Banner></div>}
           {d.facts && <SummaryList items={d.facts} />}
           <p className="mt-3 text-[13px] font-bold">{r.current ? r.current.title : t("No rate card in effect")}</p>
           {r.current && (

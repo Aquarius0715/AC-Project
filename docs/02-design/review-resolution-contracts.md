@@ -8051,3 +8051,15 @@ Found in the same round (UX-03). As its security check, tech-external-a opened a
 2. **No design note.** The note leaves `/forbidden`, and its Malay entry leaves the dictionary; "Go to Overview" gets one. The view still looks the same for a missing page and for a refused one.
 3. **Test.** `session.e2e.ts` opens an unknown page and `/forbidden` in each app. It expects "Go to Overview" to the app's home and no design note; signed out, an unknown page offers "Go to sign in".
 4. **Design and Figma.** The `/forbidden` and `*` rows of the common design name the two links. Figma's Page unavailable frames (Client 10f, Contractor, Admin, Technician) show "Go to Overview" and no note; their captions and ClickMaps say that signed out it is "Go to sign in".
+
+## IR572 The HQ jobs page names contractors briefly and speaks business language — 2026-11-01
+
+Found in the fourth round of the UX loop (UX-04: hq-operator dispatches a new customer request to Contractor A at 1920 and 1280). The task itself takes five clicks from the job: Use this time, Offer to contractor, the company, Send offer, and the toast "Offer sent". A double click on Send offer still sends one offer. Two things on the way slowed the dispatcher down:
+
+- **Contractors column.** In the table of the client's preferred times, every row repeated all 14 active contractor companies, in the order the API returns them. Each row became a block of names, and the Time and HQ technicians columns wrapped into three lines ("tech-internal-" / "a"). The list says nothing about the row's time: any active contractor may be offered any agreed time and confirms its capacity in the offer.
+- **Words.** The page, its dialogs and its messages ended sentences with requirement and API names: "(members.eligible)", "(IR113)", "(IR25)", "(IR38)", "(IR56)", "(IR64)", "(IR111)", "(IR234)", "(IR457)", "(IR31)", "(DD-A06)". The technician's acceptance appeared as "(受領)", in Japanese, in the English and Malay text.
+
+1. **Contractors.** The column names the first three active companies by name, then "and N more" (`contractorNames` in `shared/lib/adminJobs.ts`), still followed by "— confirm in the offer". The offer's company select and the Delivery filter list the companies by name too, as the Contractors tab already did.
+2. **Words.** The 23 texts of the Jobs, Plans and Contractors tabs, their dialogs and their messages lose the IDs and "(受領)"; the Malay dictionary follows ("{names} and {n} more" is new). The meaning of each sentence is unchanged.
+3. **Tests.** `adminJobs.test.ts` checks `contractorNames` (none, two in order, five, Malay) and expects the hold reason and the completed-assignment line without IDs.
+4. **Design and Figma.** The Jobs tab paragraph of the admin design describes the column. In Figma's Maintenance Coordinator frames, 18 screen texts lose the same IDs ("put on hold first", "Only these times are agreed", "Active partner contractors."); the captions keep theirs. Figma's table shows each contractor's availability per time with a Fit column; the app does not compute contractor capacity per time, which is proposed separately (UX proposals, B).

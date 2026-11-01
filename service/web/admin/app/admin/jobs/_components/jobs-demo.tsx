@@ -214,7 +214,7 @@ function BookModal({ j, slot, onClose }: { j: Job; slot: Slot; onClose: () => vo
           <Field label="Access valid from"><Input defaultValue={`${slot.date} 00:00`} /></Field>
         </div>
       )}
-      <Banner>{d === "internal" ? "The technician must accept the assignment (受領)." : "contractor-a can Accept, Decline or Propose another time — a different time always goes back to the client."}</Banner>
+      <Banner>{d === "internal" ? "The technician must accept the assignment." : "contractor-a can Accept, Decline or Propose another time — a different time always goes back to the client."}</Banner>
     </Modal>
   );
 }
@@ -273,7 +273,7 @@ function ClassifyModal({ j, onClose }: { j: Job; onClose: () => void }) {
       <p className="text-xs text-muted-foreground">{j.id} · {j.customer} · {j.unit} — follow-up of {j.followUpOf}</p>
       <Field label="Classification · required"><Choice value={cls} onChange={setCls} options={[{ id: "rework", label: "Rework (free)" }, { id: "new_request", label: "New request" }]} /></Field>
       <Field label="Reason · required (1–1000 characters)" error={tried && bad ? "A reason is required (1–1000 characters)" : undefined}><Textarea value={r} onChange={(e) => setR(e.target.value)} placeholder={`Drain pan still overflowing — same leak as ${j.followUpOf}.`} /></Field>
-      <Banner>Set once — cannot be changed later. The job stays “Requested” and is booked like any client request (IR113); the client sees “Rework (free)” or “New request” instead of “Under HQ review”.</Banner>
+      <Banner>Set once — cannot be changed later. The job stays “Requested” and is booked like any client request; the client sees “Rework (free)” or “New request” instead of “Under HQ review”.</Banner>
     </Modal>
   );
 }
@@ -282,7 +282,7 @@ function ReasonModal({ what, j, onClose }: { what: "rework" | "hold" | "reassign
   const toast = useToast();
   const [r, setR] = useState("");
   const [tried, setTried] = useState(false);
-  const title = what === "rework" ? "Return for rework" : what === "hold" ? "Put on hold (IR56)" : `Reassign ${j.id}`;
+  const title = what === "rework" ? "Return for rework" : what === "hold" ? "Put on hold" : `Reassign ${j.id}`;
   return (
     <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!r.trim()) return; if (what === "reassign") jobActions.book(j.id, j.scheduled!, "internal", "tech-internal-b"); toast(what === "rework" ? "Returned for rework" : what === "hold" ? "Job put on hold" : "Reassigned — tech-internal-b must accept", "warn"); onClose(); }}>Confirm</Btn></>}>
       {what === "reassign" && <Field label="New technician (same agreed time)"><Select><option>tech-internal-b · Available</option></Select></Field>}
