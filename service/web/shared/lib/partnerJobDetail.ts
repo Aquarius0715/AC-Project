@@ -130,7 +130,7 @@ export function detailBanner(j: ApiDetail, techName: string | null, now: number,
     case "in_progress": {
       const a = j.assignment;
       const ended = a && Date.parse(a.scheduledEnd) <= now;
-      if (ended) return { tone: "crit", text: t("The work window ended {time} without a submitted report — extend or reassign in Schedule (IR89).", { time: showTime(a!.scheduledEnd, display) }) };
+      if (ended) return { tone: "crit", text: t("The work window ended {time} without a submitted report — extend or reassign in Schedule.", { time: showTime(a!.scheduledEnd, display) }) };
       const ack = a?.acknowledgement === "accepted" ? t("accepted by the technician")
         : a?.acknowledgement === "cant_make" ? (a.cantMakeReason ? t("the technician can’t make it (“{reason}”) — reassign in Schedule", { reason: a.cantMakeReason }) : t("the technician can’t make it — reassign in Schedule"))
         : t("awaiting the technician’s acceptance");
@@ -145,8 +145,8 @@ export function detailBanner(j: ApiDetail, techName: string | null, now: number,
       return { tone: "warn", text: t("On hold by HQ — scheduling and reports are blocked until HQ resumes the job.") };
     case "completed": {
       const name = techName ?? t("The technician");
-      return { tone: "ok", text: j.completedAt ? t("Completed {time} — accepted in the quality review. {name}’s assignment ended with it, so the time is free for other visits (IR234).", { time: showTime(j.completedAt, display), name })
-        : t("Completed — accepted in the quality review. {name}’s assignment ended with it, so the time is free for other visits (IR234).", { name }) };
+      return { tone: "ok", text: j.completedAt ? t("Completed {time} — accepted in the quality review. {name}’s assignment ended with it, so the time is free for other visits.", { time: showTime(j.completedAt, display), name })
+        : t("Completed — accepted in the quality review. {name}’s assignment ended with it, so the time is free for other visits.", { name }) };
     }
     case "cancelled":
       return { tone: "crit", text: t("Cancelled by HQ — no further work.") };

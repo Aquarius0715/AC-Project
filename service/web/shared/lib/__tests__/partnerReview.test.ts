@@ -69,7 +69,7 @@ describe("evidence check (DD-P05 step 2)", () => {
 describe("review availability (IR31)", () => {
   it("is silent when allowed and explains each refusal", () => {
     expect(availabilityText({ allowed: true, reason: null }, "submitted")).toBeNull();
-    expect(availabilityText({ allowed: false, reason: "self_authored" }, "submitted")).toMatch(/cannot approve or return it \(IR31\)/);
+    expect(availabilityText({ allowed: false, reason: "self_authored" }, "submitted")).toMatch(/cannot approve or return it\. Another reviewer/);
     expect(availabilityText({ allowed: false, reason: "not_current" }, "submitted")).toMatch(/newer version/);
     expect(availabilityText({ allowed: false, reason: "not_submitted" }, "completed")).toMatch(/accepted; the job is completed/);
     expect(availabilityText({ allowed: false, reason: "not_submitted" }, "rework_requested")).toMatch(/returned for rework/);

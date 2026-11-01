@@ -358,6 +358,8 @@ Scope: FR-P10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 **Boundary cases and failures**: Draft or other-company statements are NOT_FOUND. Network failure keeps the message for retry.
 
+**Empty and filtered (IR584)**: Without statements the list reads “No statements yet — A statement appears here once HQ approves your first one.” and the detail “No statement to show”. A period or status that matches nothing reads “No statements — No statement matches these filters.”, and “Clear the filters” beside the filters removes period and status, as on HQ's payouts tab. The bank account row reads “set by HQ” (no DTO field).
+
 **Statements (BR-P10, IR341)**: HQ's drafts of the month that ended are generated on the 1st by the billing scheduler; the contractor sees a statement once HQ approves it.
 
 **Verification**: Check the traceability entries under AT-P10 (N/E/B).

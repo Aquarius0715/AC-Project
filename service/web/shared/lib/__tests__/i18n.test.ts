@@ -52,6 +52,14 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     expect(Object.keys(ms).filter((key) => !dynamic.has(key) && !code.includes(JSON.stringify(key)))).toEqual([]);
   });
 
+  it("speaks to contractors without error codes or spec IDs (IR584)", () => {
+    const partner = [...sources(join(root, "partner/app")), ...readdirSync(join(root, "shared/lib")).filter((f) => /^partner\w*\.ts$/.test(f)).map((f) => join(root, "shared/lib", f))];
+    const texts = partner.flatMap((f) => [...readFileSync(f, "utf8").matchAll(/\bt\(\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => JSON.parse(`"${m[1]}"`) as string));
+    expect(texts.length).toBeGreaterThan(100);
+    const coded = /\b(?:IR\d+|(?:FR|DD|BR|NFR|DEC|AT|SCR|DDC|REV)-[A-Z]*\d+)\b|^(?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\b/;
+    expect(texts.filter((text) => coded.test(text))).toEqual([]);
+  });
+
   it("names every sidebar item and the role words of the four apps in Malay", () => {
     for (const cfg of Object.values(ROLES)) {
       for (const item of cfg.nav.filter((i) => i.label !== "MRV")) expect(ms[item.label], item.label).toBeTruthy();

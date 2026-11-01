@@ -19,8 +19,8 @@ export type PayoutsLive = {
 };
 
 const refusal = (f: ActionFailure, t: T): string | null =>
-  f.code === "CONFLICT" ? t("CONFLICT — the statement changed (or is no longer approved); the page shows the latest state.")
-    : f.code === "NOT_FOUND" ? t("NOT_FOUND — this statement or line is not available to your company.") : null;
+  f.code === "CONFLICT" ? t("The statement changed (or is no longer approved); the page shows the latest state.")
+    : f.code === "NOT_FOUND" ? t("This statement or line is not available to your company.") : null;
 
 /** Payout statements of the company (FR-P10): approved and paid statements only, lines priced by the rate card,
  * questions to HQ on a line; corrections come back as adjustments on the next statement. Texts in the user's display
@@ -36,6 +36,7 @@ export function PayoutsView({ live }: { live: PayoutsLive }) {
   const [error, setError] = useState<string | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
   const sel = live.selected;
+  const filtered = !!(live.period || live.status);
   const askable = sel?.rows.filter((r) => r.askable && r.lineId && !r.question) ?? [];
   const questionError = t("Enter your question (1–2000 characters)");
   const send = () => {
@@ -58,19 +59,20 @@ export function PayoutsView({ live }: { live: PayoutsLive }) {
       <div className="flex flex-wrap items-center gap-2">
         <div className="w-48"><Select value={live.period} onChange={(e) => nav({ period: e.target.value || null, statementId: null })} aria-label={t("Period")}><option value="">{t("Period: {period}", { period: t("All") })}</option>{live.periods.map((p) => <option key={p.value} value={p.value}>{t("Period: {period}", { period: p.text })}</option>)}</Select></div>
         <div className="w-48"><Select value={live.status} onChange={(e) => nav({ status: e.target.value || null, statementId: null })} aria-label={t("Status")}><option value="">{t("Status: All")}</option><option value="approved">{t("Status: {status}", { status: t("Approved") })}</option><option value="paid">{t("Status: {status}", { status: t("Paid") })}</option></Select></div>
+        {filtered && <Btn size="sm" onClick={() => nav({ period: null, status: null, statementId: null })}>{t("Clear the filters")}</Btn>}
       </div>
       {refused && <Banner tone="crit">{refused}</Banner>}
       {sel && <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>{sel.kpis.map((k) => <Kpi key={k.label} label={k.label} value={k.value} sub={k.badge ? <Badge tone={k.badge.tone}>{k.badge.label}</Badge> : k.sub} />)}</div>}
       <div className="split-rev">
         <Card title={t("Statements")} className="self-start">
-          {live.statements.length === 0 ? <EmptyState title={t("No statements yet")}>{t(live.period || live.status ? "No statement matches the filter." : "A statement appears here once HQ approves your first one.")}</EmptyState> : (
+          {live.statements.length === 0 ? <EmptyState title={t(filtered ? "No statements" : "No statements yet")}>{t(filtered ? "No statement matches these filters." : "A statement appears here once HQ approves your first one.")}</EmptyState> : (
             <div className="flex flex-col gap-2">{live.statements.map((s) => (
               <ListRow key={s.id} selected={sel?.statement.id === s.id} onClick={() => nav({ statementId: s.id })}><div className="min-w-0 flex-1"><b className="text-[13px]">{s.label}</b><div className="text-[11px] text-muted-foreground">{s.sub}</div></div><Badge tone={s.badge.tone}>{s.badge.label}</Badge></ListRow>
             ))}</div>
           )}
           <p className="mt-2 text-[11px] text-muted-foreground">{t("A statement is issued on the 1st for jobs whose report was accepted in the previous month. HQ approves it; payment follows on the 15th. Drafts stay with HQ.")}</p>
         </Card>
-        {!sel ? <Card title={t("Statement")}><EmptyState title={t("No statement selected")}>{t("Only approved and paid statements are shown; jobs still in review move to the next statement.")}</EmptyState></Card> : (
+        {!sel ? <Card title={t("Statement")}><EmptyState title={t("No statement to show")}>{t("Only approved and paid statements are shown; jobs still in review move to the next statement.")}</EmptyState></Card> : (
           <Card title={sel.title} sub={sel.sub}
             action={<div className="flex items-center gap-2"><Badge tone={sel.statement.status === "paid" ? "ok" : "primary"}>{t(sel.statement.status === "paid" ? "Paid" : "Approved")}</Badge><Btn size="sm" onClick={download}>{t("Download PDF")}</Btn></div>}>
             <DataTable rowKey={(r) => r.key} rows={sel.rows} cols={[
@@ -83,8 +85,8 @@ export function PayoutsView({ live }: { live: PayoutsLive }) {
                 : r.askable ? <Plain type="button" disabled={pending} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => { setAsk({ lineId: r.lineId! }); setTopic(r.status === "deduction" ? "deduction" : "amount"); setError(null); }}>{t("Ask HQ")}</Plain>
                 : <span className="text-[11px] text-muted-foreground">{r.status === "not_included" ? t("next statement") : ""}</span> },
             ]} />
-            <div className="mt-3"><SummaryList items={[...sel.totals.map(([k, v]): [string, React.ReactNode] => [k, <b key={k}>{v}</b>]), [t("Bank account"), t("set by HQ — not shown in this demo")]]} /></div>
-            <p className="mt-2 text-[11px] text-muted-foreground">{t("Rates come from your rate card with HQ. Only jobs whose report your review accepted (FR-P05) are paid; jobs still in review move to the next statement. Amounts are shown in {currency}.", { currency: sel.statement.currency })}</p>
+            <div className="mt-3"><SummaryList items={[...sel.totals.map(([k, v]): [string, React.ReactNode] => [k, <b key={k}>{v}</b>]), [t("Bank account"), t("set by HQ")]]} /></div>
+            <p className="mt-2 text-[11px] text-muted-foreground">{t("Rates come from your rate card with HQ. Only jobs whose report your review accepted are paid; jobs still in review move to the next statement. Amounts are shown in {currency}.", { currency: sel.statement.currency })}</p>
             {sel.questions.length > 0 && <div className="mt-4"><b className="text-[13px]">{t("Questions to HQ")}</b><ul className="mt-1 divide-y divide-line">{sel.questions.map((q) => (
               <li key={q.id} className="py-2 text-[13px]"><div className="flex flex-wrap items-center justify-between gap-2"><span>{q.title}</span><Badge tone={q.tone}>{q.state}</Badge></div><div className="text-xs text-muted-foreground">“{q.message}”{q.reply ? ` — ${t("HQ: {reply}", { reply: q.reply })}` : ""}</div></li>
             ))}</ul></div>}

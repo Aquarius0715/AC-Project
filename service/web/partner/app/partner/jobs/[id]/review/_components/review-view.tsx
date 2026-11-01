@@ -24,9 +24,9 @@ export type ReviewLive = {
 };
 
 const refusal = (f: ActionFailure, t: T): string | null =>
-  f.code === "CONFLICT" ? t("CONFLICT — this report version was already accepted or returned, or the job changed in the meantime; the page shows the latest state.")
-    : f.code === "FORBIDDEN" ? t("FORBIDDEN — a contributor to this report version cannot approve it (IR31), or your company does not hold this delegation.")
-    : f.code === "NOT_FOUND" ? t("NOT_FOUND — the job is outside your company's delegation.") : null;
+  f.code === "CONFLICT" ? t("This report version was already accepted or returned, or the job changed in the meantime; the page shows the latest state.")
+    : f.code === "FORBIDDEN" ? t("A contributor to this report version cannot approve it, or your company does not hold this delegation.")
+    : f.code === "NOT_FOUND" ? t("This job is outside your company’s delegation.") : null;
 const dot: Record<EvidenceRow["tone"], string> = { ok: "bg-ok", warn: "bg-warn", muted: "bg-line" };
 
 /** Quality review of a submitted report (FR-P05): the technician's evidence, the DD-P05 evidence check, accept or
@@ -85,7 +85,7 @@ export function ReviewView({ live }: { live: ReviewLive }) {
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Quality review")} sub={t("Author: {name} · Reviewer: you (must differ)", { name: r.author })}>
-            <p className="mb-2 flex items-start gap-1.5 rounded-xl bg-primary-soft/40 px-3 py-2 text-xs text-muted-foreground"><Icon name="info" className="mt-px" />{t("A contributor to this report version cannot approve it (IR31). The reviewer never edits the technician’s original records.")}</p>
+            <p className="mb-2 flex items-start gap-1.5 rounded-xl bg-primary-soft/40 px-3 py-2 text-xs text-muted-foreground"><Icon name="info" className="mt-px" />{t("A contributor to this report version cannot approve it. The reviewer never edits the technician’s original records.")}</p>
             {open ? (
               <div className="flex flex-col gap-2">
                 <Btn disabled={pending} onClick={() => { setError(null); setRet(true); }}>{t("Return for rework…")}</Btn>

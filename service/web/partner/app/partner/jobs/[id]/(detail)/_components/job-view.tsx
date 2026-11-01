@@ -33,7 +33,7 @@ export function JobDetailView({ live }: { live: JobDetailLive }) {
   return (
     <Page narrow>
       <Crumb text={t("{id} · history", { id: h.jobId.slice(0, 8) })} />
-      <Banner>{t("Delegation ended — only the minimal history of your company’s decisions stays visible. Unit data and entry instructions are no longer shown (FR-P08).")}</Banner>
+      <Banner>{t("Delegation ended — only the minimal history of your company’s decisions stays visible. Unit data and entry instructions are no longer shown.")}</Banner>
       <Card title={`${h.jobId.slice(0, 8)} · ${typeLabel(h.type, t)}`} action={<Badge tone={h.status === "completed" ? "ok" : "muted"}>{status}</Badge>}>
         <SummaryList items={[[t("Job type"), typeLabel(h.type, t)], [t("Status"), status], [t("Completed"), live.text.completed], [t("Snapshot"), live.text.snapshot]]} />
         <h3 className="mb-1 mt-4 text-[13px] font-semibold">{t("Your company’s decisions")}</h3>

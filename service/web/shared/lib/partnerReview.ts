@@ -115,7 +115,7 @@ export function evidenceCheck(r: ApiWorkReport, names: Map<string, string>, t: T
 export function availabilityText(av: ReviewAvailability, status: string, t: T = en): string | null {
   if (av.allowed) return null;
   switch (av.reason) {
-    case "self_authored": return t("You contributed to this report version, so you cannot approve or return it (IR31). Another reviewer of your company or HQ must decide.");
+    case "self_authored": return t("You contributed to this report version, so you cannot approve or return it. Another reviewer of your company or HQ must decide.");
     case "not_current": return t("This is not the current report version — a newer version exists; the page shows the latest refs.");
     case "not_submitted": return t(status === "completed" ? "This report was accepted; the job is completed." : status === "rework_requested" ? "This version was returned for rework; wait for the technician's next version." : "The report has not been submitted yet.");
     default: return t("Reviewing needs the partner.review permission on this delegated job.");

@@ -61,7 +61,7 @@ describe("partner overview", () => {
       ["Awaiting assignment", 2, "Accepted, no technician yet", "/partner/schedule"],
       ["In progress / scheduled", 3, "tech-external-a on site from today 10:00 am MYT", "/partner/jobs?tab=active&from=2026-09-21&to=2026-09-27"],
       ["Reports to review", 1, "p05 · Server room AC · awaiting review", "/partner/jobs/p05/review"],
-      ["Overdue", 1, "Past the due date or the work window (IR89)", "/partner/jobs?tab=active&from=2026-09-21&to=2026-09-27"],
+      ["Overdue", 1, "Past the due date or the work window", "/partner/jobs?tab=active&from=2026-09-21&to=2026-09-27"],
     ]);
     expect(tiles[1].tone).toBe("warn");
     expect(tiles[4].tone).toBe("crit");
@@ -137,7 +137,7 @@ describe("partner overview", () => {
     expect(tiles.map((t) => [t.label, t.sub, t.link])).toEqual([
       ["Tawaran untuk dijawab", "p09 · tamat dalam 15 j", "Buka tawaran"], ["Menunggu penugasan", "Diterima, belum ada juruteknik", "Tugaskan"],
       ["Sedang berjalan / dijadualkan", "tech-external-a di tapak sejak hari ini 11:00 PG GMT+9", "Lihat kerja"], ["Laporan untuk disemak", "p05 · Server room AC · menunggu semakan", "Semak"],
-      ["Tertunggak", "Melepasi tarikh akhir atau tetingkap kerja (IR89)", "Lihat"],
+      ["Tertunggak", "Melepasi tarikh akhir atau tetingkap kerja", "Lihat"],
     ]);
     expect(actions(fixture(), now, names, i).slice(0, 2).map((r) => [r.badge, r.detail, r.button])).toEqual([
       ["Tawaran", "Jawab sebelum 22 Sep 2026, 2:00 PG GMT+9 (15 j lagi)", "Jawab"], ["Tertunggak", "Tetingkap kerja tamat 20 Sep 2026, 6:00 PTG GMT+9 · tech-external-a", "Tugaskan semula"],

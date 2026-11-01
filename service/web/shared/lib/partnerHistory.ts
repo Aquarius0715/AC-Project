@@ -113,7 +113,7 @@ export type NoteMode = { kind: "note" | "preview" | "closed"; button: string; te
 /** What the form may do: save a note and create the preview on an open job; only the preview once the job is completed
  * or cancelled (notes are refused then, IR123); nothing after the delegation (FR-P08). */
 export function noteMode(row: Pick<HistoryRow, "ended" | "status">, t: T = en): NoteMode {
-  if (row.ended) return { kind: "closed", button: t("Create preview"), text: t("The delegation has ended — the job is a read-only snapshot (FR-P08).") };
+  if (row.ended) return { kind: "closed", button: t("Create preview"), text: t("The delegation has ended — the job is a read-only snapshot.") };
   if (row.status === "completed" || row.status === "cancelled") return { kind: "preview", button: t("Create preview"), add: true, text: t("Notes are closed on {status} jobs — only the preview is created.", { status: statusWord(row.status, t) }) };
   return { kind: "note", button: t("Save note & create preview") };
 }

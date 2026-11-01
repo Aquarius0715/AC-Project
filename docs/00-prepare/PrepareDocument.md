@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.453.0
+version: 0.454.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -286,6 +286,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.454.0: Contractor texts name no error codes or spec IDs; an empty or filtered payouts page says why and offers "Clear the filters" (IR584). Phase 1A unchanged.
 0.453.0: A restricted AC says the restriction is payment-related and links to its detail (IR583). Phase 1A unchanged.
 0.452.0: Every HQ sidebar page names the permission a role lacks, as "To open <page>, your role needs <permission>." (IR582). Phase 1A unchanged.
 0.451.0: The HQ overview and alerts pages name the permission a role lacks instead of failing with Try again (IR581). Phase 1A unchanged.

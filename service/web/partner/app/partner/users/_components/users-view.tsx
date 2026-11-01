@@ -115,7 +115,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersD
         )}
       </Card>
       <Banner>{t("A technician you add can be assigned once HQ has verified their certificates. An account keeps its e-mail and role — to change them, remove it and add it again. You can’t change your own account, and your company always keeps one active contractor.")}</Banner>
-      <p className="text-[11px] text-muted-foreground">{sends ? t("The set-up e-mail comes from the sign-in service; in development it arrives in the local Mailpit inbox.") : t("Nothing is sent in the demo (FR-P11, IR461).")}</p>
+      <p className="text-[11px] text-muted-foreground">{sends ? t("The set-up e-mail comes from the sign-in service; in development it arrives in the local Mailpit inbox.") : t("Nothing is sent in the demo.")}</p>
       <Modal open={!!dialog} onClose={close} title={title} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant={dialog?.kind === "remove" || dialog?.kind === "disable" ? "danger" : "primary"} disabled={pending} onClick={submit}>{action}</Btn></>}>
         {adding && <>
           <Field label={t("Name")} error={tried ? nameErr : undefined}><Input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} placeholder="Lim Wei Ming" /></Field>

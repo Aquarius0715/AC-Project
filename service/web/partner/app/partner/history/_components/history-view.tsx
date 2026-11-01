@@ -81,7 +81,7 @@ function Detail({ live, detail }: { live: HistoryLive; detail: Detail }) {
   return (
     <Page>
       <Crumb live={live} text={r.short} />
-      {r.ended && <Banner>{t("Delegation ended — only your company’s own decisions remain visible; unit data, notes and reports are not shown any more (FR-P08).")}</Banner>}
+      {r.ended && <Banner>{t("Delegation ended — only your company’s own decisions remain visible; unit data, notes and reports are not shown any more.")}</Banner>}
       <div className="split">
         <Card title={t("Job history — {id}", { id: r.short })} action={<Select aria-label={t("Job")} className="w-auto" value={r.id} onChange={(e) => patch({ jobId: e.target.value })}>{live.options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</Select>}>
           <div className="grid-fluid rounded-xl border border-line bg-surface2/60 p-3 text-[13px]" style={{ ["--min" as string]: "150px" }}>

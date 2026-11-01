@@ -75,7 +75,7 @@ export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, na
       return { kind: "assign", title: assign, slot, endEditable: false, reasonRequired: false, button: t("Confirm assignment"), currentTech: null };
     case "assigned": {
       if (ended(slot, now)) {
-        return { kind: "blocked", title: reschedule, slot, banner: { tone: "crit", text: t("Work window ended; reassignment required. The agreed time {slot} passed while the job is still “assigned”. A new time needs the client’s agreement — HQ proposes it (IR113); tell HQ in the job history.", { slot: span(slot) }) } };
+        return { kind: "blocked", title: reschedule, slot, banner: { tone: "crit", text: t("Work window ended; reassignment required. The agreed time {slot} passed while the job is still “assigned”. A new time needs the client’s agreement — HQ proposes it; tell HQ in the job history.", { slot: span(slot) }) } };
       }
       const why = j.assignment?.cantMakeReason;
       const name = current ?? t("technician");
@@ -94,7 +94,7 @@ export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, na
       return {
         kind: "extend", title: ended(slot, now) ? reschedule : t("Reassign — {job} ({state})", { job: label, state: t(j.status === "in_progress" ? "in progress" : j.status === "on_hold" ? "on hold" : "rework") }), slot, endEditable: true, reasonRequired: true,
         button: t("Confirm reassignment"), currentTech: current,
-        banner: ended(slot, now) ? { tone: "crit", text: t("Work window ended; reassignment required. The work window {slot} ended while the job is “{status}” — keep the start and set a later end (same or another technician, IR89).", { slot: span(slot), status: statusWord(j.status, t) }) } : undefined,
+        banner: ended(slot, now) ? { tone: "crit", text: t("Work window ended; reassignment required. The work window {slot} ended while the job is “{status}” — keep the start and set a later end (same or another technician).", { slot: span(slot), status: statusWord(j.status, t) }) } : undefined,
       };
   }
   return { kind: "blocked", title: assign, slot, banner: { tone: "muted", text: t("The job is {status} — nothing to schedule.", { status: statusWord(j.status, t) }) } };

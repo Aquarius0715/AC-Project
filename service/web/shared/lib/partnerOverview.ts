@@ -150,7 +150,7 @@ export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: 
       sub: next ? t(next.status === "in_progress" ? "{name} on site from {time}" : "{name} starts {time}", { name: who(next.technicianId), time: relativeTime(next.slot!.startAt, now, i) }) : "—",
     },
     { label: t("Reports to review"), value: counts.reviewCount, sub: review[0] ? t("{job} · awaiting review", { job: label(review[0], t) }) : "—", href: review.length === 1 ? `/partner/jobs/${review[0].id}/review` : list("review"), link: t("Review") },
-    { label: t("Overdue"), value: counts.overdueCount, sub: counts.overdueCount ? t("Past the due date or the work window (IR89)") : "—", href: list("active"), link: t("View"), tone: counts.overdueCount ? "crit" : undefined },
+    { label: t("Overdue"), value: counts.overdueCount, sub: counts.overdueCount ? t("Past the due date or the work window") : "—", href: list("active"), link: t("View"), tone: counts.overdueCount ? "crit" : undefined },
   ];
 }
 
