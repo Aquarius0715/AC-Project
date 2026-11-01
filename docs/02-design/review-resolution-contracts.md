@@ -7783,3 +7783,15 @@ Two statements about `MQTT_URL` were out of date, and are corrected:
 Left out on purpose:
 - `AC_APP_ROLE`, which each web app's `next.config.ts` fixes at build time;
 - `OWNER_DATABASE_URL`, which only the local `seed` command and `scripts/resetdb.sh` take.
+
+## IR546 The Go design's build section names the make targets and images that exist — 2026-11-01
+
+Found in the loop, comparing backend Go design §10 with `service/api/Makefile` and `build/`:
+1. **Make targets.** §10 listed `make up` (`docker compose --profile full up`) and `make down`. The Makefile has neither, and no commit added them: the stack starts with Docker Compose (container design §4). It also listed `make test` twice, and left out targets that exist: `make seed`, `make test-unit`, `make test-integration`, `make migrations`, `make testdb` / `make testdb-cluster` and `make vuln` (IR364, IR503). The list now has every target, and points to compose for the stack; the module tree's Makefile line matches it.
+2. **Images.** §10 said "One image, several ECS services: `api`, `webhook`, and one service per worker role". That was the layout before the split by business domain (IR180). It now says what container design §2 lists:
+   - one image per Go service from `service.Dockerfile`;
+   - one worker image whose ECS services each run one role;
+   - the migrate image.
+
+   The module tree names the IoT tools' `tools` target (IR539).
+3. **Container design §2.** The text after the image table said "One backend image with several entry commands". It now says that the Go services' images share one Dockerfile, and that the worker image serves every worker role.

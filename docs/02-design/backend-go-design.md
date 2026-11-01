@@ -38,8 +38,8 @@ As built (IR363; the first design's plan is listed at the end of this section):
 
 ```text
 service/api/        (IR174; under service/api since IR179; the Next.js apps are service/web/*, IR178)
-  go.mod  Makefile  gen, swagger, seed, test, test-all, test-cluster, cover, resetdb, testdb
-  build/            service.Dockerfile (gateway and domain services), worker.Dockerfile, migrate.Dockerfile
+  go.mod  Makefile  gen, swagger, seed, test (-unit, -integration, -cluster, -all), cover, migrations, resetdb, testdb, vuln
+  build/            service.Dockerfile (gateway and domain services; the IoT tools' tools target, IR539), worker.Dockerfile, migrate.Dockerfile
   scripts/          resetdb.sh, covermerge.py, swag_annotate.py
   cmd/
     gateway/        Core API entry: forwards each REST route (IR222) to the domain service that owns its operation (IR180)
@@ -287,9 +287,9 @@ The webhook receiver (`cmd/webhook`, planned: not built yet, compose profile `pl
 
 ## 10. Build, run, and deploy
 
-- `make gen` (the operation and contract generators; it also writes the web's routes.gen.ts and contracts.gen.ts, IR313), `make swagger` (Swagger 2.0 from the swag annotations of the handlers, served by the gateway at `/docs` and `/swagger.json`, IR220; as built, IR371: Swagger UI is one pinned release with integrity hashes, under its own Content-Security-Policy), `make test`, `make cover` (merged coverage of all packages), `make resetdb` (rebuild the local database from schema.sql and reseed), `make test` / `make test-cluster` (each on a freshly rebuilt test database, `ac_test` / `ac_test_cluster`), `make test-all` (both suites at once, about a minute and a quarter, IR225), `make up` (`docker compose --profile full up`), `make down`.
+- `make gen` (the operation and contract generators; it also writes the web's routes.gen.ts and contracts.gen.ts, IR313), `make swagger` (Swagger 2.0 from the swag annotations of the handlers, served by the gateway at `/docs` and `/swagger.json`, IR220; as built, IR371: Swagger UI is one pinned release with integrity hashes, under its own Content-Security-Policy), `make seed`, `make test-unit` (vet and the tests next to the code, no database), `make test-integration` (the HTTP API suite on a fresh `ac_test`), `make test` / `make test-cluster` (everything, or the integration suite against the split services, each on a freshly rebuilt test database, `ac_test` / `ac_test_cluster`), `make test-all` (both suites at once, about a minute and a quarter, IR225), `make cover` (merged coverage of all packages), `make migrations` (schema.sql into the first migration), `make resetdb` (rebuild the local database from schema.sql and reseed), `make testdb` / `make testdb-cluster` (rebuild a test database), and `make vuln` (govulncheck on the module's toolchain, IR364, IR503). The stack itself is started with Docker Compose ([container design §4](container-design.md#4-local-and-ci-stack-docker-compose)); there is no make target for it.
 - Dockerfile: multi-stage `golang:1.26.10` builder (IR408, IR503; the module's toolchain) → `gcr.io/distroless/static-debian12:nonroot` runtime pinned by digest, read-only root filesystem, `healthcheck` subcommand, graceful SIGTERM drain ([container design §3](container-design.md#3-dockerfile-standards)).
-- One image, several ECS services: `api`, `webhook`, and one service per worker role (independent autoscaling: API on CPU and request count, workers on SQS backlog and Kinesis iterator age).
+- One image per Go service, all from `service.Dockerfile` (`--build-arg SERVICE=<name>`: the gateway and the five domain services, IR180), one worker image whose ECS services each run one role, and the migrate image ([container design §2](container-design.md#2-image-catalogue)). Each is its own ECS service with independent autoscaling: the gateway and the domain services on CPU and request count, the workers on SQS backlog and Kinesis iterator age.
 - Deploy order: migrations (expand) → workers → API → BFF; contract steps of migrations ship one release later (database design §9).
 - Health: `/healthz` (process), `/readyz` (database and required AWS clients reachable); ALB health checks use `/readyz`.
 
