@@ -7,10 +7,7 @@
 import "server-only";
 import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { i18nOf, showClock } from "@ac/web/lib/i18n";
-import {
-  actions, activity, capacity, hhmm, klDay, kpis, partnerJob, period, periodChoice, progress, timeline, timelinePct,
-  type ApiCapacity, type ApiCounts, type ApiJobEvent, type ApiMember, type ApiPartnerJob,
-} from "@ac/web/lib/partnerOverview";
+import { actions, activity, capacity, hhmm, klDay, kpis, onTeam, partnerJob, period, periodChoice, progress, timeline, timelinePct, type ApiCapacity, type ApiCounts, type ApiJobEvent, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 
 type Page<T> = { items: T[] };
 const KL = "Asia/Kuala_Lumpur";
@@ -53,8 +50,8 @@ export async function loadOverview(sp: { from?: string; to?: string }) {
     kpis: kpis(summary.counts, jobs, ms, names, { from: p.from, to: p.to }, i),
     progress: progress(jobs, ms),
     actions: actions(jobs, ms, names, i),
-    timeline: timeline(todayCapacity ?? days[p.days.indexOf(today)] ?? [], members, today, t),
-    capacity: capacity(days, members, t),
+    timeline: timeline(todayCapacity ?? days[p.days.indexOf(today)] ?? [], onTeam(members, ms), today, t),
+    capacity: capacity(days, onTeam(members, ms), t),
     activity: activity(events, new Map(jobs.map((j) => [j.id, j])), members, ms, 6, i),
     jobCount: jobs.length,
   };

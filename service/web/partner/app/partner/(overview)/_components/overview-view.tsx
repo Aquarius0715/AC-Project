@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Badge, Banner, Card, cx, EmptyState, Kpi, LinkBtn, Page, Select, TextLink, UtilBar, ScrollX } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import { BUCKETS, DAY_END, DAY_START, type ActionRow } from "@ac/web/lib/partnerOverview";
+import { BUCKETS, DAY_END, DAY_START, OVERVIEW_ROWS, type ActionRow } from "@ac/web/lib/partnerOverview";
 import type { OverviewLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
@@ -61,9 +61,10 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             )}
           </Card>
           <Card title={t("Team capacity — {period}", { period })} action={<TextLink href="/partner/team">{t("Team & capacity")} <Icon name="arrowRight" /></TextLink>}>
-            {live.capacity.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : live.capacity.map((c) => (
+            {live.capacity.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : live.capacity.slice(0, OVERVIEW_ROWS).map((c) => (
               <div key={c.id} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{c.name}</b><span className="text-muted-foreground">{c.text}</span></div><UtilBar pct={c.pct} tone={c.pct !== null && c.pct >= 90 ? "warn" : "primary"} label={`${c.name}: ${c.text}`} /></div>
             ))}
+            {live.capacity.length > OVERVIEW_ROWS && <p className="mb-2"><TextLink href="/partner/team">{t("{n} more technicians", { n: live.capacity.length - OVERVIEW_ROWS })} <Icon name="arrowRight" /></TextLink></p>}
             <p className="text-[11px] text-muted-foreground">{t("Utilization = assigned hours ÷ available hours. Undefined hours show “—”.")}</p>
           </Card>
         </div>
@@ -72,7 +73,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             <ScrollX><div className="min-w-[320px]">
               <div className="grid grid-cols-[104px_1fr] text-[11px] text-muted-foreground"><span /><div className="flex justify-between">{hours.map((h) => <span key={h}>{String(h).padStart(2, "0")}</span>)}</div></div>
               {live.timeline.length === 0 && <p className="py-2 text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p>}
-              {live.timeline.map((r) => (
+              {live.timeline.slice(0, OVERVIEW_ROWS).map((r) => (
                 <div key={r.id} className="grid grid-cols-[104px_1fr] items-center border-t border-line py-2 text-xs">
                   <span><b>{r.name}</b><span className="block text-[11px] text-muted-foreground">{r.sub}</span></span>
                   <div className="relative h-8 rounded-lg bg-surface2">
@@ -83,8 +84,9 @@ export function OverviewView({ live }: { live: OverviewLive }) {
                 </div>
               ))}
             </div></ScrollX>
+            {live.timeline.length > OVERVIEW_ROWS && <p className="mt-2"><TextLink href="/partner/schedule">{t("{n} more technicians", { n: live.timeline.length - OVERVIEW_ROWS })} <Icon name="arrowRight" /></TextLink></p>}
             <p className="mt-2 text-[11px] text-muted-foreground">
-              {t("Red line = now ({time}).", { time: live.today.now })} {t(anyBlock ? "Blue = assigned work windows (members.capacity)." : "No assignments today.")}
+              {t("Red line = now ({time}).", { time: live.today.now })} {t(anyBlock ? "Blue = assigned work windows." : "No assignments today.")}
               {live.otherZone && ` ${t("The timeline is in Kuala Lumpur time (Asia/Kuala_Lumpur).")}`}
             </p>
             {unassigned > 0 && <div className="mt-2"><Banner tone="warn">{t(unassigned === 1 ? "1 accepted job still has no technician — assign it before the delegation period ends." : "{n} accepted jobs still have no technician — assign them before the delegation period ends.", { n: unassigned })}</Banner></div>}

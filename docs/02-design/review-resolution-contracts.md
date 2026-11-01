@@ -8087,3 +8087,15 @@ Found in the same round (UX-05). After customer-a accepted HQ's time, the reques
 1. **Badge.** `JobStatusBadge` takes `client`: offered, accepted and assigned read "Scheduled" with the assigned icon. The client's request list and detail use it. HQ and the contractor keep the stage. The row's line still says "Confirmed <time> · booking the technician" or "… · technician confirmed".
 2. **Tests.** `jobBits.test.tsx` checks the three booked stages for a client and the stage for HQ. The request-to-technician scenario expects "Scheduled" and no "Assigned" on the client's page once the technician has accepted.
 3. **Design and Figma.** The client design's maintenance list rule states it. On Figma's UI Guideline page, StatusBadge/Maintenance gains the variant Status=Scheduled. The client's maintenance frames 07a–07p switch their 18 Offered / Assigned badges to it. The detail's progress stepper in Figma (07b, 07k) keeps its step names; the app shows no stepper there. The cross-role flow diagram keeps the internal stages.
+
+## IR575 The partner overview lists the team that can work, eight at a time — 2026-11-01
+
+Found in the sixth round of the UX loop (UX-06: contractor-a starts the day on the overview to find what needs action, at 1920 and 1280). With the company's 37 technician accounts, the overview was 2,750 px tall. "Team capacity — this week" and "Today" each listed every account, and "Today" read "Free all day" 37 times. The cards also listed 33 technicians whose access had ended and one whose access HQ had revoked. None of them can be assigned. "Needs your action" stayed at the top, but the coordinator had to scroll past the whole team to reach Recent activity. The timeline's note also named the API: "Blue = assigned work windows (members.capacity)."
+
+1. **Team that can work.** `onTeam` (`shared/lib/partnerOverview.ts`) keeps the technicians whose membership is neither revoked nor past its access end (`revokedAt`, `validUntil` of `members.list`). Both cards use it. Former technicians stay in Team & capacity and in job history.
+2. **Order.** Today lists those with work first (by their first slot), then those away, then the free ones by name. Team capacity lists the most assigned first, then by name.
+3. **Eight rows.** Each card shows eight technicians (`OVERVIEW_ROWS`) and then "N more technicians →", to Schedule & assignments or to Team & capacity. The note reads "Blue = assigned work windows." In Malay, "{n} lagi juruteknik".
+4. **Test.** `partnerOverview.test.ts` checks who `onTeam` keeps (no coordinator, no revoked or ended access) and the order of both cards.
+5. **Design.** The overview paragraph of the contractor design states it. Figma's dashboard shows two technicians, fewer than the eight, so it is unchanged.
+
+After the change the overview fits 1,080 px: three working technicians, with no sideways scroll at 1920 or 1280 and no axe violation. The security point held. Opening a request HQ has not offered, or another customer's unit, shows Page unavailable. The same unit with the company's own ended job in the URL shows only that job's history snapshot, and nothing about the unit.

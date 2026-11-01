@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  onTeam, OVERVIEW_ROWS,
   actions, activity, bucket, capacity, kpis, partnerJob, period, progress, shift, timeline, timelinePct, until, weekOf,
   type ApiCapacity, type ApiMember, type ApiPartnerJob, type PartnerJob,
 } from "@ac/web/lib/partnerOverview";
@@ -95,6 +96,22 @@ describe("partner overview", () => {
       { id: "m-a", name: "tech-external-a", text: "10 h / 16 h · 63%", pct: 63 },
       { id: "m-b", name: "tech-external-a2", text: "0 h / — · —", pct: null },
     ]);
+  });
+
+  it("keeps the overview's technicians to the team that can work, busiest first (IR575)", () => {
+    const now = Date.parse("2026-09-21T01:00:00Z");
+    const team: ApiMember[] = [
+      ...members,
+      { id: "m-r", userId: "user-r", displayName: "revoked", role: "technician", revokedAt: "2026-09-20T00:00:00Z" },
+      { id: "m-e", userId: "user-e", displayName: "ended", role: "technician", validUntil: "2026-09-21T00:00:00Z" },
+      { id: "m-f", userId: "user-f", displayName: "until next month", role: "technician", validUntil: "2026-10-21T00:00:00Z" },
+    ];
+    expect(onTeam(team, now).map((m) => m.id)).toEqual(["m-a", "m-b", "m-f"]); // no coordinator, no revoked or ended access
+    const day = (id: string, assignedMinutes: number): ApiCapacity => ({ membershipId: id, date: "2026-09-21", availableSlots: [], assignedSlots: assignedMinutes ? [slot("2026-09-21T06:00:00Z", "2026-09-21T08:00:00Z")] : [], availableMinutes: 480, assignedMinutes, unavailability: id === "m-f" ? "annual_leave" : null });
+    const crew = onTeam(team, now);
+    expect(capacity([[day("m-a", 0), day("m-b", 120), day("m-f", 0)]], crew).map((r) => r.id)).toEqual(["m-b", "m-a", "m-f"]); // most assigned first, then by name
+    expect(timeline([day("m-a", 0), day("m-b", 120), day("m-f", 0)], crew, "2026-09-21").map((r) => r.id)).toEqual(["m-b", "m-f", "m-a"]); // work, then away, then free
+    expect(OVERVIEW_ROWS).toBe(8);
   });
 
   it("shows the latest job events with the member who acted", () => {

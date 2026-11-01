@@ -19,7 +19,7 @@ export type ApiPartnerJob =
 export type ApiEventSummary = { count: number; customerVisible: number; notes: number; latest: { action: string; occurredAt: string } | null };
 export type ApiCounts = { offerCount: number; activeCount: number; reviewCount: number; overdueCount: number };
 export type ApiCapacity = { membershipId: string; date: string; availableSlots: Slot[]; assignedSlots: Slot[]; availableMinutes: number | null; assignedMinutes: number; unavailability: string | null };
-export type ApiMember = { id: string; userId: string; displayName: string; role: string; qualifications?: { code: string; validFrom?: string; validUntil?: string | null; revokedAt?: string | null }[] };
+export type ApiMember = { id: string; userId: string; displayName: string; role: string; qualifications?: { code: string; validFrom?: string; validUntil?: string | null; revokedAt?: string | null }[]; revokedAt?: string | null; validUntil?: string | null };
 export type ApiJobEvent = { id: string; jobId: string; actorUserId: string | null; action: string; occurredAt: string };
 
 /** One job of the company as the overview shows it. */
@@ -208,9 +208,15 @@ const UNAVAILABILITY: Record<string, string> = { annual_leave: "annual leave", s
 /** Why a technician is unavailable on a day (the members.setUnavailability types), in running text. */
 export const unavailabilityLabel = (type: string, t: T = en) => (UNAVAILABILITY[type] ? t(UNAVAILABILITY[type]) : type.replace(/_/g, " "));
 
+/** The technicians who can still work: access neither revoked by HQ nor past its end (IR575). The overview's timeline
+ * and capacity list them; a former technician stays in Team & capacity and in job history. */
+export const onTeam = (members: ApiMember[], now: number) => members.filter((m) => m.role === "technician" && !m.revokedAt && (!m.validUntil || Date.parse(m.validUntil) > now));
+/** How many technicians each overview card shows; the rest are one link away (IR575). */
+export const OVERVIEW_ROWS = 8;
+
 export type TimelineRow = { id: string; name: string; sub: string; blocks: { left: number; width: number; text: string }[]; off: string | null };
 /** Today's timeline per technician from members.capacity of the date (assigned slots inside 08:00–18:00), in Kuala
- * Lumpur hours like its axis. */
+ * Lumpur hours like its axis: those with work or away first, by their first slot, then the free ones by name (IR575). */
 export function timeline(today: ApiCapacity[], members: ApiMember[], date: string, t: T = en): TimelineRow[] {
   const cap = new Map(today.map((c) => [c.membershipId, c]));
   return members.filter((m) => m.role === "technician").map((m) => {
@@ -221,11 +227,12 @@ export function timeline(today: ApiCapacity[], members: ApiMember[], date: strin
     }).filter((b) => b.width > 0);
     const quals = (m.qualifications ?? []).filter((q) => !q.revokedAt).map((q) => shortQualification(q.code, t));
     return { id: m.id, name: m.displayName, sub: quals.slice(0, 2).join(", ") || t("Technician"), blocks, off: c?.unavailability ? unavailabilityLabel(c.unavailability, t) : null };
-  });
+  }).sort((a, b) => Number(!a.blocks.length && !a.off) - Number(!b.blocks.length && !b.off) || (a.blocks[0]?.left ?? 100) - (b.blocks[0]?.left ?? 100) || a.name.localeCompare(b.name));
 }
 
 export type CapacityRow = { id: string; name: string; text: string; pct: number | null };
-/** The period's team capacity: assigned ÷ available hours per technician (undefined availability shows “—”). */
+/** The period's team capacity: assigned ÷ available hours per technician (undefined availability shows “—”), the most
+ * assigned first, then by name (IR575). */
 export function capacity(days: ApiCapacity[][], members: ApiMember[], t: T = en): CapacityRow[] {
   const sum = new Map<string, { assigned: number; available: number | null }>();
   for (const list of days) {
@@ -237,8 +244,9 @@ export function capacity(days: ApiCapacity[][], members: ApiMember[], t: T = en)
     }
   }
   const h = (min: number) => t("{n} h", { n: Math.round((min / 60) * 10) / 10 });
-  return members.filter((m) => m.role === "technician").map((m) => {
-    const s = sum.get(m.id) ?? { assigned: 0, available: null };
+  const of = (m: ApiMember) => sum.get(m.id) ?? { assigned: 0, available: null };
+  return members.filter((m) => m.role === "technician").sort((a, b) => of(b).assigned - of(a).assigned || a.displayName.localeCompare(b.displayName)).map((m) => {
+    const s = of(m);
     const pct = s.available ? Math.min(100, Math.round((s.assigned / s.available) * 100)) : null;
     return { id: m.id, name: m.displayName, text: `${h(s.assigned)} / ${s.available === null ? "—" : h(s.available)} · ${pct === null ? "—" : `${pct}%`}`, pct };
   });
