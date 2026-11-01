@@ -188,6 +188,14 @@ Modelling rules:
 | RestrictionApplied / RestrictionReleaseRequested | Restrictions | Control (restriction Commands), notifications, SSE |
 | NotificationRequested | Any module | Notification worker |
 
+  As built (IR184–IR196, IR386, IR461, IR511), the events consumed between the domain services are the contracts of `internal/platform/events/contracts.go`, with the change-capture copies (`RowChanged:<schema>.<table>`):
+  - billing (restrictions) → equipment: `UnitRestrictionApplied`, `UnitRestrictionCleared`, `RecoveryCasesChanged`, `ReconciliationRequired`, `ReconciliationResolved`, `RestrictionCommandRequested`, `RestrictionCommandsCancelled`;
+  - equipment → billing (restrictions): `UnitRestrictionObserved`, `CommandAcknowledged`, `CommandsEnded`;
+  - any domain → identity: `NotificationRequested` (the notification store) and `AuditRecorded`; maintenance → identity: `QualificationGranted`; billing → maintenance: `JobNoteRequested`;
+  - maintenance → equipment: `OfferAccessChanged`, `AssignmentAccessChanged` (row triggers), `FilterCleaningDue`, `FilterCleaningCleared`; identity → equipment: `ConsentRevoked`;
+  - identity's own `identity-accounts` consumer: `AccountRequested`, `AccountEnabled`, `SessionsRevoked`.
+
+  The other event types in the outbox (for example `JobAssigned` or `InvoiceCreated`) record what happened for the planned SNS consumers; nothing consumes them yet. The flows of the table that have no such event, such as TelemetryReceived, CommandSettled and AlertOpened, have no event as built: the IoT bridge posts the readings, the acknowledgements and the facts to evaluate to the API over HTTP (`demo.trigger`), which stores them and evaluates the alert policies itself (IR529).
 - **Dead letters**: after bounded retries with backoff, events go to a dead-letter queue with an alert to operations; replays reuse the event ID.
 
 ## 9. IoT design

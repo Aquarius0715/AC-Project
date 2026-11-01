@@ -7850,3 +7850,14 @@ Found in the loop. Network architecture F20 (identity service → the identity p
 
    The purpose names the accounts and the sign-out. Locally the service-account client may only manage users (IR386).
 2. **Container design.** The `IDP_*` row says the same for production. It also says what happens when the variables are unset: no consumer handles AccountRequested, so the people added get no sign-in account, and signing out everywhere is the Core API's cutoff only. Before, it named the cutoff only.
+
+## IR552 Backend architecture §8 says which events the services exchange as built — 2026-11-01
+
+Found in the loop, comparing §8's table of main event flows with the code. The table names the target design's events (CommandSettled, TelemetryReceived, AlertOpened, JobStatusChanged, OfferIssued, InvoiceIssued, PaymentConfirmed, RestrictionApplied). Most of them exist in no code. The services exchange other events, which §8 did not name: the 19 contracts of `internal/platform/events/contracts.go` and the identity-accounts events.
+
+§8 keeps the table as the design and adds what is built:
+- the consumed contracts by direction (billing ↔ equipment, any domain → identity, maintenance → equipment, identity → equipment, the identity-accounts consumer), with the change-capture copies;
+- that the other outbox event types (58 types are emitted) wait for the planned SNS consumers;
+- that the table's flows without such an event have no event as built: the IoT bridge posts readings, acknowledgements and the facts to evaluate to the API, which evaluates the alert policies itself.
+
+Each direction was checked against the handler maps of the modules and `internal/server/consumers.go`.
