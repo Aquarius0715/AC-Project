@@ -391,8 +391,8 @@ func sendCommand(mc mqtt.Client, httpc *http.Client, endpoint, tenant string, w 
 // the internal service token and the tenant.
 type liveAPI struct{ equipment, token, tenant string }
 
-// reportGap runs once a minute for the live module. Its connection follows the heartbeat gap (IR532): offline after the
-// nodes have been silent for 3 minutes, online again once they are heard (device events of its binding, the open fault
+// reportGap runs once a minute for the live module. Its connection follows the heartbeat gap (IR532): offline once a
+// node has been silent for 3 minutes, online again once every node is heard (device events of its binding, the open fault
 // read back from the API, so a restart of the bridge picks it up). Then it sends how long the module has gone unheard
 // (heartbeat_gap), so the default rule ac_offline alerts when the nodes stop or their broker is out of reach and
 // resolves when they are back (IR529).

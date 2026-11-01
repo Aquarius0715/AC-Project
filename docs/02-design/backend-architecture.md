@@ -197,12 +197,26 @@ Modelling rules:
 | Provisioning | Register serial (HQ or technician, FR-T11) → claim with a one-time code or QR → issue the device certificate → bind to the unit with a reason (rebind keeps history). |
 | Topics | `t/<tenantId>/d/<deviceId>/telemetry`, `/heartbeat`, `/event` (up); `/cmd` (down); `/cmd/ack` (up); `/fw` (down) and `/fw/status` (up). QoS 1; commands are not retained. |
 | Telemetry | Batched measurements with sensorId, metric, value, unit, observedAt, sequence. Heartbeat every 60 seconds; a value older than 120 seconds is stale; AC offline alert after 15 minutes without heartbeat (default policy rule). |
-| Connection state | The IoT gateway reports a module's connection with device events (SR20): communication_lost when the connection ends (in production the broker's disconnect of the module; the development bridge after 3 minutes without the live nodes, IR532) and restored, naming that open fault, when it returns. The API does not derive offline from lastSeenAt; while a module is offline its unit's controls are disabled and commands to it are rejected. |
+| Connection state | The IoT gateway reports a module's connection with device events (SR20): communication_lost when the connection ends (in production the broker's disconnect of the module; the development bridge once a live node has gone unheard for 3 minutes, IR532) and restored, naming that open fault, when it returns. The API does not derive offline from lastSeenAt; while a module is offline its unit's controls are disabled and commands to it are rejected. |
 | Commands | Control creates the Command (requested) with expiresAt → IoT gateway publishes (sent) → the device acknowledges with the observed state → acknowledged only if received before expiresAt; otherwise expired (the expiry runs 5 s after expiresAt so an acknowledgement received in time but still on its way is not lost, IR453), and a late acknowledgement is recorded as a late event without changing the result (common design §5). Commands to offline devices are rejected before sending. |
 | Restrictions | Restriction and release are sent as Commands with policy versions; the device reports the applied restriction (ObservedRestriction). Release is shown as released only after that observation (IR35). |
 | Firmware | Campaigns stage devices in waves (FR-A20); each device operation moves queued → running → succeeded / failed with checksum verification and rollback to the previous version; control actions are rejected while an update runs. |
 | Device security | Mutual TLS, per-device certificates, topic-level access policy, tamper and power-loss events raised as device events (FR-T12). |
 | Offline behaviour | Modules buffer telemetry while offline and upload with original observedAt; commands are never queued on the device beyond expiresAt. |
+
+**Real sensor nodes in development (DEC-86 to DEC-89).** The development stack also takes a site's own ESP32 nodes from their own MQTT broker (`REAL_MQTT_URL` in `.env.local`). This is what the system expects of the nodes' firmware:
+
+- **Readings.** Each node publishes a JSON message about every 5 seconds on `smarthome/ac/<node>/sensors`. The message has `device_id`, `timestamp` and the fields `temp`, `humidity`, `pressure`, `gas`, `approx_altitude`, `voltage`, `current`, `power` (W) and `energy` (kWh); a field the node does not measure is 0.
+  - The bridge tells the nodes apart by the topic, times the readings on the stack's demo clock (not by `timestamp`) and skips retained messages.
+  - It records `temp` (°C) and `humidity` (%) of node_1 while non-zero, and `power` of node_2 in kW while its `voltage` is non-zero. The other fields have no platform metric.
+  - It keeps one message per node and scenario minute, and passes its readings to the customer's alert policies.
+- **Commands.** The app's power on and off become the plain-text firmware commands `COOL24` (cooling at 24 °C) and `OFF`. They go at QoS 1 to `smarthome/ac/<node>/command` of the command node (`REAL_MQTT_COMMAND_NODE`, node_1 by default), only with `REAL_MQTT_COMMANDS=1`. Infrared is one-way, so a command counts as acknowledged once the broker takes it.
+- **Connection.** The bridge takes the module offline once either node has gone unheard for 3 minutes, and brings it back once both have reported within the last minute (IR532). The default rule raises AC offline once a node has gone unheard for 15 minutes (IR529).
+- **OPEN (firmware).** Full remote control needs two firmware changes on the device team's side:
+  - a JSON command with the power, temperature, mode and fan level, which the firmware's infrared library (IRremoteESP8266 `IRDaikinESP`) can send;
+  - a state message after each send, which the bridge would forward as the module's reported state and acknowledgement.
+
+  The bridge would then send the requested settings in place of `COOL24` and `OFF`, and the live model (`seed.LiveSite`) would list the temperature range, modes and fan levels. The unit page shows a model's controls from its record (IR533).
 
 ## 10. Scheduled business transitions
 

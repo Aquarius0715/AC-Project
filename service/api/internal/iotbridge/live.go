@@ -144,9 +144,9 @@ func LiveGapTrigger(gap time.Duration, slot time.Time) Trigger {
 		[]Fact{{UnitID: seed.ID(seed.LiveSite.Unit), Metric: "heartbeat_gap", Value: minutes, Unit: "min", ObservedAt: slot, Quality: "valid"}})
 }
 
-// The live module goes offline after LiveOfflineAfter without any node and comes back once every node has been heard
-// within LiveOnlineWithin (the gap is the longest of the nodes'): commands sent while no node listens never arrive, and
-// the client's unit page disables its controls while the AC is offline (IR532).
+// The live module goes offline once a node has gone unheard for LiveOfflineAfter and comes back once every node has
+// been heard within LiveOnlineWithin (the gap is the longest of the nodes'): a command sent while its node is silent
+// never arrives, and the client's unit page disables its controls while the AC is offline (IR532).
 const (
 	LiveOfflineAfter = 3 * time.Minute
 	LiveOnlineWithin = time.Minute
@@ -161,8 +161,8 @@ type ConnectionFault struct {
 }
 
 // LiveConnectionTrigger is the device event that brings the live module's connection in line with the heartbeat gap:
-// communication_lost once the nodes have been silent for LiveOfflineAfter while the API has no open fault, and restored,
-// naming the open fault, once they are heard again. ok is false when the connection already matches, or while the
+// communication_lost once a node has been silent for LiveOfflineAfter while the API has no open fault, and restored,
+// naming the open fault, once every node is heard again. ok is false when the connection already matches, or while the
 // module is unbound. The sequence follows the API's newest on the axis, and the event IDs come from the binding and
 // sequence or the fault, so a repeat is one event.
 func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, at time.Time) (Trigger, bool) {

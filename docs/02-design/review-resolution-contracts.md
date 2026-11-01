@@ -7715,3 +7715,14 @@ Found in the loop's container check. `iot-bridge`, `device-sim` and the one-off 
 1. **Image.** `service.Dockerfile` has a `tools` target: the three static binaries from the `dev` stage on the same pinned distroless `nonroot` base as the services (`ac-api:tools`, 57.5 MB, no shell or toolchain).
 2. **Compose.** The three services use it with `read_only: true`, `cap_drop: [ALL]` and `no-new-privileges`. They write no file: the simulator keeps its state in retained MQTT messages.
 3. **Checked on the development stack.** Recreated, both IoT services run as `nonroot` with a read-only root and no capability. The bridge connected and the simulator's 22 modules kept reporting: 184 demo triggers answered 200 in two minutes. The container design says so.
+
+## IR540 The backend architecture describes what the real sensor nodes must send and take — 2026-11-01
+
+Found in the loop. The protocol between the platform and the site's real nodes was spread over IR524 to IR532, and the device team works on the firmware. The backend architecture (§9) now has one paragraph on it:
+- the readings topic, the message fields and which fields are recorded, at one reading a minute;
+- the command topic and the two firmware commands, sent only with `REAL_MQTT_COMMANDS=1`, acknowledged once the broker takes them;
+- the offline and AC offline timing.
+
+It also records as OPEN the two firmware changes that full remote control would need: a JSON command with temperature, mode and fan level, and a state message after each send.
+
+This corrects how IR532 ② words the trigger for going offline. The bridge measures the gap as the longest of the two nodes' silences (`LiveHeard.Gap`, `TestLiveHeartbeatGap`), so the module goes offline once either node has gone unheard for 3 minutes, not only when both have. That fits commands, which reach the AC through node_1 alone. The §9 Connection state row and the comments of `LiveConnectionTrigger` and `reportGap` now say so; the behavior is unchanged.
