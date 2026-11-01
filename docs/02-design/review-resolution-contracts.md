@@ -7679,3 +7679,10 @@ Found in the loop. The IoT design (backend architecture §9) said when the "AC o
 - The gateway reports device events: communication_lost when the connection ends (in production the broker's disconnect; the development bridge after 3 minutes without the live nodes, IR532), and restored, naming the open fault, when it returns.
 - The API never derives offline from lastSeenAt.
 - While offline, the unit's controls are disabled and commands are rejected.
+
+## IR535 Tidy-ups: one check for a recorded event, and DEC-86 points to DEC-89 — 2026-11-01
+
+Found in the loop.
+
+1. **Bridge.** Three places that send live events told a CONFLICT answer apart, each in its own words. A CONFLICT answer means the event ID was taken by an earlier send whose answer was lost, so the event is recorded. They now share one `recorded(err)` check, with no change in behavior.
+2. **DEC-86.** It still called the live air conditioner monitoring-only. Its text now adds that the unit has had remote power since DEC-89, as it already noted the customer of DEC-87.

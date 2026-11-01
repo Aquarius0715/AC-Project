@@ -192,8 +192,7 @@ func listenLive(ctx context.Context, raw, topic string, clock *demoClock, httpc 
 			return
 		}
 		for _, tr := range triggers {
-			var se *statusError
-			if err := send(httpc, endpoint, tr); err != nil && !(errors.As(err, &se) && se.code == http.StatusConflict) { // conflict: the minute is recorded
+			if err := send(httpc, endpoint, tr); err != nil && !recorded(err) {
 				gate.Release(node, slot)
 				rep.Failed(fmt.Sprintf("live %s: %v", node, err))
 				return
@@ -243,6 +242,13 @@ func send(c *http.Client, endpoint string, tr iotbridge.Trigger) error {
 }
 
 type statusError struct{ code int }
+
+// recorded tells a CONFLICT answer apart: the event ID was taken by an earlier send of the same event (its answer
+// lost), so the event is recorded and need not be sent again.
+func recorded(err error) bool {
+	var se *statusError
+	return errors.As(err, &se) && se.code == http.StatusConflict
+}
 
 func (e *statusError) Error() string { return "API answered " + http.StatusText(e.code) }
 
@@ -394,10 +400,6 @@ func reportGap(ctx context.Context, heard *iotbridge.LiveHeard, clock *demoClock
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
 	rep := &logging.Repeats{Logf: log.Printf}
-	conflict := func(err error) bool {
-		var se *statusError
-		return errors.As(err, &se) && se.code == http.StatusConflict
-	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -409,13 +411,13 @@ func reportGap(ctx context.Context, heard *iotbridge.LiveHeard, clock *demoClock
 			if err != nil {
 				rep.Failed(fmt.Sprintf("live connection: %v", err))
 			} else if tr, ok := iotbridge.LiveConnectionTrigger(f, gap, at); ok {
-				if err := send(httpc, endpoint, tr); err != nil && !conflict(err) {
+				if err := send(httpc, endpoint, tr); err != nil && !recorded(err) {
 					rep.Failed(fmt.Sprintf("live connection %s: %v", tr.Kind, err))
 				} else {
 					log.Printf("live module %s: %s (nodes unheard for %s)", seed.LiveSite.UnitName, tr.Kind, gap.Round(time.Second))
 				}
 			}
-			if err := send(httpc, endpoint, iotbridge.LiveGapTrigger(gap, at.Truncate(time.Minute))); err != nil && !conflict(err) {
+			if err := send(httpc, endpoint, iotbridge.LiveGapTrigger(gap, at.Truncate(time.Minute))); err != nil && !recorded(err) {
 				rep.Failed(fmt.Sprintf("live heartbeat gap: %v", err))
 				continue
 			}
