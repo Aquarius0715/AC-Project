@@ -228,6 +228,7 @@ Modelling rules:
 | Slot proposal reply deadline | replyBy reached | IR113 |
 | Offer expiry and re-offer | Offer deadline | FR-A06, FR-P02 |
 | Work window end warning and discard | scheduledEnd − 15 minutes (shown by the technician app) / scheduledEnd | IR89, IR337 |
+| Assignment release on ended access | The technician's access (valid until) ends before the assignment's end while the job is assigned | IR439 (OPEN-BE-09) |
 | Auto-confirm completed jobs | 7 days after completion without rating | FR-C17 (BR-C17) |
 | Follow-up classify-by time | createdAt + 1 business day, display only in HQ Jobs (IR114 item 3) | IR114, IR338 |
 | Invoice reminders | Due and overdue dates | FR-A08 |
@@ -259,6 +260,7 @@ Items of the table above that are not scheduled yet:
 - **Done by an explicit operation:**
   - restriction execution: `restrictions.execute` is refused before `executeAfter` and the 24-hour notice, and while an exception or grace period holds;
   - periodic plan job generation: `plans.generateNext`;
+  - re-offer: an expired offer returns the job to requested (IR48), and HQ offers it again with `jobs.offer` and a new offerId;
   - invoice reminders: HQ previews one with `notifications.preview` and sends it with `invoices.remind`, which saves the customer's notification; external delivery is simulated (DD-A08).
 - **Computed when read:** grace and exception expiry (compared at execution) and the certificate status (IR133); the certificate reminders are scheduled (IR336).
 - **Shown by the app:**

@@ -7730,3 +7730,11 @@ This corrects how IR532 ② words the trigger for going offline. The bridge meas
 ## IR541 DEC-86 says what the bridge sends to the nodes' broker — 2026-11-01
 
 Found in the loop. DEC-86 still said that the IoT bridge never publishes to the real nodes' broker. Since DEC-89 it sends the live unit's power commands there (`COOL24` and `OFF` on the command node's topic, with `REAL_MQTT_COMMANDS=1`), as the bridge, the container design and backend architecture §9 (IR540) say. DEC-86 now says that the bridge publishes nothing there but those commands, and nothing before DEC-89.
+
+## IR542 Backend architecture §10 lists the release on ended access and the manual re-offer — 2026-11-01
+
+Found in the loop, comparing the first table of §10 (the scheduled business transitions) with the schedulers as built:
+1. **Release on ended access.** The maintenance scheduler releases an assignment whose technician's access ends before the assignment's end (`Jobs.ReleaseEndedAccess`, IR439). The table of built transitions listed it, but the first table did not. It now has a row.
+2. **Re-offer.** The row "Offer expiry and re-offer" reads as if both were scheduled. Only the expiry is: an undecided offer returns its job to requested at its deadline (IR48), and HQ then offers the job again with `jobs.offer` and a new offerId. The list of items done by an explicit operation now says so.
+
+The release when a qualification ends (IR440) is not scheduled: it runs in `certificates.verify`, so §10 leaves it out.
