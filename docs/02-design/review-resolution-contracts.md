@@ -7804,3 +7804,15 @@ Found in the loop, comparing the module tree of backend Go design §2 with `serv
 - `platform/idp` was described as the identity provider's logout (IR386). Since IR461 to IR463 it also opens and turns off the people's accounts and sends their set-up e-mails.
 
 The tree now has them. The platform and module lists matched the directories.
+
+## IR548 The README says how to connect the real sensor nodes — 2026-11-01
+
+Found in the loop. The root README explained the local stack, the IoT demo and the first HQ administrator, but not the live site of DEC-86 to DEC-89. That was only in the container design and backend architecture §9.
+
+The README now says how to connect the real nodes, in one paragraph:
+- the broker and its login go in `.env.local`, and `migrate` then adds the live site;
+- the bridge records one reading a minute;
+- `REAL_MQTT_COMMANDS=1` lets the app switch the real air conditioner;
+- the site's client signs in as `live-sensors@example.com` once they have set a password from the Mailpit set-up e-mail.
+
+It names no broker address or login.

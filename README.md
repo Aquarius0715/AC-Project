@@ -30,6 +30,11 @@ Sign in as `customer-a` / `customer-b`, `contractor-a`, `tech-external-a`, `hq-o
 the HQ one-time-code secrets are in `docker/keycloak/realm-ac.json` (local values only). `.env.local` (git-ignored,
 from `.env.local.example`) holds local keys; `docker/iot-demo.sh` generates the broker keys on its first run.
 
+Real sensor nodes (optional, development only): with `REAL_MQTT_URL` and its login in `.env.local`, `migrate` adds a
+live site and the IoT bridge records the nodes' readings there once a minute; `REAL_MQTT_COMMANDS=1` also lets the app
+switch the real air conditioner on and off. Its client signs in as `live-sensors@example.com` after choosing a password
+from the set-up e-mail in Mailpit (DEC-86, DEC-87, DEC-89; what the nodes must send: backend architecture §9).
+
 Profiles: `infra` (PostgreSQL, Valkey, LocalStack, Mosquitto, Keycloak, Mailpit, mocks), `backend` (+ API services and
 workers), `full` (+ the four apps), `iot` (bridge, simulator, mock history), `obs`, `stripe`.
 
