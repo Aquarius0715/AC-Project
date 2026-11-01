@@ -289,6 +289,7 @@ Scope: FR-C07 / Main display pattern: **UI-ANALYSIS**. Service boundary: `teleme
    - Follow the IR99 table for ventilation/cleaning guidance (co2≥1000ppm, pm25≥35µg/m³, insufficient data). IR98 defines the allergen observation source.
    - Log ventilation never creates a Command and is not sent to HQ; the room’s ventilation history lists the logs (`ventilation.list`).
    - Cards show Live / Unavailable / Unknown / Suspect from the latest readings' read-time quality; the chart draws 5-minute (1h/24h) or hourly (7d) averages of valid readings, never joins gaps, and reads at most the 1000 newest readings — a cut-off series is labelled (D07, IR213). Units outside a room show readings but cannot log ventilation (logs belong to a room).
+   - The temperature card's advice points to Unit Control only when the unit page sets the model's temperature (control and a temperature range, DD-C03). For a model without control, or with the power alone, it says that the temperature is set on the AC itself (IR527, IR544).
 3. Viewing does not change business state. Saving a log creates one VentilationLog with co2AtLog; it does not imply reduced indoor CO2.
 4. Queries to update: `telemetry / ventilation logs`.
 

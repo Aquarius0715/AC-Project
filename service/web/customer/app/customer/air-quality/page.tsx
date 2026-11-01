@@ -9,7 +9,7 @@ import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePrincipal } from "@ac/web/lib/dal";
 import { i18nOf, showClock } from "@ac/web/lib/i18n";
 import type { ApiPropertyRow, ApiSpaceRow, ApiUnitRow } from "@ac/web/lib/assets";
-import type { ApiUnitDetail } from "@ac/web/lib/units";
+import { setsTemperature, type ApiUnitDetail } from "@ac/web/lib/units";
 import {
   airGuidance, airMetrics, airPeriods, airRooms, airRows, airSelection, airSlots, airWindow, allergenView, axisLabels, axisRange, axisTicks, cleanNote, co2Now,
   metricCard, metricInfo, ventRow, ventStrip, windowSub, windowTitle, type ApiAirSeries, type ApiMeasurement, type ApiVentilationLog,
@@ -67,7 +67,7 @@ export default async function CustomerAirQualityPage({ searchParams }: PageProps
   const live: AirLive = {
     rooms: rooms.map((r) => ({ key: r.key, spaceId: r.spaceId, label: r.label, units: r.units })), roomKey: sel.room.key, unitId: d.id, unitName: d.displayName,
     path: sel.room.path, spaceId: sel.room.spaceId, connection: d.connection, updated: showClock(now.toISOString(), display), freshAir,
-    cards: (["co2", "pm25", "temperature", "humidity"] as const).map((m) => metricCard(m, latest(m), sensors.has(m), i, d.capabilities.control)),
+    cards: (["co2", "pm25", "temperature", "humidity"] as const).map((m) => metricCard(m, latest(m), sensors.has(m), i, setsTemperature(d.capabilities))),
     strip: ventStrip(guidance, latest("co2"), roomName, d.displayName, freshAir, i.t),
     clean: cleanNote(guidance, latest("pm25"), roomName, i.t),
     allergen: allergenView(series.allergen, i), metric, period,

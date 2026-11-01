@@ -89,12 +89,13 @@ export type MetricCard = {
 const reasonText: Record<string, string> = { unit_mismatch: "unit mismatch", non_finite: "not a number", out_of_range: "out of range", invalid_time: "invalid time" };
 const originText: Record<string, string> = { estimated: "estimated", inspection: "inspection" };
 /** The card in the display language; reading times are the IR44 time of day in the user's display time zone (IR260). */
-export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, hasSensor: boolean, i: I18n = EN, control = true): MetricCard {
+export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, hasSensor: boolean, i: I18n = EN, setsTemperature = true): MetricCard {
   const { t, display } = i;
   const { unit, guide } = metricInfo[metric];
   const label = t(metricInfo[metric].label);
-  // the temperature points to the unit's remote control; a model without one (monitoring only) is set on the AC itself
-  const setpoint = control ? "Setpoint is on Unit Control" : "Set on the AC itself";
+  // the temperature points to the unit's remote control when that sets it (controlLayout's temperature); a model
+  // without control, or with the power alone, is set on the AC itself (IR527, IR544)
+  const setpoint = setsTemperature ? "Setpoint is on Unit Control" : "Set on the AC itself";
   const noAdvice = t(metric === "temperature" ? setpoint : metric === "humidity" ? "Not enough data for advice" : "Not enough data for {metric} advice", { metric: label });
   const unavailable = (sub: string, feed = { text: t("Unavailable"), tone: "unknown" as Tone, icon: "offline" as IconName }): MetricCard =>
     ({ metric, label, unit, value: null, feed, status: { text: t("Not measured"), tone: "muted", icon: "dot" }, sub, advice: noAdvice, warn: false });

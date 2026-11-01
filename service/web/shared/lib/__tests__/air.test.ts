@@ -5,6 +5,7 @@ import {
 } from "@ac/web/lib/air";
 import type { ApiPropertyRow, ApiSpaceRow, ApiUnitRow } from "@ac/web/lib/assets";
 import { i18nOf, showClock, showDay } from "@ac/web/lib/i18n";
+import { setsTemperature, type ApiUnitDetail } from "@ac/web/lib/units";
 
 const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const m = (metric: string, value: number | null, over: Partial<ApiMeasurement> = {}): ApiMeasurement => ({
@@ -19,6 +20,18 @@ describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
     expect(metricCard("temperature", m("temperature", 26), true)).toMatchObject({ status: { text: "Measured" }, advice: "Setpoint is on Unit Control" });
     expect(metricCard("temperature", m("temperature", 26), true, undefined, false).advice).toBe("Set on the AC itself"); // a model without remote control
     expect(metricCard("temperature", undefined, true, undefined, false).advice).toBe("Set on the AC itself");
+  });
+
+  it("points the temperature to Unit Control only when the model sets it there (IR544)", () => {
+    const model = (over: Partial<ApiUnitDetail["capabilities"]>): ApiUnitDetail["capabilities"] => ({
+      manufacturer: "Daikin", model: "IR via node_1", control: true, modeControl: false, fanControl: false, temperature: { min: 16, max: 30, step: 1 },
+      modes: [], fanLevels: [], ventilation: false, ventilationLevels: [], sensors: [], ...over,
+    });
+    // as the air-quality page passes it: whether the unit page has a temperature row
+    const advice = (cap: ApiUnitDetail["capabilities"]) => metricCard("temperature", m("temperature", 27.2), true, undefined, setsTemperature(cap)).advice;
+    expect(advice(model({}))).toBe("Setpoint is on Unit Control");
+    expect(advice(model({ temperature: null }))).toBe("Set on the AC itself"); // the power alone (the live Daikin, DEC-89)
+    expect(advice(model({ control: false }))).toBe("Set on the AC itself"); // monitoring only
   });
 
   it("never shows a stale, suspect, null or unsupported reading as a current value", () => {

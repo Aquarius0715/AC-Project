@@ -59,6 +59,12 @@ export function controlLayout(cap: ApiUnitDetail["capabilities"] | null): Contro
   return { control: true, temperature: cap.temperature, modes, fans, review: cap.temperature !== null || modes.length > 0 || fans.length > 0 };
 }
 
+/** Whether the unit page's remote control sets the model's temperature (its temperature row): only then do other
+ * screens point a temperature to Unit Control (IR544). */
+export function setsTemperature(cap: ApiUnitDetail["capabilities"] | null): boolean {
+  return controlLayout(cap).temperature !== null;
+}
+
 export type ApiCommand = { id: string; action: CommandAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; acknowledgedAt?: string | null; expiresAt?: string; failureCode: string | null; source?: string };
 
 /** The fixed Asia/Kuala_Lumpur time of the screens not yet on the user's display time zone; screens moved to it use

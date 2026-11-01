@@ -7752,3 +7752,16 @@ Found in the loop's security round (authentication). §6 covered sign-in, sessio
 - the best-effort provider calls.
 
 Checked, nothing to fix: the link comes from the identity provider and is not stored by the platform. `findByEmail` asks for an exact match, and the provider's admin client may only manage users (IR386).
+
+## IR544 Air quality points the temperature to Unit Control only when the model sets it there — 2026-11-01
+
+Found in the loop. Since IR527 the temperature card's advice on Air quality (Figma 05a) follows the model's control: "Setpoint is on Unit Control" with it, "Set on the AC itself" without it. The live Daikin has control for the power alone since DEC-89, with no temperature range. Its unit page therefore has no temperature row (IR530), while Air quality still pointed its temperature to Unit Control.
+
+1. **Rule.** The advice points to Unit Control only when the unit page sets the model's temperature, that is, with control and a temperature range. For a model without control, or with the power alone, it says "Set on the AC itself". DD-C07 now states this next to the card rules.
+2. **Web.** `setsTemperature` (`shared/lib/units.ts`) answers whether the unit page has the temperature row (`controlLayout`). The Air quality page passes it to `metricCard` in place of the bare control flag.
+3. **Tests.** `units.test.ts` checks `setsTemperature` for a full model, the power alone, no control and the demo screen. `air.test.ts` checks the advice for the same models as the page passes it.
+
+Other screens were checked and are unchanged:
+- the assistant's change card takes the temperature range from `controlLayout` (IR537);
+- group control sends a temperature only to a model with a range;
+- the automation editor offers a temperature only with control and a range.

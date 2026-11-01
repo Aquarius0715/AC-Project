@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { translator } from "@ac/web/lib/i18n";
-import { actionText, controlLayout, historyRow, latest, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
+import { actionText, controlLayout, historyRow, latest, setsTemperature, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 
 const ms = translator("ms");
 const tokyo = { locale: "en" as const, timeZone: "Asia/Tokyo" };
@@ -61,5 +61,7 @@ describe("the remote control a model offers (deterministic contracts, AT-X06; IR
   it("offers the power alone without a review bar, and nothing on a model without control", () => {
     expect(controlLayout(model({ modeControl: false, fanControl: false, temperature: null, modes: [], fanLevels: [] }))).toEqual({ control: true, temperature: null, modes: [], fans: [], review: false });
     expect(controlLayout(model({ control: false }))).toEqual({ control: false, temperature: null, modes: [], fans: [], review: false });
+    // other screens point a temperature to Unit Control only when its temperature row is there (IR544)
+    expect([setsTemperature(model({})), setsTemperature(model({ temperature: null })), setsTemperature(model({ control: false })), setsTemperature(null)]).toEqual([true, false, false, true]);
   });
 });
