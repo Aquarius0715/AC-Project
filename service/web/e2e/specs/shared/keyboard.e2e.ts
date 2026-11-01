@@ -34,3 +34,21 @@ test("a dialog opened by keyboard keeps focus inside and returns it to its trigg
   await expect(trigger).toBeFocused();
   expect(await page.evaluate(() => (window as unknown as { refused?: string[] }).refused ?? []), "CSP violations").toEqual([]);
 });
+
+// Every page starts with a skip link (IR568): the first Tab shows "Skip to main content", Enter moves focus to the page,
+// so a keyboard user does not tab through the sidebar and the header on every page.
+test("the first Tab offers a skip link to the page content", async ({ page, app }) => {
+  await page.goto(app.home);
+  // the page has loaded its content (a loading screen has nothing to focus, so Tab would leave the page)
+  await expect(page.getByRole("main").locator("a[href], button, select, input").first()).toBeVisible();
+  await page.keyboard.press("Tab");
+  const skip = page.getByRole("link", { name: "Skip to main content" });
+  await expect(skip).toBeFocused();
+  await expect(skip).toBeInViewport();
+  const url = page.url();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("main")).toBeFocused();
+  expect(page.url(), "the URL keeps the page's state, without a fragment").toBe(url);
+  await page.keyboard.press("Tab");
+  expect(await page.evaluate(() => !!document.activeElement?.closest("main")), "the next Tab stays in the page").toBe(true);
+});

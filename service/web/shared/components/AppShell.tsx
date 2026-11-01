@@ -130,6 +130,11 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
   return (
     <I18nProvider display={display}>
     <ToastProvider>
+      {/* keyboard users jump past the sidebar and the header to the page (UIUX accessibility, IR568) */}
+      {/* focus moves in code, not by the #main fragment: a fragment would enter the URL, which holds the screens' state,
+          and the router's own fragment handling moved focus again after it */}
+      <a href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}
+        className="fixed top-3 left-3 z-[70] -translate-y-24 rounded-control bg-primary px-3.5 py-2 text-[13px] font-semibold text-white shadow-md transition-transform focus:translate-y-0">{t("Skip to main content")}</a>
       <div className="min-h-dvh lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
         {/* the sidebar: in the page from lg up, in a sheet opened by the menu button below (shadcn/ui Sheet, DEC-75) */}
         <aside className="hidden flex-col gap-1 overflow-y-auto border-r border-line bg-surface p-4 lg:sticky lg:top-0 lg:flex lg:h-dvh">{sidebar}</aside>
@@ -152,7 +157,7 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
               <span className="inline-flex items-center gap-1.5 rounded-control bg-surface2 px-3 py-1.5 text-xs font-semibold"><Icon name="account" /> <span className="max-sm:hidden">{chip}</span><span className="sm:hidden">{chip.split(" — ")[0]}</span></span>
             </div>
           </header>
-          <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">{children}</main>
+          <main id="main" tabIndex={-1} className="min-w-0 flex-1 px-4 py-5 outline-none sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
       {role === "technician" && session?.dataSource === "api" && <QrScan open={qr} onClose={() => setQr(false)} />}

@@ -7994,3 +7994,19 @@ Found in the loop by a scan of the Go exported functions against package-qualifi
 - `scheduler.Run` was a one-line wrapper that ran every domain through `RunDomains` with no domain list, and only the worker test called it.
 
 The wrapper is removed. The test calls `RunDomains` with a nil list, and `RunDomains` says that nil means every domain.
+
+## IR568 Every page starts with a skip link to its content — 2026-11-01
+
+Found in the first round of the UX loop (UX-01; the loop keeps its log locally in `docs/05-document-review`, which git ignores). A customer controlling an AC with the keyboard alone needed 20 Tabs past the sidebar and the header to reach the first control of the unit page. Every page of every app was the same. The main scenarios must be possible with the keyboard alone (UIUX accessibility).
+
+1. **Skip link.** `AppShell` starts every page with "Skip to main content" (Malay: "Langkau ke kandungan utama").
+   - It sits above the screen until it has focus, then slides in at the top left in the primary button's colours. A first version used `sr-only` / `focus:not-sr-only`: the latter reset the padding, so the focused link was a 19 px strip over the logo.
+   - It moves focus to the page's `main` (`id="main"`, which takes focus but adds no Tab stop of its own), so the next Tab reaches the page's first control.
+   - Focus moves in code, not through the `#main` fragment. The fragment would enter the URL, which holds the screens' state, and the router's handling of it moved focus away again.
+2. **Test.** `keyboard.e2e.ts` checks it in the four apps once the page has loaded:
+   - the first Tab focuses the link, and it is in view;
+   - Enter focuses `main` and leaves the URL unchanged;
+   - the next Tab stays in the page.
+
+   While the loading screen shows, `main` holds nothing to focus.
+3. **Docs.** The accessibility paragraph of the UIUX specification states it. Figma shows no focus states, so it is unchanged.

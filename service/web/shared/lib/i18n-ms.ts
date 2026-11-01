@@ -196,6 +196,7 @@ export const ms: Record<string, string> = {
   "View details": "Lihat butiran",
   "Cooling restriction active — minimum {min} °C.": "Sekatan penyejukan aktif — minimum {min} °C.",
   "REMOTE CONTROL": "KAWALAN JAUH",
+  "Skip to main content": "Langkau ke kandungan utama",
   "Controls apply to this AC only; you confirm before sending": "Kawalan hanya untuk AC ini; anda mengesahkan sebelum menghantar",
   "Power": "Kuasa",
   "Sent as its own command": "Dihantar sebagai arahan tersendiri",
