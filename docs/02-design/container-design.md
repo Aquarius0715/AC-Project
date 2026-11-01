@@ -125,7 +125,11 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `OIDC_JWKS_URL` | backend | `http://keycloak:8080/realms/ac/protocol/openid-connect/certs` (container network) | not set (derived from the issuer discovery document) |
 | `OIDC_INTERNAL_ISSUER` | web | `http://keycloak:8080/realms/ac` (container network) | not set (same as `OIDC_ISSUER`) |
 | `OIDC_APP_CLIENT_ID` / `OIDC_ADMIN_CLIENT_ID` | backend, web | `ac-web` / `ac-admin-web` | Cognito app clients for `app.<domain>` / `admin.<domain>` (HQ network rule, IR117) |
-| `MQTT_URL` | backend (iot worker, iot-bridge, device-sim) | `tcp://mosquitto:1883` | not set; the iot worker publishes through the AWS IoT data plane endpoint (`IOT_DATA_ENDPOINT`) |
+| `MQTT_URL` | iot-bridge, device-sim (the iot worker has no jobs yet) | `tcp://mosquitto:1883` | not set; the iot worker publishes through the AWS IoT data plane endpoint (`IOT_DATA_ENDPOINT`) |
+| `MQTT_USER` / `MQTT_PASSWORD` | iot-bridge, device-sim (development only) | each tool's own broker user, `iot-bridge` / `device-sim`, and its key from `.env.local` (`MQTT_IOT_BRIDGE_KEY` / `MQTT_DEVICE_SIM_KEY`; `docker/mosquitto/passwd.sh` writes the broker's password file) | not set: devices connect to AWS IoT Core with their certificates |
+| `REAL_MQTT_URL` / `REAL_MQTT_USER` / `REAL_MQTT_PASSWORD` / `REAL_MQTT_TOPIC` | iot-bridge (development only, DEC-86) | the real nodes' broker and its login from `.env.local`, never committed; the topic defaults to `smarthome/ac/#`; empty URL: no live site | not set |
+| `REAL_MQTT_COMMANDS` / `REAL_MQTT_COMMAND_NODE` | iot-bridge (development only, DEC-89) | `1` from `.env.local` lets the bridge send the live unit's power commands, else they fail / `node_1` | not set |
+| `MOCK_HISTORY_DAYS` | mock-history (development only) | `30` (1–35 days of past readings) | not set |
 | `IOT_DATA_ENDPOINT` | backend (iot worker) | not set | AWS IoT Core data endpoint / custom domain |
 | `STRIPE_API_BASE` | backend | `http://stripe-mock:12111` | not set (api.stripe.com); keys come from Secrets Manager |
 | `WEATHER_API_BASE` | backend (automation worker) | `http://weather-mock:8080` (WireMock, `docker/wiremock/mappings/weather.json`) | weather provider base URL (PROPOSED, provider not yet chosen); key from Secrets Manager |
@@ -135,6 +139,7 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `IDENTITY_API_URL` / `EQUIPMENT_API_URL` / `MAINTENANCE_API_URL` / `BILLING_API_URL` / `ENERGY_API_URL` | gateway, domain services | `http://<domain>-api:8080` | internal service discovery names — The gateway routes each REST route to the service that owns its operation; the services call each other's internal queries (IR180, IR190) |
 | `DEMO_OPS` / `DEMO_CLOCK_START` | domain services, workers | `1` / not set (the fixture clock) | not set (demo operations off) — `demo.*` operations and the shared scenario clock (IR154, IR36, IR168) |
 | `APP_LOGIN_PASSWORD` / `SEED_FIXTURE` | migrate | a local password / the fixture path | not set (logins from infrastructure as code; no fixture) — Local logins `ac_app_login` and `ac_<domain>_login`, and the demo fixture (IR167, IR194) |
+| `SEED_MOCK_FLEET` / `SEED_LIVE_SENSORS` | migrate (development only) | `1` / `1` when `REAL_MQTT_URL` is set: the mock fleet and the live site, added with the fixture and kept on every start | not set |
 | `INTERNAL_API_TOKEN` / `IDENTITY_INTERNAL_URL` | Core API services | secret / `http://identity-api:8080` | service-to-service calls; principals from identity-api (IR182) |
 | `IDP_TOKEN_URL` / `IDP_ADMIN_URL` / `IDP_ADMIN_CLIENT_ID` / `IDP_ADMIN_CLIENT_SECRET` | identity-api only | `http://keycloak:8080/realms/ac/protocol/openid-connect/token` / `http://keycloak:8080/admin/realms/ac` / `ac-identity-admin` / a local value in `compose.yaml` | not set: a Cognito adapter calls AdminUserGlobalSignOut with identity-api's task role (`cognito-idp:AdminUserGlobalSignOut` on the user pool; planned with the AWS target) — Ends a user's sessions at the identity provider when HQ signs them out everywhere (IR386). All four or none, and the URLs are http(s), or the service does not start; unset = the Core API's cutoff only (IR384) |
 | `MAIL_SMTP_ADDR` / `MAIL_FROM` | worker-notification | `mailpit:1025` / `AC Project <no-reply@ac-project.local>` | not set: an SES adapter sends with the worker's task role (`ses:SendEmail`, planned with the AWS target) — Unset locally = the worker idles and e-mails stay previews (IR418) |
@@ -144,7 +149,7 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `CUSTOMER_WEB_URL` / `PARTNER_WEB_URL` / `TECHNICIAN_WEB_URL` / `ADMIN_WEB_URL` | web | `http://localhost:3000`–`3003` | the four host names — Links between the four apps (IR178) |
 | `SESSION_STORE_URL` | web (BFF) | `redis://valkey:6379` (web apps run on the host: `redis://127.0.0.1:6379`) | ElastiCache endpoint (TLS, `rediss://`) — The server-side session store (IR382): the record of each sign-in, revoked at sign-out; unset = the session sealed into the cookie (IR333) |
 
-As built (IR334), the code reads the database, OIDC, demo, blob, internal-call and web-session variables above. `APP_ENV`, the `AWS_*` variables, `MQTT_URL`, `IOT_DATA_ENDPOINT`, `STRIPE_API_BASE`, `WEATHER_API_BASE` and `OTEL_EXPORTER_OTLP_ENDPOINT` are set for integrations that are not built yet, and nothing reads them:
+As built (IR334, IR545), the code reads every variable above except `APP_ENV`, the `AWS_*` variables, `IOT_DATA_ENDPOINT`, `STRIPE_API_BASE`, `WEATHER_API_BASE` and `OTEL_EXPORTER_OTLP_ENDPOINT`. Those are set for integrations that are not built yet, and nothing reads them:
 
 - the outbox, the domain events and the notifications run inside the services on PostgreSQL;
 - uploaded files stay in the local blob store (OPEN-CT-02);

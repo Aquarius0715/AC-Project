@@ -7765,3 +7765,21 @@ Other screens were checked and are unchanged:
 - the assistant's change card takes the temperature range from `controlLayout` (IR537);
 - group control sends a temperature only to a model with a range;
 - the automation editor offers a temperature only with control and a range.
+
+## IR545 The container design lists the IoT tools' variables — 2026-11-01
+
+Found in the loop. The container design says every service reads environment variables only, and its table lists them. A comparison with the variables the Go code reads found some that the table left out:
+- the broker login of iot-bridge and device-sim (`MQTT_USER`, `MQTT_PASSWORD`);
+- the real nodes' broker of the live site (`REAL_MQTT_URL`, `REAL_MQTT_USER`, `REAL_MQTT_PASSWORD`, `REAL_MQTT_TOPIC`, DEC-86) and its commands (`REAL_MQTT_COMMANDS`, `REAL_MQTT_COMMAND_NODE`, DEC-89);
+- `MOCK_HISTORY_DAYS` of mock-history;
+- the seed switches `SEED_MOCK_FLEET` and `SEED_LIVE_SENSORS` of migrate.
+
+The iot profile row named some of them in prose only. The table now has their rows, with the compose values and "not set" in production, where these tools do not run.
+
+Two statements about `MQTT_URL` were out of date, and are corrected:
+- The text after the table counted it among the variables that nothing reads. iot-bridge and device-sim read it. The text now says that the code reads every variable of the table except those of the integrations not built yet: `APP_ENV`, the `AWS_*` variables, `IOT_DATA_ENDPOINT`, `STRIPE_API_BASE`, `WEATHER_API_BASE` and `OTEL_EXPORTER_OTLP_ENDPOINT`. A comparison with the code confirmed that the others are read, the service and app URLs by names the code builds.
+- Its row named the iot worker as a user. That role has no jobs yet and idles.
+
+Left out on purpose:
+- `AC_APP_ROLE`, which each web app's `next.config.ts` fixes at build time;
+- `OWNER_DATABASE_URL`, which only the local `seed` command and `scripts/resetdb.sh` take.
