@@ -106,7 +106,7 @@ Echo middleware order:
 |---|---|---|
 | 1 | Recover | Panic → UNAVAILABLE (503), stack logged, no detail returned |
 | 2 | Correlation ID | `middleware.RequestIDWithConfig` with a UUIDv7 generator (keeps an incoming `X-Request-Id`); echoed in `X-Request-Id`, logs, traces, events, audit |
-| 3 | OpenTelemetry (`otelecho`) | Span per request, attributes `ac.operation`, `ac.tenant` |
+| 3 | OpenTelemetry (`otelecho`) | Span per request, attributes `ac.operation`, `ac.tenant`. As built: not mounted yet, and nothing exports traces (OPEN-CT-04) |
 | 4 | Access log | `middleware.RequestLoggerWithConfig` writing one `slog` JSON line (method, URI, status after the error handler, request ID, latency); bodies are never logged |
 | 5 | Body limit / timeout | 1 MiB JSON checked by the dispatcher per operation, file operations more: attachments.add and jobs.reportProblem 8 MiB, reports.signOff 16 MiB (base64 files in the demo; production uploads go to S3, IR221), larger bodies VALIDATION `error.bodyTooLarge`; `middleware.ContextTimeout` 30 s on the request context used by the database (per-operation 5 s / 10 s deadlines remain the production target) |
 | 6 | Authentication | Verifies the Cognito access token (issuer, audience = app client, expiry, `token_use=access`; as built, IR367: Cognito's `token_use=access` or Keycloak's `typ=Bearer`, so an ID or refresh token is UNAUTHENTICATED), loads the selected Membership (`X-Tenant-Id` + `X-Membership-Id` from the BFF session context; the membership must belong to the token subject, be inside its validity window and the user must be active, otherwise UNAUTHENTICATED) with permissions, scopes, client role and validity; requests without a token stay anonymous and reach only `public:` operations; caches it for 30 s keyed by membershipId + scopeVersion. A token whose `auth_time` is later than the user's recorded sign-in sets `last_sign_in_at` to the business time (IR268). As built (IR384): the principal carries the membership's `sessions_revoked_at`, and a token whose `auth_time` is earlier, or that has none, is UNAUTHENTICATED `errors.session_revoked`. Each service compares it with its own token, so the 30-second principal cache of the other services delays a revocation by at most 30 seconds |
@@ -158,29 +158,30 @@ func (m *TxManager) WithTx(ctx context.Context, readOnly bool, fn func(pgx.Tx) e
 ```
 
 ```go
-// internal/ops — typed registration keeps handlers free of JSON and HTTP concerns
-func Register[I any, O any] (r *Registry, name string, mode Mode, pol Policy,
-	h func(context.Context, *Call, *I) (O, error)) {
-	r.ops[name] = &Operation{
-		Name: name, Mode: mode, Authorize: pol,
-		NewInput: func() any { return new(I) },
-		Handle: func(ctx context.Context, c *Call, in any) (any, error) { return h(ctx, c, in.(*I)) },
+// internal/ops — typed registration keeps handlers free of JSON and HTTP concerns; the mode and the authorization
+// come from the generated catalog, and a name outside the catalog panics at start-up
+func Register[I any, O any] (r *Registry, name string, h func(context.Context, *Call, *I) (O, error)) { // the space keeps the doc validator from reading a link
+	spec, ok := r.specs[name]
+	if !ok {
+		panic("ops: operation not in catalog: " + name)
 	}
+	// … stores the typed handler with spec (mode, authorization, versions, routes)
 }
 
-func NewServer(reg *Registry, authn echo.MiddlewareFunc) *echo.Echo {
-	e := echo.New()
-	e.HideBanner, e.HidePort = true, true
-	e.HTTPErrorHandler = ErrorHandler // DomainError body + fixed status mapping (§6)
-	e.Use(echoRecover(), requestID())
-	e.GET("/healthz", func(c echo.Context) error { return c.NoContent(http.StatusOK) })
-	v1 := e.Group("/v1", authn)
-	v1.POST("/ops/:operation", reg.Dispatch)
-	return e
+// internal/server/http.go (shortened)
+e := echo.New()
+e.HTTPErrorHandler = ops.HTTPErrorHandler // DomainError body + fixed status mapping (§6)
+e.Use(middleware.Recover())
+// … request ID, access log, context timeout (the table above)
+e.GET("/healthz", …)
+e.GET("/readyz", …)
+v1 := e.Group("/v1", a.Middleware())
+if err := reg.MountREST(v1); err != nil { // the catalog's REST routes of the operations this process serves (IR222)
+	return nil, err
 }
 ```
 
-Reads that must see the caller's own write immediately (for example the detail reload after a save) are marked `consistency: writer` in the generated catalog and run on the writer pool; all other reads use the Aurora reader endpoint.
+Reads that must see the caller's own write immediately (for example the detail reload after a save) are to run on the writer pool; all other reads use the Aurora reader endpoint. As built, every read runs on the reader pool (`DATABASE_READER_URL`), which locally is the same database, and the catalog has no such marker yet (OPEN-GO-03).
 
 ## 5. Handler pattern
 
@@ -302,5 +303,6 @@ The webhook receiver (`cmd/webhook`, planned: not built yet, compose profile `pl
 |---|---|
 | OPEN-GO-01 | Final choice of the TypeScript → Go contract generator (output reviewed for union types such as `UnitAction` and `Policy`) |
 | OPEN-GO-02 | WhatsApp provider SDK (depends on OPEN-BE-04) |
+| OPEN-GO-03 | Read-your-writes on a reader replica: before production points `DATABASE_READER_URL` at an Aurora replica, the reads that follow a write on the same screen (a detail reload after a save) need the writer pool, through a marker in the catalog or by running reads on the writer (IR559) |
 
 Additional contracts: every IR in the [Re-review Correction Contracts](review-resolution-contracts.md) applies, the newest included. They take priority over older text on the same topic; follow IR72 for conflict precedence.
