@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.432.0 / Created: 2026-09-14 / Updated: 2026-11-01 / Status: Draft for review / Language: English
+Version: 0.433.0 / Created: 2026-09-14 / Updated: 2026-11-01 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -22,6 +22,7 @@ Document authors and final decision makers for the 1A specification: **Masaki Ki
 | 10 | [Backend architecture](02-design/backend-architecture.md) / [Network architecture](02-design/network-architecture.md) | Production target (PROPOSED; AWS, Stripe and HQ company-network access per DEC-68 / IR117): BFF, Core API modules, data, IoT, integrations, zones and traffic flows; not Phase 1A acceptance inputs (IR116) |
 | 11 | [Backend Go design](02-design/backend-go-design.md) / [Database design](02-design/database-design.md) / [db/schema.sql](02-design/db/schema.sql) / [Operation persistence map](02-design/operation-persistence-map.csv) | Production target implementation (PROPOSED): Go + Echo service layout, request pipeline, workers, tests; PostgreSQL schemas, constraints, RLS, partitions, migrations (IR118) |
 | 12 | [Container design](02-design/container-design.md) / `compose.yaml` | Everything runs in Docker: images, Dockerfile standards, Compose profiles with local stand-ins for AWS services, ECS Fargate runtime (IR119) |
+| 13 | [Service contracts](02-design/service-contracts.ts) / [Deterministic contracts](02-design/deterministic-contracts.md) / [Strict review contracts](02-design/strict-review-contracts.md) / [Review resolution contracts](02-design/review-resolution-contracts.md) (the IR log) / [Write version catalog](02-design/write-version-catalog.csv) / [Query catalog](02-design/query-catalog.csv) / [API description](02-design/api/swagger.json) / [Demo fixture](04-agentic-sdlc/fixture-contract.json) | The binding contracts behind the documents above: types, the D / SR / IR rules (the newest IR applies, IR72), the expected version of each write, the filters and sorts of each list, the REST API generated from the handlers, and the fixture the tests and the local stack load |
 
 The four main document types are PrepareDocument, requirements, detailed design, and the UIUX specification. Requirements and design are split into four roles. Shared information is in separate files to avoid duplication. Agentic SDLC documents support execution; they are not a fifth product specification.
 
@@ -99,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.433.0 (2026-11-01): The index names the contracts and catalogs behind the documents (IR563).
 0.432.0 (2026-11-01): The security headers note which denied browser features the voice input, QR scan and location automations will need (IR562).
 0.431.0 (2026-11-01): The container design says what the IoT bridge and Mailpit do in the local stack (IR561).
 0.430.0 (2026-11-01): The Go design's security and test sections tell what is built from what is planned (IR560).

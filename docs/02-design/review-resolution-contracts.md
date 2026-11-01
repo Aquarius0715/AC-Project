@@ -7950,3 +7950,14 @@ Found in the loop. Network architecture §6 says that the apps' `Permissions-Pol
 No app calls `getUserMedia`, a speech recognizer, a barcode detector or `navigator.geolocation`.
 
 Once a real one is built, the denied feature would fail without a prompt. §6 now names the three, and the change each app's policy needs: `microphone=(self)` and `geolocation=(self)` on the customer app, `camera=(self)` on the technician app. The policy itself is unchanged, and `security-headers.e2e.ts` keeps checking it.
+
+## IR563 The documentation index names the contracts and catalogs — 2026-11-01
+
+Found in the loop, comparing the files under `docs/` with the index table of `docs/README.md`. The index named the documents, the operation catalog and the persistence map. It did not name several files that bind them:
+- the service contracts (`service-contracts.ts`);
+- the deterministic, strict review and review resolution contracts (D, SR and IR rules);
+- the write version catalog and the query catalog;
+- the API description (`api/swagger.json`);
+- the demo fixture (`fixture-contract.json`).
+
+A new row 13 lists them, with what each holds. The files the index still leaves out are records, not inputs: the review rounds of `05-document-review`, the internal decision records and the acceptance review sheets of `04-agentic-sdlc`, which the agentic SDLC README covers.
