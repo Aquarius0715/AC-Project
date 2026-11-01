@@ -8038,3 +8038,16 @@ Found in the third round of the UX loop (UX-03: tech-external-a, on a 390×844 p
 5. **Design and Figma.** The technician design quotes the end-of-window banner without the ID and states where the name comes from before the window. Figma's Technician page shows the same texts in 13 frames (overview read-only, before-window, work window ending, on hold). The ClickMap captions keep their IDs: they are notes for the reader of the design, not screen text.
 
 Device registration, diagnostics and firmware texts still carry IDs (BR-T02, CONFLICT, OFFLINE with IR94); they are left to the rounds that walk those screens.
+
+## IR571 Page unavailable leads a signed-in user back to their Overview — 2026-11-01
+
+Found in the same round (UX-03). As its security check, tech-external-a opened a job that is not theirs by its URL. The job stayed closed: the shared Page unavailable view, with no job data. Its only link, however, was "Go to sign in", for a technician who was signed in. The common design and Figma ask for a link to the role home ("Go to your home (or sign in)"). The view inside the shell (`/forbidden`) also showed a note written for designers: "One shared screen for both FORBIDDEN and NOT_FOUND, so it never reveals whether the resource exists (D01/IR57)."
+
+1. **Link.** Both views (`*` and `/forbidden`) end with one link, `UnavailableLink` (`shared/screens/unavailable-link.tsx`).
+   - A signed-in user gets "Go to Overview", to the home of their role (`roleHome`, the page the sidebar calls Overview).
+   - Anyone else gets "Go to sign in", as before.
+   - It is the view's only action, so it is drawn as its primary button (`LinkBtn`), as in Figma, instead of a small text link.
+   - It still never moves on by itself (IR57). Enter on the focused link opens the Overview in all four apps.
+2. **No design note.** The note leaves `/forbidden`, and its Malay entry leaves the dictionary; "Go to Overview" gets one. The view still looks the same for a missing page and for a refused one.
+3. **Test.** `session.e2e.ts` opens an unknown page and `/forbidden` in each app. It expects "Go to Overview" to the app's home and no design note; signed out, an unknown page offers "Go to sign in".
+4. **Design and Figma.** The `/forbidden` and `*` rows of the common design name the two links. Figma's Page unavailable frames (Client 10f, Contractor, Admin, Technician) show "Go to Overview" and no note; their captions and ClickMaps say that signed out it is "Go to sign in".

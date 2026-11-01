@@ -14,6 +14,24 @@ test("the shell names the signed-in user, not the demo persona", async ({ page, 
   await expect(page.locator("aside")).not.toContainText(/CUSTOMER-A|HQ TENANT/); // the Phase 1A scope labels
 });
 
+test("Page unavailable leads a signed-in user to their Overview and anyone else to sign in", async ({ browser, page, app }) => {
+  // one view for 403 and 404 that never moves on by itself (IR57); its one link fits who is looking (IR571)
+  for (const path of [`${app.home}/no-such-page`, "/forbidden"]) {
+    await page.goto(path);
+    await expect(page.getByText("This page isn’t available")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to Overview" })).toHaveAttribute("href", app.home);
+    await expect(page.getByText(/NOT_FOUND|IR57/)).toHaveCount(0); // no design notes on the screen
+  }
+  const context = await browser.newContext({ baseURL: app.url, storageState: { cookies: [], origins: [] } });
+  try {
+    const out = await context.newPage();
+    await out.goto("/no-such-page");
+    await expect(out.getByRole("link", { name: "Go to sign in" })).toHaveAttribute("href", "/login");
+  } finally {
+    await context.close();
+  }
+});
+
 test("Sign out ends the session, at the identity provider too", async ({ browser, app }) => {
   // a sign-in of its own: ending the provider's session must not end the one the project's other tests share
   const context = await browser.newContext({ baseURL: app.url, storageState: { cookies: [], origins: [] } });

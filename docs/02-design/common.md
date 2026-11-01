@@ -76,8 +76,8 @@ The stack is TypeScript (strict mode), React 19 and Next.js 16 App Router (DEC-6
 | /settings/preferences | Language, display timezone, read-only demo currency MYR, consent settings (client only), monthly report email (client), and Security › two-step verification (demo, FR-X08, IR112; in the HQ app Required, with nothing to turn on or off, DEC-85, IR510) |
 | /notifications | List notifications within the user's scope and manage read status. Keep this separate from business state |
 | /demo | Switch scenarios, trigger failures, control the demo clock, and reset. Demo-only screen |
-| /forbidden | Show the shared “Page unavailable” view (same component as `*`). Do not redirect automatically; show a link to the role home (IR57, IR112) |
-| `*` (undefined routes) | Show the shared “Page unavailable” view (SCR-X-not-found), using the D01 not-found text. Do not redirect automatically; show a link to the role home (IR57) |
+| /forbidden | Show the shared “Page unavailable” view (same component as `*`). Do not redirect automatically; show a link to the role home (IR57, IR112): “Go to Overview” for a signed-in user, “Go to sign in” for anyone else (IR571) |
+| `*` (undefined routes) | Show the shared “Page unavailable” view (SCR-X-not-found), using the D01 not-found text. Do not redirect automatically; show a link to the role home (IR57), as on /forbidden (IR571) |
 
 The shared header contains language selection, notifications, voice/text switching, and sign-out. Demo role switching has its own menu, separate from changing users in normal business use.
 

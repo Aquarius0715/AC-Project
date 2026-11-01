@@ -1705,7 +1705,7 @@ export const ms: Record<string, string> = {
   "This page isn’t available": "Halaman ini tidak tersedia",
   "The page doesn’t exist, or your account can’t open it. Nothing was navigated automatically.": "Halaman ini tidak wujud, atau akaun anda tidak boleh membukanya. Tiada navigasi automatik dibuat.",
   "Go to sign in": "Pergi ke log masuk",
-  "One shared screen for both FORBIDDEN and NOT_FOUND, so it never reveals whether the resource exists (D01/IR57).": "Satu skrin dikongsi untuk FORBIDDEN dan NOT_FOUND, supaya ia tidak pernah mendedahkan sama ada sumber itu wujud (D01/IR57).",
+  "Go to Overview": "Pergi ke Gambaran keseluruhan",
   "This page doesn’t exist or you don’t have access to it.": "Halaman ini tidak wujud atau anda tidak mempunyai akses kepadanya.",
   "Go to your home (or sign in)": "Pergi ke laman utama anda (atau log masuk)",
   "User": "Pengguna",
