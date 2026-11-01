@@ -7686,3 +7686,10 @@ Found in the loop.
 
 1. **Bridge.** Three places that send live events told a CONFLICT answer apart, each in its own words. A CONFLICT answer means the event ID was taken by an earlier send whose answer was lost, so the event is recorded. They now share one `recorded(err)` check, with no change in behavior.
 2. **DEC-86.** It still called the live air conditioner monitoring-only. Its text now adds that the unit has had remote power since DEC-89, as it already noted the customer of DEC-87.
+
+## IR536 The client design states the unit page's capability rules — 2026-11-01
+
+Found in the loop. DD-C03 (client design) said only that the temperature, mode and fan options come from the capabilities. Its business rules now also say:
+- A model without control shows the no-remote-control note; the temperature row needs a range; the mode and fan rows need their control and the model's values; a power-only model sends the power at once with no review bar (IR524, IR530; Figma 02o, 02p).
+- A change is only what the user changed (IR524).
+- Devices in this room show the latest readings, never the setting (IR527).

@@ -139,6 +139,12 @@ Scope: FR-C03 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
 2. Apply the following business rules to both reads and actions.
    - Each confirmed submission is one Action. Change power, temperature, mode, and fan level separately.
    - Temperature must match the model's min/max/step; choose mode and fan level from listed options.
+   - Offer only what the model supports (IR524, IR530; Figma 02o, 02p).
+     - A model without control shows "No remote control on this model" and that settings are changed on the AC itself.
+     - The temperature row needs a temperature range. The mode and fan rows need their control and list only the model's own values.
+     - A model with the power only sends it at once, with no change summary or review bar.
+   - A change is only what the user changed: a setting the AC has not reported is no change from the screen's default (IR524).
+   - Devices in this room show each AC's latest valid room temperature and power draw, never its setting (IR527).
    - A power-OFF request does not set measured temperature to 0.
    - Disable new requests to a unit while a request for that unit is pending.
 3. Create one Command and show the requested value separately. Update confirmed settings only after the device returns acknowledged. Keep the request and reason in history even on failure.
