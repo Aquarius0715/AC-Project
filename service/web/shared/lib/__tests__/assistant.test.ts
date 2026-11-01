@@ -11,7 +11,7 @@ const grammar = {
   ms: [/^suhu (.+)$/i, /^tetapkan (.+) kepada (\d{1,3}) darjah$/i, /^bantuan$/i],
 };
 const unit = (over: Partial<ApiUnitDetail> = {}) => ({
-  displayName: "Bedroom AC", location: { pathLabels: ["Home A", "1F", "Bedroom"], address: null, accessInstructions: null }, capabilities: { temperature: { min: 16, max: 30, step: 1 } },
+  displayName: "Bedroom AC", location: { pathLabels: ["Home A", "1F", "Bedroom"], address: null, accessInstructions: null }, capabilities: { control: true, modeControl: true, fanControl: true, modes: ["cool"], fanLevels: ["mid"], temperature: { min: 16, max: 30, step: 1 } },
   ...over,
 }) as unknown as ApiUnitDetail;
 const change = (celsius: number, before: number | null = 26): Extract<ResolvedIntent, { kind: "change" }> => ({ kind: "change", unitId: "u-0001-aaaa", celsius, before: { power: true, celsius: before, observedAt: null }, expectedVersion: 7 });
@@ -41,6 +41,9 @@ describe("the customer assistant (FR-X02, D09, Figma Client 09a–09g)", () => {
     expect(changeCard(change(24), unit(), en)).toEqual({ target: "Home A › 1F › Bedroom › Bedroom AC", unit: "Bedroom AC", current: "26 °C (confirmed by the device)", requested: "24 °C", range: "16–30 °C · step 1", supported: true });
     expect(changeCard(change(31), unit(), en)).toMatchObject({ supported: false });
     expect(changeCard(change(24, null), null, en)).toMatchObject({ target: "u-0001-a", current: "not known", range: "not supported", supported: false });
+    // a model without remote control takes no temperature, whatever range it lists (deterministic contracts, IR537)
+    const monitoring = unit({ capabilities: { ...unit().capabilities, control: false } as ApiUnitDetail["capabilities"] });
+    expect(changeCard(change(24), monitoring, en)).toMatchObject({ range: "not supported", supported: false });
   });
 
   it("asks for the room, then the AC, without choosing for the user (Figma 09d, IR101)", () => {

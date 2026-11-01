@@ -7693,3 +7693,10 @@ Found in the loop. DD-C03 (client design) said only that the temperature, mode a
 - A model without control shows the no-remote-control note; the temperature row needs a range; the mode and fan rows need their control and the model's values; a power-only model sends the power at once with no review bar (IR524, IR530; Figma 02o, 02p).
 - A change is only what the user changed (IR524).
 - Devices in this room show the latest readings, never the setting (IR527).
+
+## IR537 The voice assistant offers no temperature change on a model without remote control — 2026-11-01
+
+Found in the loop while looking for screens that assume a full model. The assistant's change card (Figma 09c, `changeCard`) took the temperature range from the capabilities alone. A model without control that still listed a range was "supported", so the card offered a change that the deterministic contracts forbid (control=false: no ordinary Actions).
+
+1. **Fix.** The card takes the range from `controlLayout` (IR533), which gives none without control. Such a model shows "not supported", and the change cannot be confirmed.
+2. **Tests.** `assistant.test.ts` adds a model without control that lists a range, and the fixture model states its control.

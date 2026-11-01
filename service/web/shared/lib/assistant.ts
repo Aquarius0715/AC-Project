@@ -3,7 +3,7 @@
 // and its tests. The assistant speaks its chosen language — the display language unless the panel switches it (IR306).
 import { one } from "@ac/web/lib/energy";
 import { showClock, type Display, type Locale, type T } from "@ac/web/lib/i18n";
-import { actionText, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
+import { actionText, controlLayout, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 
 /** ResolvedIntent of service-contracts.ts. */
 export type Measurement = { value: number | null; unit: string; observedAt: string; quality: "valid" | "missing" | "stale" | "suspect" };
@@ -64,7 +64,7 @@ const qualityWord = (q: Measurement["quality"], t: T) => ({ valid: t("valid"), m
 
 /** The confirmation card of a change (Figma 09c): target, current setting, requested setting and the allowed range. */
 export function changeCard(intent: Extract<ResolvedIntent, { kind: "change" }>, u: ApiUnitDetail | null, t: T) {
-  const range = u?.capabilities.temperature;
+  const range = u ? controlLayout(u.capabilities).temperature : null; // a model without control takes no temperature (IR537)
   const current = intent.before.celsius === null ? t("not known") : t("{value} °C (confirmed by the device)", { value: intent.before.celsius });
   return {
     target: u ? placeOf(u) : intent.unitId.slice(0, 8), unit: u?.displayName ?? intent.unitId.slice(0, 8), current, requested: `${intent.celsius} °C`,
