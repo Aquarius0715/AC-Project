@@ -7898,3 +7898,10 @@ Found in the loop:
    - step 3 is open (no SSE stream, IR555);
    - step 4 is partly done (simulator, mock fleet and real nodes in development; provider sandboxes with the AWS target);
    - step 5 holds (`DATA_SOURCE=mock`, the demo profile, `DEMO_OPS`).
+
+## IR557 Backend architecture §11 and §16 name the identity admin API, the SMTP mail and the development nodes — 2026-11-01
+
+Found in the loop, comparing §11 (external integrations) and §16 (open items) with the code:
+1. **Identity provider admin API.** The identity service has called the provider's admin API since IR386: the sign-out everywhere, then the accounts of IR461 to IR463. §11 listed only the BFF's sign-in. It now has the row, with the least-privilege client locally and the task role of network architecture F20 in production (IR551).
+2. **E-mail.** The row named Amazon SES only. The notification worker sends over SMTP, to Mailpit locally (IR418), and the SES adapter is planned. The row now says so.
+3. **OPEN-BE-02.** The AC manufacturer interface and the module hardware stay open. The item now notes that development uses the site's own ESP32 nodes, which switch a Daikin air conditioner by infrared (DEC-86 to DEC-89, §9).

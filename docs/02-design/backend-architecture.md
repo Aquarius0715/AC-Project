@@ -298,8 +298,9 @@ Items of the table above that are not scheduled yet:
 | Integration | Direction | Pattern | Security |
 |---|---|---|---|
 | Identity provider | BFF ↔ IdP | OIDC code + PKCE, back-channel logout | TLS, client secret or private-key JWT |
+| Identity provider admin API | Identity service → IdP | Opens, updates, turns off and on the accounts of the people added, has the provider e-mail their set-up link, and ends a user's sessions; best effort through the identity-accounts consumer (IR386, IR461–IR463, IR511) | A service-account client that may manage users only (locally); identity-api's task role with the user administration calls in production (network architecture F20) |
 | Stripe | Browser → Stripe Checkout; Stripe → webhook receiver; Billing → Stripe API | `payments.simulate` becomes a Checkout Session (currency MYR, invoice ID in metadata, Stripe idempotency key = our write key). `checkout.session.completed` / `payment_intent.succeeded` / `payment_intent.payment_failed` webhooks are verified (Stripe-Signature, 5-minute tolerance), then the PaymentIntent is retrieved before PaymentConfirmed (IR35 release). Manual payments stay `payments.recordManual`. Contractor payouts stay outside Stripe until decided (Stripe Connect is an option) | Card data never touches the platform (PCI DSS SAQ A); restricted API keys in Secrets Manager; webhook endpoint `hooks.<domain>/stripe` |
-| E-mail (Amazon SES) | Notification worker → SES | Templated send; bounce and complaint events via SNS | IAM role, SPF / DKIM / DMARC on the sending domain |
+| E-mail (Amazon SES) | Notification worker → SES | Templated send; bounce and complaint events via SNS. As built (IR418): the notification worker sends over SMTP (Mailpit locally); the SES adapter is planned | IAM role, SPF / DKIM / DMARC on the sending domain |
 | WhatsApp provider | Notification worker → provider | Business messaging API with approved templates; status webhooks | Provider credentials, signed webhooks |
 | Weather source | Automation engine → provider | Polling per service area | API key, egress allowlist |
 | Speech service (optional) | BFF → provider | Short audio upload or browser speech API; intents resolved by `voice.resolveIntent` | Microphone consent, no audio stored by default |
@@ -358,7 +359,7 @@ As built:
 | ID | Open item | Needed for |
 |---|---|---|
 | OPEN-BE-01 | Decided 2026-10-07: AWS, ap-southeast-5 primary, ap-southeast-1 DR (DEC-68) | — |
-| OPEN-BE-02 | AC manufacturer interface and IoT module hardware | IoT design, capabilities |
+| OPEN-BE-02 | AC manufacturer interface and IoT module hardware. Development uses a site's own ESP32 nodes, which switch a Daikin air conditioner by infrared (DEC-86 to DEC-89, §9) | IoT design, capabilities |
 | OPEN-BE-03 | Decided 2026-10-07: Stripe Checkout (DEC-68); enabled methods to confirm in the Stripe account | — |
 | OPEN-BE-04 | WhatsApp business provider and template approval | Notifications |
 | OPEN-BE-05 | Decided 2026-10-07: retention in §7 (confirm with legal counsel before go-live) | — |
