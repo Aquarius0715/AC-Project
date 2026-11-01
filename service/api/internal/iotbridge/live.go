@@ -144,6 +144,47 @@ func LiveGapTrigger(gap time.Duration, slot time.Time) Trigger {
 		[]Fact{{UnitID: seed.ID(seed.LiveSite.Unit), Metric: "heartbeat_gap", Value: minutes, Unit: "min", ObservedAt: slot, Quality: "valid"}})
 }
 
+// The live module goes offline after LiveOfflineAfter without any node and comes back once every node has been heard
+// within LiveOnlineWithin (the gap is the longest of the nodes'): commands sent while no node listens never arrive, and
+// the client's unit page disables its controls while the AC is offline (IR532).
+const (
+	LiveOfflineAfter = 3 * time.Minute
+	LiveOnlineWithin = time.Minute
+)
+
+// ConnectionFault is devices.connectionFault's answer for the live module: its binding, its open connection fault (the
+// DeviceEvent a restored names) and the newest sequence on the axis.
+type ConnectionFault struct {
+	BindingID *uuid.UUID `json:"bindingId"`
+	FaultID   *uuid.UUID `json:"faultId"`
+	Sequence  int64      `json:"sequence"`
+}
+
+// LiveConnectionTrigger is the device event that brings the live module's connection in line with the heartbeat gap:
+// communication_lost once the nodes have been silent for LiveOfflineAfter while the API has no open fault, and restored,
+// naming the open fault, once they are heard again. ok is false when the connection already matches, or while the
+// module is unbound. The sequence follows the API's newest on the axis, and the event IDs come from the binding and
+// sequence or the fault, so a repeat is one event.
+func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, at time.Time) (Trigger, bool) {
+	if f.BindingID == nil {
+		return Trigger{}, false
+	}
+	dev, seq := seed.ID(seed.LiveSite.Device), f.Sequence+1
+	tr := Trigger{ScenarioID: Scenario, OccurredAt: at.UTC(), EventType: "device", DeviceID: &dev, BindingID: f.BindingID, Sequence: &seq}
+	switch {
+	case f.FaultID == nil && gap >= LiveOfflineAfter:
+		tr.Kind = "communication_lost"
+		tr.EventID = uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("live/lost/%s/%d", f.BindingID, seq)))
+	case f.FaultID != nil && gap < LiveOnlineWithin:
+		tr.Kind = "restored"
+		tr.Recovery = &Recovery{Axis: "connection", SourceEventID: *f.FaultID, Value: "online"}
+		tr.EventID = uuid.NewSHA1(seed.Namespace, []byte("live/restored/"+f.FaultID.String()))
+	default:
+		return Trigger{}, false
+	}
+	return tr, true
+}
+
 // LiveHeard keeps when each live node was last heard, for the heartbeat gap. A node not heard since the bridge started
 // counts from its start. Times are kept on the wall clock: Go's monotonic clock stops while the machine sleeps (a
 // laptop's Docker VM), and a gap measured on it stayed under 15 minutes through hours without the nodes.

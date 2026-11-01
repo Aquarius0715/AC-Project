@@ -72,6 +72,19 @@ type Trigger struct {
 	DeviceID    *uuid.UUID               `json:"deviceId,omitempty"` // state
 	State       *devicesim.ReportedState `json:"state,omitempty"`    // state
 	Event       *Evaluation              `json:"event,omitempty"`    // automation: the facts against the alert policies (IR529)
+	// device: a fault or recovery of the device's current binding (SR20, IR532)
+	BindingID *uuid.UUID `json:"bindingId,omitempty"`
+	Sequence  *int64     `json:"sequence,omitempty"`
+	Kind      string     `json:"kind,omitempty"`
+	Recovery  *Recovery  `json:"recovery,omitempty"`
+}
+
+// Recovery is the DeviceRecovery a restored device event carries: the axis, the value it returns to and the fault it
+// ends (that fault's DeviceEvent ID).
+type Recovery struct {
+	Axis          string    `json:"axis"`
+	SourceEventID uuid.UUID `json:"sourceEventId"`
+	Value         string    `json:"value"`
 }
 
 // Evaluation is the EvaluationInput a demo automation trigger carries: the facts a gateway reports, which the API

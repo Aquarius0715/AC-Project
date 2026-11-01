@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.401.0 / Created: 2026-09-14 / Updated: 2026-10-31 / Status: Draft for review / Language: English
+Version: 0.402.0 / Created: 2026-09-14 / Updated: 2026-11-01 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.402.0 (2026-11-01): The live unit shows offline, with its controls disabled, after 3 minutes without its nodes, and returns online when they report (IR532).
 0.401.0 (2026-10-31): The live heartbeat gap counts the time the machine slept, so AC offline opens after hours without the nodes (IR531).
 0.400.0 (2026-10-30): Figma's client Unit Control adds the states of a model with the remote power only (02o) and of one without remote control (02p); on a power-only model the web shows no review bar (IR530).
 0.399.0 (2026-10-30): The live readings reach the customer's alert policies every minute (demo.trigger automation, alert policies only), and the default rule AC offline alerts when the live nodes are silent for 15 minutes (IR529).

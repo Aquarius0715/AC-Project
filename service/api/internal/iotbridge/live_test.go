@@ -292,3 +292,43 @@ func TestLiveGate(t *testing.T) {
 		t.Error("a released minute stayed closed")
 	}
 }
+
+// TestLiveConnectionTrigger: silent nodes take the module offline once (communication_lost after 3 minutes, with the
+// API's next sequence on the binding), nodes heard again bring it back by naming the open fault (restored within a
+// minute), and in between, or while the connection already matches, or while unbound, nothing is sent.
+func TestLiveConnectionTrigger(t *testing.T) {
+	binding, fault := seed.ID("binding-live-ac"), seed.ID("fault-live")
+	at := liveAt
+	if _, ok := LiveConnectionTrigger(ConnectionFault{}, time.Hour, at); ok {
+		t.Error("an unbound module was reported")
+	}
+	lost, ok := LiveConnectionTrigger(ConnectionFault{BindingID: &binding, Sequence: 7}, 4*time.Minute, at)
+	if !ok || lost.EventType != "device" || lost.Kind != "communication_lost" || *lost.Sequence != 8 || *lost.BindingID != binding ||
+		*lost.DeviceID != seed.ID("device-live-ac") || lost.Recovery != nil || !lost.OccurredAt.Equal(at) {
+		t.Fatalf("loss %+v", lost)
+	}
+	again, _ := LiveConnectionTrigger(ConnectionFault{BindingID: &binding, Sequence: 7}, 5*time.Minute, at.Add(time.Minute))
+	if again.EventID != lost.EventID {
+		t.Error("a repeat of the loss is another event")
+	}
+	for _, gap := range []time.Duration{0, LiveOfflineAfter - time.Second} {
+		if tr, ok := LiveConnectionTrigger(ConnectionFault{BindingID: &binding}, gap, at); ok {
+			t.Errorf("gap %s took an online module offline: %+v", gap, tr)
+		}
+	}
+	back, ok := LiveConnectionTrigger(ConnectionFault{BindingID: &binding, FaultID: &fault, Sequence: 8}, 20*time.Second, at)
+	if !ok || back.Kind != "restored" || *back.Sequence != 9 || back.Recovery == nil || *back.Recovery != (Recovery{Axis: "connection", SourceEventID: fault, Value: "online"}) {
+		t.Fatalf("recovery %+v", back)
+	}
+	for _, gap := range []time.Duration{LiveOnlineWithin, 2 * time.Minute, time.Hour} {
+		if tr, ok := LiveConnectionTrigger(ConnectionFault{BindingID: &binding, FaultID: &fault, Sequence: 8}, gap, at); ok {
+			t.Errorf("gap %s restored an offline module: %+v", gap, tr)
+		}
+	}
+	raw, _ := json.Marshal(back)
+	var body map[string]any
+	_ = json.Unmarshal(raw, &body)
+	if body["bindingId"] != binding.String() || body["sequence"] != 9.0 || body["kind"] != "restored" || body["recovery"].(map[string]any)["sourceEventId"] != fault.String() {
+		t.Errorf("recovery body %s", raw)
+	}
+}

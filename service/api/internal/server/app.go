@@ -133,6 +133,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	reg.AddJob(ops.DomainEquipment, am.RemindWarranties)
 	eq := equipmentView{am: am, alerts: monitoring.Alerts{}, tel: monitoring.Telemetry{Sensors: devices.Models{}}, models: devices.Models{}} // other domains' view (IR193)
 	devices.Register(reg, devices.Capabilities{Units: am})
+	devices.RegisterQueries(reg) // internal: a device's open connection fault for the IoT gateway (IR532 system query)
 	monitoring.RegisterAlerts(reg, monitoring.Alerts{Units: am, Access: maintenance.Access{}, Devices: deviceRecoveries{}})
 	blobs := blob.NewDirFromEnv()
 	jobs := maintenance.Jobs{Units: eq, Severity: eq, HQOrg: func(c *ops.Call) uuid.UUID { return c.Principal.OrgID }, Sites: eq, Blobs: blobs}

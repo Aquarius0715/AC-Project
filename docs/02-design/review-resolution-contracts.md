@@ -7647,3 +7647,16 @@ Found in the loop. The live broker's connection was lost at 11:16 UTC on 2026-10
 1. **Cause.** The bridge measured the gap with Go's monotonic clock (`time.Now()` readings subtracted). That clock stops while the machine sleeps, here the laptop's Docker VM. Through hours without the nodes, the gap counted only the minutes the VM was awake and stayed under 15.
 2. **Fix.** `LiveHeard` keeps and compares wall-clock times (`Round(0)` drops the monotonic reading), so the time the machine slept counts as time without the nodes. After a long sleep, the first gap report alerts.
 3. **Development stack.** The hand-sent evaluation's "AC offline" alert is left open: the nodes are still unheard. It resolves on its own when they report again (gap under 1 minute, D08).
+
+## IR532 The live module goes offline when its nodes are silent, and back online when they report — 2026-11-01
+
+Found in the loop. With the nodes out of reach, "AC offline" opened (IR529, IR531), but the live unit still said Online. Its power switch stayed enabled, and a command would wait for a node that no longer listened until it expired. The design takes a device offline only on an explicit device event (communication_lost, SR20), and the bridge sent none.
+
+1. **Internal query `devices.connectionFault`** (equipment domain, internal service token and tenant, like `control.requestedCommands`). For a device, it answers its current binding, the open fault on the connection axis and the newest sequence on that axis.
+   - The open fault is the newest non-restored event while it has no `restoredAt`, given by its DeviceEvent ID: a restored must name the fault by this ID (SR20), which a gateway cannot know from what it sent.
+   - A request without the token is 401, one without a device 422, and an unknown device 404. `TestConnectionFaultForTheGateway` runs the query around a real loss and recovery.
+2. **Bridge.** Once a minute, before the heartbeat gap report, the bridge reads the fault and brings the module's connection in line with the gap (`LiveConnectionTrigger`):
+   - communication_lost once no node has been heard for 3 minutes while no fault is open, and restored, naming the open fault, once every node has been heard within a minute;
+   - each with the API's next sequence on the binding and an event ID from the binding and sequence, or from the fault, so a repeat is one event.
+   - Reading the fault back each minute means a restarted bridge restores an outage that an earlier instance recorded.
+3. **What the user sees.** While the nodes are silent, the client's unit page says the AC is offline and disables its controls (Figma 02h, IR243), and the default rule still alerts after 15 minutes. When the nodes report again, the module and unit return to online, with last seen at the recovery.
