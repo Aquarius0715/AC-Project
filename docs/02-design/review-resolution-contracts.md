@@ -7795,3 +7795,12 @@ Found in the loop, comparing backend Go design §10 with `service/api/Makefile` 
 
    The module tree names the IoT tools' `tools` target (IR539).
 3. **Container design §2.** The text after the image table said "One backend image with several entry commands". It now says that the Go services' images share one Dockerfile, and that the worker image serves every worker role.
+
+## IR547 The Go design's module tree lists every package — 2026-11-01
+
+Found in the loop, comparing the module tree of backend Go design §2 with `service/api`:
+- `cmd/` left out the three IoT demo tools, `iotbridge`, `devicesim` and `mockhistory`, which run from the tools image (IR539);
+- `internal/` left out `bootstrap` (the first HQ administrator, IR509) and the tools' packages `iotbridge` and `devicesim`;
+- `platform/idp` was described as the identity provider's logout (IR386). Since IR461 to IR463 it also opens and turns off the people's accounts and sends their set-up e-mails.
+
+The tree now has them. The platform and module lists matched the directories.

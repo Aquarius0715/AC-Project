@@ -46,6 +46,7 @@ service/api/        (IR174; under service/api since IR179; the Next.js apps are 
     identity-api/ equipment-api/ maintenance-api/ billing-api/ energy-api/   the five domain services (Echo)
     worker/         one binary, --role=outbox|scheduler|notification|… (IR166, IR195)
     migrate/  seed/  gen/ (ops: catalog, REST routes, contracts; restdoc: the route list for the swag annotations)
+    iotbridge/  devicesim/  mockhistory/   the IoT demo tools, development only (the tools image, IR539)
   internal/
     server/         composition root: app.go wiring, http.go Echo + middleware, event consumers, cross-domain wiring, demo
     gateway/        the gateway's route table, the embedded swagger.json and Swagger UI
@@ -53,11 +54,13 @@ service/api/        (IR174; under service/api since IR179; the Next.js apps are 
                     idempotency, expected version, transaction, events and audit (Call), internal queries between services
     platform/       apperr (DomainError), auth (OIDC / JWT, Principal), authz, db (pgx pools, TxManager, RLS context),
                     events (envelope, publish, replica consumers), paging, blob (file store), democlock, unitscope,
-                    logging (slog handler), ratelimit (the write limit, IR375), idp (the identity provider's logout, IR386)
+                    logging (slog handler), ratelimit (the write limit, IR375), idp (the identity provider's admin API: the
+                    people's accounts, their set-up e-mails, turning them off, sign-out everywhere; IR386, IR461–IR463)
     modules/        one package per business area: identity assets devices control monitoring maintenance billing
                     restrictions energy notify audit summaries voice writes
     scheduler/      the clock-driven transitions per domain (IR195, IR356)
-    migrate/ migrations/ seed/
+    migrate/ migrations/ seed/ bootstrap/ (the first HQ administrator of a tenant, IR509)
+    iotbridge/ devicesim/   the tools' conversions and the simulated fleet, and the live nodes' mapping (DEC-86, IR524)
   test/integration/ the Core API against PostgreSQL, run in one process and with the split services
 ```
 
