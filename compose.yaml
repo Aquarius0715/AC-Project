@@ -35,9 +35,8 @@ x-worker: &worker             # cmd/worker (independent service, IR166/IR174)
     migrate: { condition: service_completed_successfully }
 
 x-backend: &backend          # Core API business-domain services (service/api/cmd/<service>, build/service.Dockerfile, IR180)
-  env_file:
-    - path: .env.local
-      required: false
+  # no env_file: the services read no key of .env.local, and every key reaches only the containers that use it, through
+  # compose interpolation (the broker keys of the IoT services, the live broker's login of iot-bridge; IR538)
   environment: &backend-env
     APP_ENV: local
     DEMO_OPS: "1"                                       # demo.advanceClock / demo.trigger (IR154); never set in production

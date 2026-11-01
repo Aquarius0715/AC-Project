@@ -165,7 +165,7 @@ The resource names, created locally by that script, are the ones the production 
 | SES identity | `no-reply@ac.local` (LocalStack) | Kept for the planned SES adapter; the e-mails the stack sends today go over SMTP to Mailpit from `MAIL_FROM` (`no-reply@ac-project.local`, IR418). Production verifies the real domain |
 | Secret | `ac/local/stripe` | The Stripe test key; production keeps one secret per environment in Secrets Manager |
 
-Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`, LocalStack `SERVICES` / `AWS_DEFAULT_REGION`) exist only in compose. Local values come from compose and an optional git-ignored `.env.local` (`.env.local.example`).
+Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`, LocalStack `SERVICES` / `AWS_DEFAULT_REGION`) exist only in compose. Local values come from compose and an optional git-ignored `.env.local` (`.env.local.example`). A key of `.env.local` reaches only the containers that use it, through compose interpolation (`--env-file .env.local`). No service reads the whole file, so the broker keys and the live broker's login stay out of the Core API services (IR538).
 
 ## 5. Production on ECS Fargate
 

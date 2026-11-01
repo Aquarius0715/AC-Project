@@ -7700,3 +7700,10 @@ Found in the loop while looking for screens that assume a full model. The assist
 
 1. **Fix.** The card takes the range from `controlLayout` (IR533), which gives none without control. Such a model shows "not supported", and the change cannot be confirmed.
 2. **Tests.** `assistant.test.ts` adds a model without control that lists a range, and the fixture model states its control.
+
+## IR538 The Core API services no longer receive every key of .env.local — 2026-11-01
+
+Found in the loop's secrets check. The compose anchor of the Core API services read `.env.local` as an `env_file`, so every domain service and the gateway carried every key in it. That included the local broker's keys and the live broker's login, which switches a real air conditioner (DEC-89). Yet the Go services read none of these keys: only `iot-bridge` and `device-sim` use theirs, through compose interpolation.
+
+1. **Fix.** The anchor has no `env_file`. A key reaches only the containers that use it, by interpolation: the IoT services' broker keys, and the live broker's login for `iot-bridge`. Values set in `environment` were never affected, because they win over `env_file`.
+2. **Checked.** A `docker inspect` of the recreated services shows no `REAL_MQTT_*` or `MQTT_*_KEY` outside `iot-bridge` and `device-sim`. The container design says so beside the local values.

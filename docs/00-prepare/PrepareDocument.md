@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.407.0
+version: 0.408.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -286,6 +286,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.408.0: The Core API services no longer read .env.local; each key reaches only the containers that use it (IR538). Phase 1A unchanged.
 0.407.0: The voice assistant's change card offers no temperature change on a model without remote control (IR537). Phase 1A unchanged.
 0.406.0: The client design's DD-C03 states the unit page's capability rules, changes and room readings (IR536). Phase 1A unchanged.
 0.405.0: Tidy-ups: the bridge's one check for a recorded event, and DEC-86 points to DEC-89 for the live unit's remote power (IR535). Phase 1A unchanged.
