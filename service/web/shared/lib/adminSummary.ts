@@ -3,7 +3,7 @@
 // in the user's display time zone (IR44), the period in Kuala Lumpur days (named so).
 import { EN, showClock, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { statusWord } from "@ac/web/lib/partnerJobDetail";
-import { coveragePct } from "@ac/web/lib/energy";
+import { coveragePct, warningShort } from "@ac/web/lib/energy";
 import { money as formatMoney } from "@ac/web/lib/money";
 
 const en = translator("en");
@@ -72,14 +72,16 @@ const direction = (v: number, unit: string, t: T) => (v > 0 ? { text: t("Expecte
 export function forecastView(f: ApiForecast | null | undefined, t: T = en): ForecastView {
   if (!f || f.forecastSavedKWh === null || f.predictedBaselineKWh === null || f.predictedActualKWh === null) {
     const w = f?.qualityWarnings ?? [];
-    return { state: "none", text: t(w.includes("no_units") ? "No target equipment" : w.includes("baseline_unavailable") ? "Baseline not set" : "Cannot calculate"), warnings: w };
+    const why = w.includes("no_units") ? "no_units" : w.includes("baseline_unavailable") ? "baseline_unavailable" : null;
+    // the badges name the other warnings in words; the one the title already says is not repeated (IR577)
+    return { state: "none", text: t(why === "no_units" ? "No target equipment" : why === "baseline_unavailable" ? "Baseline not set" : "Cannot calculate"), warnings: w.filter((x) => x !== why).map((x) => warningShort(x, t)) };
   }
   const b = f.baselineSnapshot;
   return {
     state: "ok", saved: direction(f.forecastSavedKWh, "kWh", t), rate: f.forecastSavingPercentage === null ? { text: "—", tone: "muted" } : direction(f.forecastSavingPercentage, "%", t),
     baseline: { value: kwh(f.predictedBaselineKWh), sub: b ? `${f.baselineRef?.id.slice(0, 8) ?? b.id.slice(0, 8)} v${f.baselineRef?.version ?? b.version} · ${b.method}${b.baselineKWh === null ? "" : ` · ${thousands(b.baselineKWh)} kWh`}` : t("baseline") },
     actual: { value: kwh(f.predictedActualKWh), sub: t("{actual} on valid slots ÷ {valid} × {expected} unit-min", { actual: f.actualKWhOnValidSlots === null ? "—" : kwh(f.actualKWhOnValidSlots), valid: thousands(f.validUnitMinutes), expected: thousands(f.expectedUnitMinutes) }) },
-    coverage: t("{valid} / {expected} unit-min", { valid: thousands(f.validUnitMinutes), expected: thousands(f.expectedUnitMinutes) }), warnings: f.qualityWarnings,
+    coverage: t("{valid} / {expected} unit-min", { valid: thousands(f.validUnitMinutes), expected: thousands(f.expectedUnitMinutes) }), warnings: f.qualityWarnings.map((x) => warningShort(x, t)),
   };
 }
 
@@ -99,7 +101,7 @@ export function axisRows(s: AdminSummary, links: ReturnType<typeof overviewLinks
       { label: t("Offline"), key: "connections=offline", count: s.offline, pct: pct(s.offline, conn), tone: "crit", href: links.connection("offline") },
       { label: t("Unknown / connecting / error"), key: "connections=connecting,error,unknown", count: s.unknown, pct: pct(s.unknown, conn), tone: "warn", href: links.connection("connecting,error,unknown") },
     ] as AxisRow[],
-    rateNote: t("Operation rate = Running ÷ (Running + Stopped) = {on} ÷ {known} = {rate}. total {total} = Running + Stopped + unknown. Unknown is never counted as Stopped. Archived units are excluded (IR39).", {
+    rateNote: t("Operation rate = Running ÷ (Running + Stopped) = {on} ÷ {known} = {rate}. total {total} = Running + Stopped + unknown. Unknown is never counted as Stopped. Archived units are excluded.", {
       on: s.powerOn, known: s.powerOn + s.powerOff, rate: s.operatingRate === null ? "—" : `${s.operatingRate.toFixed(1)}%`, total: s.total,
     }),
   };

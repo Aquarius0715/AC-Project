@@ -68,10 +68,10 @@ function Sections({ s, links }: { s: AdminSummary; links: ReturnType<typeof over
     <>
       {s.total === 0 && <Banner tone="warn">{t("Zero units in scope — nothing to show yet.")}</Banner>}
       <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
-        <Kpi label={t("Active customers")} value={k.customers} sub={t("Customer active (IR40)")} />
+        <Kpi label={t("Active customers")} value={k.customers} sub={t("with Active status")} />
         <Kpi label={t("Target units")} value={k.units} sub={t("Running {on} · Stopped {off} · unknown {unknown} · archived excluded", { on: k.on, off: k.off, unknown: k.unknown })} href={links.units} link={t("Open units")} />
         <Kpi label={t("Operation rate")} value={k.rate} sub={t("Running {on} / known {known} · unknown {unknown} not in denominator", { on: k.on, known: k.on + k.off, unknown: k.unknown })} href={links.power("on")} link={t("Units running")} />
-        <Kpi label={t("Unresolved alerts")} value={k.alerts} tone={k.alerts ? "warn" : undefined} sub={t("open/acknowledged · critical and warning (IR51)")} href={links.alerts} link={t("View alerts")} />
+        <Kpi label={t("Unresolved alerts")} value={k.alerts} tone={k.alerts ? "warn" : undefined} sub={t("open or acknowledged · critical and warning")} href={links.alerts} link={t("View alerts")} />
         <Kpi label={t("Energy used (actual)")} value={k.kwh} sub={k.kwhSub} href={links.energy} link={t("Energy analysis")} />
         <Kpi label={t("Overdue billing")} value={k.billing} tone={bill.forbidden ? undefined : bill.overdue ? "crit" : undefined} sub={k.billingSub} href={bill.forbidden ? undefined : links.billing} link={bill.forbidden ? undefined : t("Open overdue")} />
         <Kpi label={t("Maintenance jobs (period)")} value={k.jobs} sub={jobs.filter((j) => j.count).map((j) => `${j.label} ${j.count}`).join(" · ") || t("no jobs in the period")} href={links.jobs()} link={t("Open jobs")} />
@@ -81,15 +81,15 @@ function Sections({ s, links }: { s: AdminSummary; links: ReturnType<typeof over
         {f.state === "ok" ? (
           <>
             <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-              <Tile label={t("Forecast savings")} value={f.saved.text} tone={f.saved.tone} sub={t("forecastSavedKWh · this period")} />
-              <Tile label={t("Forecast saving rate")} value={f.rate.text} tone={f.rate.tone} sub={t("forecastSavingPercentage = saved ÷ predicted baseline")} />
+              <Tile label={t("Forecast savings")} value={f.saved.text} tone={f.saved.tone} sub={t("kWh this period")} />
+              <Tile label={t("Forecast saving rate")} value={f.rate.text} tone={f.rate.tone} sub={t("saved ÷ predicted baseline")} />
               <Tile label={t("Predicted baseline")} value={f.baseline.value} sub={f.baseline.sub} />
               <Tile label={t("Predicted actual")} value={f.actual.value} sub={f.actual.sub} />
             </div>
-            <p className="mt-2 flex flex-wrap items-center gap-2 text-xs">{t("Coverage {coverage} (validUnitMinutes / expectedUnitMinutes)", { coverage: f.coverage })}{f.warnings.map((w) => <Badge key={w} tone="primary">{w}</Badge>)}</p>
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-xs">{t("Coverage {coverage} (valid ÷ expected unit-minutes)", { coverage: f.coverage })}{f.warnings.map((w) => <Badge key={w} tone="primary">{w}</Badge>)}</p>
           </>
         ) : <p className="flex flex-wrap items-center gap-2 text-[13px] font-semibold">{f.text}{f.warnings.map((w) => <Badge key={w} tone="muted">{w}</Badge>)}</p>}
-        <p className="mt-2 text-[11px] text-muted-foreground">{t("A forecast, not a measured saving. Actual results for the period are in the “Energy used” KPI; baseline comparison lives in Energy analysis (A13).")}</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">{t("A forecast, not a measured saving. Actual results for the period are in the “Energy used” KPI; baseline comparison lives in Energy analysis.")}</p>
       </Card>
       <div className="grid-fluid" style={{ ["--min" as string]: "420px" }}>
         <Card title={t("Operation (power state)")} action={<TextLink href={links.units}>{t("Open units")} <Icon name="arrowRight" /></TextLink>}><Axis rows={axes.power} /><p className="mt-2 text-[11px] text-muted-foreground">{axes.rateNote}</p></Card>
@@ -102,20 +102,20 @@ function Sections({ s, links }: { s: AdminSummary; links: ReturnType<typeof over
               <div key={i} className="rounded-xl border border-line">{col.map((j) => <Link key={j.status} href={j.href} className="flex justify-between border-t border-line px-3 py-1.5 text-[13px] first:border-0 hover:bg-surface2"><span className="text-muted-foreground">{j.label}</span><b>{j.count}</b></Link>)}</div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">{t("Jobs whose requested time starts in the period. The status rows open the Jobs tab with that stage, the scope and the period (IR245).")}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("Jobs whose requested time starts in the period. The status rows open the Jobs tab with that stage, the scope and the period.")}</p>
         </Card>
         <Card title={t("Billing — unpaid by currency")} action={!bill.forbidden && <TextLink href={links.billing}>{t("Open overdue")} <Icon name="arrowRight" /></TextLink>}>
-          {bill.forbidden ? <p className="text-[13px] text-muted-foreground">{t("Hidden — billing.read is required.")}</p> : (
+          {bill.forbidden ? <p className="text-[13px] text-muted-foreground">{t("Hidden — your role cannot read billing.")}</p> : (
             <div className="rounded-xl border border-line">
               <div className="flex justify-between px-3 py-1.5 text-[13px]"><span className="text-muted-foreground">{t("Overdue invoices")}</span><b>{bill.overdue}</b></div>
               {bill.rows.map((r) => <div key={r.currency} className="flex justify-between border-t border-line px-3 py-1.5 text-[13px]"><span className="text-muted-foreground">{t("{currency} (unpaid)", { currency: r.currency })}</span><b className="text-crit">{r.text}</b></div>)}
               {bill.rows.length === 0 && <div className="border-t border-line px-3 py-1.5 text-[13px] text-muted-foreground">{t("Nothing unpaid past due.")}</div>}
             </div>
           )}
-          <p className="mt-2 text-[11px] text-muted-foreground">{t("amountsByCurrency is listed per currency and never summed across currencies. The link opens /admin/billing?overdueOnly=true — no period (IR50, SR06).")}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("Unpaid amounts are listed per currency and never added across currencies. Open overdue lists every overdue invoice, whatever the period.")}</p>
         </Card>
       </div>
-      <p className="text-[11px] text-muted-foreground">{t("KPI → list links pass the same customer / property but not the period for current-state KPIs (units, alerts, unpaid); Back restores this URL including the period (IR50, D13).")}</p>
+      <p className="text-[11px] text-muted-foreground">{t("The links keep the customer and property. Units, alerts and unpaid invoices are current, so their lists ignore the period; Back returns here with it.")}</p>
     </>
   );
 }
@@ -125,6 +125,7 @@ function Tile({ label, value, sub, tone }: { label: string; value: string; sub: 
 }
 
 function Axis({ rows }: { rows: AxisRow[] }) {
+  const t = useT();
   return (
     <>
       <div className="mb-2 flex h-2.5 w-full overflow-hidden rounded-full bg-surface2" role="img" aria-label={rows.map((r) => `${r.label} ${r.count}`).join(", ")}>
@@ -133,8 +134,8 @@ function Axis({ rows }: { rows: AxisRow[] }) {
       {rows.map((r) => (
         <div key={r.key} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 py-1 text-[13px]">
           <span className="flex items-center gap-2"><i className={cx("inline-block h-2 w-2 rounded-full", barTone[r.tone])} />{r.label}</span>
-          {/* the filter key has no spaces ("connections=connecting,error,unknown"): it breaks anywhere at phone width (IR500) */}
-          <span className="flex min-w-0 items-center gap-3"><Link href={r.href} className="min-w-0 text-[11px] text-primary [overflow-wrap:anywhere] hover:underline">{r.key} <Icon name="arrowRight" /></Link><b>{r.count}</b></span>
+          {/* a word, not the list's filter ("powerState=on"); the name says which units (IR577) */}
+          <span className="flex min-w-0 items-center gap-3"><Link href={r.href} aria-label={t("View the units: {state}", { state: r.label })} className="min-w-0 text-[11px] text-primary hover:underline">{t("View")} <Icon name="arrowRight" /></Link><b>{r.count}</b></span>
         </div>
       ))}
     </>

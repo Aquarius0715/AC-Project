@@ -8112,3 +8112,20 @@ Found in the seventh round of the UX loop (UX-07: the technician app's tap targe
 3. **Design and Figma.** The admin design's device paragraph names it. Figma's sensor tables (Technician 31, Admin 25) show a small secondary Button "Calibrate…" instead of the text link.
 
 The security point of the round: the tap-target check only reads the screens. The scan dialog lists only the units of the technician's own open jobs, as checked in UX-03.
+
+## IR577 The HQ overview speaks business language — 2026-11-02
+
+Found in UX-04 and walked in the eighth round of the UX loop (UX-08: hq-operator reads the overview at 1920 and 1280 and follows a power row to the units). The overview copied the specification's notes and field names onto the screen, as Figma's frames drew them:
+
+- requirement IDs: "Customer active (IR40)", "(IR51)", "(A13)", "(IR39)", "(IR245)", "(IR50, SR06)", "(IR50, D13)";
+- API and field names: "amountsByCurrency", "forecastSavedKWh", "forecastSavingPercentage", "validUnitMinutes / expectedUnitMinutes", "billing.read";
+- the power and connection rows linked with their list filter as text: "powerState=on →", "connections=connecting,error,unknown →";
+- the forecast's quality warnings showed as codes, "baseline_unavailable" and "partial_coverage", the first beside the title "Baseline not set" that already said it.
+
+1. **Words.** The KPI subs and the card notes keep their rules in plain words. Examples: "with Active status"; "open or acknowledged · critical and warning"; "Unpaid amounts are listed per currency and never added across currencies. Open overdue lists every overdue invoice, whatever the period."; "The links keep the customer and property. Units, alerts and unpaid invoices are current, so their lists ignore the period; Back returns here with it."; "Hidden — your role cannot read billing.".
+2. **Row links.** The power and connection rows link with "View". The accessible name says which units ("View the units: Running").
+3. **Warnings.** `warningShort` (`shared/lib/energy.ts`) names each quality warning in a few words for a badge. `forecastView` uses it, and leaves out the warning that the title states.
+4. **Tests.** `adminSummary.test.ts` expects the warnings in words and none repeated. The new `admin/overview.e2e.ts` follows the named row links and finds no ID, field name or filter on the screen.
+5. **Design and Figma.** The overview steps of DD-A01 state it. In Figma's ten overview frames, 137 screen texts follow the app, and the repeated "baseline_unavailable" badge is hidden. The notes that describe each state (loading, refetching, empty, permission-scoped) stay as annotations.
+
+Raw method codes ("demo_fixed") remain in Energy analysis; they are left to the round that walks that screen.

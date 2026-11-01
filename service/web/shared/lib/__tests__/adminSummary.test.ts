@@ -34,11 +34,12 @@ describe("HQ overview sections (DD-A01, IR244)", () => {
     expect(f).toEqual({
       state: "ok", saved: { text: "Expected reduction 9.9 kWh", tone: "ok" }, rate: { text: "Expected reduction 30.6%", tone: "ok" },
       baseline: { value: "32.4 kWh", sub: "baseline v1 · demo_fixed · 2,592 kWh" }, actual: { value: "22.5 kWh", sub: "9.0 kWh on valid slots ÷ 1,080 × 2,700 unit-min" },
-      coverage: "1,080 / 2,700 unit-min", warnings: ["modeled_baseline", "partial_coverage", "prorated_forecast"],
+      coverage: "1,080 / 2,700 unit-min", warnings: ["Modeled baseline", "Partial coverage", "Prorated forecast"], // in words (IR577)
     });
     expect(forecastView(forecast({ forecastSavedKWh: -2.5, forecastSavingPercentage: -8.1 }))).toMatchObject({ saved: { text: "Expected increase 2.5 kWh", tone: "crit" }, rate: { text: "Expected increase 8.1%" } });
     expect(forecastView(forecast({ forecastSavedKWh: 0, forecastSavingPercentage: 0 }))).toMatchObject({ saved: { text: "No change 0.0", tone: "muted" } });
-    expect(forecastView(forecast({ forecastSavedKWh: null, predictedBaselineKWh: null, qualityWarnings: ["baseline_unavailable"] }))).toEqual({ state: "none", text: "Baseline not set", warnings: ["baseline_unavailable"] });
+    expect(forecastView(forecast({ forecastSavedKWh: null, predictedBaselineKWh: null, qualityWarnings: ["baseline_unavailable"] }))).toEqual({ state: "none", text: "Baseline not set", warnings: [] }); // the title says it once (IR577)
+    expect(forecastView(forecast({ forecastSavedKWh: null, predictedBaselineKWh: null, qualityWarnings: ["baseline_unavailable", "partial_coverage"] })).warnings).toEqual(["Partial coverage"]);
     expect(forecastView(forecast({ forecastSavedKWh: null, qualityWarnings: ["no_units"] }))).toMatchObject({ text: "No target equipment" });
     expect(forecastView(null)).toEqual({ state: "none", text: "Cannot calculate", warnings: [] });
   });

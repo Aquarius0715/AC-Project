@@ -72,6 +72,12 @@ const warningText: Record<string, string> = {
   boundary_mismatch: "Boundary differs from the baseline",
 };
 export const warning = (code: string, t: T = en) => (warningText[code] ? t(warningText[code]) : code);
+// The same warnings in a few words, for a badge; a code without a label still reads as words (IR577)
+const warningShortText: Record<string, string> = {
+  partial_coverage: "Partial coverage", baseline_not_comparable: "Baseline not comparable", modeled_baseline: "Modeled baseline", prorated_modeled_baseline: "Prorated baseline",
+  prorated_forecast: "Prorated forecast", factor_missing: "Emission factor missing", boundary_mismatch: "Boundary differs", baseline_unavailable: "Baseline not set", no_units: "No target equipment",
+};
+export const warningShort = (code: string, t: T = en) => (warningShortText[code] ? t(warningShortText[code]) : code.replace(/_/g, " "));
 
 export type SummaryView = {
   actual: string; baseline: string; difference: string; percent: string; cost: string; savedCost: string; emissions: string; savedEmissions: string;
