@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.439.0
+version: 0.440.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -286,6 +286,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.440.0: The technician's job page names its unit before the window, and its banners name the visit once and show no internal IDs (IR570). Phase 1A unchanged.
 0.439.0: The contractor's offer page and job detail list the technicians who can take the visit first (IR569). Phase 1A unchanged.
 0.438.0: Every page of the four apps starts with a "Skip to main content" link (IR568); the UX loop keeps its log and proposals locally in 05-document-review (ignored by git). Phase 1A unchanged.
 0.437.0: The scheduler's Run wrapper, called only by a test, is removed; RunDomains with no domain list runs every domain (IR567). Phase 1A unchanged.

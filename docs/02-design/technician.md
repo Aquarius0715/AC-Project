@@ -285,9 +285,9 @@ Scope: FR-T08 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get
 3. Save start time, submission time, and `reportVersion`. The quality review determines completion.
 4. Queries to update: `jobs / reports / job events / notifications / audit`.
 
-**Boundary cases and failures**: Reject start and submission if unassigned, cancelled, `on_hold`, or outside the valid period. Before the work window, show the job read-only in work-not-started state (IR76). Follow IR89 for the 15-minute end warning and discarding unsaved inputs at the end. As built (IR337, Figma Technician 02):
+**Boundary cases and failures**: Reject start and submission if unassigned, cancelled, `on_hold`, or outside the valid period. Before the work window, show the job read-only in work-not-started state (IR76). `units.get` is refused then, so the heading and the Unit row name the unit from `units.list`, as the scan dialog does, and the site and access wait for the window (IR570). Follow IR89 for the 15-minute end warning and discarding unsaved inputs at the end. As built (IR337, Figma Technician 02):
 - The Work window line reads “<window> · warning at <end − 15 min> · discard at <end>”.
-- In the last 15 minutes the report shows the banner “Work window ends in n min — unsaved input will be discarded at <end> (IR89).”
+- In the last 15 minutes the report shows the banner “Work window ends in n min — unsaved input will be discarded at <end>.” (IR89)
 - The unit, alert, control and device screens show no such banner.
 
 If submission fails, keep `in_progress` and the draft.

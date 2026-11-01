@@ -25,6 +25,7 @@ export type WorkspaceLive = {
     problemPhotos: { id: string; name: string }[];
   };
   unit: { name: string; place: string; access: string | null; model: string; scope: string[] } | null; unitRefused: string | null;
+  unitName: string | null; // also before the window, when the unit itself is not open yet
   components: { group: Group; key: string }[];
   report: ApiTechReport | null; reportRefused: string | null;
   parts: { code: string; name: string; vanStockQuantity: number | null }[];
@@ -78,6 +79,9 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [linking, setLinking] = useState<string | null>(null); // the component whose “+ Link photo” list is open
   const win = windowState(job.assignment, now, f);
+  // the visit and its start alone: the banners name the time once (UX-03); the Work window line keeps the full state
+  const visit = job.assignment ? f.span(job.assignment.scheduledStart, job.assignment.scheduledEnd) : "";
+  const opens = job.assignment ? f.stamp(job.assignment.scheduledStart) : "";
   const inWork = job.status === "in_progress";
   const paused = !!job.timeOnSite?.pauses?.some((p) => !p.to);
   const editable = inWork && win.phase !== "ended" && win.phase !== "before";
@@ -134,7 +138,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   const head = (
     <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
       <Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Overview")}</Link>
-      <b className="text-ink">{job.id.slice(0, 8)} · {live.unit?.name ?? t("Unit")} — {statusText[job.status] ? t(statusText[job.status]) : job.status}</b>
+      <b className="text-ink">{job.id.slice(0, 8)} · {live.unitName ?? t("Unit")} — {statusText[job.status] ? t(statusText[job.status]) : job.status}</b>
       {dirty && <Badge tone="warn">{t("Unsaved changes")}</Badge>}
     </div>
   );
@@ -193,10 +197,10 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
     <Page>
       {head}
       {refused && <Banner tone="crit">{refused}</Banner>}
-      {job.status === "assigned" && ack === "pending" && <Banner tone="primary" action={<span className="flex gap-2"><Btn size="sm" variant="primary" disabled={pending} onClick={() => run(() => acknowledge(job.id, job.version, "accept", null, null), t("Assignment accepted"), undefined, failed)}><Icon name="check" />{t("Accept assignment")}</Btn><Btn size="sm" disabled={pending} onClick={() => setModal("cant")}>{t("Can’t make this time…")}</Btn></span>}>{t("New assignment for {window}. Accepting tells your coordinator and HQ you will attend; the client then sees your name.", { window: win.text })}</Banner>}
+      {job.status === "assigned" && ack === "pending" && <Banner tone="primary" action={<span className="flex gap-2"><Btn size="sm" variant="primary" disabled={pending} onClick={() => run(() => acknowledge(job.id, job.version, "accept", null, null), t("Assignment accepted"), undefined, failed)}><Icon name="check" />{t("Accept assignment")}</Btn><Btn size="sm" disabled={pending} onClick={() => setModal("cant")}>{t("Can’t make this time…")}</Btn></span>}>{t("New assignment for {window}. Accepting tells your coordinator and HQ you will attend; the client then sees your name.", { window: visit })}</Banner>}
       {job.status === "assigned" && ack === "cant_make" && <Banner tone="warn">{job.assignment?.cantMakeReason ? t("You said you can’t make this time (“{reason}”). Your coordinator reassigns the job or asks the client for another time.", { reason: job.assignment.cantMakeReason }) : t("You said you can’t make this time. Your coordinator reassigns the job or asks the client for another time.")}</Banner>}
-      {job.status === "assigned" && ack === "accepted" && <Banner tone={win.phase === "before" ? "primary" : "ok"} action={<Btn size="sm" variant="primary" disabled={pending || win.phase !== "open" && win.phase !== "ending"} onClick={() => setModal("checkin")}>{t("Start job (check in)")}</Btn>}>{win.phase === "before" ? t("Before the work window ({window}): read-only, Start is disabled (IR76).", { window: win.text }) : win.phase === "ended" ? t("The work window has ended — ask your coordinator to reschedule.") : t("On site: Start job opens Check in (location + unit QR); checking in starts the work (IR111).")}</Banner>}
-      {job.status === "on_hold" && <Banner tone="warn">{t("On hold by HQ — saving and submitting are blocked (CONFLICT, IR93). Your saved draft is kept; continue when HQ resumes the job.")}</Banner>}
+      {job.status === "assigned" && ack === "accepted" && <Banner tone={win.phase === "before" ? "primary" : "ok"} action={<Btn size="sm" variant="primary" disabled={pending || win.phase !== "open" && win.phase !== "ending"} onClick={() => setModal("checkin")}>{t("Start job (check in)")}</Btn>}>{win.phase === "before" ? t("Read-only until the window opens at {time} — Start is disabled before then.", { time: opens }) : win.phase === "ended" ? t("The work window has ended — ask your coordinator to reschedule.") : t("On site: Start job opens Check in (location + unit QR); checking in starts the work.")}</Banner>}
+      {job.status === "on_hold" && <Banner tone="warn">{t("On hold by HQ — saving and submitting are blocked. Your saved draft is kept; continue when HQ resumes the job.")}</Banner>}
       {job.status === "submitted" && <Banner tone="ok">{t("Submitted v{version} — read-only, awaiting quality review.", { version: job.reportRefs[job.reportRefs.length - 1]?.reportVersion ?? "" })}</Banner>}
       {job.status === "completed" && <Banner tone="ok">{t("Accepted — the job is completed and the report is visible to the customer.")}</Banner>}
       {job.status === "rework_requested" && <Banner tone="warn" action={<Btn size="sm" variant="primary" disabled={pending || win.phase === "ended"} onClick={() => run(() => resumeRework(job.id, job.version), t("Rework resumed — continue in the new draft"), undefined, failed)}>{t("Resume rework")}</Btn>}>{live.report?.reviewHistory.at(-1)?.reason ? t("Returned for rework — “{reason}”. Resume to continue as a new draft version; the returned version stays as it was.", { reason: live.report.reviewHistory.at(-1)!.reason! }) : t("Returned for rework. Resume to continue as a new draft version; the returned version stays as it was.")}</Banner>}
@@ -237,7 +241,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
               <Card title={t("Job & unit")} action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${job.unitId}?jobId=${job.id}`}>{t("Unit")} <Icon name="arrowRight" /></Link>}>
                 <SummaryList items={[
                   [t("Window"), <span key="w" className={win.phase === "ending" || win.phase === "ended" ? "font-semibold text-crit" : undefined}>{job.assignment ? f.span(job.assignment.scheduledStart, job.assignment.scheduledEnd) : "—"}</span>],
-                  [t("Site"), live.unit?.place ?? (live.unitRefused ? t("opens at the start of your window") : "—")], [t("Access"), live.unit?.access ?? "—"], [t("Unit"), live.unit ? `${live.unit.name} · ${live.unit.model}` : job.unitId.slice(0, 8)],
+                  [t("Site"), live.unit?.place ?? (live.unitRefused ? t("opens at the start of your window") : "—")], [t("Access"), live.unit?.access ?? "—"], [t("Unit"), live.unit ? `${live.unit.name} · ${live.unit.model}` : live.unitName ?? job.unitId.slice(0, 8)],
                   [t("Job"), `${typeLabel(job.type, t)} · ${t(job.origin === "periodic_plan" ? "periodic plan" : "client request")}`], [t("Request"), job.symptom ? `“${job.symptom}”` : "—"],
                   ...(job.problemPhotos.length ? [[t("Client’s photos"), <span key="p" className="flex flex-wrap gap-x-3">{job.problemPhotos.map((p) => <a key={p.id} href={`/technician/jobs/${job.id}/problem-photos/${p.id}`} target="_blank" rel="noreferrer" className="font-semibold text-primary">{p.name}</a>)}</span>] as [string, React.ReactNode]] : []),
                   [t("Linked alerts"), job.alertCount ? <Link key="a" className="font-semibold text-crit" href={`/technician/units/${job.unitId}/alerts?jobId=${job.id}`}>{t(job.alertCount === 1 ? "1 alert" : "{n} alerts", { n: job.alertCount })} <Icon name="arrowRight" /></Link> : t("none")],
@@ -388,7 +392,7 @@ function CheckInModal({ open, unitId, pending, onClose, onCheckIn }: { open: boo
         </div>
       ) : <Field label={t("Reason (required)")}><Textarea value={reason} maxLength={1000} placeholder={t("No GPS signal in the basement plant room")} onChange={(e) => setReason(e.target.value)} /></Field>}
       {error && <Banner tone="crit">{error}</Banner>}
-      <p className="text-[11px] text-muted-foreground">{t("Arrival must be inside your work window. Checking in records the arrival and starts the work (IR111).")}</p>
+      <p className="text-[11px] text-muted-foreground">{t("Arrival must be inside your work window. Checking in records the arrival and starts the work.")}</p>
     </Modal>
   );
 }

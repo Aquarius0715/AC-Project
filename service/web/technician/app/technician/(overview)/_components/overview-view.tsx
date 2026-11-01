@@ -51,7 +51,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
           </div>
         )}
       </Card>
-      {live.tab === "today" && live.readOnly.map((r) => <Banner key={r.id}>{t("{id} shows read-only until its work window opens {time} — actions are disabled until then (IR76).", { id: r.short, time: r.opens ?? "" })}</Banner>)}
+      {live.tab === "today" && live.readOnly.map((r) => <Banner key={r.id}>{t("{id} shows read-only until its work window opens {time} — actions are disabled until then.", { id: r.short, time: r.opens ?? "" })}</Banner>)}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <Card title={live.day} sub={t("Sort by time")}>
           <ScrollX>

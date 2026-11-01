@@ -63,7 +63,7 @@ export function techRow(j: ApiTechJobRow, now: number, units: Map<string, string
   let badge: TechJobRow["badge"], note: string;
   if (j.status === "assigned" && ack === "pending") [badge, note] = [{ text: t("Not accepted"), tone: "warn" }, t("new assignment — review and accept it")];
   else if (j.status === "assigned" && ack === "cant_make") [badge, note] = [{ text: t("Can’t make it"), tone: "warn" }, t("you said you can’t make it — waiting for your contractor or HQ")];
-  else if (ended) [badge, note] = [{ text: t("Work window ended"), tone: "crit" }, t("ask your contractor or HQ to extend or reassign (IR89)")];
+  else if (ended) [badge, note] = [{ text: t("Work window ended"), tone: "crit" }, t("ask your contractor or HQ to extend or reassign")];
   else if (j.status === "assigned") [badge, note] = [{ text: t("Work not started"), tone: "primary" }, opens ? t("opens {time} (read-only until then)", { time: opens }) : t("check in to start")];
   else if (j.status === "in_progress") [badge, note] = [{ text: t("In progress"), tone: "warn" }, t("report draft open")];
   else if (j.status === "on_hold") [badge, note] = [{ text: t("On hold"), tone: "warn" }, t("held by HQ — actions are blocked")];

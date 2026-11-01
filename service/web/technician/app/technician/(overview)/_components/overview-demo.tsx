@@ -24,7 +24,7 @@ export function OverviewDemo({ tab: initial }: { tab?: string }) {
           <Tabs value={tab} onChange={setTab} tabs={[{ id: "today", label: "Today", count: 2 }, { id: "all", label: "All assigned", count: all.length }]} />
           <Card title={tab === "today" ? "Today — sorted by severity, deadline, progress" : "All assigned jobs"}>
             <JobList jobs={jobs} />
-            {tab === "today" && <p className="mt-3 text-xs text-muted-foreground">job-t07 shows read-only until its work window opens at 14:00 — actions are disabled until then (IR76).</p>}
+            {tab === "today" && <p className="mt-3 text-xs text-muted-foreground">job-t07 shows read-only until its work window opens at 14:00 — actions are disabled until then.</p>}
           </Card>
           <Card title="Today · Mon 2026-09-21" sub="Sort by time">
             <div className="scroll-x"><div className="relative min-w-[480px]"><div className="grid grid-cols-5 text-[11px] text-muted-foreground">{["08:00", "10:00", "12:00", "14:00", "16:00"].map((h) => <span key={h}>{h}</span>)}</div><div className="relative mt-1 h-16 rounded-lg bg-surface2"><div className="absolute top-1 h-6 rounded bg-primary px-2 text-[11px] leading-6 text-white" style={{ left: "25%", width: "25%" }}>10–12 job-contractor-a</div><div className="absolute bottom-1 h-6 rounded bg-primary-soft px-2 text-[11px] leading-6 text-primary" style={{ left: "75%", width: "25%" }}>14–16 job-t07</div><span className="absolute inset-y-0 w-px bg-crit" style={{ left: "46%" }} /></div></div></div>

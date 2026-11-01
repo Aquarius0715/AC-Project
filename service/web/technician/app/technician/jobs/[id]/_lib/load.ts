@@ -37,6 +37,8 @@ export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | { ki
   if (job?.projection === "history") return { kind: "history", card: historyCard(job, i) }; // window ended: completed (IR234) or reassigned
   if (!job || job.projection !== "detail") return "not_found";
   const [now, unit] = await Promise.all([coreNow(), quiet(coreOp<ApiUnitDetail & { serviceScope?: string[] }>("units.get", { id: job.unitId }))]);
+  // before the work window units.get refuses, but units.list still names the unit of the assignment, as the overview does (IR570)
+  const listed = isRefused(unit) ? await quiet(coreOp<{ items: { displayName: string }[] }>("units.list", { limit: 1, filters: { unitIds: [job.unitId] } })) : null;
   const ref = job.draftReportRef ?? job.reportRefs[job.reportRefs.length - 1] ?? null;
   const editable = job.status === "in_progress" && !!job.draftReportRef;
   const [report, parts] = await Promise.all([
@@ -59,6 +61,7 @@ export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | { ki
     },
     unit: u ? { name: u.displayName, place: u.location.pathLabels.join(" › "), access: u.location.accessInstructions, model: `${u.capabilities.manufacturer} ${u.capabilities.model}`, scope: u.serviceScope ?? ["indoor", "outdoor", "electrical"] } : null,
     unitRefused: isRefused(unit) ? unit.refused : null,
+    unitName: u?.displayName ?? (listed && !isRefused(listed) ? listed.items[0]?.displayName ?? null : null),
     components: componentsFor(u?.serviceScope ?? ["indoor", "outdoor", "electrical"]),
     report: r, reportRefused: isRefused(report) ? report.refused : null,
     parts: isRefused(parts) ? [] : parts,

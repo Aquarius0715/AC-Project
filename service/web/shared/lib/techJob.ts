@@ -171,7 +171,7 @@ export function windowState(a: { scheduledStart: string; scheduledEnd: string } 
   const text = t("{range} · warning at {warn} · discard at {end}", { range, warn: f.clock(warnAt(a.scheduledEnd)), end: f.clock(a.scheduledEnd) });
   const left = Math.ceil((end - now) / 60000);
   return left <= WARN_MINUTES
-    ? { phase: "ending", text, notice: t("Work window ends in {n} min — unsaved input will be discarded at {time} (IR89).", { n: left, time: f.clock(a.scheduledEnd) }) }
+    ? { phase: "ending", text, notice: t("Work window ends in {n} min — unsaved input will be discarded at {time}.", { n: left, time: f.clock(a.scheduledEnd) }) }
     : { phase: "open", text };
 }
 

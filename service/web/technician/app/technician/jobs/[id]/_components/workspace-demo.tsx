@@ -102,10 +102,10 @@ function Workspace({ id }: { id: string }) {
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> Overview</Link><b className="text-ink">{id} · Bedroom AC</b><Badge tone={status === "Submitted" ? "ok" : status === "Assigned" ? "primary" : "warn"}>{status}</Badge></div>
-      {status === "Assigned" && <Banner action={<span className="flex gap-2"><Btn size="sm" disabled>Start job</Btn><Btn size="sm" variant="ghost" onClick={() => setCheckIn(true)}>Preview check-in</Btn></span>}>Before the work window (starts 14:00): read-only, Start is disabled (IR76). On site, Start job opens Check in (location + unit QR).</Banner>}
+      {status === "Assigned" && <Banner action={<span className="flex gap-2"><Btn size="sm" disabled>Start job</Btn><Btn size="sm" variant="ghost" onClick={() => setCheckIn(true)}>Preview check-in</Btn></span>}>Read-only until the window opens at 14:00 — Start is disabled before then. On site, Start job opens Check in (location + unit QR).</Banner>}
       {status === "Submitted" && <Banner tone="ok">Submitted v1 — read-only, awaiting quality review.</Banner>}
-      {status === "In progress" && <Banner tone="warn">Work window ends in 15 min — unsaved input will be discarded at 12:00 (IR89).</Banner>}
-      {status === "On hold" && <Banner tone="warn" action={<Btn size="sm" variant="ghost" onClick={() => setStatus("In progress")}>Demo: HQ resumes</Btn>}>On hold by HQ — save and submit are blocked (CONFLICT, IR93). Your draft v2 is kept; you can continue when HQ resumes the job.</Banner>}
+      {status === "In progress" && <Banner tone="warn">Work window ends in 15 min — unsaved input will be discarded at 12:00.</Banner>}
+      {status === "On hold" && <Banner tone="warn" action={<Btn size="sm" variant="ghost" onClick={() => setStatus("In progress")}>Demo: HQ resumes</Btn>}>On hold by HQ — saving and submitting are blocked. Your draft v2 is kept; continue when HQ resumes the job.</Banner>}
       {status === "In progress" && <p className="text-right text-[11px] text-muted-foreground"><Plain className="underline" onClick={() => setStatus("On hold")}>Demo: HQ puts the job on hold</Plain></p>}
       {errs.length > 0 && <Banner tone="crit"><b>Can’t submit:</b><ul className="list-disc pl-5 text-xs">{errs.slice(0, 5).map((e) => <li key={e}>{e}</li>)}</ul></Banner>}
       <div className="split">

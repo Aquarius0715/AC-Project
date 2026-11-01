@@ -8022,3 +8022,19 @@ Found in the second round of the UX loop (UX-02: contractor-a takes a new offer 
 3. **Design.** DD-P02's offer and job detail paragraph in the contractor design states the order. Figma's frames (Contractor 02-7…02-14) already show this order: Fits before Not qualified, and Assigned, Best fit, Not eligible.
 
 The rest of UX-02 needed no change. The overview shows "Offers to answer" with a link to the offer; Accept job says what comes next ("Offer accepted — assign a technician next") and leaves an Assign technician link; the assignment shows its result. Five clicks in all. No sideways scroll at 1920 or 1280, no axe violation, no page error.
+
+## IR570 The technician's job page names its unit and the visit once, without internal IDs — 2026-11-01
+
+Found in the third round of the UX loop (UX-03: tech-external-a, on a 390×844 phone, opens a new assignment from the overview and accepts it). Two taps reach the result ("Assignment accepted"), with no sideways scroll at 390 or 1920, no axe violation and no page error. The texts on the way were harder to read than needed:
+
+- The new-assignment banner put the whole Work window state into its sentence: "New assignment for Starts 24 Sept 2026, 10:00 am MYT · 24 Sept, 10:00 am – 12:00 pm MYT." The date came twice, and "for Starts" is not a sentence.
+- The job and overview banners ended with requirement IDs that mean nothing to a technician: "(IR76)", "(IR89)", "(IR111)" and "(CONFLICT, IR93)".
+- The job page's heading read "4c63128e · Unit — assigned", and its Unit row a short ID, while the overview banner had just named the unit ("Meeting room AC"). Before the window `units.get` is refused (IR76), and the page had no other source for the name.
+
+1. **Visit once.** The new-assignment banner names the visit alone ("New assignment for 24 Sept, 10:00 am – 12:00 pm MYT."). Before the window, the accepted job reads "Read-only until the window opens at <start> — Start is disabled before then." The Work window line in the job card keeps the full state.
+2. **No IDs.** The before-window, on-site, check-in, on-hold, overview read-only and end-of-window texts lose their IDs, and so does the overview row of a job whose window ended. The on-hold banner says "saving and submitting are blocked" without the error code. The Malay dictionary follows.
+3. **Unit name.** When `units.get` is refused, the loader asks `units.list` for the job's unit (`unitIds`, one row), as the overview and the scan dialog already do. The heading and the Unit row name it; the site and access still wait for the window.
+4. **Tests.** `techJob.test.ts` expects the end-of-window notice without the ID, in English and Malay. The request-to-technician scenario expects the job page to name the unit chosen in the customer's request and the banner to name the visit once.
+5. **Design and Figma.** The technician design quotes the end-of-window banner without the ID and states where the name comes from before the window. Figma's Technician page shows the same texts in 13 frames (overview read-only, before-window, work window ending, on hold). The ClickMap captions keep their IDs: they are notes for the reader of the design, not screen text.
+
+Device registration, diagnostics and firmware texts still carry IDs (BR-T02, CONFLICT, OFFLINE with IR94); they are left to the rounds that walk those screens.
