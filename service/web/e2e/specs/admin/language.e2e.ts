@@ -139,7 +139,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await main.getByRole("button", { name: "Garis dasar baharu" }).click();
   await expect(main.getByRole("heading", { name: "Garis dasar baharu", exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Cipta garis dasar" }).click();
-  for (const text of ["Pilih 1–100 unit", "Tamat mesti selepas mula", "Nilai ≥ 0 kWh"]) await expect(main).toContainText(text);
+  for (const text of ["Pilih 1–100 unit", "Masukkan masa mula dan tamat", "Nilai ≥ 0 kWh"]) await expect(main).toContainText(text); // an empty period asks for both ends (IR586)
   await main.getByRole("button", { name: "Batal", exact: true }).click();
   await expect(main.getByRole("heading", { name: "Garis dasar baharu", exact: true })).toBeHidden();
   // the MRV workspace (IR297): the reports with the new-report checks and a preview — a read, so nothing is stored —
@@ -181,7 +181,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   const quote = page.getByRole("dialog", { name: "Sebut harga demo baharu" });
   await expect(quote.getByLabel("Mula tempoh (Kuala Lumpur)")).toBeVisible(); // the quote's period is Kuala Lumpur time
   await quote.getByRole("button", { name: "Dapatkan sebut harga demo" }).click();
-  for (const text of ["Pilih pelanggan", "Pilih 1–100 unit", "Tamat mesti selepas mula", "1–1000 aksara", "Melebihi 0, paling banyak 100000, sehingga 3 perpuluhan"]) await expect(quote).toContainText(text);
+  for (const text of ["Pilih pelanggan", "Pilih 1–100 unit", "Masukkan masa mula dan tamat", "1–1000 aksara", "Melebihi 0, paling banyak 100000, sehingga 3 perpuluhan"]) await expect(quote).toContainText(text);
   await quote.getByRole("button", { name: "Batal", exact: true }).click();
   await expect(quote).toBeHidden();
   await main.getByRole("tab", { name: "Konsep pasaran" }).click();
