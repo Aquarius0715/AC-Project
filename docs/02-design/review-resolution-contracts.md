@@ -7837,3 +7837,16 @@ Found in the loop. Container design §6 listed only the planned production pipel
 - `scripts/check.sh` as the local run of `ci.yml`.
 
 The plan's first step builds every image, not two. Its second step is marked as what the E2E workflow already does.
+
+## IR551 The identity provider's admin flow allows the account calls — 2026-11-01
+
+Found in the loop. Network architecture F20 (identity service → the identity provider's admin API) still read as IR386 left it: its only purpose was HQ's "Sign out everywhere", and in production identity-api's task role was allowed `AdminUserGlobalSignOut` only. Since IR461 to IR463 the same flow also opens and updates the accounts of the people added, sends their set-up e-mail and turns them off and on. With that role, the planned Cognito adapter could not open a single account.
+
+1. **F20.** The task role is allowed the user administration calls on the user pool, and nothing more:
+   - `AdminCreateUser`, which also resends the set-up message;
+   - `AdminGetUser` and `ListUsers`, to find a user and its code device;
+   - `AdminUpdateUserAttributes`, `AdminEnableUser` and `AdminDisableUser`;
+   - `AdminUserGlobalSignOut`.
+
+   The purpose names the accounts and the sign-out. Locally the service-account client may only manage users (IR386).
+2. **Container design.** The `IDP_*` row says the same for production. It also says what happens when the variables are unset: no consumer handles AccountRequested, so the people added get no sign-in account, and signing out everywhere is the Core API's cutoff only. Before, it named the cutoff only.
