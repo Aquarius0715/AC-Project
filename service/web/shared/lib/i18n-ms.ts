@@ -1662,6 +1662,8 @@ export const ms: Record<string, string> = {
   "{channel} · sent {date} (demo record)": "{channel} · dihantar {date} (rekod demo)",
   "In-app": "Dalam aplikasi",
   "Preview email": "Pratonton e-mel",
+  "WhatsApp reminders need a phone number on your account. Yours has none, so reminders reach you by email and in the app.": "Peringatan WhatsApp memerlukan nombor telefon pada akaun anda. Akaun anda tiada nombor, jadi peringatan sampai melalui e-mel dan dalam aplikasi.",
+  "This person does not get this notice on that channel": "Orang ini tidak menerima notis ini melalui saluran itu",
   "Preview WhatsApp": "Pratonton WhatsApp",
   "Payment instructions (demo)": "Arahan pembayaran (demo)",
   "Transfer {amount} for {target} to the demo bank account “AC Project HQ (demo)” with the invoice number as the reference. HQ records the transfer when it arrives.": "Pindahkan {amount} untuk {target} ke akaun bank demo “AC Project HQ (demo)” dengan nombor invois sebagai rujukan. HQ merekodkan pindahan apabila ia diterima.",

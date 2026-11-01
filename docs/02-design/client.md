@@ -422,7 +422,7 @@ Scope: FR-C11 / Main display pattern: **UI-DETAIL / UI-FORM**. Service boundary:
 |---|---|---|---|
 | invoiceId | ID/required | Unpaid invoice | Target |
 | paymentChoice | UI enum/required | demo_credit_card/demo_debit_card/demo_instructions | Map cards to initiate.method; instructions to the instructions event |
-| channel | enum/for preview | email/whatsapp | Instructions |
+| channel | enum/for preview | email/whatsapp; WhatsApp only for an account with a phone number, otherwise its preview is disabled with the reason (IR578) | Instructions |
 | demoConfirmed | boolean/required | Default: false | Confirm simulation |
 | outcome | enum/demo controls | processing/confirmed/failed | Test event, separate from normal form |
 

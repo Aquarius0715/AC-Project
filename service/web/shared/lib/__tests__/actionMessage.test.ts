@@ -27,6 +27,8 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "errors.too_many_accounts", retryAfterSeconds: 81060 }))).toBe("Many users were added in the last 24 hours — you can add more in 23 h");
     // IR462: an address someone with access holds says what to do; a nested field is named by its last part
     expect(actionMessage(failure({ fieldErrors: { "newUser.email": "errors.email_taken" } }))).toBe("Email belongs to someone who still has access — use another address or ask HQ");
+    // a notice the person does not get on that channel reads in words, not "Recipient membership id — recipient ineligible" (IR578)
+    expect(actionMessage(failure({ fieldErrors: { recipientMembershipId: "errors.recipient_ineligible" } }))).toBe("This person does not get this notice on that channel");
     // IR508: HQ ended the access — only HQ gives it back, in the display language
     expect([actionMessage(failure({ code: "CONFLICT", messageKey: "errors.revoked_by_hq" })), actionMessage(failure({ fieldErrors: { email: "errors.revoked_by_hq" } }), translator("ms"))]).toEqual([
       "HQ ended this account's access — only HQ can give it back", "HQ telah menamatkan akses orang ini — hanya HQ boleh memulihkannya"]);

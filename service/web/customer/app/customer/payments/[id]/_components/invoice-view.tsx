@@ -14,6 +14,8 @@ import { Icon } from "@ac/web/components/Icon";
 
 export type InvoiceLive = {
   tab: "payment" | "restriction" | "inquiry";
+  /** The signed-in user gets WhatsApp reminders: only an account with a phone number does (IR578). */
+  whatsapp: boolean;
   /** The display time zone is not Kuala Lumpur, so the due line says the date is a Kuala Lumpur business day. */
   otherZone: boolean;
   invoice: { id: string; version: number; number: string; amount: string; due: string; dueDate: string; status: InvoiceStatus; payable: boolean };
@@ -118,7 +120,8 @@ function PaymentTab({ live }: { live: InvoiceLive }) {
             {live.reminders.length === 0 ? <p className="text-xs text-muted-foreground">{t("No reminder has been sent for this invoice.")}</p> : live.reminders.map((r) => (
               <div key={r.id} className="border-t border-line py-2 text-[13px] first:border-0">{t("{channel} · sent {date} (demo record)", { channel: channelName[r.channel] ? t(channelName[r.channel]) : r.channel, date: r.at })}</div>
             ))}
-            <div className="mt-2 flex gap-2"><Btn size="sm" variant="ghost" disabled={pending} onClick={() => show("email")}>{t("Preview email")}</Btn><Btn size="sm" variant="ghost" disabled={pending} onClick={() => show("whatsapp")}>{t("Preview WhatsApp")}</Btn></div>
+            <div className="mt-2 flex gap-2"><Btn size="sm" variant="ghost" disabled={pending} onClick={() => show("email")}>{t("Preview email")}</Btn><Btn size="sm" variant="ghost" disabled={pending || !live.whatsapp} onClick={() => show("whatsapp")}>{t("Preview WhatsApp")}</Btn></div>
+            {!live.whatsapp && <p className="mt-1 text-[11px] text-muted-foreground">{t("WhatsApp reminders need a phone number on your account. Yours has none, so reminders reach you by email and in the app.")}</p>}
           </Card>
         </div>
       </div>
@@ -128,7 +131,7 @@ function PaymentTab({ live }: { live: InvoiceLive }) {
       </Modal>
       <Modal open={!!preview} onClose={() => setPreview(null)} title={preview ? t("{channel} preview", { channel: t(channelName[preview.channel]) }) : ""} footer={<Btn onClick={() => setPreview(null)}>{t("Close")}</Btn>}>
         {preview && <>
-          <div className="mb-2"><Choice value={preview.channel} onChange={(v: "email" | "whatsapp") => show(v)} options={[{ id: "email", label: t("Email") }, { id: "whatsapp", label: t("WhatsApp") }]} /></div>
+          {live.whatsapp && <div className="mb-2"><Choice value={preview.channel} onChange={(v: "email" | "whatsapp") => show(v)} options={[{ id: "email", label: t("Email") }, { id: "whatsapp", label: t("WhatsApp") }]} /></div>}
           <div className="rounded-xl bg-surface2 p-3 text-[13px]">{preview.text.subject && <b className="mb-1 block">{t("Subject: {subject}", { subject: preview.text.subject })}</b>}{preview.text.body}</div>
           <p className="mt-2 text-xs text-muted-foreground">{t("Preview — not sent.")}</p>
         </>}

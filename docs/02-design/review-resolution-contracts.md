@@ -8129,3 +8129,16 @@ Found in UX-04 and walked in the eighth round of the UX loop (UX-08: hq-operator
 5. **Design and Figma.** The overview steps of DD-A01 state it. In Figma's ten overview frames, 137 screen texts follow the app, and the repeated "baseline_unavailable" badge is hidden. The notes that describe each state (loading, refetching, empty, permission-scoped) stay as annotations.
 
 Raw method codes ("demo_fixed") remain in Energy analysis; they are left to the round that walks that screen.
+
+## IR578 The WhatsApp reminder preview says why it is not offered — 2026-11-02
+
+Found in the ninth round of the UX loop (UX-09: customer-a reads the overdue invoice from Contracts & payments, previews its reminders and types an inquiry, at 1920 and 1280; nothing is paid). Contracts & payments leads to the invoice with "Pay now" and shows the active cooling restriction next to it. On the invoice, however, Preview WhatsApp answered with the toast "Recipient membership id — recipient ineligible" and opened nothing.
+
+`notifications.preview` renders a notice only for one of its eligible recipients on the chosen channel. WhatsApp reaches a client user only with a phone number on the account. customer-a has none, and no screen of Phase 1A sets one. The button was offered anyway, and the refusal read as an API field and error key.
+
+1. **Reach checked.** The invoice page asks `notifications.recipients` (the invoice, template payment, channel WhatsApp) whether the signed-in membership is among them. Without it, Preview WhatsApp is disabled and the card says why: "WhatsApp reminders need a phone number on your account. Yours has none, so reminders reach you by email and in the app." The preview dialog then offers no channel switch. If the check fails, the button stays.
+2. **Refusal in words.** `actionMessage` reads `errors.recipient_ineligible` as "This person does not get this notice on that channel" wherever it appears (Malay entries added).
+3. **Tests.** `actionMessage.test.ts` checks the words. The new `customer/invoice-reminders.e2e.ts` opens the overdue invoice from the list. It expects the WhatsApp reason when the button is disabled, an e-mail preview that says "Preview — not sent.", and no "recipient ineligible".
+4. **Design.** The channel row of the client's payment design states it. Figma shows the reminder card without this state; its buttons are unchanged.
+
+The security point held: customer-b opening customer-a's invoice by URL gets Page unavailable. Proposed separately (B-4): the customer's overview names an overdue invoice and an active restriction.

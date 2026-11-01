@@ -7,7 +7,7 @@
 // business days, every event time is in the user's display time zone (IR267). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
-import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
 import { amount } from "@ac/web/lib/energy";
 import { i18nOf, showDate, showTime } from "@ac/web/lib/i18n";
 import { invoiceStatus, type ApiInquiry, type ApiInvoiceDetail } from "@ac/web/lib/billing";
@@ -35,13 +35,17 @@ export default async function CustomerInvoicePage({ params, searchParams }: Page
     if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.fieldErrors.id)) notFound(); // another customer's invoice reads as absent (D01)
     throw e;
   }
-  const [now, contracts, units, properties, spaces, restrictions, inquiries, reminders, display] = await Promise.all([
+  // WhatsApp reaches only an account with a phone number: without one the preview is offered disabled, with its reason
+  // (IR578); if the check fails the button stays, and a refusal still reads in words
+  const whatsapp = Promise.all([corePrincipal(), coreOp<{ items: { id: string }[] }>("notifications.recipients", { target: { kind: "invoice", id }, templateKey: "payment", channel: "whatsapp", query: { limit: 100 } })])
+    .then(([me, r]) => r.items.some((x) => x.id === me.membershipId), () => true);
+  const [now, contracts, units, properties, spaces, restrictions, inquiries, reminders, display, whatsappReady] = await Promise.all([
     coreNow(), coreAll<ClientContract>("contracts.list"), coreAll<Unit>("units.list"), coreAll<{ id: string; name: string }>("properties.list"),
     coreAll<{ id: string; name: string; parentSpaceId: string | null }>("spaces.list"),
     coreOp<{ items: ApiRestriction[] }>("restrictions.forInvoice", { invoiceId: id, query: { limit: 20 } }).then((p) => p.items),
     coreAll<ApiInquiry>("inquiries.list", { filters: { invoiceId: id } }),
     coreAll<Reminder>("notifications.list", { filters: { type: "payment_reminder" } }).then((ns) => ns.filter((n) => n.target.kind === "invoice" && n.target.id === id)),
-    coreDisplay(),
+    coreDisplay(), whatsapp,
   ]);
   const i18n = i18nOf(display);
   const { t } = i18n;
@@ -71,7 +75,7 @@ export default async function CustomerInvoicePage({ params, searchParams }: Page
   }
   const st = invoiceStatus(inv, now);
   const live: InvoiceLive = {
-    tab, otherZone: display.timeZone !== KL,
+    tab, otherZone: display.timeZone !== KL, whatsapp: whatsappReady,
     invoice: {
       id: inv.id, version: inv.version, number: inv.number, amount: amount(inv.amountMinor, inv.currency),
       due: t("Due {date} · billing period {month}", { date: businessDay(inv.dueAt, loc), month: billingMonth(inv.period.from, loc) }), dueDate: businessDay(inv.dueAt, loc), status: st, payable: st === "Unpaid" || st === "Overdue",

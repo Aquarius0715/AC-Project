@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.447.0 / Created: 2026-09-14 / Updated: 2026-11-01 / Status: Draft for review / Language: English
+Version: 0.448.0 / Created: 2026-09-14 / Updated: 2026-11-01 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -100,6 +100,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.448.0 (2026-11-02): A customer without a phone number sees why WhatsApp reminders do not reach them, instead of an error (IR578, UX-09).
 0.447.0 (2026-11-02): HQ reads the overview without requirement IDs, field names or list filters on the screen (IR577, UX-08).
 0.446.0 (2026-11-01): A technician on a phone taps Calibrate… as a button, no longer a 19 px text link (IR576, UX-07).
 0.445.0 (2026-11-01): A contractor with a large team sees its working technicians on one overview screen (IR575, UX-06).

@@ -16,6 +16,8 @@ const fieldText: Record<string, string> = {
   "error.duplicate": "{field} is already used",
   "error.count": "{field} has the wrong number of entries",
   "error.invalidFile": "{field} is not an accepted file — check its type and size", // the bytes, the type or the size (IR308)
+  // the person does not get this notice on that channel, e.g. WhatsApp without a phone number on the account (IR578)
+  "errors.recipient_ineligible": "This person does not get this notice on that channel",
   // the address belongs to someone who still has access, here or elsewhere (IR461, IR462)
   "errors.email_taken": "{field} belongs to someone who still has access — use another address or ask HQ",
   // HQ ended this person's access: only HQ gives it back, not a new account (IR508)
