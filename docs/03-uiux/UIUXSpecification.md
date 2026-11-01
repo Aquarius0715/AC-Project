@@ -194,7 +194,7 @@ The project's target touch area is 44×44px. Allow the main scenarios to be comp
 - Report library sources, adopted versions, and shared component locations. Do not add duplicate kits.
 - Give forms, Query, URL, and local state clear responsibilities. Every Effect must have a reason to synchronize with an external system.
 - Check that colors, fonts, sizes, and spacing use tokens, and that status colors are paired with text and icons.
-- Check loading/empty/error/forbidden/offline/stale displays and preservation of input after submission failure. As built (IR581): an HQ page whose read the role may not make shows which permission it needs and whom to ask (`NeedsAccess`, as Customers & units did), not "could not be loaded" with Try again.
+- Check loading/empty/error/forbidden/offline/stale displays and preservation of input after submission failure. As built (IR581, IR582): an HQ page whose read the role may not make shows "To open <page>, your role needs <permission>." and whom to ask (`NeedsAccess`, through `withAccess` on every sidebar page), not "could not be loaded" with Try again.
 - Test smartphones, keyboard use, English/Malay switching, missing data, long text, and voice alternatives. Clearly identify checks not yet run.
 - Do not show success before device confirmation, imply real transactions, confuse CO₂ units, or suggest that marking an item read has resolved a fault.
 

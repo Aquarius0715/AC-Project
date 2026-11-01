@@ -15,6 +15,7 @@ import {
   type ApiAlertLite, type ApiDeviceEventFull,
 } from "@ac/web/lib/techDevices";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
+import { withAccess } from "@ac/web/lib/withAccess";
 import { DevicesDemo } from "./_components/devices-demo";
 import { DevicesView, type DevicesLive } from "./_components/devices-view";
 
@@ -29,7 +30,12 @@ const absent = <T,>(p: Promise<T>) => p.catch((e) => { // an alert or unit HQ ca
   throw e;
 });
 
-export default async function AdminDevicesPage({ searchParams }: PageProps<"/admin/devices">) {
+// a role without the page's read permission sees which one it needs, not a failure (IR582)
+export default async function AdminDevicesPage(props: PageProps<"/admin/devices">) {
+  return withAccess("Devices & models", ["device.read"], () => AdminDevicesPageContent(props));
+}
+
+async function AdminDevicesPageContent({ searchParams }: PageProps<"/admin/devices">) {
   await connection();
   if (!apiMode()) return <DevicesDemo />;
   const sp = await searchParams;

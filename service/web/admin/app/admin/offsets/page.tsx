@@ -9,6 +9,7 @@ import { coreAll, apiMode, coreDisplay, coreNow, coreOp, corePermissions } from 
 import type { ApiCustomer } from "@ac/web/lib/billing";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { recordRows, type ApiOffsetRecord } from "@ac/web/lib/offsets";
+import { withAccess } from "@ac/web/lib/withAccess";
 import { OffsetsDemo } from "./_components/offsets-demo";
 import { OffsetsView } from "./_components/offsets-view";
 
@@ -17,7 +18,12 @@ type Unit = { id: string; displayName: string; customerOrgId: string; archived: 
 const STATES = ["demo_requested", "demo_purchased", "demo_retired", "failed"] as const;
 const CREATED = { "7d": 7, "30d": 30, "90d": 90, all: null } as const;
 
-export default async function AdminOffsetsPage({ searchParams }: PageProps<"/admin/offsets">) {
+// a role without the page's read permission sees which one it needs, not a failure (IR582)
+export default async function AdminOffsetsPage(props: PageProps<"/admin/offsets">) {
+  return withAccess("Offsets", ["offset.read"], () => AdminOffsetsPageContent(props));
+}
+
+async function AdminOffsetsPageContent({ searchParams }: PageProps<"/admin/offsets">) {
   await connection();
   if (!apiMode()) return <OffsetsDemo />;
   const sp = await searchParams;

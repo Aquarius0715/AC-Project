@@ -8181,3 +8181,28 @@ Found in the twelfth round of the UX loop (UX-12: hq-operator handles a filter-c
 5. **Remaining.** Access & roles, Devices & models, Maintenance jobs, Contracts, Billing, Automation policies, Energy analysis, MRV, Offsets and Audit still fail this way. They follow in the next round with the same component.
 
 The security point held: `alerts.acknowledge` through the relay answers FORBIDDEN for hq-override-only. hq-restriction-manager holds `alert.resolve`, so its acknowledge of another mock alert succeeded, correctly. Two filter-cleaning alerts of the mock fleet are now acknowledged ("Mock · cooling, on" and "Mock · readings missing").
+
+## IR582 Every HQ page names the permission a role lacks — 2026-11-02
+
+The thirteenth round of the UX loop (UX-13) finishes IR581. It crawled the sidebar again as hq-override-only, whose only permission is `restriction.override`. Access & roles, Devices & models, Maintenance jobs, Contracts, Billing, Automation policies, Energy analysis, MRV, Offsets and Audit still read "could not be loaded · Reference … · Try again".
+
+1. **One wrapper.** `withAccess` (`shared/lib/withAccess.tsx`) renders a page and turns a refused read (FORBIDDEN) into `NeedsAccess`. Each page lists the permissions its reads accept, its own first; the first one the role does not hold is named. The lists follow the operation catalog's admin permissions:
+
+   | Page | Permissions |
+   |---|---|
+   | Access & roles | `identity.read`, `asset.read` |
+   | Devices & models | `device.read` |
+   | Maintenance jobs | `job.read`, `asset.read` |
+   | Contracts | `contract.read`, `asset.read` |
+   | Billing | `billing.read`, `asset.read` |
+   | Automation policies | `automation.policy.read`, `asset.read`, `device.read` |
+   | Energy analysis | `energy.read`, `asset.read` |
+   | MRV | `mrv.read` |
+   | Offsets | `offset.read` |
+   | Audit | `audit.read` |
+
+2. **Wording.** "<page> needs <permission>" read oddly with plural page names, so the state now reads "To open <page>, your role needs <permission>." Customers & units, which said "Customers & units need asset.read", uses the same component.
+3. **Test.** `admin/overview.e2e.ts` opens the 13 sidebar pages as hq-override-only. On each it expects its permission named and no Try again. Restrictions opens, since `restriction.override` is that page's permission.
+4. **Figma** has no frame of this state, so it is unchanged.
+
+Left for later: the sidebar still lists every page to every HQ role.

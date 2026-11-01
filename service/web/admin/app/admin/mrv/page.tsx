@@ -9,13 +9,19 @@ import { coreAll, apiMode, coreDisplay, coreOp, corePermissions } from "@ac/web/
 import { baselineRows, klInstant, type ApiBaseline } from "@ac/web/lib/energy";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { mrvView, reportRows, reviewItems, type ApiFactor, type ApiMRVReport } from "@ac/web/lib/mrv";
+import { withAccess } from "@ac/web/lib/withAccess";
 import { MRVDemo } from "./_components/mrv-demo";
 import { MRVView, type MRVLive } from "./_components/mrv-view";
 
 type Page<T> = { items: T[] };
 type Unit = { id: string; displayName: string; customerOrgId: string; archived: boolean };
 
-export default async function AdminMRVPage({ searchParams }: PageProps<"/admin/mrv">) {
+// a role without the page's read permission sees which one it needs, not a failure (IR582)
+export default async function AdminMRVPage(props: PageProps<"/admin/mrv">) {
+  return withAccess("MRV", ["mrv.read"], () => AdminMRVPageContent(props));
+}
+
+async function AdminMRVPageContent({ searchParams }: PageProps<"/admin/mrv">) {
   await connection();
   if (!apiMode()) return <MRVDemo />;
   const sp = await searchParams;

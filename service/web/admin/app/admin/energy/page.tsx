@@ -10,13 +10,19 @@ import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { ApiCustomer, ApiProperty } from "@ac/web/lib/billing";
 import { baselineRows, klInstant, klLocal, summaryView, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
 import { i18nOf } from "@ac/web/lib/i18n";
+import { withAccess } from "@ac/web/lib/withAccess";
 import { EnergyDemo } from "./_components/energy-demo";
 import { EnergyView, type EnergyLive } from "./_components/energy-view";
 
 type Unit = { id: string; displayName: string; customerOrgId: string; propertyId: string; archived: boolean };
 const minute = (d: Date) => new Date(Math.floor(d.getTime() / 60000) * 60000);
 
-export default async function AdminEnergyPage({ searchParams }: PageProps<"/admin/energy">) {
+// a role without the page's read permission sees which one it needs, not a failure (IR582)
+export default async function AdminEnergyPage(props: PageProps<"/admin/energy">) {
+  return withAccess("Energy analysis", ["energy.read", "asset.read"], () => AdminEnergyPageContent(props));
+}
+
+async function AdminEnergyPageContent({ searchParams }: PageProps<"/admin/energy">) {
   await connection();
   if (!apiMode()) return <EnergyDemo />;
   const sp = await searchParams;

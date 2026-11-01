@@ -12,9 +12,15 @@ import { memberRows, type ApiMember, type ApiOrganization } from "@ac/web/lib/me
 import { AccessDemo } from "./_components/access-demo";
 import { AccessView } from "./_components/access-view";
 import type { Role } from "@ac/web/lib/contracts.gen";
+import { withAccess } from "@ac/web/lib/withAccess";
 
 
-export default async function AdminAccessPage({ searchParams }: PageProps<"/admin/settings/access">) {
+// a role without the page's read permission sees which one it needs, not a failure (IR582)
+export default async function AdminAccessPage(props: PageProps<"/admin/settings/access">) {
+  return withAccess("Access & roles", ["identity.read", "asset.read"], () => AdminAccessPageContent(props));
+}
+
+async function AdminAccessPageContent({ searchParams }: PageProps<"/admin/settings/access">) {
   await connection();
   if (!apiMode()) return <AccessDemo />;
   const sp = await searchParams;

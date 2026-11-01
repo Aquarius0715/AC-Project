@@ -20,6 +20,7 @@ import { amount } from "@ac/web/lib/energy";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { archiveLocation, archiveUnit, createCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
 import { Icon, type IconName } from "@ac/web/components/Icon";
+import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 
 export type UnitLive = {
   u: ApiUnitDetail; path: string; model: string; device: { id: string; serial: string; connection: Connection } | null; deviceKnown: boolean;
@@ -56,8 +57,7 @@ const clearUnit = { unitId: null };
  * customer, location, unit and unit filters live in the URL; every write is a Server Action and re-renders the page.
  * Texts in the display language; the first render's times come formatted from the page (IR293). */
 export function UnitsView({ live }: { live: UnitsLive | null }) {
-  const t = useT();
-  if (!live) return <Page><EmptyState title={t("Customers & units need asset.read")}>{t("Ask an identity administrator for Customers & units access (Access & roles).")}</EmptyState></Page>;
+  if (!live) return <NeedsAccess what="Customers & units" permission="asset.read" />; // as every HQ page says it (IR582)
   return live.customer ? <CustomerScreen live={live} c={live.customer} /> : <CustomerList live={live} />;
 }
 

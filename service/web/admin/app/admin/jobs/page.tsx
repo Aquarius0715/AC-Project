@@ -5,6 +5,7 @@
 // Actions (./actions.ts). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
 import { apiMode } from "@ac/web/lib/dal";
+import { withAccess } from "@ac/web/lib/withAccess";
 import { JobsDemo } from "./_components/jobs-demo";
 import { JobsView } from "./_components/jobs-view";
 import { PlansView } from "./_components/plans-view";
@@ -12,7 +13,12 @@ import { ContractorsView } from "./_components/contractors-view";
 import { SlaView } from "./_components/sla-view";
 import { loadContractors, loadJobs, loadPlans, loadSla } from "./_lib/load";
 
-export default async function AdminJobsPage({ searchParams }: PageProps<"/admin/jobs">) {
+// a role without the page's read permission sees which one it needs, not a failure (IR582)
+export default async function AdminJobsPage(props: PageProps<"/admin/jobs">) {
+  return withAccess("Maintenance jobs", ["job.read", "asset.read"], () => AdminJobsPageContent(props));
+}
+
+async function AdminJobsPageContent({ searchParams }: PageProps<"/admin/jobs">) {
   await connection();
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);

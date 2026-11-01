@@ -9,7 +9,7 @@ export function NeedsAccess({ what, permission }: { what: string; permission: st
   const t = useT();
   return (
     <Page>
-      <EmptyState title={t("{what} needs {permission}", { what: t(what), permission })}>{t("Ask an identity administrator for {what} access (Access & roles).", { what: t(what) })}</EmptyState>
+      <EmptyState title={t("To open {what}, your role needs {permission}.", { what: t(what), permission })}>{t("Ask an identity administrator for {what} access (Access & roles).", { what: t(what) })}</EmptyState>
     </Page>
   );
 }

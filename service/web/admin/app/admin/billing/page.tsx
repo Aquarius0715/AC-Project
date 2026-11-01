@@ -13,6 +13,7 @@ import {
   billingMonths, contractOptions, inquiryRows, invoiceDetail, invoiceRows, lastClosedMonth, monthsText, statementDetail, statementRows,
   type ApiContract, type ApiCustomer, type ApiInquiry, type ApiInvoice, type ApiInvoiceDetail, type ApiOrganization, type ApiProperty, type ApiRecipient, type ApiStatement,
 } from "@ac/web/lib/billing";
+import { withAccess } from "@ac/web/lib/withAccess";
 import { BillingView, type BillingLive } from "./_components/billing-view";
 
 type Page<T> = { items: T[] };
@@ -22,7 +23,12 @@ const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => 
   throw e;
 });
 
-export default async function AdminBillingPage({ searchParams }: PageProps<"/admin/billing">) {
+// a role without the page's read permission sees which one it needs, not a failure (IR582)
+export default async function AdminBillingPage(props: PageProps<"/admin/billing">) {
+  return withAccess("Billing", ["billing.read", "asset.read"], () => AdminBillingPageContent(props));
+}
+
+async function AdminBillingPageContent({ searchParams }: PageProps<"/admin/billing">) {
   await connection();
   if (!apiMode()) return <BillingView />;
   const sp = await searchParams;

@@ -8,11 +8,17 @@ import { apiMode, coreAll, coreDisplay } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiCustomer, ApiProperty } from "@ac/web/lib/billing";
 import { contractRows, unitOptions, type ApiContractFull, type ApiUnitBrief, type PlanType } from "@ac/web/lib/contracts";
+import { withAccess } from "@ac/web/lib/withAccess";
 import { ContractsView } from "./_components/contracts-view";
 
 const plans: PlanType[] = ["rto", "general", "energy", "environment"];
 
-export default async function AdminContractsPage({ searchParams }: PageProps<"/admin/billing/contracts">) {
+// a role without the page's read permission sees which one it needs, not a failure (IR582)
+export default async function AdminContractsPage(props: PageProps<"/admin/billing/contracts">) {
+  return withAccess("Contracts", ["contract.read", "asset.read"], () => AdminContractsPageContent(props));
+}
+
+async function AdminContractsPageContent({ searchParams }: PageProps<"/admin/billing/contracts">) {
   await connection();
   if (!apiMode()) return <ContractsView />;
   const sp = await searchParams;

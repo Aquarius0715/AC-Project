@@ -14,6 +14,7 @@ import {
 } from "@ac/web/lib/audit";
 import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiAlertLite } from "@ac/web/lib/techDevices";
+import { withAccess } from "@ac/web/lib/withAccess";
 import { AuditView, type AuditLive } from "./_components/audit-view";
 
 type Page<T> = { items: T[]; total: number };
@@ -24,7 +25,12 @@ const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => 
   throw e;
 });
 
-export default async function AdminAuditPage({ searchParams }: PageProps<"/admin/audit">) {
+// a role without the page's read permission sees which one it needs, not a failure (IR582)
+export default async function AdminAuditPage(props: PageProps<"/admin/audit">) {
+  return withAccess("Audit", ["audit.read"], () => AdminAuditPageContent(props));
+}
+
+async function AdminAuditPageContent({ searchParams }: PageProps<"/admin/audit">) {
   await connection();
   if (!apiMode()) return <AuditView />;
   const sp = await searchParams;

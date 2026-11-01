@@ -8,12 +8,18 @@ import { translator } from "@ac/web/lib/i18n";
 import type { ApiCustomer, ApiProperty } from "@ac/web/lib/billing";
 import type { ApiCapability } from "@ac/web/lib/devices";
 import { policyGroups, type ApiAutoPolicy } from "@ac/web/lib/automation";
+import { withAccess } from "@ac/web/lib/withAccess";
 import { AutomationDemo } from "./_components/automation-demo";
 import { AutomationView } from "./_components/automation-view";
 
 type Unit = { id: string; displayName: string; customerOrgId: string; propertyId: string; modelId: string; archived: boolean };
 
-export default async function AdminAutomationPage({ searchParams }: PageProps<"/admin/settings/automation">) {
+// a role without the page's read permission sees which one it needs, not a failure (IR582)
+export default async function AdminAutomationPage(props: PageProps<"/admin/settings/automation">) {
+  return withAccess("Automation policies", ["automation.policy.read", "asset.read", "device.read"], () => AdminAutomationPageContent(props));
+}
+
+async function AdminAutomationPageContent({ searchParams }: PageProps<"/admin/settings/automation">) {
   await connection();
   if (!apiMode()) return <AutomationDemo />;
   const sp = await searchParams;
