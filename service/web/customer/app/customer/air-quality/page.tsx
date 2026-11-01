@@ -60,6 +60,9 @@ export default async function CustomerAirQualityPage({ searchParams }: PageProps
   const guidance = airGuidance(latest("co2"), latest("pm25"), freshAir);
   const roomName = sel.room.spaceId ? spaces.find((s) => s.id === sel.room.spaceId)?.name ?? i.t("this room") : sel.room.path; // outside rooms: the property
   const slots = airSlots(series.items, w);
+  // a cut-off series loaded only its newest readings: what lies before the oldest one is not loaded, not a gap (IR592)
+  const loadedFrom = series.items.length < series.total ? series.items[series.items.length - 1]?.observedAt ?? null : null;
+  const notLoaded = (start: string) => loadedFrom !== null && Date.parse(start) + w.slotMs <= Date.parse(loadedFrom);
   const points = slots.map((s) => s.avg);
   const info = metricInfo[metric];
   const range = axisRange(points, info.guide);
@@ -73,9 +76,9 @@ export default async function CustomerAirQualityPage({ searchParams }: PageProps
     allergen: allergenView(series.allergen, i), metric, period,
     chart: {
       title: `${i.t(info.label)} — ${windowTitle(period, i.t)}`, sub: windowSub(w, info.unit, roomName, i), points, labels: axisLabels(w, i), guide: info.guide, ...range, ticks: axisTicks(range.min, range.max),
-      hasSensor: sensors.has(metric), readings: series.items.length, total: series.total, valid: slots.some((s) => s.avg !== null), gaps: slots.some((s) => s.avg === null),
+      hasSensor: sensors.has(metric), readings: series.items.length, total: series.total, valid: slots.some((s) => s.avg !== null), gaps: slots.some((s) => s.avg === null && !notLoaded(s.start)),
     },
-    rows: airRows(slots, metric, w.slotMs, i), co2Now: co2Now(latest("co2"), display),
+    rows: airRows(slots, metric, w.slotMs, i, loadedFrom), co2Now: co2Now(latest("co2"), display),
     history: logs ? { rows: logs.items.map((v) => ventRow(v, me.membershipId, names, now.getTime(), i)), total: logs.total } : null,
   };
   return <AirQualityView live={live} />;

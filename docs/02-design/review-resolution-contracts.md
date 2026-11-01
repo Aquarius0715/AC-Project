@@ -8289,3 +8289,11 @@ Found in the twenty-first round of the UX loop (UX-21: hq-operator tries to dele
 2. **State.** "Remove permanently" is disabled while the unit has blockers, as "Delete unit" is; each blocker link sits on a 24 px line (WCAG 2.2 target size).
 3. **Tests.** The `i18n.test.ts` guard also reads HQ's `admin/units` screen and `assets.ts`; `assets.test.ts` follows the installation date error; the new `admin/units-delete.e2e.ts` checks both blocked deletions, the disabled buttons and the dialog's accessibility.
 4. **Figma.** Admin's customers & units frames (list footnote, new unit, delete unit, delete location, archived unit) take the same words.
+
+## IR592 A cut-off air series says what is not loaded instead of showing a gap — 2026-11-02
+
+Found in the twenty-second round of the UX loop (UX-22: customer-a reads the air quality of Bedroom AC — CO₂, PM2.5, temperature, humidity and the allergen observation — switches to PM2.5 over 7 days and the table, and opens Log ventilation without saving, at 1920 and 1280). Nothing was saved. The page loads at most 1000 readings of a series (D07: 10 pages of 100), newest first, and says "Showing the latest 1000 of 3385 readings — earlier readings are not loaded, so the start of the window is incomplete." Yet the 7-day table listed "17 Sept, 12:00 am – 22 Sept, 2:00 pm · No data · Gap — not joined" for the hours before the oldest loaded reading, as if the sensor had been down for five days, and the chart's legend called the blank start "No data (gap, not joined)". The authorization held: `telemetry.series` on another customer's unit, an unknown unit and an unknown room all answer NOT_FOUND alike.
+
+1. **Not loaded.** When a series is cut off, the slots that end before its oldest loaded reading read "Not loaded — Earlier readings are not loaded" (`airRows(…, loadedFrom)`); gaps among the loaded readings keep "No data — Gap — not joined", and the chart's gap legend shows only for those. The Malay dictionary follows.
+2. **Proposed, not built.** Server-side averages for the 24 h and 7 d windows, so the charts cover their whole window in one page (B-9 in the UX proposals).
+3. **Tests.** `air.test.ts` checks the not-loaded and real-gap rows; the new `customer/air-quality.e2e.ts` reads the 7-day PM2.5 table and expects "Not loaded" whenever the cut-off note shows.

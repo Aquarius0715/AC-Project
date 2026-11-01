@@ -249,18 +249,25 @@ export function axisTicks(min: number, max: number): number[] {
 /** The table view: newest slot first, consecutive empty slots merged into one gap row; each row's slot as a span in the
  * display time zone. */
 export type AirRow = { key: string; time: string; value: string; note: string; gap: boolean };
-export function airRows(slots: AirSlot[], metric: AirMetric, slotMs: number, i: I18n = EN): AirRow[] {
+export function airRows(slots: AirSlot[], metric: AirMetric, slotMs: number, i: I18n = EN, loadedFrom: string | null = null): AirRow[] {
   const { t, display } = i;
   const out: AirRow[] = [];
   const end = (s: AirSlot) => new Date(Date.parse(s.start) + slotMs).toISOString();
-  let gap: { newest: AirSlot; oldest: AirSlot } | null = null;
+  // a series cut off at its page limit loads only its newest readings: the slots wholly before the oldest loaded reading
+  // are not loaded, which is not a gap in the data (IR592)
+  const cut = loadedFrom ? Date.parse(loadedFrom) : null;
+  const unloaded = (s: AirSlot) => cut !== null && Date.parse(end(s)) <= cut;
+  let gap: { newest: AirSlot; oldest: AirSlot; unloaded: boolean } | null = null;
   const flush = () => {
-    if (gap) out.push({ key: `gap-${gap.oldest.start}`, time: showSpan(gap.oldest.start, end(gap.newest), display), value: t("No data"), note: t("Gap — not joined"), gap: true });
+    if (gap) out.push({ key: `gap-${gap.oldest.start}`, time: showSpan(gap.oldest.start, end(gap.newest), display), value: t(gap.unloaded ? "Not loaded" : "No data"),
+      note: t(gap.unloaded ? "Earlier readings are not loaded" : "Gap — not joined"), gap: true });
     gap = null;
   };
   for (const s of [...slots].reverse()) {
     if (s.avg === null) {
-      gap = gap ? { newest: gap.newest, oldest: s } : { newest: s, oldest: s };
+      const u = unloaded(s);
+      if (gap && gap.unloaded !== u) flush();
+      gap = gap ? { newest: gap.newest, oldest: s, unloaded: u } : { newest: s, oldest: s, unloaded: u };
       continue;
     }
     flush();

@@ -105,6 +105,15 @@ describe("the air-quality screen in the display language and time zone (FR-C07, 
     expect(airRows(slots, "co2", hour.slotMs, MS_TOKYO).slice(0, 2).map((r) => [r.time, r.value, r.note])).toEqual([["14 Sep, 10:07–10:12 PG GMT+9", "Tiada data", "Jurang — tidak disambung"], ["14 Sep, 10:02–10:07 PG GMT+9", "900 ppm", "1 bacaan"]]);
   });
 
+  it("says that the slots before a cut-off series' oldest loaded reading are not loaded, not a gap (IR592)", () => {
+    const hour = airWindow("1h", NOW);
+    const slots = airSlots([m("co2", 900, { observedAt: "2026-09-14T01:05:00Z" })], hour); // only the newest page came back
+    expect(airRows(slots, "co2", hour.slotMs, undefined, "2026-09-14T01:05:00Z").map((r) => [r.time, r.value, r.note])).toEqual([
+      ["14 Sept, 9:07 – 9:12 am MYT", "No data", "Gap — not joined"], ["14 Sept, 9:02 – 9:07 am MYT", "900 ppm", "1 reading"],
+      ["14 Sept, 8:12 – 9:02 am MYT", "Not loaded", "Earlier readings are not loaded"],
+    ]);
+  });
+
   it("words the ventilation log and its current CO2 in the display language and time zone (IR110)", () => {
     expect([co2Now(m("co2", 1180)), co2Now(m("co2", 1180), MS_TOKYO.display), co2Now(m("co2", 1180, { quality: "stale" }))]).toEqual(["1180 ppm · 9:12 am MYT", "1180 ppm · 10:12 PG GMT+9", null]);
     const v: ApiVentilationLog = {

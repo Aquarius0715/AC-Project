@@ -1494,6 +1494,8 @@ export const ms: Record<string, string> = {
   "rolling window ending {time} · 5-min averages": "tetingkap bergerak berakhir {time} · purata 5 minit",
   "{time} now": "{time} sekarang",
   "{time} yesterday": "{time} semalam",
+  "Not loaded": "Tidak dimuatkan",
+  "Earlier readings are not loaded": "Bacaan lebih awal tidak dimuatkan",
   "Gap — not joined": "Jurang — tidak disambung",
   "{n} reading": "{n} bacaan",
   "{n} readings": "{n} bacaan",
