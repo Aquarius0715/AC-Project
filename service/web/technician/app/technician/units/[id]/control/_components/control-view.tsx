@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Badge, Banner, Btn, Card, EmptyState, Field, Input, Modal, Page, Select, SummaryList, Textarea } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
+import { focusField } from "@ac/web/lib/focusField";
 import { actionOf } from "@ac/web/lib/clientAutomations";
 import { actionCode, actionWord, fieldText, refusal } from "@ac/web/lib/techControl";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -31,6 +32,7 @@ export function ControlView({ live }: { live: ControlLive }) {
   const [confirm, setConfirm] = useState<null | "cmd" | "run">(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [refused, setRefused] = useState<string | null>(null);
+  const ids = { reason: useId(), durationMinutes: useId(), trReason: useId() };
   useEffect(() => { // device acknowledgements and run states arrive on the server: refresh while something is open
     if (!live.active) return;
     const timer = setInterval(() => router.refresh(), 4000);
@@ -52,12 +54,15 @@ export function ControlView({ live }: { live: ControlLive }) {
     if (kind === "cmd" && (reason.trim().length < 1 || reason.trim().length > 1000)) e.reason = t("Reason is required (1–1000 characters)");
     if (kind === "run") {
       const n = Number(minutes);
-      if (!Number.isInteger(n) || n < 1 || n > 15) e.durationMinutes = t("VALIDATION — a test run is 1–15 minutes only");
+      if (!Number.isInteger(n) || n < 1 || n > 15) e.durationMinutes = t("A test run lasts 1–15 minutes");
       if (trReason.trim().length < 1 || trReason.trim().length > 1000) e.trReason = t("Reason is required (1–1000 characters)");
     }
     setErrors(e);
     setRefused(null);
-    if (!Object.keys(e).length) setConfirm(kind);
+    // a refused review takes focus to the field to fix, as on the other forms (IR590)
+    const bad = (["reason", "durationMinutes", "trReason"] as const).find((k) => e[k]);
+    if (bad) return focusField(ids[bad]);
+    setConfirm(kind);
   };
   const send = () => {
     const kind = confirm;
@@ -91,7 +96,7 @@ export function ControlView({ live }: { live: ControlLive }) {
       {refused && <Banner tone="crit">{refused}</Banner>}
       {live.unit.restriction && <Banner tone="warn">{t("Restriction active — {restriction} applies to diagnostics too.", { restriction: live.unit.restriction })}</Banner>}
       {live.unit.blocked && <Banner tone="warn">{t("Control is blocked right now ({reason}) — commands and test runs wait until it clears.", { reason: live.unit.blocked })}</Banner>}
-      {!job.inWindow && <Banner tone="warn">{t("Outside the work window {window} — the Core API refuses diagnostic commands now (IR94).", { window: job.window })}</Banner>}
+      {!job.inWindow && <Banner tone="warn">{t("Outside your work window {window} — diagnostic commands can’t be sent now.", { window: job.window })}</Banner>}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Normal diagnostic action")}>
@@ -99,7 +104,7 @@ export function ControlView({ live }: { live: ControlLive }) {
               <Field label={t("Job")}><Input readOnly value={job.id.slice(0, 8)} className="bg-surface2" /></Field>
               <Field label={t("Action")} error={errors.action}>{select(action, setAction, t("Action"))}</Field>
             </div>
-            <div className="mt-3"><Field label={t("Reason (required)")} error={errors.reason}><Textarea value={reason} maxLength={1000} placeholder={t("Why this command is needed for the diagnosis")} onChange={(e) => setReason(e.target.value)} /></Field></div>
+            <div className="mt-3"><Field label={t("Reason (required)")} error={errors.reason}><Textarea id={ids.reason} value={reason} maxLength={1000} placeholder={t("Why this command is needed for the diagnosis")} onChange={(e) => setReason(e.target.value)} /></Field></div>
             <div className="mt-3 flex justify-end"><Btn variant="primary" disabled={pending || busy || options.length === 0} onClick={() => review("cmd")}>{t("Review & send")}</Btn></div>
             {latest && <p className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ${latest.badge.tone === "ok" ? "bg-ok-soft text-ok" : latest.badge.tone === "crit" ? "bg-crit-soft text-crit" : "bg-surface2 text-muted-foreground"}`}>{latest.title} — {latest.sub}</p>}
           </Card>
@@ -122,10 +127,10 @@ export function ControlView({ live }: { live: ControlLive }) {
           <Card title={t("Test run")}>
             <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
               <Field label={t("Start action")}>{select(start, setStart, t("Start action"))}</Field>
-              <Field label={t("Duration (min)")} error={errors.durationMinutes}><Input inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value)} /></Field>
+              <Field label={t("Duration (min)")} error={errors.durationMinutes}><Input id={ids.durationMinutes} inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value)} /></Field>
             </div>
             <div className="mt-3"><Field label={t("End action")}>{select(end, setEnd, t("End action"))}</Field></div>
-            <div className="mt-3"><Field label={t("Reason (required)")} error={errors.trReason}><Textarea value={trReason} maxLength={1000} placeholder={t("What the test run should show")} onChange={(e) => setTrReason(e.target.value)} /></Field></div>
+            <div className="mt-3"><Field label={t("Reason (required)")} error={errors.trReason}><Textarea id={ids.trReason} value={trReason} maxLength={1000} placeholder={t("What the test run should show")} onChange={(e) => setTrReason(e.target.value)} /></Field></div>
             {live.banner && <div className="mt-3"><Banner tone={live.banner.tone}><b>{live.banner.title}</b><div className="text-xs">{live.banner.text}</div></Banner></div>}
             {live.run?.state === "end_failed" && <div className="mt-2"><Btn className="w-full" variant="danger" disabled={pending || live.active || !job.inWindow} onClick={retryEnd}>{t("Retry end command")}</Btn>{!job.inWindow && <p className="mt-1 text-[11px] text-muted-foreground">{t("Retry not available — no authorization")}</p>}</div>}
             {live.run?.state === "end_blocked" && <p className="mt-2 text-[11px] text-muted-foreground">{t("Retry not available — no authorization")}</p>}
@@ -134,7 +139,7 @@ export function ControlView({ live }: { live: ControlLive }) {
           </Card>
           <Card title={t("Authorization")}>
             <SummaryList items={[[t("Assignment"), job.id.slice(0, 8)], [t("Window"), <span key="w" className={job.inWindow ? "" : "text-crit"}>{job.window}</span>], [t("Restriction"), live.unit.restriction ?? t("none")], [t("Pending commands"), String(live.unit.pending)]]} />
-            <p className="mt-2 text-[11px] text-muted-foreground">{t("Checked again just before each command. When the window ends, no end command can be sent (end_blocked).")}</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">{t("Checked again just before each command. When the window ends, no end command can be sent.")}</p>
           </Card>
         </div>
       </div>

@@ -48,7 +48,7 @@ describe("technician alert evidence", () => {
   it("shows a resolved alert without a policy (IR66)", () => {
     const done: ApiTechAlert = { ...base, id: "alert-win-1", rule: null, policyId: null, evidenceKind: "inferred", status: "resolved", acknowledgedAt: "2026-09-14T01:25:00Z", resolvedAt: "2026-09-14T01:30:00Z", resolutionReason: "Window closed", previousAlertId: null };
     const v = alertView(done, { ...ctx, job: null, unit: null, canResolve: true }, NOW);
-    expect([v.banner.sub, v.banner.tone, v.banner.state]).toEqual(["Suspected · no policy — it resolves only with a reason (IR66)", "ok", "Resolved · today 9:30 am MYT"]);
+    expect([v.banner.sub, v.banner.tone, v.banner.state]).toEqual(["Suspected · no policy — it resolves only with a reason", "ok", "Resolved · today 9:30 am MYT"]);
     expect(v.cards).toHaveLength(1); // no rule: no latest reading of its metric
     expect(v.resolution).toMatchObject({ info: null, done: "Resolved today 9:30 am MYT — Window closed. Acknowledged today 9:25 am MYT.", note: "Completing the job alone never resolves an alert. If the condition returns, a new alert is created with previousAlertId = alert-wi." });
     expect(v.history.map((h) => h.title)).toEqual(["Resolved", "Acknowledged", "Raised"]);
@@ -64,8 +64,8 @@ describe("technician alert evidence", () => {
     expect(alertChoices([earlier, base], NOW).map((c) => [c.id, c.title, c.sub])).toEqual([["alert-temp-a", "Bedroom too hot", "Open · today 9:12 am MYT"], ["alert-temp-0", "Bedroom too hot", "Resolved · 2 Sept 2026, 10:00 am MYT"]]);
     const forbidden = alertView(base, ctx, NOW).resolution.forbidden;
     expect(refusal({ code: "FORBIDDEN", messageKey: "error.forbidden" }, forbidden, EN.t)).toBe(forbidden);
-    expect(refusal({ code: "FORBIDDEN", messageKey: "errors.assignment_ended" }, forbidden, EN.t)).toBe("FORBIDDEN — Your work window on this unit has ended.");
-    expect(refusal({ code: "VALIDATION", messageKey: "error.validation" }, forbidden, EN.t)).toBe("VALIDATION — a resolution reason is required (1–1000 characters).");
+    expect(refusal({ code: "FORBIDDEN", messageKey: "errors.assignment_ended" }, forbidden, EN.t)).toBe("Your work window on this unit has ended.");
+    expect(refusal({ code: "VALIDATION", messageKey: "error.validation" }, forbidden, EN.t)).toBe("A resolution reason is required (1–1000 characters).");
     expect(refusal({ code: "CONFLICT", messageKey: "error.weird" }, forbidden, EN.t)).toBe("CONFLICT: Weird"); // IR380: the shared wording
   });
 

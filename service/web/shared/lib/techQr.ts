@@ -28,7 +28,7 @@ export function qrMatch(r: ApiQrResolution, unit: ApiQrUnit | null, job: ApiQrJo
   const { t, display } = i;
   const title = unit?.displayName ?? opts.name ?? t("Assigned unit");
   const sub = unit ? [unit.location.pathLabels.join(" › "), `${unit.capabilities.manufacturer} ${unit.capabilities.model}`].filter(Boolean).join(" · ")
-    : opts.locked ? t("Unit details open when your work window starts (IR94).") : "";
+    : opts.locked ? t("Unit details open when your work window starts.") : "";
   let card: QrMatch["job"] = null;
   if (r.jobId) {
     const j = job?.projection === "detail" ? job : null;
@@ -48,5 +48,5 @@ export function qrMatch(r: ApiQrResolution, unit: ApiQrUnit | null, job: ApiQrJo
 export function qrRefusal(f: { code: string; messageKey: string }, t: T = en): { title: string; text: string; absent: boolean } {
   if (f.code === "NOT_FOUND") return { title: t("Page unavailable"), text: t("This label is not on a unit in your assignments, or it is unknown. Check the label, or enter the unit ID manually."), absent: true };
   if (f.code === "VALIDATION") return { title: t("Not a label"), text: t("Enter the label code, a device serial or the unit ID."), absent: false };
-  return { title: t("Scan failed"), text: t("{code} — try again.", { code: f.code }), absent: false };
+  return { title: t("Scan failed"), text: t("The label could not be checked — try again."), absent: false };
 }

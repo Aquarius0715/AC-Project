@@ -248,7 +248,9 @@ export function historyCard(h: ApiTechHistory, i: I18n = EN) {
       [t("Status"), done ? (h.completedAt ? t("Completed {time}", { time: showDate(h.completedAt, display) }) : t("Completed")) : t("{status} when your assignment ended", { status: statusWord(h.status, t) })],
       [t("Your report"), report], [t("Assignment ended"), showTime(h.asOf, display)],
     ] as [string, string][],
-    note: t(done ? "Your time is free for other jobs. The report, the unit and its devices stay with HQ and the customer." : "HQ or your coordinator changed the assignment, so the job details and the unit are no longer shown to you."),
+    note: t(done ? "Your time is free for other jobs. The report, the unit and its devices stay with HQ and the customer."
+      : h.status === "cancelled" ? "The job was cancelled, so the job details and the unit are no longer shown to you."
+      : "Your work window ended, or HQ or your coordinator changed the assignment, so the job details and the unit are no longer shown to you."), // the snapshot does not say which (IR590)
     back: t("Overview"),
   };
 }

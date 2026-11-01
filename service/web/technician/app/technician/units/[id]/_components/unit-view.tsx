@@ -33,7 +33,7 @@ export function TechUnitView({ live }: { live: UnitLive }) {
                 <LinkBtn href={live.alertsHref} size="sm">{t("Alert evidence")} <Icon name="arrowRight" /></LinkBtn>
                 {live.controlHref ? <LinkBtn href={live.controlHref} size="sm">{t("Diagnostics")} <Icon name="arrowRight" /></LinkBtn> : <p className="text-[11px] text-muted-foreground">{t("Diagnostic control opens for a job you are assigned to on this AC (assigned or in progress).")}</p>}
               </div>
-              {live.register.missing && <p className="mt-2 text-[11px] text-muted-foreground">{t("Missing values are never filled from similar models or today’s date (BR-T02).")}</p>}
+              {live.register.missing && <p className="mt-2 text-[11px] text-muted-foreground">{t("Missing values are never filled from similar models or today’s date.")}</p>}
             </Card>
             <Card title={t("Components ({n})", { n: live.componentCount })}>
               {live.components.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No components in this unit’s service scope.")}</p> : live.components.map((c) => (

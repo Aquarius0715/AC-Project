@@ -80,12 +80,12 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
     id: a.id, version: a.version, status: a.status, severity: a.severity, policyless: !a.policyId,
     banner: {
       title: `${a.id.slice(0, 8)} · ${title}`, tone, state: a.status === "open" ? null : `${t(state)} · ${when((a.status === "resolved" ? a.resolvedAt : a.acknowledgedAt) ?? a.detectedAt)}`,
-      sub: words ? words.policy : t("{kind} · no policy — it resolves only with a reason (IR66)", { kind: t(KIND[a.evidenceKind] ?? "Evidence") }),
+      sub: words ? words.policy : t("{kind} · no policy — it resolves only with a reason", { kind: t(KIND[a.evidenceKind] ?? "Evidence") }),
     },
     cards,
     resolution: {
       info: a.status === "resolved" ? null : words ? t("Automatic resolution needs a remeasurement {recovery} — or a reason below with alert.resolve.", { recovery: words.recovery })
-        : t("No remeasurement resolves this alert — it has no policy. Resolve it with a reason below with alert.resolve (IR66)."),
+        : t("No remeasurement resolves this alert — it has no policy. Resolve it with a reason below with alert.resolve."),
       done: a.status !== "resolved" ? null : [t("Resolved {time} — {reason}.", { time: when(a.resolvedAt ?? a.detectedAt), reason: a.resolutionReason ? resolutionText(a.resolutionReason, t) : t("no reason recorded") }), a.acknowledgedAt ? t("Acknowledged {time}.", { time: when(a.acknowledgedAt) }) : ""].filter(Boolean).join(" "),
       note: a.status === "resolved" ? t("Completing the job alone never resolves an alert. If the condition returns, a new alert is created with previousAlertId = {id}.", { id: a.id.slice(0, 8) })
         : t("Recurrence after resolution creates a new alert with previousAlertId linking back to this one."),
@@ -126,8 +126,8 @@ const REFUSED: Record<string, string> = {
 /** A refused acknowledge or resolve in words; a missing alert.resolve says how the alert can still resolve. */
 export function refusal(r: { code: string; messageKey: string; retryAfterSeconds?: number | null }, forbidden: string, t: T): string {
   if (r.messageKey === "error.forbidden") return forbidden;
-  if (REFUSED[r.messageKey]) return `${r.code} — ${t(REFUSED[r.messageKey])}`;
-  if (r.code === "VALIDATION") return t("VALIDATION — a resolution reason is required (1–1000 characters).");
-  if (r.code === "UNAVAILABLE" || r.code === "TIMEOUT") return t("UNAVAILABLE — not sent; your reason is kept. Try again.");
+  if (REFUSED[r.messageKey]) return t(REFUSED[r.messageKey]); // in words, without the error code (IR590)
+  if (r.code === "VALIDATION") return t("A resolution reason is required (1–1000 characters).");
+  if (r.code === "UNAVAILABLE" || r.code === "TIMEOUT") return t("Not sent; your reason is kept. Try again.");
   return actionMessage({ ...r, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

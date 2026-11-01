@@ -41,10 +41,10 @@ const FORBIDDEN: Record<string, string> = {
   "errors.assignment_not_started": "your work window has not started", "errors.assignment_ended": "your work window has ended", "errors.assignment_required": "you are not assigned to this job",
 };
 const refusal = (f: ActionFailure, t: T): string =>
-  f.messageKey === "errors.report_version_changed" || f.messageKey === "error.versionConflict" ? t("CONFLICT — the report or job changed elsewhere; reload the page to continue from the latest version.")
-    : f.code === "CONFLICT" ? t("CONFLICT — the job is not in a state that allows this (on hold, submitted or cancelled); the page shows the latest state.")
-    : f.code === "FORBIDDEN" ? t("FORBIDDEN — {reason} (outside your work window or assignment).", { reason: FORBIDDEN[f.messageKey] ? t(FORBIDDEN[f.messageKey]) : f.messageKey.replace(/^errors?\./, "").replace(/_/g, " ") })
-    : f.code === "UNAVAILABLE" ? t("UNAVAILABLE — not sent; your draft is kept on this page. Try again.") : actionMessage(f, t); // field errors, the write limit's wait and other codes (IR380)
+  f.messageKey === "errors.report_version_changed" || f.messageKey === "error.versionConflict" ? t("The report or job changed elsewhere; reload the page to continue from the latest version.")
+    : f.code === "CONFLICT" ? t("The job is not in a state that allows this (on hold, submitted or cancelled); the page shows the latest state.")
+    : f.code === "FORBIDDEN" ? t("Not allowed: {reason}.", { reason: FORBIDDEN[f.messageKey] ? t(FORBIDDEN[f.messageKey]) : f.messageKey.replace(/^errors?\./, "").replace(/_/g, " ") })
+    : f.code === "UNAVAILABLE" ? t("Not sent; your draft is kept on this page. Try again.") : actionMessage(f, t); // field errors, the write limit's wait and other codes (IR380)
 const LEAK: Record<string, string> = { pass: "passed", fail: "failed", not_done: "not done" };
 const MAX_PHOTOS = 10, MAX_BYTES = 5 << 20;
 

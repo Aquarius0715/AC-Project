@@ -124,17 +124,17 @@ export const blockedText = (d: Pick<ApiUnitDetail, "controlAvailability">, t: T 
   d.controlAvailability.state !== "blocked" ? null : BLOCKED[d.controlAvailability.reasonKey] ? t(BLOCKED[d.controlAvailability.reasonKey]) : d.controlAvailability.reasonKey.replace(/^(errors?|control)\./, "").replace(/_/g, " ");
 
 const REFUSED: Record<string, string> = {
-  "errors.restriction_active": "FORBIDDEN — the active restriction does not allow this action (for example a setpoint below its minimum).",
-  "errors.unit_busy": "CONFLICT — the unit is busy: a firmware update or an unfinished command must finish first.",
-  "errors.reconciliation_required": "CONFLICT — the unit must be reconciled after a restriction before it can be controlled.",
-  "errors.assignment_not_started": "FORBIDDEN — your work window has not started.",
-  "errors.assignment_ended": "FORBIDDEN — your work window has ended.",
+  "errors.restriction_active": "The active restriction does not allow this action (for example a setpoint below its minimum).",
+  "errors.unit_busy": "The unit is busy: a firmware update or an unfinished command must finish first.",
+  "errors.reconciliation_required": "The unit must be reconciled after a restriction before it can be controlled.",
+  "errors.assignment_not_started": "Your work window has not started.",
+  "errors.assignment_ended": "Your work window has ended.",
 };
 const CODES: Record<string, string> = {
-  OFFLINE: "OFFLINE — the device is not reachable (connection or power signal), so nothing was sent.",
-  FORBIDDEN: "FORBIDDEN — outside your assignment or work window, or without diagnostic permission.",
-  CONFLICT: "CONFLICT — the unit or job changed; the page now shows the latest version.",
-  UNAVAILABLE: "UNAVAILABLE — not sent; your entries are kept. Try again.",
+  OFFLINE: "The device is not reachable (connection or power signal), so nothing was sent.",
+  FORBIDDEN: "Outside your assignment or work window, or your role has no diagnostic permission.",
+  CONFLICT: "The unit or job changed; the page now shows the latest version.",
+  UNAVAILABLE: "Not sent; your entries are kept. Try again.",
 };
 /** The DomainError of a refused diagnostic write, in the words of Figma Technician 02 (IR46 / IR47 / D04); null for a
  * VALIDATION that only marks fields. */

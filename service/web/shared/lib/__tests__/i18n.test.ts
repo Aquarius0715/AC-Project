@@ -47,14 +47,20 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     expect([...new Set(literals.filter((text) => !(text in ms)))]).toEqual([]);
   });
 
+  it("lists each English text once in the Malay dictionary (a renamed key can collide with an existing one)", () => {
+    const keys = [...readFileSync(join(root, "shared/lib/i18n-ms.ts"), "utf8").matchAll(/^\s*("(?:[^"\\]|\\.)*"):/gm)].map((m) => m[1]);
+    expect(keys.length).toBeGreaterThan(1000);
+    expect(keys.filter((k, n) => keys.indexOf(k) !== n)).toEqual([]);
+  });
+
   it("has no Malay entry the code no longer shows", () => {
     const dynamic = new Set(Object.values(ROLES).flatMap((cfg) => [cfg.sub, cfg.chip.split(" — ")[0], ...cfg.nav.map((i) => i.label)]));
     expect(Object.keys(ms).filter((key) => !dynamic.has(key) && !code.includes(JSON.stringify(key)))).toEqual([]);
   });
 
-  it("speaks to customers, contractors and technicians at their devices without error codes or spec IDs (IR584, IR585, IR587)", () => {
+  it("speaks to customers, contractors and technicians without error codes or spec IDs (IR584, IR585, IR587, IR590)", () => {
     const lib = (name: RegExp) => readdirSync(join(root, "shared/lib")).filter((f) => name.test(f)).map((f) => join(root, "shared/lib", f));
-    const files = [...sources(join(root, "customer/app")), ...lib(/^client\w*\.ts$/), ...sources(join(root, "partner/app")), ...lib(/^partner\w*\.ts$/), ...sources(join(root, "technician/app/technician/devices")), ...lib(/^techDevices\.ts$/)];
+    const files = [...sources(join(root, "customer/app")), ...lib(/^client\w*\.ts$/), ...sources(join(root, "partner/app")), ...lib(/^partner\w*\.ts$/), ...sources(join(root, "technician/app")), ...lib(/^tech\w*\.ts$/)];
     const strings = files.flatMap((f) => [...readFileSync(f, "utf8").matchAll(/"((?:[^"\\\n]|\\.)*)"/g)].flatMap((m) => {
       try { return [JSON.parse(`"${m[1]}"`) as string]; } catch { return []; }
     }));
