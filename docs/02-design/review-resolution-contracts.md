@@ -7986,3 +7986,11 @@ They are removed, with the `klTime` import of `partnerJobDetail.ts`, and the hea
 Found in the loop by a scan of `shared/lib` exports against the named imports of every module (the earlier name search missed IR565's helpers). One export is unused: `units.componentGroups`, with the map `groupOf` it alone used. It repeated the groups of the 18 ComponentKeys that `techJob.componentGroups` defines, the one the technician screens and tests use. The unused copy is removed, so the groups have one definition.
 
 The scan found no other unused export. Four are used by tests alone, on purpose: `HQ_REFUSAL_KEYS`, `EVIDENCE_KEYS` and `NOTIFICATION_KEYS`, whose tests check every key, and `getJobState`, the non-React read for tests.
+
+## IR567 The scheduler loses a wrapper only a test called — 2026-11-01
+
+Found in the loop by a scan of the Go exported functions against package-qualified references (`pkg.Name`), after IR566's scan of the web. Three functions have no production caller:
+- `ops.ClientRequest` and `server.NewScenarioClock` are test support for the integration package, which must reach them from outside: the REST binding of an operation call, and the scenario clock shared by the split services of one binary.
+- `scheduler.Run` was a one-line wrapper that ran every domain through `RunDomains` with no domain list, and only the worker test called it.
+
+The wrapper is removed. The test calls `RunDomains` with a nil list, and `RunDomains` says that nil means every domain.

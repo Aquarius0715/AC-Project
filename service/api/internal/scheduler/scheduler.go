@@ -186,12 +186,7 @@ func tick(ctx context.Context, m *db.TxManager, now time.Time, domains []string,
 	return r, nil
 }
 
-// Run ticks every domain every interval until ctx is cancelled.
-func Run(ctx context.Context, m *db.TxManager, interval time.Duration, clock func() time.Time, logf func(string, ...any), reg *ops.Registry) {
-	RunDomains(ctx, m, interval, clock, logf, nil, reg)
-}
-
-// RunDomains ticks the given domains every interval until ctx is cancelled.
+// RunDomains ticks the given domains (every domain when domains is nil) every interval until ctx is cancelled.
 func RunDomains(ctx context.Context, m *db.TxManager, interval time.Duration, clock func() time.Time, logf func(string, ...any), domains []string, reg *ops.Registry) {
 	t := time.NewTicker(interval)
 	defer t.Stop()
