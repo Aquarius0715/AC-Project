@@ -52,9 +52,9 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     expect(Object.keys(ms).filter((key) => !dynamic.has(key) && !code.includes(JSON.stringify(key)))).toEqual([]);
   });
 
-  it("speaks to contractors, and to technicians about devices, without error codes or spec IDs (IR584, IR585)", () => {
+  it("speaks to customers, contractors and technicians at their devices without error codes or spec IDs (IR584, IR585, IR587)", () => {
     const lib = (name: RegExp) => readdirSync(join(root, "shared/lib")).filter((f) => name.test(f)).map((f) => join(root, "shared/lib", f));
-    const files = [...sources(join(root, "partner/app")), ...lib(/^partner\w*\.ts$/), ...sources(join(root, "technician/app/technician/devices")), ...lib(/^techDevices\.ts$/)];
+    const files = [...sources(join(root, "customer/app")), ...lib(/^client\w*\.ts$/), ...sources(join(root, "partner/app")), ...lib(/^partner\w*\.ts$/), ...sources(join(root, "technician/app/technician/devices")), ...lib(/^techDevices\.ts$/)];
     const strings = files.flatMap((f) => [...readFileSync(f, "utf8").matchAll(/"((?:[^"\\\n]|\\.)*)"/g)].flatMap((m) => {
       try { return [JSON.parse(`"${m[1]}"`) as string]; } catch { return []; }
     }));

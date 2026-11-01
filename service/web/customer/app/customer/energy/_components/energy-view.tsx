@@ -60,7 +60,7 @@ export function EnergyView({ live }: { live: EnergyLive }) {
           <Select aria-label={t("Baseline")} className="w-auto" value={live.baselineId ?? "none"} onChange={(e) => nav({ baselineId: e.target.value })}>
             {live.baselines.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}<option value="none">{t("No baseline")}</option>
           </Select>
-          {!live.baselines.length && <span className="text-[11px] text-muted-foreground">{t("No baseline covers exactly these units — actual energy stays viewable (DD-C06).")}</span>}
+          {!live.baselines.length && <span className="text-[11px] text-muted-foreground">{t("No baseline covers exactly these units — actual energy stays viewable.")}</span>}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
           <span className="text-xs text-muted-foreground">{t("Units")}</span>
@@ -145,7 +145,7 @@ function ExportModal({ live, onClose }: { live: EnergyLive; onClose: () => void 
     <Modal open onClose={onClose} title={t("Export report")} footer={<><Btn onClick={onClose}>{t("Close")}</Btn>{!file && <Btn variant="primary" disabled={pending || !!err} onClick={download}>{t("Download")}</Btn>}</>}>
       {file ? (
         <div className="flex flex-col gap-3">
-          <Banner tone="ok" action={<DemoBadge />}><b>{t("Report ready")}</b><div className="text-xs">{t("{file} · {kb} KB · {format} — a demo file; nothing is e-mailed now.", { file: file.fileName, kb: Math.max(1, Math.round(file.size / 1024)), format: file.mime === "text/csv" ? "CSV" : "PDF" })}</div></Banner>
+          <Banner tone="ok" action={<DemoBadge />}><b>{t("Report ready")}</b><div className="text-xs">{t("{file} · {kb} KB · {format} — a demo file: nothing is downloaded or e-mailed.", { file: file.fileName, kb: Math.max(1, Math.round(file.size / 1024)), format: file.mime === "text/csv" ? "CSV" : "PDF" })}</div></Banner>
           {live.prefs && email !== live.prefs.monthlyReportEmail && <p className="text-xs text-muted-foreground">{t(email ? "Monthly e-mail turned on in your preferences." : "Monthly e-mail turned off in your preferences.")}</p>}
         </div>
       ) : (

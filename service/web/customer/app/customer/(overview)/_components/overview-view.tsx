@@ -87,7 +87,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
-        <Card title={live.propertyName ? t("Units in {property}", { property: live.propertyName }) : t("Units in all properties")} sub={t("Latest value per unit — no averaged temperature across rooms (BR-C01)")} action={<TextLink href="/customer/properties">{t("View all")} <Icon name="arrowRight" /></TextLink>}>
+        <Card title={live.propertyName ? t("Units in {property}", { property: live.propertyName }) : t("Units in all properties")} sub={t("Latest value per unit — no averaged temperature across rooms")} action={<TextLink href="/customer/properties">{t("View all")} <Icon name="arrowRight" /></TextLink>}>
           <div className="flex flex-col divide-y divide-line">
             <div className="hidden grid-cols-[minmax(0,1fr)_72px_72px_72px_120px_14px] gap-2 pb-2 text-[11px] text-muted-foreground lg:grid">
               <span>{t("Unit · location · observed")}</span><span>{t("Room temp")}</span><span>{t("Humidity")}</span><span>{t("Power now")}</span><span>{t("Status")}</span><span />
