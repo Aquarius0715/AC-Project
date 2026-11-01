@@ -7939,3 +7939,14 @@ The rest of §3 matches the Dockerfiles:
 - the web build type-checks before it builds;
 - the runtime removes npm, npx and corepack, upgrades the Debian packages and runs as `node`;
 - the Go images build on `golang:1.26.10` and run on the digest-pinned distroless image.
+
+## IR562 The Permissions-Policy notes the features the design will need — 2026-11-01
+
+Found in the loop. Network architecture §6 says that the apps' `Permissions-Policy` (IR383) denies the camera, microphone, geolocation, payment, USB and display-capture features "which no app uses". That holds today, because three designed features are demo stand-ins:
+- the assistant's voice input uses a demo transcript;
+- the technician's check-in takes a typed QR value ("Demo: the camera scan fills this");
+- location automations run on demo location events.
+
+No app calls `getUserMedia`, a speech recognizer, a barcode detector or `navigator.geolocation`.
+
+Once a real one is built, the denied feature would fail without a prompt. §6 now names the three, and the change each app's policy needs: `microphone=(self)` and `geolocation=(self)` on the customer app, `camera=(self)` on the technician app. The policy itself is unchanged, and `security-headers.e2e.ts` keeps checking it.
