@@ -7865,3 +7865,17 @@ Each direction was checked against the handler maps of the modules and `internal
 ## IR553 Backend architecture §4 points its event column to §8 — 2026-11-01
 
 Found in the loop, after IR552. The "Main events published" column of §4's module table uses the design's names, for example DeviceConnectionChanged, CommandSettled, AlertOpened, InvoiceIssued, PayoutChanged and MrvReportChanged. Like §8's flow table, most of them exist in no code. A note under the table now says that the column holds the design's events, and that §8 lists the events exchanged as built. The table is unchanged. Its count of 210 operations matches the operation catalog and the persistence map.
+
+## IR554 Backend architecture §3 says which runtime components run today — 2026-11-01
+
+Found in the loop. §3's table of runtime components describes the target. It said nothing about what runs today, and some of it reads as built:
+- the Core API as one modular monolith (since IR180 a gateway and five domain services);
+- a telemetry processor, an automation engine, a webhook receiver and an outbox relay;
+- a cache with idempotency keys and read caches.
+
+A note under the table now lists what runs today:
+- the Core API's services;
+- the workers that run (the scheduler, the notification worker, the outbox housekeeping) and those that idle (telemetry, rollups, import / export, webhook, relay);
+- where schedules and conditions are evaluated;
+- the IoT bridge in place of the IoT gateway;
+- what the cache holds: sessions and write-limit counters, while idempotency keys are in PostgreSQL.

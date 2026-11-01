@@ -66,6 +66,15 @@ Decisions applied (DEC-67, DEC-68, DEC-69):
 | Message broker | Domain events and work queues (at-least-once) | Managed | Throughput | Persistent queues |
 | MQTT broker | Device connections and topics | Managed IoT messaging service | Connections | Retained state, sessions |
 
+As built, the table above is the target. What runs today (IR180, IR335, IR375, IR382, IR418, IR428; backend Go design §7):
+- **Core API**: the gateway and the five business-domain services, or one process in development and tests.
+- **Workers**:
+  - the scheduler per domain, the notification worker (e-mail over SMTP) and the outbox role's housekeeping run;
+  - schedule automations run in the scheduler (IR54), and conditions are evaluated when a gateway's facts arrive or HQ fires a rule (IR529);
+  - the telemetry processor, the rollups, the import / export worker, the webhook receiver and the outbox relay are planned, and their roles idle.
+- **IoT**: locally the IoT bridge (`cmd/iotbridge`) stands in for the IoT gateway service, between the broker and the API (§9).
+- **Cache**: it holds the BFF sessions and the write-limit counters. Idempotency keys are in PostgreSQL (`platform.idempotency_keys`), and no read cache is built.
+
 ## 3a. AWS service mapping
 
 | Component | AWS service (PROPOSED) | Notes |
