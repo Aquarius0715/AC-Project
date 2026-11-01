@@ -7816,3 +7816,12 @@ The README now says how to connect the real nodes, in one paragraph:
 - the site's client signs in as `live-sensors@example.com` once they have set a password from the Mailpit set-up e-mail.
 
 It names no broker address or login.
+
+## IR549 `.env.local.example` lists what compose reads from `.env.local` — 2026-11-01
+
+Found in the loop, comparing `.env.local.example` with the `${…}` interpolations of `compose.yaml`. Since IR538 a key of `.env.local` reaches only the containers that interpolate it:
+1. **Keys nothing read.** `STRIPE_WEBHOOK_SECRET` and `LOG_LEVEL` were in the template, but no compose interpolation, code or design document uses them. They are removed, so the template no longer suggests settings that change nothing. The webhook service is still planned; it brings its key when it is built.
+2. **Optional overrides.** compose also reads three keys that have defaults: `REAL_MQTT_TOPIC` (`smarthome/ac/#`), `REAL_MQTT_COMMAND_NODE` (`node_1`) and `VALKEY_PASSWORD` (`local-valkey-only`). The template now lists them as comments with their defaults.
+3. `STRIPE_TEST_SECRET_KEY` says that it is the stripe profile's Stripe CLI key.
+
+The values stay empty: the template holds no secret. The E2E workflow and `docker/iot-demo.sh`, which copy the template and generate the broker keys, are unchanged.
