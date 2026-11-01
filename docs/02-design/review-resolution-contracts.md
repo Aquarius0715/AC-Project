@@ -7861,3 +7861,7 @@ Found in the loop, comparing §8's table of main event flows with the code. The 
 - that the table's flows without such an event have no event as built: the IoT bridge posts readings, acknowledgements and the facts to evaluate to the API, which evaluates the alert policies itself.
 
 Each direction was checked against the handler maps of the modules and `internal/server/consumers.go`.
+
+## IR553 Backend architecture §4 points its event column to §8 — 2026-11-01
+
+Found in the loop, after IR552. The "Main events published" column of §4's module table uses the design's names, for example DeviceConnectionChanged, CommandSettled, AlertOpened, InvoiceIssued, PayoutChanged and MrvReportChanged. Like §8's flow table, most of them exist in no code. A note under the table now says that the column holds the design's events, and that §8 lists the events exchanged as built. The table is unchanged. Its count of 210 operations matches the operation catalog and the persistence map.
