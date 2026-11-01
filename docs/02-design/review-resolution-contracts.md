@@ -7905,3 +7905,9 @@ Found in the loop, comparing §11 (external integrations) and §16 (open items) 
 1. **Identity provider admin API.** The identity service has called the provider's admin API since IR386: the sign-out everywhere, then the accounts of IR461 to IR463. §11 listed only the BFF's sign-in. It now has the row, with the least-privilege client locally and the task role of network architecture F20 in production (IR551).
 2. **E-mail.** The row named Amazon SES only. The notification worker sends over SMTP, to Mailpit locally (IR418), and the SES adapter is planned. The row now says so.
 3. **OPEN-BE-02.** The AC manufacturer interface and the module hardware stay open. The item now notes that development uses the site's own ESP32 nodes, which switch a Daikin air conditioner by infrared (DEC-86 to DEC-89, §9).
+
+## IR558 The database design lists `partner_users` and the tables in use — 2026-11-01
+
+Found in the loop, comparing database design §2 with `schema.sql` and the code:
+1. **`identity.partner_users`.** The contractors' user lists (IR416) were missing from the identity row. Every other table of `schema.sql` is in its schema's row, and every table a row names exists. The row now has `partner_users`, and says what `client_users` holds.
+2. **Tables not used yet.** The list said "six tables" but named seven. One of them, `notify.deliveries`, has been used since IR418: the notification worker records each e-mail delivery there. The list now names the six that the code still leaves unused: `billing.stripe_events`, `monitoring.measurements_15m` / `_1h`, `notify.templates`, `platform.scheduled_items` and `platform.stream_checkpoints`. A search of the Go code found none of them.
