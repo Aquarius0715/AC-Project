@@ -80,7 +80,8 @@ export function mrvDraftErrors(d: MRVDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!d.organizationId) e.organizationId = t("Choose a customer organization");
   if (d.unitIds.length < 1 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
-  if (!d.from || !d.to || d.from >= d.to) e.period = t("The end must be after the start");
+  if (!d.from || !d.to) e.period = t("Enter the start and the end"); // an empty period is not an end before its start (IR586)
+  else if (d.from >= d.to) e.period = t("The end must be after the start");
   if (!d.baseline) e.baseline = t("Choose a baseline version");
   if (!d.factor) e.factor = t("Choose an emission factor version");
   if ([...d.boundary.trim()].length < 1 || d.boundary.length > 500) e.boundary = t("1–500 characters");

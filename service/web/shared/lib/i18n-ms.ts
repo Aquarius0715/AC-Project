@@ -1288,6 +1288,7 @@ export const ms: Record<string, string> = {
   "e.g. only if someone is home · only if outdoor ≥ 30°C": "cth. hanya jika ada orang di rumah · hanya jika luar ≥ 30°C",
 
   // customer energy & cost and offsets (lib/energy, lib/clientEnergy)
+  "Enter the start and the end": "Masukkan masa mula dan tamat",
   "The end must be after the start": "Tamat mesti selepas mula",
   "At most 366 days": "Paling lama 366 hari",
   "{from} – {to} ({n} day) · {zone}": "{from} – {to} ({n} hari) · {zone}",

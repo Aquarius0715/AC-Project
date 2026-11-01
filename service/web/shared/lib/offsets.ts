@@ -81,7 +81,8 @@ export function quoteErrors(d: QuoteDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!d.customerId) e.customerId = t("Choose a customer");
   if (d.unitIds.length < 1 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
-  if (!d.from || !d.to || d.from >= d.to) e.period = t("The end must be after the start");
+  if (!d.from || !d.to) e.period = t("Enter the start and the end"); // an empty period is not an end before its start (IR586)
+  else if (d.from >= d.to) e.period = t("The end must be after the start");
   if ([...d.purpose.trim()].length < 1 || [...d.purpose.trim()].length > 1000) e.purpose = t("1–1000 characters");
   const n = Number(d.amountKg);
   if (!/^\d+(\.\d{1,3})?$/.test(d.amountKg.trim()) || !(n > 0 && n <= 100000)) e.amountKg = t("Above 0, at most 100000, up to 3 decimals");

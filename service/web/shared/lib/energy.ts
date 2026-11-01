@@ -110,12 +110,13 @@ export function summaryView(s: ApiEnergySummary, i: I18n = EN): SummaryView {
   };
 }
 
-export type BaselineRow = { id: string; version: number; method: ApiBaseline["method"]; value: string; units: string; period: string; boundaryId: BoundaryId; b: ApiBaseline };
+export type BaselineRow = { id: string; version: number; method: ApiBaseline["method"]; value: string; units: string; period: string; dates: string; boundaryId: BoundaryId; b: ApiBaseline };
 /** The baseline list (DD-A13): value and unit count in the display language; the period stays Kuala Lumpur time. */
 export function baselineRows(bs: ApiBaseline[], t: T = en): BaselineRow[] {
   return bs.map((b) => ({
     id: b.id, version: b.version, method: b.method, value: b.baselineKWh === null ? t("no value") : `${one(b.baselineKWh)} kWh`,
-    units: t(b.unitIds.length === 1 ? "1 unit" : "{n} units", { n: b.unitIds.length }), period: `${klStamp(b.period.from)} → ${klStamp(b.period.to)}`, boundaryId: b.boundaryId, b,
+    units: t(b.unitIds.length === 1 ? "1 unit" : "{n} units", { n: b.unitIds.length }), period: `${klStamp(b.period.from)} → ${klStamp(b.period.to)}`,
+    dates: `${klStamp(b.period.from).slice(0, 10)} → ${klStamp(b.period.to).slice(0, 10)}`, boundaryId: b.boundaryId, b, // the option names its dates (IR586)
   }));
 }
 
@@ -133,7 +134,8 @@ export function baselineDraft(b?: ApiBaseline): BaselineDraft {
 export function baselineErrors(d: BaselineDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (d.unitIds.length < 1 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
-  if (!d.from || !d.to || d.from >= d.to) e.period = t("The end must be after the start");
+  if (!d.from || !d.to) e.period = t("Enter the start and the end"); // an empty period is not an end before its start (IR586)
+  else if (d.from >= d.to) e.period = t("The end must be after the start");
   else if (Date.parse(klInstant(d.to)) - Date.parse(klInstant(d.from)) > 366 * 24 * 3600 * 1000) e.period = t("At most 366 days");
   if (d.method === "demo_fixed" && !(d.baselineKWh.trim() !== "" && Number.isFinite(+d.baselineKWh) && +d.baselineKWh >= 0)) e.baselineKWh = t("A value ≥ 0 kWh");
   if (d.method === "demo_period_comparison" && d.boundaryId === "whole_building_electricity") e.boundaryId = t("Period comparison measures AC input electricity only");

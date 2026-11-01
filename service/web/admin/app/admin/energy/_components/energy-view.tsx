@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Page, Select, SummaryList, Tabs, Textarea } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { baselineDraft, baselineErrors, baselineInput, type BaselineDraft, type BaselineRow, type SummaryView } from "@ac/web/lib/energy";
+import { focusField } from "@ac/web/lib/focusField";
 import { saveBaseline } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 
@@ -54,7 +55,7 @@ function Analysis({ live, a }: { live: EnergyLive; a: NonNullable<EnergyLive["an
       <Card title={t("Scope")}>
         <div className="flex flex-wrap items-end gap-3">
           <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => nav({ customerId: e.target.value || null, unitIds: null, baselineId: null })}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
-          <Field label={t("Baseline")}><Select value={a.baselineId ?? ""} onChange={(e) => nav({ baselineId: e.target.value || null, unitIds: null, from: null, to: null })}><option value="">{t("No baseline")}</option>{live.baselines.map((b) => <option key={b.id} value={b.id}>{b.id.slice(0, 8)} · {b.value} · {b.units}</option>)}</Select></Field>
+          <Field label={t("Baseline")}><Select value={a.baselineId ?? ""} onChange={(e) => nav({ baselineId: e.target.value || null, unitIds: null, from: null, to: null })}><option value="">{t("No baseline")}</option>{live.baselines.map((b) => <option key={b.id} value={b.id}>{b.id.slice(0, 8)} · {b.dates} · {b.value} · {b.units}</option>)}</Select></Field>
           <Field label={t("From (Kuala Lumpur)")}><Input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
           <Field label={t("To")}><Input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
           <Btn size="sm" disabled={!from || !to || (from === a.from && to === a.to)} onClick={() => nav({ from, to })}>{t("Apply period")}</Btn>
@@ -108,9 +109,12 @@ function Baselines({ live, l }: { live: EnergyLive; l: NonNullable<EnergyLive["l
   const [from, setFrom] = useState(l.from);
   const [to, setTo] = useState(l.to);
   const customer = live.customers.find((c) => c.id === live.scope.customerId)?.name;
+  const ids = { unitIds: useId(), period: useId(), baselineKWh: useId(), boundaryId: useId(), boundary: useId(), assumptions: useId(), source: useId() };
   const save = () => {
     setTried(true);
-    if (Object.keys(errors).length > 0) return;
+    // a failed save takes focus to the first field to fix, top to bottom (IR586, as IR573)
+    const bad = (Object.keys(ids) as (keyof typeof ids)[]).find((k) => errors[k]);
+    if (bad) return focusField(ids[bad]);
     run(() => saveBaseline(baselineInput(d, sel?.id), sel?.version), (b) => (sel ? t("Saved as baseline version {v}", { v: b.version }) : t("Baseline created")), (b) => { setCreating(false); nav({ baselineId: b.id }); });
   };
   const err = (k: string) => (tried ? errors[k] : undefined);
@@ -134,17 +138,17 @@ function Baselines({ live, l }: { live: EnergyLive; l: NonNullable<EnergyLive["l
           <Card title={sel ? <span className="flex flex-wrap items-center gap-2">{t("Baseline {id}", { id: sel.id.slice(0, 8) })}<Badge>{t("Version {v}", { v: sel.version })}</Badge><Badge tone="warn">{t("Editing → v{n}", { n: sel.version + 1 })}</Badge></span> : t("New baseline")}
             sub={sel ? t("Saving creates version {next} — the version number is assigned automatically", { next: sel.version + 1 }) : t("Saving creates version 1")} className="self-start">
             <div className="flex flex-col gap-4">
-              <section><h3 className="mb-1 text-[13px] font-bold">{t("Units · the same set is required for comparison")}</h3><div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{live.units.map((u) => <Check key={u.id} label={u.label} checked={d.unitIds.includes(u.id)} onChange={(on) => set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) })} />)}</div>{err("unitIds") && <p className="mt-1 text-xs text-crit">{err("unitIds")}</p>}</section>
+              <section><h3 className="mb-1 text-[13px] font-bold">{t("Units · the same set is required for comparison")}</h3><div id={ids.unitIds} className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{live.units.map((u) => <Check key={u.id} label={u.label} checked={d.unitIds.includes(u.id)} onChange={(on) => set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) })} />)}</div>{err("unitIds") && <p className="mt-1 text-xs text-crit">{err("unitIds")}</p>}</section>
               <section className="grid-fluid" style={{ ["--min" as string]: "190px" }}>
-                <Field label={t("Period from (Kuala Lumpur)")} error={err("period")}><Input type="datetime-local" value={d.from} onChange={(e) => set({ from: e.target.value })} /></Field>
+                <Field label={t("Period from (Kuala Lumpur)")} error={err("period")}><Input id={ids.period} type="datetime-local" value={d.from} onChange={(e) => set({ from: e.target.value })} /></Field>
                 <Field label={t("Period to")} hint={t("Up to 366 days")}><Input type="datetime-local" value={d.to} onChange={(e) => set({ to: e.target.value })} /></Field>
               </section>
               <Field label={t("Method")}><Choice value={d.method} onChange={(v) => set({ method: v })} options={[{ id: "demo_fixed" as const, label: `demo_fixed · ${t("entered value")}` }, { id: "demo_period_comparison" as const, label: `demo_period_comparison · ${t("measured")}` }]} /></Field>
-              {d.method === "demo_fixed" ? <div className="max-w-xs"><Field label={t("Baseline energy (kWh)")} error={err("baselineKWh")} hint={t("Fictional demo value · ≥ 0 · not used for demo_period_comparison")}><Input type="number" min="0" step="0.1" value={d.baselineKWh} onChange={(e) => set({ baselineKWh: e.target.value })} /></Field></div> : <p className="text-xs text-muted-foreground">{t("Measured from the period’s readings when saved; no value is entered (SR29).")}</p>}
-              <Field label={t("Boundary")} error={err("boundaryId")}><Choice value={d.boundaryId} onChange={(v) => set({ boundaryId: v })} options={[{ id: "ac_input_electricity" as const, label: t("AC input electricity") }, { id: "whole_building_electricity" as const, label: t("Whole-building electricity") }]} /></Field>
-              <Field label={t("Boundary description")} error={err("boundary")} hint={t("1–500 characters")}><Input value={d.boundary} maxLength={500} onChange={(e) => set({ boundary: e.target.value })} placeholder={t("AC unit input electricity only")} /></Field>
-              <Field label={t("Assumptions")} error={err("assumptions")} hint={t("1–2000 characters")}><Textarea value={d.assumptions} maxLength={2000} onChange={(e) => set({ assumptions: e.target.value })} /></Field>
-              <Field label={t("Source")} error={err("source")}><Input value={d.source} maxLength={500} onChange={(e) => set({ source: e.target.value })} placeholder={t("Demo source (fictional)")} /></Field>
+              {d.method === "demo_fixed" ? <div className="max-w-xs"><Field label={t("Baseline energy (kWh)")} error={err("baselineKWh")} hint={t("Fictional demo value · ≥ 0 · not used for demo_period_comparison")}><Input id={ids.baselineKWh} type="number" min="0" step="0.1" value={d.baselineKWh} onChange={(e) => set({ baselineKWh: e.target.value })} /></Field></div> : <p className="text-xs text-muted-foreground">{t("Measured from the period’s readings when saved; no value is entered (SR29).")}</p>}
+              <Field label={t("Boundary")} error={err("boundaryId")}><div id={ids.boundaryId}><Choice value={d.boundaryId} onChange={(v) => set({ boundaryId: v })} options={[{ id: "ac_input_electricity" as const, label: t("AC input electricity") }, { id: "whole_building_electricity" as const, label: t("Whole-building electricity") }]} /></div></Field>
+              <Field label={t("Boundary description")} error={err("boundary")} hint={t("1–500 characters")}><Input id={ids.boundary} value={d.boundary} maxLength={500} onChange={(e) => set({ boundary: e.target.value })} placeholder={t("AC unit input electricity only")} /></Field>
+              <Field label={t("Assumptions")} error={err("assumptions")} hint={t("1–2000 characters")}><Textarea id={ids.assumptions} value={d.assumptions} maxLength={2000} onChange={(e) => set({ assumptions: e.target.value })} /></Field>
+              <Field label={t("Source")} error={err("source")}><Input id={ids.source} value={d.source} maxLength={500} onChange={(e) => set({ source: e.target.value })} placeholder={t("Demo source (fictional)")} /></Field>
               {sel && <Banner tone="warn">{t("MRV reports that already reference version {v} keep version {v}. Results are labelled “adjusted” only if an adjustment model exists — none does in this demo.", { v: sel.version })}</Banner>}
               {live.canWrite && <div className="flex justify-end gap-2">{creating ? <Btn onClick={() => setCreating(false)}>{t("Cancel")}</Btn> : <Btn disabled={pending} onClick={() => { setD(baselineDraft(sel?.b)); setTried(false); }}>{t("Discard")}</Btn>}<Btn variant="primary" disabled={pending} onClick={save}>{sel ? t("Save as version {n}", { n: sel.version + 1 }) : t("Create baseline")}</Btn></div>}
             </div>

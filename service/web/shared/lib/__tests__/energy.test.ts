@@ -122,6 +122,9 @@ describe("HQ energy baselines in the display language (IR296)", () => {
     });
     expect(baselineErrors({ ...draft, unitIds: ["u1"], from: "2025-01-01T00:00", to: "2026-09-01T00:00", method: "demo_fixed", baselineKWh: "-1", boundaryId: "ac_input_electricity", boundary: "AC", source: "demo" }))
       .toEqual({ period: "At most 366 days", baselineKWh: "A value ≥ 0 kWh" });
+    // an empty period asks for both ends instead of saying the end is before the start; the option names its dates (IR586)
+    expect([baselineErrors({ ...draft, from: "", to: "" }).period, baselineErrors({ ...draft, from: "", to: "" }, ms).period]).toEqual(["Enter the start and the end", "Masukkan masa mula dan tamat"]);
+    expect(baselineRows([b]).map((r) => r.dates)).toEqual(["2026-09-01 → 2026-09-08"]);
   });
 
   it("never shows coverage below full as 100 (one reading missing is not 100.0%)", () => {
