@@ -335,7 +335,8 @@ Items of the table above that are not scheduled yet:
 
 - Everything runs in Docker (IR119): the same images run in Compose locally and in CI and on ECS Fargate in staging and production; infrastructure as code for every environment; immutable image digests promoted from dev to staging to production.
 - CI runs type checks, lint, unit, contract, and end-to-end tests (NFR-07), database migration checks, and security scans; production deploys use rolling or blue-green releases with automatic rollback on health checks.
-  - As built (IR364): the dependency scans are `make vuln` (govulncheck at a pinned version, run on the module's own toolchain so that it checks the standard library the images build with, IR503) for the Go modules and `npm audit` for the web workspace (`--omit=dev` for what ships). Each development round also reviews one class of vulnerability in the code.
+  - As built (IR550): GitHub Actions runs the lint and type checks, the unit and integration suites (the migration check is one of the Go tests: `schema.sql` equals the first migration), the document validators and the end-to-end suite. The security scans do not run in CI yet.
+  - As built (IR364): the dependency scans run by hand: `make vuln` for the Go modules (govulncheck at a pinned version, on the module's own toolchain so that it checks the standard library the images build with, IR503) and `npm audit` for the web workspace (`--omit=dev` for what ships). Dependabot proposes the updates (IR550). Each development round also reviews one class of vulnerability in the code.
 - Database migrations are backward compatible for one release (expand, migrate, contract).
 
 ## 15. Migration from the Phase 1A mock
@@ -345,6 +346,12 @@ Items of the table above that are not scheduled yet:
 3. Replace the mock event bus with the BFF SSE stream; keep the IR71 invalidation lists.
 4. Replace simulators with provider sandboxes and the device simulator in development and staging; the scenario clock remains only in the demo environment.
 5. Keep the demo environment with the mock adapter for sales and training; production never includes demo operations.
+
+As built:
+- Steps 1 and 2 are done: with `DATA_SOURCE=api` the screens read through the server-side DAL and the operation relay and write through Server Actions, on the REST routes (IR222, IR223).
+- Step 3 is open: there is no SSE stream yet (§5, IR555).
+- Step 4 is partly done: the device simulator, the mock fleet and the real sensor nodes run in development (§9), and the provider sandboxes come with the AWS target.
+- Step 5 holds: `DATA_SOURCE=mock` and the compose `demo` profile keep the Phase 1A demo, and demo operations need `DEMO_OPS=1`.
 
 ## 16. Open items
 

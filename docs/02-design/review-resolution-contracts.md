@@ -7888,3 +7888,13 @@ Found in the loop, comparing §5's contract table with the BFF and the Core API.
 3. **Files.** No pre-signed URL is issued, and no scanner runs. Uploads reach the Core API in the Server Action's body and are checked there (magic bytes, size, image dimensions; IR368, IR389). They are kept in the local blob store (OPEN-CT-02), and the apps' routes stream them back after the Core API authorizes the read.
 
 A note under the table now says so. The other rows hold: idempotency keys are kept 24 hours (`platform.idempotency_keys.expires_at`), and the error codes map to the listed statuses.
+
+## IR556 Backend architecture §14 and §15 say what is done — 2026-11-01
+
+Found in the loop:
+1. **§14.** It said that CI runs security scans. The CI of IR550 runs no scan: `make vuln` and `npm audit` are run by hand (IR364), and Dependabot proposes updates. §14 now lists what GitHub Actions runs, with the migration check among the Go tests, and says that the scans run by hand for now.
+2. **§15.** The migration plan from the Phase 1A mock had no status. It now has one:
+   - steps 1 and 2 are done (DAL, relay and Server Actions on the REST routes);
+   - step 3 is open (no SSE stream, IR555);
+   - step 4 is partly done (simulator, mock fleet and real nodes in development; provider sandboxes with the AWS target);
+   - step 5 holds (`DATA_SOURCE=mock`, the demo profile, `DEMO_OPS`).

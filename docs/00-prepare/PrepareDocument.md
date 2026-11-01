@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.425.0
+version: 0.426.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -286,6 +286,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.426.0: Backend architecture §14 says what CI runs and that the security scans run by hand; §15 gives the status of each migration step from the Phase 1A mock (IR556). Phase 1A unchanged.
 0.425.0: Backend architecture §5 says how the caller context, change notification and files work as built: the user's own token, no SSE yet, uploads through Server Actions into the local blob store (IR555). Phase 1A unchanged.
 0.424.0: Backend architecture §3 says which runtime components run today: the Core API's services, the workers that run or idle, the IoT bridge and what the cache holds (IR554). Phase 1A unchanged.
 0.423.0: Backend architecture §4 says that its event column holds the design's names and points to §8 for the events as built (IR553). Phase 1A unchanged.
