@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.461.0
+version: 0.462.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -286,6 +286,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.462.0: A refused certificate submit focuses the first field to fix; the certificate and photo pickers show keyboard focus (IR593). Phase 1A unchanged.
 0.461.0: The air quality table labels the hours before a cut-off series' oldest reading "Not loaded" (IR592). Phase 1A unchanged.
 0.460.0: HQ customers & units texts carry no codes or IDs; "Remove permanently" is disabled for a unit in use (IR591). Phase 1A unchanged.
 0.459.0: Technician texts carry no error codes or spec IDs, and a refused diagnostic review focuses the first field to fix (IR590). Phase 1A unchanged.

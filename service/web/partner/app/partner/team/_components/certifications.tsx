@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Badge, Banner, Btn, Card, cx, DataTable, Field, Input, LinkBtn, Modal, Select, SummaryList, Textarea } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
+import { focusField } from "@ac/web/lib/focusField";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { certificateErrors, certificateRefusal, fileSize, FILE_TYPES, type CertForm, type CertRow } from "@ac/web/lib/partnerCertificates";
 import { requestTraining, submitCertificate } from "../actions";
@@ -102,6 +103,7 @@ function CertificateModal({ live, kind, row, onClose }: { live: Live; kind: "ren
   });
   const [file, setFile] = useState<File | null>(null);
   const [tried, setTried] = useState(false);
+  const ids = { membershipId: useId(), name: useId(), issued: useId(), expires: useId(), number: useId(), file: useId() };
   const [server, setServer] = useState<Record<string, string>>({});
   const [refused, setRefused] = useState<string | null>(null);
   const local = tried ? certificateErrors(form, t) : {};
@@ -109,7 +111,11 @@ function CertificateModal({ live, kind, row, onClose }: { live: Live; kind: "ren
   const set = (p: Partial<CertForm>) => { setForm({ ...form, ...p }); setServer({}); setRefused(null); };
   const save = () => {
     setTried(true);
-    if (Object.keys(certificateErrors(form, t)).length || !file) return;
+    const e = certificateErrors(form, t);
+    // a refused submit takes focus to the first field to fix, top to bottom (IR593, as IR586)
+    const bad = (Object.keys(ids) as (keyof typeof ids)[]).find((k) => e[k] || (k === "file" && !file));
+    if (bad) return focusField(ids[bad]);
+    if (!file) return;
     const data = new FormData();
     for (const [k, v] of Object.entries({ membershipId: form.membershipId, code: form.code, name: form.name, number: form.number, issued: form.issued, expires: form.expires })) data.set(k, v);
     if (renew) data.set("renewalOf", row!.cert!.id);
@@ -127,7 +133,7 @@ function CertificateModal({ live, kind, row, onClose }: { live: Live; kind: "ren
       ) : (
         <>
           <Field label={t("Technician")} error={err("membershipId")}>
-            <Select value={form.membershipId} onChange={(e) => set({ membershipId: e.target.value })}>
+            <Select id={ids.membershipId} value={form.membershipId} onChange={(e) => set({ membershipId: e.target.value })}>
               {c.people.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </Select>
           </Field>
@@ -137,19 +143,19 @@ function CertificateModal({ live, kind, row, onClose }: { live: Live; kind: "ren
                 {c.codes.map((x) => <option key={x.code} value={x.code}>{x.text}</option>)}
               </Select>
             </Field>
-            <Field label={t("Certificate name")} error={err("name")}><Input value={form.name} maxLength={120} onChange={(e) => set({ name: e.target.value })} /></Field>
+            <Field label={t("Certificate name")} error={err("name")}><Input id={ids.name} value={form.name} maxLength={120} onChange={(e) => set({ name: e.target.value })} /></Field>
           </div>
         </>
       )}
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
-        <Field label={t("Issued on")} error={err("issued")}><Input type="date" value={form.issued} onChange={(e) => set({ issued: e.target.value })} /></Field>
-        <Field label={t("Expires on")} error={err("expires")}><Input type="date" value={form.expires} min={form.issued || undefined} onChange={(e) => set({ expires: e.target.value })} /></Field>
+        <Field label={t("Issued on")} error={err("issued")}><Input id={ids.issued} type="date" value={form.issued} onChange={(e) => set({ issued: e.target.value })} /></Field>
+        <Field label={t("Expires on")} error={err("expires")}><Input id={ids.expires} type="date" value={form.expires} min={form.issued || undefined} onChange={(e) => set({ expires: e.target.value })} /></Field>
       </div>
-      <Field label={t("Certificate number")} error={err("number")}><Input value={form.number} maxLength={64} onChange={(e) => set({ number: e.target.value })} /></Field>
+      <Field label={t("Certificate number")} error={err("number")}><Input id={ids.number} value={form.number} maxLength={64} onChange={(e) => set({ number: e.target.value })} /></Field>
       <div className="flex flex-col gap-1 text-xs font-semibold text-ink">
         <span>{t("Certificate file")}</span>
-        <label className={cx("block cursor-pointer rounded-xl border border-dashed px-4 py-4 text-center hover:bg-surface2", err("file") ? "border-crit" : "border-line")}>
-          <Input type="file" accept={FILE_TYPES.join(",")} className="sr-only h-px w-px" onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); set({ file: f ? { name: f.name, type: f.type, size: f.size } : null }); }} />
+        <label className={cx("block cursor-pointer rounded-xl border border-dashed px-4 py-4 text-center hover:bg-surface2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary", err("file") ? "border-crit" : "border-line")}>
+          <Input id={ids.file} type="file" accept={FILE_TYPES.join(",")} className="sr-only h-px w-px" onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); set({ file: f ? { name: f.name, type: f.type, size: f.size } : null }); }} />
           <b className="flex items-center gap-1 text-[13px]">{file ? <><Icon name="document" />{`${file.name} · ${fileSize(file.size)}`}</> : t("Choose a file")}</b>
           <span className="block text-[11px] font-normal text-muted-foreground">{t("PDF / JPG / PNG, up to 10 MB")}{file ? ` · ${t("Replace")}` : ""}</span>
         </label>

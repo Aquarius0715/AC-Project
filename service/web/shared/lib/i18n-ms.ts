@@ -2083,6 +2083,7 @@ export const ms: Record<string, string> = {
   "Not-applicable reasons": "Sebab tidak berkenaan",
   "{n} / {total} given": "{n} / {total} diberikan",
   "none needed": "tidak diperlukan",
+  "Add photos": "Tambah foto",
   "Photos": "Foto",
   "{n} attached": "{n} dilampirkan",
   "{n} recorded": "{n} direkodkan",

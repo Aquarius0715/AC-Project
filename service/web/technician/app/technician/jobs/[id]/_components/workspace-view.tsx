@@ -315,8 +315,8 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                   <div className="flex flex-wrap gap-2">
                     {photos.map((a) => <Photo key={a.id} src={photoUrl(a)} name={a.name} />)}
                     {editable && photos.length < MAX_PHOTOS && (
-                      <label className={cx("grid h-16 w-20 cursor-pointer place-items-center rounded-lg border border-dashed border-line text-xl text-muted-foreground hover:bg-surface2", pending && "pointer-events-none opacity-50")}>
-                        +<Input type="file" accept="image/jpeg,image/png" className="sr-only h-px w-px" onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
+                      <label className={cx("grid h-16 w-20 cursor-pointer place-items-center rounded-lg border border-dashed border-line text-xl text-muted-foreground hover:bg-surface2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary", pending && "pointer-events-none opacity-50")}>
+                        +<Input type="file" aria-label={t("Add photos")} accept="image/jpeg,image/png" className="sr-only h-px w-px" onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
                       </label>
                     )}
                     {!editable && photos.length === 0 && <span className="text-xs text-muted-foreground">{t("No photos.")}</span>}

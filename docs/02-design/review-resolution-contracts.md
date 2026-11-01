@@ -8297,3 +8297,11 @@ Found in the twenty-second round of the UX loop (UX-22: customer-a reads the air
 1. **Not loaded.** When a series is cut off, the slots that end before its oldest loaded reading read "Not loaded — Earlier readings are not loaded" (`airRows(…, loadedFrom)`); gaps among the loaded readings keep "No data — Gap — not joined", and the chart's gap legend shows only for those. The Malay dictionary follows.
 2. **Proposed, not built.** Server-side averages for the 24 h and 7 d windows, so the charts cover their whole window in one page (B-9 in the UX proposals).
 3. **Tests.** `air.test.ts` checks the not-loaded and real-gap rows; the new `customer/air-quality.e2e.ts` reads the 7-day PM2.5 table and expects "Not loaded" whenever the cut-off note shows.
+
+## IR593 The certificate form focuses the field to fix; hidden file pickers show their focus — 2026-11-02
+
+Found in the twenty-third round of the UX loop (UX-23: contractor-a reads Team & capacity › Certifications — filters, KPIs, tech-external-a's three qualifications expiring in 9 days — and opens Add certificate, submits it empty and with an expiry before the issue date, without sending, at 1920 and 1280). Nothing was submitted. The checks name their fields, but focus stayed on "Submit for verification", and the certificate file — a visually hidden file input inside a dashed drop box — showed no focus at all when reached with Tab (WCAG 2.4.7): a keyboard user could not tell that the picker was focused. The technician's "+" photo picker in the report workspace has the same pattern, and its input was named only "+". The authorization held: `certificates.submit` with a malformed document input answers VALIDATION before anything is stored.
+
+1. **Focus.** A refused certificate submit takes focus to the first field to fix (technician, name, issue date, expiry date, number, file) with `focusField` (IR586).
+2. **Focus visible.** The drop boxes of the certificate file and of the technician's photos draw the focus outline when their hidden input has keyboard focus (`has-[:focus-visible]:outline-…`); the photo input is named "Add photos". The Malay dictionary follows.
+3. **Test.** The new `partner/certificates.e2e.ts` submits an empty certificate, expects focus on "Issued on", tabs to the file picker and expects its drop box's outline.
