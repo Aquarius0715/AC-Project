@@ -3242,7 +3242,7 @@ export const ms: Record<string, string> = {
   "This device has no sensors.": "Peranti ini tiada penderia.",
   "Stale after": "Lapuk selepas",
   "Last calibrated": "Kali terakhir ditentukur",
-  "Calibrate": "Tentukur",
+  "Calibrate…": "Tentukur…",
   "Operation history": "Sejarah operasi",
   "No operations yet.": "Belum ada operasi.",
   "Shown for your assigned job on this unit.": "Dipaparkan untuk kerja yang ditugaskan kepada anda pada unit ini.",

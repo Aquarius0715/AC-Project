@@ -215,7 +215,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
                         <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><th /></tr></thead>
                         <tbody>{dv.sensors.map((s) => (
                           <tr key={s.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{s.metric}</td><td>{s.unit}</td><td>{s.stale}</td><td className="text-xs">{s.calibrated}</td>
-                            <td className="pr-3 text-right">{live.canMaintain && <Plain type="button" disabled={pending || busy || !canWrite} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => { setCal({ sensorId: s.id, reference: "", measured: "" }); setErrors({}); setModal("calibrate"); }}>{t("Calibrate")} <Icon name="arrowRight" /></Plain>}</td></tr>
+                            <td className="pr-3 text-right">{live.canMaintain && <Btn size="sm" disabled={pending || busy || !canWrite} onClick={() => { setCal({ sensorId: s.id, reference: "", measured: "" }); setErrors({}); setModal("calibrate"); }}>{t("Calibrate…")}</Btn>}</td></tr>
                         ))}</tbody>
                       </table></ScrollX>
                     )}

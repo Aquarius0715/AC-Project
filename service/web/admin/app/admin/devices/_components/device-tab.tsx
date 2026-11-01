@@ -15,7 +15,7 @@ const dot: Record<string, string> = { ok: "bg-ok", crit: "bg-crit", warn: "bg-wa
 
 /** IoT devices (DD-A04, Figma Admin 246:2): the list sorted by serial with the state chips and the search, and the
  * deviceId detail as the technician's device screen draws it — tiles, the bound unit, the actions, the firmware card,
- * sensors with Calibrate →, the operation and calibration history and the events. Register, bind, connection check,
+ * sensors with Calibrate… (a small button like the device actions, IR576), the operation and calibration history and the events. Register, bind, connection check,
  * calibration and firmware update are Server Actions. Texts in the display language; times in the user's display time
  * zone; metric and evidence codes stay codes (IR295, IR319). */
 export function DeviceTab({ live }: { live: DevicesLive }) {
@@ -136,7 +136,7 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
                     <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><th /></tr></thead>
                     <tbody>{dv.sensors.map((x) => (
                       <tr key={x.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{x.metric}</td><td>{x.unit}</td><td>{x.stale}</td><td className="text-xs">{x.calibrated}</td>
-                        <td className="pr-3 text-right">{live.canWrite && <Plain type="button" disabled={pending || busy} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => calibrateOf(x.id)}>{t("Calibrate")} <Icon name="arrowRight" /></Plain>}</td></tr>
+                        <td className="pr-3 text-right">{live.canWrite && <Btn size="sm" disabled={pending || busy} onClick={() => calibrateOf(x.id)}>{t("Calibrate…")}</Btn>}</td></tr>
                     ))}</tbody>
                   </table></ScrollX>
                 )}

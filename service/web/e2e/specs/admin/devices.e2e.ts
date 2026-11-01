@@ -27,7 +27,7 @@ test("the device list filters by state and the detail shows the device as Figma 
   await page.waitForURL(/deviceId=/);
   for (const label of ["Connection", "Power signal", "Tamper", "Firmware", "Bound to unit"]) await expect(main).toContainText(label);
   for (const name of [/^Sensors \(\d+\) · from the unit’s capability$/, "Operation history", "Calibration history", "Device events"]) await expect(main.getByRole("heading", { name })).toBeVisible();
-  await expect(main.getByRole("button", { name: "Calibrate", exact: true }).first()).toBeVisible();
+  await expect(main.getByRole("button", { name: "Calibrate…", exact: true }).first()).toBeVisible(); // a small button like Rebind… (IR576)
   for (const name of [/^Check connection/, /^Calibrate sensor/, /^Update firmware/]) await expect(main.getByRole("button", { name })).toBeVisible();
 });
 

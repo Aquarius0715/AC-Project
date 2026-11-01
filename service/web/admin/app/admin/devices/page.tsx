@@ -50,7 +50,7 @@ export default async function AdminDevicesPage({ searchParams }: PageProps<"/adm
   };
   if (tab === "devices") {
     // the list and the detail as Figma Admin 246:2 and the technician's device screen draw them: sorted by serial, the
-    // state chips, tiles, the bound unit, the actions, sensors with Calibrate →, the operation and calibration
+    // state chips, tiles, the bound unit, the actions, sensors with Calibrate…, the operation and calibration
     // history and the events (IR319)
     const names = new Map(units.items.map((u) => [u.id, u.displayName]));
     live.rows = techDeviceRows(devices.items, names, now.getTime(), i.t);

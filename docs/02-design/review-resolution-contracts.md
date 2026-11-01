@@ -8099,3 +8099,16 @@ Found in the sixth round of the UX loop (UX-06: contractor-a starts the day on t
 5. **Design.** The overview paragraph of the contractor design states it. Figma's dashboard shows two technicians, fewer than the eight, so it is unchanged.
 
 After the change the overview fits 1,080 px: three working technicians, with no sideways scroll at 1920 or 1280 and no axe violation. The security point held. Opening a request HQ has not offered, or another customer's unit, shows Page unavailable. The same unit with the company's own ended job in the URL shows only that job's history snapshot, and nothing about the unit.
+
+## IR576 Calibrate is a small button, like the other device actions — 2026-11-01
+
+Found in the seventh round of the UX loop (UX-07: the technician app's tap targets on a 390×844 touch phone, left from UX-03). Every visible control was measured on Overview, Assigned jobs, Devices, Notifications, Preferences and the scan dialog. Nearly all of them are 28–36 px tall, under the project's 44×44 px target. Raising them all is proposed separately (UX proposals, B). The smallest were:
+
+- **Calibrate** in the sensor table of a device: 76×19 px, a text link with an arrow, although it opens a dialog. Rebind…, the other device action on the same page, is a small button (28 px).
+- **All** in the card header of Alerts on my units: 30×15 px. A lone link in a card header has no neighbour within 24 px, so WCAG 2.2's spacing exception covers it, and it is left as is.
+
+1. **Button.** Calibrate becomes "Calibrate…", a small secondary button (`Btn size="sm"`, 28 px tall), in the technician's devices and in HQ's device detail alike. The ellipsis says that it opens a dialog, as Rebind… does. Malay: "Tentukur…".
+2. **Test.** `admin/devices.e2e.ts` looks for the button "Calibrate…".
+3. **Design and Figma.** The admin design's device paragraph names it. Figma's sensor tables (Technician 31, Admin 25) show a small secondary Button "Calibrate…" instead of the text link.
+
+The security point of the round: the tap-target check only reads the screens. The scan dialog lists only the units of the technician's own open jobs, as checked in UX-03.
