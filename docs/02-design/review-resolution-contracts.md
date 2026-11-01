@@ -7738,3 +7738,17 @@ Found in the loop, comparing the first table of §10 (the scheduled business tra
 2. **Re-offer.** The row "Offer expiry and re-offer" reads as if both were scheduled. Only the expiry is: an undecided offer returns its job to requested at its deadline (IR48), and HQ then offers the job again with `jobs.offer` and a new offerId. The list of items done by an explicit operation now says so.
 
 The release when a qualification ends (IR440) is not scheduled: it runs in `certificates.verify`, so §10 leaves it out.
+
+## IR543 Backend architecture §6 describes the account set-up — 2026-11-01
+
+Found in the loop's security round (authentication). §6 covered sign-in, sessions, two-step verification and password reset, but not how a new person's account is opened. That was spread over IR423, IR461 to IR464, IR468 and IR511, and the link's validity was in the code only (`idp.Keycloak.SendSetup`).
+
+§6 now has an Account set-up row:
+- the `AccountRequested` event and the identity-accounts consumer;
+- the link back to the person's app, which sets the password, verifies the e-mail and, for an HQ account without a code device, sets up the one-time code;
+- its validity of 3 days;
+- `resendInvite`, for a person who has not signed in yet, at most every 5 minutes, and for a contractor's person only before the access end;
+- the cap of 30 accounts a day per organization;
+- the best-effort provider calls.
+
+Checked, nothing to fix: the link comes from the identity provider and is not stored by the platform. `findByEmail` asks for an exact match, and the provider's admin client may only manage users (IR386).
