@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ApiDevice, ApiDeviceDetail, ApiDeviceOperation } from "@ac/web/lib/devices";
 import {
   calibrationText, deviceFieldText, deviceRefusal, deviceTiles, eventRows, failureText, filterOf, firmwareCard, HQ_FILTERS, jobFor, newerFirmware, newerVersions, openAlerts, openFaults,
-  operationRows, sensorRows, techDeviceRows, type ApiAlertLite, type ApiDeviceEventFull, type TechJob,
+  operationLabel, operationRows, sensorRows, techDeviceRows, type ApiAlertLite, type ApiDeviceEventFull, type TechJob,
 } from "@ac/web/lib/techDevices";
 import { i18nOf } from "@ac/web/lib/i18n";
 
@@ -98,19 +98,19 @@ describe("firmwareCard", () => {
   it("is absent without a firmware operation", () => expect(firmwareCard(detail(), [op()])).toBeNull());
   it("shows the active update with the D05 lock and its deadline", () => {
     const active = op({ id: "fw", kind: "firmware", status: "running", targetVersion: "v2", startedAt: "2026-09-14T01:00:01Z", expiresAt: "2026-09-14T01:01:00Z", finishedAt: null });
-    expect(firmwareCard(detail({ activeOperation: active }), [])).toEqual({ tone: "primary", title: "Firmware update v1 → v2", status: "Running", text: "Started 9:00 am MYT · control commands locked (D05) · fails if the device does not confirm by 9:01 am MYT" });
+    expect(firmwareCard(detail({ activeOperation: active }), [])).toEqual({ tone: "primary", title: "Firmware update v1 → v2", status: "Running", text: "Started 9:00 am MYT · control commands locked · fails if the device does not confirm by 9:01 am MYT" });
     const queued = { ...active, status: "queued" as const, startedAt: null };
     expect(firmwareCard(detail({ activeOperation: queued }), [])?.status).toBe("Queued");
   });
   it("keeps the old version after a failure and reports a finished install", () => {
-    expect(firmwareCard(detail(), [op({ kind: "firmware", status: "failed", targetVersion: "v2", failureCode: "TIMEOUT" })])).toEqual({ tone: "crit", title: "Firmware update to v2 failed", status: "Failed", text: "TIMEOUT — no confirmation within 60 s · the old version v1 is kept" });
+    expect(firmwareCard(detail(), [op({ kind: "firmware", status: "failed", targetVersion: "v2", failureCode: "TIMEOUT" })])).toEqual({ tone: "crit", title: "Firmware update to v2 failed", status: "Failed", text: "no confirmation within 60 s · the old version v1 is kept" });
     expect(firmwareCard(detail({ firmwareVersion: "v2" }), [op({ kind: "firmware", status: "succeeded", targetVersion: "v2", finishedAt: "2026-09-14T01:00:05Z" })])).toEqual({ tone: "ok", title: "Firmware v2 installed", status: "Succeeded", text: "finished 14 Sept 2026, 9:00 am MYT · history appended" });
   });
 });
 
 describe("operation history", () => {
   it("names every failure code and passes unknown ones through", () => {
-    expect(failureText("TIMEOUT")).toMatch(/^TIMEOUT — no confirmation within 60 s$/);
+    expect(failureText("TIMEOUT")).toMatch(/^no confirmation within 60 s$/);
     expect(failureText("OFFLINE")).toMatch(/not online at the start/);
     expect(failureText("CONFLICT")).toMatch(/another operation/);
     expect(failureText("UNAVAILABLE")).toMatch(/reported a failure/);
@@ -123,9 +123,13 @@ describe("operation history", () => {
       op({ id: "4", kind: "firmware", status: "running", targetVersion: "v2", finishedAt: null }), op({ id: "5", kind: "firmware", status: "succeeded", targetVersion: "v2" }),
       op({ id: "6", status: "failed", failureCode: "TIMEOUT" }),
     ], "v1");
-    expect(rows.map((r) => r.detail)).toEqual(["heartbeat confirmed", "waiting for the heartbeat", "starts within a second", "v1 → v2", "v2 installed", "TIMEOUT — no confirmation within 60 s"]);
+    expect(rows.map((r) => r.detail)).toEqual(["heartbeat confirmed", "waiting for the heartbeat", "starts within a second", "v1 → v2", "v2 installed", "no confirmation within 60 s"]);
     expect(rows[1].time).toBe("14 Sept 2026, 9:00 am MYT"); // startedAt, else createdAt
     expect(rows[0]).toMatchObject({ id: "1", kind: "Connection check", status: "succeeded", statusText: "Succeeded" });
+  });
+  it("names the running operation in words, not as an enum (IR585)", () => {
+    expect(operationLabel({ kind: "check", status: "queued" })).toBe("Connection check · Queued");
+    expect(operationLabel({ kind: "firmware", status: "running" }, MS.t)).toBe(`${MS.t("Firmware update")} · ${MS.t("Running")}`);
   });
   it("prints a calibration with the signed offset reference − measured", () => {
     const base = { id: "c", sensorId: "s", metric: "temperature" as const, unit: "°C" as const, calibratedAt: "2026-09-14T01:04:00Z", actorId: "u" };
@@ -179,12 +183,12 @@ describe("the device screens in Malay with the display time zone (IR287)", () =>
     expect(deviceTiles(detail(), null, NOW)[2].value).toBe("Clear"); // English shows the text after the context
     expect(operationRows([op()], "v1", MS)[0]).toMatchObject({ kind: "Semakan sambungan", statusText: "Berjaya", detail: "denyutan disahkan" });
     expect(eventRows([event()], new Map(), NOW, MS)[0]).toMatchObject({ time: "hari ini 10:00 PG GMT+9", detail: "Denyutan terlepas (bukan bukti kehilangan kuasa) · heartbeat", recovery: "terbuka" });
-    expect(failureText("TIMEOUT", MS.t)).toBe("TIMEOUT — tiada pengesahan dalam 60 s");
+    expect(failureText("TIMEOUT", MS.t)).toBe("tiada pengesahan dalam 60 s");
     expect(sensorRows(device({ sensors: [{ id: "s1", metric: "temperature", unit: "°C", staleAfterSeconds: 120, calibratedAt: null }] }), MS)).toEqual([{ id: "s1", metric: "Suhu", unit: "°C", stale: "120 s", calibrated: "Tidak pernah" }]); // the metric in words (IR499)
   });
   it("words a refused write and its fields", () => {
-    expect(deviceRefusal({ code: "CONFLICT", messageKey: "errors.duplicate_serial", fieldErrors: {} })).toBe("CONFLICT — this serial is already registered.");
-    expect(deviceRefusal({ code: "OFFLINE", messageKey: "error.offline", fieldErrors: {} })).toMatch(/^OFFLINE — the device is not reachable/);
+    expect(deviceRefusal({ code: "CONFLICT", messageKey: "errors.duplicate_serial", fieldErrors: {} })).toBe("This serial is already registered.");
+    expect(deviceRefusal({ code: "OFFLINE", messageKey: "error.offline", fieldErrors: {} })).toMatch(/^The device is not reachable, so nothing was started/);
     expect(deviceRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { reason: "error.required" } })).toBeNull();
     expect([deviceFieldText("error.duplicate"), deviceFieldText("error.duplicate", MS.t), deviceFieldText("errors.serial_format")]).toEqual(["Already registered", "Sudah didaftarkan", "serial format"]);
   });

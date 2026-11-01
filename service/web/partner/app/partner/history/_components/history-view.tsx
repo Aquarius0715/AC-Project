@@ -58,7 +58,7 @@ function List({ live }: { live: HistoryLive }) {
             </table>
           </ScrollX>
         )}
-        <p className="mt-3 text-[11px] text-muted-foreground">{t(live.total > 100 ? "Showing {shown} of {total} (the latest 100) · own company only (FR-P08) · offers appear here after acceptance." : "Showing {shown} of {total} · own company only (FR-P08) · offers appear here after acceptance.", { shown: live.rows.length, total: all })}</p>
+        <p className="mt-3 text-[11px] text-muted-foreground">{t(live.total > 100 ? "Showing {shown} of {total} (the latest 100) · own company only · offers appear here after acceptance." : "Showing {shown} of {total} · own company only · offers appear here after acceptance.", { shown: live.rows.length, total: all })}</p>
       </Card>
     </Page>
   );

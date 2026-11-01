@@ -29,6 +29,14 @@ test("the device list filters by state and the detail shows the device as Figma 
   for (const name of [/^Sensors \(\d+\) · from the unit’s capability$/, "Operation history", "Calibration history", "Device events"]) await expect(main.getByRole("heading", { name })).toBeVisible();
   await expect(main.getByRole("button", { name: "Calibrate…", exact: true }).first()).toBeVisible(); // a small button like Rebind… (IR576)
   for (const name of [/^Check connection/, /^Calibrate sensor/, /^Update firmware/]) await expect(main.getByRole("button", { name })).toBeVisible();
+
+  // a calibration without values asks for a number under both fields (IR585); nothing is recorded
+  await main.getByRole("button", { name: /^Calibrate sensor/ }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Record", exact: true }).click();
+  await expect(dialog.getByText("Enter a number", { exact: true })).toHaveCount(2);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
 });
 
 // The model editor (DD-A04, Figma Admin 106:3, IR350): a saved model shows its capability version; an edit marks the

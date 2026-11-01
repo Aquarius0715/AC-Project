@@ -8,7 +8,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { ApiDeviceDetail, Metric } from "@ac/web/lib/devices";
-import { deviceFieldText, deviceRefusal, FILTERS, filterOf, openAlerts, type EventRow, type Filter, type OperationRow, type TechDeviceRow, metricText } from "@ac/web/lib/techDevices";
+import { deviceFieldText, deviceRefusal, FILTERS, filterOf, openAlerts, operationLabel, type EventRow, type Filter, type OperationRow, type TechDeviceRow, metricText } from "@ac/web/lib/techDevices";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { acknowledgeAlert, addResponseNote, bindDevice, calibrateSensor, checkDevice, registerDevice, updateFirmware } from "../actions";
 import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
@@ -83,7 +83,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
     const target = live.rebind.find((u) => u.unitId === bind.unitId);
     const e: Record<string, string> = {};
     if (!target) e.unitId = t("Choose a unit");
-    if (bind.reason.trim().length < 1 || bind.reason.trim().length > 1000) e.reason = t("VALIDATION — a reason is required to rebind (1–1000 characters)");
+    if (bind.reason.trim().length < 1 || bind.reason.trim().length > 1000) e.reason = t("A reason is required (1–1000 characters)");
     setErrors(e);
     if (Object.keys(e).length || !dv || !target) return;
     run(() => bindDevice(dv.detail.id, dv.detail.version, target.unitId, target.jobId, bind.reason), t("Device rebound — new sensor IDs issued"), ok(), failed);
@@ -92,8 +92,8 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
     const s = dv?.detail.sensors.find((x) => x.id === cal.sensorId);
     const e: Record<string, string> = {};
     if (!s) e.sensorId = t("Choose a sensor");
-    if (cal.reference.trim() === "" || !Number.isFinite(+cal.reference)) e.referenceValue = t("A number");
-    if (cal.measured.trim() === "" || !Number.isFinite(+cal.measured)) e.measuredValue = t("A number");
+    if (cal.reference.trim() === "" || !Number.isFinite(+cal.reference)) e.referenceValue = t("Enter a number");
+    if (cal.measured.trim() === "" || !Number.isFinite(+cal.measured)) e.measuredValue = t("Enter a number");
     setErrors(e);
     if (Object.keys(e).length || !dv || !s || !dv.jobId) return;
     run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit, +cal.reference, +cal.measured, dv.jobId!), t("Calibration recorded — earlier readings unchanged"), ok(), failed);
@@ -171,7 +171,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
                 </div>
               )}
               {live.canMaintain && !dv.jobId && <p className="-mt-2 text-xs text-muted-foreground">{t("Device work runs under your assigned job on this unit — there is none now, so the device is read-only.")}</p>}
-              {busy && <p className="-mt-2 text-xs text-muted-foreground">{t("One device operation at a time ({operation}) — the others wait; control commands are locked during an update (D05).", { operation: `${dv.detail.activeOperation?.kind} ${dv.detail.activeOperation?.status}` })}</p>}
+              {busy && <p className="-mt-2 text-xs text-muted-foreground">{t("One device operation at a time ({operation}) — the others wait; control commands are locked during an update.", { operation: dv.detail.activeOperation ? operationLabel(dv.detail.activeOperation, t) : "" })}</p>}
               {dv.firmwareCard && (
                 <div className={cx("rounded-xl border p-3", dv.firmwareCard.tone === "crit" ? "border-crit bg-crit-soft/40" : dv.firmwareCard.tone === "ok" ? "border-[#86efac] bg-ok-soft/40" : "border-primary bg-primary-soft/40")}>
                   <div className="flex items-center justify-between gap-2"><b className="text-[13px]">{dv.firmwareCard.title}</b><Badge tone={dv.firmwareCard.tone}>{dv.firmwareCard.status}</Badge></div>
@@ -180,12 +180,12 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
                 </div>
               )}
               {live.events && dv.eventsLocked ? (
-                <Banner>{t("Device events open while you have an assignment on {unit} (IR94). Ask HQ or your coordinator if you need them now.", { unit: dv.unit?.name ?? t("this unit") })}</Banner>
+                <Banner>{t("Device events open while you have an assignment on {unit}. Ask HQ or your coordinator if you need them now.", { unit: dv.unit?.name ?? t("this unit") })}</Banner>
               ) : dv.events ? (
                 <div>
                   <div className="mb-2 flex items-baseline gap-2"><b className="text-[15px]">{t("Device events")}</b><span className="text-xs text-muted-foreground">{t("connection, power and tamper are separate events")}</span></div>
                   {dv.events.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No device events.")}</p> : (
-                    <ScrollX className="rounded-xl border border-line"><table className="w-full min-w-[560px] text-[13px]">
+                    <ScrollX className="rounded-xl border border-line"><table className="w-full min-w-[560px] text-[13px] [&_td]:pr-3 [&_th]:pr-3">
                       <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Time")}</th><th>{t("Event")}</th><th>{t("Detail")}</th><th>{t("Recovery / response")}</th></tr></thead>
                       <tbody>{dv.events.map((e) => (
                         <tr key={e.id} className="border-t border-line align-top">
@@ -211,7 +211,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
                   <div>
                     <b className="text-[15px]">{t("Sensors ({n}) · from the unit’s capability", { n: dv.sensors.length })}</b>
                     {dv.sensors.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("This device has no sensors.")}</p> : (
-                      <ScrollX className="mt-2 rounded-xl border border-line"><table className="w-full min-w-[420px] text-[13px]">
+                      <ScrollX className="mt-2 rounded-xl border border-line"><table className="w-full min-w-[420px] text-[13px] [&_td]:pr-3 [&_th]:pr-3">
                         <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><th /></tr></thead>
                         <tbody>{dv.sensors.map((s) => (
                           <tr key={s.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{s.metric}</td><td>{s.unit}</td><td>{s.stale}</td><td className="text-xs">{s.calibrated}</td>
@@ -223,7 +223,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
                   <div>
                     <b className="text-[15px]">{t("Operation history")}</b>
                     {dv.operations.length === 0 ? <p className="text-[13px] text-muted-foreground">{t(live.canMaintain && dv.jobId ? "No operations yet." : "Shown for your assigned job on this unit.")}</p> : (
-                      <ScrollX className="mt-2 rounded-xl border border-line"><table className="w-full min-w-[420px] text-[13px]">
+                      <ScrollX className="mt-2 rounded-xl border border-line"><table className="w-full min-w-[420px] text-[13px] [&_td]:pr-3 [&_th]:pr-3">
                         <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Kind")}</th><th>{t("Started")}</th><th>{t("Detail")}</th><th>{t("Status")}</th></tr></thead>
                         <tbody>{dv.operations.map((o) => (
                           <tr key={o.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{o.kind}</td><td className="text-xs">{o.time}</td><td className="text-xs">{o.detail}</td>
@@ -259,7 +259,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
       <Modal open={modal === "rebind"} onClose={close} title={t("Rebind device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={rebind}>{t("Rebind")}</Btn></>}>
         <Field label={t("New unit")} error={errors.unitId}><Select value={bind.unitId} onChange={(e) => setBind({ ...bind, unitId: e.target.value })}><option value="">{t("Select…")}</option>{live.rebind.filter((u) => u.unitId !== dv?.row.unitId).map((u) => <option key={u.unitId} value={u.unitId}>{u.label}</option>)}</Select></Field>
         <Field label={t("Reason (required)")} error={errors.reason}><Textarea value={bind.reason} maxLength={1000} onChange={(e) => setBind({ ...bind, reason: e.target.value })} /></Field>
-        <p className="text-[11px] text-muted-foreground">{t("History stays with the previous binding; the device gets new sensor IDs on the new unit (SR24).")}</p>
+        <p className="text-[11px] text-muted-foreground">{t("History stays with the previous binding; the device gets new sensor IDs on the new unit.")}</p>
       </Modal>
       <Modal open={modal === "calibrate"} onClose={close} title={t("Calibrate sensor")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={calibrate}>{t("Record calibration")}</Btn></>}>
         <Field label={t("Sensor")} error={errors.sensorId ?? errors.unit ?? errors.metric}><Select value={cal.sensorId} onChange={(e) => setCal({ ...cal, sensorId: e.target.value })}>{dv?.detail.sensors.map((s) => <option key={s.id} value={s.id}>{metricText(s.metric, t)} ({s.unit})</option>)}</Select></Field>

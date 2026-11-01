@@ -25,7 +25,7 @@ export function tabFilters(tab: TabId, fromAt: string, toAt: string): NonNullabl
 export const SORTS = [
   { id: "status:asc", label: "Status, earliest stage first", text: "status, then deadline" }, { id: "status:desc", label: "Status, latest stage first", text: "status (last first)" },
   { id: "dueAt:asc", label: "Deadline, soonest first", text: "deadline (soonest first)" }, { id: "dueAt:desc", label: "Deadline, latest first", text: "deadline (latest first)" },
-  { id: "severity:desc", label: "Unit urgency, most urgent first", text: "unit urgency (IR30)" },
+  { id: "severity:desc", label: "Unit urgency, most urgent first", text: "unit urgency" },
 ] as const;
 export type SortId = (typeof SORTS)[number]["id"];
 export const sortOf = (v?: string): SortId => (SORTS.find((s) => s.id === v)?.id ?? "status:asc");

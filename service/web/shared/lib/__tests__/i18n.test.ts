@@ -52,11 +52,15 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     expect(Object.keys(ms).filter((key) => !dynamic.has(key) && !code.includes(JSON.stringify(key)))).toEqual([]);
   });
 
-  it("speaks to contractors without error codes or spec IDs (IR584)", () => {
-    const partner = [...sources(join(root, "partner/app")), ...readdirSync(join(root, "shared/lib")).filter((f) => /^partner\w*\.ts$/.test(f)).map((f) => join(root, "shared/lib", f))];
-    const texts = partner.flatMap((f) => [...readFileSync(f, "utf8").matchAll(/\bt\(\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => JSON.parse(`"${m[1]}"`) as string));
+  it("speaks to contractors, and to technicians about devices, without error codes or spec IDs (IR584, IR585)", () => {
+    const lib = (name: RegExp) => readdirSync(join(root, "shared/lib")).filter((f) => name.test(f)).map((f) => join(root, "shared/lib", f));
+    const files = [...sources(join(root, "partner/app")), ...lib(/^partner\w*\.ts$/), ...sources(join(root, "technician/app/technician/devices")), ...lib(/^techDevices\.ts$/)];
+    const strings = files.flatMap((f) => [...readFileSync(f, "utf8").matchAll(/"((?:[^"\\\n]|\\.)*)"/g)].flatMap((m) => {
+      try { return [JSON.parse(`"${m[1]}"`) as string]; } catch { return []; }
+    }));
+    const texts = [...new Set(strings.filter((text) => text in ms))]; // every literal the dictionary translates, maps of texts included
     expect(texts.length).toBeGreaterThan(100);
-    const coded = /\b(?:IR\d+|(?:FR|DD|BR|NFR|DEC|AT|SCR|DDC|REV)-[A-Z]*\d+)\b|^(?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\b/;
+    const coded = /\b(?:IR\d+|(?:FR|DD|BR|NFR|DEC|AT|SCR|DDC|REV)-[A-Z]*\d+|SR\d+|D\d{2,})\b|^(?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\b/;
     expect(texts.filter((text) => coded.test(text))).toEqual([]);
   });
 

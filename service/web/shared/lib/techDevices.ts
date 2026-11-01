@@ -96,7 +96,7 @@ export function firmwareCard(d: ApiDeviceDetail, ops: (ApiDeviceOperation & { st
   const last = active ?? ops.find((o) => o.kind === "firmware") ?? null;
   if (!last) return null;
   if (last.status === "queued" || last.status === "running") {
-    const started = t("Started {time} · control commands locked (D05)", { time: showClock(last.startedAt ?? last.createdAt, display) });
+    const started = t("Started {time} · control commands locked", { time: showClock(last.startedAt ?? last.createdAt, display) });
     return { tone: "primary" as const, title: t("Firmware update {from} → {to}", { from: d.firmwareVersion, to: last.targetVersion ?? "—" }), status: t(last.status === "queued" ? "Queued" : "Running"),
       text: last.expiresAt ? `${started} · ${t("fails if the device does not confirm by {time}", { time: showClock(last.expiresAt, display) })}` : started };
   }
@@ -105,14 +105,16 @@ export function firmwareCard(d: ApiDeviceDetail, ops: (ApiDeviceOperation & { st
 }
 
 const FAILURE: Record<string, string> = {
-  TIMEOUT: "TIMEOUT — no confirmation within 60 s", OFFLINE: "OFFLINE — the device was not online at the start", CONFLICT: "CONFLICT — a command or another operation was running",
-  UNAVAILABLE: "UNAVAILABLE — the device reported a failure",
+  TIMEOUT: "no confirmation within 60 s", OFFLINE: "the device was not online at the start", CONFLICT: "a command or another operation was running",
+  UNAVAILABLE: "the device reported a failure",
 };
 /** Why a device operation failed (IR67, REV19-018). */
 export const failureText = (code: string | null | undefined, t: T = en) => (code && FAILURE[code] ? t(FAILURE[code]) : code ?? t("no result"));
 
 const KIND: Record<ApiDeviceOperation["kind"], string> = { check: "Connection check", calibrate: "Calibration", firmware: "Firmware update" };
 const STATUS: Record<ApiDeviceOperation["status"], string> = { queued: "Queued", running: "Running", succeeded: "Succeeded", failed: "Failed" };
+/** An operation in words, as “Connection check · Queued”. */
+export const operationLabel = (o: Pick<ApiDeviceOperation, "kind" | "status">, t: T = en) => `${t(KIND[o.kind] ?? o.kind)} · ${t(STATUS[o.status] ?? o.status)}`;
 /** One operation of the T11 history (Figma 03: started, “v1 → v2”, “heartbeat confirmed”). */
 export type OperationRow = { id: string; kind: string; status: ApiDeviceOperation["status"]; statusText: string; time: string; detail: string };
 export function operationRows(ops: (ApiDeviceOperation & { startedAt?: string | null })[], current: string, i: I18n = EN): OperationRow[] {
@@ -170,13 +172,13 @@ export function eventRows(es: ApiDeviceEventFull[], alerts: Map<string, ApiAlert
 export const openAlerts = (rows: EventRow[]) => [...new Map(rows.flatMap((r) => r.alerts).filter((a) => a.status === "open").map((a) => [a.id, a])).values()];
 
 const REFUSED: Record<string, string> = {
-  OFFLINE: "OFFLINE — the device is not reachable; nothing was started (an update needs an online device).",
-  CONFLICT: "CONFLICT — another operation is running or the device changed; the page shows the latest state.",
-  FORBIDDEN: "FORBIDDEN — outside your assignment or work window, or without device permission.",
+  OFFLINE: "The device is not reachable, so nothing was started (an update needs an online device).",
+  CONFLICT: "Another operation is running or the device changed; the page shows the latest state.",
+  FORBIDDEN: "Outside your assignment or work window, or your role has no device permission.",
 };
 /** A refused device write in words (null for a VALIDATION that only marks fields). */
 export function deviceRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): string | null {
-  if (f.messageKey === "errors.duplicate_serial" || (f.code === "CONFLICT" && f.fieldErrors.serial)) return t("CONFLICT — this serial is already registered.");
+  if (f.messageKey === "errors.duplicate_serial" || (f.code === "CONFLICT" && f.fieldErrors.serial)) return t("This serial is already registered.");
   return REFUSED[f.code] ? t(REFUSED[f.code]) : null;
 }
 const FIELD: Record<string, string> = { "error.required": "Required", "error.length": "1–1000 characters", "error.invalid": "Not valid", "error.duplicate": "Already registered" };
