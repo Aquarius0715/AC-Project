@@ -5410,6 +5410,8 @@ export const ms: Record<string, string> = {
   "Audit log · newest first": "Log audit · terbaharu dahulu",
   "No audit entries match these filters": "Tiada entri audit sepadan dengan penapis ini",
   "No audit entries match this period, actor, target, correlation ID or result.": "Tiada entri audit sepadan dengan tempoh, pelaku, sasaran, ID korelasi atau keputusan ini.",
+  "No entries with the result {result}": "Tiada entri dengan keputusan {result}",
+  "This log records the changes that succeeded. Denied, failed and pending attempts are not recorded, so an empty list does not mean that none happened.": "Log ini merekodkan perubahan yang berjaya. Percubaan yang ditolak, gagal dan belum selesai tidak direkodkan, jadi senarai kosong tidak bermakna tiada yang berlaku.",
   "{n} of {total} · 25 per page": "{n} daripada {total} · 25 setiap halaman",
   "Actor": "Pelaku",
   "Role at the time": "Peranan pada masa itu",

@@ -55,6 +55,10 @@ describe("HQ audit log (FR-A16, DD-A16, SCR-A16)", () => {
     expect(actorOptions([{ userId: "user-0001", displayName: "hq-operator" }, { userId: "user-0002", displayName: "contractor-a" }], rows, "user-9999")).toEqual([
       { id: "user-0002", name: "contractor-a" }, { id: "user-0001", name: "hq-operator" }, { id: "system-demo", name: "system-demo" }, { id: "user-9999", name: "user-9999" },
     ]);
+    // two people of one name carry the start of their IDs; a unique name stays as it is (IR599)
+    expect(actorOptions([{ userId: "a1b2c3d4-0000-4000-8000-000000000001", displayName: "Ahmad" }, { userId: "e5f6a7b8-0000-4000-8000-000000000002", displayName: "Ahmad" }, { userId: "user-0001", displayName: "hq-operator" }], [], "")).toEqual([
+      { id: "a1b2c3d4-0000-4000-8000-000000000001", name: "Ahmad · a1b2c3d4" }, { id: "e5f6a7b8-0000-4000-8000-000000000002", name: "Ahmad · e5f6a7b8" }, { id: "user-0001", name: "hq-operator" },
+    ]);
     const kinds = targetKinds(rows, "zz_kind");
     expect([kinds.includes("restriction"), kinds.includes("command"), kinds.includes("filter_care_settings"), kinds.at(-1), kinds.length]).toEqual([true, true, true, "zz_kind", 16]);
   });

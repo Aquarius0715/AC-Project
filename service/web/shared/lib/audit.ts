@@ -126,13 +126,16 @@ const KINDS = ["alert", "automation", "command", "contract", "device", "device_e
 export const targetKinds = (rows: Pick<AuditRow, "targetKind">[], current: string) => [...new Set([...KINDS, ...rows.map((r) => r.targetKind), ...(current ? [current] : [])])].sort();
 
 /** The Actor filter's people by name: the users of the memberships the session may read (members.list), the actors of
- * the shown entries and the URL's actor (a system actor by its ID). */
+ * the shown entries and the URL's actor (a system actor by its ID). A name that several people share carries the start
+ * of each one's ID, as the entry's detail shows it, so the auditor can tell them apart (IR599). */
 export function actorOptions(members: { userId: string; displayName: string }[], rows: Pick<AuditRow, "actor" | "actorId">[], current: string): { id: string; name: string }[] {
   const m = new Map<string, string>();
   for (const x of members) m.set(x.userId, x.displayName);
   for (const r of rows) if (!m.has(r.actorId)) m.set(r.actorId, r.actor);
   if (current && !m.has(current)) m.set(current, current);
-  return [...m].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  const shared = new Map<string, number>();
+  for (const name of m.values()) shared.set(name, (shared.get(name) ?? 0) + 1);
+  return [...m].map(([id, name]) => ({ id, name: (shared.get(name) ?? 0) > 1 ? `${name} · ${id.slice(0, 8)}` : name })).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }
 
 /** A record related to an entry: its own target, or the target of an entry with the same correlation ID. */

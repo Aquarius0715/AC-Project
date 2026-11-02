@@ -129,7 +129,7 @@ export function AuditView({ live }: { live?: AuditLive }) {
           </Card>
           <div className="split-rev">
             <Card title={corr ? t("Correlation {id}", { id: corr }) : t("Audit log · newest first")} className="self-start">
-              {rows.length === 0 ? <NoEntries live={live} periodErr={periodErr} corr={corr} /> : (
+              {rows.length === 0 ? <NoEntries live={live} periodErr={periodErr} corr={corr} result={f.result} /> : (
                 <div className="flex flex-col gap-2">{rows.map((l) => (
                   <ListRow key={l.id} selected={sel?.id === l.id} onClick={() => open(l.id)}>
                     <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{l.op}</b><Badge tone={resultTone(l.res)}>{resultWord(l.res, t)}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{l.target}</div><div className="truncate text-[11px] text-muted-foreground">{l.actor} ({l.role}) · {l.at} · {l.corr}</div></div>
@@ -176,11 +176,13 @@ function FilterLink({ onClick, children }: { onClick: () => void; children: Reac
 }
 
 /** Why the list is empty: nothing was searched (an invalid period, Figma Admin 338:602), an unknown or out-of-scope
- * correlation ID — they look the same (338:332) — or no match. */
-function NoEntries({ live, periodErr, corr }: { live?: AuditLive; periodErr?: string; corr: string }) {
+ * correlation ID — they look the same (338:332) — no denied, failed or pending entry, which the log does not record
+ * (IR599, proposal B-13), or no match. */
+function NoEntries({ live, periodErr, corr, result }: { live?: AuditLive; periodErr?: string; corr: string; result: string }) {
   const { t } = useI18n();
   if (periodErr || (live && !live.searched)) return <EmptyState title={t("Nothing was searched")}>{t("The period must start before it ends and cover at most 366 days. Earlier results are cleared so they are not mistaken for this search.")}</EmptyState>;
   if (corr) return <EmptyState title={t("No entries with this correlation ID")}>{t("This looks the same for an ID that does not exist and for one outside your managed scope. Clear the correlation ID or widen the period.")}</EmptyState>;
+  if (live && (result === "Denied" || result === "Failed" || result === "Pending")) return <EmptyState title={t("No entries with the result {result}", { result: resultWord(result, t) })}>{t("This log records the changes that succeeded. Denied, failed and pending attempts are not recorded, so an empty list does not mean that none happened.")}</EmptyState>;
   return <EmptyState title={t("No audit entries match these filters")}>{t("No audit entries match this period, actor, target, correlation ID or result.")}</EmptyState>;
 }
 

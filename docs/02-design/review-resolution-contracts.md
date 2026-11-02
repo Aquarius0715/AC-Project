@@ -8373,3 +8373,26 @@ The authorization held. tech-internal-a asked about a unit outside its scope:
 3. **Figma.** The monitoring frames draw a fully loaded period, the state that B-9 (server-side windows) would give. They need no change.
 4. **Tests.** `techUnit.test.ts` covers the cut chart and the cut small charts in English and Malay, and the start of the 24 h axis.
 5. **Proposals.** Loading the whole period remains proposal B-9. The walk-through also found that the demo's fixture devices keep a seed-time "last seen" while readings arrive: their heartbeats carry no state, and the bridge drops them. That is proposal B-12.
+
+## IR599 The audit explorer says that it records only the changes that succeeded — 2026-11-02
+
+Found in the twenty-ninth round of the UX loop (UX-29). hq-restriction-manager traced activity in the audit log at 1920 and 1280: the newest entries, the Denied filter, an entry's detail with its related records, a reversed period, and the device events of Bedroom AC. The explorer reads well: the read-only banner, the filters kept in the URL, the open entry with its actor, recorded role, correlation and target filters, the related records, and device events with their sequence and recovery. Two frictions remained:
+
+- All 898 entries of the log are successes. `db.Recorder` writes an entry inside the operation's own transaction, always with the result success. A refused or failed write therefore rolls back and leaves no entry, and nothing records pending. The Denied, Failed and Pending filters always came back empty under "No audit entries match these filters". An auditor looking for refused attempts would conclude that there were none.
+- The Actor filter names people only by display name. People who share a name cannot be told apart; the dev data holds 15 "E2E Colleague". The entry's detail, by contrast, shows each actor's ID.
+
+The authorization held:
+
+| Probe on `audit.list` | Answer |
+|---|---|
+| A correlation ID that matches nothing | no entries |
+| An actor ID made of SQL text | no entries |
+| An unknown result, a reversed or over-long period, a limit of 1000 | VALIDATION |
+| A delete operation | NOT_FOUND (there is none) |
+
+The recorded before/after values hold no contact or secret fields.
+
+1. **Words.** Under Denied, Failed or Pending, an empty list now says "No entries with the result {result}" and "This log records the changes that succeeded. Denied, failed and pending attempts are not recorded, so an empty list does not mean that none happened." The Malay dictionary follows.
+2. **Actors.** A name that several people share carries the start of each one's ID, for example "Ahmad · a1b2c3d4", as the entry's detail shows it.
+3. **Design.** DD-A16 now notes as built that only successful changes are recorded. Recording denied, failed and pending attempts is a backend change and awaits a decision. Figma's audit frames keep their designed entries.
+4. **Tests.** `audit.test.ts` covers shared names. `audit.e2e.ts` checks the Denied empty state.
