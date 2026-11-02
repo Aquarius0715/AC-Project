@@ -34,3 +34,17 @@ test("a page the role may not read names the permission it needs", async ({ brow
     await context.close();
   }
 });
+
+// "Waiting for HQ" counts the requests to book whatever their requested time and opens them with no period (DEC-90,
+// IR611): the count matches the Jobs list's Requested tile.
+test("Waiting for HQ opens the requests to book, with no period", async ({ page }) => {
+  await page.goto("/admin?period=today");
+  const main = page.getByRole("main");
+  const link = main.getByRole("link", { name: "Open requests" });
+  await expect(link).toHaveAttribute("href", "/admin/jobs?stage=requested");
+  const tile = main.locator('[data-slot="card"]').filter({ hasText: "Waiting for HQ" });
+  const count = (await tile.locator("div").filter({ hasText: /^\d+$/ }).first().innerText()).trim();
+  await link.click();
+  await page.waitForURL(/\/admin\/jobs\?stage=requested$/);
+  await expect(main.getByRole("button", { name: new RegExp(`^Requested ${count}`) }).or(main.getByText(new RegExp(`^Requested\\s*${count}$`))).first()).toBeVisible();
+});

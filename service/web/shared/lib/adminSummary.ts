@@ -59,6 +59,8 @@ export function overviewLinks(q: { customerId: string | null; propertyId: string
     units: `/admin/units${scope()}`, power: (state: "on" | "off" | "unknown") => `/admin/units${scope({ powerState: state })}`,
     connection: (c: string) => `/admin/units${scope({ connections: c })}`, alerts: "/admin/alerts", billing: "/admin/billing?overdueOnly=true",
     jobs: (stage?: string) => `/admin/jobs${scope({ ...(stage ? { stage } : {}), ...(q.period ? { from: q.period.from, to: q.period.to } : {}) })}`, energy: "/admin/energy",
+    // the requests waiting for HQ, whatever their requested time (DEC-90, IR611)
+    waiting: `/admin/jobs${scope({ stage: "requested" })}`,
   };
 }
 

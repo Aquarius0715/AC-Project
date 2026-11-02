@@ -8514,3 +8514,13 @@ Decided by the user as DEC-90 (UX-loop proposal of UX-09). An overdue invoice, a
 2. **Reads.** The overview reads `invoices.list` (overdue only), `contracts.list` and `restrictions.forInvoice`, the reads the payments page makes. A member without billing access gets FORBIDDEN and sees no notice.
 3. **Design.** DD-C01 says the same as built. Figma's Client row 01 gains 01c with the notice. The Malay dictionary follows.
 4. **Tests.** `clientBilling.test.ts` covers one and several invoices, the temperature limit, power off, a scheduled and a released restriction, and Malay. `restriction-notice.e2e.ts` checks the overview's links up to the restriction's detail. On the development stack, Demo Customer A's overview showed both lines at 1920 and 1280, and axe passed.
+
+## IR611 HQ's overview counts what waits for HQ, whatever the period — 2026-11-02
+
+Decided by the user as DEC-90 (UX-loop proposal of UX-04). The overview counts jobs by their requested visit time in the period (IR245). A new request for a visit in two days therefore showed nowhere on "Today", and "Open jobs" opened an empty list while requests waited to be booked. Only the notification bell told the dispatcher.
+
+1. **Tile.** The first tile, "Waiting for HQ", counts the jobs in Requested without a pending time proposal (`jobs.list` total, no period). A declined time proposal, a declined or expired offer (IR48), and a follow-up to classify all return a job there, so one count answers "what is waiting for me". It follows the selected customer and property, and turns amber when not zero.
+2. **Link.** "Open requests" opens the Jobs list at the Requested stage with the scope and no period (`overviewLinks.waiting`).
+3. **Access.** A role without job.read gets FORBIDDEN from `jobs.list`, and the tile is left out.
+4. **Design.** DD-A01 says the same as built. Figma Admin 38:3 shows the tile at the front of the KPI row, and the row's titles now wrap rather than clip. The Malay dictionary follows.
+5. **Tests.** `adminSummary.test.ts` checks that the link ignores the period. On the development stack the tile counted 1 at 1920 and 1280, matching the Jobs list's Requested tile, and axe passed.

@@ -27,6 +27,10 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
   const customerId = customers?.some((c) => c.id === one("customerId")) ? one("customerId")! : null;
   const properties = customerId ? await quiet(coreAll<{ id: string; name: string }>("properties.list", { filters: { customerId } })) : null;
   const propertyId = properties?.some((p) => p.id === one("propertyId")) ? one("propertyId")! : null;
+  // what waits for HQ whatever its requested time — requests to book, offers declined or expired, follow-ups to classify
+  // (DEC-90, IR611); a role without job.read sees no such tile
+  const scope = { ...(customerId ? { customerId } : {}), ...(propertyId ? { propertyId } : {}) };
+  const waitingPage = quiet(coreOp<{ total: number }>("jobs.list", { limit: 1, filters: { status: "requested", proposalPending: false, ...scope } }));
   let summary: AdminSummary | null = null;
   if (!period.error) {
     try {
@@ -37,10 +41,11 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
       throw e;
     }
   }
+  const waiting = (await waitingPage)?.total ?? null;
   return (
     <AdminOverviewView live={{
       period: { kind, from: period.from, to: period.to, error: period.error ?? null, label: period.label }, custom: { from: one("from") ?? "", to: one("to") ?? "" },
-      customers, customerId, properties, propertyId, summary, asOf: summary ? asOfText(summary.asOf ?? now.toISOString(), period.label, i) : null,
+      customers, customerId, properties, propertyId, summary, asOf: summary ? asOfText(summary.asOf ?? now.toISOString(), period.label, i) : null, waiting,
     }} />
   );
 }

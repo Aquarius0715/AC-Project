@@ -1614,6 +1614,8 @@ export const ms: Record<string, string> = {
   "{shown} of {n} invoice": "{shown} daripada {n} invois",
   "{shown} of {n} invoices": "{shown} daripada {n} invois",
   "Pay now": "Bayar sekarang",
+  "Open requests": "Buka permintaan",
+  "requests to book or reassign · any requested time": "permintaan untuk ditempah atau diagih semula · sebarang masa diminta",
   "Invoice {number} is overdue — {amount}": "Invois {number} tertunggak — {amount}",
   "{n} invoices are overdue — {amount} in total": "{n} invois tertunggak — {amount} kesemuanya",
   "A restriction starts {time} unless it is paid — {policy}": "Sekatan bermula {time} melainkan ia dibayar — {policy}",

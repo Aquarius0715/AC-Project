@@ -12,6 +12,7 @@ type Live = {
   period: { kind: string; from: string; to: string; error: string | null; label: string }; custom: { from: string; to: string };
   customers: { id: string; name: string }[] | null; customerId: string | null; properties: { id: string; name: string }[] | null; propertyId: string | null;
   summary: AdminSummary | null; asOf: string | null;
+  waiting: number | null; // requests waiting for HQ, any requested time (IR611); null without job.read
 };
 const PERIODS = [{ id: "today", label: "Today" }, { id: "7d", label: "Last 7 days" }, { id: "30d", label: "Last 30 days" }, { id: "custom", label: "Custom" }];
 const barTone: Record<AxisRow["tone"], string> = { primary: "bg-primary", muted: "bg-muted-foreground/50", warn: "bg-warn", ok: "bg-ok", crit: "bg-crit" };
@@ -51,12 +52,12 @@ export function AdminOverviewView({ live }: { live: Live }) {
         <div className="flex items-center gap-2 text-xs text-muted-foreground">{live.asOf && <span>{live.asOf}</span>}<Btn size="sm" onClick={() => router.refresh()}><Icon name="refresh" />{t("Refresh")}</Btn></div>
       </div>
       {live.period.error && <Banner tone="warn">{t("{error} — choose another period.", { error: live.period.error })}</Banner>}
-      {s && <Sections s={s} links={links} />}
+      {s && <Sections s={s} links={links} waiting={live.waiting} />}
     </Page>
   );
 }
 
-function Sections({ s, links }: { s: AdminSummary; links: ReturnType<typeof overviewLinks> }) {
+function Sections({ s, links, waiting }: { s: AdminSummary; links: ReturnType<typeof overviewLinks>; waiting: number | null }) {
   const t = useT();
   const k = kpisFrom(s, t);
   const f = forecastView(s.energyForecast, t);
@@ -68,6 +69,8 @@ function Sections({ s, links }: { s: AdminSummary; links: ReturnType<typeof over
     <>
       {s.total === 0 && <Banner tone="warn">{t("Zero units in scope — nothing to show yet.")}</Banner>}
       <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
+        {/* what waits for HQ whatever the period: requests to book, offers declined or expired, follow-ups to classify (IR611) */}
+        {waiting !== null && <Kpi label={t("Waiting for HQ")} value={waiting} tone={waiting ? "warn" : undefined} sub={t("requests to book or reassign · any requested time")} href={links.waiting} link={t("Open requests")} />}
         <Kpi label={t("Active customers")} value={k.customers} sub={t("with Active status")} />
         <Kpi label={t("Target units")} value={k.units} sub={t("Running {on} · Stopped {off} · unknown {unknown} · archived excluded", { on: k.on, off: k.off, unknown: k.unknown })} href={links.units} link={t("Open units")} />
         <Kpi label={t("Operation rate")} value={k.rate} sub={t("Running {on} / known {known} · unknown {unknown} not in denominator", { on: k.on, known: k.on + k.off, unknown: k.unknown })} href={links.power("on")} link={t("Units running")} />
