@@ -1,5 +1,6 @@
 // The work report's checks (FR-T09, IR594): the workspace passes axe — its Next action controls are named — and a
-// submit with empty checklist results is refused in words and takes focus to the first result to fix. Nothing is
+// submit with empty checklist results is refused in words and takes focus to the first result to fix. The check-in
+// before it refuses a site too far away under the distance, and then focuses the job's title (IR620). Nothing is
 // submitted. It needs tech-external-a inside the seed job's work window (the CI seed's clock); a dev stack whose clock
 // has passed it skips. Checking in, when the job is not started yet, changes the job as report-autosave does.
 import { test, expect } from "../../fixtures/test";
@@ -27,8 +28,18 @@ test("an incomplete report names its issues in words and focuses the first one",
       const checkIn = page.getByRole("dialog", { name: "Check in at site" });
       await expect(checkIn.getByLabel("Distance to the site (m)")).toHaveValue(/\d/);
       await expect(checkIn.getByLabel("Scanned unit QR")).not.toHaveValue("");
+      // too far: the message sits under the distance, which takes the focus (IR620)
+      const distance = checkIn.getByLabel(/^Distance to the site/);
+      const near = await distance.inputValue();
+      await distance.fill("250");
+      await checkIn.getByRole("button", { name: "Check in & start" }).click();
+      await expect(distance).toBeFocused();
+      await expect(distance).toHaveAccessibleName(/within 200 m of the site/);
+      await distance.fill(near);
       await checkIn.getByRole("button", { name: "Check in & start" }).click();
       await expect(page.getByText("Checked in — the job has started").first()).toBeVisible();
+      // the view mounts again for the new job version; the focus goes to the job's title, which now says so (IR620)
+      await expect(page.getByRole("heading", { name: /— in progress$/ })).toBeFocused();
     }
     await expect(result).toBeVisible({ timeout: 30_000 });
     await expectAccessible(page);

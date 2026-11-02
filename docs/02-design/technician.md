@@ -431,7 +431,7 @@ Scope: FR-T13 / Main display pattern: **UI-FORM**. Service boundary: `units.reso
 
 **Scan dialog in API mode (IR230)**: the camera is simulated — the label code (`ac-unit:<id>`), a bound device serial or the unit ID is typed, or one of the user's units (`units.list`) is scanned with one tap. `units.resolveQr` (through the BFF) answers the unit and the user's next open job on it; the matched card shows the label and scan time, the unit with its location and model (`units.get`), and “Your job today” or “Your next job” with its window, type, status and linked alerts (`jobs.get`). Before the work window `units.get` is FORBIDDEN (IR94), so the card names the unit from the list and says its details open with the window. Open unit → the unit register with the job; Open job → the workspace; Enter ID manually focuses the field. An empty scan asks for a label.
 
-**Boundary cases and failures**: Unassigned or unknown label → shared Page unavailable without unit data. Outside the window → same error and disabled state as `jobs.start`.
+**Boundary cases and failures**: Unassigned or unknown label → shared Page unavailable without unit data. Outside the window → same error and disabled state as `jobs.start`. A refused check-in shows its message under the field it concerns and focuses it: a distance over 200 m, a label of another unit (`errors.qr_unit_mismatch`), a manual check-in without a reason. After the check-in the focus goes to the job's title, which then reads in progress (IR620).
 
 **Verification**: Check the traceability entries under AT-T13 (N/E/B).
 

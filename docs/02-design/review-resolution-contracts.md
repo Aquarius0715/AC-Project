@@ -8679,3 +8679,21 @@ Found in the UX loop (UX-38, the contractor's Users). Closing a dialog that a ta
    - `actionMessage.test.ts` covers `fieldErrorTexts`.
    - The users e2e of both apps check the focus on the first field to fix, on the row's button after a save, and on the list after a removal. A new partner check covers Escape from a row's dialog.
    - On the development stack, contractor-a added, refused, resent, changed and removed a technician at 1920 and 1280 with axe passing. The focus came back to each row's Access, Disable and Remove buttons after Escape and Cancel. An address held by a customer owner showed its message under Email.
+
+## IR621 Check in at site names the field to fix, and the job's title takes the focus after the check-in — 2026-11-02
+
+Found in the UX loop (UX-39, the technician's QR scan and check-in on a phone). Check in at site showed every refusal in one red box under the form, and the focus stayed on Check in & start. This covered a distance over 200 m, a missing label and a manual check-in without a reason. A label of another unit, refused by the Core API, only appeared in a toast, and the box behind the dialog stayed hidden. After a successful check-in the focus fell to the page. The view is keyed by the job's version, so it mounts again, and Start job is gone with it. The work report's note also named a status code: "Rework resumes from rework_requested as a new draft version".
+
+1. **Errors under their fields.** Each check sits under the field it concerns: Distance to the site, Scanned unit QR, or Reason. That field takes the focus, as IR586 and IR620 ask. The checks are `checkInErrors` in `techJob.ts`. The Core API's refusals land the same way: `distanceMeters` on the distance, `qrUnitId` (`errors.qr_unit_mismatch`) on the scanned label, and `reason` on the reason. A refusal without a field keeps the page banner and the toast.
+2. **The job's title after the check-in.** The job's title line is a heading (h2) that can take the focus. The check-in leaves the job's id, and that job's next view focuses its title, which now ends "— in progress". A screen reader user hears that the work has started, and the next Tab goes into the checklist.
+3. **Wording.** The note reads "A report returned for rework continues as a new draft version." The Malay dictionary and the demo follow.
+4. **Design.** DD-T13 says the same. Figma is unchanged: the fields and the title look as before.
+5. **Tests.**
+   - `techJob.test.ts` covers `checkInErrors` and the field map.
+   - `report-checks.e2e.ts` refuses 250 m under the distance with the focus there, then checks in and finds the focus on the "— in progress" title. It runs where the seed job's window is open, as on CI.
+   - On the development stack, tech-internal-a did the following on a temporary job for Living room AC at 390×844 with touch:
+     - Scanned an unknown label: "Page unavailable" as a warning.
+     - Tapped the one-tap label, a 44 px chip: Matched, "Your job today".
+     - Opened the job and was refused for 250 m, for an empty manual reason, and for Bedroom AC's label, each under its field with the focus there.
+     - Checked in, and the focus was on the title.
+   - axe passed on the scan and check-in dialogs. At 1920 the workspace was unchanged. The job was removed afterwards.

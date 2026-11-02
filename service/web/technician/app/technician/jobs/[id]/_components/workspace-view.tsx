@@ -9,10 +9,10 @@ import { focusField } from "@ac/web/lib/focusField";
 import { metricUnit, type Metric } from "@ac/web/lib/devices";
 import { zonedInstant, type T } from "@ac/web/lib/i18n";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
-import { actionMessage, type ActionFailure } from "@ac/web/lib/actionMessage";
+import { actionMessage, fieldErrorTexts, type ActionFailure } from "@ac/web/lib/actionMessage";
 import {
-  componentLabel, draftFrom, draftInput, fmtOf, followUpText, groupLabel, itemPhotos, linkPhoto, progress, readingMetrics, submitIssues, timeRows, versionRows, windowState,
-  type ApiTechReport, type Draft, type DraftPart, type DraftRefrigerant, type Group, type Issue, type Known, type Result, type TimeOnSite,
+  CHECK_IN_API_FIELDS, CHECK_IN_FIELDS, checkInErrors, componentLabel, draftFrom, draftInput, fmtOf, followUpText, groupLabel, itemPhotos, linkPhoto, progress, readingMetrics, submitIssues, timeRows, versionRows, windowState,
+  type ApiTechReport, type CheckInField, type Draft, type DraftPart, type DraftRefrigerant, type Group, type Issue, type Known, type Result, type TimeOnSite,
 } from "@ac/web/lib/techJob";
 import { acknowledge, checkIn, pauseWork, resumeRework, saveDraft, signOff, submitReport, uploadPhoto } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
@@ -77,6 +77,13 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   const [tab, setTab] = useState<Group>(live.components[0]?.group ?? "indoor");
   const [view, setView] = useState<"readings" | "parts" | "time">("readings");
   const [modal, setModal] = useState<null | "checkin" | "cant" | "part" | "refrigerant" | "sign" | "submit">(null);
+  const [checkInErr, setCheckInErr] = useState<CheckInErrors>({});
+  // after a check-in the view mounts again for the new job version: focus goes to the job's title, now "in progress"
+  useEffect(() => {
+    if (titleFocusFor !== live.job.id) return;
+    titleFocusFor = null;
+    document.getElementById("job-title")?.focus();
+  }, [live.job.id]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [linking, setLinking] = useState<string | null>(null); // the component whose “+ Link photo” list is open
   const win = windowState(job.assignment, now, f);
@@ -141,7 +148,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   const head = (
     <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
       <Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Overview")}</Link>
-      <b className="text-ink">{job.id.slice(0, 8)} · {live.unitName ?? t("Unit")} — {statusText[job.status] ? t(statusText[job.status]) : job.status}</b>
+      <h2 id="job-title" tabIndex={-1} className="rounded font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring/50">{job.id.slice(0, 8)} · {live.unitName ?? t("Unit")} — {statusText[job.status] ? t(statusText[job.status]) : job.status}</h2>
       {dirty && <Badge tone="warn">{t("Unsaved changes")}</Badge>}
     </div>
   );
@@ -202,7 +209,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
       {refused && <Banner tone="crit">{refused}</Banner>}
       {job.status === "assigned" && ack === "pending" && <Banner tone="primary" action={<span className="flex gap-2"><Btn size="sm" variant="primary" disabled={pending} onClick={() => run(() => acknowledge(job.id, job.version, "accept", null, null), t("Assignment accepted"), undefined, failed)}><Icon name="check" />{t("Accept assignment")}</Btn><Btn size="sm" disabled={pending} onClick={() => setModal("cant")}>{t("Can’t make this time…")}</Btn></span>}>{t("New assignment for {window}. Accepting tells your coordinator and HQ you will attend; the client then sees your name.", { window: visit })}</Banner>}
       {job.status === "assigned" && ack === "cant_make" && <Banner tone="warn">{job.assignment?.cantMakeReason ? t("You said you can’t make this time (“{reason}”). Your coordinator reassigns the job or asks the client for another time.", { reason: job.assignment.cantMakeReason }) : t("You said you can’t make this time. Your coordinator reassigns the job or asks the client for another time.")}</Banner>}
-      {job.status === "assigned" && ack === "accepted" && <Banner tone={win.phase === "before" ? "primary" : "ok"} action={<Btn size="sm" variant="primary" disabled={pending || win.phase !== "open" && win.phase !== "ending"} onClick={() => setModal("checkin")}>{t("Start job (check in)")}</Btn>}>{win.phase === "before" ? t("Read-only until the window opens at {time} — Start is disabled before then.", { time: opens }) : win.phase === "ended" ? t("The work window has ended — ask your coordinator to reschedule.") : t("On site: Start job opens Check in (location + unit QR); checking in starts the work.")}</Banner>}
+      {job.status === "assigned" && ack === "accepted" && <Banner tone={win.phase === "before" ? "primary" : "ok"} action={<Btn size="sm" variant="primary" disabled={pending || win.phase !== "open" && win.phase !== "ending"} onClick={() => { setCheckInErr({}); setModal("checkin"); }}>{t("Start job (check in)")}</Btn>}>{win.phase === "before" ? t("Read-only until the window opens at {time} — Start is disabled before then.", { time: opens }) : win.phase === "ended" ? t("The work window has ended — ask your coordinator to reschedule.") : t("On site: Start job opens Check in (location + unit QR); checking in starts the work.")}</Banner>}
       {job.status === "on_hold" && <Banner tone="warn">{t("On hold by HQ — saving and submitting are blocked. Your saved draft is kept; continue when HQ resumes the job.")}</Banner>}
       {job.status === "submitted" && <Banner tone="ok">{t("Submitted v{version} — read-only, awaiting quality review.", { version: job.reportRefs[job.reportRefs.length - 1]?.reportVersion ?? "" })}</Banner>}
       {job.status === "completed" && <Banner tone="ok">{t("Accepted — the job is completed and the report is visible to the customer.")}</Banner>}
@@ -342,7 +349,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                   {editable && <Btn size="sm" disabled={pending} onClick={() => setModal("sign")}>{t((rep ?? live.report)?.signOff ? "Sign again" : "Get signature")}</Btn>}
                 </div>
                 {editable && <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || !dirty && !!rep} onClick={() => save()}>{t("Save draft")}</Btn><Btn variant="primary" disabled={pending} onClick={trySubmit}>{t("Submit report")}</Btn></div>}
-                <p className="text-[11px] text-muted-foreground">{t("Submitted versions become read-only. Rework resumes from rework_requested as a new draft version. Saving again clears the sign-off.")}</p>
+                <p className="text-[11px] text-muted-foreground">{t("Submitted versions become read-only. A report returned for rework continues as a new draft version. Saving again clears the sign-off.")}</p>
               </div>
             )}
           </Card>
@@ -354,7 +361,15 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
           </Card>
         </div>
       </div>
-      <CheckInModal open={modal === "checkin"} unitId={job.unitId} pending={pending} onClose={() => setModal(null)} onCheckIn={(method, distance, qr, reason) => run(() => checkIn(job.id, job.version, method, distance, qr, reason), t("Checked in — the job has started"), () => setModal(null), failed)} />
+      <CheckInModal open={modal === "checkin"} unitId={job.unitId} pending={pending} errors={checkInErr} setErrors={setCheckInErr} onClose={() => setModal(null)}
+        onCheckIn={(method, distance, qr, reason) => run(() => checkIn(job.id, job.version, method, distance, qr, reason), t("Checked in — the job has started"), () => { titleFocusFor = job.id; setModal(null); }, (f) => {
+          // a refusal of a field (too far, another unit's label) shows under that field, which takes the focus (IR620)
+          const fields = fieldErrorTexts(f, CHECK_IN_API_FIELDS, t);
+          const first = CHECK_IN_FIELDS.find((k) => fields[k]);
+          if (!first) return failed(f);
+          setCheckInErr(fields);
+          focusField(CHECK_IN_IDS[first]);
+        })} />
       <CantMakeModal open={modal === "cant"} pending={pending} zone={live.zone} onClose={() => setModal(null)} onSend={(reason, slot) => run(() => acknowledge(job.id, job.version, "cant_make", reason, slot), t("Sent to your coordinator"), () => setModal(null), failed)} />
       <PartModal open={modal === "part"} parts={live.parts} components={live.components} onClose={() => setModal(null)} onAdd={(p) => { edit((d) => ({ ...d, parts: [...d.parts, p] })); setModal(null); }} />
       <RefrigerantModal open={modal === "refrigerant"} onClose={() => setModal(null)} onAdd={(r) => { edit((d) => ({ ...d, refrigerant: [...d.refrigerant, r] })); setModal(null); }} />
@@ -368,33 +383,38 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   );
 }
 
-function CheckInModal({ open, unitId, pending, onClose, onCheckIn }: { open: boolean; unitId: string; pending: boolean; onClose: () => void; onCheckIn: (method: "location_qr" | "manual", distance: number | null, qr: string | null, reason: string | null) => void }) {
+type CheckInErrors = Partial<Record<CheckInField, string>>;
+/** The page keys the view by the job's version, so the check-in, which moves the job on, mounts it again and drops the
+ * focus with Start job: the job id left here sends the focus to the title of that job's next view (IR620). */
+let titleFocusFor: string | null = null;
+/** The check-in form's fields by id: one dialog per page, and a refusal from the Core API focuses its field. */
+const CHECK_IN_IDS: Record<CheckInField, string> = { distance: "check-in-distance", qr: "check-in-qr", reason: "check-in-reason" };
+
+function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onCheckIn }: { open: boolean; unitId: string; pending: boolean; errors: CheckInErrors; setErrors: (e: CheckInErrors) => void; onClose: () => void; onCheckIn: (method: "location_qr" | "manual", distance: number | null, qr: string | null, reason: string | null) => void }) {
   const t = useT();
   const [method, setMethod] = useState<"location_qr" | "manual">("location_qr");
   const [distance, setDistance] = useState("40");
   const [qr, setQr] = useState(`ac-unit:${unitId}`);
   const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const clear = (k: CheckInField) => { if (errors[k]) setErrors({ ...errors, [k]: undefined }); };
   const go = () => {
-    if (method === "manual") {
-      if (reason.trim().length < 1 || reason.trim().length > 1000) return setError(t("A reason is required for a manual check-in (1–1000 characters)"));
-      return onCheckIn("manual", null, null, reason.trim());
-    }
-    const d = Number(distance);
-    if (!Number.isFinite(d) || d < 0 || d > 200) return setError(t("Location check-in needs you within 200 m of the site — check in manually with a reason otherwise"));
-    if (!qr.trim()) return setError(t("Scan the unit’s QR label"));
-    onCheckIn("location_qr", d, qr.trim(), null);
+    const e = checkInErrors(method, distance, qr, reason, t);
+    setErrors(e);
+    // a refused check-in takes the focus to the first field to fix, top to bottom (IR586, IR620)
+    const bad = CHECK_IN_FIELDS.find((k) => e[k]);
+    if (bad) return focusField(CHECK_IN_IDS[bad]);
+    if (method === "manual") onCheckIn("manual", null, null, reason.trim());
+    else onCheckIn("location_qr", Number(distance), qr.trim(), null);
   };
   return (
     <Modal open={open} onClose={onClose} title={t("Check in at site")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={go}>{t("Check in & start")}</Btn></>}>
-      <Field label={t("How")}><Choice value={method} onChange={(v) => { setMethod(v); setError(null); }} options={[{ id: "location_qr", label: t("Location + unit QR") }, { id: "manual", label: t("Manual (reason)") }]} /></Field>
+      <Field label={t("How")}><Choice value={method} onChange={(v) => { setMethod(v); setErrors({}); }} options={[{ id: "location_qr", label: t("Location + unit QR") }, { id: "manual", label: t("Manual (reason)") }]} /></Field>
       {method === "location_qr" ? (
         <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
-          <Field label={t("Distance to the site (m)")} hint={t("Demo: the device's location service fills this; within 200 m")}><Input inputMode="numeric" value={distance} onChange={(e) => setDistance(e.target.value)} /></Field>
-          <Field label={t("Scanned unit QR")} hint={t("Demo: the camera scan fills this")}><Input value={qr} onChange={(e) => setQr(e.target.value)} /></Field>
+          <Field label={t("Distance to the site (m)")} hint={t("Demo: the device's location service fills this; within 200 m")} error={errors.distance}><Input id={CHECK_IN_IDS.distance} inputMode="numeric" value={distance} onChange={(e) => { setDistance(e.target.value); clear("distance"); }} /></Field>
+          <Field label={t("Scanned unit QR")} hint={t("Demo: the camera scan fills this")} error={errors.qr}><Input id={CHECK_IN_IDS.qr} value={qr} onChange={(e) => { setQr(e.target.value); clear("qr"); }} /></Field>
         </div>
-      ) : <Field label={t("Reason (required)")}><Textarea value={reason} maxLength={1000} placeholder={t("No GPS signal in the basement plant room")} onChange={(e) => setReason(e.target.value)} /></Field>}
-      {error && <Banner tone="crit">{error}</Banner>}
+      ) : <Field label={t("Reason (required)")} error={errors.reason}><Textarea id={CHECK_IN_IDS.reason} value={reason} maxLength={1000} placeholder={t("No GPS signal in the basement plant room")} onChange={(e) => { setReason(e.target.value); clear("reason"); }} /></Field>}
       <p className="text-[11px] text-muted-foreground">{t("Arrival must be inside your work window. Checking in records the arrival and starts the work.")}</p>
     </Modal>
   );

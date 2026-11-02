@@ -2869,7 +2869,7 @@ export const ms: Record<string, string> = {
   "Get signature": "Dapatkan tandatangan",
   "Save draft": "Simpan draf",
   "Submit report": "Hantar laporan",
-  "Submitted versions become read-only. Rework resumes from rework_requested as a new draft version. Saving again clears the sign-off.": "Versi yang dihantar menjadi baca sahaja. Kerja semula disambung daripada rework_requested sebagai versi draf baharu. Menyimpan semula mengosongkan pengesahan.",
+  "Submitted versions become read-only. A report returned for rework continues as a new draft version. Saving again clears the sign-off.": "Versi yang dihantar menjadi baca sahaja. Laporan yang dikembalikan untuk kerja semula disambung sebagai versi draf baharu. Menyimpan semula mengosongkan pengesahan.",
   "Versions & autosave": "Versi & simpan automatik",
   "Work window": "Tetingkap kerja",
   "ending": "hampir tamat",

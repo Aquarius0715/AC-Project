@@ -131,7 +131,7 @@ function Workspace({ id }: { id: string }) {
             <div className="grid-fluid mt-2" style={{ ["--min"as string]: "150px" }}><Field label="Next action"><Select disabled={readOnly}><option>None</option><option>Re-inspect</option><option>Replace part</option></Select></Field></div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3"><div><b className="text-[13px]">Customer sign-off</b><div>{signed ? <Badge tone="ok">Signed · {signed}</Badge> : <Badge tone="warn">Not signed</Badge>}</div></div><Btn size="sm" disabled={readOnly} onClick={() => setSignModal(true)}>{signed ? "Sign again" : "Get signature"}</Btn></div>
             <div className="mt-3 rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted-foreground">Photos (JPEG/PNG, ≤5 MiB, ≤10) · 1 attached · <Plain disabled={readOnly} className="font-semibold text-primary disabled:opacity-50" onClick={() => toast("Photo added (demo)")}><Icon name="add" /> Add photo</Plain></div>
-            <p className="mt-2 text-[11px] text-muted-foreground">Submitted versions become read-only. Rework resumes from rework_requested as a new draft version.</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">Submitted versions become read-only. A report returned for rework continues as a new draft version.</p>
             {!readOnly && <div className="mt-3 flex flex-wrap justify-end gap-2"><Btn onClick={() => toast("Draft autosaved 11:44")}>Save draft</Btn><Btn variant="primary" onClick={submit}>Submit report</Btn></div>}
           </Card>
         </div>

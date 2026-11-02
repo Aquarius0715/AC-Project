@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { componentsFor, draftFrom, draftInput, fmtOf, followUpText, groupOf, historyCard, itemPhotos, knownOf, linkPhoto, progress, submitIssues, timeRows, versionRows, warnAt, windowState, type ApiTechReport, type Draft } from "@ac/web/lib/techJob";
+import { checkInErrors, CHECK_IN_API_FIELDS, componentsFor, draftFrom, draftInput, fmtOf, followUpText, groupOf, historyCard, itemPhotos, knownOf, linkPhoto, progress, submitIssues, timeRows, versionRows, warnAt, windowState, type ApiTechReport, type Draft } from "@ac/web/lib/techJob";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
@@ -163,5 +163,24 @@ describe("the server's formatting and Malay (IR282)", () => {
       rows: [["Status", "Selesai 21 Sep 2026"], ["Laporan anda", "Diterima dalam semakan kualiti"], ["Tugasan tamat", "21 Sep 2026, 5:00 PTG GMT+9"]],
       note: "Masa anda lapang untuk kerja lain. Laporan, unit dan perantinya kekal dengan HQ dan pelanggan.", back: "Gambaran keseluruhan",
     });
+  });
+});
+
+// IR620: Check in at site names the field to fix, so the form shows the error there and focuses it
+describe("check-in checks", () => {
+  it("asks for the site within 200 m and the scanned label, or a reason for a manual check-in", () => {
+    expect(checkInErrors("location_qr", "40", "ac-unit:u-1", "")).toEqual({});
+    expect(checkInErrors("location_qr", "250", "", "")).toEqual({
+      distance: "Location check-in needs you within 200 m of the site — check in manually with a reason otherwise",
+      qr: "Scan the unit’s QR label",
+    });
+    expect(Object.keys(checkInErrors("location_qr", "-1", "x", ""))).toEqual(["distance"]);
+    expect(checkInErrors("manual", "250", "", "  ")).toEqual({ reason: "A reason is required for a manual check-in (1–1000 characters)" });
+    expect(checkInErrors("manual", "", "", "No GPS in the plant room")).toEqual({});
+    expect(checkInErrors("manual", "", "", "x".repeat(1001))).toHaveProperty("reason");
+  });
+  it("words them in Malay and maps the Core API's fields onto the form's", () => {
+    expect(checkInErrors("manual", "", "", "", translator("ms")).reason).not.toBe("A reason is required for a manual check-in (1–1000 characters)");
+    expect(CHECK_IN_API_FIELDS).toEqual({ distanceMeters: "distance", qrUnitId: "qr", reason: "reason" });
   });
 });
