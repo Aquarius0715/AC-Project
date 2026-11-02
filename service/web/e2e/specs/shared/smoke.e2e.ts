@@ -4,22 +4,27 @@
 // serious issues, IR359). Follows the app's own links only, navigations only. axe runs through page.evaluate, which the
 // page CSP does not govern, so the policy itself stays as strict as in production. The crawl runs again at 360 px, the
 // narrowest width the UIUX specification names, in Malay, the longest words (IR487, IR500): no axe violation there either, and no page scrolls sideways. Every page declares
-// the display language as its language (IR489) and is titled with its name (IR490).
+// the display language as its language (IR489) and is titled with its name (IR490). The phone pass emulates a touch
+// screen, where every shared control is at least 44 px tall (the UIUX touch target, IR615).
 import type { Page } from "@playwright/test";
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 import { axeViolations } from "../../fixtures/a11y";
 import type { App } from "../../fixtures/apps";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
-type Crawl = { seen: number; failed: string[]; inaccessible: string[]; wide: string[]; otherLang: string[]; untitled: string[] };
+type Crawl = { seen: number; failed: string[]; inaccessible: string[]; wide: string[]; otherLang: string[]; untitled: string[]; small: string[] };
+
+/** The shared controls a touch screen sizes to 44 px (IR615): buttons (not Plain, which takes its parent's size), inputs,
+ * selects, the input groups of the comboboxes, tabs and toggles. */
+const TOUCH_CONTROLS = ['[data-slot="button"]:not([data-plain])', '[data-slot="input"]', '[data-slot="native-select"]', '[data-slot="input-group"]', '[data-slot="tabs-trigger"]', '[data-slot="toggle"]', '[data-slot="toggle-group-item"]'].join(", ");
 
 /** Visits up to 40 pages the app links to, from its home, and records what fails on each; `lang` is the page language
  * every page must declare (WCAG 3.1.1, IR489). `wideFont` sets a wide font on every page before it is measured, so a
  * Mac finds what the wider fonts of the Linux runners push sideways (IR501). */
-async function crawl(page: Page, app: App, lang = "en", wideFont = false): Promise<Crawl> {
+async function crawl(page: Page, app: App, lang = "en", wideFont = false, touch = false): Promise<Crawl> {
   const seen = new Set<string>();
   const queue = [app.home];
-  const out: Crawl = { seen: 0, failed: [], inaccessible: [], wide: [], otherLang: [], untitled: [] };
+  const out: Crawl = { seen: 0, failed: [], inaccessible: [], wide: [], otherLang: [], untitled: [], small: [] };
   while (queue.length && seen.size < 40) {
     const path = queue.shift()!;
     if (seen.has(path)) continue;
@@ -31,6 +36,14 @@ async function crawl(page: Page, app: App, lang = "en", wideFont = false): Promi
     for (const v of await axeViolations(page)) out.inaccessible.push(`${path}: ${v}`);
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (sideways > 1) out.wide.push(`${path}: ${sideways}px`);
+    if (touch) { // a shared control under the 44 px touch target (IR615)
+      const small = await page.locator(TOUCH_CONTROLS).evaluateAll((els) => els.flatMap((el) => {
+        const r = el.getBoundingClientRect();
+        const name = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 30);
+        return r.width > 0 && r.height > 0 && r.height < 43.5 ? [`${el.getAttribute("data-slot")} "${name}" ${Math.round(r.height)}px`] : [];
+      }));
+      for (const x of small) out.small.push(`${path}: ${x}`);
+    }
     const declared = await page.locator("html").getAttribute("lang");
     if (declared !== lang) out.otherLang.push(`${path}: ${declared}`);
     const title = await page.title(); // the page's name, then the product (WCAG 2.4.2, IR490)
@@ -75,7 +88,8 @@ test.afterEach(async ({ page }) => {
 });
 
 test.describe("phone width", () => {
-  test.use({ bypassCSP: true }); // the wide test font is an injected style; the first crawl checks the CSP itself
+  // the wide test font is an injected style (the first crawl checks the CSP itself); a touch screen is pointer: coarse
+  test.use({ bypassCSP: true, hasTouch: true });
 
   test("every linked page at phone width in Malay is accessible and fits the screen", async ({ page, app }) => {
     test.setTimeout(300_000);
@@ -83,12 +97,14 @@ test.describe("phone width", () => {
     zoneBefore = zone;
     await setDisplay(page, MALAY, zone);
     await page.setViewportSize({ width: 360, height: 800 }); // the UIUX specification's narrowest width and Figma's mobile frames
-    const r = await crawl(page, app, "ms", true);
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches), "a touch screen").toBe(true);
+    const r = await crawl(page, app, "ms", true, true);
     expect(r.failed, "pages that did not render").toEqual([]);
     expect(r.otherLang, "pages that do not declare Malay").toEqual([]);
     expect(r.untitled, "pages whose title does not name them").toEqual([]);
     expect(r.inaccessible, "critical or serious accessibility violations at phone width").toEqual([]);
     expect(r.wide, "pages that scroll sideways at phone width").toEqual([]);
+    expect(r.small, "shared controls under the 44 px touch target").toEqual([]);
     expect(r.seen).toBeGreaterThan(3);
   });
 });

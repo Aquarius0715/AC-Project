@@ -8592,3 +8592,20 @@ Decided by the user as DEC-90 (UX-loop proposal B-8 of UX-19). A history counted
    - `TestContractorAndTechnicianProjections` checks a cancelled history without completion: inside a period from before its end it is listed, while a period starting after its end, or ending before it, leaves it out.
    - `partnerHistory.test.ts` covers the row's end time in English and Malay, and `history.e2e.ts` the new empty-list text.
    - On the development stack, contractor-a's 90 days now list the company's 12 ended jobs (11 cancelled, the seed's unfinished one), each with its end, at 1920 and 1280. Before, the list was empty with "Show all time". axe passed.
+
+## IR615 Controls are at least 44 px on touch screens — 2026-11-02
+
+Decided by the user as DEC-90 (UX-loop proposal B-3 of UX-07). The UIUX specification sets a 44×44 px touch area, but on a 390×844 phone nearly every control of the technician app was 28–36 px tall (Scan QR 36×28, tabs 33, inputs and buttons 32, small buttons 28). A technician on site often wears gloves and works one-handed. Customers and contractors on phones saw the same sizes.
+
+1. **Components.** On a touch screen only (`pointer: coarse`, Tailwind `pointer-coarse:`), the shared shadcn/ui controls are at least 44 px tall:
+   - The Button of every size, and the link buttons built on it. Icon buttons are 44×44.
+   - The Input, the native Select, the comboboxes' input group and chips, the tab triggers, and the toggles behind the choice buttons.
+   - A mouse keeps the compact sizes, so desktop screens are unchanged.
+   - `Plain` (a card, a chip or a text action) takes its parent's size and carries `data-plain`.
+2. **Check.** The smoke crawl's phone pass (360 px, Malay) now emulates a touch screen (`hasTouch`) and asserts that `(pointer: coarse)` matches. It fails on any shared control under 44 px, besides the axe and sideways-scroll checks it already made. All four apps pass.
+3. **Not covered.** Chips and tree rows that the screens build from `Plain` stay under 44 px. Examples: the technician's device filters (29 px), the overview's filters (33 px), the contractor's event filters (29 px), the customer's location tree (21 px) and HQ's tree and Remove actions (19–33 px). They are display fixes for later rounds, screen by screen.
+4. **Design.** The UIUX specification says the same. Figma's Button set description and the Technician legend state the touch sizes, and the frames draw the mouse sizes.
+5. **Tests.**
+   - `touch.test.tsx` checks the touch classes of the shared controls and Plain's opt-out.
+   - The phone crawl measures the controls.
+   - On the development stack, the technician's devices page at 390×844 with touch showed the search, Register device and Rebind at 44 px without sideways scroll. The same page with a mouse kept 32 / 28 px.
