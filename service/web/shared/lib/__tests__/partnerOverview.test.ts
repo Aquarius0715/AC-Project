@@ -27,7 +27,7 @@ function fixture(): PartnerJob[] {
     summary("ca", "in_progress", { assignmentId: "as-ca", technicianMembershipId: "m-a", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }),
     summary("p05", "submitted", { assignmentId: "as-5", technicianMembershipId: "m-a", scheduledSlot: slot("2026-09-19T01:00:00Z", "2026-09-19T03:00:00Z") }),
     summary("c1", "completed"), summary("z1", "cancelled"),
-    { projection: "history", jobId: "h1", type: "reactive", status: "completed", completedAt: "2026-09-10T00:00:00Z", ownDecisionEvents: [] },
+    { projection: "history", jobId: "h1", type: "reactive", status: "completed", completedAt: "2026-09-10T00:00:00Z", asOf: "2026-09-20T16:00:00Z", ownDecisionEvents: [] },
   ];
   return rows.map((j) => partnerJob(j, units));
 }

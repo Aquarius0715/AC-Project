@@ -1,5 +1,6 @@
 // Partner jobs list (FR-P02, DD-P01, IR225): each status tab is in the URL, is selected, and lists jobs that open their
-// detail — or shows the empty state when its count is 0.
+// detail — or, for a job whose delegation ended in the period, its history (IR614) — or shows the empty state when its
+// count is 0.
 import { test, expect } from "../../fixtures/test";
 
 test("the status tabs keep the URL and open the jobs they list", async ({ page }) => {
@@ -14,7 +15,7 @@ test("the status tabs keep the URL and open the jobs they list", async ({ page }
     if (i > 0) await page.waitForURL(/[?&]tab=/);
     else await page.waitForURL((u) => !u.searchParams.has("tab"));
     const count = Number(names[i].match(/(\d+)\s*$/)?.[1] ?? NaN);
-    const jobs = page.locator("main a[href^='/partner/jobs/']");
+    const jobs = page.locator("main a[href^='/partner/jobs/'], main a[href^='/partner/history?jobId=']");
     if (count === 0) await expect(jobs).toHaveCount(0);
     else if (count > 0) await expect(jobs.first()).toBeVisible();
   }

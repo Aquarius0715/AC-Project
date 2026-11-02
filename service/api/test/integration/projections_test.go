@@ -156,8 +156,11 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	if code, m := post(s, &contrA, "jobs.list", `{"filters":{"status":"assigned"},"limit":100}`); code != 200 || byJob(m, job) != nil {
 		t.Error("history status filter")
 	}
-	if code, m := post(s, &contrA, "jobs.list", `{"filters":{"from":"`+ts(-100)+`"},"limit":100}`); code != 200 || byJob(m, job) != nil {
-		t.Error("history period filter on null completedAt")
+	// without a completion the history counts at its as-of, when the delegation ended (IR614)
+	for period, want := range map[string]bool{`"from":"` + ts(-100) + `"`: true, `"from":"` + ts(1) + `"`: false, `"to":"` + ts(-100) + `"`: false} {
+		if code, m := post(s, &contrA, "jobs.list", `{"filters":{`+period+`},"limit":100}`); code != 200 || (byJob(m, job) != nil) != want {
+			t.Errorf("history period filter {%s} on null completedAt: want %v", period, want)
+		}
 	}
 	if _, m := post(s, &contrA, "jobs.list", `{"filters":{"status":"accepted","organizationId":"`+seed.ID("org-contractor-a").String()+`"},"limit":100}`); byJob(m, job) == nil {
 		t.Error("history with own organization")

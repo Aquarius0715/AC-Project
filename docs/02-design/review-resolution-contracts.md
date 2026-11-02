@@ -8577,3 +8577,18 @@ Decided by the user as DEC-90 (UX-loop proposal B-12 of UX-28). The simulated fi
    - `i18n.test.ts` covers `showRecent`, `units.test.ts` the readings' times and `techDevices.test.ts` hours and days.
    - On the development stack, after restarting the bridge and the simulator, Living room AC, Lobby AC, Bedroom AC and Bedroom AC B were last seen within the minute, as the lab's live module is. Meeting room AC sent nothing more.
    - The customer's unit pages and HQ's device detail were checked at 1920 and 1280, and axe passed.
+
+## IR614 A history without completion counts in a period by when its delegation ended — 2026-11-02
+
+Decided by the user as DEC-90 (UX-loop proposal B-8 of UX-19). A history counted in a period by its frozen completion only (IR29), and a job HQ cancelled, or one whose delegation ended unfinished, has none. Such jobs never fell in any period. The contractor's job history opens on the last 90 days, so this month's cancellations showed only under "all time". After IR589 an empty list pointed there, but a list that also held recent completed jobs left them out without a word.
+
+1. **Rule.** In `jobs.list`, `from`/`to` match a history (JobHistorySnapshot) by its `completedAt`, or, when it has none, by its `asOf`: the time its access ended. That is the delegation's end for a contractor, and the revocation, completion or window end for a technician. This amends IR29's "null does not match". Completed histories still count by their completion, and summaries by their requested visit (IR245).
+2. **Screen.**
+   - The contractor's history row now says when the delegation ended ("1 own decision event · delegation ended 23 Sept 2026, 12:13 am MYT (read-only snapshot)"), which is also why the row lies in the period. The web's history type carries the `asOf` the API returns.
+   - The empty 90-day list no longer blames missing completion dates: "{n} jobs of your company are older than 90 days — they show under all time."
+3. **Design.** The query catalog's mapping for `jobs.list` and DD-P07's job history paragraph say the same. Figma Contractor 05-1's ended row shows its end. The Malay dictionary follows.
+4. **Side effect.** The partner Jobs list filters by the week too. A job whose delegation ended this week now lists there, with a link to its history. One that ended unfinished keeps its frozen status, so it also counts under Active, while the Overview's Active KPI counts only the jobs the company still holds. Keeping histories out of the stage tabs needs a new `jobs.list` filter, so it is proposed separately (UX proposal B-15) and not built. `jobs.e2e.ts` accepts a history row's link.
+5. **Tests.**
+   - `TestContractorAndTechnicianProjections` checks a cancelled history without completion: inside a period from before its end it is listed, while a period starting after its end, or ending before it, leaves it out.
+   - `partnerHistory.test.ts` covers the row's end time in English and Malay, and `history.e2e.ts` the new empty-list text.
+   - On the development stack, contractor-a's 90 days now list the company's 12 ended jobs (11 cancelled, the seed's unfinished one), each with its end, at 1920 and 1280. Before, the list was empty with "Show all time". axe passed.

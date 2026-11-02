@@ -274,6 +274,15 @@ func inPeriod(f *listFilters, t *time.Time) bool {
 	return (f.From == nil || !t.Before(*f.From)) && (f.To == nil || t.Before(*f.To))
 }
 
+// periodTime is the time a history counts at in a period (IR29, IR614): its frozen completion, or, without one (cancelled,
+// or ended unfinished), when its access ended — the snapshot's as-of — so recent ends fall in a recent period.
+func periodTime(h History) *time.Time {
+	if h.CompletedAt != nil {
+		return h.CompletedAt
+	}
+	return &h.AsOf
+}
+
 // extraProjections returns the offer and history rows of contractors and technicians after the IR23 filters.
 func (m Jobs) extraProjections(ctx context.Context, c *ops.Call, f *listFilters) ([]listItem, error) {
 	if f.private() {
@@ -300,7 +309,7 @@ func (m Jobs) extraProjections(ctx context.Context, c *ops.Call, f *listFilters)
 		return nil, err
 	}
 	for _, h := range hs {
-		if !f.statusOK(h.Status) || !inPeriod(f, h.CompletedAt) || f.Origin != nil || (f.Type != nil && *f.Type != h.Type) || (f.OverdueOnly != nil && *f.OverdueOnly) ||
+		if !f.statusOK(h.Status) || !inPeriod(f, periodTime(h)) || f.Origin != nil || (f.Type != nil && *f.Type != h.Type) || (f.OverdueOnly != nil && *f.OverdueOnly) ||
 			(f.OrganizationID != nil && (h.ContractorOrgID == nil || *h.ContractorOrgID != *f.OrganizationID)) {
 			continue
 		}

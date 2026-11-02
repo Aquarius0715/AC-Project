@@ -18,7 +18,7 @@ const summary = (over: Record<string, unknown>, evs: ApiEvent[] = []) => ({
   projection: "summary", id: "job-1-aaaa", version: 7, unitId: "u1", type: "reactive", status: "in_progress", dueAt: "x", requestedSlot: slot("a", "b"), scheduledSlot: slot("2026-09-21T01:00:00Z", "2026-09-21T03:00:00Z"),
   assignmentId: "as", displayStatus: "in_progress", technicianMembershipId: "m-a", assignmentAcknowledgement: "accepted", accessValidFrom: "2026-09-14T00:00:00Z", accessValidUntil: "2026-09-25T16:00:00Z", origin: "client_request", eventSummary: eventSummary(evs), ...over,
 }) as unknown as ApiPartnerJob;
-const history = (jobId: string, evs: ApiEvent[]) => ({ projection: "history", jobId, type: "periodic", status: "completed", completedAt: null, ownDecisionEvents: evs }) as ApiPartnerJob;
+const history = (jobId: string, evs: ApiEvent[]) => ({ projection: "history", jobId, type: "periodic", status: "completed", completedAt: null, asOf: "2026-09-20T16:00:00Z", ownDecisionEvents: evs }) as ApiPartnerJob;
 const events = [
   ev("e1", "offer.accepted", "2026-09-18T00:30:00Z"),
   ev("e2", "note.added", "2026-09-20T06:05:00Z", { visibility: "internal", message: "Missing filter photo" }),
@@ -38,7 +38,7 @@ describe("partner job history", () => {
     const unassigned = historyRow(summary({ status: "accepted", technicianMembershipId: null, assignmentAcknowledgement: null }), NOW, units, names)!;
     expect(unassigned.tech).toEqual({ name: "Unassigned", sub: "assign in Schedule", tone: "crit" });
     const h = historyRow(history("job-9-hhhh", [events[0]]), NOW, units, names)!;
-    expect([h.tab, h.ended, h.sub, h.badge.text, h.version]).toEqual(["ended", true, "1 own decision event · delegation ended (read-only snapshot)", "Completed", null]);
+    expect([h.tab, h.ended, h.sub, h.badge.text, h.version]).toEqual(["ended", true, "1 own decision event · delegation ended 21 Sept 2026, 12:00 am MYT (read-only snapshot)", "Completed", null]);
     expect(historyRow({ projection: "offer", status: "offered" } as unknown as ApiPartnerJob, NOW, units, names)).toBeNull();
   });
 
@@ -85,7 +85,7 @@ describe("partner job history", () => {
       { title: "Kerja dimulakan", at: "2026-09-21T01:05:00Z", when: "hari ini 10:05 PG GMT+9" }, "Sedang berjalan",
     ]);
     const h = historyRow(history("job-9-hhhh", [events[0]]), NOW, units, names, MS)!;
-    expect([h.title, h.sub, h.delegation, h.tech.sub]).toEqual(["Pemeriksaan berkala", "1 peristiwa keputusan sendiri · delegasi tamat (rakaman baca sahaja)", "tamat — sejarah sahaja", "tidak ditunjukkan selepas delegasi"]);
+    expect([h.title, h.sub, h.delegation, h.tech.sub]).toEqual(["Pemeriksaan berkala", "1 peristiwa keputusan sendiri · delegasi tamat 21 Sep 2026, 1:00 PG GMT+9 (rakaman baca sahaja)", "tamat — sejarah sahaja", "tidak ditunjukkan selepas delegasi"]);
     expect(eventItem(events[1], byUser(members, "u-me", ms), MS)).toMatchObject({ title: "Nota ditambah", detail: "“Missing filter photo” · dalaman · oleh contractor-a", at: "20 Sep 2026, 3:05 PTG GMT+9" });
     expect(eventItem(ev("m", "offer.accepted", "2026-09-20T00:00:00Z", null, "u-me"), byUser(members, "u-me", ms), MS).detail).toBe("oleh anda");
     expect(noteMode({ ended: false, status: "completed" }, ms)).toEqual({ kind: "preview", button: "Cipta pratonton", add: true, text: "Nota ditutup untuk kerja yang selesai — hanya pratonton dicipta." });

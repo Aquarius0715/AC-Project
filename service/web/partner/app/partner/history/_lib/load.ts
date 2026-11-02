@@ -34,8 +34,8 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
     return { rows, total: list.total };
   };
   const listed = await collect(period === "90d");
-  // an empty period says how many jobs lie outside it: a history counts by its completion, so a cancelled job or one
-  // whose delegation ended unfinished never falls in the 90 days (IR29, IR589)
+  // an empty period says how many jobs lie outside it (IR589): a job counts by its requested visit, a history by its
+  // completion or, without one, by when its delegation ended (IR29, IR614)
   const outside = period === "90d" && listed.rows.length === 0 ? (await collect(false)).rows.length : 0;
   const counts = tabCounts(listed.rows);
   const base = {

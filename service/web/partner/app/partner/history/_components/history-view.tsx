@@ -41,7 +41,7 @@ function List({ live }: { live: HistoryLive }) {
       </div>
       <Card title={t("Your jobs — {company} only · choose a job to open its history", { company: live.company })}>
         {live.rows.length === 0 ? (live.outside > 0
-          ? <EmptyState title={t("No jobs in the last 90 days")} action={<Btn size="sm" onClick={() => patch({ period: "all" })}>{t("Show all time")}</Btn>}>{t(live.outside === 1 ? "1 job of your company shows under all time — a cancelled job, or one that ended unfinished, has no completion date for this period." : "{n} jobs of your company show under all time — cancelled jobs and jobs that ended unfinished have no completion date for this period.", { n: live.outside })}</EmptyState>
+          ? <EmptyState title={t("No jobs in the last 90 days")} action={<Btn size="sm" onClick={() => patch({ period: "all" })}>{t("Show all time")}</Btn>}>{t(live.outside === 1 ? "1 job of your company is older than 90 days — it shows under all time." : "{n} jobs of your company are older than 90 days — they show under all time.", { n: live.outside })}</EmptyState>
           : <EmptyState title={t(all ? "No jobs in this view" : "No jobs yet")}>{t("Jobs appear here once your company accepts an offer.")}</EmptyState>) : (
           <ScrollX>
             <table className="w-full min-w-[880px] text-[13px]">
