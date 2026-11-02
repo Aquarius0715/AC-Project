@@ -407,6 +407,9 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 			if err != nil || tag.RowsAffected() == 0 {
 				return err
 			}
+			if err := control.AuditResult(ctx, tx, *in.CommandID, "system-iot", "failed", "DEVICE_REJECTED", in.OccurredAt); err != nil {
+				return err
+			}
 			return control.EndRestrictionCommands(ctx, tx, []uuid.UUID{*in.CommandID}, in.OccurredAt)
 		})
 	}

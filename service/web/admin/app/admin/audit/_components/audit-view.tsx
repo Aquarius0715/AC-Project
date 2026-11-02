@@ -176,13 +176,13 @@ function FilterLink({ onClick, children }: { onClick: () => void; children: Reac
 }
 
 /** Why the list is empty: nothing was searched (an invalid period, Figma Admin 338:602), an unknown or out-of-scope
- * correlation ID — they look the same (338:332) — no failed or pending entry, which the log does not record yet
- * (IR599; denied writes are recorded since IR603), or no match. */
+ * correlation ID — they look the same (338:332) — no pending or failed entry, which only device commands have (IR604),
+ * or no match. */
 function NoEntries({ live, periodErr, corr, result }: { live?: AuditLive; periodErr?: string; corr: string; result: string }) {
   const { t } = useI18n();
   if (periodErr || (live && !live.searched)) return <EmptyState title={t("Nothing was searched")}>{t("The period must start before it ends and cover at most 366 days. Earlier results are cleared so they are not mistaken for this search.")}</EmptyState>;
   if (corr) return <EmptyState title={t("No entries with this correlation ID")}>{t("This looks the same for an ID that does not exist and for one outside your managed scope. Clear the correlation ID or widen the period.")}</EmptyState>;
-  if (live && (result === "Failed" || result === "Pending")) return <EmptyState title={t("No entries with the result {result}", { result: resultWord(result, t) })}>{t("This log records the changes that succeeded and the writes it refused. Failed and pending attempts are not recorded, so an empty list does not mean that none happened.")}</EmptyState>;
+  if (live && (result === "Failed" || result === "Pending")) return <EmptyState title={t("No entries with the result {result}", { result: resultWord(result, t) })}>{t("Pending and failed results belong to device commands: a command waits as pending, and its result follows under the same correlation ID.")}</EmptyState>;
   return <EmptyState title={t("No audit entries match these filters")}>{t("No audit entries match this period, actor, target, correlation ID or result.")}</EmptyState>;
 }
 

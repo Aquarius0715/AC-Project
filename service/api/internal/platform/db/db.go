@@ -183,6 +183,10 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 	}
 	for _, a := range c.Audits { // the audit log is identity's: published in this transaction, stored by its consumer (IR196)
 		id := uuid.Must(uuid.NewV7())
+		result := a.Result
+		if result == "" {
+			result = "success"
+		}
 		var membership *uuid.UUID
 		if p.MembershipID != uuid.Nil {
 			m := p.MembershipID
@@ -190,7 +194,7 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 		}
 		if err := events.Publish(ctx, tx, p.TenantID, "audit", id, events.AuditRecorded, events.Audit{ID: id, ActorID: p.UserID.String(), ActorRole: p.Role,
 			MembershipID: membership, Action: a.Action, TargetKind: a.TargetKind, TargetID: a.TargetID, PreviousVersion: a.PreviousVersion, NextVersion: a.NextVersion,
-			OccurredAt: c.Now, CorrelationID: c.CorrelationID, Result: "success", Reason: a.Reason, MaskedBefore: ops.Masked(a.Before), MaskedAfter: ops.Masked(a.After)}); err != nil {
+			OccurredAt: c.Now, CorrelationID: c.CorrelationID, Result: result, Reason: a.Reason, MaskedBefore: ops.Masked(a.Before), MaskedAfter: ops.Masked(a.After)}); err != nil {
 			return err
 		}
 	}

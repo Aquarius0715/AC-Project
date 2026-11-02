@@ -272,3 +272,20 @@ func TestCommandHistory(t *testing.T) {
 		t.Errorf("requestedAt asc: %d", code)
 	}
 }
+
+// TestCommandExpiryAudited (IR604): a command whose window passes without an answer is failed by the scheduler, and
+// its request's audit trail ends with that result under the same correlation ID: pending, then failed (TIMEOUT).
+func TestCommandExpiryAudited(t *testing.T) {
+	s := server(t)
+	u := boundUnit(t, s, "online")
+	_, g := post(s, &customerB, "units.get", `{"id":"`+u+`"}`)
+	code, m := write(s, &customerB, "commands.create", `{"unitId":"`+u+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(ver(g))+`}`, 0)
+	if code != 200 {
+		t.Fatalf("command: %d %v", code, m)
+	}
+	owner(t, `UPDATE control.commands SET expires_at = requested_at + interval '1 second' WHERE id = $1`, data(m)["id"])
+	expireAt(t, clock.Add(time.Minute)) // the window passed with no answer
+	if trail := commandTrail(t, s, m); len(trail) != 2 || trail[0] != "pending customer-b" || trail[1] != "failed system-scheduler TIMEOUT" {
+		t.Errorf("the expired command's audit trail: %v", trail)
+	}
+}

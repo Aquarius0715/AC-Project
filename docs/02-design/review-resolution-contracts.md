@@ -8437,3 +8437,20 @@ Decided by the user as DEC-90 (UX-loop proposal of UX-29, first part). FR-A16 as
 4. **Screens.** The audit explorer words the two refusals: "Refused — the role may not do this" and "Refused — not found in the actor's scope". Another reason stays as recorded. The empty-list notice of IR599 now covers only Failed and Pending, which are not recorded yet. DD-A16 says the same as built. The Malay dictionary follows.
 5. **Tests.** `TestDeniedWritesAudited` covers four cases: a contractor archiving a unit (FORBIDDEN, twice, at most one entry a minute); a contractor reviewing an in-house job (NOT_FOUND, with the job as target); a refused read; an input error. `TestDeniedTarget` covers the target rules. The asset lifecycle test counts its successful entries. `audit.test.ts` and `audit.e2e.ts` follow.
 6. **Next.** Pending and failed results for asynchronous operations (a command requested, then its final result under the same correlation ID) are the second part of the decision.
+
+## IR604 A device command is audited pending, then with its result — 2026-11-02
+
+Decided by the user as DEC-90 (UX-loop proposal of UX-29, second part). IR90 defines pending as "accepted and awaiting result", with the final result appended under the same correlation ID. Yet a command request was recorded as success when it was only sent, and the device's answer was never recorded.
+
+1. **Request.** `commands.create` (a person's command, from the app or the voice assistant) records its entry with the result `pending`. `ops.AuditEntry` gains a result that defaults to success.
+2. **Result.** When the command ends, `control.AuditResult` appends an entry under the request's correlation ID. The action is `commands.create` and the target is the command; the actor is the part of the system that saw the end, with the role `system`:
+
+   | How the command ends | Actor | Result | Reason |
+   |---|---|---|---|
+   | The device acknowledges it in time | system-iot | success | — |
+   | The device refuses it | system-iot | failed | DEVICE_REJECTED |
+   | The window passes without an answer (scheduler) | system-scheduler | failed | TIMEOUT |
+
+   A late acknowledgement after the window adds no entry. Commands of a restriction, a diagnosis or an automation are audited under their own operations and get no appended result.
+3. **Screens.** The audit explorer's correlation trace shows the request and its result together. Its empty-list notice under Pending or Failed now says that these results belong to device commands. The Malay dictionary follows, and DD-A16 says the same as built.
+4. **Tests.** The demo acknowledgement test checks the trail "pending (customer-b) → success (system-iot)". `TestCommandExpiryAudited` checks "pending → failed (system-scheduler, TIMEOUT)". `audit.e2e.ts` checks the Pending notice on an empty day.

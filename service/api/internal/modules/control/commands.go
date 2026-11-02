@@ -269,7 +269,8 @@ func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Com
 	}
 	// requested: the IoT gateway sends it to the device and reports it sent (demo trigger command_sent)
 	c.Emit(ops.Event{AggregateType: "command", AggregateID: x.ID, Type: "CommandRequested", Payload: map[string]any{"unitId": in.UnitID, "deviceId": dev, "action": json.RawMessage(in.Action)}})
-	c.Audit(ops.AuditEntry{Action: "commands.create", TargetKind: "command", TargetID: x.ID.String(), NextVersion: &x.Version, Reason: deref(in.Reason)})
+	// the device answers later: the request is pending, and its result follows under this correlation ID (IR90, IR604)
+	c.Audit(ops.AuditEntry{Action: "commands.create", TargetKind: "command", TargetID: x.ID.String(), NextVersion: &x.Version, Reason: deref(in.Reason), Result: "pending"})
 	return x, nil
 }
 
@@ -479,6 +480,25 @@ func (m Commands) list(ctx context.Context, c *ops.Call, in *ListInput) (paging.
 	return paging.Page[Command]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}, rows.Err()
 }
 
+// AuditResult appends the final result of a command that a person asked for (commands.create: source ui or voice) under the request's
+// correlation ID, after its pending entry: success when the device acknowledged it, failed when the device refused it
+// or its window passed, the failure code as the reason (IR90, IR604). actor is the system part that saw it. Commands of
+// a restriction, a diagnosis or an automation are recorded under their own operations.
+func AuditResult(ctx context.Context, tx pgx.Tx, command uuid.UUID, actor, result, reason string, at time.Time) error {
+	var tenant uuid.UUID
+	var corr *string
+	var source string
+	if err := tx.QueryRow(ctx, `SELECT tenant_id, correlation_id, source FROM control.commands WHERE id = $1`, command).Scan(&tenant, &corr, &source); err != nil {
+		return err
+	}
+	if (source != "ui" && source != "voice") || corr == nil || *corr == "" {
+		return nil
+	}
+	id := uuid.Must(uuid.NewV7())
+	return events.Publish(ctx, tx, tenant, "audit", id, events.AuditRecorded, events.Audit{ID: id, ActorID: actor, ActorRole: "system", Action: "commands.create",
+		TargetKind: "command", TargetID: command.String(), OccurredAt: at, CorrelationID: *corr, Result: result, Reason: reason})
+}
+
 // ExpireGrace is how long after expiresAt a command waits before it is expired (IR453): an acknowledgement the bridge
 // received before expiresAt may still be on its way to the API, and the time it was received decides the result.
 const ExpireGrace = 5 * time.Second
@@ -494,6 +514,11 @@ func ExpireCommands(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) 
 	if err != nil {
 		return 0, err
 	}
+	for _, id := range ids {
+		if err := AuditResult(ctx, tx, id, "system-scheduler", "failed", "TIMEOUT", now); err != nil {
+			return 0, err
+		}
+	}
 	return len(ids), publishRestrictionCommands(ctx, tx, events.CommandsEnded, ids, now) // billing reacts (IR185)
 }
 
@@ -507,6 +532,9 @@ func Acknowledge(ctx context.Context, tx pgx.Tx, command uuid.UUID, receivedAt t
 	}
 	if tag.RowsAffected() == 1 {
 		if err := publishRestrictionCommands(ctx, tx, events.CommandAcknowledged, []uuid.UUID{command}, receivedAt); err != nil { // billing reacts (IR185)
+			return true, err
+		}
+		if err := AuditResult(ctx, tx, command, "system-iot", "success", "", receivedAt); err != nil {
 			return true, err
 		}
 		if err := applyObserved(ctx, tx, command, receivedAt); err != nil {

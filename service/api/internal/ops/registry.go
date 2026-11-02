@@ -57,6 +57,9 @@ type AuditEntry struct {
 	PreviousVersion *int
 	NextVersion     *int
 	Reason          string
+	// Result is success unless set: pending for a request whose result comes later under the same correlation ID
+	// (IR90; a device command, IR604).
+	Result string
 	// Before / After hold the changed fields only (see Changes); the recorder masks secrets and contacts.
 	Before, After map[string]*string
 }

@@ -161,6 +161,10 @@ func TestDemoOperations(t *testing.T) {
 	if _, m := post(s, &customerB, "commands.get", `{"id":"`+cmd+`"}`); data(m)["status"] != "acknowledged" {
 		t.Errorf("acknowledged: %v", m)
 	}
+	// the request was audited pending; the acknowledgement appends its result under the same correlation ID (IR90, IR604)
+	if trail := commandTrail(t, s, m); len(trail) != 2 || trail[0] != "pending customer-b" || trail[1] != "success system-iot " {
+		t.Errorf("the command's audit trail: %v", trail)
+	}
 	// the acknowledged setting becomes the observed state without a unit version change
 	_, g2 := post(s, &customerB, "units.get", `{"id":"`+u+`"}`)
 	if obs := data(g2)["observedState"].(map[string]any); obs["power"] != true || obs["observedAt"] != clock.Add(time.Second).Format(time.RFC3339Nano) {
@@ -184,4 +188,27 @@ func TestDemoOperations(t *testing.T) {
 	if code, m := write(s, &customerB, "demo.reset", `{"confirmation":true}`, 0); code != 503 || m["messageKey"] != "errors.demo_reset_offline" {
 		t.Errorf("reset: %d %v", code, m)
 	}
+}
+
+// commandTrail lists the audit entries of a commands.create response's correlation ID, oldest first, as "result actor"
+// with a final entry's reason (IR604).
+func commandTrail(t *testing.T, s *apiserver.Server, created map[string]any) []string {
+	t.Helper()
+	drainEvents(t)
+	corr := created["meta"].(map[string]any)["correlationId"].(string)
+	day := `"from":"` + clock.Add(-24*time.Hour).Format(time.RFC3339) + `","to":"` + clock.Add(24*time.Hour).Format(time.RFC3339) + `"`
+	_, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"correlationId":"`+corr+`"},"limit":10}`)
+	out := []string{}
+	for _, a := range items(m) {
+		if a["action"] != "commands.create" {
+			continue
+		}
+		e := a["result"].(string) + " " + map[bool]string{true: "customer-b", false: a["actorId"].(string)}[a["actorId"] == seed.ID("user-customer-b").String()]
+		if a["result"] != "pending" {
+			reason, _ := a["reason"].(string)
+			e += " " + reason
+		}
+		out = append([]string{e}, out...) // the list is newest first
+	}
+	return out
 }

@@ -5411,7 +5411,7 @@ export const ms: Record<string, string> = {
   "No audit entries match these filters": "Tiada entri audit sepadan dengan penapis ini",
   "No audit entries match this period, actor, target, correlation ID or result.": "Tiada entri audit sepadan dengan tempoh, pelaku, sasaran, ID korelasi atau keputusan ini.",
   "No entries with the result {result}": "Tiada entri dengan keputusan {result}",
-  "This log records the changes that succeeded and the writes it refused. Failed and pending attempts are not recorded, so an empty list does not mean that none happened.": "Log ini merekodkan perubahan yang berjaya dan penulisan yang ditolak. Percubaan yang gagal dan belum selesai tidak direkodkan, jadi senarai kosong tidak bermakna tiada yang berlaku.",
+  "Pending and failed results belong to device commands: a command waits as pending, and its result follows under the same correlation ID.": "Keputusan belum selesai dan gagal adalah milik arahan peranti: arahan menunggu sebagai belum selesai, dan keputusannya menyusul di bawah ID korelasi yang sama.",
   "Refused — the role may not do this": "Ditolak — peranan ini tidak dibenarkan melakukannya",
   "Refused — not found in the actor's scope": "Ditolak — tidak dijumpai dalam skop pelaku",
   "{n} of {total} · 25 per page": "{n} daripada {total} · 25 setiap halaman",

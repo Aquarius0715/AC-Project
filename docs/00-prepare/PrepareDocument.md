@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.472.0
+version: 0.473.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -287,6 +287,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.473.0: A person's device command is audited pending and gets its result (success, or failed with the reason) under the same correlation ID (IR604). Phase 1A unchanged.
 0.472.0: Writes refused for permission or scope leave a denied audit entry, at most one per actor and operation a minute (IR603). Phase 1A unchanged.
 0.471.0: Notifications say whether their target opens for the reader (targetOpen), and a withdrawn offer's notice has no link (IR602). Phase 1A unchanged.
 0.470.0: A technician reads the notices of a job whose history snapshot is theirs, through a new reference copy (IR601). Phase 1A unchanged.
