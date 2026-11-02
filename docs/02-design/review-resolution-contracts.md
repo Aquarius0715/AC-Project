@@ -8524,3 +8524,33 @@ Decided by the user as DEC-90 (UX-loop proposal of UX-04). The overview counts j
 3. **Access.** A role without job.read gets FORBIDDEN from `jobs.list`, and the tile is left out.
 4. **Design.** DD-A01 says the same as built. Figma Admin 38:3 shows the tile at the front of the KPI row, and the row's titles now wrap rather than clip. The Malay dictionary follows.
 5. **Tests.** `adminSummary.test.ts` checks that the link ignores the period. On the development stack the tile counted 1 at 1920 and 1280, matching the Jobs list's Requested tile, and axe passed.
+
+## IR612 Contractors list and remove their technicians' unavailable days — 2026-11-02
+
+Decided by the user as DEC-90 (UX-loop proposal B-5 of UX-10). Unavailable days, once saved, could not be removed or shortened: `members.setUnavailability` only added, and no screen listed the saved days. A day saved for the wrong technician, or leave that was cancelled, kept that person out of every "who can take a visit" list for those dates; only HQ, through the database, could fix it. The technician select also showed two "E2E Signer" entries with nothing to tell them apart.
+
+1. **Read.** The new read `members.unavailability` (`Query` → `Page<Unavailability>`, `GET /v1/members/unavailability`) lists the rows whose last Kuala Lumpur day is today or later, first day first. A contractor sees their own company's rows only; HQ sees all of them. The filters are `organizationId` and `membershipId`; the latter includes the rows of that technician's whole company. Sorts are `id` and `from`, and `from` joins the Query sort fields.
+2. **Write.** The new write `members.clearUnavailability` (`{id, from}` → `UnavailabilityCleared {id, remaining}`, `POST /v1/members/unavailability/{id}/clear`) removes a row's days from `from` on:
+   - From its first day, the row goes and `remaining` is null.
+   - From a later day, the row keeps the earlier days and its version goes up by one.
+   - `from` must be a Kuala Lumpur day from today to the row's last day; otherwise it is VALIDATION `from=error.range`. Days before today therefore stay recorded.
+   - The expected version is required (write-version catalog). Another company's row is NOT_FOUND before the version is checked.
+   - It is audited as `members.clearUnavailability` on the target kind `unavailability`. A refused attempt is recorded as denied under the same kind: `deniedKinds` gains the operation's own entry, which wins over its resource's (IR603).
+   - It emits `UnavailabilityCleared`.
+   - Its authorization is the same as setting the days: `contractor:partner.assign:own-company | admin:job.write`.
+3. **Database.** `maintenance.unavailability` gains the common `version` and `updated_at` columns (database design §3). `members.setUnavailability` writes `updated_at`. The development database was patched with `ALTER TABLE … ADD COLUMN`.
+4. **Screen.** Team & capacity gains the card "Upcoming unavailable days": who ("All technicians" for the whole company), type, note and days, each with Remove.
+   - The dialog "Remove unavailable days" asks "Remove from". It defaults to the row's first day, or today once the row has started.
+   - Before the confirm, it says what the removal does: "All of these days are removed." or "Still unavailable: <days>; the days from <day> on are removed.", with "Days before today stay recorded." for a started row.
+   - A day outside the row is refused under the field, and nothing is sent.
+   - The toast names who can take visits again. A CONFLICT or NOT_FOUND reloads the list.
+   - Focus returns to the row's Remove button, or to the list once the row is gone. `Modal` gains `finalFocus` for that, and the dialog stays mounted while it closes, so Base UI's close path runs.
+5. **Names.** Every label of the screen adds the e-mail of the technician's partner user (`partnerUsers.list`, now also DD-P06) where two technicians share a name. That covers the technicians, the week, the qualifications, the technician selects of the unavailable days and certificate forms, and the list. The technicians are sorted by that label, so the same names sit together.
+6. **Counts.** There are 212 operations and 233 REST routes. The maintenance service gains two.
+7. **Design.** FR-P06, DD-P06 (summary row, service boundary, the new paragraph), SCR-P06 and the catalogs say the same. Figma Contractor shows the card empty on 04-1 and gains 04-9 (the list, after 04-8's save) and 04-10 (the remove dialog), with their click maps. The System Architecture counts follow (maintenance 65). The Malay dictionary follows.
+8. **Tests.**
+   - `TestUnavailabilityListAndClear` covers the list's scope, order, filters and sort, and the clear's version, range, partial and whole removal, past days and audit.
+   - `TestForeignTargets` covers contractor B against A's row, for the clear and for both list filters. `TestDeniedTarget` covers the denied target kind.
+   - `partnerTeam.test.ts` covers the rows, the labels, the checks and the effect texts in English and Malay. `modal.test.tsx` covers `finalFocus`.
+   - `team.e2e.ts` adds three days from today, shortens them to one, removes it, and checks axe and the focus. It also takes the exact name of "Unavailable days", which the rows' Remove buttons now contain.
+   - On the development stack, contractor-a did the same at 1920 and 1280. They also removed the round-10 entry no screen could remove before ("E2E Signer · e2e-signin-…214616@example.com", 28 Sept).

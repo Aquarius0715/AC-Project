@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -102,5 +103,109 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 	if code, m := write(s, &contrA, "members.setUnavailability", `{"membershipId":null,"from":"2026-09-20","to":"2026-09-20","type":"public_holiday","note":"   "}`, 0); code != 200 ||
 		data(m)["organizationId"] != seed.ID("org-contractor-a").String() || data(m)["note"] != nil {
 		t.Fatalf("organization-wide: %d %v", code, m)
+	}
+}
+
+// TestUnavailabilityListAndClear: members.unavailability lists the rows whose last Kuala Lumpur day is today or later,
+// first day first, a contractor's own company only; members.clearUnavailability clears a row's days from a day on —
+// from its first day the row goes, from a later day the earlier days stay (version + 1) — never a day before today,
+// with the row's version, and only within the caller's company (IR612). The clock's day is Monday 2026-09-14.
+func TestUnavailabilityListAndClear(t *testing.T) {
+	s := server(t)
+	tech, orgA := seed.ID("tech-external-a"), seed.ID("org-contractor-a")
+	clean := func() { owner(t, `DELETE FROM maintenance.unavailability WHERE organization_id = $1`, orgA) }
+	clean()
+	t.Cleanup(clean)
+	set := func(body string) string {
+		t.Helper()
+		code, m := write(s, &contrA, "members.setUnavailability", body, 0)
+		if code != 200 || ver(m) != 1 {
+			t.Fatalf("set %s: %d %v", body, code, m)
+		}
+		return data(m)["id"].(string)
+	}
+	leave := set(`{"membershipId":"` + tech.String() + `","from":"2026-09-16","to":"2026-09-18","type":"annual_leave"}`)
+	sick := set(`{"membershipId":"` + tech.String() + `","from":"2026-09-10","to":"2026-09-15","type":"sick"}`)
+	set(`{"membershipId":null,"from":"2026-09-08","to":"2026-09-09","type":"public_holiday"}`) // over on the 9th: never listed
+	holiday := set(`{"membershipId":null,"from":"2026-09-20","to":"2026-09-20","type":"public_holiday"}`)
+	ids := func(a *actor, query string) []string {
+		t.Helper()
+		code, m := post(s, a, "members.unavailability", query)
+		if code != 200 {
+			t.Fatalf("list %s: %d %v", query, code, m)
+		}
+		out := []string{}
+		for _, it := range items(m) {
+			if it["organizationId"] == orgA.String() {
+				out = append(out, it["id"].(string))
+			}
+		}
+		return out
+	}
+	same := func(name string, got []string, want ...string) {
+		t.Helper()
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Errorf("%s: %v, want %v", name, got, want)
+		}
+	}
+	same("contractor A", ids(&contrA, `{"limit":100}`), sick, leave, holiday) // the row that ended on the 9th is not listed
+	same("by first day, descending", ids(&contrA, `{"limit":100,"sort":{"field":"from","direction":"desc"}}`), holiday, leave, sick)
+	same("contractor B", ids(&contrB, `{"limit":100}`))
+	same("HQ for the company", ids(&hq, `{"limit":100,"filters":{"organizationId":"`+orgA.String()+`"}}`), sick, leave, holiday)
+	same("the technician with the whole company's days", ids(&contrA, `{"limit":100,"filters":{"membershipId":"`+tech.String()+`"}}`), sick, leave, holiday)
+	same("another technician", ids(&contrA, `{"limit":100,"filters":{"membershipId":"`+seed.ID("tech-external-b").String()+`"}}`))
+	if code, m := post(s, &contrA, "members.unavailability", `{"filters":{"type":"sick"}}`); code != 422 || fields(m) != "type=error.notAllowed" {
+		t.Errorf("a filter outside the catalog: %d %s", code, fields(m))
+	}
+
+	clear := func(a *actor, id, from string, version int) (int, map[string]any) {
+		return write(s, a, "members.clearUnavailability", `{"id":"`+id+`","from":"`+from+`"}`, version)
+	}
+	if code, _ := clear(&contrA, leave, "2026-09-17", 0); code != 422 {
+		t.Errorf("no expected version: %d", code)
+	}
+	if code, _ := clear(&contrB, leave, "2026-09-17", 1); code != 404 {
+		t.Errorf("another company: %d", code)
+	}
+	if code, m := clear(&contrA, leave, "2026-09-17", 2); code != 409 {
+		t.Errorf("stale version: %d %v", code, m)
+	}
+	for name, from := range map[string]string{"before today": "2026-09-13", "after its last day": "2026-09-19"} {
+		code, m := clear(&contrA, leave, from, 1)
+		refusal(t, name, code, m, "from=error.range")
+	}
+	code, m := clear(&contrA, leave, "2026-09-17", 1)
+	r, _ := data(m)["remaining"].(map[string]any)
+	if code != 200 || r == nil || r["from"] != "2026-09-16" || r["to"] != "2026-09-16" || r["version"].(float64) != 2 {
+		t.Fatalf("a new last day: %d %v", code, m)
+	}
+	if code, _ := clear(&contrA, leave, "2026-09-16", 1); code != 409 {
+		t.Errorf("the version before the change: %d", code)
+	}
+	if code, m := clear(&contrA, leave, "2026-09-16", 2); code != 200 || data(m)["remaining"] != nil {
+		t.Fatalf("from its first day: %d %v", code, m)
+	}
+	if code, _ := clear(&contrA, leave, "2026-09-16", 3); code != 404 {
+		t.Errorf("a removed row: %d", code)
+	}
+	// a row that started before today keeps its past days: cleared from today, it ends yesterday and leaves the list
+	code, m = clear(&contrA, sick, "2026-09-10", 1)
+	refusal(t, "its past first day", code, m, "from=error.range")
+	code, m = clear(&contrA, sick, "2026-09-14", 1)
+	if r, _ := data(m)["remaining"].(map[string]any); code != 200 || r == nil || r["from"] != "2026-09-10" || r["to"] != "2026-09-13" {
+		t.Fatalf("from today: %d %v", code, m)
+	}
+	same("after the clears", ids(&contrA, `{"limit":100}`), holiday)
+	var past, gone int
+	ownerScan(t, `SELECT count(*) FILTER (WHERE id = $1 AND days = daterange('2026-09-10', '2026-09-13', '[]')), count(*) FILTER (WHERE id = $2)
+		FROM maintenance.unavailability`, []any{sick, leave}, &past, &gone)
+	if past != 1 || gone != 0 {
+		t.Errorf("rows: past days kept %d, removed row %d", past, gone)
+	}
+	var audited int
+	ownerScan(t, `SELECT count(*) FROM audit.audit_log WHERE action = 'members.clearUnavailability' AND result = 'success' AND target_id IN ($1, $2)`,
+		[]any{leave, sick}, &audited)
+	if audited != 3 {
+		t.Errorf("%d audited clears, want 3", audited)
 	}
 }

@@ -2,7 +2,8 @@
 
 // Server Actions of the team screen (FR-P06, FR-P09, DD-P06 Figma 04-8, DD-P09 Figma 04-6/04-7):
 // members.setUnavailability for one technician or the whole company — confirmed assignments inside the days are kept,
-// and the action returns how many the Core API found (conflictingAssignmentIds, IR276); certificates.submit for a
+// and the action returns how many the Core API found (conflictingAssignmentIds, IR276); members.clearUnavailability with
+// the row's version, which removes the days from a chosen day on (IR612); certificates.submit for a
 // renewal or a new certificate, its file read from the form data and sent base64 (IR129, IR277); and
 // certificates.requestTraining with the certificate version as the expected version (write-version catalog).
 import { refresh } from "next/cache";
@@ -24,6 +25,19 @@ export async function setUnavailability(input: OpInput<"members.setUnavailabilit
     refresh();
     return { ok: true, value: { conflicts: u.conflictingAssignmentIds?.length ?? 0 } };
   } catch (e) {
+    return failure(e);
+  }
+}
+
+/** members.clearUnavailability: the row's days from `from` (a Kuala Lumpur day) on are removed; `kept` is false when
+ * the whole row went. A CONFLICT or NOT_FOUND reloads the list, since someone else changed it. */
+export async function clearUnavailability(id: string, version: number, from: string): Promise<Result<{ kept: boolean }>> {
+  try {
+    const r = await coreOp<{ remaining: unknown }>("members.clearUnavailability", { id, from }, { write: true, expectedVersion: version });
+    refresh();
+    return { ok: true, value: { kept: r.remaining != null } };
+  } catch (e) {
+    if (e instanceof CoreError && (e.error.code === "CONFLICT" || e.error.code === "NOT_FOUND")) refresh();
     return failure(e);
   }
 }

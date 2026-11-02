@@ -76,6 +76,12 @@ func TestForeignTargets(t *testing.T) {
 		t.Fatalf("contractor A's certificate: %d %v", code, m)
 	}
 	certA := data(m)["id"].(string)
+	code, m = write(s, &contrA, "members.setUnavailability", `{"membershipId":"`+techExtA+`","from":"2026-09-20","to":"2026-09-21","type":"training"}`, 0)
+	if code != 200 {
+		t.Fatalf("contractor A's unavailable days: %d %v", code, m)
+	}
+	unavA := data(m)["id"].(string)
+	t.Cleanup(func() { owner(t, `DELETE FROM maintenance.unavailability WHERE id = $1`, unavA) })
 	stmtA, lineA := uuid.NewString(), uuid.NewString()
 	owner(t, `INSERT INTO billing.payout_statements (id, tenant_id, contractor_org_id, period, status, currency, gross_minor, deductions_minor, net_minor, pay_date)
 		VALUES ($1,$2,$3,'2001-01','approved','MYR',30000,0,30000,'2001-02-15')`, stmtA, seed.ID("tenant-a"), seed.ID("org-contractor-a"))
@@ -162,6 +168,7 @@ func TestForeignTargets(t *testing.T) {
 		{&contrB, "jobs.addNote", `{"jobId":"` + jobC + `","message":"Hello","visibility":"internal"}`, 1},
 		{&contrB, "members.eligible", `{"jobId":"` + jobC + `","startAt":"` + at(25) + `","endAt":"` + at(27) + `","query":{"limit":5}}`, 0},
 		{&contrB, "members.setUnavailability", `{"membershipId":"` + techExtA + `","from":"2026-09-20","to":"2026-09-21","type":"training"}`, 0},
+		{&contrB, "members.clearUnavailability", `{"id":"` + unavA + `","from":"2026-09-20"}`, 1},
 		{&contrB, "certificates.submit", `{"membershipId":"` + techExtA + `","code":"demo_outdoor","name":"Outdoor AC","number":"N-B","issuedAt":"` + at(-24*30) + `","expiresAt":"` + at(24*300) + `","file":` + pdf + `}`, 0},
 		{&contrB, "certificates.requestTraining", `{"certificateId":"` + certA + `","note":"Please renew"}`, 1},
 		{&contrB, "payouts.get", `{"id":"` + stmtA + `"}`, 0},
@@ -274,6 +281,8 @@ func TestForeignTargets(t *testing.T) {
 		{&contrB, "members.capacity", `{"date":"2026-09-15","query":{"limit":100,"filters":{"organizationId":"` + id("org-contractor-a") + `"}}}`, []string{techExtA}},
 		{&contrB, "rateCards.list", `{"limit":100,"filters":{"contractorOrgId":"` + id("org-contractor-a") + `"}}`, []string{id("org-contractor-a")}},
 		{&contrB, "certificates.list", `{"limit":100,"filters":{"membershipId":"` + techExtA + `"}}`, []string{techExtA, certA}},
+		{&contrB, "members.unavailability", `{"limit":100,"filters":{"organizationId":"` + id("org-contractor-a") + `"}}`, []string{techExtA, unavA}},
+		{&contrB, "members.unavailability", `{"limit":100,"filters":{"membershipId":"` + techExtA + `"}}`, []string{techExtA, unavA}},
 		{&contrB, "payouts.list", `{"limit":100,"filters":{"contractorOrgId":"` + id("org-contractor-a") + `"}}`, []string{stmtA}},
 		{&contrB, "units.list", `{"limit":100,"filters":{"unitIds":["` + unitA + `"]}}`, []string{unitA}},
 		{&contrB, "devices.list", `{"limit":100,"filters":{"unitId":"` + unitA + `"}}`, []string{unitA}},

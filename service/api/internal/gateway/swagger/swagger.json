@@ -15929,6 +15929,125 @@
             }
         },
         "/v1/members/unavailability": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR612 rows whose last Kuala Lumpur day is today or later; contractor sees own-company rows only\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P06 · Query: filters organizationId,membershipId · sort id,from (default from asc;id asc)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "members"
+                ],
+                "summary": "members.unavailability (read)",
+                "operationId": "members.unavailability",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "page cursor: nextCursor of the previous page (D12)",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size 1–100, default 25",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "field:direction — fields id,from; default from asc;id asc",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter → organizationId",
+                        "name": "organizationId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter → membershipId, with the rows of that technician's whole company (membershipId null)",
+                        "name": "membershipId",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/maintenance.UnavailabilityPage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -15978,6 +16097,127 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/maintenance.Unavailability"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/members/unavailability/{id}/clear": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: contractor:partner.assign:own-company | admin:job.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR612 from is a Kuala Lumpur day from today to the row's last day; from on or before its first day removes the row, a later day keeps the earlier days (new last day = from - 1); days before today stay recorded\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-P06",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "members"
+                ],
+                "summary": "members.clearUnavailability (write)",
+                "operationId": "members.clearUnavailability",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target unavailability, read members.unavailability)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "input; the path parameters come from the route",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/maintenance.ClearUnavailabilityInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/maintenance.UnavailabilityCleared"
                                         }
                                     }
                                 }
@@ -18442,7 +18682,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: contractor:own-company\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; own company only\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P11 · Query: filters status,partnerRole,search · sort id,name,email,invitedAt,createdAt,updatedAt (default name asc;id asc)",
+                "description": "Authorization: contractor:own-company\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; own company only\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P11, DD-P06 · Query: filters status,partnerRole,search · sort id,name,email,invitedAt,createdAt,updatedAt (default name asc;id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -32327,6 +32567,17 @@
                 }
             }
         },
+        "maintenance.ClearUnavailabilityInput": {
+            "type": "object",
+            "properties": {
+                "from": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
         "maintenance.CostInput": {
             "type": "object",
             "properties": {
@@ -34218,6 +34469,17 @@
                 }
             }
         },
+        "maintenance.UnavailabilityCleared": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "remaining": {
+                    "$ref": "#/definitions/maintenance.Unavailability"
+                }
+            }
+        },
         "maintenance.UnavailabilityInput": {
             "type": "object",
             "properties": {
@@ -34235,6 +34497,26 @@
                 },
                 "type": {
                     "type": "string"
+                }
+            }
+        },
+        "maintenance.UnavailabilityPage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/maintenance.Unavailability"
+                    }
+                },
+                "nextCursor": {
+                    "type": "string"
+                },
+                "snapshotVersion": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },

@@ -62,7 +62,7 @@ func scanPartnerUser(r pgx.Row) (PartnerUser, error) {
 //	@Description	Authorization: contractor:own-company
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; own company only
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-P11 · Query: filters status,partnerRole,search · sort id,name,email,invitedAt,createdAt,updatedAt (default name asc;id asc)
+//	@Description	Design: DD-P11, DD-P06 · Query: filters status,partnerRole,search · sort id,name,email,invitedAt,createdAt,updatedAt (default name asc;id asc)
 //	@Tags			partnerUsers
 //	@Accept			json
 //	@Produce		json

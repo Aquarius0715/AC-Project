@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -19,7 +20,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
-// Workforce is members.eligible / members.capacity / members.setUnavailability (IR132 items 3–5).
+// Workforce is members.eligible / members.capacity / members.setUnavailability (IR132 items 3–5) and the unavailable
+// days' list and clear (IR612).
 type Workforce struct {
 	Delivery Delivery
 }
@@ -511,8 +513,8 @@ func (m Workforce) setUnavailability(ctx context.Context, c *ops.Call, in *Unava
 	}
 	u := Unavailability{TenantID: c.Principal.TenantID, Version: 1, CreatedAt: c.Now, UpdatedAt: c.Now, OrganizationID: org, MembershipID: in.MembershipID,
 		From: in.From, To: in.To, Type: in.Type, Note: in.Note, ConflictingAssignmentIDs: conflicts}
-	if err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.unavailability (tenant_id, organization_id, membership_id, days, type, note, conflicting_assignment_ids, created_at)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, daterange($3::date, $4::date, '[]'), $5, $6, $7, $8) RETURNING id`,
+	if err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.unavailability (tenant_id, organization_id, membership_id, days, type, note, conflicting_assignment_ids, created_at, updated_at)
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, daterange($3::date, $4::date, '[]'), $5, $6, $7, $8, $8) RETURNING id`,
 		org, in.MembershipID, in.From, in.To, in.Type, in.Note, conflicts, c.Now).Scan(&u.ID); err != nil {
 		return u, err
 	}
@@ -521,9 +523,191 @@ func (m Workforce) setUnavailability(ctx context.Context, c *ops.Call, in *Unava
 	return u, nil
 }
 
-// RegisterWorkforce binds the IR132 maintenance-side member operations.
+// unavailabilityCols are the columns scanUnavailability reads: the days as the first and the last day.
+const unavailabilityCols = `id, tenant_id, version, created_at, updated_at, organization_id, membership_id, lower(days), upper(days) - 1, type, note, conflicting_assignment_ids`
+
+func scanUnavailability(row pgx.Row) (Unavailability, error) {
+	var u Unavailability
+	var first, last time.Time
+	err := row.Scan(&u.ID, &u.TenantID, &u.Version, &u.CreatedAt, &u.UpdatedAt, &u.OrganizationID, &u.MembershipID, &first, &last, &u.Type, &u.Note, &u.ConflictingAssignmentIDs)
+	u.From, u.To = first.Format("2006-01-02"), last.Format("2006-01-02")
+	return u, err
+}
+
+// ---- members.unavailability ----
+
+// unavailabilityList answers the unavailable days that are not over yet: the rows whose last Kuala Lumpur day is today
+// or later, a contractor's own company only (IR612).
+//
+//	@Summary		members.unavailability (read)
+//	@ID				members.unavailability
+//	@Description	Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR612 rows whose last Kuala Lumpur day is today or later; contractor sees own-company rows only
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-P06 · Query: filters organizationId,membershipId · sort id,from (default from asc;id asc)
+//	@Tags			members
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit			query		integer	false	"page size 1–100, default 25"
+//	@Param			sort			query		string	false	"field:direction — fields id,from; default from asc;id asc"
+//	@Param			organizationId	query		string	false	"filter → organizationId"
+//	@Param			membershipId	query		string	false	"filter → membershipId, with the rows of that technician's whole company (membershipId null)"
+//	@Success		200				{object}	ops.Envelope{data=UnavailabilityPage}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/members/unavailability [get]
+func (m Workforce) unavailabilityList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Unavailability], error) {
+	var f struct {
+		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
+		MembershipID   *uuid.UUID `json:"membershipId,omitempty"` // with the rows of the technician's whole company
+	}
+	if len(in.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+		dec.DisallowUnknownFields()
+		if dec.Decode(&f) != nil {
+			return paging.Page[Unavailability]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+		}
+	}
+	args := []any{c.Now.In(kualaLumpur).Format("2006-01-02")}
+	add := func(v any) string { args = append(args, v); return "$" + strconv.Itoa(len(args)) }
+	conds := []string{"upper(days) > $1::date"}
+	if c.Principal.Role == "contractor" {
+		conds = append(conds, "organization_id = "+add(c.Principal.OrgID))
+	}
+	if f.OrganizationID != nil {
+		conds = append(conds, "organization_id = "+add(*f.OrganizationID))
+	}
+	if f.MembershipID != nil {
+		p := add(*f.MembershipID)
+		conds = append(conds, "(membership_id = "+p+" OR (membership_id IS NULL AND organization_id IN (SELECT organization_id FROM maintenance.ref_memberships WHERE id = "+p+")))")
+	}
+	rows, err := c.Tx.Query(ctx, "SELECT "+unavailabilityCols+" FROM maintenance.unavailability WHERE "+strings.Join(conds, " AND ")+" ORDER BY lower(days), id", args...)
+	if err != nil {
+		return paging.Page[Unavailability]{}, err
+	}
+	all := []Unavailability{}
+	for rows.Next() {
+		u, err := scanUnavailability(rows)
+		if err != nil {
+			rows.Close()
+			return paging.Page[Unavailability]{}, err
+		}
+		all = append(all, u)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return paging.Page[Unavailability]{}, err
+	}
+	if err := paging.SortSlice(all, in.Sort, map[string]func(a, b Unavailability) int{
+		"id":   func(a, b Unavailability) int { return strings.Compare(a.ID.String(), b.ID.String()) },
+		"from": func(a, b Unavailability) int { return strings.Compare(a.From, b.From) },
+	}); err != nil {
+		return paging.Page[Unavailability]{}, err
+	}
+	return pageOf(all, *in, f, c.Principal.ScopeVersion)
+}
+
+// ---- members.clearUnavailability ----
+
+// ClearUnavailabilityInput is members.clearUnavailability input.
+type ClearUnavailabilityInput struct {
+	ID   uuid.UUID `json:"id"`
+	From string    `json:"from"`
+}
+
+// Validate implements ops.Validator.
+func (in *ClearUnavailabilityInput) Validate() map[string]string {
+	fe := map[string]string{}
+	if in.ID == uuid.Nil {
+		fe["id"] = "error.required"
+	}
+	if _, err := time.Parse("2006-01-02", in.From); err != nil {
+		fe["from"] = "error.invalid"
+	}
+	return fe
+}
+
+// UnavailabilityCleared is UnavailabilityCleared of service-contracts.ts: the row's days that remain, or null when the
+// row is gone.
+type UnavailabilityCleared struct {
+	ID        uuid.UUID       `json:"id"`
+	Remaining *Unavailability `json:"remaining"`
+}
+
+// clearUnavailability clears a row's days from `from` (a Kuala Lumpur day, today or later) to its last day (IR612): from
+// on or before its first day removes the row; a later day keeps the earlier days, so days already passed stay recorded.
+//
+//	@Summary		members.clearUnavailability (write)
+//	@ID				members.clearUnavailability
+//	@Description	Authorization: contractor:partner.assign:own-company | admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR612 from is a Kuala Lumpur day from today to the row's last day; from on or before its first day removes the row, a later day keeps the earlier days (new last day = from - 1); days before today stay recorded
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-P06
+//	@Tags			members
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string						true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer						true	"all: required (target unavailability, read members.unavailability)"
+//	@Param			id					path		string						true	"input field id"
+//	@Param			request				body		ClearUnavailabilityInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=UnavailabilityCleared}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/members/unavailability/{id}/clear [post]
+func (m Workforce) clearUnavailability(ctx context.Context, c *ops.Call, in *ClearUnavailabilityInput) (UnavailabilityCleared, error) {
+	u, err := scanUnavailability(c.Tx.QueryRow(ctx, `SELECT `+unavailabilityCols+` FROM maintenance.unavailability WHERE id = $1 FOR UPDATE`, in.ID))
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && c.Principal.Role == "contractor" && u.OrganizationID != c.Principal.OrgID) {
+		return UnavailabilityCleared{}, apperr.E(apperr.NotFound, "error.notFound")
+	}
+	if err != nil {
+		return UnavailabilityCleared{}, err
+	}
+	if u.Version != *c.ExpectedVersion {
+		return UnavailabilityCleared{}, apperr.E(apperr.Conflict, "error.versionConflict")
+	}
+	if in.From < c.Now.In(kualaLumpur).Format("2006-01-02") || in.From > u.To {
+		return UnavailabilityCleared{}, apperr.Fields(map[string]string{"from": "error.range"})
+	}
+	payload := map[string]any{"organizationId": u.OrganizationID, "from": in.From}
+	if in.From <= u.From {
+		if _, err := c.Tx.Exec(ctx, `DELETE FROM maintenance.unavailability WHERE id = $1`, u.ID); err != nil {
+			return UnavailabilityCleared{}, err
+		}
+		c.Emit(ops.Event{AggregateType: "unavailability", AggregateID: u.ID, Type: "UnavailabilityCleared", Payload: payload})
+		c.Audit(ops.AuditEntry{Action: "members.clearUnavailability", TargetKind: "unavailability", TargetID: u.ID.String(), PreviousVersion: c.ExpectedVersion})
+		return UnavailabilityCleared{ID: u.ID}, nil
+	}
+	from, _ := time.Parse("2006-01-02", in.From)
+	u.To, u.Version, u.UpdatedAt = from.AddDate(0, 0, -1).Format("2006-01-02"), u.Version+1, c.Now
+	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.unavailability SET days = daterange(lower(days), $2::date, '[)'), version = $3, updated_at = $4 WHERE id = $1`,
+		u.ID, in.From, u.Version, c.Now); err != nil {
+		return UnavailabilityCleared{}, err
+	}
+	c.Emit(ops.Event{AggregateType: "unavailability", AggregateID: u.ID, Type: "UnavailabilityCleared", Payload: payload})
+	c.Audit(ops.AuditEntry{Action: "members.clearUnavailability", TargetKind: "unavailability", TargetID: u.ID.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &u.Version})
+	return UnavailabilityCleared{ID: u.ID, Remaining: &u}, nil
+}
+
+// RegisterWorkforce binds the IR132 maintenance-side member operations and the unavailable days' list and clear (IR612).
 func RegisterWorkforce(r *ops.Registry, m Workforce) {
 	ops.Register(r, "members.eligible", m.eligible)
 	ops.Register(r, "members.capacity", m.capacity)
 	ops.Register(r, "members.setUnavailability", m.setUnavailability)
+	ops.Register(r, "members.unavailability", m.unavailabilityList)
+	ops.Register(r, "members.clearUnavailability", m.clearUnavailability)
 }

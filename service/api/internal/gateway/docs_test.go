@@ -94,7 +94,7 @@ func TestServesTheAPIDescription(t *testing.T) {
 		}
 		operations += len(methods)
 	}
-	if documented != 231 || operations != documented {
+	if documented != 233 || operations != documented {
 		t.Errorf("documented %d of the catalog's routes, %d operations in the document", documented, operations)
 	}
 }

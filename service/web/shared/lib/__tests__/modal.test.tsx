@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Modal } from "@ac/web/components/ui";
@@ -16,6 +16,19 @@ function Harness({ fields = true, inner = false }: { fields?: boolean; inner?: b
         {fields ? <input aria-label="Name" /> : <p>Delete this?</p>}
       </Modal>
       {inner && <Modal open={second} title="Inner" onClose={() => setSecond(false)} footer={<button>OK</button>}><p>Sure?</p></Modal>}
+    </>
+  );
+}
+// a list whose row the dialog removes: the row's button opened it, so focus goes to the list (IR612)
+function Removal() {
+  const [rows, setRows] = useState(["a"]);
+  const [open, setOpen] = useState(false);
+  const gone = useRef(false);
+  return (
+    <>
+      <div id="rows" tabIndex={-1} role="region" aria-label="Rows">{rows.map((r) => <button key={r} onClick={() => setOpen(true)}>Remove {r}</button>)}</div>
+      <Modal open={open} title="Remove" onClose={() => setOpen(false)} finalFocus={() => (gone.current ? document.getElementById("rows") : true)}
+        footer={<button onClick={() => { gone.current = true; setRows([]); setOpen(false); }}>Remove</button>}><p>Sure?</p></Modal>
     </>
   );
 }
@@ -39,6 +52,16 @@ describe("the modal dialog's keyboard behaviour", () => {
     render(<Harness fields={false} />);
     open();
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" })));
+  });
+  it("moves focus to the list when its action took the trigger away", async () => {
+    render(<Removal />);
+    const trigger = screen.getByRole("button", { name: "Remove a" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const remove = await screen.findByRole("button", { name: "Remove" });
+    fireEvent.click(remove);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("region", { name: "Rows" })));
   });
   it("lets only the innermost of stacked dialogs answer Escape", async () => {
     render(<Harness inner />);

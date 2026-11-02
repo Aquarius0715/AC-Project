@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { grantRows, listed, memberRows, teamQuery, teamStats, unavailabilityConflicts, unavailabilityErrors, unavailabilityRefusal, weekday, weekRows, type ApiTeamMember, type TeamJob } from "@ac/web/lib/partnerTeam";
+import { clearEffect, clearError, dayRange, grantRows, listed, memberRows, teamQuery, teamStats, technicianNames, unavailabilityConflicts, unavailabilityErrors, unavailabilityRefusal, unavailabilityRows, weekday, weekRows, type ApiTeamMember, type ApiUnavailability, type TeamJob } from "@ac/web/lib/partnerTeam";
 import type { ApiCapacity } from "@ac/web/lib/partnerOverview";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
@@ -95,6 +95,30 @@ describe("partner team & capacity", () => {
     });
     expect(unavailabilityRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} }).text).toBe("That technician is no longer in your company — reload the page.");
     expect(unavailabilityRefusal({ code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} })).toEqual({ fields: {}, text: null });
+  });
+
+  it("lists the upcoming unavailable days and says what a removal does (IR612)", () => {
+    const signer = (id: string) => ({ id, displayName: "E2E Signer" });
+    const names = technicianNames([a, signer("m-s1"), signer("m-s2"), signer("m-s3")], new Map([["m-s1", "s1@example.com"], ["m-s2", "s2@example.com"], ["m-a", "a@example.com"]]));
+    expect([...names.values()]).toEqual(["tech-external-a", "E2E Signer · s1@example.com", "E2E Signer · s2@example.com", "E2E Signer"]); // no e-mail known: the name only
+    const u = (id: string, membershipId: string | null, from: string, to: string, type = "annual_leave", note: string | null = null): ApiUnavailability => ({ id, version: 1, membershipId, from, to, type, note });
+    const rows = unavailabilityRows([u("u2", "m-s1", "2026-09-17", "2026-09-18", "training", "Refresher"), u("u1", "m-a", "2026-09-10", "2026-09-16"), u("u3", null, "2026-09-21", "2026-09-21", "public_holiday"), u("u4", "m-gone", "2026-09-30", "2026-09-30")], names, "2026-09-15");
+    expect(rows.map((r) => [r.who, r.type, r.note, r.days, r.first, r.started])).toEqual([
+      ["tech-external-a", "Annual leave", null, "Thu 10 – Wed 16 Sept", "2026-09-15", true],
+      ["E2E Signer · s1@example.com", "Training", "Refresher", "Thu 17 – Fri 18 Sept", "2026-09-17", false],
+      ["All technicians", "Public holiday", null, "Mon, 21 Sept", "2026-09-21", false],
+      ["Technician", "Annual leave", null, "Wed, 30 Sept", "2026-09-30", false],
+    ]);
+    expect(clearError(rows[0], "2026-09-14", "en")).toBe("Choose a day from Tue, 15 Sept to Wed, 16 Sept"); // the past days stay
+    expect(clearError(rows[0], "2026-09-17", "en")).toBe("Choose a day from Tue, 15 Sept to Wed, 16 Sept");
+    expect(clearError(rows[0], "", "en")).not.toBeNull();
+    expect(clearError(rows[0], "2026-09-15", "en")).toBeNull();
+    expect(clearEffect(rows[1], "2026-09-17", "en")).toBe("All of these days are removed.");
+    expect(clearEffect(rows[1], "2026-09-18", "en")).toBe("Still unavailable: Thu, 17 Sept; the days from Fri, 18 Sept on are removed.");
+    expect(clearEffect(rows[0], "2026-09-15", "en")).toBe("Still unavailable: Thu 10 – Mon 14 Sept; the days from Tue, 15 Sept on are removed. Days before today stay recorded.");
+    expect(dayRange("2026-09-29", "2026-10-02", "ms")).toBe("Sel, 29 Sep – Jum, 2 Okt");
+    expect(unavailabilityRows([u("u3", null, "2026-09-21", "2026-09-21", "public_holiday")], names, "2026-09-15", MS)[0]).toMatchObject({ who: "Semua juruteknik", type: "Cuti umum", days: "Isn, 21 Sep" });
+    expect(clearEffect(rows[1], "2026-09-18", "ms", ms)).toBe("Masih tidak tersedia: Kha, 17 Sep; hari mulai Jum, 18 Sep dibuang.");
   });
 
   it("words the team in Malay with Kuala Lumpur days (IR276)", () => {

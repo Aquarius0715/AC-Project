@@ -180,3 +180,52 @@ export function unavailabilityRefusal(f: { code: string; messageKey: string; fie
   const fields = Object.fromEntries(Object.entries(f.fieldErrors).map(([k, v]) => [k, FIELD_TEXT[k]?.[v] ? t(FIELD_TEXT[k][v]) : v]));
   return { fields, text: Object.keys(fields).length ? null : t("Check the input.") };
 }
+
+/** members.unavailability rows (Unavailability of service-contracts.ts, IR612). */
+export type ApiUnavailability = { id: string; version: number; membershipId: string | null; from: string; to: string; type: string; note: string | null };
+
+/** The technicians as the select and the unavailable days show them (IR612): a name two technicians share gets each
+ * one's e-mail (their partner user), so the right one is picked; without an e-mail the name stays as it is. */
+export function technicianNames(members: { id: string; displayName: string }[], emails: Map<string, string>): Map<string, string> {
+  const count = new Map<string, number>();
+  for (const m of members) count.set(m.displayName, (count.get(m.displayName) ?? 0) + 1);
+  return new Map(members.map((m) => [m.id, (count.get(m.displayName) ?? 0) > 1 && emails.get(m.id) ? `${m.displayName} · ${emails.get(m.id)}` : m.displayName]));
+}
+
+/** Kuala Lumpur days as text in the user's language: “Wed 16 Sept” or “Wed 16 – Fri 18 Sept”. */
+export function dayRange(from: string, to: string, locale: Locale): string {
+  const noon = (d: string) => new Date(`${d}T04:00:00Z`); // 12:00 in Kuala Lumpur
+  const f = new Intl.DateTimeFormat(intlTag(locale), { weekday: "short", day: "numeric", month: "short", timeZone: KL });
+  return (from === to ? f.format(noon(from)) : f.formatRange(noon(from), noon(to))).replace(/[\u00a0\u2009\u202f]/g, " ");
+}
+
+/** The day before a date (YYYY-MM-DD). */
+export const dayBefore = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) - DAY).toISOString().slice(0, 10);
+
+export type UnavailabilityRow = {
+  id: string; version: number; who: string; type: string; note: string | null; days: string;
+  from: string; to: string; first: string; started: boolean;
+};
+/** The upcoming unavailable days on Team & capacity (IR612): who — “All technicians” for the whole company — the
+ * type, the Kuala Lumpur days and the note, first day first. `first` is the earliest day that can be removed: a row
+ * that started before today keeps its past days. */
+export function unavailabilityRows(rows: ApiUnavailability[], names: Map<string, string>, today: string, i: I18n = EN): UnavailabilityRow[] {
+  const { t, display: { locale } } = i;
+  return [...rows].sort((a, b) => a.from.localeCompare(b.from) || a.id.localeCompare(b.id)).map((u) => ({
+    id: u.id, version: u.version, who: u.membershipId ? names.get(u.membershipId) ?? t("Technician") : t("All technicians"),
+    type: t(UNAVAILABILITY_TYPES.find((x) => x.id === u.type)?.text ?? "Other"), note: u.note, days: dayRange(u.from, u.to, locale),
+    from: u.from, to: u.to, first: u.from < today ? today : u.from, started: u.from < today,
+  }));
+}
+
+/** The remove dialog's own check before members.clearUnavailability: a day from `first` to the row's last day. */
+export function clearError(row: Pick<UnavailabilityRow, "first" | "to">, from: string, locale: Locale, t: T = en): string | null {
+  return isDate(from) && from >= row.first && from <= row.to ? null : t("Choose a day from {first} to {last}", { first: dayRange(row.first, row.first, locale), last: dayRange(row.to, row.to, locale) });
+}
+
+/** What removing from `from` does to the row, said before the user confirms: all of it, or the days that stay. */
+export function clearEffect(row: Pick<UnavailabilityRow, "from" | "started">, from: string, locale: Locale, t: T = en): string {
+  const past = row.started ? ` ${t("Days before today stay recorded.")}` : "";
+  if (from <= row.from) return t("All of these days are removed.");
+  return `${t("Still unavailable: {days}; the days from {day} on are removed.", { days: dayRange(row.from, dayBefore(from), locale), day: dayRange(from, from, locale) })}${past}`;
+}

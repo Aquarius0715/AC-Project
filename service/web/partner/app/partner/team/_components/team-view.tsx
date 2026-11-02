@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Badge, Banner, Btn, Card, cx, EmptyState, Field, Input, LinkBtn, Modal, Page, Select, Tabs, TextLink, UtilBar, ScrollX } from "@ac/web/components/ui";
-import { useT } from "@ac/web/components/I18n";
+import { useLocale, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
-import { unavailabilityConflicts, unavailabilityErrors, unavailabilityRefusal, type UnavailabilityForm, type WeekCell } from "@ac/web/lib/partnerTeam";
-import { setUnavailability } from "../actions";
+import { clearEffect, clearError, dayRange, unavailabilityConflicts, unavailabilityErrors, unavailabilityRefusal, type UnavailabilityForm, type UnavailabilityRow, type WeekCell } from "@ac/web/lib/partnerTeam";
+import { clearUnavailability, setUnavailability } from "../actions";
 import { Certifications } from "./certifications";
 import type { TeamLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
@@ -18,7 +18,8 @@ const cellTone: Record<WeekCell["kind"], string> = {
 };
 
 /** Team & capacity (FR-P06, Figma Contractor 04-1…04-5, 04-8) from the Core API: the URL's date, qualification and
- * activeOnly, the technicians with the chosen day, the team's week, the qualification grants and unavailable days.
+ * activeOnly, the technicians with the chosen day, the team's week, the qualification grants and unavailable days —
+ * added in a dialog, listed while upcoming and removed from a chosen day on (IR612).
  * Texts in the user's display language; every date and time comes formatted from the loader (IR276). */
 export function TeamView({ live }: { live: TeamLive }) {
   const t = useT();
@@ -42,6 +43,8 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
   const t = useT();
   const patch = useUrlPatch();
   const [open, setOpen] = useState(false);
+  // the remove dialog stays mounted while it closes, so its focus handling runs (n renews its state for each opening)
+  const [removing, setRemoving] = useState<{ row: UnavailabilityRow; open: boolean; n: number } | null>(null);
   const q = live.query;
   if (live.total === 0) {
     return <Page>{tabs}<EmptyState title={t("No technicians")}>{t("No technicians in your company yet. Add them in Users.")}</EmptyState></Page>;
@@ -108,8 +111,58 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
           </Card>
         </div>
       )}
+      <Card title={t("Upcoming unavailable days")}>
+        <div id="unavailable-days" tabIndex={-1} role="region" aria-label={t("Upcoming unavailable days")} className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+        {live.unavailable.length === 0 ? <p className="py-2 text-[13px] text-muted-foreground">{t("No upcoming unavailable days. Add them with Unavailable days above.")}</p> : (
+          <ul className="divide-y divide-line">
+            {live.unavailable.map((u) => (
+              <li key={u.id} className="flex flex-wrap items-center gap-3 py-2.5">
+                <div className="min-w-[220px] flex-1"><b className="block break-words text-[13px]">{u.who}</b><span className="block text-[11px] text-muted-foreground">{u.note ? `${u.type} · ${u.note}` : u.type}</span></div>
+                <span className="min-w-[160px] text-[13px]">{u.days}</span>
+                <Btn size="sm" variant="ghost" aria-label={t("Remove unavailable days of {who}, {days}", { who: u.who, days: u.days })} onClick={() => setRemoving((r) => ({ row: u, open: true, n: (r?.n ?? 0) + 1 }))}><Icon name="delete" />{t("Remove")}</Btn>
+              </li>
+            ))}
+          </ul>
+        )}
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">{t("Days that have passed stay recorded. Removing days makes the technician available for visits on them again.")}</p>
+      </Card>
       {open && <UnavailableDays live={live} onClose={() => setOpen(false)} />}
+      {removing && <RemoveDays key={removing.n} row={removing.row} open={removing.open} onClose={() => setRemoving((r) => r && { ...r, open: false })} />}
     </Page>
+  );
+}
+
+/** Remove unavailable days (IR612): from the row's first day — or today, once it has started — all of it goes; a later
+ * day keeps the days before it. The effect is said before the confirm; members.clearUnavailability sends the row's
+ * version, so a row someone changed meanwhile is refused and the list reloads. */
+function RemoveDays({ row, open, onClose }: { row: UnavailabilityRow; open: boolean; onClose: () => void }) {
+  const t = useT();
+  const locale = useLocale();
+  const [pending, run] = useAction();
+  const [from, setFrom] = useState(row.first);
+  const [tried, setTried] = useState(false);
+  const gone = useRef(false); // the whole row went, and its Remove button with it: focus goes to the list
+  const error = tried ? clearError(row, from, locale, t) : null;
+  const remove = () => {
+    setTried(true);
+    if (clearError(row, from, locale, t)) return;
+    run(() => clearUnavailability(row.id, row.version, from),
+      (v) => (v.kept ? t("Unavailable days shortened — {who} can take visits again from {day}.", { who: row.who, day: dayRange(from, from, locale) }) : t("Unavailable days removed — {who} can take visits on those days again.", { who: row.who })),
+      (v) => { gone.current = !v.kept; onClose(); },
+      (f) => { if (f.code !== "VALIDATION") onClose(); });
+  };
+  return (
+    <Modal open={open} onClose={onClose} title={t("Remove unavailable days")} finalFocus={() => (gone.current ? document.getElementById("unavailable-days") : true)} footer={<>
+      <Btn onClick={onClose}>{t("Cancel")}</Btn>
+      <Btn variant="danger" disabled={pending} onClick={remove}>{t("Remove")}</Btn>
+    </>}>
+      <p className="text-[13px]"><b className="break-words">{row.who}</b> · {row.type} · {row.days}</p>
+      <Field label={t("Remove from")} error={error ?? undefined}>
+        <Input type="date" value={from} min={row.first} max={row.to} onChange={(e) => { setFrom(e.target.value); setTried(false); }} />
+      </Field>
+      {!clearError(row, from, locale, t) && <Banner tone="warn">{clearEffect(row, from, locale, t)}</Banner>}
+    </Modal>
   );
 }
 

@@ -111,6 +111,16 @@ type RateCardPage struct {
 
 var _ = paging.Page[RateCard](RateCardPage{})
 
+// UnavailabilityPage is paging.Page[Unavailability].
+type UnavailabilityPage struct {
+	Items           []Unavailability `json:"items"`
+	NextCursor      *string          `json:"nextCursor"`
+	Total           int              `json:"total"`
+	SnapshotVersion int              `json:"snapshotVersion"`
+}
+
+var _ = paging.Page[Unavailability](UnavailabilityPage{})
+
 // anyPage is paging.Page[any].
 type anyPage struct {
 	Items           []any   `json:"items"`

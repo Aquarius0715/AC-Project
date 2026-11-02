@@ -258,7 +258,7 @@ func TestRegisterGuards(t *testing.T) {
 }
 
 func TestCatalogShape(t *testing.T) {
-	if len(Catalog) != 210 { // IR437 jobs.getAttachment, IR436 certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions, IR416 partnerUsers.*
+	if len(Catalog) != 212 { // IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions, IR416 partnerUsers.*
 		t.Fatalf("catalog size %d", len(Catalog))
 	}
 	for _, s := range Catalog {
@@ -372,6 +372,7 @@ func TestDeniedTarget(t *testing.T) {
 		{"jobs.review", review{JobID: a, ReportVersion: 2}, "job", a},
 		{"units.save", map[string]any{"id": a, "customerOrgId": b}, "unit", a},
 		{"members.revokeSessions", map[string]any{"membershipId": b}, "membership", b},
+		{"members.clearUnavailability", map[string]any{"id": a, "from": "2026-09-20"}, "unavailability", a},
 		{"jobs.offer", map[string]any{"contractorOrgId": b, "jobId": a}, "job", a},
 		{"policies.delete", map[string]any{"policyId": "not-a-uuid"}, "policy", "—"},
 		{"offsets.request", map[string]any{"quoteId": a, "unitIds": []string{b}}, "quote", a},

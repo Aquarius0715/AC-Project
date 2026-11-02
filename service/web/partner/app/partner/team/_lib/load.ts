@@ -1,15 +1,17 @@
 // The reads of the contractor's team & capacity (FR-P06, DD-P06, SCR-P06) through the DAL: session.get (the own
 // company, so another orgId in the URL reads as NOT_FOUND, AT-P06-E item 1), members.list (the company's technicians with
 // their qualification grants and membership periods), members.capacity for each Kuala Lumpur day of the chosen date's
-// week, and jobs.list per technician (the job of a booked block and the confirmed assignments unavailable days would
-// overlap). The Certifications tab adds certificates.list and units.list (the qualifications a booked job's unit
-// needs, IR277). Texts in the user's display language; every date and time is formatted here, on the server (IR276).
+// week, jobs.list per technician (the job of a booked block and the confirmed assignments unavailable days would
+// overlap), members.unavailability (the upcoming unavailable days, IR612) and partnerUsers.list (the e-mail that tells
+// apart two technicians of the same name). The Certifications tab adds certificates.list and units.list (the
+// qualifications a booked job's unit needs, IR277). Texts in the user's display language; every date and time is
+// formatted here, on the server (IR276).
 import "server-only";
 import { coreAll, coreDisplay, coreIdentity, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
 import { i18nOf, showDay, showSpan } from "@ac/web/lib/i18n";
 import { klDay, weekOf, type ApiCapacity, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 import { qualificationLabel, requiredFor } from "@ac/web/lib/partnerJobDetail";
-import { activeNow, grantRows, KL, listed, memberRows, QUALIFICATION_CODES, teamQuery, teamStats, UNAVAILABILITY_TYPES, weekday, weekRows, type ApiTeamMember, type TeamJob } from "@ac/web/lib/partnerTeam";
+import { activeNow, grantRows, KL, listed, memberRows, QUALIFICATION_CODES, technicianNames, teamQuery, teamStats, UNAVAILABILITY_TYPES, unavailabilityRows, weekday, weekRows, type ApiTeamMember, type ApiUnavailability, type TeamJob } from "@ac/web/lib/partnerTeam";
 import { CERT_STATUSES, certKpis, certQuery, certRows, impact, WINDOWS, type ApiCert, type CertJob } from "@ac/web/lib/partnerCertificates";
 
 type Page<T> = { items: T[]; total: number };
@@ -35,16 +37,24 @@ export async function loadTeam(sp: TeamParams) {
   const week = weekOf(noon(q.date));
   const dates = [0, 1, 2, 3, 4, 5, 6].map((n) => plusDays(week.from, n));
   const dayIndex = dates.indexOf(q.date);
-  const members = (await coreAll<ApiTeamMember>("members.list", { filters: { role: "technician" } })).filter((m) => m.role === "technician");
+  const [listedMembers, users] = await Promise.all([
+    coreAll<ApiTeamMember>("members.list", { filters: { role: "technician" } }),
+    optional(coreAll<{ membershipId: string | null; email: string }>("partnerUsers.list", { filters: { partnerRole: "technician" } }), []),
+  ]);
+  const techs = listedMembers.filter((m) => m.role === "technician");
+  // one label per technician on the whole screen, sorted by it: a name two technicians share gets each one's e-mail
+  const names = technicianNames(techs, new Map(users.flatMap((u) => (u.membershipId ? [[u.membershipId, u.email] as const] : []))));
+  const members = techs.map((m) => ({ ...m, displayName: names.get(m.id) ?? m.displayName })).sort((a, b) => a.displayName.localeCompare(b.displayName) || a.id.localeCompare(b.id));
   const current = members.filter((m) => activeNow(m, nowMs)); // capacity and assignments exist only for these
   const shown = listed(members, q, nowMs);
-  const [capacity, booked, certs, units] = await Promise.all([
+  const [capacity, booked, certs, units, unavailable] = await Promise.all([
     Promise.all(dates.map((date) => optional(coreOp<Page<ApiCapacity>>("members.capacity", { date, query: { limit: 100 } }).then((r) => r.items), []))),
     Promise.all(current.map((m) => optional(coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: { membershipId: m.id }, limit: 100 }), { items: [], total: 0 })
       .then((r) => r.items.flatMap((j): (TeamJob & { unitId: string })[] => (j.projection === "summary" && j.scheduledSlot && j.status !== "completed" && j.status !== "cancelled" // completion releases the assignment (IR234)
         ? [{ jobId: j.id, short: j.id.slice(0, 8), technicianId: m.id, slot: j.scheduledSlot, text: showSpan(j.scheduledSlot.startAt, j.scheduledSlot.endAt, display), unitId: j.unitId }] : []))))),
     optional(coreAll<ApiCert>("certificates.list"), [] as ApiCert[]),
     optional(coreAll<{ id: string; displayName: string; serviceScope?: string[] }>("units.list"), []),
+    optional(coreAll<ApiUnavailability>("members.unavailability"), [] as ApiUnavailability[]),
   ]);
   const jobs: TeamJob[] = booked.flat().map((j) => ({ jobId: j.jobId, short: j.short, technicianId: j.technicianId, slot: j.slot, text: j.text }));
   const unitOf = new Map(units.map((u) => [u.id, u]));
@@ -56,6 +66,7 @@ export async function loadTeam(sp: TeamParams) {
   return {
     notFound: false as const, company, query: q, otherZone: display.timeZone !== KL,
     technicians: current.map((m) => ({ id: m.id, name: m.displayName })), total: members.length, activeCount: current.length,
+    unavailable: unavailabilityRows(unavailable, names, q.today, i),
     rows: memberRows(shown.rows, capacity, dayIndex, jobs, nowMs, i), hidden: shown.hidden, expired: shown.expired,
     week: {
       title: dayIndex >= 5 ? t("Week of {day} — hours ({selected} selected)", { day: from, selected: showDay(noon(q.date), { locale, timeZone: KL }) }) : t("Week of {day} — assigned / available hours", { day: from }),

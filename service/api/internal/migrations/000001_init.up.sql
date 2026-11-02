@@ -1322,7 +1322,9 @@ CREATE TABLE maintenance.unavailability (        -- FR-P06
   type                       text NOT NULL CHECK (type IN ('annual_leave','training','public_holiday','sick','other')),
   note                       text,
   conflicting_assignment_ids uuid[] NOT NULL DEFAULT '{}',
-  created_at                 timestamptz NOT NULL DEFAULT platform.app_now()
+  version                    int NOT NULL DEFAULT 1,             -- members.clearUnavailability shortens a row (IR612)
+  created_at                 timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at                 timestamptz NOT NULL DEFAULT platform.app_now()
 );
 
 CREATE TABLE maintenance.sla_targets (           -- FR-A22

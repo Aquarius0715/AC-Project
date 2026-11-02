@@ -127,18 +127,22 @@ type Denial struct {
 	TargetKind, TargetID, Reason string
 }
 
-// deniedKinds names the audit target kind of an operation's resource, as the entries of its successful writes do.
+// deniedKinds names the audit target kind of an operation's resource, as the entries of its successful writes do; an
+// operation's own entry wins over its resource's (members.clearUnavailability names an unavailability, IR612).
 var deniedKinds = map[string]string{"alerts": "alert", "automations": "automation", "commands": "command", "contracts": "contract", "devices": "device",
 	"invoices": "invoice", "jobs": "job", "members": "membership", "payments": "payment", "policies": "policy", "restrictions": "restriction",
 	"units": "unit", "spaces": "space", "properties": "property", "customers": "customer", "certificates": "certificate", "clientUsers": "user",
-	"partnerUsers": "user"}
+	"partnerUsers": "user", "members.clearUnavailability": "unavailability"}
 
 // deniedTarget is the target a refused write asked for: the input's id under the kind of the operation's resource,
 // else its <kind>Id, else the first other …Id field that holds a UUID, named by that field (propertyId: property).
 // An input without one records the resource's kind and "—". No other input value is kept.
 func deniedTarget(op string, in any) (string, string) {
 	res, _, _ := strings.Cut(op, ".")
-	kind := deniedKinds[res]
+	kind := deniedKinds[op]
+	if kind == "" {
+		kind = deniedKinds[res]
+	}
 	if kind == "" {
 		kind = res
 	}

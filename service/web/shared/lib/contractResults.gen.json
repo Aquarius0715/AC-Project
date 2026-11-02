@@ -2892,6 +2892,13 @@
    "utilization"
   ]
  },
+ "members.clearUnavailability": {
+  "fields": [
+   "id",
+   "remaining"
+  ],
+  "items": null
+ },
  "members.eligible": {
   "fields": [
    "items",
@@ -2996,6 +3003,28 @@
    "version"
   ],
   "items": null
+ },
+ "members.unavailability": {
+  "fields": [
+   "items",
+   "nextCursor",
+   "snapshotVersion",
+   "total"
+  ],
+  "items": [
+   "conflictingAssignmentIds",
+   "createdAt",
+   "from",
+   "id",
+   "membershipId",
+   "note",
+   "organizationId",
+   "tenantId",
+   "to",
+   "type",
+   "updatedAt",
+   "version"
+  ]
  },
  "mrv.get": {
   "fields": [

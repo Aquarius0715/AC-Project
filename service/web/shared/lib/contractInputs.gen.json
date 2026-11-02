@@ -689,6 +689,10 @@
   "date",
   "query"
  ],
+ "members.clearUnavailability": [
+  "from",
+  "id"
+ ],
  "members.eligible": [
   "endAt",
   "jobId",
@@ -724,6 +728,12 @@
   "note",
   "to",
   "type"
+ ],
+ "members.unavailability": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
  ],
  "mrv.get": [
   "id",

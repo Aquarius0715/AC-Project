@@ -416,8 +416,9 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([t
 
 /** A modal dialog: the shadcn/ui Dialog, as the WAI-ARIA dialog pattern and UX-06 ask (IR361). On open, focus moves into
  * it: the first field or control of the body, else the first footer button (Cancel), else the close button. Tab stays
- * inside, Escape or a press outside closes it, and focus returns to what had it before (the trigger). */
-export function Modal({ open, title, onClose, children, footer, wide }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean }) {
+ * inside, Escape or a press outside closes it, and focus returns to what had it before (the trigger) — or to what
+ * `finalFocus` returns, where the dialog's own action takes the trigger away (a removed row, IR612). */
+export function Modal({ open, title, onClose, children, footer, wide, finalFocus }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean; finalFocus?: () => HTMLElement | true | null }) {
   const t = useT();
   const popup = useRef<HTMLDivElement>(null);
   const firstStop = () => {
@@ -427,7 +428,7 @@ export function Modal({ open, title, onClose, children, footer, wide }: { open: 
   };
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent ref={popup} showCloseButton={false} initialFocus={firstStop} className={cn("flex max-h-[92dvh] flex-col gap-0 p-0", wide ? "sm:max-w-3xl" : "sm:max-w-[560px]")}>
+      <DialogContent ref={popup} showCloseButton={false} initialFocus={firstStop} finalFocus={finalFocus ?? true} className={cn("flex max-h-[92dvh] flex-col gap-0 p-0", wide ? "sm:max-w-3xl" : "sm:max-w-[560px]")}>
         <div data-part="header" className="flex items-center justify-between gap-3 border-b px-5 py-4">
           <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
           <DialogClose render={<Button variant="ghost" size="icon-sm" aria-label={t("Close")} />}><Icon name="close" /></DialogClose>
