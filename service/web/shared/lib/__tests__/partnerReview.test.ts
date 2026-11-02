@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  alertRows, availabilityText, dueRow, evidenceCheck, inspectionRows, partLines, readingRows, resultText, timeOnSiteText, versionRows,
+  alertRows, availabilityText, dueRow, evidenceCheck, inspectionRows, partLines, readingRows, resultText, returnReason, reworkItems, timeOnSiteText, versionRows,
   type ApiInspectionItem, type ApiReviewJob, type ApiWorkReport,
 } from "@ac/web/lib/partnerReview";
 import { componentGroups, componentLabel } from "@ac/web/lib/techJob";
@@ -34,6 +34,20 @@ describe("inspection rows", () => {
       expect(label.startsWith(componentLabel[key].toLowerCase()), `${key}: ${label}`).toBe(true);
     }
     expect(Object.values(resultText).map((x) => x.label)).toEqual(["Normal", "Attention", "Not inspected", "Not applicable"]);
+  });
+  it("offers the items that need rework, as HQ's dialog does, and leads the reason with the ticked ones (IR609)", () => {
+    const rows = inspectionRows([
+      item({ componentKey: "filter", result: "attention", reason: "Dusty" }), item({ componentKey: "drain_pipe", result: "not_inspected", reason: "Blocked access" }),
+      item({ componentKey: "outlet", result: null }), item({ componentKey: "louver" }),
+    ]);
+    expect(reworkItems(rows, [["Refrigerant pressure (pipe)", "460 kPa"]], 0)).toEqual([
+      { label: "Indoor unit — filter condition — attention (Dusty)", checked: true }, { label: "Indoor unit — drain pipe — not inspected (Blocked access)", checked: true },
+      { label: "Indoor unit — outlet — no result", checked: true }, { label: "Refrigerant pressure (pipe) — re-measure", checked: false },
+      { label: "Photos — add more evidence", checked: true },
+    ]);
+    expect(reworkItems(rows.slice(3), [], 2)).toEqual([{ label: "Photos — add more evidence", checked: false }]); // a normal item needs no rework
+    expect(returnReason(["Indoor unit — filter condition — attention (Dusty)"], " Clean it again. ")).toBe("Rework: Indoor unit — filter condition — attention (Dusty). Clean it again.");
+    expect(reworkItems(inspectionRows([item({ componentKey: "filter", result: "attention", reason: "Dusty" })], MS_TOKYO.t), [], 1, MS_TOKYO.t)[0].label).toBe("Unit dalaman — keadaan penapis — perhatian (Dusty)");
   });
   it("names the photos linked to a finding (IR352)", () => {
     const r = report({ items: [item({ result: "attention", reason: "Dusty", evidenceIds: ["a1", "fedcba9876543210"] })] });

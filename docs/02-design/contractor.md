@@ -202,6 +202,7 @@ Scope: FR-P05 / Main display pattern: **UI-DETAIL / UI-FORM**. Service boundary:
 
 1. Review the submitted inspections, photos, measurements, work details, and next actions. Enter acceptance or return with a reason. Share the result with the technician, customer, and HQ.
    - As built (IR352): each inspection row names the report photos linked to its finding (“📷 Linked photos: …”).
+   - As built (IR609): Return for rework lists the items that need rework, as HQ's dialog does (IR232, Figma Contractor 398:2): the inspection items that need attention, were not inspected or have no result (ticked), each reading to re-measure, and more photos (ticked when the report has none). The ticked items lead the reason ("Rework: …. <reason>", 1–1000 characters together), so the technician reads them in a fixed form.
 2. Apply the following business rules to both reads and actions.
    - Accept only when required inspection records and evidence are complete.
    - Check whether reasons for “Not inspected” or “Not applicable” items are valid.

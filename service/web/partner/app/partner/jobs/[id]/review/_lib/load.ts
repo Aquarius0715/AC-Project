@@ -8,7 +8,7 @@ import { coreAll, coreDisplay, coreOp, corePrincipal, CoreError } from "@ac/web/
 import { i18nOf, intlTag, showTime } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import {
-  alertRows, availabilityText, dueRow, evidenceCheck, inspectionRows, partLines, readingRows, timeOnSiteText, versionRows,
+  alertRows, availabilityText, dueRow, evidenceCheck, inspectionRows, partLines, readingRows, reworkItems, timeOnSiteText, versionRows,
   type ApiAlertLite, type ApiReviewJob, type ApiWorkReport,
 } from "@ac/web/lib/partnerReview";
 import type { ReviewLive } from "../_components/review-view";
@@ -51,6 +51,8 @@ export async function loadReview(jobId: string): Promise<ReviewLive> {
     ...base,
     report: {
       id: r.id, version: r.version, author, submitted: r.submittedAt ? showTime(r.submittedAt, display) : null, items: inspectionRows(r.items, t, r.attachmentRefs), readings: readingRows(r.measurements, t),
+      // the return dialog's “Items that need rework”, as HQ's (IR609)
+      rework: reworkItems(inspectionRows(r.items, t, r.attachmentRefs), readingRows(r.measurements, t), r.attachmentRefs.filter((a) => a.status === "ready").length, t),
       parts: partLines(r.parts, r.refrigerant, t), signOff: r.signOff ? `${r.signOff.signerName} · ${showTime(r.signOff.signedAt, display)}` : null, workText: r.workText, next, photos,
       timeOnSite: timeOnSiteText(job.timeOnSite, i), evidence: check.rows, acceptable: check.acceptable, missing: check.missing,
       allowed: r.reviewAvailability.allowed, blocked: availabilityText(r.reviewAvailability, job.status, t),

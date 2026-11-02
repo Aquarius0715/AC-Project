@@ -8492,3 +8492,12 @@ Decided by the user as DEC-90, the contractor part of IR605. The diagnosis view 
 1. **Reads.** Each metric is read in one call as the day's hourly averages of the valid readings (`bucketMinutes` 60, IR605). Hours without a valid reading are left out, as before.
 2. **Design.** DD-P04's as-built note says so.
 3. **Check.** On the development stack, contractor-a opened Living room AC through a temporary accepted job at 1280 wide. Both charts drew all twelve bars, from yesterday 1:10 pm to 11:10 am, and axe passed. The temporary job was removed afterwards.
+
+## IR609 The contractor's return for rework lists the items to redo — 2026-11-02
+
+Decided by the user as DEC-90 (UX-loop proposal of UX-27). HQ's return dialog has listed "Items that need rework" since IR232, and Figma draws the same list on the contractor's dialog. The contractor's dialog offered only a free-text reason, so the reviewer retyped which items, readings or photos needed work.
+
+1. **List.** The dialog lists the inspection items that need attention, were not inspected or have no result — ticked — then each reading to re-measure, then more photos. The photos line is ticked when the report has none. HQ's dialog builds the same list from the same helper (`reworkItems`), which now lives with the shared review helpers.
+2. **Reason.** The ticked items lead the reason the technician reads: "Rework: <items>. <words>". The words stay required, and the whole reason must keep to 1000 characters ("{n} / 1000 characters with the ticked items"). A refused return takes focus to the reason (IR597). `jobs.review` and its input are unchanged.
+3. **Design.** DD-P05 says the same as built. Figma already drew the list.
+4. **Tests.** `partnerReview.test.ts` covers the items, ticked or not, in English and Malay, and the reason. HQ's tests pass on the shared helper unchanged. On the development stack, contractor-a returned a temporary report with one attention item and no photos. Both lines were ticked, the checkboxes were reachable by Tab, axe passed, and the stored reason read "Rework: Indoor unit — filter condition — attention (…); Photos — add more evidence. Please clean the filter again and add a photo." The temporary job was removed afterwards.

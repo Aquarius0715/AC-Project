@@ -11,7 +11,7 @@ import { EN, showSpan, showTime, translator, zonedInstant, zonedParts, type I18n
 import { actionMessage, fieldName } from "@ac/web/lib/actionMessage";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
-import { inspectionRows, readingRows, resultText, type ApiWorkReport } from "@ac/web/lib/partnerReview";
+import { inspectionRows, readingRows, resultText, reworkItems, type ApiWorkReport } from "@ac/web/lib/partnerReview";
 
 export type ApiHqRow = {
   projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; dueAt: string; requestedSlot: Slot; scheduledSlot: Slot | null;
@@ -344,9 +344,9 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
       submitted, author, checks: t(r.items.length === 1 ? "1 check" : "{n} checks", { n: r.items.length }), photos: t(photos === 1 ? "1 photo" : "{n} photos", { n: photos }),
     }),
     tone: decide ? (mode === "hq_escalation" ? "warn" : "primary") : j.status === "completed" ? "ok" : "muted",
-    // Figma 06-1 “Items that need rework”: the items needing attention (ticked), the readings, and the photos.
-    rework: [...rows.filter((x) => x.tone === "warn" || x.tone === "crit").map((x) => ({ label: `${x.label} — ${x.result.toLowerCase()}${x.reason ? ` (${x.reason})` : ""}`, checked: true })),
-      ...readings.map(([label]) => ({ label: t("{reading} — re-measure", { reading: label }), checked: false })), { label: t("Photos — add more evidence"), checked: photos === 0 }],
+    // Figma 06-1 “Items that need rework”: the items needing attention (ticked), the readings, and the photos (shared with
+    // the contractor's dialog, IR609)
+    rework: reworkItems(inspectionRows(r.items, t, r.attachmentRefs), readings, photos, t),
     parts: [...r.parts.map((p): [string, string] => [`${p.name} × ${p.quantity}`, `${p.source.replace(/_/g, " ")}${p.replacesComponentKey ? ` · ${t("replaces {part}", { part: p.replacesComponentKey.replace(/_/g, " ") })}` : ""}`]),
       ...r.refrigerant.map((x): [string, string] => [t("{refrigerant} · cylinder {id}", { refrigerant: x.refrigerant, id: x.cylinderId }), t("recovered {recovered} kg · charged {charged} kg · leak check {check}", { recovered: x.recoveredKg, charged: x.chargedKg, check: x.leakCheck.replace(/_/g, " ") })])],
     next: r.nextAction?.kind === "follow_up" ? t("Follow-up {date} — {note}", { date: r.nextAction.date.slice(0, 10), note: r.nextAction.note }) : t("No follow-up needed"),
@@ -357,8 +357,4 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
     })),
   };
 }
-/** The return reason sent to jobs.review: the ticked items, then the reviewer's words (1–1000 together). */
-export function returnReason(items: string[], text: string, t: T = en): string {
-  const words = text.trim();
-  return items.length ? `${t("Rework: {items}.", { items: items.join("; ") })}${words ? ` ${words}` : ""}` : words;
-}
+export { returnReason } from "@ac/web/lib/partnerReview"; // the HQ dialog's reason, shared with the contractor's (IR609)

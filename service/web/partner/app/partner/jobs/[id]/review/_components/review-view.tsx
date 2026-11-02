@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, cx, EmptyState, Field, Modal, Page, SummaryList, Textarea } from "@ac/web/components/ui";
+import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import type { T } from "@ac/web/lib/i18n";
 import { statusWord } from "@ac/web/lib/partnerJobDetail";
-import { resultText, type EvidenceRow, type InspectionRow, type VersionRow } from "@ac/web/lib/partnerReview";
+import { resultText, returnReason, type EvidenceRow, type InspectionRow, type ReworkItem, type VersionRow } from "@ac/web/lib/partnerReview";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { focusField } from "@ac/web/lib/focusField";
 import { reviewReport } from "../actions";
@@ -20,7 +21,7 @@ export type ReviewLive = {
     id: string; version: number; author: string; submitted: string | null; items: InspectionRow[]; readings: [string, string][]; parts: [string, string][];
     signOff: string | null; workText: string; next: string;
     photos: { id: string; name: string; url: string }[]; timeOnSite: string; evidence: EvidenceRow[]; acceptable: boolean; missing: string[]; allowed: boolean; blocked: string | null;
-    versions: VersionRow[]; last: { decision: "accept" | "return"; version: number; reason: string | null } | null;
+    versions: VersionRow[]; last: { decision: "accept" | "return"; version: number; reason: string | null } | null; rework: ReworkItem[];
   };
 };
 
@@ -38,6 +39,7 @@ export function ReviewView({ live }: { live: ReviewLive }) {
   const [pending, run] = useAction();
   const [ret, setRet] = useState(false);
   const [why, setWhy] = useState("");
+  const [ticked, setTicked] = useState<string[] | null>(null); // the items to redo; null until the dialog opens
   const [error, setError] = useState<string | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
   const r = live.report;
@@ -46,15 +48,18 @@ export function ReviewView({ live }: { live: ReviewLive }) {
   if (!r) {
     return <Page>{head}<Card title={t("No report to review")}><EmptyState title={t(live.job.status === "submitted" ? "Report not readable" : "Nothing submitted yet")}>{live.job.status === "submitted" ? t("The submitted report is outside your company's delegation window.") : t("This job is {status}; a review opens once the technician submits the report.", { status })}</EmptyState></Card></Page>;
   }
-  const reasonError = t("A reason is required (1–1000 characters)");
+  const items = ticked ?? r.rework.filter((x) => x.checked).map((x) => x.label);
+  // the ticked items lead the reason the technician reads, as on HQ's dialog (IR609)
+  const reason = returnReason(items, why, t);
+  const reasonError = !why.trim() ? t("A reason is required (1–1000 characters)") : reason.length > 1000 ? t("{n} / 1000 characters with the ticked items", { n: reason.length }) : null;
   // a refused return takes focus to the reason, the one field to fix (IR597, as IR586)
-  const badReason = () => { setError(reasonError); focusField("return-reason"); };
+  const badReason = (message = reasonError ?? t("A reason is required (1–1000 characters)")) => { setError(message); focusField("return-reason"); };
   const failed = (f: ActionFailure) => { setRefused(refusal(f, t)); if (f.fieldErrors.reason) badReason(); };
   const decide = (decision: "accept" | "return") => {
-    if (decision === "return" && (why.trim().length < 1 || why.trim().length > 1000)) return badReason();
+    if (decision === "return" && reasonError) return badReason(reasonError);
     setError(null);
-    run(() => reviewReport(live.job.id, live.job.version, r.version, decision, decision === "return" ? why.trim() : null),
-      (v) => t(v.status === "completed" ? "Report accepted — job completed" : "Returned for rework"), () => { setRefused(null); setRet(false); setWhy(""); }, failed);
+    run(() => reviewReport(live.job.id, live.job.version, r.version, decision, decision === "return" ? reason : null),
+      (v) => t(v.status === "completed" ? "Report accepted — job completed" : "Returned for rework"), () => { setRefused(null); setRet(false); setWhy(""); setTicked(null); }, failed);
   };
   const open = live.job.status === "submitted" && r.allowed;
   return (
@@ -111,6 +116,9 @@ export function ReviewView({ live }: { live: ReviewLive }) {
         </div>
       </div>
       <Modal open={ret} onClose={() => setRet(false)} title={t("Return for rework")} footer={<><Btn onClick={() => setRet(false)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => decide("return")}>{t("Return report")}</Btn></>}>
+        <fieldset className="flex flex-col gap-1.5"><legend className="mb-1 text-[13px] font-semibold">{t("Items that need rework")}</legend>
+          {r.rework.map((x) => <label key={x.label} className="flex items-start gap-2 text-[13px]"><Checkbox className="mt-0.5" checked={items.includes(x.label)} onCheckedChange={(v) => setTicked(v === true ? [...items, x.label] : items.filter((y) => y !== x.label))} />{x.label}</label>)}
+        </fieldset>
         <Field label={t("Reason (required, 1–1000 characters)")} error={error ?? undefined}><Textarea id="return-reason" value={why} maxLength={1000} onChange={(e) => setWhy(e.target.value)} placeholder={t("Missing evidence photo for the indoor unit filter")} /></Field>
         <p className="text-[11px] text-muted-foreground">{t("The technician sees the reason and resumes the report as a new version; the returned version is kept.")}</p>
       </Modal>

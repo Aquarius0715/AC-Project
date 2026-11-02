@@ -43,6 +43,25 @@ const componentLabel: Record<string, string> = {
 export const resultText: Record<NonNullable<ApiInspectionItem["result"]>, { label: string; tone: "ok" | "warn" | "muted" | "crit" }> = {
   normal: { label: "Normal", tone: "ok" }, attention: { label: "Attention", tone: "warn" }, not_inspected: { label: "Not inspected", tone: "crit" }, not_applicable: { label: "Not applicable", tone: "muted" },
 };
+/** An item a reviewer can return for rework, ticked when it needs it. */
+export type ReworkItem = { label: string; checked: boolean };
+/** The items that need rework, as HQ's and the contractor's return dialogs offer them (Figma Admin 06-1, Contractor 398:2
+ * “Items that need rework”; IR232, IR609): the inspection items that need attention, were not inspected or have no
+ * result — ticked — then each reading to re-measure, and more photos, ticked when the report has none. */
+export function reworkItems(items: Pick<InspectionRow, "label" | "result" | "reason">[], readings: [string, string][], photos: number, t: T = en): ReworkItem[] {
+  const word = (r: ApiInspectionItem["result"]) => t(r ? resultText[r].label : "No result").toLowerCase();
+  return [
+    ...items.filter((x) => x.result === null || x.result === "attention" || x.result === "not_inspected")
+      .map((x) => ({ label: `${x.label} — ${word(x.result)}${x.reason ? ` (${x.reason})` : ""}`, checked: true })),
+    ...readings.map(([label]) => ({ label: t("{reading} — re-measure", { reading: label }), checked: false })),
+    { label: t("Photos — add more evidence"), checked: photos === 0 },
+  ];
+}
+/** The return reason sent to jobs.review: the ticked items, then the reviewer's words (1–1000 together). */
+export function returnReason(items: string[], text: string, t: T = en): string {
+  const words = text.trim();
+  return items.length ? `${t("Rework: {items}.", { items: items.join("; ") })}${words ? ` ${words}` : ""}` : words;
+}
 /** One inspection row (Figma 03 “Indoor unit — filter condition · Normal”, reason under not-applicable items) with the
  * names of the report photos linked to its finding (InspectionItem.evidenceIds, IR352); a photo the report no longer
  * lists keeps its ID. */
