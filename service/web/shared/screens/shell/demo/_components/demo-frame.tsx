@@ -31,8 +31,8 @@ export function ClockFace({ time, onMinute, onHour, disabled }: { time: string; 
       <div className="font-mono text-xl font-bold tracking-tight">{time}</div>
       <p className="mt-1 text-[11px] text-muted-foreground">{t("Real-time speed · advancing jumps do not consume session lifetime")}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <Plain type="button" className={jump} disabled={disabled} onClick={onMinute}>{t("+1 min")}</Plain>
-        <Plain type="button" className={jump} disabled={disabled} onClick={onHour}>{t("+1 hour")}</Plain>
+        <Plain touch type="button" className={jump} disabled={disabled} onClick={onMinute}>{t("+1 min")}</Plain>
+        <Plain touch type="button" className={jump} disabled={disabled} onClick={onHour}>{t("+1 hour")}</Plain>
       </div>
     </>
   );

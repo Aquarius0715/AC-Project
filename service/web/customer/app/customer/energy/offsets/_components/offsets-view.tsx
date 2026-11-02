@@ -49,7 +49,7 @@ export function OffsetsView({ live }: { live: Live }) {
       <Card title={t("Based on Energy & cost")} sub={`${live.subject} · ${live.period.label}${live.estimate ? ` · ${live.estimate.factor}` : ""}`}>
         {live.estimate ? <div className="flex flex-wrap gap-x-8 gap-y-1 text-[13px]"><span>{t("Estimated emissions")} <b>{live.estimate.emissions}</b></span><span>{t("Estimated savings")} <b className={live.estimate.comparable ? "text-ok" : "text-muted-foreground"}>{live.estimate.savedEmissions}</b></span></div>
           : <p className="text-[13px] text-muted-foreground">{t("No estimate for this selection — the emission factor or valid readings are missing.")}</p>}
-        <Plain type="button" className="mt-2 text-xs font-semibold text-primary" aria-expanded={explain} onClick={() => setExplain((e) => !e)}><Icon name="info" /> {t("What is a carbon offset?")} <Icon name={explain ? "chevronDown" : "chevronRight"} /></Plain>
+        <Plain touch type="button" className="mt-2 text-xs font-semibold text-primary" aria-expanded={explain} onClick={() => setExplain((e) => !e)}><Icon name="info" /> {t("What is a carbon offset?")} <Icon name={explain ? "chevronDown" : "chevronRight"} /></Plain>
         {explain && <p className="mt-1 text-xs text-muted-foreground">{t("An offset retires a carbon credit to compensate emissions. Here it is simulated — nothing real is purchased, and no market, price or balance exists.")}</p>}
       </Card>
       {done ? (

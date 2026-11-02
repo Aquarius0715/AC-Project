@@ -8635,3 +8635,18 @@ Found in the UX loop (UX-35), after IR615 and IR616. About 25 filter chips and t
 2. **Check.** The phone crawl also measures `Plain` chips and tabs.
 3. **Design.** The UIUX specification and Figma's Technician legend say the same.
 4. **Tests.** `touch.test.tsx` covers a chip and a tab built from `Plain`. The phone crawl passes in the four apps.
+
+## IR618 Every button is touch-sized, and the crawl measures them all — 2026-11-02
+
+Found in the UX loop (UX-36), after IR617. The `Plain` buttons that are neither chips nor tabs stayed under 44 px on a touch screen:
+- the customer's Rename icons in the location tree (21 px), an alert's "Open" chevron (22 px) and "What is a carbon offset?" (21 px);
+- HQ's Remove actions of a model's metrics and firmware versions (18–19 px), the tree's Add room / Add floor / Add floor or area (27 px), the Customers and "back to" links (18–21 px) and the audit entry's filter links (19–37 px);
+- the demo panel's +1 min / +1 hour (37 px).
+
+1. **Marked actions.** `Plain` takes a `touch` flag. On a touch screen such an action is at least 44×44, centred, like an icon button. A mouse sees no change. The actions above carry it.
+2. **Names stay readable.** On a tablet the wider edit buttons squeezed the customer's tree, and names were cut ("Living ro…"). A row's type and unit count now wrap under a name that cannot fit beside them. Wide screens keep one line.
+3. **Check.** The phone crawl now measures every button, `Plain` included, since all of `Plain`'s small ones are chips, tabs or marked actions. It passes in the four apps at 360 px in Malay.
+4. **Design.** The UIUX specification says the same.
+5. **Tests.**
+   - `touch.test.tsx` covers the `touch` flag.
+   - On the development stack, the customer's location tree at 1280 with touch had 44×44 edit buttons and whole names, while with a mouse at 1920 it was unchanged. HQ's tree on a touch tablet had 44 px rows, menus and Add links. axe passed.

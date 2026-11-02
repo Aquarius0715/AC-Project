@@ -14,9 +14,10 @@ import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display"
 
 type Crawl = { seen: number; failed: string[]; inaccessible: string[]; wide: string[]; otherLang: string[]; untitled: string[]; small: string[] };
 
-/** The shared controls a touch screen sizes to 44 px (IR615): buttons (a Plain one only as a chip or a tab, IR617; else it
- * takes its parent's size), inputs, selects, the input groups of the comboboxes, tabs and toggles. */
-const TOUCH_CONTROLS = ['[data-slot="button"]:not([data-plain])', '[data-plain][aria-pressed]', '[data-plain][role="tab"]', '[data-slot="input"]', '[data-slot="native-select"]', '[data-slot="input-group"]', '[data-slot="tabs-trigger"]', '[data-slot="toggle"]', '[data-slot="toggle-group-item"]'].join(", ");
+/** The controls a touch screen sizes to 44 px (IR615, IR617, IR618): every button — a Plain one too, whose chips, tabs and
+ * marked actions are touch-sized and whose cards are larger anyway —, inputs, selects, the input groups of the
+ * comboboxes, tabs and toggles. */
+const TOUCH_CONTROLS = ['[data-slot="button"]', '[data-slot="input"]', '[data-slot="native-select"]', '[data-slot="input-group"]', '[data-slot="tabs-trigger"]', '[data-slot="toggle"]', '[data-slot="toggle-group-item"]'].join(", ");
 
 /** Visits up to 40 pages the app links to, from its home, and records what fails on each; `lang` is the page language
  * every page must declare (WCAG 3.1.1, IR489). `wideFont` sets a wide font on every page before it is measured, so a

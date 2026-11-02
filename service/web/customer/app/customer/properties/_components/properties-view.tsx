@@ -71,11 +71,15 @@ function Row({ depth, selected, onClick, icon, name, tag, meta, onRename }: { de
   return (
     <div className={cx("flex items-center gap-2 rounded-lg px-2 py-1.5", selected ? "bg-primary-soft" : "hover:bg-surface2")} style={{ paddingLeft: 8 + depth * 16 }}>
       <Plain type="button" onClick={onClick} aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-        <Icon name={icon} className="text-muted-foreground" /><span className="truncate font-semibold">{name}</span>
-        {tag && <span className="rounded bg-surface2 px-1.5 text-[10px] text-muted-foreground">{tag}</span>}
-        {meta && <span className="truncate text-[11px] text-muted-foreground">{meta}</span>}
+        <Icon name={icon} className="shrink-0 text-muted-foreground" />
+        {/* the type and the unit count wrap below a name the row cannot fit beside them (a touch screen's 44 px edit button, IR618) */}
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="truncate font-semibold">{name}</span>
+          {tag && <span className="rounded bg-surface2 px-1.5 text-[10px] text-muted-foreground">{tag}</span>}
+          {meta && <span className="truncate text-[11px] text-muted-foreground">{meta}</span>}
+        </span>
       </Plain>
-      {onRename && <Plain type="button" aria-label={t("Rename {name}", { name })} onClick={onRename} className="text-muted-foreground hover:text-primary"><Icon name="edit" /></Plain>}
+      {onRename && <Plain touch type="button" aria-label={t("Rename {name}", { name })} onClick={onRename} className="text-muted-foreground hover:text-primary"><Icon name="edit" /></Plain>}
     </div>
   );
 }

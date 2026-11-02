@@ -172,7 +172,7 @@ export function AuditView({ live }: { live?: AuditLive }) {
 }
 
 function FilterLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
-  return <Plain className="text-xs font-semibold text-primary hover:underline" onClick={onClick}>{children}</Plain>;
+  return <Plain touch className="text-xs font-semibold text-primary hover:underline" onClick={onClick}>{children}</Plain>;
 }
 
 /** Why the list is empty: nothing was searched (an invalid period, Figma Admin 338:602), an unknown or out-of-scope

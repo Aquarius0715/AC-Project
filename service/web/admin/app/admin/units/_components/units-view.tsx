@@ -166,7 +166,7 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
-        <Plain type="button" className="font-semibold text-primary" onClick={() => nav({ customerId: null, tab: null, locationId: null, propertyId: null, unitId: null, powerState: null, connections: null, search: null })}><Icon name="chevronLeft" /> {t("Customers")}</Plain>
+        <Plain touch type="button" className="font-semibold text-primary" onClick={() => nav({ customerId: null, tab: null, locationId: null, propertyId: null, unitId: null, powerState: null, connections: null, search: null })}><Icon name="chevronLeft" /> {t("Customers")}</Plain>
         <span className="text-muted-foreground">/ {r.name}{c.unit ? ` / ${c.unit.u.displayName}` : ""}</span>
         {r.marks.map((x) => <Badge key={x.label} tone={x.tone} icon={x.icon}>{x.label}</Badge>)}
         <div className="ml-auto flex gap-2">
@@ -262,7 +262,7 @@ function SpaceNode({ s, depth, selId, nav, canWrite, setM }: { s: TreeSpace; dep
   );
 }
 const AddLink = ({ depth, onClick, children }: { depth: number; onClick: () => void; children: React.ReactNode }) => (
-  <Plain type="button" onClick={onClick} className="block py-1 text-left text-[12px] font-semibold text-primary" style={{ paddingLeft: depth * 14 + 8 }}>{children}</Plain>
+  <Plain touch type="button" onClick={onClick} className="block py-1 text-left text-[12px] font-semibold text-primary pointer-coarse:justify-start" style={{ paddingLeft: depth * 14 + 8 }}>{children}</Plain>
 );
 function LocationMenu({ onRename, onDelete }: { onRename: () => void; onDelete: () => void }) {
   const t = useT();
@@ -370,7 +370,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: Custo
   return (
     <>
       <Card title={<span className="flex flex-wrap items-center gap-2">{u.displayName}<PowerBadge s={u.effectivePowerState === "on" ? "running" : u.effectivePowerState === "off" ? "stopped" : "unknown"} /><ConnBadge s={u.connection} />{x.seen && <span className="text-[11px] font-normal text-muted-foreground">{t("seen {time}", { time: x.seen })}</span>}{u.activeAlertCount > 0 && <Badge tone="warn" icon="warning">{count(t, u.activeAlertCount, "1 open alert", "{n} open alerts")}</Badge>}</span>}
-        sub={<>{u.id.slice(0, 8)} · {t("version {v}", { v: u.version })} · <Plain type="button" className="font-semibold text-primary" onClick={() => nav({ unitId: null, locationId: u.archived ? null : u.spaceId ?? `unassigned:${u.propertyId}` })}><Icon name="chevronLeft" /> {t("back to {place}", { place: back })}</Plain></>}
+        sub={<>{u.id.slice(0, 8)} · {t("version {v}", { v: u.version })} · <Plain touch type="button" className="font-semibold text-primary" onClick={() => nav({ unitId: null, locationId: u.archived ? null : u.spaceId ?? `unassigned:${u.propertyId}` })}><Icon name="chevronLeft" /> {t("back to {place}", { place: back })}</Plain></>}
         action={live.canWrite && !u.archived && <Btn size="sm" variant="danger" onClick={() => setModal("delete")}>{t("Delete unit…")}</Btn>}>
         {u.archived && <div className="mb-3"><Banner tone="warn">{t("Read only — {note}. Deleted (archived) units are left out of lists, summaries and totals.", { note: x.archivedNote ?? "" })}</Banner></div>}
         <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">

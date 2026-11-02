@@ -55,7 +55,7 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
           {a.cause === "fault" && a.group === "attn" && <Link href={`/customer/maintenance?new=${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Request repair")}</Link>}
         </div>
       </div>
-      <Plain type="button" aria-label={t("Open {title}", { title: a.title })} onClick={() => show(a)} className="text-muted-foreground"><Icon name="chevronRight" /></Plain>
+      <Plain touch type="button" aria-label={t("Open {title}", { title: a.title })} onClick={() => show(a)} className="text-muted-foreground"><Icon name="chevronRight" /></Plain>
     </div>
   );
   return (
