@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  alertRows, availabilityText, dueRow, evidenceCheck, inspectionRows, partLines, readingRows, timeOnSiteText, versionRows,
+  alertRows, availabilityText, dueRow, evidenceCheck, inspectionRows, partLines, readingRows, resultText, timeOnSiteText, versionRows,
   type ApiInspectionItem, type ApiReviewJob, type ApiWorkReport,
 } from "@ac/web/lib/partnerReview";
+import { componentGroups, componentLabel } from "@ac/web/lib/techJob";
 import { i18nOf } from "@ac/web/lib/i18n";
 
 const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
@@ -25,6 +26,14 @@ describe("inspection rows", () => {
     expect(rows.map((r) => r.label)).toEqual(["Indoor unit — filter condition", "Outdoor unit — compressor", "Electrical — wiring insulation"]);
     expect(rows[2]).toMatchObject({ result: "not_applicable", reason: "No exposed wiring" });
     expect(inspectionRows([item({ componentKey: "new_part" })])[0].label).toBe("Indoor unit — new part");
+  });
+  it("names each item and result as the technician's checklist does (IR597)", () => {
+    // the reviewer reads the words the technician chose from: “refrigerant pipe” is an item, its pressure a reading
+    for (const { group, keys } of componentGroups) for (const key of keys) {
+      const label = inspectionRows([item({ componentGroup: group, componentKey: key })])[0].label.split(" — ")[1];
+      expect(label.startsWith(componentLabel[key].toLowerCase()), `${key}: ${label}`).toBe(true);
+    }
+    expect(Object.values(resultText).map((x) => x.label)).toEqual(["Normal", "Attention", "Not inspected", "Not applicable"]);
   });
   it("names the photos linked to a finding (IR352)", () => {
     const r = report({ items: [item({ result: "attention", reason: "Dusty", evidenceIds: ["a1", "fedcba9876543210"] })] });

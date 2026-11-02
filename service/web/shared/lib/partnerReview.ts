@@ -36,13 +36,14 @@ export type ApiAlertLite = { id: string; type: string; severity: string; status:
 const groupLabel: Record<ApiInspectionItem["componentGroup"], string> = { indoor: "Indoor unit", outdoor: "Outdoor unit", electrical: "Electrical" };
 const componentLabel: Record<string, string> = {
   filter: "filter condition", evaporator_coil: "evaporator coil", blower_motor: "blower motor", blower_fan: "blower fan", drain_pipe: "drain pipe", drain_pan: "drain pan", outlet: "outlet",
-  louver: "louver", condenser_coil: "condenser coil", compressor: "compressor", fan: "fan", blade: "fan blade", refrigerant_pipe: "refrigerant pressure", thermostat: "thermostat",
+  louver: "louver", condenser_coil: "condenser coil", compressor: "compressor", fan: "fan", blade: "fan blade", refrigerant_pipe: "refrigerant pipe", thermostat: "thermostat",
   sensor: "sensor", capacitor: "capacitor", contactor: "contactor", wiring: "wiring insulation",
 };
+// the words the technician chose the result from (IR597)
 export const resultText: Record<NonNullable<ApiInspectionItem["result"]>, { label: string; tone: "ok" | "warn" | "muted" | "crit" }> = {
-  normal: { label: "OK", tone: "ok" }, attention: { label: "Attention", tone: "warn" }, not_inspected: { label: "Not inspected", tone: "crit" }, not_applicable: { label: "Not applicable", tone: "muted" },
+  normal: { label: "Normal", tone: "ok" }, attention: { label: "Attention", tone: "warn" }, not_inspected: { label: "Not inspected", tone: "crit" }, not_applicable: { label: "Not applicable", tone: "muted" },
 };
-/** One inspection row (Figma 03 “Indoor unit — filter condition · OK”, reason under not-applicable items) with the
+/** One inspection row (Figma 03 “Indoor unit — filter condition · Normal”, reason under not-applicable items) with the
  * names of the report photos linked to its finding (InspectionItem.evidenceIds, IR352); a photo the report no longer
  * lists keeps its ID. */
 export type InspectionRow = { id: string; label: string; result: ApiInspectionItem["result"]; reason: string | null; photos: string[] };

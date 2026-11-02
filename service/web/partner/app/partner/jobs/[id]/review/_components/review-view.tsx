@@ -9,6 +9,7 @@ import type { T } from "@ac/web/lib/i18n";
 import { statusWord } from "@ac/web/lib/partnerJobDetail";
 import { resultText, type EvidenceRow, type InspectionRow, type VersionRow } from "@ac/web/lib/partnerReview";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
+import { focusField } from "@ac/web/lib/focusField";
 import { reviewReport } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 
@@ -46,9 +47,11 @@ export function ReviewView({ live }: { live: ReviewLive }) {
     return <Page>{head}<Card title={t("No report to review")}><EmptyState title={t(live.job.status === "submitted" ? "Report not readable" : "Nothing submitted yet")}>{live.job.status === "submitted" ? t("The submitted report is outside your company's delegation window.") : t("This job is {status}; a review opens once the technician submits the report.", { status })}</EmptyState></Card></Page>;
   }
   const reasonError = t("A reason is required (1–1000 characters)");
-  const failed = (f: ActionFailure) => { setRefused(refusal(f, t)); if (f.fieldErrors.reason) setError(reasonError); };
+  // a refused return takes focus to the reason, the one field to fix (IR597, as IR586)
+  const badReason = () => { setError(reasonError); focusField("return-reason"); };
+  const failed = (f: ActionFailure) => { setRefused(refusal(f, t)); if (f.fieldErrors.reason) badReason(); };
   const decide = (decision: "accept" | "return") => {
-    if (decision === "return" && (why.trim().length < 1 || why.trim().length > 1000)) return setError(reasonError);
+    if (decision === "return" && (why.trim().length < 1 || why.trim().length > 1000)) return badReason();
     setError(null);
     run(() => reviewReport(live.job.id, live.job.version, r.version, decision, decision === "return" ? why.trim() : null),
       (v) => t(v.status === "completed" ? "Report accepted — job completed" : "Returned for rework"), () => { setRefused(null); setRet(false); setWhy(""); }, failed);
@@ -108,7 +111,7 @@ export function ReviewView({ live }: { live: ReviewLive }) {
         </div>
       </div>
       <Modal open={ret} onClose={() => setRet(false)} title={t("Return for rework")} footer={<><Btn onClick={() => setRet(false)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => decide("return")}>{t("Return report")}</Btn></>}>
-        <Field label={t("Reason (required, 1–1000 characters)")} error={error ?? undefined}><Textarea value={why} maxLength={1000} onChange={(e) => setWhy(e.target.value)} placeholder={t("Missing evidence photo for the indoor unit filter")} /></Field>
+        <Field label={t("Reason (required, 1–1000 characters)")} error={error ?? undefined}><Textarea id="return-reason" value={why} maxLength={1000} onChange={(e) => setWhy(e.target.value)} placeholder={t("Missing evidence photo for the indoor unit filter")} /></Field>
         <p className="text-[11px] text-muted-foreground">{t("The technician sees the reason and resumes the report as a new version; the returned version is kept.")}</p>
       </Modal>
     </Page>

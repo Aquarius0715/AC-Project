@@ -8329,3 +8329,25 @@ Found in the twenty-sixth round of the UX loop (UX-26: customer-a follows "Offse
 
 1. **Words.** Without a price the row reads "No price — no offset provider is selected in this demo". The Malay dictionary follows.
 2. **Test.** `customer/energy.e2e.ts` gets a demo quote and expects the sentence.
+
+## IR597 The quality review names checklist items and results as the technician does — 2026-11-02
+
+Found in the twenty-seventh round of the UX loop (UX-27: contractor-a reviews tech-external-a's submitted report v1 of a temporary job on Living room AC — 18 checklist items, no photos or readings — tries to return it without a reason, then returns it with one, at 1920 and 1280; the temporary job was removed afterwards). The review reads well: the evidence check says what is present and what is missing, the self-approval rule stands above the buttons, the versions card says who reviews now, and a returned report shows the reason in a banner. Three frictions remained:
+
+- The result the technician chose as "Normal" read "OK" on the partner's review, HQ's report card and the customer's completed report.
+- The outdoor item `refrigerant_pipe` read "refrigerant pressure", which is the name of a reading. A reviewer could take the inspection for a measurement, while the evidence check counted "0 recorded" readings.
+- A return without a reason showed the message under the field, but focus stayed on the button.
+
+The authorization held. contractor-a reading or reviewing a job that HQ keeps in-house answers NOT_FOUND. Other refusals:
+
+| Probe by contractor-a | Answer |
+|---|---|
+| Review with `reviewMode=hq_escalation` | VALIDATION on `reviewMode` |
+| Reason of 1001 characters | VALIDATION on `reason` |
+| Review of a job not submitted | CONFLICT |
+
+1. **Words.** `resultText.normal` reads "Normal" and the item `refrigerant_pipe` reads "refrigerant pipe", as on the technician's checklist (FR-T05, BR-T05). The Malay dictionary follows ("paip bahan pendingin").
+2. **Focus.** A refused return takes focus to the reason, whether the dialog or the server refused it (`focusField`, as IR586).
+3. **Figma and demo.** The six Quality Review frames on the Contractor page (56:7, 398:2, 398:158, 398:298, 398:437, 398:580) now read "Normal" for the results and "Outdoor unit — refrigerant pipe" for the item. Their row "Drainage — condensate flow", which is not a checklist group, became "Indoor unit — drain pipe". The demo view follows.
+4. **Tests.** `partnerReview.test.ts` checks every checklist key and result word against the technician's. `adminJobs.test.ts` expects "Normal".
+5. **Proposal.** The partner's return dialog lacks the "Items that need rework" list that Figma and HQ's dialog have (IR232). It is proposal B-11 and is not built.

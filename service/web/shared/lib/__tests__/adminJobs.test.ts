@@ -135,7 +135,7 @@ describe("HQ maintenance jobs", () => {
     const byUser = new Map([["u-tech", "tech-internal-a"], ["u-hq", "hq-operator"]]);
     const card = reportCard(job({ status: "submitted" }), report, byUser);
     expect([card.title, card.sub, card.mode, card.decide, card.tone]).toEqual(["Work report · version 1", "Submitted 15 Sept 2026, 11:48 am MYT by tech-internal-a · 3 checks · 1 photo", "normal", true, "primary"]);
-    expect(card.rows.map((r) => [r.label, r.result, r.photos])).toEqual([["Indoor unit — filter condition", "OK", []], ["Indoor unit — blower fan", "Attention", ["p.jpg"]], ["Outdoor unit — fan", "Not applicable", []]]); // the finding's linked photo (IR352)
+    expect(card.rows.map((r) => [r.label, r.result, r.photos])).toEqual([["Indoor unit — filter condition", "Normal", []], ["Indoor unit — blower fan", "Attention", ["p.jpg"]], ["Outdoor unit — fan", "Not applicable", []]]); // the finding's linked photo (IR352)
     expect(card.readings).toEqual([["Refrigerant pressure", "412 kPa · recorded"]]);
     expect(card.rework).toEqual([{ label: "Indoor unit — blower fan — attention (reduced on Low)", checked: true }, { label: "Refrigerant pressure — re-measure", checked: false }, { label: "Photos — add more evidence", checked: false }]);
     expect(reportCard(job({ status: "submitted", reportRefs: [{ reportId: "r1", reportVersion: 1 }, { reportId: "r1", reportVersion: 4 }] }), report, byUser).sub).toMatch(/^Resubmitted 15 Sept 2026, 11:48 am MYT/);

@@ -13,7 +13,7 @@ export function ReviewDemo({ id }: { id: string }) {
   const [ret, setRet] = useState(false);
   const [why, setWhy] = useState("");
   const [tried, setTried] = useState(false);
-  const checks: [string, string, string][] = [["Indoor unit — filter condition", "Normal", "ok"], ["Outdoor unit — refrigerant pressure", "Normal", "ok"], ["Electrical — wiring insulation", "Not applicable", "muted"], ["Drainage — condensate flow", "Normal", "ok"]];
+  const checks: [string, string, string][] = [["Indoor unit — filter condition", "Normal", "ok"], ["Outdoor unit — refrigerant pipe", "Normal", "ok"], ["Electrical — wiring insulation", "Not applicable", "muted"], ["Indoor unit — drain pipe", "Normal", "ok"]];
   return (
     <Page>
       <div className="text-[13px] text-muted-foreground"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> Jobs</Link> › {id} · Quality review</div>

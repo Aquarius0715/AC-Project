@@ -790,7 +790,7 @@ export const ms: Record<string, string> = {
   "compressor": "pemampat",
   "fan": "kipas",
   "fan blade": "bilah kipas",
-  "refrigerant pressure": "tekanan bahan pendingin",
+  "refrigerant pipe": "paip bahan pendingin",
   "thermostat": "termostat",
   "sensor": "penderia",
   "capacitor": "kapasitor",
