@@ -8351,3 +8351,25 @@ The authorization held. contractor-a reading or reviewing a job that HQ keeps in
 3. **Figma and demo.** The six Quality Review frames on the Contractor page (56:7, 398:2, 398:158, 398:298, 398:437, 398:580) now read "Normal" for the results and "Outdoor unit — refrigerant pipe" for the item. Their row "Drainage — condensate flow", which is not a checklist group, became "Indoor unit — drain pipe". The demo view follows.
 4. **Tests.** `partnerReview.test.ts` checks every checklist key and result word against the technician's. `adminJobs.test.ts` expects "Normal".
 5. **Proposal.** The partner's return dialog lacks the "Items that need rework" list that Figma and HQ's dialog have (IR232). It is proposal B-11 and is not built.
+
+## IR598 The technician's unit chart says which readings it did not load — 2026-11-02
+
+Found in the twenty-eighth round of the UX loop (UX-28). tech-internal-a opened Living room AC's register from a temporary assigned job and read its monitoring over 1 h, 24 h and 7 days, at 390×844 and 1920. The temporary job was removed afterwards. The register was complete and honest: "Not registered" stood for the missing installation date, and the components matched the job's checklist. The page passed axe at both widths, with no sideways scroll. Two frictions remained:
+
+- The screen loads at most 400 readings of the chosen metric (four pages of 100) and 100 of each other metric. A minute series therefore filled only the last 6.7 hours of the 24 h and 7 d charts, and only 1.7 hours of the small charts; the rest stayed blank. The footnote still counted "400 measurements in this period" and called blanks gaps in missing data. A technician looking for yesterday afternoon would take the blank for missing data.
+- The 24 h chart's axis started at "9:56 am", the same clock time it ends at, without the day.
+
+The authorization held. tech-internal-a asked about a unit outside its scope:
+
+| Probe | Answer |
+|---|---|
+| `units.get`, `telemetry.summary`, `devices.events` | NOT_FOUND |
+| `telemetry.series`, also together with a unit in scope | NOT_FOUND |
+| `alerts.list` filtered by that unit | no items |
+| Unknown `metric` or `period` in the URL | the defaults |
+
+1. **Cut series.** The period can hold more readings than the screen loaded (`total` of `telemetry.series`). The chart then shows "Showing the latest {n} of {total} readings — earlier readings in this period are not loaded." in place of the count. Each cut small chart says "Earlier readings are not loaded", as IR592 does on the customer's air chart. The Malay dictionary follows.
+2. **Axis.** The 24 h axis starts with its day, for example "22 Sept, 9:56 am".
+3. **Figma.** The monitoring frames draw a fully loaded period, the state that B-9 (server-side windows) would give. They need no change.
+4. **Tests.** `techUnit.test.ts` covers the cut chart and the cut small charts in English and Malay, and the start of the 24 h axis.
+5. **Proposals.** Loading the whole period remains proposal B-9. The walk-through also found that the demo's fixture devices keep a seed-time "last seen" while readings arrive: their heartbeats carry no state, and the bridge drops them. That is proposal B-12.

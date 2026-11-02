@@ -17,27 +17,31 @@ import {
   windowEvents, type ApiTechUnit, type Point,
 } from "@ac/web/lib/techUnit";
 
-type Page<T> = { items: T[]; nextCursor?: string | null };
+type Page<T> = { items: T[]; nextCursor?: string | null; total?: number };
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
   if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
   throw e;
 });
 const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || !!e.error.fieldErrors.id);
 
-/** The readings of a metric in the period, newest first: up to `pages` pages of 100 (telemetry.series pages its query). */
-async function series(unitId: string, metric: OpInput<"telemetry.series">["metric"], from: number, to: number, pages: number): Promise<Point[]> {
+/** The readings of a metric in the period, newest first: up to `pages` pages of 100 (telemetry.series pages its query),
+ * with how many the period holds, so a cut series says what is not loaded (IR598). */
+async function series(unitId: string, metric: OpInput<"telemetry.series">["metric"], from: number, to: number, pages: number): Promise<{ items: Point[]; total: number }> {
   const out: Point[] = [];
+  let total = 0;
   let cursor: string | null | undefined;
   for (let page = 0; page < pages; page++) {
     const r: Page<Point> = await coreOp<Page<Point>>("telemetry.series", {
       from: new Date(from).toISOString(), to: new Date(to + 1000).toISOString(), unitIds: [unitId], metric, query: { limit: 100, sort: { field: "observedAt", direction: "desc" }, ...(cursor ? { cursor } : {}) },
     });
     out.push(...r.items);
+    if (page === 0) total = r.total ?? 0;
     cursor = r.nextCursor;
     if (!cursor) break;
   }
-  return out;
+  return { items: out, total: Math.max(total, out.length) };
 }
+const NONE = { items: [] as Point[], total: 0 };
 
 export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: string; period?: string }) {
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
@@ -67,8 +71,8 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const [alerts, jobs, points, more, devices] = await Promise.all([
     optional(coreOp<Page<ApiAlert>>("alerts.list", { limit: 50, filters: { unitId: id } }).then((r) => r.items), [] as ApiAlert[]),
     optional(coreOp<Page<ApiTechJobRow>>("jobs.list", { limit: 20, filters: { unitId: id } }).then((r) => r.items), [] as ApiTechJobRow[]),
-    optional(series(id, metric, from, to, 4), [] as Point[]),
-    Promise.all(others.map((m) => optional(series(id, m, from, to, 1), [] as Point[]))),
+    optional(series(id, metric, from, to, 4), NONE),
+    Promise.all(others.map((m) => optional(series(id, m, from, to, 1), NONE))),
     tab === "monitoring" ? optional(coreOp<Page<{ id: string }>>("devices.list", { limit: 5, filters: { unitId: id } }).then((r) => r.items), []) : Promise.resolve([]),
   ]);
   const events = (await Promise.all(devices.map((x) => optional(coreOp<Page<ApiDeviceEventFull>>("devices.events", {
@@ -84,8 +88,8 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
     periods: PERIODS.map((p) => ({ id: p, label: t(p) })),
     stopped: stoppedBanner(d, nowMs, i),
     register: registerRows(d, i), components: componentCards(d, i), componentCount: d.components.length,
-    tiles: liveTiles(d, nowMs, i), chart: seriesChart(metric, unitOf(metric), points, period, nowMs, i),
-    others: otherMetrics(d, metric, Object.fromEntries(others.map((m, k) => [m, more[k]])), period, nowMs, i),
+    tiles: liveTiles(d, nowMs, i), chart: seriesChart(metric, unitOf(metric), points.items, period, nowMs, i, points.total),
+    others: otherMetrics(d, metric, Object.fromEntries(others.map((m, k) => [m, more[k].items])), period, nowMs, i, Object.fromEntries(others.map((m, k) => [m, more[k].total]))),
     events: windowEvents(alerts, events, period, nowMs, i),
     history: jobRows(jobs, i), alerts: openAlerts(alerts, nowMs, i).map((a) => ({ ...a, href: `${alertsHref}${job ? "&" : "?"}alertId=${a.id}` })), alertsHref,
     controlHref: control ? `/technician/units/${id}/control?jobId=${control}` : null,

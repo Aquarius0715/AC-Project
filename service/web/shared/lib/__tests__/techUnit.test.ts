@@ -72,11 +72,23 @@ describe("technician unit screen", () => {
     ];
     const c = seriesChart("temperature", "°C", items, "24h", NOW);
     expect(c.points).toEqual([25, 26, null, null, null, null, null, null, null, null, null, 24.5]); // the suspect reading is not plotted
-    expect([c.title, c.labels[0], c.labels[4], c.count, c.empty]).toEqual(["Temperature (°C) · last 24 h (rolling)", "9:35 am", "now", "4 measurements in this period", false]);
+    expect([c.title, c.labels[0], c.labels[4], c.count, c.cut, c.empty]).toEqual(["Temperature (°C) · last 24 h (rolling)", "13 Sept, 9:35 am", "now", "4 measurements in this period", null, false]); // the 24 h axis starts with its day (IR598)
+    expect(seriesChart("temperature", "°C", items, "1h", NOW).labels[0]).toBe("8:35 am");
     expect(c.gap).toBe("no data 13 Sept, 1:35 pm – 14 Sept, 7:35 am MYT (gap not connected)");
     const week = seriesChart("temperature", "°C", [], "7d", NOW);
     expect([week.title, week.labels[0], week.empty, week.gap, week.count]).toEqual(["Temperature (°C) · last 7 days (Kuala Lumpur calendar days)", "8 Sept", true, null, "0 measurements in this period"]);
-    expect(otherMetrics(unit, "temperature", { power: [{ value: 1.2, observedAt: "2026-09-14T01:30:00Z" }] }, "24h", NOW).map((x) => [x.metric, x.value, x.tone, x.points[11]])).toEqual([["power", "1.2 kW", undefined, 1.2], ["humidity", "60.0 % (stale)", "warn", null]]);
+    expect(otherMetrics(unit, "temperature", { power: [{ value: 1.2, observedAt: "2026-09-14T01:30:00Z" }] }, "24h", NOW).map((x) => [x.metric, x.value, x.tone, x.points[11], x.cut])).toEqual([["power", "1.2 kW", undefined, 1.2, false], ["humidity", "60.0 % (stale)", "warn", null, false]]);
+  });
+
+  it("says what a cut series does not load instead of counting the period (IR598)", () => {
+    // 400 of the period's 1440 minute readings were loaded: the start of the chart is blank because nothing older was read
+    const items = Array.from({ length: 400 }, (_, k) => ({ value: 24, observedAt: new Date(NOW - k * 60_000).toISOString() }));
+    const c = seriesChart("temperature", "°C", items, "24h", NOW, undefined, 1440);
+    expect([c.count, c.cut, c.gap]).toEqual([null, "Showing the latest 400 of 1440 readings — earlier readings in this period are not loaded.", null]);
+    expect(seriesChart("temperature", "°C", items, "24h", NOW, MS, 1440).cut).toBe("Menunjukkan 400 bacaan terkini daripada 1440 — bacaan lebih awal dalam tempoh ini tidak dimuatkan.");
+    expect(seriesChart("temperature", "°C", items.slice(0, 60), "1h", NOW, undefined, 60)).toMatchObject({ count: "60 measurements in this period", cut: null });
+    const power = Array.from({ length: 100 }, (_, k) => ({ value: 1, observedAt: new Date(NOW - k * 60_000).toISOString() }));
+    expect(otherMetrics(unit, "temperature", { power }, "24h", NOW, undefined, { power: 1440 }).map((x) => [x.metric, x.cut])).toEqual([["power", true], ["humidity", false]]);
   });
 
   it("lists the period's alert and device events, newest first", () => {

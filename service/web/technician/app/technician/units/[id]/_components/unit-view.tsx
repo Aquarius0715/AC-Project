@@ -78,6 +78,7 @@ export function TechUnitView({ live }: { live: UnitLive }) {
               {live.others.map((m) => (
                 <Card key={m.metric} title={m.label} action={<b className={cx("text-[13px]", m.tone === "warn" && "text-warn")}>{m.value}</b>}>
                   {m.points.every((v) => v === null) ? <p className="text-xs text-muted-foreground">{t("No valid readings in this period.")}</p> : <LineChart points={m.points} height={56} />}
+                  {m.cut && <p className="mt-1 text-[11px] font-semibold text-warn">{t("Earlier readings are not loaded")}</p>}
                   <div className="mt-1 flex justify-between gap-2 text-[11px] text-muted-foreground"><span>{m.sub}</span><Plain type="button" className="font-semibold text-primary" onClick={() => patch({ metric: m.metric })}>{t("Chart")} <Icon name="arrowRight" /></Plain></div>
                 </Card>
               ))}
@@ -111,6 +112,7 @@ function Series({ chart }: { chart: SeriesChart }) {
   return (
     <div className="mt-3">
       {chart.empty ? <div className="rounded-xl border border-dashed border-line p-6 text-center text-[13px] text-muted-foreground">{t("No valid readings in this period.")}</div> : <LineChart points={chart.points} height={200} labels={chart.labels} />}
+      {chart.cut && <p className="mt-2 text-xs font-semibold text-warn">{chart.cut}</p>}
       <p className="mt-1 text-[11px] text-muted-foreground">{[chart.count, chart.gap, t("Gaps in missing data are not connected by lines. Reordered or duplicate demo events never roll values backward.")].filter(Boolean).join(" · ")}</p>
     </div>
   );

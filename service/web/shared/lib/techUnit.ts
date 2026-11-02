@@ -111,10 +111,12 @@ export function stoppedBanner(d: ApiTechUnit, nowMs: number, i: I18n = EN): stri
     : i.t("No data has reached the server from this unit yet — nothing here is real-time.");
 }
 
-export type SeriesChart = { title: string; points: (number | null)[]; labels: string[]; gap: string | null; count: string; empty: boolean };
+export type SeriesChart = { title: string; points: (number | null)[]; labels: string[]; gap: string | null; count: string | null; cut: string | null; empty: boolean };
 /** One metric over the period: 12 equal slots with the latest valid reading in each (stale, suspect and missing ones
- * are not plotted), the empty slots between readings named as a gap that stays unconnected. */
-export function seriesChart(metric: string, unit: string, items: Point[], p: Period, nowMs: number, i: I18n = EN): SeriesChart {
+ * are not plotted), the empty slots between readings named as a gap that stays unconnected. When the period holds more
+ * readings (`total`) than the screen loaded, it says that the earlier ones are not loaded instead of counting the period
+ * (IR598, as IR592 on the customer's air chart); the 24 h axis starts with its day. */
+export function seriesChart(metric: string, unit: string, items: Point[], p: Period, nowMs: number, i: I18n = EN, total = items.length): SeriesChart {
   const { t, display } = i;
   const { from, to } = periodRange(p, nowMs);
   const points = bucket(items, new Date(from), new Date(to), 12);
@@ -127,26 +129,29 @@ export function seriesChart(metric: string, unit: string, items: Point[], p: Per
     while (points[end + 1] === null) end++;
     gap = t("no data {span} (gap not connected)", { span: showSpan(new Date(from + k * slot).toISOString(), new Date(from + (end + 1) * slot).toISOString(), display) });
   }
-  const start = p === "7d" ? showDayMonth(new Date(from).toISOString(), { ...display, timeZone: "Asia/Kuala_Lumpur" }) : showClock(new Date(from).toISOString(), display, false);
+  const at = new Date(from).toISOString();
+  const start = p === "7d" ? showDayMonth(at, { ...display, timeZone: "Asia/Kuala_Lumpur" }) : p === "24h" ? `${showDayMonth(at, display)}, ${showClock(at, display, false)}` : showClock(at, display, false);
+  const cut = total > items.length;
   const name = `${label(metric, t)}${unit ? ` (${unit})` : ""}`;
   return {
     title: p === "7d" ? t("{metric} · last 7 days (Kuala Lumpur calendar days)", { metric: name }) : t("{metric} · last {period} (rolling)", { metric: name, period: t(p === "1h" ? "1 h" : "24 h") }),
     points, labels: [start, "", "", "", t("now")], gap, empty: points.every((v) => v === null),
-    count: t(items.length === 1 ? "1 measurement in this period" : "{n} measurements in this period", { n: items.length }),
+    count: cut ? null : t(items.length === 1 ? "1 measurement in this period" : "{n} measurements in this period", { n: items.length }),
+    cut: cut ? t("Showing the latest {n} of {total} readings — earlier readings in this period are not loaded.", { n: items.length, total }) : null,
   };
 }
 
-export type MiniMetric = { metric: string; label: string; value: string; sub: string; points: (number | null)[]; tone?: "warn" };
+export type MiniMetric = { metric: string; label: string; value: string; sub: string; points: (number | null)[]; cut: boolean; tone?: "warn" };
 /** Up to three other metrics of the unit with their latest value and the period's slots (Figma: humidity, power,
- * supply air). */
-export function otherMetrics(d: ApiTechUnit, shown: string, series: Record<string, Point[]>, p: Period, nowMs: number, i: I18n = EN): MiniMetric[] {
+ * supply air); `cut` when the period holds more readings (`totals`) than were loaded (IR598). */
+export function otherMetrics(d: ApiTechUnit, shown: string, series: Record<string, Point[]>, p: Period, nowMs: number, i: I18n = EN, totals: Record<string, number> = {}): MiniMetric[] {
   const { t } = i;
   const { from, to } = periodRange(p, nowMs);
   return d.latestMeasurements.filter((m) => m.metric !== shown).slice(0, 3).map((m) => ({
     metric: m.metric, label: label(m.metric, t), tone: m.quality !== "valid" ? "warn" as const : undefined,
     value: m.value === null ? "—" : `${airNumber(m.metric, m.value)} ${m.unit}${m.quality !== "valid" ? ` (${t(QUALITY[m.quality] ?? m.quality)})` : ""}`,
     sub: t(d.connection !== "online" ? "last known · observed {time}" : "observed {time}", { time: relativeTime(m.observedAt, nowMs, i) }),
-    points: bucket(series[m.metric] ?? [], new Date(from), new Date(to), 12),
+    points: bucket(series[m.metric] ?? [], new Date(from), new Date(to), 12), cut: (totals[m.metric] ?? 0) > (series[m.metric]?.length ?? 0),
   }));
 }
 

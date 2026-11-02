@@ -1497,6 +1497,7 @@ export const ms: Record<string, string> = {
   "{time} yesterday": "{time} semalam",
   "Not loaded": "Tidak dimuatkan",
   "Earlier readings are not loaded": "Bacaan lebih awal tidak dimuatkan",
+  "Showing the latest {n} of {total} readings — earlier readings in this period are not loaded.": "Menunjukkan {n} bacaan terkini daripada {total} — bacaan lebih awal dalam tempoh ini tidak dimuatkan.",
   "Gap — not joined": "Jurang — tidak disambung",
   "{n} reading": "{n} bacaan",
   "{n} readings": "{n} bacaan",
