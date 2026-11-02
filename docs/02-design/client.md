@@ -220,7 +220,7 @@ Scope: FR-C05 / Main display pattern: **UI-FORM**. Service boundary: `automation
    - Phase 1A uses only synthetic events for location data.
    - Lifestyle-pattern inference is a demo; do not collect real personal behavior histories.
    - Missing condition data does not count as a match. Every “Only if” condition must hold too; when a rule's own trigger held but it could not run, the run log keeps the reason and the list shows the last skip (IR215).
-3. Withdrawing consent disables related condition rules. Do not show already issued Commands as cancelled. Manual actions remain available within permissions.
+3. Withdrawing consent disables related condition rules. Do not show already issued Commands as cancelled. Manual actions remain available within permissions. As built (IR619): the list's consent card warns, with the count, only when a withdrawal turned location automations off. Otherwise it says plainly that location automations cannot run until consent is given again, and Grant consent is a secondary button beside the page's Create automation.
 4. Queries to update: `consents / automations / simulation results / audit`。
 5. The action options follow the unit's capabilities: power, temperature, mode and fan when the AC can be controlled, and ventilation on a model with a fresh-air function. A saved action is kept unchanged when the rule is edited (IR314).
 

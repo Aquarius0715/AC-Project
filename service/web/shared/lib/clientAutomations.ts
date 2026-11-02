@@ -400,12 +400,16 @@ export function testFact(d: Draft): Omit<OpInput<"automations.simulate">["facts"
   }
 }
 
-/** The location consent card (Figma 03a/03f); its times in the user's display time zone (IR44). */
+/** The location consent card (Figma 03a/03f); its times in the user's display time zone (IR44). A withdrawal warns only
+ * when it turned location automations off; otherwise the card is plain (IR619). */
 export function consentCard(c: ApiConsent | null, locationRules: number, disabledByConsent: number, i: I18n = EN): { granted: boolean; title: string; text: string; tone: "ok" | "warn" | "muted" } {
   const { t } = i;
   if (!c) return { granted: false, title: t("Not recorded"), text: t("No location consent record exists for your account — location automations cannot be used."), tone: "muted" };
   if (c.granted) {
     return { granted: true, title: t("Granted"), tone: "ok", text: t(locationRules === 1 ? "Granted {when} · used only by {n} location automation · demo location events (no real GPS history)." : "Granted {when} · used only by {n} location automations · demo location events (no real GPS history).", { when: showTime(c.grantedAt, i.display), n: locationRules }) };
+  }
+  if (c.revokedAt && disabledByConsent === 0) { // a choice, not a fault: nothing was turned off (IR619)
+    return { granted: false, title: t("Revoked"), tone: "muted", text: t("Withdrawn {when} · location automations cannot run until you grant it again. Manual control and schedules are unaffected.", { when: showTime(c.revokedAt, i.display) }) };
   }
   if (c.revokedAt) {
     return { granted: false, title: t("Revoked"), tone: "warn", text: t(disabledByConsent === 1 ? "Withdrawn {when} · {n} location automation was turned off and will not run. Granting consent again does NOT turn them back on automatically — you re-enable each one. Manual control is unaffected." : "Withdrawn {when} · {n} location automations were turned off and will not run. Granting consent again does NOT turn them back on automatically — you re-enable each one. Manual control is unaffected.", { when: showTime(c.revokedAt, i.display), n: disabledByConsent }) };

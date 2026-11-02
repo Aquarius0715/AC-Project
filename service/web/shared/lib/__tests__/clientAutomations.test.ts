@@ -63,6 +63,11 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
     ]);
     expect(eventTest({ unitId: "u1", decision: "suppressed", ruleId: null, reason: "offline" }, "a1", new Map(), "Bedroom AC", { kind: "set_power", power: true }, "2026-09-14T01:00:00Z", MS))
       .toMatchObject({ title: "Isn, 14 Sep, 09:00 MYT — tidak dihantar", detail: "Tiada apa-apa akan dihantar: AC di luar talian" });
+    // a withdrawal that turned nothing off is plain; one that did warns, with the count (IR619)
+    const revoked = { id: "c", version: 3, granted: false, grantedAt: null, revokedAt: "2026-09-20T01:49:00Z" };
+    expect(consentCard(revoked, 0, 0)).toMatchObject({ tone: "muted", text: "Withdrawn 20 Sept 2026, 9:49 am MYT · location automations cannot run until you grant it again. Manual control and schedules are unaffected." });
+    expect(consentCard(revoked, 2, 2)).toMatchObject({ tone: "warn", text: expect.stringMatching(/^Withdrawn 20 Sept 2026, 9:49 am MYT · 2 location automations were turned off/) });
+    expect(consentCard(revoked, 0, 0, MS).text).toMatch(/^Ditarik balik .* automasi lokasi tidak boleh berjalan/);
     expect(consentCard({ id: "c", version: 2, granted: true, grantedAt: "2026-09-10T02:00:00Z", revokedAt: null }, 1, 0, MS)).toMatchObject({ title: "Diberikan", text: "Diberikan 10 Sep 2026, 11:00 PG GMT+9 · digunakan hanya oleh 1 automasi lokasi · peristiwa lokasi demo (tiada sejarah GPS sebenar)." });
     expect([runClock("2026-09-14T14:00:00Z"), runClock("2026-09-14T14:00:00Z", "Asia/Tokyo")]).toEqual(["22:00 MYT", "23:00 GMT+9"]);
   });

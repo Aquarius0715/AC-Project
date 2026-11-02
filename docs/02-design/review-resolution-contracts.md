@@ -8650,3 +8650,16 @@ Found in the UX loop (UX-36), after IR617. The `Plain` buttons that are neither 
 5. **Tests.**
    - `touch.test.tsx` covers the `touch` flag.
    - On the development stack, the customer's location tree at 1280 with touch had 44×44 edit buttons and whole names, while with a mouse at 1920 it was unchanged. HQ's tree on a touch tablet had 44 px rows, menus and Add links. axe passed.
+
+## IR619 Withdrawn location consent does not alarm a customer who has no location automations — 2026-11-02
+
+Found in the UX loop (UX-37, the customer's automations and schedules). The location consent card sat above the list as a red, error-like box: "Revoked · Withdrawn 20 Sept 2026, 9:49 am MYT · 0 location automations were turned off and will not run. Granting consent again does NOT turn them back on automatically…". Its blue Grant consent button competed with Create automation. A customer who only wants a weekday schedule read an alarm about something they never used, and the count of zero said nothing.
+
+1. **Plain when nothing was turned off.** A withdrawal that turned no location automation off shows a muted card: "Withdrawn {when} · location automations cannot run until you grant it again. Manual control and schedules are unaffected."
+2. **Warning when there is something to fix.** A withdrawal that did turn some off keeps the count and the re-enable note, as a warning with an amber border, not the red of an error. This matches Figma Client 03f.
+3. **One primary action.** Grant consent is primary only where it is the remedy: location automations turned off, or the editor of a location automation. Otherwise the page's one primary action is Create automation.
+4. **Design.** DD-C05 says the same. The Malay dictionary follows.
+5. **Tests.**
+   - `clientAutomations.test.ts` covers both withdrawn cards, in English and Malay.
+   - `automations.e2e.ts` passes.
+   - On the development stack, customer-a created a Sunday pre-cool schedule, switched it on, edited it and deleted it at 1920 and 1280, with the plain card. The confirmations and the next run ("Sun, 27 Sept, 06:00 MYT") read clearly, and axe passed.

@@ -41,9 +41,11 @@ function ConsentCard({ live, compact }: { live: AutomationsLive; compact?: boole
   const c = live.consent;
   const flip = () => c.version !== null && run(() => updateConsent(!c.granted, c.version!), t(c.granted ? "Location consent withdrawn — location automations are off" : "Location consent granted"));
   const badge = <Badge tone={c.tone === "ok" ? "ok" : c.tone === "warn" ? "warn" : "muted"} icon={c.granted ? "check" : c.tone === "warn" ? "unsupported" : "dot"}>{c.title}</Badge>;
-  const action = c.version !== null && <Btn size="sm" variant={c.granted ? "secondary" : "primary"} disabled={pending} onClick={flip}>{t(c.granted ? (compact ? "Withdraw" : "Withdraw consent") : (compact ? "Grant" : "Grant consent"))}</Btn>;
+  // the page's one primary action is Create automation; granting is primary only where it is the remedy — location
+  // automations turned off by a withdrawal, or the editor of a location automation (IR619)
+  const action = c.version !== null && <Btn size="sm" variant={c.granted || (c.tone !== "warn" && !compact) ? "secondary" : "primary"} disabled={pending} onClick={flip}>{t(c.granted ? (compact ? "Withdraw" : "Withdraw consent") : (compact ? "Grant" : "Grant consent"))}</Btn>;
   return (
-    <div className={cx("rounded-2xl border p-4", c.tone === "warn" ? "border-crit bg-warn-soft/60" : compact ? "border-line bg-primary-soft/40" : "border-line bg-surface")}>
+    <div className={cx("rounded-2xl border p-4", c.tone === "warn" ? "border-warn bg-warn-soft/60" : compact ? "border-line bg-primary-soft/40" : "border-line bg-surface")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2 text-[13px]"><b className="inline-flex items-center gap-1.5">{!compact && <Icon name="location" />}{t(compact ? "Location consent" : "Location consent — for arrival/departure automations only")}</b>{badge}</div>
         {action}
