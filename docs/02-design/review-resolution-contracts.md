@@ -8484,3 +8484,11 @@ Decided by the user as DEC-90, the customer part of IR605 (UX-22). The air page 
 3. **Keyboard.** The air table scrolls inside its own region. axe found that region unreachable by keyboard (scrollable-region-focusable, serious). It now takes the focus and is named after the chart ("PM2.5 — last 7 days"), so a keyboard scrolls it.
 4. **Specifications.** DD-C07 and the deterministic paging rule say the same.
 5. **Tests.** `customerOverview.test.ts` covers the hourly points. `air-quality.e2e.ts` checks that a week reads no "Not loaded" hour and no cut-off notice, that the table's region takes the focus, and that axe passes. On the development stack the week table had 149 hourly rows, none unloaded.
+
+## IR608 The contractor's unit charts read the whole day — 2026-11-02
+
+Decided by the user as DEC-90, the contractor part of IR605. The diagnosis view of a unit drew the last 24 hours of two metrics in twelve 2-hour bars. It read only the newest 400 readings, so with minute readings the earlier bars came out empty.
+
+1. **Reads.** Each metric is read in one call as the day's hourly averages of the valid readings (`bucketMinutes` 60, IR605). Hours without a valid reading are left out, as before.
+2. **Design.** DD-P04's as-built note says so.
+3. **Check.** On the development stack, contractor-a opened Living room AC through a temporary accepted job at 1280 wide. Both charts drew all twelve bars, from yesterday 1:10 pm to 11:10 am, and axe passed. The temporary job was removed afterwards.

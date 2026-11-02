@@ -1,6 +1,7 @@
 // The reads of the contractor's unit view (FR-P04, FR-P08, DD-P04) through the DAL: units.get inside the accepted
 // offer's access window (contractor:accepted-valid-offer, IR169), its alerts, the company's jobs on it, the members
-// for the technician's name and the last 24 hours of two diagnosis metrics (telemetry.series). Outside the window the
+// for the technician's name and the last 24 hours of two diagnosis metrics (telemetry.series, the whole day as hourly
+// averages, IR608). Outside the window the
 // unit reads as not found; with the URL's jobId the page then shows that job's history snapshot (Figma: delegation
 // ended while open). Texts in the user's display language; every time is formatted here (IR280).
 import "server-only";
@@ -14,6 +15,8 @@ import { chart, chartMetrics, contextJob, evidenceRows, jobContext, pastWork, re
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 type Page<T> = { items: T[]; nextCursor?: string | null };
+/** telemetry.series with bucketMinutes: the period's averages (AirSeries.buckets, IR605). */
+type SeriesPage = Page<Point> & { buckets: { start: string; value: number | null; count: number }[] | null };
 type Point = { value: number | null; observedAt: string; quality?: string; unit?: string };
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
   if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
@@ -22,17 +25,11 @@ const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => 
 const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || !!e.error.fieldErrors.id);
 const minute = (ms: number) => new Date(ms).toISOString().slice(0, 16) + ":00Z";
 
-/** Up to 400 readings of a metric in the window, newest first (telemetry.series pages its query). */
+/** A metric over the window, whole: the hourly averages of its valid readings (bucketMinutes, IR605, IR608) — up to 400
+ * of the newest readings covered only the last hours of the day. */
 async function series(unitId: string, metric: OpInput<"telemetry.series">["metric"], from: number, to: number): Promise<Point[]> {
-  const out: Point[] = [];
-  let cursor: string | null | undefined;
-  for (let page = 0; page < 4; page++) {
-    const r: Page<Point> = await coreOp<Page<Point>>("telemetry.series", { from: minute(from), to: minute(to), unitIds: [unitId], metric, query: { limit: 100, sort: { field: "observedAt", direction: "desc" }, ...(cursor ? { cursor } : {}) } });
-    out.push(...r.items);
-    cursor = r.nextCursor;
-    if (!cursor) break;
-  }
-  return out;
+  const r = await coreOp<SeriesPage>("telemetry.series", { from: minute(from), to: minute(to), unitIds: [unitId], metric, bucketMinutes: 60, query: {} });
+  return (r.buckets ?? []).filter((b) => b.count > 0).map((b) => ({ value: b.value, observedAt: b.start }));
 }
 
 export async function loadUnit(id: string, jobId?: string) {
