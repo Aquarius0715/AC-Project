@@ -8501,3 +8501,16 @@ Decided by the user as DEC-90 (UX-loop proposal of UX-27). HQ's return dialog ha
 2. **Reason.** The ticked items lead the reason the technician reads: "Rework: <items>. <words>". The words stay required, and the whole reason must keep to 1000 characters ("{n} / 1000 characters with the ticked items"). A refused return takes focus to the reason (IR597). `jobs.review` and its input are unchanged.
 3. **Design.** DD-P05 says the same as built. Figma already drew the list.
 4. **Tests.** `partnerReview.test.ts` covers the items, ticked or not, in English and Malay, and the reason. HQ's tests pass on the shared helper unchanged. On the development stack, contractor-a returned a temporary report with one attention item and no photos. Both lines were ticked, the checkboxes were reachable by Tab, axe passed, and the stored reason read "Rework: Indoor unit — filter condition — attention (…); Photos — add more evidence. Please clean the filter again and add a photo." The temporary job was removed afterwards.
+
+## IR610 The customer overview says what is overdue and restricted — 2026-11-02
+
+Decided by the user as DEC-90 (UX-loop proposal of UX-09). An overdue invoice, and the cooling restriction it caused, appeared only under Contracts & payments. A customer who found the Lobby AC "not cooling enough" had no hint on the first screen.
+
+1. **Notice.** While an invoice is overdue, a warning notice above the overview's tiles says so:
+   - One overdue invoice: "Invoice INV-… is overdue — 120.00 MYR", with Pay now (the invoice).
+   - Several: "{n} invoices are overdue — {amount} in total", with View invoices (the overdue list).
+   - An active restriction they caused: "Cooling is limited to 24 °C or warmer on 1 unit until it is paid", or the units switched off. A scheduled restriction says "A restriction starts {time} unless it is paid — {policy}". The line links View restriction details, the restriction's own detail, as the unit page does (IR583).
+   - Nothing is shown when nothing is overdue, or after a restriction is released.
+2. **Reads.** The overview reads `invoices.list` (overdue only), `contracts.list` and `restrictions.forInvoice`, the reads the payments page makes. A member without billing access gets FORBIDDEN and sees no notice.
+3. **Design.** DD-C01 says the same as built. Figma's Client row 01 gains 01c with the notice. The Malay dictionary follows.
+4. **Tests.** `clientBilling.test.ts` covers one and several invoices, the temperature limit, power off, a scheduled and a released restriction, and Malay. `restriction-notice.e2e.ts` checks the overview's links up to the restriction's detail. On the development stack, Demo Customer A's overview showed both lines at 1920 and 1280, and axe passed.

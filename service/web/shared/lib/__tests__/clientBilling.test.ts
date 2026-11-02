@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { clientUserRows, inviteError, type ApiClientUser } from "@ac/web/lib/assets";
 import type { ApiInvoice } from "@ac/web/lib/billing";
 import {
+  dueNotice,
   clientInvoiceRows, contractCards, inquiryLines, noticeTimeline, noticeUnits, paymentLines, previewText, restrictionNotice, type ClientContract, type ClientPayment,
 } from "@ac/web/lib/clientBilling";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
@@ -92,5 +93,25 @@ describe("the customer's users in the display language (FR-C19, IR267)", () => {
 
   it("checks an invite address in either language", () => {
     expect([inviteError("bad", []), inviteError("lim@x.com", [{ email: "LIM@x.com" }], translator("ms")), inviteError("new@x.com", [])]).toEqual(["A valid email address (up to 254 characters)", "Sudah menjadi pengguna pelanggan ini", undefined]);
+  });
+});
+
+describe("the overview's notice (DEC-90, IR610)", () => {
+  const inv = (id: string, number: string, amountMinor: number) => ({ id, number, amountMinor, currency: "MYR" as const });
+  const limit = { id: "r1", state: "applied" as const, policy: { kind: "temperature_limit" as const, minimumCoolingSetpoint: 24 }, unitIds: ["u1"], executeAfter: "2026-09-15T00:00:00Z" };
+  it("names the overdue invoice and the restriction it caused, with where to act", () => {
+    expect(dueNotice([inv("i1", "INV-202608-0001", 12000)], { r: limit, invoiceId: "i1" })).toEqual([
+      { text: "Invoice INV-202608-0001 is overdue — 120.00 MYR", href: "/customer/payments/i1", link: "Pay now" },
+      { text: "Cooling is limited to 24 °C or warmer on 1 unit until it is paid", href: "/customer/payments/i1?tab=restriction&restrictionId=r1", link: "View restriction details" },
+    ]);
+  });
+  it("counts several invoices, words a power-off and a scheduled restriction, and says nothing when all is paid", () => {
+    const two = [inv("i1", "INV-1", 12000), inv("i2", "INV-2", 3050)];
+    expect(dueNotice(two, null)).toEqual([{ text: "2 invoices are overdue — 150.50 MYR in total", href: "/customer/payments?status=overdue", link: "View invoices" }]);
+    expect(dueNotice(two, { r: { ...limit, policy: { kind: "power_off" }, unitIds: ["u1", "u2"] }, invoiceId: "i1" })![1].text).toBe("2 units are switched off until it is paid");
+    expect(dueNotice(two, { r: { ...limit, state: "scheduled" }, invoiceId: "i1" })![1].text).toBe("A restriction starts 15 Sept 2026, 8:00 am MYT unless it is paid — Temperature limit — cooling setpoint ≥ 24 °C");
+    expect(dueNotice(two, { r: { ...limit, state: "released" }, invoiceId: "i1" })).toHaveLength(1); // a released restriction is not said
+    expect(dueNotice([], { r: limit, invoiceId: "i1" })).toBeNull();
+    expect(dueNotice([inv("i1", "INV-1", 12000)], { r: limit, invoiceId: "i1" }, MS_TOKYO)!.map((l) => l.link)).toEqual(["Bayar sekarang", "Lihat butiran sekatan"]);
   });
 });

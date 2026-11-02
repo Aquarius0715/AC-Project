@@ -6,6 +6,7 @@
 import { amount } from "@ac/web/lib/energy";
 import { billingMonth, businessDay, invoiceStatus, KL, type ApiContract, type ApiInquiry, type ApiInvoice, type ApiPayment, type InvoiceStatus } from "@ac/web/lib/billing";
 import { policyText, stateLabel, type ApiCommand, type ApiRestriction, type RestrictionState } from "@ac/web/lib/restrictions";
+import { money } from "@ac/web/lib/money";
 import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
 
 const en = translator("en");
@@ -161,4 +162,31 @@ export function previewText(channel: string, inv: { number: string; amount: stri
     : inv.status === "Processing" ? t("Hello, your payment for {number} ({amount}) is being processed. It is not paid yet.", p)
     : t(inv.status === "Overdue" ? "Hello, {number} ({amount}) was due on {date}. Pay with a demo card or view payment instructions in the app." : "Hello, {number} ({amount}) is due on {date}. Pay with a demo card or view payment instructions in the app.", p);
   return { subject, body };
+}
+
+// ---- the overview's notice (DEC-90, IR610) ----
+
+/** One line of the overview's notice: what is due or restricted, and where to act on it. */
+export type DueLine = { text: string; href: string; link: string };
+/** The customer overview's notice while something is due or restricted (DEC-90, IR610): the overdue invoice with Pay
+ * now — or how many are overdue and their total, with View invoices — and the restriction they caused, on how many
+ * units, with View restriction details: the restriction's own detail, as the unit page links it (IR583). Nothing when
+ * nothing is overdue. */
+export function dueNotice(overdue: Pick<ApiInvoice, "id" | "number" | "amountMinor" | "currency">[], restriction: { r: Pick<ApiRestriction, "id" | "state" | "policy" | "unitIds" | "executeAfter">; invoiceId: string } | null, i: I18n = EN): DueLine[] | null {
+  if (!overdue.length) return null;
+  const { t, display } = i;
+  const lines: DueLine[] = [overdue.length === 1
+    ? { text: t("Invoice {number} is overdue — {amount}", { number: overdue[0].number, amount: money(overdue[0].amountMinor, overdue[0].currency) }), href: `/customer/payments/${overdue[0].id}`, link: t("Pay now") }
+    : { text: t("{n} invoices are overdue — {amount} in total", { n: overdue.length, amount: money(overdue.reduce((sum, x) => sum + x.amountMinor, 0), overdue[0].currency) }), href: "/customer/payments?status=overdue", link: t("View invoices") }];
+  const r = restriction?.r;
+  if (r && live.includes(r.state)) {
+    const n = r.unitIds.length;
+    const text = r.state === "scheduled"
+      ? t("A restriction starts {time} unless it is paid — {policy}", { time: showTime(r.executeAfter, display), policy: policyText(r.policy, t) })
+      : r.policy.kind === "power_off"
+        ? t(n === 1 ? "{n} unit is switched off until it is paid" : "{n} units are switched off until it is paid", { n })
+        : t(n === 1 ? "Cooling is limited to {value} °C or warmer on {n} unit until it is paid" : "Cooling is limited to {value} °C or warmer on {n} units until it is paid", { n, value: r.policy.minimumCoolingSetpoint });
+    lines.push({ text, href: `/customer/payments/${restriction!.invoiceId}?tab=restriction&restrictionId=${r.id}`, link: t("View restriction details") });
+  }
+  return lines;
 }

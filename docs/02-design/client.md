@@ -84,6 +84,7 @@ Scope: FR-C01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `units.
    - Do not average different rooms' temperatures into a representative temperature.
    - Show temperature and humidity for the selected unit or each room's measurement point.
    - Show total energy for the period and current power at the latest observation time.
+   - As built (IR610, DEC-90): while an invoice is overdue, a notice above the tiles names it — or how many are overdue and their total — with Pay now (or View invoices). It also names the restriction the invoice caused and on how many units, with View restriction details, the restriction's own detail as the unit page links it (IR583). A scheduled restriction says when it starts. The notice reads `invoices.list` (overdue), `contracts.list` and `restrictions.forInvoice`, as the payments page does. A member without billing access, or a customer with nothing overdue, sees no notice (Figma Client 01c).
 3. Viewing does not change business state. Keep filters in the URL and restore them on Back.
 4. Queries to update: `units / telemetry / alerts (only on subscribed events)`.
 

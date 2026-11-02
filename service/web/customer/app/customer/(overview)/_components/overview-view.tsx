@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Badge, BarChart, Btn, Card, ConnBadge, Kpi, LineChart, Page, PowerBadge, Select, SeverityBadge, Tabs, TextLink } from "@ac/web/components/ui";
+import { Badge, Banner, BarChart, Btn, Card, ConnBadge, Kpi, LineChart, Page, PowerBadge, Select, SeverityBadge, Tabs, TextLink } from "@ac/web/components/ui";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { OVERVIEW_PERIODS, type OverviewPeriod } from "@ac/web/lib/customerOverview";
 import { showClock } from "@ac/web/lib/i18n";
@@ -46,6 +46,13 @@ export function OverviewView({ live }: { live: OverviewLive }) {
         </div>
       </div>
 
+      {live.due && ( // something is overdue or restricted: said where the customer first looks (DEC-90, IR610)
+        <Banner tone="warn">
+          <div className="flex flex-col gap-1">{live.due.map((l) => (
+            <div key={l.href} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"><span>{l.text}</span><TextLink href={l.href}>{l.link} <Icon name="arrowRight" /></TextLink></div>
+          ))}</div>
+        </Banner>
+      )}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Kpi label={t("Running")} badge={<PowerBadge s="running" />} value={c.powerOn} sub={live.propertyName ? t("{units} in {property} · latest observation", { units: units(c.total), property: live.propertyName }) : t("{units} · latest observation", { units: units(c.total) })} href="/customer/properties?powerState=on" link={t("View running units")} />

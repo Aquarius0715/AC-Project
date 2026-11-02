@@ -6,9 +6,11 @@
 // air-quality unit (telemetry.series). URL keys: propertyId, unitId, period (today, 7d, 30d). Texts and times in the
 // user's display language and time zone (coreDisplay, IR260).
 import "server-only";
-import { coreAll, coreDisplay, coreNow, coreOp } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
-import { unitPlaces } from "@ac/web/lib/clientBilling";
+import { dueNotice, unitPlaces, type ClientContract } from "@ac/web/lib/clientBilling";
+import type { ApiInvoice } from "@ac/web/lib/billing";
+import type { ApiRestriction } from "@ac/web/lib/restrictions";
 import { baselinesFor, dayRanges, periodRange } from "@ac/web/lib/clientEnergy";
 import { ruleCard, triggerOf, type ApiAutomation, type ApiConsent, type ApiOccurrence } from "@ac/web/lib/clientAutomations";
 import { metricCard, type ApiAirSeries } from "@ac/web/lib/air";
@@ -54,11 +56,25 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
     const page: ApiAirSeries = await coreOp("telemetry.series", { from: new Date(to - 86_400_000).toISOString(), to: new Date(to).toISOString(), unitIds: [air!.id], metric: "co2", bucketMinutes: 60, query: {} });
     return bucketPoints(page.buckets ?? []);
   };
+  // what is due or restricted (DEC-90, IR610): the overdue invoices and the restriction they caused, read as the payments
+  // page reads them; a member without billing access sees no notice
+  const due = (async () => {
+    const [overdue, contracts] = await Promise.all([coreAll<ApiInvoice>("invoices.list", { filters: { overdueOnly: true } }), coreAll<ClientContract>("contracts.list")]);
+    const k = contracts.find((c) => (c.activeRestrictionIds ?? []).length > 0 && overdue.some((x) => x.contractId === c.id));
+    let restriction: { r: ApiRestriction; invoiceId: string } | null = null;
+    if (k) {
+      const invoiceId = overdue.find((x) => x.contractId === k.id)!.id;
+      const page = await coreOp<{ items: ApiRestriction[] }>("restrictions.forInvoice", { invoiceId, query: { limit: 10 } });
+      const r = page.items.find((x) => (k.activeRestrictionIds ?? []).includes(x.id));
+      if (r) restriction = { r, invoiceId };
+    }
+    return dueNotice(overdue, restriction, i);
+  })().catch((e) => { if (e instanceof CoreError && (e.error.code === "FORBIDDEN" || e.error.code === "NOT_FOUND")) return null; throw e; });
   const inScope = automations.filter((a) => a.unitIds.some((u) => ids.includes(u))).sort((a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name));
   const shown = inScope.slice(0, 3);
-  const [summary, sums, co2, nexts] = await Promise.all([
+  const [summary, sums, co2, nexts, dueLines] = await Promise.all([
     coreOp<Summary>("summaries.get", { kind: "customer", filters }), energy, hasCo2 ? series() : Promise.resolve(null),
-    Promise.all(shown.map((a) => (a.kind === "schedule" && a.enabled ? coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: a.id, count: 8 }).then((o) => o.find((x) => x.phase === "schedule_start")?.at ?? null).catch(() => null) : Promise.resolve(null)))),
+    Promise.all(shown.map((a) => (a.kind === "schedule" && a.enabled ? coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: a.id, count: 8 }).then((o) => o.find((x) => x.phase === "schedule_start")?.at ?? null).catch(() => null) : Promise.resolve(null)))), due
   ]);
   const unitName = new Map(units.map((u) => [u.id, u.displayName]));
   const n = sel.scope.length;
@@ -67,6 +83,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
     : t(n === 1 ? "all {n} unit" : "all {n} units", { n });
   const roomOf = (u: OverviewUnit) => (u.spaceId ? spaces.find((s) => s.id === u.spaceId)?.name : null) ?? properties.find((p) => p.id === u.propertyId)?.name ?? t("Room");
   return {
+    due: dueLines,
     now: now.toISOString(), period: kind, periodLabel: t(periodLabel[kind]), note: periodNote(kind, period, i), asOf: summary.asOf, display,
     properties: properties.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name })), propertyId: sel.propertyId, propertyName: sel.propertyName,
     units: sel.inProperty.map((u) => ({ id: u.id, name: u.displayName })), unitId: sel.unitId,
