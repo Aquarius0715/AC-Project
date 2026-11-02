@@ -3160,6 +3160,7 @@ export const ms: Record<string, string> = {
   "{n} s ago": "{n} s lalu",
   "{n} min ago": "{n} min lalu",
   "{n} h ago": "{n} j lalu",
+  "{n} d ago": "{n} hari lalu",
   "Unbound": "Tidak terikat",
   "check running — waiting for the device": "semakan berjalan — menunggu peranti",
   "lost {time}": "terputus {time}",

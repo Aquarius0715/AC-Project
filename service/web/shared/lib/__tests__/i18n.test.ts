@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { intlTag, isLocale, showSpan, showTime, translate, translator, zonedInstant, zonedParts } from "@ac/web/lib/i18n";
+import { intlTag, isLocale, showRecent, showSpan, showTime, translate, translator, zonedInstant, zonedParts } from "@ac/web/lib/i18n";
 import { ms } from "@ac/web/lib/i18n-ms";
 import { ROLES } from "@ac/web/lib/nav";
 import { consentNote } from "@ac/web/lib/preferences";
@@ -108,5 +108,11 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     const at = "2026-09-14T01:00:00Z";
     expect([showTime(at), showTime(at, { locale: "ms", timeZone: "Asia/Kuala_Lumpur" }), showTime(at, { locale: "en", timeZone: "Asia/Tokyo" }), showTime(at, { locale: "en", timeZone: "UTC" })])
       .toEqual(["14 Sept 2026, 9:00 am MYT", "14 Sep 2026, 9:00 PG MYT", "14 Sept 2026, 10:00 am GMT+9", "14 Sept 2026, 1:00 am UTC"]);
+  });
+  it("shows a recent time alone on today and with its date on another day (IR613)", () => {
+    const at = "2026-09-14T00:30:00Z"; // 8:30 am in Kuala Lumpur
+    expect([showRecent(at, Date.parse("2026-09-14T10:00:00Z")), showRecent(at, Date.parse("2026-09-23T06:00:00Z")), showRecent(at, Date.parse("2026-09-13T17:00:00Z")), showRecent(null, 0)])
+      .toEqual(["8:30 am MYT", "14 Sept 2026, 8:30 am MYT", "8:30 am MYT", "—"]); // 13 Sept 17:00 UTC is already the 14th in Kuala Lumpur
+    expect(showRecent(at, Date.parse("2026-09-14T15:30:00Z"), { locale: "en", timeZone: "Asia/Tokyo" })).toBe("14 Sept 2026, 9:30 am GMT+9"); // the 15th in Tokyo
   });
 });

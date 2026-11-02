@@ -30,7 +30,10 @@ export function jobFor(unitId: string | null, jobs: TechJob[]): string | null {
 const ago = (iso: string | null, now: number, t: T) => {
   if (!iso) return t("never seen");
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  return s < 120 ? t("{n} s ago", { n: s }) : s < 7200 ? t("{n} min ago", { n: Math.round(s / 60) }) : t("{n} h ago", { n: Math.round(s / 3600) });
+  if (s < 120) return t("{n} s ago", { n: s });
+  if (s < 7200) return t("{n} min ago", { n: Math.round(s / 60) });
+  // past two days in days, not "222 h ago" (IR613)
+  return s < 172_800 ? t("{n} h ago", { n: Math.round(s / 3600) }) : t("{n} d ago", { n: Math.round(s / 86_400) });
 };
 /** One device of the list (Figma Technician 03, Admin 246:2): serial, connection, unit, firmware and its sensor count. */
 /** `unit` names the bound unit; a device not bound yet says so with its planned unit (D05, IR467). */

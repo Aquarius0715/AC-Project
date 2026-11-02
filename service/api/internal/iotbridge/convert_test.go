@@ -76,7 +76,7 @@ func TestEventIDIsOnePerReading(t *testing.T) {
 
 // TestUnknownDeviceIsRefused: a device that is not a demo link converts to nothing and says why.
 func TestUnknownDeviceIsRefused(t *testing.T) {
-	out, err := NewResolver(Links).Triggers(batch("device-no-sensor", 1), received)
+	out, err := NewResolver(Links).Triggers(batch("device-unknown", 1), received)
 	if err == nil || len(out) != 0 {
 		t.Fatalf("unknown device: %d triggers, err %v", len(out), err)
 	}
@@ -182,5 +182,31 @@ func TestToScenarioKeepsTheMinuteSlot(t *testing.T) {
 	late.Measurements[0].ObservedAt = now.Truncate(time.Minute).Add(-time.Minute)
 	if got := ToScenario(late, now, offset, margin); !got.Measurements[0].ObservedAt.Equal(slot) {
 		t.Errorf("late reading at %v, want %v", got.Measurements[0].ObservedAt, slot)
+	}
+}
+
+// TestLinksFollowTheFixture: the links are the fixture contract's devices (demoSeed.devices), each with its unit and its
+// connection there, so the simulator runs every fixture module and plays the connection the seed gives it (IR613).
+func TestLinksFollowTheFixture(t *testing.T) {
+	f, err := seed.Load("../../../../docs/04-agentic-sdlc/fixture-contract.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	devices := map[string]struct{ unit, connection string }{}
+	for _, d := range f.DemoSeed.Devices {
+		unit := ""
+		if d.UnitID != nil {
+			unit = *d.UnitID
+		}
+		devices[d.ID] = struct{ unit, connection string }{unit, d.Connection}
+	}
+	for _, l := range Links {
+		d, ok := devices[l.Device]
+		if !ok || d.unit != l.Unit || d.connection != l.Connection {
+			t.Errorf("%s: link %s/%s, fixture %+v", l.Device, l.Unit, l.Connection, d)
+		}
+	}
+	if len(Links) != len(devices) {
+		t.Errorf("%d links for %d fixture devices", len(Links), len(devices))
 	}
 }

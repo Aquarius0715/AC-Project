@@ -70,20 +70,22 @@ func TestCommandExpiryOnTheDeviceClock(t *testing.T) {
 	}
 }
 
-// TestStateTriggerFromAHeartbeat: a heartbeat with a state becomes the device's state report at the scenario time;
-// one without a state reports nothing; a device ID that is not a UUID is refused.
+// TestStateTriggerFromAHeartbeat: a heartbeat with a state becomes the device's state report at the scenario time; one
+// without a state becomes a report with no settings, which the API takes as heard only (IR528, IR613); a bad device ID
+// is an error.
 func TestStateTriggerFromAHeartbeat(t *testing.T) {
 	on, c := true, 24.0
 	dev := DeviceID("device-mock-cool-on")
 	at := time.Date(2026, 9, 15, 1, 30, 0, 0, time.UTC)
-	tr, ok, err := StateTrigger(devicesim.Heartbeat{DeviceID: dev.String(), State: &devicesim.ReportedState{Power: &on, Celsius: &c}}, at)
-	if err != nil || !ok || tr.EventType != "state" || tr.DeviceID == nil || *tr.DeviceID != dev || tr.State == nil || *tr.State.Celsius != 24 || !tr.OccurredAt.Equal(at) {
-		t.Fatalf("state trigger %+v ok=%v err=%v", tr, ok, err)
+	tr, err := StateTrigger(devicesim.Heartbeat{DeviceID: dev.String(), State: &devicesim.ReportedState{Power: &on, Celsius: &c}}, at)
+	if err != nil || tr.EventType != "state" || tr.DeviceID == nil || *tr.DeviceID != dev || tr.State == nil || *tr.State.Celsius != 24 || !tr.OccurredAt.Equal(at) {
+		t.Fatalf("state trigger %+v err=%v", tr, err)
 	}
-	if _, ok, _ := StateTrigger(devicesim.Heartbeat{DeviceID: dev.String()}, at); ok {
-		t.Error("a heartbeat without a state reports one")
+	tr, err = StateTrigger(devicesim.Heartbeat{DeviceID: dev.String()}, at)
+	if err != nil || tr.EventType != "state" || tr.State == nil || *tr.State != (devicesim.ReportedState{}) || !tr.OccurredAt.Equal(at) {
+		t.Errorf("a heartbeat without a state: %+v err=%v", tr, err)
 	}
-	if _, _, err := StateTrigger(devicesim.Heartbeat{DeviceID: "nope", State: &devicesim.ReportedState{}}, at); err == nil {
+	if _, err := StateTrigger(devicesim.Heartbeat{DeviceID: "nope", State: &devicesim.ReportedState{}}, at); err == nil {
 		t.Error("a bad device ID is accepted")
 	}
 }

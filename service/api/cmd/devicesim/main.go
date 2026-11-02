@@ -1,5 +1,6 @@
 // Command devicesim runs simulated IoT modules for the demo: each module publishes a telemetry batch every minute and a
-// heartbeat every 60 seconds to the MQTT broker, as backend-architecture §9 describes. The devices must already be
+// heartbeat every 60 seconds to the MQTT broker, as backend-architecture §9 describes; a device that is not online in
+// the fixture or the fleet sends neither (IR613). The devices must already be
 // registered (their IDs come from --device-ids); the broker login comes from MQTT_USER and MQTT_PASSWORD, because the
 // broker refuses anonymous clients (security loop, IR413).
 package main
@@ -44,10 +45,9 @@ func main() {
 		if name == "" {
 			continue
 		}
-		id := seed.ID(name).String()
-		m := devicesim.NewModule(*tenant, id, *firmware, seedOf(id)).Only(sensorsOf(name)...)
+		m, beating := fixtureModule(*tenant, name, *firmware)
 		modules = append(modules, m)
-		beats[m] = true
+		beats[m] = beating
 	}
 	if *withFleet {
 		fleet, err := devicesim.MockFleet()
@@ -133,6 +133,21 @@ func clientTag(tenant string) string {
 	return tenant
 }
 
+// fixtureModule is the module of a fixture device and whether it sends heartbeats. It plays its device's connection in
+// the fixture, as the mock fleet does (IR613): an online device reports its sensors and beats; one that is offline sends
+// neither readings nor heartbeats and leaves commands unanswered, so the demo shows its last known values. A device
+// without a link is taken as online.
+func fixtureModule(tenant, name, firmware string) (*devicesim.Module, bool) {
+	id := seed.ID(name).String()
+	m := devicesim.NewModule(tenant, id, firmware, seedOf(id)).Only(sensorsOf(name)...)
+	for _, l := range iotbridge.Links {
+		if l.Device == name && l.Connection != "online" {
+			return m.Behave("silent", "ignore", false), false
+		}
+	}
+	return m, true
+}
+
 // sensorsOf names the sensors a fixture device has (its bridge link), so it reports only those.
 func sensorsOf(device string) []string {
 	for _, l := range iotbridge.Links {
@@ -147,7 +162,7 @@ func sensorsOf(device string) []string {
 	return nil
 }
 
-// demoDevices are the fixture devices that report measurements (the links of internal/iotbridge).
+// demoDevices are the fixture devices (the links of internal/iotbridge), with or without sensors.
 func demoDevices() []string {
 	out := make([]string, 0, len(iotbridge.Links))
 	for _, l := range iotbridge.Links {

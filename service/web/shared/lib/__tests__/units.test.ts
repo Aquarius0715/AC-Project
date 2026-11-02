@@ -39,6 +39,10 @@ describe("unit commands and readings in the display language and time zone (FR-X
     expect(latest(d, "temperature")).toEqual({ text: "28.0 °C (stale)", at: "9:12 am MYT" });
     expect(latest(d, "temperature", ms, tokyo)).toEqual({ text: "28.0 °C (lapuk)", at: "10:12 am GMT+9" });
     expect([latest(d, "humidity"), latest(d, "power")]).toEqual([null, null]);
+    // with the scenario's now (IR613): the same day keeps the time alone, another day adds the date
+    expect(latest(d, "temperature", undefined, undefined, Date.parse("2026-09-14T09:00:00Z"))?.at).toBe("9:12 am MYT");
+    expect(latest(d, "temperature", undefined, undefined, Date.parse("2026-09-23T06:00:00Z"))?.at).toBe("14 Sept 2026, 9:12 am MYT");
+    expect(latest(d, "temperature", ms, tokyo, Date.parse("2026-09-23T06:00:00Z"))?.at).toBe("14 Sept 2026, 10:12 am GMT+9");
   });
 });
 

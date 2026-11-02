@@ -4,7 +4,7 @@
 // fixture unit.
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
-import { apiMode, coreAll, coreDisplay, coreOp, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { translator } from "@ac/web/lib/i18n";
 import { unitRowFromApi, type ApiUnit } from "@ac/web/lib/client";
 import type { ApiCommand, ApiUnitDetail } from "@ac/web/lib/units";
@@ -40,17 +40,18 @@ export default async function CustomerUnitPage({ params }: PageProps<"/customer/
     if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.fieldErrors.id)) notFound();
     throw e;
   }
-  const [room, policies, history, display, restriction] = await Promise.all([
+  const [room, policies, history, display, restriction, now] = await Promise.all([
     coreOp<{ items: ApiUnit[] }>("units.list", { limit: 100, filters: detail.spaceId ? { spaceId: detail.spaceId } : { unitIds: [id] } }),
     coreOp<{ items: ApiPolicy[] }>("policies.list", { limit: 100 }),
     coreOp<{ items: ApiCommand[] }>("commands.list", { unitId: id, query: { limit: 20 } }),
     coreDisplay(),
     detail.effectiveControlPolicy.state === "restricted" ? restrictionHref(id).catch(() => null) : Promise.resolve(null), // a link only, never a failure
+    coreNow(), // the scenario's now: a time of another day keeps its date (IR613)
   ]);
   const t = translator(display.locale);
   const severity: Record<string, string> = { critical: "Critical", warning: "Warning", normal: "Info" };
   const options: PolicyOption[] = policies.items
     .filter((p) => p.kind === "alert")
     .map((p) => ({ id: p.id, name: p.name, rule: `${p.metric} ${p.operator} ${p.threshold}${p.durationSeconds ? t(" for {n} s", { n: p.durationSeconds }) : ""} → ${p.severity && severity[p.severity] ? t(severity[p.severity]) : p.severity}` }));
-  return <UnitView id={id} detail={detail} room={room.items.map(unitRowFromApi)} policies={options} history={history.items} restrictionHref={restriction} />;
+  return <UnitView id={id} detail={detail} room={room.items.map(unitRowFromApi)} policies={options} history={history.items} restrictionHref={restriction} nowMs={now.getTime()} />;
 }

@@ -55,15 +55,18 @@ func CommandTopic(tenant, device uuid.UUID) string {
 	return devicesim.Topic(tenant.String(), device.String(), "cmd")
 }
 
-// StateTrigger turns a heartbeat into the device's state report (DemoTrigger state) at the given scenario time; a
-// heartbeat without a state reports nothing.
-func StateTrigger(hb devicesim.Heartbeat, at time.Time) (Trigger, bool, error) {
-	if hb.State == nil {
-		return Trigger{}, false, nil
-	}
+// StateTrigger turns a heartbeat into the device's state report (DemoTrigger state) at the given scenario time. A
+// heartbeat without a state, as a module that reads no air-conditioner settings sends it, is a report with no settings,
+// which the API takes as heard only (IR528): the device's last seen time follows its heartbeats, as the live module's
+// does (IR613).
+func StateTrigger(hb devicesim.Heartbeat, at time.Time) (Trigger, error) {
 	dev, err := uuid.Parse(hb.DeviceID)
 	if err != nil {
-		return Trigger{}, false, fmt.Errorf("device %q: %w", hb.DeviceID, err)
+		return Trigger{}, fmt.Errorf("device %q: %w", hb.DeviceID, err)
+	}
+	state := hb.State
+	if state == nil {
+		state = &devicesim.ReportedState{}
 	}
 	at = at.UTC()
 	return Trigger{
@@ -72,6 +75,6 @@ func StateTrigger(hb devicesim.Heartbeat, at time.Time) (Trigger, bool, error) {
 		OccurredAt: at,
 		EventType:  "state",
 		DeviceID:   &dev,
-		State:      hb.State,
-	}, true, nil
+		State:      state,
+	}, nil
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
@@ -25,10 +26,10 @@ func TestSeedIsPerDevice(t *testing.T) {
 	}
 }
 
-// TestDemoDevicesAreTheFixtureLinks: the simulator runs the four demo devices that report measurements, by fixture name.
+// TestDemoDevicesAreTheFixtureLinks: the simulator runs the five fixture devices, by fixture name (IR613).
 func TestDemoDevicesAreTheFixtureLinks(t *testing.T) {
 	names := demoDevices()
-	if len(names) != 4 || !strings.HasPrefix(names[0], "device-") {
+	if len(names) != 5 || !strings.HasPrefix(names[0], "device-") {
 		t.Fatalf("demo devices %v", names)
 	}
 	if seed.ID(names[0]).String() != "71f1fdc1-0d2b-516c-8bfa-bd8dfecd338b" {
@@ -54,5 +55,32 @@ func TestSensorsOfAFixtureDevice(t *testing.T) {
 	}
 	if sensorsOf("device-unknown") != nil {
 		t.Error("an unknown device has sensors")
+	}
+}
+
+// TestFixtureModulesPlayTheirConnection: an online fixture device reports and beats; the device that is offline in the
+// fixture (Meeting room AC's) sends no readings, no heartbeats and no command answers; a device without sensors only
+// beats (IR613).
+func TestFixtureModulesPlayTheirConnection(t *testing.T) {
+	at := time.Date(2026, 9, 15, 1, 30, 0, 0, time.UTC)
+	online, beats := fixtureModule("t", "device-online-rto", "v1")
+	if raw, err := online.Telemetry(at); err != nil || raw == nil || !beats {
+		t.Errorf("online: %s %v beats=%v", raw, err, beats)
+	}
+	offline, beats := fixtureModule("t", "device-offline-rto", "v1")
+	if raw, err := offline.Telemetry(at); err != nil || raw != nil || beats {
+		t.Errorf("offline: %s %v beats=%v", raw, err, beats)
+	}
+	cmd := []byte(`{"commandId":"c1","kind":"set_temperature","setpoint":25,"expiresAt":"2026-09-15T01:31:00Z"}`)
+	if ack, _, err := offline.Acknowledge(cmd, at); err != nil || ack != nil {
+		t.Errorf("offline answers a command: %s %v", ack, err)
+	}
+	if _, beats := fixtureModule("t", "device-unknown", "v1"); !beats {
+		t.Error("a device without a link is not taken as online")
+	}
+	// device-no-sensor (Bedroom AC B) has no sensors: its module only beats
+	bare, beats := fixtureModule("t", "device-no-sensor", "v1")
+	if raw, err := bare.Telemetry(at); err != nil || raw != nil || !beats {
+		t.Errorf("no sensors: %s %v beats=%v", raw, err, beats)
 	}
 }

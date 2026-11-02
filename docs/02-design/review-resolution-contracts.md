@@ -8554,3 +8554,26 @@ Decided by the user as DEC-90 (UX-loop proposal B-5 of UX-10). Unavailable days,
    - `partnerTeam.test.ts` covers the rows, the labels, the checks and the effect texts in English and Malay. `modal.test.tsx` covers `finalFocus`.
    - `team.e2e.ts` adds three days from today, shortens them to one, removes it, and checks axe and the focus. It also takes the exact name of "Unavailable days", which the rows' Remove buttons now contain.
    - On the development stack, contractor-a did the same at 1920 and 1280. They also removed the round-10 entry no screen could remove before ("E2E Signer · e2e-signin-…214616@example.com", 28 Sept).
+
+## IR613 The demo's fixture modules behave like real ones — 2026-11-02
+
+Decided by the user as DEC-90 (UX-loop proposal B-12 of UX-28). The simulated fixture modules sent readings every minute, but the bridge dropped their heartbeats, which carry no air-conditioner state. Living room AC, Lobby AC and Bedroom AC B therefore read "Online · last seen 14 Sept 2026" next to readings a minute old. Meeting room AC is offline in the seed, but the simulator still sent its readings and heartbeats. The real lab module (IR524–IR532) shows how a module without state reports: the bridge reports each heartbeat as a state with no settings, which the API takes as heard only (IR528).
+
+1. **Bridge.** `iotbridge.StateTrigger` turns a heartbeat without a state into the same heard-only report. The device's and its unit's last seen time then follow the heartbeats. A heartbeat with a state still reports that state.
+2. **Simulator.** The links of the fixture devices (`iotbridge.Links`) carry each device's connection in the seed. The simulator runs every fixture module by that connection, as it runs the mock fleet:
+   - An online module reports its sensors and beats.
+   - The offline one (device-offline-rto, Meeting room AC) sends neither readings nor heartbeats and leaves commands unanswered, so the demo shows its last known values.
+   - device-no-sensor (Bedroom AC B) is now run too. A module narrowed to no sensor sends only its heartbeat, where it used to send every sensor.
+3. **Scope.** The simulator and the bridge are development only (the `iot` profile): no API or contract change. CI's E2E stack runs without the simulator.
+4. **Times of another day (found in the walk-through).** Last seen and the confirmed setting now carry their date when they are not from today:
+   - The customer's unit page showed an offline AC's "Last seen 8:30 am MYT" and a setting "reported 8:59 am MYT", both from 14 Sept, on the 23rd, as if from today.
+   - The page now gets the scenario's now, and `showRecent` keeps the time alone on today and adds the date otherwise ("Last seen 14 Sept 2026, 8:30 am MYT."). The latest readings beside them follow the same rule (`latest(…, nowMs)`).
+   - HQ's and the technician's device views counted a long silence in hours ("last seen 222 h ago"). After two days they now count days ("9 d ago"; Malay "9 hari lalu").
+5. **Design.** Container design's `iot` profile row says the same.
+6. **Tests.**
+   - `TestStateTriggerFromAHeartbeat` checks the heard-only report.
+   - `TestLinksFollowTheFixture` keeps the links equal to the fixture contract's devices, units and connections.
+   - `TestFixtureModulesPlayTheirConnection` checks the online, offline and sensorless modules. `TestAModuleWithoutSensorsOnlyBeats` checks the module.
+   - `i18n.test.ts` covers `showRecent`, `units.test.ts` the readings' times and `techDevices.test.ts` hours and days.
+   - On the development stack, after restarting the bridge and the simulator, Living room AC, Lobby AC, Bedroom AC and Bedroom AC B were last seen within the minute, as the lab's live module is. Meeting room AC sent nothing more.
+   - The customer's unit pages and HQ's device detail were checked at 1920 and 1280, and axe passed.

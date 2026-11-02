@@ -173,6 +173,14 @@ function dayKey(ms: number, timeZone: string): string {
   }
 }
 
+/** A reading's or report's time: the time alone on the display's today, else the date and time, so a last seen of days
+ * ago never reads as today's (“8:30 am MYT” on 14 Sept is “14 Sept 2026, 8:30 am MYT” on the 23rd, IR613). `nowMs` is
+ * the scenario's now; “—” without a time. */
+export function showRecent(iso: string | null, nowMs: number, d: Display = DEFAULT_DISPLAY): string {
+  if (!iso) return "—";
+  return dayKey(Date.parse(iso), d.timeZone) === dayKey(nowMs, d.timeZone) ? showClock(iso, d) : showTime(iso, d);
+}
+
 /** “today 9:12 am MYT”, “yesterday …”, “tomorrow …” on the days next to now in the user's display time zone, else the
  * IR44 date and time: the relative day stands in for the date (IR260). */
 export function relativeTime(iso: string, nowMs: number, i: I18n = EN): string {

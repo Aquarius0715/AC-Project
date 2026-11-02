@@ -95,6 +95,17 @@ func TestOnlyNarrowsTheReadings(t *testing.T) {
 	}
 }
 
+// TestAModuleWithoutSensorsOnlyBeats: a module narrowed to no sensor sends no readings, and still its heartbeat (IR613).
+func TestAModuleWithoutSensorsOnlyBeats(t *testing.T) {
+	m := NewModule(tenant, device, "v1", 1).Only()
+	if raw, err := m.Telemetry(time.Now()); err != nil || raw != nil {
+		t.Errorf("readings %s %v", raw, err)
+	}
+	if raw, err := m.Beat(time.Now()); err != nil || raw == nil {
+		t.Errorf("heartbeat %s %v", raw, err)
+	}
+}
+
 // TestHeartbeatReportsTheState: a module that reports its state sends it with the heartbeat, and a set-temperature
 // command it applies changes the reported setpoint; a module that does not report sends no state.
 func TestHeartbeatReportsTheState(t *testing.T) {

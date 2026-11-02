@@ -4,7 +4,7 @@
 import { airNumber } from "@ac/web/lib/air";
 import type { Metric, RestrictionAction, UnitAction as AnyUnitAction, UnitSymbol } from "@ac/web/lib/contracts.gen";
 import { policyText } from "@ac/web/lib/restrictions";
-import { DEFAULT_DISPLAY, showClock, showTime, translator, type Display, type T } from "@ac/web/lib/i18n";
+import { DEFAULT_DISPLAY, showClock, showRecent, showTime, translator, type Display, type T } from "@ac/web/lib/i18n";
 
 type Mode = "cool" | "dry" | "fan";
 type Fan = "low" | "mid" | "high";
@@ -107,10 +107,12 @@ const qualityText: Record<string, string> = { missing: "missing", stale: "stale"
 
 /** The latest reading of a metric as text (IR213): a stale or suspect value keeps its quality beside it — shown, never
  * as a current value (D07); null without a reading or with a null value (no fallback to an older one). The time is the
- * IR44 time of day in the user's display time zone. */
-export function latest(d: ApiUnitDetail, metric: string, t: T = en, display: Display = DEFAULT_DISPLAY): { text: string; at: string } | null {
+ * IR44 time of day in the user's display time zone, with its date when it is not the scenario's today (`nowMs`, IR613). */
+export function latest(d: ApiUnitDetail, metric: string, t: T = en, display: Display = DEFAULT_DISPLAY, nowMs?: number): { text: string; at: string } | null {
   const m = d.latestMeasurements.find((x) => x.metric === metric);
-  return m && m.value !== null ? { text: `${airNumber(metric, m.value)} ${m.unit}${m.quality === "valid" ? "" : ` (${t(qualityText[m.quality] ?? m.quality)})`}`, at: showClock(m.observedAt, display) } : null;
+  // with the scenario's now, a reading of another day keeps its date (IR613)
+  const at = (iso: string) => (nowMs === undefined ? showClock(iso, display) : showRecent(iso, nowMs, display));
+  return m && m.value !== null ? { text: `${airNumber(metric, m.value)} ${m.unit}${m.quality === "valid" ? "" : ` (${t(qualityText[m.quality] ?? m.quality)})`}`, at: at(m.observedAt) } : null;
 }
 
 // Technician unit monitoring (FR-T02): the rolling series window for telemetry.series. The component groups of the 18

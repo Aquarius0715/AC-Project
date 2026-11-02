@@ -65,6 +65,9 @@ describe("deviceTiles", () => {
   it("reads an online device with the heartbeat age and the newer firmware", () => {
     const [conn, power, tamper, fw] = deviceTiles(detail(), "v2", NOW);
     expect(conn).toMatchObject({ value: "Online", dot: "ok", sub: "last seen 30 s ago" });
+    // a long silence reads in hours up to two days, then in days (IR613)
+    const seen = (lastSeenAt: string) => deviceTiles(detail({ connection: "offline", lastSeenAt }), "v2", NOW)[0].sub;
+    expect([seen("2026-09-13T00:05:00Z"), seen("2026-09-04T19:05:00Z")]).toEqual(["last seen 25 h ago", "last seen 9 d ago"]);
     expect(power).toMatchObject({ value: "ON", dot: "primary" });
     expect(tamper).toMatchObject({ value: "Clear", dot: "ok", sub: "no removal detected" });
     expect(fw).toMatchObject({ value: "v1", sub: "v2 available" });

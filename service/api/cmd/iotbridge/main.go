@@ -112,19 +112,17 @@ func subscribeDemo(client mqtt.Client, resolver *iotbridge.Resolver, clock *demo
 			}
 		}
 	})
-	// t/<tenantId>/d/<deviceId>/heartbeat: a module that reports its air conditioner's state carries it
+	// t/<tenantId>/d/<deviceId>/heartbeat: a module that reports its air conditioner's state carries it; one that does
+	// not is heard all the same (IR613)
 	sub("t/+/d/+/heartbeat", func(_ mqtt.Client, msg mqtt.Message) {
 		var hb devicesim.Heartbeat
 		if err := json.Unmarshal(msg.Payload(), &hb); err != nil {
 			log.Printf("heartbeat on %s: %v", msg.Topic(), err)
 			return
 		}
-		tr, ok, err := iotbridge.StateTrigger(hb, time.Now().Add(clock.offset()-clockMargin))
+		tr, err := iotbridge.StateTrigger(hb, time.Now().Add(clock.offset()-clockMargin))
 		if err != nil {
 			log.Printf("heartbeat from %s: %v", hb.DeviceID, err)
-			return
-		}
-		if !ok {
 			return
 		}
 		if err := send(httpc, endpoint, tr); err != nil {

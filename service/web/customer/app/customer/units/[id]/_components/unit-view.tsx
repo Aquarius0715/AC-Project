@@ -8,7 +8,7 @@ import { units, unitRowFromApi, type ApiUnit, type UnitRow } from "@ac/web/lib/c
 import { OpError } from "@ac/web/lib/ops";
 import { controlLayout, FAN_LABEL, historyRow, latest, MODE_LABEL, type ApiCommand, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
 import { waitForCommand } from "@ac/web/lib/unitCommands";
-import { showClock, showTime } from "@ac/web/lib/i18n";
+import { showRecent, showTime } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
 import { createCommand, setUnitAlertPolicies } from "../actions";
 import { RenameModal } from "../../../_components/rename-modal";
@@ -22,9 +22,10 @@ type Cmd = { id: string; text: string; when: string; bad?: boolean };
 const CONNECTION: Record<string, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
 const REASONS: Record<string, string> = { "errors.unit_busy": "another command is still waiting for this AC", "error.versionConflict": "this AC changed — reload and try again", "control.restriction_active": "a service restriction limits this setting", "control.reconciliation_required": "HQ is checking this AC" };
 
-/** Unit detail and remote control. In API mode the Server Component passes the unit, its room and the policies; the
- * texts and times follow the user's display language and time zone (FR-X01, IR44, IR259). */
-export function UnitView({ id, detail, room: roomRows, policies, history = [], restrictionHref = null }: { id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; history?: ApiCommand[]; restrictionHref?: string | null }) {
+/** Unit detail and remote control. In API mode the Server Component passes the unit, its room, the policies and the
+ * scenario's now; the texts and times follow the user's display language and time zone (FR-X01, IR44, IR259), and a
+ * time of another day keeps its date (IR613). */
+export function UnitView({ id, detail, room: roomRows, policies, history = [], restrictionHref = null, nowMs = 0 }: { id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; history?: ApiCommand[]; restrictionHref?: string | null; nowMs?: number }) {
   const t = useT();
   const display = useDisplay();
   const toast = useToast();
@@ -34,7 +35,7 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [], r
   const roomUnits = { data: roomRows ?? units };
   const apiPolicies = { data: policies ?? null };
   const mockUnit = units.find((u) => u.id === id) ?? units[0];
-  const unit = d ? { ...unitRowFromApi(d as unknown as ApiUnit), loc: d.location.pathLabels.join(" › "), obs: showClock(d.lastSeenAt, display) } : mockUnit;
+  const unit = d ? { ...unitRowFromApi(d as unknown as ApiUnit), loc: d.location.pathLabels.join(" › "), obs: showRecent(d.lastSeenAt, nowMs, display) } : mockUnit;
   const offline = unit.conn === "offline";
   const policy = d?.effectiveControlPolicy.state === "restricted" ? d.effectiveControlPolicy.policy : null;
   const restricted = d ? policy?.kind === "temperature_limit" : id === "unit-limited";
@@ -92,9 +93,9 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [], r
   const min = policy?.kind === "temperature_limit" ? Math.max(cap.min, policy.minimumCoolingSetpoint) : restricted ? 24 : cap.min;
   const max = cap.max;
   const confirmed = d ? d.observedState.celsius ?? "—" : 26;
-  const room = d ? latest(d, "temperature", t, display) : { text: "28.0 °C", at: "09:12:30" };
-  const hum = d ? latest(d, "humidity", t, display) : { text: "60 %", at: "09:12:30" };
-  const pow = d ? latest(d, "power", t, display) : { text: "742 W", at: "09:12:30" };
+  const room = d ? latest(d, "temperature", t, display, nowMs) : { text: "28.0 °C", at: "09:12:30" };
+  const hum = d ? latest(d, "humidity", t, display, nowMs) : { text: "60 %", at: "09:12:30" };
+  const pow = d ? latest(d, "power", t, display, nowMs) : { text: "742 W", at: "09:12:30" };
   const disabled = offline || blocked || (d !== null && !d.capabilities.control);
   const track = (c: ApiCommand) => setSent((xs) => [c, ...xs.filter((x) => x.id !== c.id)]);
   const reason = (key: string, code: string) => (REASONS[key] ? t(REASONS[key]) : code);
@@ -165,7 +166,7 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [], r
             {offline ? <Banner tone="warn">{t("This AC is offline. Remote actions are disabled until the connection returns. Last seen {when}.", { when: unit.obs })}</Banner> : (
               <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
                 <Stat label={t("Room temperature (measured)")} value={room?.text ?? "—"} sub={room ? t("observed {at}", { at: room.at }) : t("no recent measurement")} />
-                <Stat label={t("Confirmed setting")} value={d ? `${d.observedState.celsius ?? "—"}°C · ${modeWord(d.observedState.mode)} · ${fanWord(d.observedState.fanLevel)}` : `26°C · ${t("Cool")} · ${t("Mid")}`} sub={d ? t("reported {at}", { at: showClock(d.observedState.observedAt, display) }) : t("acknowledged by device")} />
+                <Stat label={t("Confirmed setting")} value={d ? `${d.observedState.celsius ?? "—"}°C · ${modeWord(d.observedState.mode)} · ${fanWord(d.observedState.fanLevel)}` : `26°C · ${t("Cool")} · ${t("Mid")}`} sub={d ? t("reported {at}", { at: showRecent(d.observedState.observedAt, nowMs, display) }) : t("acknowledged by device")} />
                 <Stat label={t("Humidity")} value={hum?.text ?? "—"} sub={hum ? t("observed {at}", { at: hum.at }) : t("no recent measurement")} />
               </div>
             )}

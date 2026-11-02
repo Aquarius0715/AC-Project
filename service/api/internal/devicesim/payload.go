@@ -85,13 +85,14 @@ func NewModule(tenantID, deviceID, firmware string, seed uint64) *Module {
 	return &Module{TenantID: tenantID, DeviceID: deviceID, Firmware: firmware, rng: rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)), setpoint: 24}
 }
 
-// Only narrows the module to the sensors its device has, by sensor name; unknown names are ignored.
+// Only narrows the module to the sensors its device has, by sensor name; unknown names are ignored. A device with none
+// (device-no-sensor) reports no readings, only its heartbeat (IR613).
 func (m *Module) Only(names ...string) *Module {
 	keep := map[string]bool{}
 	for _, n := range names {
 		keep[n] = true
 	}
-	var out []Sensor
+	out := []Sensor{}
 	for _, s := range Sensors {
 		if keep[s.ID] {
 			out = append(out, s)
@@ -130,7 +131,7 @@ func (m *Module) HeartbeatTopic() string { return Topic(m.TenantID, m.DeviceID, 
 // Telemetry takes one reading of every sensor at the given time and returns it as a batch; each reading gets the
 // next sequence number, so the backend can keep them in order and drop duplicates.
 //
-// The pattern changes the readings: silent sends nothing (nil), unit_mismatch reports the temperature in kelvin,
+// The pattern changes the readings: silent sends nothing (nil), as does a module without sensors; unit_mismatch reports the temperature in kelvin,
 // out_of_range reports an impossible temperature, missing reports no values, invalid_time stamps the readings an
 // hour ahead; a module whose air conditioner draws no power reports 0 kW.
 func (m *Module) Telemetry(at time.Time) ([]byte, error) {
@@ -145,6 +146,9 @@ func (m *Module) Telemetry(at time.Time) ([]byte, error) {
 	sensors := m.sensors
 	if sensors == nil {
 		sensors = Sensors
+	}
+	if len(sensors) == 0 { // a module without sensors sends only its heartbeat
+		return nil, nil
 	}
 	b := Batch{DeviceID: m.DeviceID, Measurements: make([]Measurement, 0, len(sensors))}
 	for _, s := range sensors {

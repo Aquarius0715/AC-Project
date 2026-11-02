@@ -18,20 +18,24 @@ const Scenario = "iot-demo"
 
 // Link ties one fixture device to its unit and to its sensors, by the sensor names the simulator uses.
 type Link struct {
-	Device  string            // fixture ID, e.g. device-online-rto
-	Unit    string            // fixture ID of the unit the device is bound to
-	Sensors map[string]string // simulator sensor name → fixture sensor ID
+	Device     string            // fixture ID, e.g. device-online-rto
+	Unit       string            // fixture ID of the unit the device is bound to
+	Sensors    map[string]string // simulator sensor name → fixture sensor ID
+	Connection string            // the device's connection in the fixture: a module that is not online sends nothing (IR613)
 }
 
-// Links are the four demo devices that report measurements, with the sensors each has in the fixture (the fifth,
-// device-no-sensor, reports none).
+// Links are the demo fixture's five devices with the sensors each has there (device-no-sensor has none: its module only
+// beats) and their connection.
 var Links = []Link{
 	{Device: "device-online-rto", Unit: "unit-online-rto", Sensors: map[string]string{"temperature": "sensor-online-temperature", "power": "sensor-online-power",
-		"humidity": "sensor-online-humidity", "co2": "sensor-online-co2", "pm25": "sensor-online-pm25"}},
+		"humidity": "sensor-online-humidity", "co2": "sensor-online-co2", "pm25": "sensor-online-pm25"}, Connection: "online"},
 	{Device: "device-tamper", Unit: "unit-non-rto", Sensors: map[string]string{"temperature": "sensor-tamper-temperature", "power": "sensor-tamper-power",
-		"humidity": "sensor-tamper-humidity"}},
-	{Device: "device-offline-rto", Unit: "unit-offline-rto", Sensors: map[string]string{"temperature": "sensor-offline-temperature", "power": "sensor-offline-power"}},
-	{Device: "device-limited", Unit: "unit-limited", Sensors: map[string]string{"temperature": "sensor-limited-temperature", "power": "sensor-limited-power"}},
+		"humidity": "sensor-tamper-humidity"}, Connection: "online"},
+	{Device: "device-offline-rto", Unit: "unit-offline-rto", Sensors: map[string]string{"temperature": "sensor-offline-temperature", "power": "sensor-offline-power"},
+		Connection: "offline"},
+	{Device: "device-limited", Unit: "unit-limited", Sensors: map[string]string{"temperature": "sensor-limited-temperature", "power": "sensor-limited-power"},
+		Connection: "online"},
+	{Device: "device-no-sensor", Unit: "unit-other-customer", Sensors: map[string]string{}, Connection: "online"},
 }
 
 // target is one link resolved to the IDs the API uses.
