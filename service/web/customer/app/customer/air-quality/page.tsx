@@ -1,7 +1,8 @@
 // /customer/air-quality (FR-C07, SCR-C07): in API mode a Server Component reads the customer's rooms (properties.list,
 // spaces.list, units.list), the selected unit's units.get (latest readings with read-time quality, capability sensors and
-// fresh-air function), telemetry.series of the selected metric and period — newest first, at most 1000 readings in 10
-// pages of 100 (D07), with the IR98 allergen observation — and the room's ventilation.list. Log ventilation is
+// fresh-air function), telemetry.series of the selected metric and period — the whole window in the chart's slots,
+// 5-minute or hourly averages of the valid readings (bucketMinutes, IR605, IR607), with the IR98 allergen
+// observation — and the room's ventilation.list. Log ventilation is
 // ventilation.log, a manual record that creates no Command and is not sent to HQ (IR110). URL keys: spaceId, unitId,
 // metric, period. Texts and times in the user's display language and time zone (IR266). The Phase 1A demo keeps the
 // fixtures.
@@ -11,27 +12,19 @@ import { i18nOf, showClock } from "@ac/web/lib/i18n";
 import type { ApiPropertyRow, ApiSpaceRow, ApiUnitRow } from "@ac/web/lib/assets";
 import { setsTemperature, type ApiUnitDetail } from "@ac/web/lib/units";
 import {
-  airGuidance, airMetrics, airPeriods, airRooms, airRows, airSelection, airSlots, airWindow, allergenView, axisLabels, axisRange, axisTicks, cleanNote, co2Now,
-  metricCard, metricInfo, ventRow, ventStrip, windowSub, windowTitle, type ApiAirSeries, type ApiMeasurement, type ApiVentilationLog,
+  airGuidance, airMetrics, airPeriods, airRooms, airRows, airSelection, airWindow, allergenView, axisLabels, axisRange, axisTicks, cleanNote, co2Now,
+  metricCard, metricInfo, ventRow, ventStrip, windowSub, windowTitle, type AirSlot, type AirWindow, type ApiAirSeries, type ApiVentilationLog,
 } from "@ac/web/lib/air";
 import { AirQualityDemo } from "./_components/air-quality-demo";
 import { AirQualityView, type AirLive } from "./_components/air-quality-view";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
-const MAX_READINGS = 1000; // D07: 10 pages of 100; a cut-off series is labelled, never shown as complete
-
-/** telemetry.series of one unit, newest first, following nextCursor up to MAX_READINGS. */
-async function readSeries(unitId: string, metric: OpInput<"telemetry.series">["metric"], from: string, to: string) {
-  const items: ApiMeasurement[] = [];
-  let cursor: string | null = null;
-  let total = 0;
-  let allergen: ApiAirSeries["allergenObservation"] = null;
-  do {
-    const page: ApiAirSeries = await coreOp("telemetry.series", { from, to, unitIds: [unitId], metric, query: { limit: 100, sort: { field: "observedAt", direction: "desc" }, ...(cursor ? { cursor } : {}) } });
-    items.push(...page.items);
-    ({ total, nextCursor: cursor, allergenObservation: allergen } = page);
-  } while (cursor && items.length < MAX_READINGS);
-  return { items, total, allergen };
+/** telemetry.series of one unit over the window, whole: the chart's slots — 5-minute averages for an hour or a day, hourly
+ * for 7 days — of the valid readings, with how many readings the window holds (IR605, IR607). */
+async function readSeries(unitId: string, metric: OpInput<"telemetry.series">["metric"], w: AirWindow) {
+  const page: ApiAirSeries = await coreOp("telemetry.series", { from: w.from, to: w.to, unitIds: [unitId], metric, bucketMinutes: w.slotMs === 300_000 ? 5 : 60, query: {} });
+  const slots: AirSlot[] = (page.buckets ?? []).map((b) => ({ start: b.start, avg: b.value, n: b.count }));
+  return { slots, total: page.total, allergen: page.allergenObservation };
 }
 
 export default async function CustomerAirQualityPage({ searchParams }: PageProps<"/customer/air-quality">) {
@@ -51,7 +44,7 @@ export default async function CustomerAirQualityPage({ searchParams }: PageProps
   const w = airWindow(period, now);
   const [d, series, logs] = await Promise.all([
     coreOp<ApiUnitDetail>("units.get", { id: sel.unitId }),
-    readSeries(sel.unitId, metric, w.from, w.to),
+    readSeries(sel.unitId, metric, w),
     sel.room.spaceId ? coreOp<{ items: ApiVentilationLog[]; total: number }>("ventilation.list", { filters: { spaceId: sel.room.spaceId }, limit: 10 }) : null,
   ]);
   const latest = (m: string) => d.latestMeasurements.find((x) => x.metric === m);
@@ -59,10 +52,7 @@ export default async function CustomerAirQualityPage({ searchParams }: PageProps
   const freshAir = d.capabilities.ventilation && d.capabilities.ventilationLevels.includes("low");
   const guidance = airGuidance(latest("co2"), latest("pm25"), freshAir);
   const roomName = sel.room.spaceId ? spaces.find((s) => s.id === sel.room.spaceId)?.name ?? i.t("this room") : sel.room.path; // outside rooms: the property
-  const slots = airSlots(series.items, w);
-  // a cut-off series loaded only its newest readings: what lies before the oldest one is not loaded, not a gap (IR592)
-  const loadedFrom = series.items.length < series.total ? series.items[series.items.length - 1]?.observedAt ?? null : null;
-  const notLoaded = (start: string) => loadedFrom !== null && Date.parse(start) + w.slotMs <= Date.parse(loadedFrom);
+  const slots = series.slots; // the whole window: never cut off, so no slot is "not loaded" (IR592 → IR607)
   const points = slots.map((s) => s.avg);
   const info = metricInfo[metric];
   const range = axisRange(points, info.guide);
@@ -76,9 +66,9 @@ export default async function CustomerAirQualityPage({ searchParams }: PageProps
     allergen: allergenView(series.allergen, i), metric, period,
     chart: {
       title: `${i.t(info.label)} — ${windowTitle(period, i.t)}`, sub: windowSub(w, info.unit, roomName, i), points, labels: axisLabels(w, i), guide: info.guide, ...range, ticks: axisTicks(range.min, range.max),
-      hasSensor: sensors.has(metric), readings: series.items.length, total: series.total, valid: slots.some((s) => s.avg !== null), gaps: slots.some((s) => s.avg === null && !notLoaded(s.start)),
+      hasSensor: sensors.has(metric), readings: series.total, total: series.total, valid: slots.some((s) => s.avg !== null), gaps: slots.some((s) => s.avg === null),
     },
-    rows: airRows(slots, metric, w.slotMs, i, loadedFrom), co2Now: co2Now(latest("co2"), display),
+    rows: airRows(slots, metric, w.slotMs, i, null), co2Now: co2Now(latest("co2"), display),
     history: logs ? { rows: logs.items.map((v) => ventRow(v, me.membershipId, names, now.getTime(), i)), total: logs.total } : null,
   };
   return <AirQualityView live={live} />;

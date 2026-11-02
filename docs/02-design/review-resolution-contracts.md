@@ -8474,3 +8474,13 @@ Decided by the user as DEC-90, the technician part of IR605. The unit page loade
 2. **Chart.** The averages are plotted in the chart's twelve slots, like readings. The footnote counts the period's readings ("1403 measurements in this period"). A complete series is never cut, so IR598's notices appear only when an hour is cut.
 3. **Design.** DD-T03 says the same as built.
 4. **Tests.** `techUnit.test.ts` checks that a complete series counts the period's readings and is not cut. On the development stack, Living room AC's day chart ran from yesterday's time to now, and its week chart counted 3720 readings.
+
+## IR607 The customer's air charts read their whole window — 2026-11-02
+
+Decided by the user as DEC-90, the customer part of IR605 (UX-22). The air page read at most 1000 readings in ten pages. A 24-hour chart therefore covered about 17 hours, and the 7-day chart the same 17 hours. IR592 labelled the rest "Not loaded". The overview's air card read at most 300 CO₂ readings for its 24 hourly points and then said "Chart from the latest 300 readings."
+
+1. **Air page.** The window is read in one call as the chart's own slots (`bucketMinutes`): 5-minute averages for an hour or a day, hourly ones for 7 days. The slots' averages, counts and gaps are the API's. The chart, the table and the readings count cover the whole window. IR592's cut-off notice and its "Not loaded" rows no longer occur, and the notice and its Malay entry are removed.
+2. **Overview.** The air card reads the last 24 hours as hourly averages (`bucketPoints`), whole. Its "latest 300 readings" note and the Malay entry are removed.
+3. **Keyboard.** The air table scrolls inside its own region. axe found that region unreachable by keyboard (scrollable-region-focusable, serious). It now takes the focus and is named after the chart ("PM2.5 — last 7 days"), so a keyboard scrolls it.
+4. **Specifications.** DD-C07 and the deterministic paging rule say the same.
+5. **Tests.** `customerOverview.test.ts` covers the hourly points. `air-quality.e2e.ts` checks that a week reads no "Not loaded" hour and no cut-off notice, that the table's region takes the focus, and that axe passes. On the development stack the week table had 149 hourly rows, none unloaded.

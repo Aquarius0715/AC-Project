@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  attentionCard, emissionsCard, energyCard, hourlyPoints, nextRunText, overviewRows, overviewScope, periodNote, periodOf, previousRange, whenText, type OverviewUnit,
+  attentionCard, bucketPoints, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodNote, periodOf, previousRange, whenText, type OverviewUnit,
 } from "@ac/web/lib/customerOverview";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiEnergySummary } from "@ac/web/lib/energy";
@@ -77,8 +77,9 @@ describe("customer overview", () => {
     expect([nextRunText("2026-09-14T10:00:00Z", NOW, MS_TOKYO), nextRunText("2026-09-14T23:30:00Z", NOW, MS_TOKYO)]).toEqual(["hari ini 7:00 PTG GMT+9", "esok 8:30 PG GMT+9"]);
   });
 
-  it("averages the valid CO2 readings per hour of the last 24 h", () => {
-    const pts = hourlyPoints([m("co2", 900, { observedAt: "2026-09-14T00:40:00Z" }), m("co2", 1100, { observedAt: "2026-09-14T00:50:00Z" }), m("co2", 5000, { observedAt: "2026-09-14T00:55:00Z", quality: "suspect" }), m("co2", 700, { observedAt: "2026-09-12T00:00:00Z" })], NOW);
-    expect([pts.length, pts[23], pts.filter((p) => p !== null).length]).toEqual([24, 1000, 1]);
+  it("plots the hourly averages of the last 24 h, rounded, an hour without a valid reading empty (IR607)", () => {
+    const hours = Array.from({ length: 24 }, (_, k) => ({ value: k === 23 ? 1000.4 : k === 5 ? 712.6 : null }));
+    const pts = bucketPoints(hours);
+    expect([pts.length, pts[23], pts[5], pts.filter((p) => p !== null).length]).toEqual([24, 1000, 713, 2]);
   });
 });

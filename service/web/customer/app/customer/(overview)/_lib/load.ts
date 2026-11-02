@@ -11,12 +11,12 @@ import { i18nOf } from "@ac/web/lib/i18n";
 import { unitPlaces } from "@ac/web/lib/clientBilling";
 import { baselinesFor, dayRanges, periodRange } from "@ac/web/lib/clientEnergy";
 import { ruleCard, triggerOf, type ApiAutomation, type ApiConsent, type ApiOccurrence } from "@ac/web/lib/clientAutomations";
-import { metricCard, type ApiAirSeries, type ApiMeasurement } from "@ac/web/lib/air";
+import { metricCard, type ApiAirSeries } from "@ac/web/lib/air";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiPropertyRow, ApiSpaceRow } from "@ac/web/lib/assets";
 import type { ApiBaseline, ApiEnergySummary } from "@ac/web/lib/energy";
 import {
-  attentionCard, emissionsCard, energyCard, hourlyPoints, nextRunText, overviewRows, overviewScope, periodLabel, periodNote, periodOf, previousRange, type OverviewUnit,
+  attentionCard, bucketPoints, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodLabel, periodNote, periodOf, previousRange, type OverviewUnit,
 } from "@ac/web/lib/customerOverview";
 
 type Summary = { counts: { total: number; powerOn: number; powerOff: number; powerUnknown: number; alertCount: number }; asOf: string };
@@ -48,15 +48,11 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   // the air-quality card: the chosen unit, else the first unit shown with a CO2 reading
   const air = sel.scope.find((u) => u.id === sel.unitId) ?? sel.scope.find((u) => u.latestMeasurements.some((m) => m.metric === "co2")) ?? sel.scope[0] ?? null;
   const hasCo2 = !!air?.latestMeasurements.some((m) => m.metric === "co2");
+  // the last 24 hours in hourly averages of the valid CO2 readings, whole (bucketMinutes, IR605, IR607)
   const series = async () => {
-    const items: ApiMeasurement[] = [];
-    let cursor: string | null = null;
-    do { // newest first, at most 300 readings for the 24-hour chart
-      const page: ApiAirSeries = await coreOp("telemetry.series", { from: new Date(nowMs - 86_400_000).toISOString(), to: now.toISOString(), unitIds: [air!.id], metric: "co2", query: { limit: 100, sort: { field: "observedAt", direction: "desc" }, ...(cursor ? { cursor } : {}) } });
-      items.push(...page.items);
-      cursor = page.nextCursor;
-    } while (cursor && items.length < 300);
-    return { items, cut: !!cursor };
+    const to = Math.floor(nowMs / 60_000) * 60_000;
+    const page: ApiAirSeries = await coreOp("telemetry.series", { from: new Date(to - 86_400_000).toISOString(), to: new Date(to).toISOString(), unitIds: [air!.id], metric: "co2", bucketMinutes: 60, query: {} });
+    return bucketPoints(page.buckets ?? []);
   };
   const inScope = automations.filter((a) => a.unitIds.some((u) => ids.includes(u))).sort((a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name));
   const shown = inScope.slice(0, 3);
@@ -80,7 +76,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
     emissions: sums ? { ...emissionsCard(sums[0], baseline ? baseline.method : null, i), scope: scopeText } : null,
     air: air ? {
       id: air.id, room: roomOf(air), unit: air.displayName, co2: metricCard("co2", air.latestMeasurements.find((m) => m.metric === "co2"), true, i),
-      pm25: metricCard("pm25", air.latestMeasurements.find((m) => m.metric === "pm25"), true, i), points: co2 ? hourlyPoints(co2.items, nowMs) : [], cut: co2?.cut ?? false,
+      pm25: metricCard("pm25", air.latestMeasurements.find((m) => m.metric === "pm25"), true, i), points: co2 ?? [],
     } : null,
     attention: attentionCard(alerts, sel.scope, nowMs, 3, i),
     automations: {

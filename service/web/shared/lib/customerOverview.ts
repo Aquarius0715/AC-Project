@@ -117,20 +117,9 @@ export function attentionCard(alerts: ApiAlert[], units: OverviewUnit[], nowMs: 
   };
 }
 
-/** The hourly averages of the valid readings of the last 24 h (null = no reading in that hour). */
-export function hourlyPoints(items: ApiMeasurement[], nowMs: number): (number | null)[] {
-  const to = Math.floor(nowMs / 60_000) * 60_000;
-  const from = to - 24 * 3_600_000;
-  const sum = Array<number>(24).fill(0), n = Array<number>(24).fill(0);
-  for (const m of items) {
-    const t = Date.parse(m.observedAt);
-    if (m.quality !== "valid" || m.value === null || t < from || t >= to) continue;
-    const i = Math.floor((t - from) / 3_600_000);
-    sum[i] += m.value;
-    n[i] += 1;
-  }
-  return sum.map((s, i) => (n[i] ? Math.round(s / n[i]) : null));
-}
+/** The air card's 24 points: the hourly averages of the valid CO2 readings of the last 24 hours, whole (bucketMinutes 60,
+ * IR607), rounded; an hour without a valid reading stays empty. */
+export const bucketPoints = (buckets: { value: number | null }[]): (number | null)[] => buckets.map((b) => (b.value === null ? null : Math.round(b.value)));
 
 /** “today 6:00 pm MYT”, “tomorrow 7:30 am MYT”, else the date and time — the next run of a schedule rule (IR260). */
 export const nextRunText = (iso: string, nowMs: number, i: I18n = EN) => relativeTime(iso, nowMs, i);

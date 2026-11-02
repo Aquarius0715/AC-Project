@@ -29,7 +29,10 @@ export type ApiAllergen = {
   sourceLabel: string | null; observedAt: string | null; evidenceText: string | null;
 };
 /** AirSeries of service-contracts.ts: Page<Measurement> & {allergenObservation}. */
-export type ApiAirSeries = { items: ApiMeasurement[]; nextCursor: string | null; total: number; allergenObservation: ApiAllergen | null };
+export type ApiAirSeries = {
+  items: ApiMeasurement[]; nextCursor: string | null; total: number; allergenObservation: ApiAllergen | null;
+  buckets: { start: string; value: number | null; count: number }[] | null; // with bucketMinutes: the period's averages (IR605)
+};
 export type VentMethod = "window_opened" | "door_opened" | "ventilation_fan" | "other";
 /** VentilationLog of service-contracts.ts. */
 export type ApiVentilationLog = {

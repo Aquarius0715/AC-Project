@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.475.0
+version: 0.476.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -287,6 +287,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.476.0: The customer's air page and overview air card read whole windows in averages, and the air table is keyboard-scrollable (IR607). Phase 1A unchanged.
 0.475.0: The technician's day and week charts read the whole period in averages (IR606). Phase 1A unchanged.
 0.474.0: telemetry.series answers bucketMinutes (5 or 60) with the whole period in averages (IR605). Phase 1A unchanged.
 0.473.0: A person's device command is audited pending and gets its result (success, or failed with the reason) under the same correlation ID (IR604). Phase 1A unchanged.

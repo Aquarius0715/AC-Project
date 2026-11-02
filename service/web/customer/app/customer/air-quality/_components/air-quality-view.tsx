@@ -98,7 +98,9 @@ export function AirQualityView({ live }: { live: AirLive | null }) {
               </div>
             </>
           ) : (
-            <div className="max-h-[420px] overflow-y-auto">
+            // the table scrolls on its own: it takes the focus so a keyboard can scroll it, named as the chart is (axe
+            // scrollable-region-focusable, IR607)
+            <div className="max-h-[420px] overflow-y-auto" tabIndex={0} role="region" aria-label={c.title}>
               <DataTable rows={live.rows} rowKey={(r) => r.key} cols={[
                 { key: "t", label: t("Time"), render: (r) => r.time },
                 { key: "v", label: `${label} (${info.unit})`, render: (r) => (r.gap ? <span className="text-muted-foreground">{r.value}</span> : r.value) },
@@ -106,7 +108,6 @@ export function AirQualityView({ live }: { live: AirLive | null }) {
               ]} />
             </div>
           )}
-        {c.hasSensor && c.total > c.readings && <p className="mt-2 text-xs font-semibold text-warn">{t("Showing the latest {n} of {total} readings — earlier readings are not loaded, so the start of the window is incomplete.", { n: c.readings, total: c.total })}</p>}
       </Card>
       <Card title={t("Ventilation history")} sub={live.history ? `${live.path} · ${t(live.history.total === 1 ? "{n} log" : "{n} logs", { n: live.history.total })} · ${t("manual records, nothing sent to the AC or to HQ")}` : live.path}>
         {!live.history ? <p className="text-[13px] text-muted-foreground">{t("Ventilation logs belong to a room — {unit} is not in one.", { unit: live.unitName })}</p>

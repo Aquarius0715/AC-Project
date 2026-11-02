@@ -79,7 +79,6 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             <p className="mb-2 text-[11px] text-muted-foreground">{t("{sub} · {unit} sensor · threshold 1000 ppm", { sub: live.air.co2.sub, unit: live.air.unit })}</p>
             {live.air.points.some((p) => p !== null) ? <LineChart points={live.air.points} min={400} max={Math.max(1200, ...live.air.points.filter((p): p is number => p !== null).map((p) => p + 100))} threshold={1000} height={90} />
               : <p className="text-[11px] text-muted-foreground">{t("No CO2 readings in the last 24 h.")}</p>}
-            {live.air.cut && <p className="text-[11px] text-muted-foreground">{t("Chart from the latest 300 readings.")}</p>}
             <p className="mt-1 text-xs">PM2.5 <b>{live.air.pm25.value === null ? "—" : `${live.air.pm25.value} µg/m³`}</b> <span className="text-muted-foreground">· {live.air.pm25.advice}</span></p>
           </> : <p className="text-[13px] text-muted-foreground">{t("No units in this selection.")}</p>}
           <TextLink href={live.air ? `/customer/air-quality?unitId=${live.air.id}` : "/customer/air-quality"} className="mt-1 inline-block">{t("Air quality details")} <Icon name="arrowRight" /></TextLink>
