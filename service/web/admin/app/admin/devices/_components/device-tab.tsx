@@ -67,7 +67,7 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">{counts.map(({ f, label, n }) => (
           <Plain key={f} type="button" aria-pressed={filter === f} onClick={() => { setFilter(f); const next = followFilter(rows, f, dv?.row.id ?? null); if (next) nav({ deviceId: next }); }}
-            className={cx("flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold pointer-coarse:min-h-11", filter === f ? "border-ink bg-ink text-white" : "border-line bg-surface")}>
+            className={cx("flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold", filter === f ? "border-ink bg-ink text-white" : "border-line bg-surface")}>
             {f !== "all" && f !== "nosensors" && <span className={cx("h-2 w-2 rounded-full", f === "online" ? "bg-ok" : f === "offline" ? "bg-crit" : "bg-warn")} />}{label} <span className="text-xs opacity-70">{n}</span>
           </Plain>
         ))}</div>

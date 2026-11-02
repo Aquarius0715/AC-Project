@@ -32,4 +32,11 @@ describe("touch-sized controls", () => {
     expect(coarse(b)).toEqual(["pointer-coarse:min-h-0"]);
     expect(b.hasAttribute("data-plain")).toBe(true);
   });
+  it("sizes a chip or a tab built from Plain (IR617)", () => {
+    render(<><Plain aria-pressed={false}>Offline</Plain><Plain role="tab" aria-selected>Today</Plain></>);
+    for (const el of [screen.getByRole("button", { name: "Offline" }), screen.getByRole("tab", { name: "Today" })]) {
+      expect(coarse(el)).toEqual(expect.arrayContaining(["pointer-coarse:min-h-11", "pointer-coarse:inline-flex", "pointer-coarse:items-center"]));
+      expect(coarse(el)).not.toContain("pointer-coarse:min-h-0");
+    }
+  });
 });

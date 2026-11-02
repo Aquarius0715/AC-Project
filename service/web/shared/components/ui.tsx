@@ -323,11 +323,15 @@ export function ActionMenu({ label, disabled, onChoose, children }: { label: str
 }
 export const Textarea = ({ className, ...p }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <UITextarea {...p} className={cn("min-h-[84px] resize-y", className)} />;
 /** A button with no look of its own, like the browser's button under Tailwind's reset: the text, size and layout come from
- * its parent and its classes (the 44 px touch height of IR615 too). A screen uses it for a selectable card, a chip or a text action, so the shadcn Button's
+ * its parent and its classes (the 44 px touch height of IR615 too), except that a chip or a tab is touch-sized (IR617). A screen uses it for a selectable card, a chip or a text action, so the shadcn Button's
  * height, padding, radius and weight are reset here rather than in each screen. */
-export const Plain = ({ className, ...p }: React.ComponentProps<typeof Button>) => (
-  <Button {...p} data-plain="" variant="ghost" className={cn("inline-block h-auto min-w-0 pointer-coarse:min-h-0 shrink gap-0 rounded-none p-0 font-[inherit] whitespace-normal justify-start leading-[inherit] [font-size:inherit] [letter-spacing:inherit] active:translate-y-0 disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto", className)} />
-);
+export const Plain = ({ className, ...p }: React.ComponentProps<typeof Button>) => {
+  // a chip (aria-pressed) or a tab (role tab) is a control of its own: on a touch screen it is 44 px tall like the
+  // shared ones, its label centred (IR617)
+  const control = p["aria-pressed"] !== undefined || p.role === "tab";
+  return <Button {...p} data-plain="" variant="ghost" className={cn("inline-block h-auto min-w-0 pointer-coarse:min-h-0 shrink gap-0 rounded-none p-0 font-[inherit] whitespace-normal justify-start leading-[inherit] [font-size:inherit] [letter-spacing:inherit] active:translate-y-0 disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto",
+    control && "pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center", className)} />;
+};
 /** A one-time code as separate boxes (Figma 10g): one transparent input over the boxes, so typing, pasting and the
  * browser's one-time-code autofill all work; the box for the next digit is outlined while the input has focus. */
 export function CodeInput({ value, onChange, label, length = 6, autoFocus }: { value: string; onChange: (v: string) => void; label: string; length?: number; autoFocus?: boolean }) {

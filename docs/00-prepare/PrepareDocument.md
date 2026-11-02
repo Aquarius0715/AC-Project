@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.485.0
+version: 0.486.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -287,6 +287,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.486.0: Every filter chip and tab built from Plain is 44 px tall on touch screens (IR617). Phase 1A unchanged.
 0.485.0: The technician's job tabs and device filters are touch-sized, and a device filter that hides the open device opens its first device, for HQ too (IR616). Phase 1A unchanged.
 0.484.0: On touch screens the shared controls are at least 44 px tall, checked by the phone crawl (IR615). Phase 1A unchanged.
 0.483.0: The job history's period counts a cancelled or unfinished job by when its delegation ended, and the row shows that time (IR614). Phase 1A unchanged.

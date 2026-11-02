@@ -8626,3 +8626,12 @@ Found in the UX loop (UX-34), after IR615. Two problems on the technician's phon
    - `admin/devices.e2e.ts` passes unchanged.
    - On the development stack, Offline opened Meeting room AC on the technician's phone, and on HQ's tab at 1920 and 1280.
 5. **Next.** The other screens' `Plain` chips and rows listed in UX-33 follow screen by screen.
+
+## IR617 Chips and tabs built from Plain are touch-sized everywhere — 2026-11-02
+
+Found in the UX loop (UX-35), after IR615 and IR616. About 25 filter chips and tab bars on 20 screens are built from `Plain`, the button without a look of its own, so they kept their compact sizes on a touch screen. IR616 fixed the technician's two by hand. The rest remained, for example the contractor's Job history tabs (33 px) and a job's event filters (29 px), and the filters on the customer's maintenance, automations, alert policies and air quality pages and on HQ's units, restrictions, jobs and alerts.
+
+1. **One rule.** `Plain` itself makes a chip (`aria-pressed`) or a tab (`role="tab"`) at least 44 px tall on a touch screen, with its label centred (`pointer-coarse:inline-flex`, `min-h-11`, `items-center`). On a mouse nothing changes. Other `Plain` buttons — cards, tree rows, text actions — keep their parent's size. IR616's hand-made classes on the technician's two controls and HQ's device chips are dropped, since the rule now covers them.
+2. **Check.** The phone crawl also measures `Plain` chips and tabs.
+3. **Design.** The UIUX specification and Figma's Technician legend say the same.
+4. **Tests.** `touch.test.tsx` covers a chip and a tab built from `Plain`. The phone crawl passes in the four apps.
