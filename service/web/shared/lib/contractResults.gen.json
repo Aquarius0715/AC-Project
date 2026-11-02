@@ -4422,6 +4422,7 @@
  "telemetry.series": {
   "fields": [
    "allergenObservation",
+   "buckets",
    "items",
    "nextCursor",
    "snapshotVersion",

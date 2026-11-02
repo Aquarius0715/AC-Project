@@ -300,3 +300,57 @@ func TestLatestMeasurements(t *testing.T) {
 		t.Fatalf("no readings: %v", data(m)["latestMeasurements"])
 	}
 }
+
+// TestBucketedSeries (IR605, DEC-90): with bucketMinutes the series answers the whole period in averages — every stretch
+// present, the average of its valid readings with their count, no value and 0 where none is valid — and no page of
+// readings; the total still counts every reading. Only 5 and 60 minutes are taken, at most 1000 stretches, and the
+// unit must be readable as before.
+func TestBucketedSeries(t *testing.T) {
+	s := server(t)
+	u := newUnit(t, s, "Bucket AC") // customer B's
+	from := clock.Add(-time.Hour)
+	for i, v := range []float64{20, 21, 22, 23, 24} {
+		reading(t, u, "temperature", v, "°C", from.Add(time.Duration(i)*time.Minute), "valid")
+	}
+	reading(t, u, "temperature", 99, "°C", from.Add(5*time.Minute), "suspect") // left out of the average
+	reading(t, u, "temperature", 25, "°C", from.Add(6*time.Minute), "valid")
+	reading(t, u, "temperature", 30, "°C", from.Add(11*time.Minute), "stale") // a stretch of invalid readings only
+	body := func(extra string) string {
+		return `{"from":"` + from.Format(time.RFC3339) + `","to":"` + clock.Format(time.RFC3339) + `","unitIds":["` + u + `"],"metric":"temperature","query":{}` + extra + `}`
+	}
+	code, m := post(s, &customerB, "telemetry.series", body(`,"bucketMinutes":5`))
+	if code != 200 {
+		t.Fatalf("bucketed series: %d %v", code, m)
+	}
+	d := data(m)
+	bs, _ := d["buckets"].([]any)
+	if len(bs) != 12 || len(items(m)) != 0 || d["total"] != 8.0 || d["nextCursor"] != nil {
+		t.Fatalf("12 five-minute stretches, no page, every reading counted: %d buckets, %d items, total %v", len(bs), len(items(m)), d["total"])
+	}
+	b := func(i int) map[string]any { return bs[i].(map[string]any) }
+	if b(0)["start"] != from.UTC().Format(time.RFC3339) || b(0)["value"] != 22.0 || b(0)["count"] != 5.0 {
+		t.Errorf("the first stretch averages its five valid readings: %v", b(0))
+	}
+	if b(1)["value"] != 25.0 || b(1)["count"] != 1.0 {
+		t.Errorf("a suspect reading is left out of the average: %v", b(1))
+	}
+	if b(2)["value"] != nil || b(2)["count"] != 0.0 || b(11)["value"] != nil || b(11)["count"] != 0.0 {
+		t.Errorf("stretches without a valid reading stay, empty: %v / %v", b(2), b(11))
+	}
+	if code, m := post(s, &customerB, "telemetry.series", body(`,"bucketMinutes":60`)); code != 200 || len(data(m)["buckets"].([]any)) != 1 || data(m)["buckets"].([]any)[0].(map[string]any)["count"] != 6.0 {
+		t.Errorf("one hourly stretch of six valid readings: %d %v", code, m)
+	}
+	if code, m := post(s, &customerB, "telemetry.series", body(``)); code != 200 || data(m)["buckets"] != nil || len(items(m)) == 0 {
+		t.Errorf("without bucketMinutes the page of readings as before: %d %v", code, m)
+	}
+	if code, m := post(s, &customerB, "telemetry.series", body(`,"bucketMinutes":7`)); code != 422 || fields(m) != "bucketMinutes=error.invalid" {
+		t.Errorf("a stretch other than 5 or 60 minutes: %d %s", code, fields(m))
+	}
+	long := `{"from":"` + clock.Add(-30*24*time.Hour).Format(time.RFC3339) + `","to":"` + clock.Format(time.RFC3339) + `","unitIds":["` + u + `"],"metric":"temperature","query":{},"bucketMinutes":5}`
+	if code, m := post(s, &customerB, "telemetry.series", long); code != 422 || fields(m) != "bucketMinutes=error.range" {
+		t.Errorf("more than 1000 stretches: %d %s", code, fields(m))
+	}
+	if code, _ := post(s, &customerA, "telemetry.series", body(`,"bucketMinutes":5`)); code != 404 {
+		t.Errorf("another customer's unit in buckets: %d", code)
+	}
+}

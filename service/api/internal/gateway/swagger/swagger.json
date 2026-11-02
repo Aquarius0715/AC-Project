@@ -24717,6 +24717,12 @@
                         "in": "query"
                     },
                     {
+                        "type": "integer",
+                        "description": "input field bucketMinutes",
+                        "name": "bucketMinutes",
+                        "in": "query"
+                    },
+                    {
                         "type": "string",
                         "description": "page cursor: nextCursor of the previous page (D12)",
                         "name": "cursor",
@@ -34295,6 +34301,13 @@
                 "allergenObservation": {
                     "$ref": "#/definitions/monitoring.AllergenObservation"
                 },
+                "buckets": {
+                    "description": "with bucketMinutes only; null otherwise (IR605)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/monitoring.SeriesBucket"
+                    }
+                },
                 "items": {
                     "type": "array",
                     "items": {
@@ -34883,6 +34896,20 @@
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "monitoring.SeriesBucket": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "start": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
                 }
             }
         },

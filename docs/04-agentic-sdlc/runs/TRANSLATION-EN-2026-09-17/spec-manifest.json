@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "ecc9e37bc2b30a5fb497eb56e15b3000a5aff7b4d46c1e0cc4cea09c513f7a3b",
+  "spec_baseline_id": "3eeb3d1afa3d4aa23f0bdeed593e7ba7d1ba8b28d5a658562a568ca21058d78d",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "0664f45dab20a077191079cba6d449d3dd1900f3df659bfe7ff4cd930a801752"
+      "sha256": "894361fd557446dced26361857f576e23022e61994daebbfdde5fd69596b9a9e"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -102,7 +102,7 @@
     },
     {
       "path": "02-design/api/swagger.json",
-      "sha256": "2175e54cb8f62ea8eb051d4087e77c6322953ca7526b5739428374452873ce94"
+      "sha256": "7ef45319ea5b40063574853ed5abf545672678d88e1436c0a146f611fbde415f"
     },
     {
       "path": "02-design/backend-architecture.md",
@@ -146,7 +146,7 @@
     },
     {
       "path": "02-design/operation-catalog.csv",
-      "sha256": "a1ae1af6e16be627b506788550e622886cf4afb6cbd6d375057eaa55e6a42f0e"
+      "sha256": "4d64edd791a0965dd8e7d24245d6687f19cb5755c65e91037ce85dea82918865"
     },
     {
       "path": "02-design/operation-persistence-map.csv",
@@ -158,11 +158,11 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "6ada0a243196d25a646327b403fc013ba17039bb6ff5f456ddd73e2f120a9059"
+      "sha256": "3fe4a30528d0ba36d16d2ba5d64c95c9c497addd01980ede531fdf78c44a7ece"
     },
     {
       "path": "02-design/service-contracts.ts",
-      "sha256": "3ab4dd0470b1c282ba12895bdaa3708bd9ccddd99e5eba7cb25081e3fb1280eb"
+      "sha256": "09476f3627e02adf44c342d747fa91159495ab0f46e9d2e97299bfc9952cd45f"
     },
     {
       "path": "02-design/strict-review-contracts.md",
@@ -286,7 +286,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "caca79997e2498af87d7262edfbd2b8886e26353069346f278a1dadcef93f9ab"
+      "sha256": "c986b43aa912633b44ff11a8fda371f97032c3e2d53b810166a4f39c05471f78"
     },
     {
       "path": "tools/check_review_regressions.py",

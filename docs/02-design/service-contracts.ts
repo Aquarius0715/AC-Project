@@ -393,7 +393,7 @@ export type OperationContracts = {
   'spaces.list': {input:Query;result:Page<Space>;mode:'read'};
   'spaces.save': {input:{id?:ID;propertyId:ID;parentSpaceId:ID|null;kind:Space['kind'];name:string};result:Space;mode:'write'};
   'summaries.get': {input:{kind:'customer'|'partner'|'technician';filters:Query['filters']};result:Summary;mode:'read'};
-  'telemetry.series': {input:Range & {unitIds?:ID[];spaceId?:ID;metric:Metric;sensorId?:ID;query:Query};result:AirSeries;mode:'read'};
+  'telemetry.series': {input:Range & {unitIds?:ID[];spaceId?:ID;metric:Metric;sensorId?:ID;bucketMinutes?:5|60;query:Query};result:AirSeries;mode:'read'};
   'telemetry.summary': {input:Range & {unitIds:ID[];metric?:Metric};result:TelemetrySummary;mode:'read'};
   'units.archive': {input:{id:ID;reason:string};result:ArchivedResource;mode:'write'};
   'units.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
@@ -470,6 +470,7 @@ export type ChangeEntityType = 'unit'|'device'|'measurement'|'allergen_observati
 export type ChangeEvent = {generation:number;cursor:number;eventId:ID;entityType:ChangeEntityType;entityId:ID|null;version:number|null;occurredAt:Instant;changedFields:string[]};
 export type Subscribe = (context:Context,input:{afterCursor:number;resources:Exclude<ChangeEntityType,'cursor_only'>[];unitIds:ID[]},listener:(event:ChangeEvent)=>void)=>()=>void;
 export type AllergenObservation = {availability:'not_measured'|'unsupported'|'available';substance:string|null;value:number|null;unit:string|null;sourceLabel:string|null;observedAt:Instant|null;evidenceText:string|null};
-export type AirSeries = Page<Measurement> & {allergenObservation:AllergenObservation|null};
+export type SeriesBucket = {start:Instant;value:number|null;count:number}; // bucketMinutes: the average of the valid readings of one stretch, null without one (IR605)
+export type AirSeries = Page<Measurement> & {allergenObservation:AllergenObservation|null;buckets:SeriesBucket[]|null};
 
 export type NotificationRecipient = {id:ID;role:Role;displayLabel:string;allowedChannels:Channel[]};

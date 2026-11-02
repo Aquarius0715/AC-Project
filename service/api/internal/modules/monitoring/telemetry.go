@@ -97,14 +97,20 @@ func (m Telemetry) readableUnits(ctx context.Context, c *ops.Call, units []uuid.
 
 // SeriesInput is telemetry.series input.
 type SeriesInput struct {
-	From     time.Time    `json:"from"`
-	To       time.Time    `json:"to"`
-	UnitIDs  []uuid.UUID  `json:"unitIds,omitempty"`
-	SpaceID  *uuid.UUID   `json:"spaceId,omitempty"`
-	Metric   string       `json:"metric"`
-	SensorID *uuid.UUID   `json:"sensorId,omitempty"`
-	Query    paging.Query `json:"query"`
+	From     time.Time   `json:"from"`
+	To       time.Time   `json:"to"`
+	UnitIDs  []uuid.UUID `json:"unitIds,omitempty"`
+	SpaceID  *uuid.UUID  `json:"spaceId,omitempty"`
+	Metric   string      `json:"metric"`
+	SensorID *uuid.UUID  `json:"sensorId,omitempty"`
+	// BucketMinutes asks for the whole period in averages instead of a page of readings: 5 for a day, 60 for a week
+	// (IR605, DEC-90).
+	BucketMinutes *int         `json:"bucketMinutes,omitempty"`
+	Query         paging.Query `json:"query"`
 }
+
+// maxBuckets bounds one bucketed series (a 35-day period in 60-minute buckets is 840).
+const maxBuckets = 1000
 
 func validRange(from, to time.Time, max time.Duration, fe map[string]string) {
 	switch {
@@ -134,6 +140,13 @@ func (in *SeriesInput) Validate() map[string]string {
 	if len(in.Query.Filters) > 0 && string(in.Query.Filters) != "{}" && string(in.Query.Filters) != "null" {
 		fe["query.filters"] = "error.invalid"
 	}
+	if b := in.BucketMinutes; b != nil {
+		if *b != 5 && *b != 60 {
+			fe["bucketMinutes"] = "error.invalid"
+		} else if fe["to"] == "" && in.To.Sub(in.From) > time.Duration(maxBuckets)*time.Duration(*b)*time.Minute {
+			fe["bucketMinutes"] = "error.range"
+		}
+	}
 	return fe
 }
 
@@ -148,14 +161,23 @@ type AllergenObservation struct {
 	EvidenceText *string    `json:"evidenceText"`
 }
 
-// AirSeries is Page<Measurement> & {allergenObservation} (the page fields spelled out so the API description can
-// read them).
+// SeriesBucket is SeriesBucket of service-contracts.ts: one stretch of a bucketed series — the average of its valid
+// readings (null without one) and how many there were.
+type SeriesBucket struct {
+	Start time.Time `json:"start"`
+	Value *float64  `json:"value"`
+	Count int       `json:"count"`
+}
+
+// AirSeries is Page<Measurement> & {allergenObservation, buckets} (the page fields spelled out so the API description
+// can read them).
 type AirSeries struct {
 	Items               []Measurement        `json:"items"`
 	NextCursor          *string              `json:"nextCursor"`
 	Total               int                  `json:"total"`
 	SnapshotVersion     int                  `json:"snapshotVersion"`
 	AllergenObservation *AllergenObservation `json:"allergenObservation"`
+	Buckets             []SeriesBucket       `json:"buckets"` // with bucketMinutes only; null otherwise (IR605)
 }
 
 // @Summary		telemetry.series (read)
@@ -167,24 +189,25 @@ type AirSeries struct {
 // @Tags			telemetry
 // @Accept			json
 // @Produce		json
-// @Param			from		query		string		false	"input field from"
-// @Param			to			query		string		false	"input field to"
-// @Param			unitIds		query		[]string	false	"input field unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
-// @Param			spaceId		query		string		false	"input field spaceId"
-// @Param			metric		query		string		false	"input field metric"
-// @Param			sensorId	query		string		false	"input field sensorId"
-// @Param			cursor		query		string		false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer		false	"page size 1–100, default 25"
-// @Param			sort		query		string		false	"field:direction — fields observedAt; default observedAt asc;sensorId asc;id asc"
-// @Success		200			{object}	ops.Envelope{data=AirSeries}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+// @Param			from			query		string		false	"input field from"
+// @Param			to				query		string		false	"input field to"
+// @Param			unitIds			query		[]string	false	"input field unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+// @Param			spaceId			query		string		false	"input field spaceId"
+// @Param			metric			query		string		false	"input field metric"
+// @Param			sensorId		query		string		false	"input field sensorId"
+// @Param			bucketMinutes	query		integer		false	"input field bucketMinutes"
+// @Param			cursor			query		string		false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit			query		integer		false	"page size 1–100, default 25"
+// @Param			sort			query		string		false	"field:direction — fields observedAt; default observedAt asc;sensorId asc;id asc"
+// @Success		200				{object}	ops.Envelope{data=AirSeries}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/telemetry/series [get]
 func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (AirSeries, error) {
@@ -226,6 +249,21 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.measurements m WHERE "+where, args...).Scan(&total); err != nil {
 		return AirSeries{}, err
 	}
+	if in.BucketMinutes != nil { // the whole period in averages, every bucket present (IR605)
+		buckets, err := bucketed(ctx, c, where, args, in.From, in.To, time.Duration(*in.BucketMinutes)*time.Minute)
+		if err != nil {
+			return AirSeries{}, err
+		}
+		out := AirSeries{Items: []Measurement{}, Total: total, SnapshotVersion: w.Snapshot, Buckets: buckets}
+		if len(units) == 1 {
+			a, err := allergen(ctx, c, units[0])
+			if err != nil {
+				return out, err
+			}
+			out.AllergenObservation = &a
+		}
+		return out, nil
+	}
 	rows, err := c.Tx.Query(ctx, fmt.Sprintf("SELECT %s FROM monitoring.measurements m WHERE %s ORDER BY m.observed_at %s, m.sensor_id ASC, m.event_id ASC LIMIT %d OFFSET %d",
 		measurementCols, where, dir, w.Limit, w.Offset), args...)
 	if err != nil {
@@ -251,6 +289,45 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 			return out, err
 		}
 		out.AllergenObservation = &a
+	}
+	return out, nil
+}
+
+// bucketed averages the valid readings of the series in stretches of size from from to to (IR605, DEC-90): a stretch
+// without a valid reading stays in the list with no value and a count of 0, so a gap is never joined; stale, suspect
+// and missing readings are left out, as the charts leave them out.
+func bucketed(ctx context.Context, c *ops.Call, where string, args []any, from, to time.Time, size time.Duration) ([]SeriesBucket, error) {
+	q := fmt.Sprintf(`SELECT date_bin(make_interval(secs => $%d), m.observed_at, $3) AS b,
+		avg(m.value) FILTER (WHERE m.quality = 'valid' AND m.value IS NOT NULL), count(*) FILTER (WHERE m.quality = 'valid' AND m.value IS NOT NULL)
+		FROM monitoring.measurements m WHERE %s GROUP BY b`, len(args)+1, where)
+	rows, err := c.Tx.Query(ctx, q, append(append([]any{}, args...), size.Seconds())...)
+	if err != nil {
+		return nil, err
+	}
+	got := map[int64]SeriesBucket{}
+	for rows.Next() {
+		var b SeriesBucket
+		if err := rows.Scan(&b.Start, &b.Value, &b.Count); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		got[b.Start.UnixMilli()] = b
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out := []SeriesBucket{}
+	for at := from; at.Before(to); at = at.Add(size) {
+		b, ok := got[at.UnixMilli()]
+		if !ok {
+			b = SeriesBucket{Start: at}
+		}
+		b.Start = at.UTC()
+		if b.Count == 0 {
+			b.Value = nil
+		}
+		out = append(out, b)
 	}
 	return out, nil
 }

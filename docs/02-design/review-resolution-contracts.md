@@ -8454,3 +8454,14 @@ Decided by the user as DEC-90 (UX-loop proposal of UX-29, second part). IR90 def
    A late acknowledgement after the window adds no entry. Commands of a restriction, a diagnosis or an automation are audited under their own operations and get no appended result.
 3. **Screens.** The audit explorer's correlation trace shows the request and its result together. Its empty-list notice under Pending or Failed now says that these results belong to device commands. The Malay dictionary follows, and DD-A16 says the same as built.
 4. **Tests.** The demo acknowledgement test checks the trail "pending (customer-b) → success (system-iot)". `TestCommandExpiryAudited` checks "pending → failed (system-scheduler, TIMEOUT)". `audit.e2e.ts` checks the Pending notice on an empty day.
+
+## IR605 A series can answer its whole period in averages — 2026-11-02
+
+Decided by the user as DEC-90 (UX-loop proposal of UX-22, confirmed in UX-28). The 24-hour and 7-day charts read raw minute readings in pages of 100 (D07). The screens stop after a few pages: 1000 readings on the customer's air page, 400 on the technician's unit. So the charts covered only the last hours of their period, and IR592 and IR598 could only say so.
+
+1. **Input.** `telemetry.series` takes `bucketMinutes`: 5 (for a day) or 60 (for a week). Any other value answers VALIDATION `bucketMinutes=error.invalid`. A period of more than 1000 stretches answers `bucketMinutes=error.range`.
+2. **Result.** With `bucketMinutes`, the series answers `buckets` and no page of readings: every stretch from `from` to `to`, oldest first. Each stretch holds its start, the average of its valid readings, and how many there were. A stretch without a valid reading keeps no value and a count of 0, so a gap is never joined. Stale, suspect and missing readings are left out, as the charts leave them out. `total` still counts every reading of the period. Without `bucketMinutes`, nothing changes and `buckets` is null.
+3. **Scope.** The unit or space must be readable exactly as for the readings (D01, IR49(b)). One query averages the period in the database, so a week costs one round trip instead of up to 100 pages.
+4. **Contract.** `SeriesBucket` and `AirSeries.buckets` are in the service contracts. The operation catalog's input and the Swagger document follow, and so do the contract snapshots of the web.
+5. **Tests.** `TestBucketedSeries` covers the stretches, the averages without invalid readings, empty stretches, the hourly stretch, the unchanged page, both refusals and another customer's unit.
+6. **Next.** The technician's, the customer's and the partner's charts read their 24-hour and 7-day periods this way. Each changes in its own IR.
