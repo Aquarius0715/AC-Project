@@ -21,6 +21,7 @@ export type ApiNotification = {
   occurredAt: string;
   readAt: string | null;
   severity?: "critical" | "warning" | "normal";
+  targetOpen?: boolean; // false: the target's page does not open for the reader, so the row is not a link (IR602)
 };
 
 export type InboxRow = { id: string; version: number; t: string; d: string; w: string; read: boolean; href: string };
@@ -108,6 +109,8 @@ export function inboxRow(n: ApiNotification, role: Role, display: Display = DEFA
   const message = n.params.message ? messageText(n.params.message, display) : word(reasonWords, n.params.reason);
   const text = details[n.templateKey]?.(n, display) ?? [message, status].filter(Boolean).join(" · ");
   const detail = [text, n.channel === "inApp" ? null : channelText(n.channel, translator(display.locale))].filter(Boolean).join(" · "); // "e-mail" in words (IR488)
-  const href = typeRoutes[role]?.[n.type] ?? (n.sourceAlertId && alertsPage[role] ? alertsPage[role] : (routes[role][n.target.kind]?.(n.target.id) ?? ""));
+  // a notice whose target page no longer opens — an offer withdrawn before the company accepted it — stays readable
+  // without a link, so it never leads to "This page isn't available" (IR602)
+  const href = n.targetOpen === false ? "" : typeRoutes[role]?.[n.type] ?? (n.sourceAlertId && alertsPage[role] ? alertsPage[role] : (routes[role][n.target.kind]?.(n.target.id) ?? ""));
   return { id: n.id, version: n.version, t: translate(display.locale, title, { name: n.params.targetName }), d: detail, w: showTime(n.occurredAt, display), read: n.readAt !== null, href };
 }

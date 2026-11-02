@@ -99,6 +99,7 @@ type Notification struct {
 	Severity               string            `json:"severity"`
 	OccurredAt             time.Time         `json:"occurredAt"`
 	ReadAt                 *time.Time        `json:"readAt"`
+	TargetOpen             bool              `json:"targetOpen"` // the target's page opens for the reader, so the notice may link it (IR602)
 }
 
 // Params is Notification.params: the stored params projected onto the canonical shape (IR142).
@@ -157,7 +158,46 @@ func scanNotification(r pgx.Row) (Notification, error) {
 	x.Target = map[string]string{"kind": kind, "id": id}
 	x.Params = projectParams(params, name, x.OccurredAt, x.Type)
 	x.DeliveryState = deliveryState(x.Channel)
+	x.TargetOpen = true
 	return x, err
+}
+
+// QueryJobsOpen asks maintenance which jobs open for the caller — jobs.get answers them, live or as the caller's
+// history — so a contractor's or a technician's notice links its job only while the page opens: an offer withdrawn
+// before the company accepted it leaves a notice without a link (IR602). Maintenance serves it under this name;
+// notify cannot import maintenance.
+const QueryJobsOpen = "maintenance.jobsOpen"
+
+// JobsOpenInput is the input of QueryJobsOpen: the jobs of one page of notices.
+type JobsOpenInput struct {
+	JobIDs []uuid.UUID `json:"jobIds"`
+}
+
+// openTargets clears TargetOpen on the job notices of a contractor or a technician whose job page does not open for
+// them (IR602); every other target opens wherever its notice is readable (IR58).
+func openTargets(ctx context.Context, c *ops.Call, items []Notification) error {
+	if c.Principal.Role != "contractor" && c.Principal.Role != "technician" {
+		return nil
+	}
+	ids := []uuid.UUID{}
+	for _, x := range items {
+		if id, err := uuid.Parse(x.Target["id"]); err == nil && x.Target["kind"] == "job" && !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	open, err := ops.Query[[]uuid.UUID](ctx, c, QueryJobsOpen, JobsOpenInput{JobIDs: ids})
+	if err != nil {
+		return err
+	}
+	for i, x := range items {
+		if id, err := uuid.Parse(x.Target["id"]); err == nil && x.Target["kind"] == "job" {
+			items[i].TargetOpen = slices.Contains(open, id)
+		}
+	}
+	return nil
 }
 
 // Inbox is the notification read / preview operation set (IR142).
@@ -267,6 +307,9 @@ func (Inbox) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pa
 	if err := rows.Err(); err != nil {
 		return paging.Page[Notification]{}, err
 	}
+	if err := openTargets(ctx, c, items); err != nil {
+		return paging.Page[Notification]{}, err
+	}
 	return paging.Page[Notification]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}, nil
 }
 
@@ -321,6 +364,11 @@ func (Inbox) markRead(ctx context.Context, c *ops.Call, in *MarkReadInput) (Noti
 	if x.Version != *c.ExpectedVersion {
 		return x, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
+	one := []Notification{x}
+	if err := openTargets(ctx, c, one); err != nil {
+		return x, err
+	}
+	x = one[0]
 	if x.ReadAt != nil { // already read: unchanged
 		return x, nil
 	}
@@ -696,7 +744,7 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, in *PreviewInput) (Notifi
 	return Notification{ID: uuid.New(), TenantID: c.Principal.TenantID, Version: 1, CreatedAt: c.Now, UpdatedAt: c.Now, SourceAlertID: in.SourceAlertID, Type: typ,
 		RecipientMembershipID: in.RecipientMembershipID, ScopeVersionAtCreation: scope, Target: map[string]string{"kind": in.Target.Kind, "id": in.Target.ID.String()},
 		TemplateKey: in.TemplateKey, Params: Params{TargetName: t.name, At: c.Now, Status: status, Reason: in.Reason, Message: in.Message}, Channel: in.Channel,
-		DeliveryState: "preview", Severity: severity, OccurredAt: c.Now}, nil
+		DeliveryState: "preview", Severity: severity, OccurredAt: c.Now, TargetOpen: true}, nil
 }
 
 // Register binds the notification operations.

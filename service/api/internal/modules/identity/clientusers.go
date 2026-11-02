@@ -470,6 +470,7 @@ type InvitePreview struct {
 	Severity               string            `json:"severity"`
 	OccurredAt             time.Time         `json:"occurredAt"`
 	ReadAt                 *time.Time        `json:"readAt"`
+	TargetOpen             bool              `json:"targetOpen"` // Notification.targetOpen (IR602): the invitee's page opens
 }
 
 // @Summary		clientUsers.resendInvite (write)
@@ -518,7 +519,7 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 		return InvitePreview{}, err
 	}
 	c.Audit(ops.AuditEntry{Action: "clientUsers.resendInvite", TargetKind: "client_user", TargetID: x.ID.String(), Reason: "set-up e-mail sent again"})
-	return InvitePreview{ID: uuid.New(), TenantID: x.TenantID, Version: 1, CreatedAt: c.Now, UpdatedAt: c.Now, Type: "invite", Target: map[string]string{"kind": "client_user", "id": x.ID.String()},
+	return InvitePreview{ID: uuid.New(), TenantID: x.TenantID, Version: 1, CreatedAt: c.Now, UpdatedAt: c.Now, TargetOpen: true, Type: "invite", Target: map[string]string{"kind": "client_user", "id": x.ID.String()},
 		TemplateKey: "invite", Params: map[string]any{"targetName": x.Email, "at": c.Now, "status": "invited", "reason": nil, "amountMinor": nil, "currency": nil, "method": nil, "message": nil},
 		Channel: "email", DeliveryState: "queued", Severity: "normal", OccurredAt: c.Now}, nil
 }

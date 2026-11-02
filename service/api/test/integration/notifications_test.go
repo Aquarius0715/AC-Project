@@ -421,11 +421,61 @@ func TestContractorInbox(t *testing.T) {
 	if !seen[offered] || seen[other] || seen[unit] {
 		t.Errorf("contractor inbox: offered %v, another job %v, a unit %v", seen[offered], seen[other], seen[unit])
 	}
+	for _, it := range items(m) { // the accepted job opens for the company: its notice may link it (IR602)
+		if it["id"] == offered && it["targetOpen"] != true {
+			t.Errorf("the accepted job's notice: targetOpen %v", it["targetOpen"])
+		}
+	}
 	if code, m := post(s, &contrB, "notifications.list", `{"limit":100}`); code != 200 || len(items(m)) > 0 {
 		for _, it := range items(m) {
 			if it["id"] == offered {
 				t.Error("another contractor reads the notification")
 			}
 		}
+	}
+}
+
+// IR602: HQ withdraws an offer by cancelling the job before the company accepted it. The company keeps the notice — the
+// offer was its own — but the job page no longer opens for it (jobs.get NOT_FOUND), so the notice says targetOpen
+// false and the apps show it without a link.
+func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
+	s := server(t)
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	job := data(m)["id"].(string)
+	if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
+		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(60)+`","termsVersion":"t"}`, 1); code != 200 {
+		t.Fatalf("offer: %d %v", code, m)
+	}
+	notice := func() map[string]any {
+		t.Helper()
+		drainEvents(t)
+		code, m := post(s, &contrA, "notifications.list", `{"limit":100}`)
+		if code != 200 {
+			t.Fatalf("contractor inbox: %d %v", code, m)
+		}
+		var last map[string]any
+		for _, it := range items(m) { // newest first: the first notice of the job is its latest
+			if tg, _ := it["target"].(map[string]any); tg["kind"] == "job" && tg["id"] == job && last == nil {
+				last = it
+			}
+		}
+		return last
+	}
+	if n := notice(); n == nil || n["targetOpen"] != true {
+		t.Fatalf("the open offer's notice links the offer: %v", n)
+	}
+	if code, m := write(s, &hq, "jobs.cancel", `{"jobId":"`+job+`","cancelReason":"the customer withdrew"}`, 2); code != 200 {
+		t.Fatalf("cancel: %d %v", code, m)
+	}
+	n := notice()
+	if n == nil {
+		t.Fatal("the company lost the notice of its withdrawn offer")
+	}
+	if n["targetOpen"] != false {
+		t.Errorf("the withdrawn offer's notice still links a page that does not open: %v", n)
+	}
+	if code, _ := post(s, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+		t.Errorf("the withdrawn offer's job opens for the company: %d", code)
 	}
 }

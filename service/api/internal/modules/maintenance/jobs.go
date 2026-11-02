@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
+	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/blob"
@@ -1644,6 +1645,29 @@ func RegisterJobs(r *ops.Registry, m Jobs) {
 	ops.Register(r, "jobs.hold", m.hold)
 	ops.Register(r, "jobs.resumeHold", m.resumeHold)
 	ops.Register(r, "jobs.addNote", m.addNote)
+	ops.RegisterQuery(r, ops.DomainMaintenance, notify.QueryJobsOpen, m.jobsOpen)
+}
+
+// jobsOpen serves notify's QueryJobsOpen: of the jobs of one page of notices, those whose page opens for the caller —
+// jobs.get answers them, live or as the caller's history (IR602). Only a contractor's and a technician's job pages
+// can close while their notices stay readable; for the other roles every job is passed through.
+func (m Jobs) jobsOpen(ctx context.Context, c *ops.Call, in *notify.JobsOpenInput) ([]uuid.UUID, error) {
+	if len(in.JobIDs) > 100 {
+		return nil, apperr.Fields(map[string]string{"jobIds": "error.range"})
+	}
+	out := []uuid.UUID{}
+	for _, id := range in.JobIDs {
+		if c.Principal.Role == "contractor" || c.Principal.Role == "technician" {
+			if _, _, err := m.projection(ctx, c, id); err != nil {
+				if code := apperr.From(err).Code; code == apperr.NotFound || code == apperr.Forbidden {
+					continue
+				}
+				return nil, err
+			}
+		}
+		out = append(out, id)
+	}
+	return out, nil
 }
 
 func unmarshalSlots(raw []byte, out *[]Slot) error {

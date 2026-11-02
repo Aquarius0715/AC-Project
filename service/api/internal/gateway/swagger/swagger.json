@@ -31361,6 +31361,10 @@
                         "type": "string"
                     }
                 },
+                "targetOpen": {
+                    "description": "Notification.targetOpen (IR602): the invitee's page opens",
+                    "type": "boolean"
+                },
                 "templateKey": {
                     "type": "string"
                 },
@@ -35072,6 +35076,10 @@
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "targetOpen": {
+                    "description": "the target's page opens for the reader, so the notice may link it (IR602)",
+                    "type": "boolean"
                 },
                 "templateKey": {
                     "type": "string"

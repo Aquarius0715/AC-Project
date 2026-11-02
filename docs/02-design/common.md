@@ -123,7 +123,7 @@ The schema distinguishes null (no value) from “not registered.” Treat unknow
 | Contract / Invoice / Payment | customerOrgId、unitIds[]、planType、period、rulesVersion / contractId、amountMinor、currency、dueAt、status / invoiceId、amountMinor、method?、status、externalRef?、confirmedAt? |
 | Restriction | contractId、causeInvoiceIds[]、unitIds[]、rulesVersion、noticeAt、executeAfter、reason、policy、state、applyCommandIds[]、releaseCommandIds[]、exception?、graceUntil? |
 | Automation / Consent | unitIds[]、condition(discriminated union)、action、priority、timezone、enabled / purpose、granted、grantedAt?、revokedAt? |
-| Notification / AuditEvent | recipientId、channel(inApp/email/whatsapp)、templateKey、params、readAt?、deliveryState(preview/simulated/failed) / actorId、action、targetId、before?、after?、reason?、result、correlationId、occurredAt |
+| Notification / AuditEvent | recipientId、channel(inApp/email/whatsapp)、templateKey、params、readAt?、deliveryState(preview/simulated/failed)、targetOpen (the target page opens for the reader, IR602) / actorId、action、targetId、before?、after?、reason?、result、correlationId、occurredAt |
 | EnergyBaseline / EmissionFactor | unitIds[]、period、method、version、kWh、boundary / region、year、kgCO2ePerKWh、source、version、isDemo |
 | MRVReport / OffsetRecord | period、baselineId、factorId、boundary、coverage、totals、evidenceIds[]、reviewHistory[]、status(draft/demo_reviewed) / amountKg、state(quoted/demo_requested/demo_purchased/demo_retired/failed)、demoCertificateRef?、isDemo |
 

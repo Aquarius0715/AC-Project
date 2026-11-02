@@ -19,6 +19,14 @@ describe("inbox rows and alert rows", () => {
       .toMatchObject({ t: "Alert on Bedroom AC", href: "/customer/alerts" });
   });
 
+  it("does not link a notice whose page no longer opens for the reader (IR602)", () => {
+    // an offer HQ withdrew before the company accepted it: the notice stays, readable, without a dead link
+    const withdrawn = inboxRow(note({ params: { ...note({}).params, status: "cancelled" }, targetOpen: false }), "contractor");
+    expect([withdrawn.t, withdrawn.d, withdrawn.href]).toEqual(["Job update — job-1", "Cancelled", ""]);
+    expect(inboxRow(note({ targetOpen: true }), "contractor").href).toBe("/partner/jobs/job-1");
+    expect(inboxRow(note({}), "technician").href).toBe("/technician/jobs/job-1"); // a fixture without the field links as before
+  });
+
   it("titles and times a row in the user's display language and time zone (FR-X01, IR258)", () => {
     expect(inboxRow(note({}), "client").w).toBe("14 Sept 2026, 9:00 am MYT");
     const r = inboxRow(note({}), "client", { locale: "ms", timeZone: "Asia/Tokyo" });
