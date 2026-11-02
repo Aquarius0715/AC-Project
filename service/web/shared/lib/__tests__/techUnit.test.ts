@@ -87,6 +87,9 @@ describe("technician unit screen", () => {
     expect([c.count, c.cut, c.gap]).toEqual([null, "Showing the latest 400 of 1440 readings — earlier readings in this period are not loaded.", null]);
     expect(seriesChart("temperature", "°C", items, "24h", NOW, MS, 1440).cut).toBe("Menunjukkan 400 bacaan terkini daripada 1440 — bacaan lebih awal dalam tempoh ini tidak dimuatkan.");
     expect(seriesChart("temperature", "°C", items.slice(0, 60), "1h", NOW, undefined, 60)).toMatchObject({ count: "60 measurements in this period", cut: null });
+    // the period's averages (IR606) are complete: they count the period's readings and are never cut
+    const averages = Array.from({ length: 288 }, (_, k) => ({ value: 24, observedAt: new Date(NOW - 86_400_000 + k * 300_000).toISOString() }));
+    expect(seriesChart("temperature", "°C", averages, "24h", NOW, undefined, 1438, true)).toMatchObject({ count: "1438 measurements in this period", cut: null });
     const power = Array.from({ length: 100 }, (_, k) => ({ value: 1, observedAt: new Date(NOW - k * 60_000).toISOString() }));
     expect(otherMetrics(unit, "temperature", { power }, "24h", NOW, undefined, { power: 1440 }).map((x) => [x.metric, x.cut])).toEqual([["power", true], ["humidity", false]]);
   });

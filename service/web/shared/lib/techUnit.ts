@@ -113,10 +113,11 @@ export function stoppedBanner(d: ApiTechUnit, nowMs: number, i: I18n = EN): stri
 
 export type SeriesChart = { title: string; points: (number | null)[]; labels: string[]; gap: string | null; count: string | null; cut: string | null; empty: boolean };
 /** One metric over the period: 12 equal slots with the latest valid reading in each (stale, suspect and missing ones
- * are not plotted), the empty slots between readings named as a gap that stays unconnected. When the period holds more
- * readings (`total`) than the screen loaded, it says that the earlier ones are not loaded instead of counting the period
- * (IR598, as IR592 on the customer's air chart); the 24 h axis starts with its day. */
-export function seriesChart(metric: string, unit: string, items: Point[], p: Period, nowMs: number, i: I18n = EN, total = items.length): SeriesChart {
+ * are not plotted), the empty slots between readings named as a gap that stays unconnected. A `complete` series — the
+ * period's averages (IR606) — counts the period's readings (`total`); otherwise, when the period holds more readings
+ * than the screen loaded, it says that the earlier ones are not loaded instead of counting the period (IR598, as IR592
+ * on the customer's air chart). The 24 h axis starts with its day. */
+export function seriesChart(metric: string, unit: string, items: Point[], p: Period, nowMs: number, i: I18n = EN, total = items.length, complete = false): SeriesChart {
   const { t, display } = i;
   const { from, to } = periodRange(p, nowMs);
   const points = bucket(items, new Date(from), new Date(to), 12);
@@ -131,12 +132,13 @@ export function seriesChart(metric: string, unit: string, items: Point[], p: Per
   }
   const at = new Date(from).toISOString();
   const start = p === "7d" ? showDayMonth(at, { ...display, timeZone: "Asia/Kuala_Lumpur" }) : p === "24h" ? `${showDayMonth(at, display)}, ${showClock(at, display, false)}` : showClock(at, display, false);
-  const cut = total > items.length;
+  const cut = !complete && total > items.length;
+  const n = complete ? total : items.length;
   const name = `${label(metric, t)}${unit ? ` (${unit})` : ""}`;
   return {
     title: p === "7d" ? t("{metric} · last 7 days (Kuala Lumpur calendar days)", { metric: name }) : t("{metric} · last {period} (rolling)", { metric: name, period: t(p === "1h" ? "1 h" : "24 h") }),
     points, labels: [start, "", "", "", t("now")], gap, empty: points.every((v) => v === null),
-    count: cut ? null : t(items.length === 1 ? "1 measurement in this period" : "{n} measurements in this period", { n: items.length }),
+    count: cut ? null : t(n === 1 ? "1 measurement in this period" : "{n} measurements in this period", { n }),
     cut: cut ? t("Showing the latest {n} of {total} readings — earlier readings in this period are not loaded.", { n: items.length, total }) : null,
   };
 }

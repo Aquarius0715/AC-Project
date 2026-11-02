@@ -8465,3 +8465,12 @@ Decided by the user as DEC-90 (UX-loop proposal of UX-22, confirmed in UX-28). T
 4. **Contract.** `SeriesBucket` and `AirSeries.buckets` are in the service contracts. The operation catalog's input and the Swagger document follow, and so do the contract snapshots of the web.
 5. **Tests.** `TestBucketedSeries` covers the stretches, the averages without invalid readings, empty stretches, the hourly stretch, the unchanged page, both refusals and another customer's unit.
 6. **Next.** The technician's, the customer's and the partner's charts read their 24-hour and 7-day periods this way. Each changes in its own IR.
+
+## IR606 The technician's unit charts cover their whole period — 2026-11-02
+
+Decided by the user as DEC-90, the technician part of IR605. The unit page loaded at most 400 readings of the chosen metric and 100 of each other one, so the 24-hour and 7-day charts covered only the last hours. IR598 could only say so.
+
+1. **Reads.** For a day and for a week, the main chart and the small charts read the whole period as 5- and 60-minute averages (`bucketMinutes`, IR605). An hour still reads its readings, at most 400, which an hour of minute readings never reaches.
+2. **Chart.** The averages are plotted in the chart's twelve slots, like readings. The footnote counts the period's readings ("1403 measurements in this period"). A complete series is never cut, so IR598's notices appear only when an hour is cut.
+3. **Design.** DD-T03 says the same as built.
+4. **Tests.** `techUnit.test.ts` checks that a complete series counts the period's readings and is not cut. On the development stack, Living room AC's day chart ran from yesterday's time to now, and its week chart counted 3720 readings.

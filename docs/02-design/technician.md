@@ -132,7 +132,7 @@ Scope: FR-T03 / Main display pattern: **UI-DETAIL** and **UI-ANALYSIS**. Service
 **Steps**
 
 1. Select metric and period. Check sensor, power, operation, and connection values and their times. Demo update events change values. Make stopped updates clear when communication is lost.
-   - As built (IR283): the metric and the period are URL keys (`metric` opens Monitoring, `period` 1h / 24h / 7d). Up to three other metrics show their latest value and the period's slots. The events of the period are the unit's alert raises, acknowledgements and resolutions and its device's connection, power and tamper events (`devices.list` → `devices.events` with from / to).
+   - As built (IR283, IR606): the metric and the period are URL keys (`metric` opens Monitoring, `period` 1h / 24h / 7d). An hour shows its readings; a day and a week read the whole period as 5- and 60-minute averages of the valid readings (`telemetry.series` with `bucketMinutes`, IR605), so the charts cover their period. Up to three other metrics show their latest value and the period's slots. The events of the period are the unit's alert raises, acknowledgements and resolutions and its device's connection, power and tamper events (`devices.list` → `devices.events` with from / to).
 2. Keep observation time (measured on site) separate from receipt time (received by the server). Mark data stale after staleAfterSeconds. Do not overwrite current values with older events. Keep series units fixed and leave gaps where data is missing.
 3. Keep latest values and time-series charts consistent using the same eventId and version. Unsubscribe when leaving the screen or changing scope.
 4. Queries to update: `telemetry / unit summary`.
