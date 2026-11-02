@@ -29,7 +29,7 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 | billing | Billing | contracts (versioned), contract_units, invoices, payments, stripe_events, inquiries, payout_statements, payout_lines, payout_queries, payout_runs (the scheduler's monthly draft runs, IR341), ref_customers and ref_units reference copies (IR194, IR199) |
 | restrictions | Restrictions | restrictions, restriction_invoices, restriction_units, restriction_commands (billing's record of the commands it requested, IR194) |
 | energy | Energy & carbon | baselines (versioned), emission_factors (versioned), mrv_reports (versioned), mrv_reviews, offset_quotes, offset_records, offset_attempts, reference copies (IR189): ref_units, ref_customers, ref_properties, ref_organizations, ref_jobs, ref_alerts, ref_attachments, ref_power_samples (minute-slot power samples) |
-| notify | Notifications | notifications, deliveries, templates, reference copies of other domains' rows kept from RowChanged events (IR188): ref_units, ref_customers, ref_properties, ref_jobs, ref_offers, ref_assignments, ref_invoices, ref_inquiries, ref_restrictions, ref_restriction_units, ref_devices, ref_certificates |
+| notify | Notifications | notifications, deliveries, templates, reference copies of other domains' rows kept from RowChanged events (IR188): ref_units, ref_customers, ref_properties, ref_jobs, ref_offers, ref_assignments, ref_invoices, ref_inquiries, ref_restrictions, ref_restriction_units, ref_devices, ref_certificates, ref_job_histories (IR601) |
 | audit | Audit | audit_log (append-only, partitioned) |
 
 As built (IR335), six tables are created but not used yet:

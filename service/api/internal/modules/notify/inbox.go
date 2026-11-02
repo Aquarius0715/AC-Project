@@ -55,8 +55,10 @@ func kindsFor(perms map[string]bool) []string {
 
 // readableSQL is the IR58 current-scope condition on the resolved target t for the principal at now; kind / id are the
 // SQL expressions of the target. A technician reads a job while the assignment lets them open it (IR49: active and its
-// scheduled window not over, as jobs.get; IR253), so a revoked or ended assignment hides the job's notifications. A
-// contractor reads the jobs offered to its organization and the certificates of its technicians (IR336).
+// scheduled window not over, as jobs.get; IR253) and afterwards while the job's history snapshot is theirs, as jobs.get
+// then shows it (IR124): the notice of a cancellation or a reassignment stays readable (IR601). A revoked or ended
+// assignment without a snapshot hides the job's notifications. A contractor reads the jobs offered to its organization
+// and the certificates of its technicians (IR336).
 func readableSQL(p *ops.Principal, now time.Time, kind, id string, args *[]any) string {
 	add := func(v any) string { *args = append(*args, v); return fmt.Sprintf("$%d", len(*args)) }
 	switch p.Role {
@@ -70,8 +72,10 @@ func readableSQL(p *ops.Principal, now time.Time, kind, id string, args *[]any) 
 			kind + " = 'certificate' AND t.org = " + org + "))"
 	default:
 		unitScope := "(t.unit_id = ANY(" + add(p.Scopes["unit"]) + ") OR t.property_id = ANY(" + add(p.Scopes["property"]) + ") OR t.org = ANY(" + add(p.Scopes["organization"]) + "))"
-		return "((" + kind + " = 'job' AND EXISTS (SELECT 1 FROM notify.ref_assignments a WHERE a.job_id = " + id + " AND a.technician_membership_id = " + add(p.MembershipID) +
-			" AND a.status = 'active' AND (a.scheduled IS NULL OR " + add(now) + " < upper(a.scheduled)))) OR (" +
+		me := add(p.MembershipID)
+		return "((" + kind + " = 'job' AND (EXISTS (SELECT 1 FROM notify.ref_assignments a WHERE a.job_id = " + id + " AND a.technician_membership_id = " + me +
+			" AND a.status = 'active' AND (a.scheduled IS NULL OR " + add(now) + " < upper(a.scheduled)))" +
+			" OR EXISTS (SELECT 1 FROM notify.ref_job_histories h WHERE h.job_id = " + id + " AND h.owner_kind = 'membership' AND h.owner_id = " + me + "))) OR (" +
 			kind + " IN ('unit','device') AND " + unitScope + "))"
 	}
 }

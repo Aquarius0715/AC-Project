@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "ed96f517334e45039321a1ebd31863792d4aadadd6c8a1485853c510627da6d6",
+  "spec_baseline_id": "58dde2cde3c5fb063f9182cbd6a8390bc55ece12f4c8090524899502b00c2899",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "e1365d26ab568e1f969eba44338826d6bea2e984475d46c0151b2e0cd5787859"
+      "sha256": "9d270c0812a5a34da0af13d84820e28b673fe1dfd6921c10ea13282932bb0e32"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -130,7 +130,7 @@
     },
     {
       "path": "02-design/database-design.md",
-      "sha256": "04a46bdc9a8ea72de8e239d1175d6f659de1f921b340880a556cc285a02ba049"
+      "sha256": "975346822546c21bff5a419d52161f08ab228a1ad580a64f428bc4c263d14508"
     },
     {
       "path": "02-design/deterministic-contracts.md",
@@ -158,7 +158,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "1bad9414f3a4a075297f0cc1d522d58860bb682f89480580490e293feb5884ae"
+      "sha256": "ac1d18b88695e1f1f3e22bb3cb0108e893217615d12c980675eb36a8cbf17e3e"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -286,7 +286,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "a377daee6679df63aebd73a93a13bbcade99d3994c0078ac5466b18c9ee6f1ab"
+      "sha256": "51528b3b8d120b279f1830d07d2eaf98168b10228bb931355f267efa1abd7f13"
     },
     {
       "path": "tools/check_review_regressions.py",

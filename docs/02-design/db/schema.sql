@@ -1827,6 +1827,8 @@ CREATE TABLE notify.ref_restriction_units (restriction_id uuid NOT NULL, unit_id
 CREATE TABLE notify.ref_devices (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, serial text, unit_id uuid);
 CREATE TABLE notify.ref_properties (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_org_id uuid);  -- identity: membership scopes (IR194)
 CREATE TABLE notify.ref_certificates (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, organization_id uuid, membership_id uuid, name text);  -- expiry reminders (IR336)
+CREATE TABLE notify.ref_job_histories (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, job_id uuid, owner_kind text, owner_id uuid);  -- a technician's own job history keeps the job's notices readable (IR601)
+CREATE INDEX ref_job_histories_job ON notify.ref_job_histories (job_id, owner_id);
 
 -- Reference copies for billing (IR194), kept by the billing-api consumer: customer organizations of restrictions and
 -- inquiries, and the property of each contract unit (invoices.list propertyId, IR199).
@@ -1897,6 +1899,8 @@ CREATE TRIGGER devices_capture AFTER INSERT OR DELETE OR UPDATE OF serial, unit_
   FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'serial', 'unit_id');
 CREATE TRIGGER certificates_capture AFTER INSERT OR DELETE OR UPDATE OF organization_id, membership_id, name ON maintenance.certificates
   FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'organization_id', 'membership_id', 'name');
+CREATE TRIGGER job_history_snapshots_capture AFTER INSERT OR DELETE OR UPDATE OF job_id, owner_kind, owner_id ON maintenance.job_history_snapshots
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'job_id', 'owner_kind', 'owner_id');
 
 -- ---------------------------------------------------------------------------------------------
 -- Row-level security: every business table with tenant_id, partitions included. A partition is a table of its own:

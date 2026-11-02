@@ -350,6 +350,7 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 	t.Cleanup(func() {
 		owner(t, `DELETE FROM notify.notifications WHERE id = $1`, nid)
 		owner(t, `DELETE FROM notify.ref_assignments WHERE id = $1`, aid)
+		owner(t, `DELETE FROM notify.ref_job_histories WHERE job_id = $1`, job)
 	})
 	listed := func() bool {
 		_, m := post(s, &techInt, "notifications.list", `{"filters":{"type":"schedule_change"},"limit":100}`)
@@ -366,6 +367,22 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 	owner(t, `UPDATE notify.ref_assignments SET status = 'revoked' WHERE id = $1`, aid)
 	if listed() {
 		t.Error("revoked assignment: notification still listed")
+	}
+	// the job's history snapshot of the technician — frozen when the assignment ended — brings the notice back, so a
+	// cancellation or reassignment is told; another technician's snapshot does not (IR601)
+	hid, other := uuid.NewString(), uuid.NewString()
+	owner(t, `INSERT INTO notify.ref_job_histories (id, tenant_id, job_id, owner_kind, owner_id) VALUES ($1,$2,$3,'membership',$4), ($5,$2,$3,'organization',$6)`,
+		other, tenant, job, seed.ID("tech-external-a"), hid, seed.ID("org-contractor-a"))
+	if listed() {
+		t.Error("another member's or the company's history: notification listed")
+	}
+	owner(t, `UPDATE notify.ref_job_histories SET owner_kind = 'membership', owner_id = $2 WHERE id = $1`, hid, tech)
+	if !listed() {
+		t.Error("the technician's own history: notification not listed")
+	}
+	owner(t, `DELETE FROM notify.ref_job_histories WHERE id IN ($1, $2)`, hid, other)
+	if listed() {
+		t.Error("history gone: notification still listed")
 	}
 	owner(t, `UPDATE notify.ref_assignments SET status = 'active', scheduled = tstzrange($2,$3) WHERE id = $1`, aid, clock.Add(-3*time.Hour), clock.Add(-time.Hour))
 	if listed() {
