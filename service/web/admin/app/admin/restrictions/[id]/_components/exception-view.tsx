@@ -84,7 +84,7 @@ export function ExceptionView({ live }: { live: Live }) {
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Summary")}>
-            {isRelease && <Banner>{t("Release view (restriction.override only, IR03): billing fields are not shown.")}</Banner>}
+            {isRelease && <Banner>{t("Release view (restriction.override only): billing fields are not shown.")}</Banner>}
             <SummaryList items={[
               [t("Policy"), policyText(r.policy, t)], [t("Units"), live.units.map((u) => `${u.name} · ${u.apply}/${u.release}`).join(", ") || "—"],
               ...(isRelease ? [] : [[t("Cause invoices"), `${r.causeInvoiceIds?.length ?? 0}`] as [string, string]]),

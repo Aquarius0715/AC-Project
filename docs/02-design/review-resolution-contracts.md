@@ -8314,3 +8314,11 @@ Found in the twenty-fourth round of the UX loop (UX-24: tech-internal-a fills an
 2. **First item to fix.** A refused submit switches to the group of the first item without a result and focuses its result select (`focusField`, IR586); the banner reads "Not submitted — {n} issues:" and the checklist hint "… they are listed above Submit report."; the hint shows only while the report can be edited.
 3. **Codes in parentheses.** "(VALIDATION)", "(CONFLICT)" and "(FORBIDDEN)" leave the partner schedule and history texts and the technician's work window and alert resolution texts; the `i18n.test.ts` guard now also catches a code in parentheses. The Malay dictionary follows.
 4. **Tests.** `partnerSchedule.test.ts` and `techAlerts.test.ts` follow the words; the new `technician/report-checks.e2e.ts` (inside the seed job's window on CI) runs axe on the workspace and expects a refused submit to focus a result select.
+
+## IR595 HQ's restriction screens name no spec IDs — 2026-11-02
+
+Found in the twenty-fifth round of the UX loop (UX-25: hq-restriction-manager reads the applied cooling restriction of Lobby AC — its steps, policy, notice, cause invoice, units and commands — and opens the exception screen with its four actions, at 1920 and 1280). Nothing was changed. The list's notes ended with (SR26) and (IR05), the release view's banner with (IR03), and the exception screen's with "restriction.override only, IR03". The operation names under each action (restrictions.defer, restrictions.exempt, …) stay: Figma Admin's exception frames draw them for HQ. The authorization held: hq-operator, without restriction permissions, gets FORBIDDEN for `restrictions.override`.
+
+1. **Words.** The four texts drop their IDs; the two release-view banners now read the same ("Release view (restriction.override only): billing fields are not shown.") and share one Malay entry.
+2. **Tests.** The `i18n.test.ts` guard also reads HQ's restriction screens and `restrictions.ts`; `admin/restrictions.e2e.ts` checks the note and that the page shows no spec ID.
+3. **Figma.** Admin's schedule-restriction modal and its no-client state drop (IR05).

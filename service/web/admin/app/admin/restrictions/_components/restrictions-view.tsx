@@ -71,7 +71,7 @@ function Manager({ live }: { live: NonNullable<RestrictionsLive> }) {
           </Select></Field>
         </div>
       )}
-      {!live.full && <Banner>{t("Release view (restriction.override only): billing fields are not shown (IR03).")}</Banner>}
+      {!live.full && <Banner>{t("Release view (restriction.override only): billing fields are not shown.")}</Banner>}
       <div className="split-rev">
         <Card title={t("Restrictions")} sub={t("newest first")} className="self-start">
           {live.rows.length === 0 ? <EmptyState title={t("No restrictions")}>{t("No restriction matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{live.rows.map((x) => <ListRow key={x.id} selected={r?.id === x.id} onClick={() => { setConfirmRules(false); nav({ restrictionId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={stateTone(x.state)}>{stateWord(x.state, t)}</Badge></div><div className="text-[11px] text-muted-foreground">{x.label}</div><div className="text-[11px] text-muted-foreground">{x.policy} · {t(x.units === 1 ? "1 unit" : "{n} units", { n: x.units })} · {x.progress}</div></div></ListRow>)}</div>}
@@ -110,9 +110,9 @@ function Manager({ live }: { live: NonNullable<RestrictionsLive> }) {
                 ...(live.canUnits ? [{ key: "d", label: "", render: (u: UnitRow) => <Link className="text-xs font-semibold text-primary" href={`/admin/units?unitId=${u.unitId}`}>{t("Details")} <Icon name="arrowRight" /></Link> }] : []),
                 { key: "x", label: "", render: (u) => live.canWrite && <span className="flex flex-wrap gap-1">{u.retryApply && <Btn size="sm" onClick={() => setRetry({ phase: "apply", unitIds: [u.unitId], reason: "" })}>{t("Retry apply")}</Btn>}{u.retryRelease && <Btn size="sm" onClick={() => setRetry({ phase: "release", unitIds: [u.unitId], reason: "" })}>{t("Retry release")}</Btn>}{u.reconcile && <Btn size="sm" disabled={pending} onClick={() => run(() => reconcileUnits(r.id, r.version, [u.unitId]), t("Reconciled with the latest observation"))}>{t("Reconcile")}</Btn>}</span> },
               ]} />
-              <p className="mt-2 text-[11px] text-muted-foreground">{t("Retry and Reconcile appear only for units that are pending, failed or waiting for reconciliation (SR26). Reaching the deadline never stops real equipment by itself.")}</p>
+              <p className="mt-2 text-[11px] text-muted-foreground">{t("Retry and Reconcile appear only for units that are pending, failed or waiting for reconciliation. Reaching the deadline never stops real equipment by itself.")}</p>
             </Card>
-            {r.recoveryCases.length > 0 && <Card title={t("Recovery cases")} sub={t("Earlier observed restrictions to reconcile explicitly (SR26)")}>{r.recoveryCases.map((c) => <p key={c.id} className="text-[13px]">{c.unitId.slice(0, 8)} · <Badge tone={c.state === "resolved" ? "ok" : "warn"}>{recovery[c.state] ?? c.state}</Badge></p>)}</Card>}
+            {r.recoveryCases.length > 0 && <Card title={t("Recovery cases")} sub={t("Earlier observed restrictions to reconcile explicitly")}>{r.recoveryCases.map((c) => <p key={c.id} className="text-[13px]">{c.unitId.slice(0, 8)} · <Badge tone={c.state === "resolved" ? "ok" : "warn"}>{recovery[c.state] ?? c.state}</Badge></p>)}</Card>}
           </div>
         )}
       </div>
@@ -146,7 +146,7 @@ function ScheduleModal({ open, onClose, contracts, now, onDone }: { open: boolea
   const errors: Record<string, string> = {};
   if (!k) errors.contractId = t("Choose an eligible RTO contract");
   else if (k.invoices.length === 0) errors.contractId = t("This contract has no overdue unpaid invoice");
-  else if (k.recipients === 0) errors.contractId = t("No active client can receive the notice (IR05)");
+  else if (k.recipients === 0) errors.contractId = t("No active client can receive the notice");
   if (unitIds.length === 0) errors.unitIds = t("Choose at least one unit");
   if (kind === "temperature_limit" && (!range || !(sp >= range.min && sp <= range.max))) errors.setpoint = range ? t("Within {min}–{max} °C for the chosen units", { min: range.min, max: range.max }) : t("The chosen units need a temperature range");
   if (!at || Date.parse(at) < now.getTime() + 24 * 3600 * 1000) errors.executeAfter = t("At least 24 hours from now");

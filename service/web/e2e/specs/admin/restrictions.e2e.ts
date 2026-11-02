@@ -27,6 +27,9 @@ test("the cause invoice filter and the units' Details links", async ({ browser, 
   await page.waitForURL(/invoiceId=[0-9a-f-]{36}/);
   const list = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Restrictions", exact: true }) });
   await expect(list.locator("button[aria-pressed]")).toHaveCount(1);
+  // the screen's notes name no spec IDs (IR595)
+  await expect(main).toContainText("Retry and Reconcile appear only for units that are pending, failed or waiting for reconciliation.");
+  await expect(main).not.toContainText(/\((?:IR|SR)\d+\)/);
 
   // the selected restriction's units open their unit screen, which finds the customer itself
   const units = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Units", exact: true }) });
