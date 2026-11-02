@@ -101,7 +101,7 @@ export function auditRow(a: ApiAudit, i: I18n = EN, nowMs?: number): AuditRow {
     occurred: showTime(a.occurredAt, i.display),
     corr: a.correlationId,
     res: resultOf(a.result),
-    reason: a.reason,
+    reason: reasonText(a, t),
     changes: fields.map((f) => {
       const before = a.maskedBefore?.[f] ?? "null", after = a.maskedAfter?.[f] ?? "null";
       return { field: f, before, after, changed: before !== after };
@@ -109,11 +109,22 @@ export function auditRow(a: ApiAudit, i: I18n = EN, nowMs?: number): AuditRow {
   };
 }
 
+/** A denied write records the refusal's message key as its reason (IR603): it is said in words; any other reason stays as
+ * recorded. */
+const DENIAL: Record<string, string> = {
+  "error.forbidden": "Refused — the role may not do this",
+  "error.notFound": "Refused — not found in the actor's scope",
+};
+export const reasonText = (a: Pick<ApiAudit, "result" | "reason">, t: T = en): string | null => (a.result === "denied" && a.reason && DENIAL[a.reason] ? t(DENIAL[a.reason]) : a.reason);
+
 /** An entry as a timeline item (the restriction exception screen's audit card, IR301; the correlation trace, IR320). */
-export const auditItem = (a: ApiAudit, i: I18n = EN) => ({
-  time: showTime(a.occurredAt, i.display), title: `${a.action} · ${resultWord(resultOf(a.result), i.t)}`,
-  detail: `${a.actorName ?? a.actorId} (${roleAtTimeWord(a.actorRoleAtTime, i.t)})${a.reason ? ` · ${a.reason}` : ""}`,
-});
+export const auditItem = (a: ApiAudit, i: I18n = EN) => {
+  const reason = reasonText(a, i.t);
+  return {
+    time: showTime(a.occurredAt, i.display), title: `${a.action} · ${resultWord(resultOf(a.result), i.t)}`,
+    detail: `${a.actorName ?? a.actorId} (${roleAtTimeWord(a.actorRoleAtTime, i.t)})${reason ? ` · ${reason}` : ""}`,
+  };
+};
 
 /** The entries of one correlation ID in the order they were appended (Figma Admin 338:2): a pending entry stays as it
  * was; the final result is a later entry of its own. Empty when the entry stands alone. */

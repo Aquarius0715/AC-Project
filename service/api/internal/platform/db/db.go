@@ -160,6 +160,21 @@ func (s Idempotency) Abort(ctx context.Context, p *ops.Principal, op, key string
 // Recorder writes audit rows and outbox events in the operation's transaction (ops.Recorder).
 type Recorder struct{}
 
+// RecordDenied implements ops.DeniedRecorder: the audit entry of a refused write, result denied — the actor, the
+// operation, the target it asked for and the refusal's message key as the reason; no input values (IR603).
+func (Recorder) RecordDenied(ctx context.Context, tx pgx.Tx, c *ops.Call, op string, d ops.Denial) error {
+	p := c.Principal
+	id := uuid.Must(uuid.NewV7())
+	var membership *uuid.UUID
+	if p.MembershipID != uuid.Nil {
+		m := p.MembershipID
+		membership = &m
+	}
+	return events.Publish(ctx, tx, p.TenantID, "audit", id, events.AuditRecorded, events.Audit{ID: id, ActorID: p.UserID.String(), ActorRole: p.Role,
+		MembershipID: membership, Action: op, TargetKind: d.TargetKind, TargetID: d.TargetID, OccurredAt: c.Now, CorrelationID: c.CorrelationID,
+		Result: "denied", Reason: d.Reason})
+}
+
 // Record implements ops.Recorder.
 func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) error {
 	p := c.Principal

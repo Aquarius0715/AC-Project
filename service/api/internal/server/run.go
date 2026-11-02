@@ -105,6 +105,8 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 			}
 		}
 		cfg.WriteLimit = &ratelimit.Window{Store: store, Limit: limit, Window: time.Minute, Prefix: "ac:rl:write:"}
+		// denied writes recorded in the audit log: one per actor and operation a minute, across instances (IR603)
+		cfg.DenyLimit = &ratelimit.Window{Store: store, Limit: 1, Window: time.Minute, Prefix: "ac:rl:denied:"}
 	}
 	// the accounts a contractor or customer owner adds per organization in 24 hours (IR464; 30 by default)
 	if v := os.Getenv("ACCOUNTS_PER_ORG_PER_DAY"); v != "" {

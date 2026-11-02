@@ -354,3 +354,32 @@ func TestBodyLimits(t *testing.T) {
 		t.Fatalf("a body above the file limit: %d", w.Code)
 	}
 }
+
+// TestDeniedTarget: a refused write records the target it asked for — the input's id under the kind its resource's
+// successful writes use, else its <kind>Id, else another …Id holding a UUID named by that field; nothing else of the
+// input (IR603).
+func TestDeniedTarget(t *testing.T) {
+	const a, b = "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"
+	type review struct {
+		JobID         string `json:"jobId"`
+		ReportVersion int    `json:"reportVersion"`
+	}
+	for _, c := range []struct {
+		op       string
+		in       any
+		kind, id string
+	}{
+		{"jobs.review", review{JobID: a, ReportVersion: 2}, "job", a},
+		{"units.save", map[string]any{"id": a, "customerOrgId": b}, "unit", a},
+		{"members.revokeSessions", map[string]any{"membershipId": b}, "membership", b},
+		{"jobs.offer", map[string]any{"contractorOrgId": b, "jobId": a}, "job", a},
+		{"policies.delete", map[string]any{"policyId": "not-a-uuid"}, "policy", "—"},
+		{"offsets.request", map[string]any{"quoteId": a, "unitIds": []string{b}}, "quote", a},
+		{"spaces.save", map[string]any{"propertyId": a, "parentSpaceId": nil, "name": "2F"}, "property", a},
+		{"restrictions.override", map[string]any{}, "restriction", "—"},
+	} {
+		if kind, id := deniedTarget(c.op, c.in); kind != c.kind || id != c.id {
+			t.Errorf("%s: %s %s, want %s %s", c.op, kind, id, c.kind, c.id)
+		}
+	}
+}

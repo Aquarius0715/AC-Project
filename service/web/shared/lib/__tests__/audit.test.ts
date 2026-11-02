@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  actorOptions, auditDeviceEvents, auditFilters, auditItem, auditQuery, auditRow, correlationQuery, correlationTrace, periodError, relatedRecords, resultWord, roleAtTimeWord, targetKinds,
+  actorOptions, auditDeviceEvents, auditFilters, auditItem, auditQuery, auditRow, correlationQuery, correlationTrace, periodError, reasonText, relatedRecords, resultWord, roleAtTimeWord, targetKinds,
   type ApiAudit, type ApiAuditDeviceEvent,
 } from "@ac/web/lib/audit";
 import { EN, i18nOf, translator } from "@ac/web/lib/i18n";
@@ -59,6 +59,9 @@ describe("HQ audit log (FR-A16, DD-A16, SCR-A16)", () => {
     expect(actorOptions([{ userId: "a1b2c3d4-0000-4000-8000-000000000001", displayName: "Ahmad" }, { userId: "e5f6a7b8-0000-4000-8000-000000000002", displayName: "Ahmad" }, { userId: "user-0001", displayName: "hq-operator" }], [], "")).toEqual([
       { id: "a1b2c3d4-0000-4000-8000-000000000001", name: "Ahmad · a1b2c3d4" }, { id: "e5f6a7b8-0000-4000-8000-000000000002", name: "Ahmad · e5f6a7b8" }, { id: "user-0001", name: "hq-operator" },
     ]);
+    // a denied write's refusal in words; another reason, or a key the screen does not know, stays as recorded (IR603)
+    expect([reasonText({ result: "denied", reason: "error.forbidden" }), reasonText({ result: "denied", reason: "error.notFound" }, MS.t), reasonText({ result: "success", reason: "error.forbidden" }), reasonText({ result: "denied", reason: "errors.other" })])
+      .toEqual(["Refused — the role may not do this", "Ditolak — tidak dijumpai dalam skop pelaku", "error.forbidden", "errors.other"]);
     const kinds = targetKinds(rows, "zz_kind");
     expect([kinds.includes("restriction"), kinds.includes("command"), kinds.includes("filter_care_settings"), kinds.at(-1), kinds.length]).toEqual([true, true, true, "zz_kind", 16]);
   });

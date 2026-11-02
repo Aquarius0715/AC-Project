@@ -30,6 +30,15 @@ func (r notifyingRecorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, o
 	return r.inner.Record(ctx, tx, c, op)
 }
 
+// RecordDenied passes a refused write's audit entry to the inner recorder (ops.DeniedRecorder, IR603); a refusal notifies
+// nobody.
+func (r notifyingRecorder) RecordDenied(ctx context.Context, tx pgx.Tx, c *ops.Call, op string, d ops.Denial) error {
+	if dr, ok := r.inner.(ops.DeniedRecorder); ok {
+		return dr.RecordDenied(ctx, tx, c, op, d)
+	}
+	return nil
+}
+
 type recipientSet struct {
 	ids []uuid.UUID
 }

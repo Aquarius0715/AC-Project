@@ -1,7 +1,7 @@
 // HQ audit explorer (FR-A16, DD-A16, SCR-A16, Figma Admin 337:2 / 338:x / 340:2, IR320): the read-only banner; the
 // filters live in the URL (actor, target kind and ID, correlation ID, result, period) and so does the open entry
-// (entryId); "Filter by …" of the open entry keeps it open; an unknown correlation ID, a reversed period and a Denied
-// filter (the log records only the changes that succeeded, IR599) say why nothing shows; the related records link the
+// (entryId); "Filter by …" of the open entry keeps it open; an unknown correlation ID, a reversed period and a Failed
+// filter (failed attempts are not recorded, IR599, IR603) say why nothing shows; the related records link the
 // records' own screens. The device events tab reads events only for a
 // picked device — no fallback — and links an event's audit trail. Nothing is written, except a display-zone round trip
 // that gives an empty log (a fresh seed) its first entries and leaves the preferences as they were.
@@ -80,10 +80,11 @@ test("the audit log keeps its filters and the open entry in the URL", async ({ p
   await expect(main.getByRole("heading", { name: "Nothing was searched" })).toBeVisible();
   await expect(main).toContainText("Period must be start < end, at most 366 days");
 
-  // the log records the changes that succeeded: an empty Denied list says so, not that nothing was denied (IR599)
-  await page.goto("/admin/audit?result=Denied");
-  await expect(main.getByRole("heading", { name: "No entries with the result Denied" })).toBeVisible();
-  await expect(main).toContainText("Denied, failed and pending attempts are not recorded, so an empty list does not mean that none happened.");
+  // the log records the changes that succeeded and the writes it refused (IR603): an empty Failed list says that failed
+  // attempts are not recorded, not that none happened (IR599)
+  await page.goto("/admin/audit?result=Failed");
+  await expect(main.getByRole("heading", { name: "No entries with the result Failed" })).toBeVisible();
+  await expect(main).toContainText("Failed and pending attempts are not recorded, so an empty list does not mean that none happened.");
 });
 
 test("device events load only for a picked device and link the event's audit trail", async ({ page }) => {

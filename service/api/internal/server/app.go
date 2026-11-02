@@ -35,6 +35,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/blob"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
+	"github.com/pradita/ac-project/service/api/internal/platform/ratelimit"
 )
 
 // Config is the runtime configuration (container design §4 environment variables).
@@ -53,6 +54,7 @@ type Config struct {
 	PrincipalTTL      time.Duration        // principal cache of RemoteSource: 0 = 30 s, negative = no cache (IR181)
 	DemoClock         ScenarioClock        // shared scenario clock of several services in one binary (tests); overrides DemoStart
 	WriteLimit        ops.WriteLimiter     // writes per membership and minute (IR375); nil = no limit
+	DenyLimit         ops.WriteLimiter     // denied writes recorded per actor, operation and minute (IR603); nil = this process counts
 	IdentityProvider  identity.Provider    // ends sessions (IR386) and opens / turns off accounts (IR461) at the identity provider; nil = none
 	AccountApps       identity.AccountApps // the apps a new account's set-up e-mail returns to (IR461)
 	AccountsPerDay    int                  // accounts a contractor or customer owner adds per organization in 24 h (IR464); 0 = 30
@@ -97,6 +99,10 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	reg.ServeDomains(cfg.Domains...)
 	reg.DB, reg.Rec, reg.Idem = m, notifyingRecorder{inner: db.Recorder{}}, db.Idempotency{M: m}
 	reg.Limit = cfg.WriteLimit
+	reg.DenyLimit = cfg.DenyLimit
+	if reg.DenyLimit == nil { // without the shared store each process keeps its own minute counts (tests, a single instance)
+		reg.DenyLimit = &ratelimit.Window{Store: &ratelimit.Memory{}, Limit: 1, Window: time.Minute, Prefix: "ac:rl:denied:"}
+	}
 	if cfg.AccountsPerDay > 0 {
 		identity.AccountsPerOrgPerDay = cfg.AccountsPerDay
 	}

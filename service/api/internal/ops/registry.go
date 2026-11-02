@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -112,6 +113,88 @@ type Recorder interface {
 	Record(ctx context.Context, tx pgx.Tx, c *Call, op string) error
 }
 
+// DeniedRecorder writes the audit entry of a write refused for permission or scope, in a transaction of its own after
+// the refused one rolled back (IR603).
+type DeniedRecorder interface {
+	RecordDenied(ctx context.Context, tx pgx.Tx, c *Call, op string, d Denial) error
+}
+
+// Denial is a refused write: the target it asked for and the refusal's message key.
+type Denial struct {
+	TargetKind, TargetID, Reason string
+}
+
+// deniedKinds names the audit target kind of an operation's resource, as the entries of its successful writes do.
+var deniedKinds = map[string]string{"alerts": "alert", "automations": "automation", "commands": "command", "contracts": "contract", "devices": "device",
+	"invoices": "invoice", "jobs": "job", "members": "membership", "payments": "payment", "policies": "policy", "restrictions": "restriction",
+	"units": "unit", "spaces": "space", "properties": "property", "customers": "customer", "certificates": "certificate", "clientUsers": "user",
+	"partnerUsers": "user"}
+
+// deniedTarget is the target a refused write asked for: the input's id under the kind of the operation's resource,
+// else its <kind>Id, else the first other …Id field that holds a UUID, named by that field (propertyId: property).
+// An input without one records the resource's kind and "—". No other input value is kept.
+func deniedTarget(op string, in any) (string, string) {
+	res, _, _ := strings.Cut(op, ".")
+	kind := deniedKinds[res]
+	if kind == "" {
+		kind = res
+	}
+	raw, _ := json.Marshal(in)
+	var m map[string]any
+	_ = json.Unmarshal(raw, &m)
+	uuidOf := func(k string) (string, bool) {
+		s, ok := m[k].(string)
+		if !ok {
+			return "", false
+		}
+		_, err := uuid.Parse(s)
+		return s, err == nil
+	}
+	if id, ok := uuidOf("id"); ok {
+		return kind, id
+	}
+	rest := []string{}
+	for k := range m {
+		if strings.HasSuffix(k, "Id") && k != kind+"Id" {
+			rest = append(rest, k)
+		}
+	}
+	slices.Sort(rest)
+	for _, k := range append([]string{kind + "Id"}, rest...) {
+		if id, ok := uuidOf(k); ok {
+			return strings.TrimSuffix(k, "Id"), id
+		}
+	}
+	return kind, "—"
+}
+
+// recordDenied writes the audit entry of a write refused for permission (FORBIDDEN) or scope (NOT_FOUND), at most one
+// per actor and operation a minute (DenyLimit), so a flood of attempts cannot fill the log (IR603). A failure here is
+// logged and never answered: the caller gets the refusal.
+func (r *Registry) recordDenied(ctx context.Context, c *Call, op string, in any, err error) {
+	dr, ok := r.Rec.(DeniedRecorder)
+	de := apperr.From(err)
+	if !ok || r.DB == nil || c.Principal == nil || (de.Code != apperr.Forbidden && de.Code != apperr.NotFound) {
+		return
+	}
+	if r.DenyLimit != nil {
+		if wait, lerr := r.DenyLimit.Allow(ctx, c.Principal.TenantID.String()+":"+c.Principal.UserID.String()+":"+op); lerr == nil && wait > 0 {
+			return
+		}
+	}
+	kind, id := deniedTarget(op, in)
+	if rerr := r.DB.Run(ctx, false, c.Principal, func(tx pgx.Tx) error {
+		if tx != nil {
+			if _, err := tx.Exec(ctx, `SELECT set_config('app.now', $1, true)`, c.Now.UTC().Format(time.RFC3339Nano)); err != nil {
+				return err
+			}
+		}
+		return dr.RecordDenied(ctx, tx, c, op, Denial{TargetKind: kind, TargetID: id, Reason: de.MessageKey})
+	}); rerr != nil {
+		slog.WarnContext(ctx, "ops: denied write not recorded", "op", op, "err", rerr)
+	}
+}
+
 // Idempotency stores write results by Idempotency-Key (platform.idempotency_keys).
 type Idempotency interface {
 	// Begin returns a stored response when the same key and hash completed before, CONFLICT for a reused key
@@ -129,6 +212,9 @@ type Registry struct {
 	Rec   Recorder
 	Idem  Idempotency
 	Clock func() time.Time
+	// DenyLimit bounds the denied writes recorded in the audit log: one per actor and operation a minute (IR603);
+	// nil records every one.
+	DenyLimit WriteLimiter
 
 	domains map[string]bool // ServeDomains; nil = all
 
@@ -358,7 +444,11 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 		if p == nil {
 			return fail(c, apperr.E(apperr.Unauthenticated, "error.unauthenticated"), corr)
 		}
-		return fail(c, apperr.E(apperr.Forbidden, "error.forbidden"), corr)
+		denied := apperr.E(apperr.Forbidden, "error.forbidden")
+		if op.Spec.Mode == Write {
+			r.recordDenied(ctx, &Call{Principal: p, Now: r.Clock(), CorrelationID: corr}, name, in, denied)
+		}
+		return fail(c, denied, corr)
 	}
 	key := c.Request().Header.Get("Idempotency-Key")
 	write := op.Spec.Mode == Write
@@ -425,6 +515,9 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 	if err != nil {
 		if write && r.Idem != nil {
 			r.Idem.Abort(ctx, p, name, key)
+		}
+		if write {
+			r.recordDenied(ctx, call, name, in, err)
 		}
 		return fail(c, err, corr)
 	}

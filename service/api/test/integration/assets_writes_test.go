@@ -250,11 +250,12 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	if code, _ := write(s, &hq, "spaces.save", `{"propertyId":"`+prop+`","parentSpaceId":null,"kind":"floor","name":"2F"}`, 0); code != 404 {
 		t.Errorf("archived property takes no spaces: %d", code)
 	}
-	// every successful write left one audit row and one outbox event (same transaction)
+	// every successful write left one audit row and one outbox event (same transaction); a refused one may leave a
+	// denied entry (IR603), counted apart
 	var audits, events int
 	p := &ops.Principal{TenantID: seed.ID("tenant-a"), MembershipID: seed.ID("hq-operator")}
 	if err := s.DB.Run(t.Context(), true, p, func(tx pgx.Tx) error {
-		if err := tx.QueryRow(t.Context(), `SELECT count(*) FROM audit.audit_log WHERE target_id = $1`, prop).Scan(&audits); err != nil {
+		if err := tx.QueryRow(t.Context(), `SELECT count(*) FROM audit.audit_log WHERE target_id = $1 AND result = 'success'`, prop).Scan(&audits); err != nil {
 			return err
 		}
 		return tx.QueryRow(t.Context(), `SELECT count(*) FROM platform.outbox WHERE aggregate_id = $1 AND event_type NOT LIKE 'RowChanged:%'`, prop).Scan(&events)
