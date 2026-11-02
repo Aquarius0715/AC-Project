@@ -421,7 +421,9 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([t
 /** A modal dialog: the shadcn/ui Dialog, as the WAI-ARIA dialog pattern and UX-06 ask (IR361). On open, focus moves into
  * it: the first field or control of the body, else the first footer button (Cancel), else the close button. Tab stays
  * inside, Escape or a press outside closes it, and focus returns to what had it before (the trigger) — or to what
- * `finalFocus` returns, where the dialog's own action takes the trigger away (a removed row, IR612). */
+ * `finalFocus` returns, where the dialog's own action takes the trigger away (a removed row, IR612). That element
+ * itself takes the focus, also a list region outside the Tab order: Base UI would pass it on to the region's first
+ * control, another row's button (IR620). */
 export function Modal({ open, title, onClose, children, footer, wide, finalFocus }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean; finalFocus?: () => HTMLElement | true | null }) {
   const t = useT();
   const popup = useRef<HTMLDivElement>(null);
@@ -430,9 +432,15 @@ export function Modal({ open, title, onClose, children, footer, wide, finalFocus
       .find((el) => !(el as HTMLButtonElement).disabled && el.tabIndex >= 0);
     return stop("body") ?? stop("footer") ?? stop("header") ?? true;
   };
+  const returnTo = finalFocus && (() => {
+    const el = finalFocus();
+    if (!(el instanceof HTMLElement)) return el ?? true;
+    queueMicrotask(() => el.focus({ preventScroll: true }));
+    return false;
+  });
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent ref={popup} showCloseButton={false} initialFocus={firstStop} finalFocus={finalFocus ?? true} className={cn("flex max-h-[92dvh] flex-col gap-0 p-0", wide ? "sm:max-w-3xl" : "sm:max-w-[560px]")}>
+      <DialogContent ref={popup} showCloseButton={false} initialFocus={firstStop} finalFocus={returnTo ?? true} className={cn("flex max-h-[92dvh] flex-col gap-0 p-0", wide ? "sm:max-w-3xl" : "sm:max-w-[560px]")}>
         <div data-part="header" className="flex items-center justify-between gap-3 border-b px-5 py-4">
           <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
           <DialogClose render={<Button variant="ghost" size="icon-sm" aria-label={t("Close")} />}><Icon name="close" /></DialogClose>
@@ -471,11 +479,18 @@ export type Col<T> = { key: string; label: string; render: (r: T) => React.React
 // TanStack Table builds the rows and cells (shadcn/ui's data table, DEC-75); a column carries its classes as meta
 const tableFx = tableFeatures({ columnMeta: {} as { className?: string; hideBelow?: "sm" | "md" } });
 const hideCls = (m?: { hideBelow?: "sm" | "md" }) => (m?.hideBelow === "sm" ? "max-sm:hidden" : m?.hideBelow === "md" ? "max-md:hidden" : undefined);
+/** A cell's content under one component type for good. A column's `render` is a new function on every render of the
+ * page, and FlexRender mounts a function as a component, so each render remounted every cell: a row's button that
+ * opened a dialog was gone when the dialog closed, and focus fell to the page (IR620). */
+function Cell<T>({ render, row }: { render: (r: T) => React.ReactNode; row: T }) {
+  return render(row);
+}
 /** Responsive table: scrolls horizontally if needed; optional columns hide on narrow containers. A row that opens a
  * record (`onRowClick`) is focusable and opens with Enter or Space as well as a click (keyboard access, IR294). */
 export function DataTable<T extends RowData>({ cols, rows, rowKey, onRowClick, selectedKey }: { cols: Col<T>[]; rows: T[]; rowKey: (r: T) => string; onRowClick?: (r: T) => void; selectedKey?: string }) {
   const t = useT();
-  const columns = cols.map((c): ColumnDef<typeof tableFx, T> => ({ id: c.key, header: c.label, cell: ({ row }) => c.render(row.original), meta: { className: c.className, hideBelow: c.hideBelow } }));
+  const columns = cols.map((c): ColumnDef<typeof tableFx, T> => ({ id: c.key, header: c.label, meta: { className: c.className, hideBelow: c.hideBelow } }));
+  const renders = new Map(cols.map((c) => [c.key, c.render]));
   const table = useTable({ features: tableFx, data: rows, columns, getRowId: (r) => rowKey(r) });
   return (
     <div className="overflow-hidden rounded-xl border">
@@ -501,7 +516,7 @@ export function DataTable<T extends RowData>({ cols, rows, rowKey, onRowClick, s
                 className={cx("data-[state=selected]:bg-primary-soft/60", onRowClick && "cursor-pointer outline-none focus-visible:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary")}>
                 {row.getAllCells().map((cell) => (
                   <TableCell key={cell.id} className={cx("px-3 py-2.5 whitespace-normal", hideCls(cell.column.columnDef.meta), cell.column.columnDef.meta?.className)}>
-                    <table.FlexRender cell={cell} />
+                    <Cell render={renders.get(cell.column.id)!} row={r} />
                   </TableCell>
                 ))}
               </TableRow>

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Badge, Banner, Btn, Card, DataTable, EmptyState, Field, Input, LinkBtn, Modal, Page, PageHead, Select, Textarea } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { Icon } from "@ac/web/components/Icon";
 import { useAction } from "@ac/web/lib/useAction";
-import type { ActionFailure } from "@ac/web/lib/actionMessage";
+import { fieldErrorTexts, type ActionFailure } from "@ac/web/lib/actionMessage";
+import { focusField } from "@ac/web/lib/focusField";
 import { ACCESS_MAX_DAYS, accessEnd, accessError, addDays, nameError, PARTNER_ROLES, PARTNER_STATUSES, partnerInviteError, reasonError, roleLabel, statusLabel, type PartnerRole, type PartnerStatus, type PartnerUserRow } from "@ac/web/lib/partnerUsers";
 
 type Result = { ok: true; value: null } | ({ ok: false } & ActionFailure);
@@ -22,6 +23,10 @@ export type UsersData = { company: string; status: PartnerStatus | null; rows: P
 type Dialog =
   | { kind: "invite" }
   | { kind: "access" | "disable" | "enable" | "remove"; row: PartnerUserRow };
+/** The dialog's fields, top to bottom, and the Core API fields that land on them. */
+type FieldKey = "name" | "email" | "until" | "reason";
+const FIELDS: FieldKey[] = ["name", "email", "until", "reason"];
+const API_FIELDS: Record<string, FieldKey> = { displayName: "name", email: "email", accessUntil: "until", reason: "reason" };
 
 /** Users (FR-P11, IR461): the contractor's company accounts, with the actions each row allows; one dialog at a time
  * (add, access end, disable, enable, remove), each change after the adding with a reason. */
@@ -35,6 +40,9 @@ export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersD
   const [role, setRole] = useState<PartnerRole>("technician");
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
+  const [server, setServer] = useState<Partial<Record<FieldKey, string>>>({});
+  const ids: Record<FieldKey, string> = { name: useId(), email: useId(), until: useId(), reason: useId() };
+  const gone = useRef(false); // the removed row took the dialog's trigger with it: focus goes to the list
   if (!data) {
     return (
       <Page>
@@ -47,7 +55,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersD
   }
   // a technician's access ends at most a year ahead (IR461); three months is offered first
   const open = (d: Dialog) => {
-    setDialog(d); setTried(false); setReason(""); setEmail(""); setName(""); setRole("technician");
+    setDialog(d); setTried(false); setReason(""); setEmail(""); setName(""); setRole("technician"); setServer({}); gone.current = false;
     setUntil(addDays(data.today, 90));
   };
   const close = () => setDialog(null);
@@ -56,14 +64,26 @@ export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersD
   const nameErr = adding ? nameError(name, t) : undefined;
   const untilErr = (adding && role === "technician") || dialog?.kind === "access" ? accessError(until, data.today, t) : undefined;
   const reasonErr = dialog && !adding ? reasonError(reason, t) : undefined;
+  const edit = (k: FieldKey) => setServer((s) => (s[k] ? { ...s, [k]: undefined } : s));
   const submit = () => {
     setTried(true);
-    if (!dialog || emailErr || nameErr || untilErr || reasonErr) return;
+    if (!dialog) return;
+    // a refused submit takes focus to the first field to fix, top to bottom (IR586, IR593)
+    const local: Partial<Record<FieldKey, string>> = { name: nameErr, email: emailErr, until: untilErr, reason: reasonErr };
+    const bad = FIELDS.find((k) => local[k]);
+    if (bad) return focusField(ids[bad]);
+    // what the Core API refuses on a field (an address someone else still holds, IR462) shows under it as well
+    const refused = (f: ActionFailure) => {
+      const fields = fieldErrorTexts(f, API_FIELDS, t);
+      setServer(fields);
+      const first = FIELDS.find((k) => fields[k]);
+      if (first) focusField(ids[first]);
+    };
     const who = dialog.kind === "invite" ? name.trim() || email.trim() : dialog.row.name ?? dialog.row.email;
-    if (dialog.kind === "invite") run(() => ops.invite(email, role, name, role === "technician" ? accessEnd(until) : null), sends ? t("{name} added — a set-up e-mail is on its way to {email}", { name: who, email: email.trim() }) : t("{name} added — nothing is sent in the demo", { name: who }), close);
-    else if (dialog.kind === "access") run(() => ops.access(dialog.row, accessEnd(until), reason), t("Access of {name} now ends {date}", { name: who, date: until }), close);
-    else if (dialog.kind === "remove") run(() => ops.remove(dialog.row, reason), t("{name} removed", { name: who }), close);
-    else run(() => ops.setStatus(dialog.row, dialog.kind === "disable" ? "disabled" : "active", reason), t(dialog.kind === "disable" ? "{name} disabled — they can no longer sign in" : "{name} enabled again", { name: who }), close);
+    if (dialog.kind === "invite") run(() => ops.invite(email, role, name, role === "technician" ? accessEnd(until) : null), sends ? t("{name} added — a set-up e-mail is on its way to {email}", { name: who, email: email.trim() }) : t("{name} added — nothing is sent in the demo", { name: who }), close, refused);
+    else if (dialog.kind === "access") run(() => ops.access(dialog.row, accessEnd(until), reason), t("Access of {name} now ends {date}", { name: who, date: until }), close, refused);
+    else if (dialog.kind === "remove") run(() => ops.remove(dialog.row, reason), t("{name} removed", { name: who }), () => { gone.current = true; close(); }, refused);
+    else run(() => ops.setStatus(dialog.row, dialog.kind === "disable" ? "disabled" : "active", reason), t(dialog.kind === "disable" ? "{name} disabled — they can no longer sign in" : "{name} enabled again", { name: who }), close, refused);
   };
   const title = !dialog ? "" : {
     invite: t("Add a user to {company}", { company: data.company || t("your company") }),
@@ -87,6 +107,7 @@ export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersD
         </Select>
       </div>
       <Card pad={false}>
+        <div id="users-list" tabIndex={-1} role="region" aria-label={t("Users")} className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
         {data.rows.length === 0 ? <EmptyState title={t("No users")}>{t("No account of your company has this status.")}</EmptyState> : (
           <DataTable rows={data.rows} rowKey={(u) => u.id} cols={[
             // on a phone the role and status sit under the name, so the actions keep their room
@@ -104,8 +125,8 @@ export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersD
                 <div className="flex flex-wrap items-center gap-1">
                   {a.resend && <Btn size="sm" variant="ghost" disabled={pending} onClick={() => run(() => ops.resend(u), sends ? t("Set-up e-mail sent again to {email}", { email: u.email }) : t("Set-up e-mail re-sent to {email} — nothing is sent in the demo", { email: u.email }))}><Icon name="send" />{t("Resend set-up e-mail")}</Btn>}
                   {a.access && <Btn size="sm" variant="ghost" onClick={() => { open({ kind: "access", row: u }); if (u.accessDate) setUntil(u.accessDate); }}><Icon name="edit" />{t("Access")}</Btn>}
-                  {a.disable && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "disable", row: u })}>{t("Disable")}</Btn>}
-                  {a.enable && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "enable", row: u })}>{t("Enable")}</Btn>}
+                  {/* Disable and Enable share one place: the button that opened the dialog stays, with the focus, once the account has changed */}
+                  {(a.disable || a.enable) && <Btn size="sm" variant="ghost" onClick={() => open({ kind: a.disable ? "disable" : "enable", row: u })}>{a.disable ? t("Disable") : t("Enable")}</Btn>}
                   {a.remove && <Btn size="sm" variant="ghost" onClick={() => open({ kind: "remove", row: u })}><Icon name="delete" />{t("Remove")}</Btn>}
                   {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
                 </div>
@@ -113,25 +134,26 @@ export function UsersView({ data, ops, onStatus, sends = false }: { data: UsersD
             } },
           ]} />
         )}
+        </div>
       </Card>
       <Banner>{t("A technician you add can be assigned once HQ has verified their certificates. An account keeps its e-mail and role — to change them, remove it and add it again. You can’t change your own account, and your company always keeps one active contractor.")}</Banner>
       <p className="text-[11px] text-muted-foreground">{sends ? t("The set-up e-mail comes from the sign-in service; in development it arrives in the local Mailpit inbox.") : t("Nothing is sent in the demo.")}</p>
-      <Modal open={!!dialog} onClose={close} title={title} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant={dialog?.kind === "remove" || dialog?.kind === "disable" ? "danger" : "primary"} disabled={pending} onClick={submit}>{action}</Btn></>}>
+      <Modal open={!!dialog} onClose={close} title={title} finalFocus={() => (gone.current ? document.getElementById("users-list") : true)} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant={dialog?.kind === "remove" || dialog?.kind === "disable" ? "danger" : "primary"} disabled={pending} onClick={submit}>{action}</Btn></>}>
         {adding && <>
-          <Field label={t("Name")} error={tried ? nameErr : undefined}><Input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} placeholder="Lim Wei Ming" /></Field>
-          <Field label={t("Email")} error={tried ? emailErr : undefined}><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="lim.tech@example.com" /></Field>
+          <Field label={t("Name")} error={(tried ? nameErr : undefined) ?? server.name}><Input id={ids.name} value={name} maxLength={120} onChange={(e) => { setName(e.target.value); edit("name"); }} placeholder="Lim Wei Ming" /></Field>
+          <Field label={t("Email")} error={(tried ? emailErr : undefined) ?? server.email}><Input id={ids.email} type="email" value={email} onChange={(e) => { setEmail(e.target.value); edit("email"); }} placeholder="lim.tech@example.com" /></Field>
           <Field label={t("Role")} hint={t("Contractors manage jobs, the team and users; technicians do the work on site.")}>
             <Select aria-label={t("Role")} value={role} onChange={(e) => setRole(e.target.value as PartnerRole)}>{PARTNER_ROLES.map((r) => <option key={r} value={r}>{t(roleLabel[r])}</option>)}</Select>
           </Field>
         </>}
         {((adding && role === "technician") || dialog?.kind === "access") &&
-          <Field label={t("Access until")} hint={t("The last day they can sign in, at most a year ahead (Kuala Lumpur time).")} error={tried ? untilErr : undefined}>
-            <Input type="date" value={until} min={data.today} max={addDays(data.today, ACCESS_MAX_DAYS)} onChange={(e) => setUntil(e.target.value)} />
+          <Field label={t("Access until")} hint={t("The last day they can sign in, at most a year ahead (Kuala Lumpur time).")} error={(tried ? untilErr : undefined) ?? server.until}>
+            <Input id={ids.until} type="date" value={until} min={data.today} max={addDays(data.today, ACCESS_MAX_DAYS)} onChange={(e) => { setUntil(e.target.value); edit("until"); }} />
           </Field>}
         {adding && <Banner>{t("Their account is created now and they get an e-mail to set their password; until they sign in they are listed as “Not signed in yet”.")}</Banner>}
         {dialog?.kind === "disable" && <Banner tone="warn">{t("Their access ends now. Enabling them again restores their access period, if it has not ended.")}</Banner>}
         {dialog?.kind === "remove" && <Banner tone="warn">{dialog.row.status === "invited" ? t("Their account is removed before they signed in.") : t("Their access ends now and they leave your company's user list.")}</Banner>}
-        {dialog && dialog.kind !== "invite" && <Field label={t("Reason")} error={tried ? reasonErr : undefined}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("e.g. on leave until October")} /></Field>}
+        {dialog && dialog.kind !== "invite" && <Field label={t("Reason")} error={(tried ? reasonErr : undefined) ?? server.reason}><Textarea id={ids.reason} value={reason} onChange={(e) => { setReason(e.target.value); edit("reason"); }} placeholder={t("e.g. on leave until October")} /></Field>}
       </Modal>
     </Page>
   );

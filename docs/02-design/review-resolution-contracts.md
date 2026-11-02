@@ -8663,3 +8663,19 @@ Found in the UX loop (UX-37, the customer's automations and schedules). The loca
    - `clientAutomations.test.ts` covers both withdrawn cards, in English and Malay.
    - `automations.e2e.ts` passes.
    - On the development stack, customer-a created a Sunday pre-cool schedule, switched it on, edited it and deleted it at 1920 and 1280, with the plain card. The confirmations and the next run ("Sun, 27 Sept, 06:00 MYT") read clearly, and axe passed.
+
+## IR620 A row's dialog gives the focus back to the row, and the Users dialogs take it to the field to fix — 2026-11-02
+
+Found in the UX loop (UX-38, the contractor's Users). Closing a dialog that a table row opened left the focus on the page itself: after Escape or Cancel, the next Tab started again at the skip link. The cause was the shared DataTable. Pages write their columns inline, so each render brings new render functions, and TanStack's FlexRender mounts a function as a component. So every render of the page, such as opening the dialog, remounted every cell, and the row's button that opened the dialog was gone when it closed. A refused Add user or change also left the focus on the button, and an address that the Core API refused only showed in a toast.
+
+1. **DataTable keeps its cells.** A cell's content renders under one component type for good. The elements of a cell stay across renders, and so does the focus on a row's button. This applies to every table in the four apps.
+2. **The focus goes back to the row's button.** A dialog opened from a row gives the focus back to that button after Escape, Cancel or a save. In the Users pages of the contractor and the customer, Disable and Enable share one place in the row. The button that opened the dialog stays, with the focus, once the account has changed. The same holds for Make owner / Make member.
+3. **Removing a row focuses the list itself.** When the dialog's action removes its row, the focus goes to the list region, as IR612 asked. Base UI handed a region outside the Tab order to its first control, which was another row's button. The shared Modal now focuses the element `finalFocus` names. This also covers the Team page's unavailable days when other rows remain.
+4. **Refused submits.** In the Users dialogs, a refused submit takes the focus to the first field to fix, top to bottom, as IR586 and IR593 ask. A field the Core API refuses keeps its message under that field as well as in the toast, for example an address someone else still holds (`errors.email_taken`, IR462). The message clears when the field is edited.
+5. **Design.** DD-P11, DD-C19 and the UIUX accessibility rules say the same. Figma is unchanged: nothing looks different.
+6. **Tests.**
+   - `dataTable.test.tsx` keeps a cell's button, and its focus, across renders. It fails on the FlexRender version.
+   - `modal.test.tsx` focuses the list itself when rows remain.
+   - `actionMessage.test.ts` covers `fieldErrorTexts`.
+   - The users e2e of both apps check the focus on the first field to fix, on the row's button after a save, and on the list after a removal. A new partner check covers Escape from a row's dialog.
+   - On the development stack, contractor-a added, refused, resent, changed and removed a technician at 1920 and 1280 with axe passing. The focus came back to each row's Access, Disable and Remove buttons after Escape and Cancel. An address held by a customer owner showed its message under Email.

@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.488.0
+version: 0.489.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -287,6 +287,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.489.0: Table rows keep their buttons across renders, so a dialog gives the focus back to the row; the Users dialogs focus the field to fix (IR620). Phase 1A unchanged.
 0.488.0: The customer's location consent card warns only when a withdrawal turned automations off (IR619). Phase 1A unchanged.
 0.487.0: Icon and text actions are 44 px on touch screens too, and the phone crawl measures every button (IR618). Phase 1A unchanged.
 0.486.0: Every filter chip and tab built from Plain is 44 px tall on touch screens (IR617). Phase 1A unchanged.

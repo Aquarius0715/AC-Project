@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { DataTable, type Col } from "@ac/web/components/ui";
@@ -48,5 +49,26 @@ describe("DataTable", () => {
     // a key pressed on a control inside the row belongs to that control
     fireEvent.keyDown(within(office).getByText("Office AC"), { key: "Enter" });
     expect(open.mock.calls.map(([u]) => u.id)).toEqual(["u-1", "u-2", "u-1"]);
+  });
+
+  // IR620: pages write their columns inline, so every render brings new render functions; the cells keep their
+  // elements all the same — the focus stays on a row's button, and a dialog it opened can give the focus back to it
+  it("keeps a cell's controls across renders of the page", () => {
+    function Page() {
+      const [n, setN] = useState(0);
+      return (
+        <>
+          <p>Opened {n}</p>
+          <DataTable rows={units} rowKey={(u) => u.id} cols={[{ key: "a", label: "Actions", render: (u) => <button onClick={() => setN(n + 1)}>Edit {u.name}</button> }]} />
+        </>
+      );
+    }
+    render(<Page />);
+    const edit = screen.getByRole("button", { name: "Edit Bedroom AC" });
+    edit.focus();
+    fireEvent.click(edit);
+    expect(screen.getByText("Opened 1")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit Bedroom AC" })).toBe(edit);
+    expect(document.activeElement).toBe(edit);
   });
 });

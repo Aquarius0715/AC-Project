@@ -16,6 +16,7 @@ test("a contractor adds a technician, waits to resend the set-up e-mail, moves t
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Add user" }).click();
   await expect(dialog.getByText("A name of 1–120 characters")).toBeVisible(); // nothing typed yet
+  await expect(dialog.getByLabel("Name")).toBeFocused(); // the first field to fix, top to bottom (IR620, as IR586)
   await dialog.getByLabel("Name").fill("E2E Technician");
   await dialog.getByLabel("Email").fill(email);
   await dialog.getByRole("combobox", { name: "Role" }).selectOption("technician");
@@ -38,14 +39,17 @@ test("a contractor adds a technician, waits to resend the set-up e-mail, moves t
   await dialog.getByLabel("Access until").fill("2026-12-31");
   await dialog.getByRole("button", { name: "Save access" }).click();
   await expect(dialog.getByText("A reason of 1–1000 characters")).toBeVisible(); // no reason yet
+  await expect(dialog.getByLabel("Reason")).toBeFocused();
   await dialog.getByLabel("Reason").fill("Contract until year end");
   await dialog.getByRole("button", { name: "Save access" }).click();
   await expect(row(email)).toContainText("31 Dec 2026");
+  await expect(row(email).getByRole("button", { name: "Access" })).toBeFocused(); // back on the row's button (IR620)
 
   await row(email).getByRole("button", { name: "Remove" }).click();
   await dialog.getByLabel("Reason").fill("Should have been a contractor");
   await dialog.getByRole("button", { name: "Remove" }).click();
   await expect(row(email)).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Users" })).toBeFocused(); // the row went with its button: the list
 
   // the same address again, with the right role: the same person comes back with a new account set-up (IR462)
   await page.getByRole("button", { name: "Add user" }).click();
@@ -90,4 +94,18 @@ test("a contractor cannot give a technician access for more than a year", async 
   await dialog.getByRole("combobox", { name: "Role" }).selectOption("contractor");
   await expect(dialog.getByLabel("Access until")).toHaveCount(0);
   await dialog.getByRole("button", { name: "Cancel" }).click();
+});
+
+// IR620: a dialog opened from a row gives the focus back to that row's button on Escape (the table keeps its cells'
+// elements while the page re-renders), so a keyboard user carries on where they were.
+test("a row's dialog closed with Escape gives the focus back to the row's button", async ({ page, app }) => {
+  test.skip(app.id !== "partner", "partner only");
+  await page.goto("/partner/users");
+  const access = page.getByRole("row").filter({ hasText: "tech-external-a" }).getByRole("button", { name: "Access" });
+  await access.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(access).toBeFocused();
 });

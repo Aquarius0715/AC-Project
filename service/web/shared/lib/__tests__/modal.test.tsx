@@ -20,15 +20,15 @@ function Harness({ fields = true, inner = false }: { fields?: boolean; inner?: b
   );
 }
 // a list whose row the dialog removes: the row's button opened it, so focus goes to the list (IR612)
-function Removal() {
-  const [rows, setRows] = useState(["a"]);
+function Removal({ start = ["a"] }: { start?: string[] }) {
+  const [rows, setRows] = useState(start);
   const [open, setOpen] = useState(false);
   const gone = useRef(false);
   return (
     <>
       <div id="rows" tabIndex={-1} role="region" aria-label="Rows">{rows.map((r) => <button key={r} onClick={() => setOpen(true)}>Remove {r}</button>)}</div>
       <Modal open={open} title="Remove" onClose={() => setOpen(false)} finalFocus={() => (gone.current ? document.getElementById("rows") : true)}
-        footer={<button onClick={() => { gone.current = true; setRows([]); setOpen(false); }}>Remove</button>}><p>Sure?</p></Modal>
+        footer={<button onClick={() => { gone.current = true; setRows((rs) => rs.slice(1)); setOpen(false); }}>Remove</button>}><p>Sure?</p></Modal>
     </>
   );
 }
@@ -62,6 +62,16 @@ describe("the modal dialog's keyboard behaviour", () => {
     fireEvent.click(remove);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("region", { name: "Rows" })));
+  });
+  it("moves focus to the list itself, not to another row's button, when rows remain (IR620)", async () => {
+    render(<Removal start={["a", "b"]} />);
+    const trigger = screen.getByRole("button", { name: "Remove a" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("region", { name: "Rows" })));
+    expect(screen.getByRole("button", { name: "Remove b" })).not.toBe(document.activeElement);
   });
   it("lets only the innermost of stacked dialogs answer Escape", async () => {
     render(<Harness inner />);

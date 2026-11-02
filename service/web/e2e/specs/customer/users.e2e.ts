@@ -25,6 +25,7 @@ test("the add dialog refuses a missing name, a bad or existing address and adds 
   await dialog.getByRole("button", { name: "Add user" }).click();
   await expect(dialog).toContainText("A valid email address (up to 254 characters)");
   await expect(dialog).toContainText("A name of 1–120 characters");
+  await expect(dialog.getByLabel("Name")).toBeFocused(); // the first field to fix, top to bottom (IR620, as IR586)
   await dialog.getByLabel("Email").fill(email.toUpperCase()); // the check ignores case
   await expect(dialog).toContainText("Already a user of this customer");
   await dialog.getByRole("button", { name: "Cancel" }).click();
@@ -55,11 +56,15 @@ test("the owner adds a user, changes the role and removes them", async ({ page }
   await row.getByRole("button", { name: "Make member" }).click();
   await dialog.getByRole("button", { name: "Change role" }).click();
   await expect(dialog).toContainText("A reason of 1–1000 characters");
+  await expect(dialog.getByLabel("Reason")).toBeFocused();
   await dialog.getByLabel("Reason").fill("Not an owner after all");
   await dialog.getByRole("button", { name: "Change role" }).click();
   await expect(row).toContainText("Member");
+  // the row's button that opened the dialog has the focus again, now worded for the new role (IR620)
+  await expect(row.getByRole("button", { name: "Make owner" })).toBeFocused();
   await row.getByRole("button", { name: "Remove" }).click();
   await dialog.getByLabel("Reason").fill("Not joining after all");
   await dialog.getByRole("button", { name: "Remove" }).click();
   await expect(row).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Users" })).toBeFocused(); // the row went with its button: the list
 });

@@ -63,6 +63,14 @@ const humanize = (s: string) => {
 /** A field of a refusal in words: its last part, humanized ("newUser.email" → "Email"). */
 export const fieldName = (field: string) => humanize(field.split(".").pop() ?? field);
 
+/** The field errors of a refusal under the form's own names (`fields` maps an API field to one, the rest are left out),
+ * each worded as the toast words it: the text under the field to fix (IR586). */
+export function fieldErrorTexts<K extends string>(r: ActionFailure, fields: Record<string, K>, t: T = translator("en")): Partial<Record<K, string>> {
+  const out: Partial<Record<K, string>> = {};
+  for (const [field, key] of Object.entries(r.fieldErrors)) if (fields[field]) out[fields[field]] = actionMessage({ ...r, fieldErrors: { [field]: key } }, t);
+  return out;
+}
+
 export function actionMessage(r: ActionFailure, t: T = translator("en")): string {
   const [field, key] = Object.entries(r.fieldErrors)[0] ?? [];
   if (field && key) {

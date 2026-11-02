@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actionMessage } from "@ac/web/lib/actionMessage";
+import { actionMessage, fieldErrorTexts } from "@ac/web/lib/actionMessage";
 import { translator } from "@ac/web/lib/i18n";
 
 const failure = (over: Partial<Parameters<typeof actionMessage>[0]>) => ({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: {}, ...over });
@@ -64,5 +64,21 @@ describe("actionMessage for the user management refusals (IR416–IR421)", () =>
     expect(actionMessage(r("errors.invoice_has_payment"), translator("ms"))).toBe("Invois ini sudah mempunyai pembayaran yang sedang diproses atau telah direkodkan — selesaikan atau gagalkan pembayaran itu dahulu");
     expect(actionMessage(r("errors.last_identity_admin"))).toBe("At least one active membership must keep identity.write — give it to another HQ membership first, then change this one");
     expect(actionMessage(r("errors.some_other_rule"))).toBe("Some other rule"); // other keys are still humanized
+  });
+});
+
+// IR620: the Users dialogs put a field refusal under its field as well as in the toast
+describe("fieldErrorTexts", () => {
+  it("words each known field as the toast does, under the form's own names, and leaves the rest out", () => {
+    const f = failure({ fieldErrors: { email: "errors.email_taken", accessUntil: "error.range", tenantId: "error.invalid" } });
+    expect(fieldErrorTexts(f, { email: "email", accessUntil: "until" })).toEqual({
+      email: "Email belongs to someone who still has access — use another address or ask HQ",
+      until: "Access until is out of range",
+    });
+    expect(fieldErrorTexts(failure({ code: "CONFLICT", messageKey: "errors.own_account" }), { email: "email" })).toEqual({});
+  });
+  it("words them in the display language", () => {
+    const ms = fieldErrorTexts(failure({ fieldErrors: { reason: "error.length" } }), { reason: "reason" }, translator("ms"));
+    expect(ms.reason).not.toBe("Reason is too short or too long");
   });
 });
