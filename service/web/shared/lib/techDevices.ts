@@ -52,6 +52,13 @@ export const HQ_FILTERS: { id: Filter; label: string }[] = [...FILTERS, { id: "n
 export const filterOf = (f: Filter) => (r: TechDeviceRow) =>
   f === "all" || (f === "tamper" ? r.tamper : f === "nosensors" ? r.sensors === 0 : f === "online" ? r.conn === "online" : r.conn !== "online");
 
+/** The device a state filter opens (IR616): when the open device is one the filter hides, the filter's first device —
+ * so the detail never shows a device the list no longer has; null keeps the open one (or when the filter shows none). */
+export function followFilter(rows: TechDeviceRow[], f: Filter, openId: string | null): string | null {
+  const kept = rows.filter(filterOf(f));
+  return openId && !kept.some((r) => r.id === openId) && kept[0] ? kept[0].id : null;
+}
+
 /** When the open fault of each axis was detected (the newest fault of the axis while it has no restoredAt, T12 events). */
 export type OpenFaults = Partial<Record<"connection" | "power" | "tamper", string>>;
 const faultAxis: Partial<Record<ApiDeviceEventFull["eventType"], keyof OpenFaults>> = { communication_lost: "connection", power_lost: "power", tamper: "tamper" };

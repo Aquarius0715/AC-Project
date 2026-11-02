@@ -6,7 +6,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { metrics, metricUnit, type Metric } from "@ac/web/lib/devices";
-import { filterOf, HQ_FILTERS, type Filter, metricText } from "@ac/web/lib/techDevices";
+import { filterOf, followFilter, HQ_FILTERS, type Filter, metricText } from "@ac/web/lib/techDevices";
 import { bindDevice, calibrateSensor, checkDevice, registerDevice, updateFirmware } from "../actions";
 import type { DevicesLive } from "./devices-view";
 import { Icon } from "@ac/web/components/Icon";
@@ -66,8 +66,8 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">{counts.map(({ f, label, n }) => (
-          <Plain key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}
-            className={cx("flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold", filter === f ? "border-ink bg-ink text-white" : "border-line bg-surface")}>
+          <Plain key={f} type="button" aria-pressed={filter === f} onClick={() => { setFilter(f); const next = followFilter(rows, f, dv?.row.id ?? null); if (next) nav({ deviceId: next }); }}
+            className={cx("flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold pointer-coarse:min-h-11", filter === f ? "border-ink bg-ink text-white" : "border-line bg-surface")}>
             {f !== "all" && f !== "nosensors" && <span className={cx("h-2 w-2 rounded-full", f === "online" ? "bg-ok" : f === "offline" ? "bg-crit" : "bg-warn")} />}{label} <span className="text-xs opacity-70">{n}</span>
           </Plain>
         ))}</div>

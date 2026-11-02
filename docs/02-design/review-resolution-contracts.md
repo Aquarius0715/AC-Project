@@ -8609,3 +8609,20 @@ Decided by the user as DEC-90 (UX-loop proposal B-3 of UX-07). The UIUX specific
    - `touch.test.tsx` checks the touch classes of the shared controls and Plain's opt-out.
    - The phone crawl measures the controls.
    - On the development stack, the technician's devices page at 390×844 with touch showed the search, Register device and Rebind at 44 px without sideways scroll. The same page with a mouse kept 32 / 28 px.
+
+## IR616 The technician's filters fit a finger, and the device detail follows the filter — 2026-11-02
+
+Found in the UX loop (UX-34), after IR615. Two problems on the technician's phone:
+
+- **Size.** Screens build chips and tabs of their own from `Plain`, so they kept their compact sizes on a touch screen. The overview's Today / All assigned tabs were 33 px, and the devices' state filters 29 px.
+- **Detail.** On the devices page, a state filter that hid the open device left its detail open below the list. "Offline" listed Meeting room AC, while the detail still showed Bedroom AC, online. HQ's device tab did the same.
+
+1. **Touch.** The two technician controls take `pointer-coarse:min-h-11`, as the shared controls do (IR615), and the overview's tabs center their label. A mouse keeps the compact sizes.
+2. **Detail follows the filter.** On the technician's devices page and HQ's device tab, a filter that hides the open device opens its first listed device (`followFilter`). The device events view keeps its device.
+3. **Design.** DD-T11 and DD-A04 say the same.
+4. **Tests.**
+   - `techDevices.test.ts` covers `followFilter`.
+   - `touch-chips.e2e.ts` checks at 390×844 with touch that the tabs and filters are at least 44 px and work by tap, that the detail follows Offline, and that axe passes.
+   - `admin/devices.e2e.ts` passes unchanged.
+   - On the development stack, Offline opened Meeting room AC on the technician's phone, and on HQ's tab at 1920 and 1280.
+5. **Next.** The other screens' `Plain` chips and rows listed in UX-33 follow screen by screen.

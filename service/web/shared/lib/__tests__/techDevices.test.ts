@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ApiDevice, ApiDeviceDetail, ApiDeviceOperation } from "@ac/web/lib/devices";
 import {
-  calibrationText, deviceFieldText, deviceRefusal, deviceTiles, eventRows, failureText, filterOf, firmwareCard, HQ_FILTERS, jobFor, newerFirmware, newerVersions, openAlerts, openFaults,
+  calibrationText, deviceFieldText, deviceRefusal, deviceTiles, eventRows, failureText, filterOf, followFilter, firmwareCard, HQ_FILTERS, jobFor, newerFirmware, newerVersions, openAlerts, openFaults,
   operationLabel, operationRows, sensorRows, techDeviceRows, type ApiAlertLite, type ApiDeviceEventFull, type TechJob,
 } from "@ac/web/lib/techDevices";
 import { i18nOf } from "@ac/web/lib/i18n";
@@ -58,6 +58,17 @@ describe("techDeviceRows / filterOf", () => {
     expect(rows.filter(filterOf("online")).map((r) => r.id)).toEqual(["a"]);
     expect(rows.filter(filterOf("offline")).map((r) => r.id)).toEqual(["b", "c"]);
     expect(rows.filter(filterOf("tamper")).map((r) => r.id)).toEqual(["b"]);
+  });
+});
+
+describe("followFilter (IR616)", () => {
+  it("opens the filter's first device when the open one is hidden, and keeps it otherwise", () => {
+    const list = techDeviceRows([device({ id: "a", serial: "AC-A" }), device({ id: "b", serial: "AC-B", connection: "offline" }), device({ id: "c", serial: "AC-C", connection: "offline" })], new Map(), NOW);
+    expect(followFilter(list, "offline", "a")).toBe("b"); // the online device is hidden: the first offline one opens
+    expect(followFilter(list, "offline", "c")).toBeNull(); // still listed
+    expect(followFilter(list, "all", "a")).toBeNull();
+    expect(followFilter(list, "tamper", "a")).toBeNull(); // the filter shows none: the open device stays
+    expect(followFilter(list, "online", null)).toBeNull(); // nothing open
   });
 });
 

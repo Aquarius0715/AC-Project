@@ -379,6 +379,8 @@ Scope: FR-T11 / Main display pattern: **UI-LIST**, **UI-FORM**, **UI-DETAIL**. S
 
 **Verification**: Check the traceability entries under AT-T11 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
+As built (IR616): the device list's state filters All / Online / Offline / Tamper work as HQ's: a filter that hides the open device opens its first listed device, so the detail never shows a device the list no longer has. On a touch screen the filters, like the overview's Today / All assigned tabs, are 44 px tall (IR615).
+
 ### DD-T12 Details
 
 **Source mapping**: SRC-06 BIZ-20 → FR-T12 → DD-T12. Source category: original company requirements SRC-06 + design additions. Design addition: distinguishing communication loss, power loss, and removal. Field types, required status, defaults, and action order are implementation proposals.

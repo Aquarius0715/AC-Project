@@ -31,7 +31,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div role="tablist" className="flex flex-wrap gap-2">
-          {live.tabs.map((x) => <Plain key={x.id} role="tab" aria-selected={live.tab === x.id} onClick={() => patch({ tab: x.id === "today" ? null : x.id })} className={cx("rounded-control border px-3 py-1.5 text-[13px] font-semibold", live.tab === x.id ? "border-primary bg-primary text-white" : "border-line bg-surface text-ink hover:bg-surface2")}>{x.label} ({x.count})</Plain>)}
+          {live.tabs.map((x) => <Plain key={x.id} role="tab" aria-selected={live.tab === x.id} onClick={() => patch({ tab: x.id === "today" ? null : x.id })} className={cx("inline-flex items-center rounded-control border px-3 py-1.5 text-[13px] font-semibold pointer-coarse:min-h-11", live.tab === x.id ? "border-primary bg-primary text-white" : "border-line bg-surface text-ink hover:bg-surface2")}>{x.label} ({x.count})</Plain>)}
         </div>
         <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => patch({ sort: e.target.value === "severity" ? null : e.target.value })}>{live.sorts.map((s) => <option key={s.id} value={s.id}>{s.text}</option>)}</Select>
       </div>
