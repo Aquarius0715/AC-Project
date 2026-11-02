@@ -8396,3 +8396,13 @@ The recorded before/after values hold no contact or secret fields.
 2. **Actors.** A name that several people share carries the start of each one's ID, for example "Ahmad · a1b2c3d4", as the entry's detail shows it.
 3. **Design.** DD-A16 now notes as built that only successful changes are recorded. Recording denied, failed and pending attempts is a backend change and awaits a decision. Figma's audit frames keep their designed entries.
 4. **Tests.** `audit.test.ts` covers shared names. `audit.e2e.ts` checks the Denied empty state.
+
+## IR600 An alert without a cooldown notifies once while it is open — 2026-11-02
+
+Decided by the user as DEC-90 (UX-loop proposal of UX-24). The HQ default policy has no cooldown. While a unit stayed offline, its ac_offline rule matched at every evaluation and notified the same open alert again and again. In the development stack, Live · Daikin AC (offline since 20 Sept) had gathered over 5,700 fault notices from one open alert, about two a minute, burying every other notice in its owner's inbox.
+
+1. **Rule.** A policy without a cooldown notifies once per open alert. While the alert it notified about stays open — acknowledged or not — later matches are suppressed with the reason `cooldown`. A recurrence after the alert resolved opens a new alert (linked to the old one, IR66) and notifies again. Policies with a cooldown keep it: they notify again once the cooldown has passed, while the alert is open. `NotificationOutcome` keeps its reasons, so the contract does not change.
+2. **Screens.** HQ's "Test with demo data" words the `cooldown` outcome for both cases: "No new notice: one about {name} already went out — within the cooldown, or for its alert that is still open." The Malay dictionary follows.
+3. **Specifications.** BR-A05, DD-A05 step 2 and the deterministic evaluation contract say the same.
+4. **Tests.** `TestAutomationNotifications` expects the default policy's second evaluation to be suppressed. `TestAlertRecoveryResolvesPolicyAlerts` checks that a breach that goes on adds no notice and that the recurrence notifies again. Its alert order no longer depends on equal test-clock times. `adminAlerts.test.ts` covers the new wording.
+5. **Development data.** The notices already created stay. Clearing them is part of a data reset, which is the user's decision.

@@ -162,6 +162,8 @@ describe("Test with demo data (DD-A05 item 7, IR348)", () => {
       "No alert: 29.9 °C does not meet ≥ 30 °C.", "No alert: 30 °C meets ≥ 30 °C, but not within the active hours.",
     ]);
     expect(["disabled", "cooldown", "quality", "owner_forbidden"].map((r) => testOutcome(d("suppressed", r as NotificationDecision["reason"]), p, 30, "Bedroom AC").tone)).toEqual(["warn", "muted", "warn", "warn"]);
+    // within the cooldown, or the default policy's open alert already told (IR600)
+    expect(testOutcome(d("suppressed", "cooldown"), p, 30, "Bedroom AC").text).toBe("No new notice: one about Bedroom AC already went out — within the cooldown, or for its alert that is still open.");
     expect(testOutcome(null, p, 30, "Bedroom AC")).toEqual({ tone: "warn", text: "The policy did not run on Bedroom AC — it is no longer attached to it." });
     expect(testOutcome(d("suppressed", "not_due"), { metric: "refrigerant_pressure", operator: "lte", threshold: 350 }, 351, "AC", MS.t).text).toBe("Tiada amaran: 351 kPa tidak memenuhi ≤ 350 kPa.");
   });

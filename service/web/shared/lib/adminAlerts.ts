@@ -269,7 +269,8 @@ export function testOutcome(d: NotificationDecision | null, p: Pick<AdminPolicy,
   if (d.decision === "failed") return { tone: "crit", text: t("An alert, but nobody is notified: no recipient may read {name}.", v) };
   switch (d.reason) {
     case "disabled": return { tone: "warn", text: t("No alert: the policy is off. Switch it on and save it to test it.") };
-    case "cooldown": return { tone: "muted", text: t("No alert yet: a notification about {name} went out within the cooldown.", v) };
+    // a policy notifies again only after its cooldown — or, without one (the default policy), once per open alert (IR600)
+    case "cooldown": return { tone: "muted", text: t("No new notice: one about {name} already went out — within the cooldown, or for its alert that is still open.", v) };
     case "quality": return { tone: "warn", text: t("No alert: the reading does not count (missing, stale or not valid).") };
     case "owner_forbidden": return { tone: "warn", text: t("No alert: the member who made the policy no longer has access.") };
     default: return holds(p.operator, value, p.threshold)

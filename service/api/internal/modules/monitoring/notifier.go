@@ -243,8 +243,9 @@ func recoverAlert(ctx context.Context, c *ops.Call, unit, policy uuid.UUID, rule
 // its conditions holds for the facts at the tick (facts are taken as sustained for durationSeconds in the demo
 // evaluation); absent facts give not_due, invalid quality gives quality. With fire, a matching policy reuses or opens
 // its source Alert and creates one Notification per recipient and channel; zero recipients add one DeliveryFailure
-// (no_recipient, SR12) and do not advance the cooldown. With fire, a condition whose fact is past its recovery
-// threshold resolves the policy's open Alert first, whether the policy is enabled or not (D08).
+// (no_recipient, SR12) and do not advance the cooldown. A policy without a cooldown notifies once per open Alert
+// (IR600). With fire, a condition whose fact is past its recovery threshold resolves the policy's open Alert first,
+// whether the policy is enabled or not (D08).
 func (n Notifier) Evaluate(ctx context.Context, c *ops.Call, unit uuid.UUID, factsJSON []byte, at time.Time, eventID uuid.UUID, fire bool) ([]json.RawMessage, error) {
 	var facts []fact
 	_ = json.Unmarshal(factsJSON, &facts)
@@ -317,6 +318,21 @@ func (n Notifier) Evaluate(ctx context.Context, c *ops.Call, unit uuid.UUID, fac
 				return nil, err
 			}
 			if last != nil && at.Sub(*last) < time.Duration(p.cooldown)*time.Minute {
+				reason = "cooldown"
+			}
+		}
+		if reason == "" && p.cooldown == 0 { // without a cooldown (the default policy) a policy notifies once per open alert: nothing more while the
+			// alert it notified about stays open; a recurrence after it resolved opens a new alert and notifies again (IR600, DEC-90)
+			var key *string
+			if hitKey != "" {
+				key = &hitKey
+			}
+			var told bool
+			if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.alerts a JOIN monitoring.alert_notifications n ON n.alert_id = a.id AND n.policy_id = a.policy_id
+				WHERE a.unit_id = $1 AND a.policy_id = $2 AND a.rule_key IS NOT DISTINCT FROM $3 AND a.type = 'sensor' AND a.status <> 'resolved')`, unit, p.id, key).Scan(&told); err != nil {
+				return nil, err
+			}
+			if told {
 				reason = "cooldown"
 			}
 		}

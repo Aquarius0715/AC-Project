@@ -4093,7 +4093,7 @@ export const ms: Record<string, string> = {
   "{value} {unit} on {name} raises an alert and notifies the recipients — simulated, nothing is stored.": "{value} {unit} pada {name} menimbulkan amaran dan memaklumkan penerima — disimulasikan, tiada yang disimpan.",
   "An alert, but nobody is notified: no recipient may read {name}.": "Amaran, tetapi tiada sesiapa dimaklumkan: tiada penerima boleh membaca {name}.",
   "No alert: the policy is off. Switch it on and save it to test it.": "Tiada amaran: polisi dimatikan. Hidupkan dan simpan untuk mengujinya.",
-  "No alert yet: a notification about {name} went out within the cooldown.": "Belum ada amaran: pemberitahuan tentang {name} telah dihantar dalam tempoh bertenang.",
+  "No new notice: one about {name} already went out — within the cooldown, or for its alert that is still open.": "Tiada pemberitahuan baharu: satu tentang {name} telah dihantar — dalam tempoh bertenang, atau untuk amarannya yang masih terbuka.",
   "No alert: the reading does not count (missing, stale or not valid).": "Tiada amaran: bacaan tidak dikira (hilang, lapuk atau tidak sah).",
   "No alert: the member who made the policy no longer has access.": "Tiada amaran: ahli yang membuat polisi tidak lagi mempunyai akses.",
   "No alert: {value} {unit} meets {op} {threshold} {unit}, but not within the active hours.": "Tiada amaran: {value} {unit} memenuhi {op} {threshold} {unit}, tetapi bukan dalam waktu aktif.",

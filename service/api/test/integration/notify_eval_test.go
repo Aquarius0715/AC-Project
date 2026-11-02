@@ -96,8 +96,9 @@ func TestAutomationNotifications(t *testing.T) {
 	if open != 1 || reused != first || failures != 2 {
 		t.Errorf("one open alert with two failures: %d %s/%s %d", open, reused, first, failures)
 	}
-	// cooldown after a created notification (30 minutes); the default policy has none
-	if _, m := post(s, &customerB, "automations.simulate", input(high)); outcome(m, u, withRecipient)["reason"] != "cooldown" || outcome(m, u, def)["decision"] != "selected" {
+	// cooldown after a created notification (30 minutes); the default policy has none and notifies once per open alert,
+	// so its alert of the unit, still open, sends nothing more either (IR600)
+	if _, m := post(s, &customerB, "automations.simulate", input(high)); outcome(m, u, withRecipient)["reason"] != "cooldown" || outcome(m, u, def)["reason"] != "cooldown" {
 		t.Errorf("cooldown: %v", m)
 	}
 	if _, m := post(s, &customerB, "notifications.list", `{"filters":{"type":"fault"},"limit":100}`); len(items(m)) == 0 {
@@ -124,7 +125,8 @@ func TestAutomationNotifications(t *testing.T) {
 // D08 / IR66: fired facts past the recovery threshold resolve the open policy alerts of the unit — the attached
 // policy's and the default rule's — with the recovery as evidence; a fact between the thresholds, a suspect one and a
 // simulation change nothing, an alert without a policy stays open, and the next breach opens a new alert linked to the
-// resolved one.
+// resolved one. Both policies have no cooldown, so each notifies once per open alert: a breach that goes on adds no
+// notice, and the recurrence notifies again (IR600).
 func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 	s := server(t)
 	owner(t, `DELETE FROM control.evaluation_events`)
@@ -169,7 +171,9 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 			t.Skip(err)
 		}
 		defer conn.Close(ctx)
-		rs, err := conn.Query(ctx, `SELECT id, status, resolution_reason, resolution_evidence_ids, previous_alert_id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 ORDER BY detected_at, created_at`, u, policy)
+		// the test clock stands still, so a recurrence has its predecessor's times: the one it links to comes first
+		rs, err := conn.Query(ctx, `SELECT id, status, resolution_reason, resolution_evidence_ids, previous_alert_id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2
+			ORDER BY detected_at, created_at, previous_alert_id IS NOT NULL`, u, policy)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -189,10 +193,23 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 		}
 		return out
 	}
+	told := func(policy string) int {
+		var n int
+		ownerScan(t, `SELECT count(*) FROM monitoring.alert_notifications WHERE unit_id = $1 AND policy_id = $2`, []any{u, policy}, &n)
+		return n
+	}
 	fire("1200", "valid", false)
 	first := of(pol)
 	if len(first) != 1 || first[0].status != "open" || len(of(def)) != 1 {
 		t.Fatalf("the breach opens the policy's and the default rule's alerts: %v / %v", first, of(def))
+	}
+	toldPol, toldDef := told(pol), told(def)
+	if toldPol != 1 || toldDef < 1 {
+		t.Fatalf("the breach notifies: policy %d, default %d", toldPol, toldDef)
+	}
+	fire("1250", "valid", false) // the breach goes on: the open alerts were told already
+	if told(pol) != toldPol || told(def) != toldDef || len(of(pol)) != 1 {
+		t.Errorf("a breach that goes on notifies again: policy %d → %d, default %d → %d", toldPol, told(pol), toldDef, told(def))
 	}
 	fire("950", "valid", false)   // between the thresholds
 	fire("850", "suspect", false) // not a valid reading
@@ -216,6 +233,9 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 	again := of(pol)
 	if len(again) != 2 || again[1].status != "open" || again[1].previous == nil || again[1].previous.String() != first[0].id {
 		t.Fatalf("a recurrence opens a new alert linked to the resolved one: %+v", again)
+	}
+	if told(pol) != 2*toldPol || told(def) != 2*toldDef {
+		t.Errorf("the recurrence notifies again: policy %d, default %d", told(pol), told(def))
 	}
 	_, m = post(s, &customerB, "alerts.get", `{"id":"`+again[1].id+`"}`)
 	if data(m)["previousAlertId"] != first[0].id {

@@ -261,7 +261,7 @@ Scope: FR-A05 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 **Steps**
 
 1. Choose the owner customer, metric, comparison, and duration. Specify recipients, channels, and escalation delay. After saving, combine conditions to check trigger and recovery behavior.
-2. Apply these business rules to reads and actions. Units are fixed by metric. Do not use missing or stale data to judge normal thresholds; treat them as connection/data-quality notices. Suppress repeats with cooldown. Record severity changes as new notification reasons.
+2. Apply these business rules to reads and actions. Units are fixed by metric. Do not use missing or stale data to judge normal thresholds; treat them as connection/data-quality notices. Suppress repeats with cooldown; a policy without one (the default policy) notifies once per open alert, and a recurrence after the alert resolved notifies again (IR600). Record severity changes as new notification reasons.
 3. Save Policy version. On trigger, create an Alert and Notification preview. Keep notification read status separate from Alert acknowledgement.
 4. Queries to update: `policies / alerts / notifications / admin summary / audit`。
 5. Tabs: `tab=alerts` (default; alert list with status/severity/cause/unit filters and the `alertId` detail; the status tiles, the customer → property → unit scope, the severity and the selection are URL state, IR318) and `tab=policies` (policy list and the `policyId` editor). The detail shows cause and evidence using the BIZ-17 wording above, the target unit, and notification activity; reading a notification never changes the Alert.

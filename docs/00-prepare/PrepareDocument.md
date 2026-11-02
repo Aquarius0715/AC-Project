@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.468.0
+version: 0.469.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -185,6 +185,7 @@ Small text and controls are adjusted for readability and usability in work scree
 | DEC-87 | The real device belongs to a client of its own, not to customer-b (which keeps the mock fleet): "Live Sensor Customer" with the owner `live-sensors@example.com`, whose sign-in account is opened as HQ adds a customer owner, and who sets the password from the set-up e-mail (Mailpit in development) | User request in this conversation, 2026-10-30 (“リアルデバイスと繋げるのは、別ユーザーにしてください（クライアント”); reflected in IR525 |
 | DEC-88 | (Superseded by DEC-89.) Each real sensor node is a device of its own on a unit of its own, because a unit has at most one active device: node_1 (room temperature and humidity) and node_2 (power), each with its own monitoring-only model, both in Live Sensor Customer's Sensor room | User request in this conversation, 2026-10-30 (“もう一つデバイスがあるはずなので、それも同じ組織に入れてください”); reflected in IR526 |
 | DEC-89 | Both real nodes serve one Daikin air conditioner: they are one module on one unit ("Live · Daikin AC"). The app switches it on and off through node_1's infrared LED, and sending to the nodes' broker is on (`REAL_MQTT_COMMANDS=1`). Power on sends the firmware's COOL24 and power off sends OFF; the other settings wait for a firmware that takes them | User answers in this conversation, 2026-10-30 (“同じエアコン（1台）”, “有効にしてよい”, the firmware and “DAIKINです”); reflected in IR528 |
+| DEC-90 | The UX loop's proposals of 2026-11-02 are taken as recommended. Build: (1) HQ Overview counts what waits for HQ regardless of the period; (3) on touch screens every control is at least 44 px; (4) the customer overview names an overdue invoice and the restriction it caused; (5) contractors list and remove their technicians' unavailable days, and same-name technicians show their e-mail; (6) a technician keeps the notices of a job whose assignment ended while its history snapshot is theirs; (7) a contractor's notice of an offer withdrawn before acceptance has no link; (8) a job history without a completion counts in the period by its delegation's end; (9) `telemetry.series` returns server-side averages for long windows; (10) a policy without a cooldown notifies once per open alert; (11) the partner's Return for rework lists the items to redo, as HQ's does; (12) the development simulator and bridge behave like real modules; (13) the audit log records denied writes, throttled, and then pending and failed results. Keep as built: (2) contractor capacity per preferred time stays out of Phase 1A | User decision in this conversation, 2026-11-02 (“すべて推奨どおりお願いします”); reflected from IR600 on |
 
 **DEC-10 (design proposal)**: Preserve work status on reassignment. Release restrictions only after all cause invoices fixed at notice time are paid. Release does not automatically power units on or restore previous set temperatures. Manual payment recording, test-run end confirmation, and viewing saved reports are specified for the 1A demo. This does not mean company approval of commercial rules. See [input/output contract DDC-08](../02-design/implementation-contracts.md#ddc-08-multi-resource-revisit-and-cross-role-contracts).
 
@@ -286,6 +287,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.469.0: The UX loop's proposals are decided (DEC-90); a policy without a cooldown notifies once per open alert (IR600). Phase 1A unchanged.
 0.468.0: The audit explorer says that denied, failed and pending attempts are not recorded, and tells same-name actors apart (IR599). Phase 1A unchanged.
 0.467.0: The technician's unit monitoring names the readings it did not load and dates the start of the 24 h axis (IR598). Phase 1A unchanged.
 0.466.0: The partner's quality review uses the technician's words for items and results, and a refused return focuses the reason (IR597). Phase 1A unchanged.
