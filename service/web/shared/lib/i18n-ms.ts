@@ -1439,6 +1439,7 @@ export const ms: Record<string, string> = {
   "Period / units": "Tempoh / unit",
   "Quote ID": "ID sebut harga",
   "{id} (demo)": "{id} (demo)",
+  "No price — no offset provider is selected in this demo": "Tiada harga — tiada penyedia ofset dipilih dalam demo ini",
   "Estimated amount": "Anggaran jumlah",
   "{amount} (demo)": "{amount} (demo)",
   "Expires": "Tamat tempoh",

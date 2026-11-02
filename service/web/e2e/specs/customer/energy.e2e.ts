@@ -19,3 +19,15 @@ test("the energy page and its demo report say what they do, in words", async ({ 
   await dialog.getByRole("button", { name: "Close" }).last().click();
   await expect(dialog).toHaveCount(0);
 });
+
+// A demo quote (FR-C13, IR596) has no price — no offset provider is selected — and says so instead of a bare dash. The
+// quote expires by itself after 15 minutes; no offset record is requested.
+test("a demo offset quote says why it has no price", async ({ page, app }) => {
+  test.skip(app.id !== "customer", "client only");
+  await page.goto("/customer/energy");
+  const main = page.getByRole("main");
+  await main.getByRole("link", { name: /Offset these emissions/ }).click();
+  await page.waitForURL(/\/customer\/energy\/offsets/);
+  await main.getByRole("button", { name: "Get demo quote" }).click();
+  await expect(main).toContainText("No price — no offset provider is selected in this demo");
+});

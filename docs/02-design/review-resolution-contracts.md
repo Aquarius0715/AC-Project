@@ -8322,3 +8322,10 @@ Found in the twenty-fifth round of the UX loop (UX-25: hq-restriction-manager re
 1. **Words.** The four texts drop their IDs; the two release-view banners now read the same ("Release view (restriction.override only): billing fields are not shown.") and share one Malay entry.
 2. **Tests.** The `i18n.test.ts` guard also reads HQ's restriction screens and `restrictions.ts`; `admin/restrictions.e2e.ts` checks the note and that the page shows no spec ID.
 3. **Figma.** Admin's schedule-restriction modal and its no-client state drop (IR05).
+
+## IR596 A demo offset quote says why it has no price — 2026-11-02
+
+Found in the twenty-sixth round of the UX loop (UX-26: customer-a follows "Offset these emissions" from Energy & cost, tries an amount of 0, gets a demo quote for 1.5 kgCO₂e and reaches the confirmation without submitting, at 1920 and 1280). No offset record was requested; the quote expires by itself after 15 minutes. The flow is clear — a demo banner, three steps, the amount rule under the field with the quote button disabled, "Getting a quote creates no record.", the confirmation's "I understand this is a simulated request" — but the quote listed "Estimated amount —": `offsets.preview` never prices a demo quote (no provider, `estimatedAmountMinor` null by contract), so a customer looking for the cost found only a dash. The authorization held: a quote for another customer's unit answers NOT_FOUND.
+
+1. **Words.** Without a price the row reads "No price — no offset provider is selected in this demo". The Malay dictionary follows.
+2. **Test.** `customer/energy.e2e.ts` gets a demo quote and expects the sentence.

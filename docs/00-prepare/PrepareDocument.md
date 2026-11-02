@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.464.0
+version: 0.465.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -286,6 +286,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.465.0: The customer's demo offset quote explains its missing price (IR596). Phase 1A unchanged.
 0.464.0: HQ restriction texts drop their spec IDs (IR595). Phase 1A unchanged.
 0.463.0: The work report's next-action controls are labelled; a refused submit focuses the first item to fix; codes in parentheses leave partner and technician texts (IR594). Phase 1A unchanged.
 0.462.0: A refused certificate submit focuses the first field to fix; the certificate and photo pickers show keyboard focus (IR593). Phase 1A unchanged.

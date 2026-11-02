@@ -69,7 +69,7 @@ export function OffsetsView({ live }: { live: Live }) {
         <Card title={<span className="flex items-center gap-2">{t("Demo quote")} <Badge tone="primary" icon="time">{t("Quoted")}</Badge></span>}>
           <SummaryList items={[
             [t("Amount"), `${kg3(quote.amountKg)} kgCO₂e`], [t("Period / units"), `${span(quote)} · ${live.subject}`],
-            [t("Quote ID"), t("{id} (demo)", { id: quote.id.slice(0, 8) })], [t("Estimated amount"), quote.estimatedAmountMinor !== null && quote.currency ? t("{amount} (demo)", { amount: amount(quote.estimatedAmountMinor, quote.currency) }) : "—"],
+            [t("Quote ID"), t("{id} (demo)", { id: quote.id.slice(0, 8) })], [t("Estimated amount"), quote.estimatedAmountMinor !== null && quote.currency ? t("{amount} (demo)", { amount: amount(quote.estimatedAmountMinor, quote.currency) }) : t("No price — no offset provider is selected in this demo")],
             [t("Expires"), showTime(quote.expiresAt, display)], [t("Records created"), t("None yet")],
           ]} />
           <div className="mt-3 flex gap-2"><Btn onClick={() => setStep(0)}><Icon name="arrowLeft" /> {t("Back")}</Btn><Btn variant="primary" onClick={() => setStep(2)}>{t("Continue")}</Btn></div>
