@@ -176,7 +176,7 @@ function Compose({ detail, onPreview }: { detail: Extract<Detail, { missing: fal
         </Field>
         {ofRole.length > 1 && <Field label={t("Recipient")}><Select value={chosen?.id ?? ""} onChange={(e) => setRecipient(e.target.value)}>{ofRole.map((p) => <option key={p.id} value={p.id}>{p.displayLabel}</option>)}</Select></Field>}
         <Field label={t("Channel")}><Select value={channels.some((c) => c.id === channel) ? channel : "inApp"} disabled={closed} onChange={(e) => setChannel(e.target.value)}>{channels.map((c) => <option key={c.id} value={c.id}>{t("{channel} · preview only", { channel: c.id })}</option>)}</Select></Field>
-        <Field label={t("Message (1–2000 chars)")} error={tried && !message.trim() ? t("A message is required (VALIDATION) — nothing was saved") : tooLong ? t("At most 2000 characters") : undefined}>
+        <Field label={t("Message (1–2000 chars)")} error={tried && !message.trim() ? t("A message is required — nothing was saved") : tooLong ? t("At most 2000 characters") : undefined}>
           <Textarea value={message} disabled={closed} onChange={(e) => setMessage(e.target.value)} placeholder={t("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.")} />
         </Field>
         <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || closed} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || closed || !chosen} onClick={send} className="h-auto min-h-8 max-w-full whitespace-normal text-left">{mode.add && <Icon name="add" />}{mode.button}</Btn></div>

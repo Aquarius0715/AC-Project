@@ -66,7 +66,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     }));
     const texts = [...new Set(strings.filter((text) => text in ms))]; // every literal the dictionary translates, maps of texts included
     expect(texts.length).toBeGreaterThan(100);
-    const coded = /\b(?:IR\d+|(?:FR|DD|BR|NFR|DEC|AT|SCR|DDC|REV)-[A-Z]*\d+|SR\d+|D\d{2,})\b|^(?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\b/;
+    const coded = /\b(?:IR\d+|(?:FR|DD|BR|NFR|DEC|AT|SCR|DDC|REV)-[A-Z]*\d+|SR\d+|D\d{2,})\b|^(?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\b|\((?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\)/;
     expect(texts.filter((text) => coded.test(text))).toEqual([]);
   });
 

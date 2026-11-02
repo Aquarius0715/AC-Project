@@ -214,7 +214,7 @@ function WeekCard({ week, members, sel, choice, zone }: { week: NonNullable<Sche
         <span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-warn-soft" />{t("Leave / unavailable")}</span>
         <span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-surface2" />{t("No available hours")}</span>
       </p>
-      <p className="text-[11px] text-muted-foreground">{t("Only own-company technicians are shown. Days and times in Kuala Lumpur time (Asia/Kuala_Lumpur). Overlap with a confirmed block is rejected on save (CONFLICT).")}</p>
+      <p className="text-[11px] text-muted-foreground">{t("Only own-company technicians are shown. Days and times in Kuala Lumpur time (Asia/Kuala_Lumpur). A time that overlaps a confirmed block is refused on save.")}</p>
     </Card>
   );
 }

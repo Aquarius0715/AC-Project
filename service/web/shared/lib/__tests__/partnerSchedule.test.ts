@@ -107,7 +107,7 @@ describe("partner schedule", () => {
 
   it("states the refusals of the assignment", () => {
     const f = (code: string, messageKey: string, fieldErrors: Record<string, string> = {}) => assignRefusal({ code, messageKey, fieldErrors }, "tech-external-a");
-    expect(f("CONFLICT", "errors.assignment_overlap")).toBe("Overlaps a confirmed schedule for tech-external-a (CONFLICT) — choose another technician.");
+    expect(f("CONFLICT", "errors.assignment_overlap")).toBe("Overlaps a confirmed schedule for tech-external-a — choose another technician.");
     expect(f("FORBIDDEN", "errors.access_window")).toMatch(/^Outside the delegation period/);
     expect(f("FORBIDDEN", "errors.qualification_missing")).toMatch(/revoked or expiring, FORBIDDEN/);
     expect(f("VALIDATION", "error.validation", { startAt: "errors.slot_not_agreed" })).toMatch(/^Start: the slot must be the agreed visit time/);
@@ -135,6 +135,6 @@ describe("partner schedule", () => {
     const week = weekGrid(["2026-09-22"], members.slice(0, 1), [[cap("m-a", "2026-09-22", [], [], 0, "sick")]], new Map(), null, ms);
     expect([week[0].sub, week[0].cells]).toEqual(["Dalaman, Luaran, Elektrik · 0 j tersedia", [{ kind: "leave", text: "Cuti", sub: "cuti sakit" }]]);
     expect(assignRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { reason: "error.required" } }, "tech-external-a", ms)).toBe("Sebab: diperlukan (1–1000 aksara)");
-    expect(assignRefusal({ code: "CONFLICT", messageKey: "errors.assignment_overlap", fieldErrors: {} }, "tech-external-a", ms)).toBe("Bertindih dengan jadual yang disahkan untuk tech-external-a (CONFLICT) — pilih juruteknik lain.");
+    expect(assignRefusal({ code: "CONFLICT", messageKey: "errors.assignment_overlap", fieldErrors: {} }, "tech-external-a", ms)).toBe("Bertindih dengan jadual yang disahkan untuk tech-external-a — pilih juruteknik lain.");
   });
 });

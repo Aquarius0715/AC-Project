@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useEffectEvent } from "react";
 import { Badge, Banner, Btn, Card, Choice, cx, DataTable, EmptyState, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilBar, Plain, ScrollX } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
+import { focusField } from "@ac/web/lib/focusField";
 import { metricUnit, type Metric } from "@ac/web/lib/devices";
 import { zonedInstant, type T } from "@ac/web/lib/i18n";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
@@ -129,6 +130,8 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
     if (found.length) {
       const first = found.find((i) => i.group);
       if (first?.group) setTab(first.group);
+      // focus the first item to fix once its tab shows it, so a phone does not have to scroll up to it (IR594)
+      if (first?.key) focusField(`result-${first.key}`);
       return;
     }
     setModal("submit");
@@ -204,7 +207,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
       {job.status === "submitted" && <Banner tone="ok">{t("Submitted v{version} — read-only, awaiting quality review.", { version: job.reportRefs[job.reportRefs.length - 1]?.reportVersion ?? "" })}</Banner>}
       {job.status === "completed" && <Banner tone="ok">{t("Accepted — the job is completed and the report is visible to the customer.")}</Banner>}
       {job.status === "rework_requested" && <Banner tone="warn" action={<Btn size="sm" variant="primary" disabled={pending || win.phase === "ended"} onClick={() => run(() => resumeRework(job.id, job.version), t("Rework resumed — continue in the new draft"), undefined, failed)}>{t("Resume rework")}</Btn>}>{live.report?.reviewHistory.at(-1)?.reason ? t("Returned for rework — “{reason}”. Resume to continue as a new draft version; the returned version stays as it was.", { reason: live.report.reviewHistory.at(-1)!.reason! }) : t("Returned for rework. Resume to continue as a new draft version; the returned version stays as it was.")}</Banner>}
-      {inWork && win.phase === "ended" && <Banner tone="crit">{t("The work window ended — unsaved input was discarded and the job can no longer be edited (FORBIDDEN). Ask your coordinator.")}</Banner>}
+      {inWork && win.phase === "ended" && <Banner tone="crit">{t("The work window ended — unsaved input was discarded and the job can no longer be edited. Ask your coordinator.")}</Banner>}
       {live.reportRefused && <Banner tone="warn">{t("The report is not readable now ({reason}).", { reason: FORBIDDEN[live.reportRefused] ? t(FORBIDDEN[live.reportRefused]) : live.reportRefused.replace(/^errors?\./, "").replace(/_/g, " ") })}</Banner>}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4 xl:col-span-2">
@@ -216,7 +219,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-[13px] font-semibold">{label(it.componentKey)}</span>
                       {editable ? (
-                        <div className="w-44"><Select aria-label={t("Result of {item}", { item: label(it.componentKey) })} value={it.result ?? ""} onChange={(e) => edit((d) => ({ ...d, items: d.items.map((x) => (x.componentKey === it.componentKey ? { ...x, result: (e.target.value || null) as Result } : x)) }))}>
+                        <div className="w-44"><Select id={`result-${it.componentKey}`} aria-label={t("Result of {item}", { item: label(it.componentKey) })} value={it.result ?? ""} onChange={(e) => edit((d) => ({ ...d, items: d.items.map((x) => (x.componentKey === it.componentKey ? { ...x, result: (e.target.value || null) as Result } : x)) }))}>
                           <option value="">{t("— Select result")}</option>{results.map((r) => <option key={r.id} value={r.id}>{t(r.label)}</option>)}
                         </Select></div>
                       ) : readOnlyResult(it.result)}
@@ -236,7 +239,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                 {groups.map((g) => (
                   <div key={g.group} className="mb-2"><div className="mb-1 flex justify-between text-xs"><b>{g.label}</b><span className="text-muted-foreground">{g.done} / {g.total}</span></div><UtilBar pct={g.total ? (g.done / g.total) * 100 : 0} tone={g.issues ? "warn" : "primary"}  label={`${g.label} ${g.done} / ${g.total}`} /></div>
                 ))}
-                <p className="text-[11px] text-muted-foreground">{issues?.length ? t(issues.length === 1 ? "1 issue blocks submit — see the summary on the right." : "{n} issues block submit — see the summary on the right.", { n: issues.length }) : t("{n} items still empty — each needs a result, or not inspected / not applicable with a reason, before submit.", { n: draft.items.filter((x) => x.result === null).length })}</p>
+                {editable && <p className="text-[11px] text-muted-foreground">{issues?.length ? t(issues.length === 1 ? "1 issue blocks submit — it is listed above Submit report." : "{n} issues block submit — they are listed above Submit report.", { n: issues.length }) : t("{n} items still empty — each needs a result, or not inspected / not applicable with a reason, before submit.", { n: draft.items.filter((x) => x.result === null).length })}</p>}
               </Card>
               <Card title={t("Job & unit")} action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${job.unitId}?jobId=${job.id}`}>{t("Unit")} <Icon name="arrowRight" /></Link>}>
                 <SummaryList items={[
@@ -303,7 +306,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Work report — {version}", { version: rep ? t("draft v{version}", { version: rep.version }) : live.report ? `v${live.report.version}` : t("not started") })}>
-            {issues && issues.length > 0 && <Banner tone="crit"><b>{t(issues.length === 1 ? "Not submitted (VALIDATION) — 1 issue:" : "Not submitted (VALIDATION) — {n} issues:", { n: issues.length })}</b> {issues.slice(0, 6).map((x) => x.text).join(" · ")}{issues.length > 6 ? " · …" : ""}. {t("The draft is kept.")}</Banner>}
+            {issues && issues.length > 0 && <Banner tone="crit"><b>{t(issues.length === 1 ? "Not submitted — 1 issue:" : "Not submitted — {n} issues:", { n: issues.length })}</b> {issues.slice(0, 6).map((x) => x.text).join(" · ")}{issues.length > 6 ? " · …" : ""}. {t("The draft is kept.")}</Banner>}
             {editable && win.notice && <div className="mt-2"><Banner tone="warn">{win.notice}</Banner></div>}
             {!inWork && !live.report && <p className="text-[13px] text-muted-foreground">{t("The report opens when you check in at the site.")}</p>}
             {(inWork || live.report) && (
@@ -326,10 +329,10 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                 <Field label={t("Next action")}>
                   {editable ? (
                     <div className="flex flex-col gap-2">
-                      <Select value={draft.nextAction.kind} onChange={(e) => edit((d) => ({ ...d, nextAction: e.target.value === "none" ? { kind: "none" } : { kind: "follow_up", date: "", note: "" } }))}><option value="none">{t("None")}</option><option value="follow_up">{t("Follow-up visit")}</option></Select>
+                      <Select aria-label={t("Next action")} value={draft.nextAction.kind} onChange={(e) => edit((d) => ({ ...d, nextAction: e.target.value === "none" ? { kind: "none" } : { kind: "follow_up", date: "", note: "" } }))}><option value="none">{t("None")}</option><option value="follow_up">{t("Follow-up visit")}</option></Select>
                       {draft.nextAction.kind === "follow_up" && <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
-                        <Input type="date" value={draft.nextAction.date.slice(0, 10)} onChange={(e) => edit((d) => ({ ...d, nextAction: { kind: "follow_up", date: e.target.value ? new Date(`${e.target.value}T09:00:00+08:00`).toISOString() : "", note: d.nextAction.kind === "follow_up" ? d.nextAction.note : "" } }))} />
-                        <Input placeholder={t("What to do (required)")} maxLength={1000} value={draft.nextAction.note} onChange={(e) => edit((d) => ({ ...d, nextAction: { kind: "follow_up", date: d.nextAction.kind === "follow_up" ? d.nextAction.date : "", note: e.target.value } }))} />
+                        <Input type="date" aria-label={t("Follow-up date")} value={draft.nextAction.date.slice(0, 10)} onChange={(e) => edit((d) => ({ ...d, nextAction: { kind: "follow_up", date: e.target.value ? new Date(`${e.target.value}T09:00:00+08:00`).toISOString() : "", note: d.nextAction.kind === "follow_up" ? d.nextAction.note : "" } }))} />
+                        <Input aria-label={t("What to do (required)")} placeholder={t("What to do (required)")} maxLength={1000} value={draft.nextAction.note} onChange={(e) => edit((d) => ({ ...d, nextAction: { kind: "follow_up", date: d.nextAction.kind === "follow_up" ? d.nextAction.date : "", note: e.target.value } }))} />
                       </div>}
                     </div>
                   ) : <p className="font-normal">{followUpText(draft.nextAction, i18n)}</p>}

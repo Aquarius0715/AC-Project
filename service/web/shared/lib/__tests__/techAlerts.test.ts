@@ -36,7 +36,7 @@ describe("technician alert evidence", () => {
     expect(v.resolution).toEqual({
       info: "Automatic resolution needs a remeasurement < 28.0 °C for 60 s — or a reason below with alert.resolve.", done: null,
       note: "Recurrence after resolution creates a new alert with previousAlertId linking back to this one.",
-      forbidden: "Not resolved (FORBIDDEN) — you don’t have alert.resolve. The alert resolves automatically once a remeasurement stays < 28.0 °C for 60 s, or ask a permitted user.",
+      forbidden: "Not resolved — you don’t have alert.resolve. The alert resolves automatically once a remeasurement stays < 28.0 °C for 60 s, or ask a permitted user.",
     });
     expect(v.history).toEqual([{ id: "raised", time: "today 9:12 am MYT", title: "Raised", sub: "temperature 30.4 °C · Temperature ≥ 30.0 °C for 60 s", badge: { text: "Observed (demo)", tone: "primary" } }]);
     expect(v.related).toEqual([

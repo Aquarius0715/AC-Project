@@ -183,10 +183,10 @@ const FIELD_ERRORS: Record<string, string> = {
 /** Readable refusals of jobs.assign (DD-P03 boundary cases), in the display language. */
 export function assignRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, tech: string, t: T = en): string {
   switch (f.messageKey) {
-    case "errors.assignment_overlap": return t("Overlaps a confirmed schedule for {name} (CONFLICT) — choose another technician.", { name: tech });
+    case "errors.assignment_overlap": return t("Overlaps a confirmed schedule for {name} — choose another technician.", { name: tech });
     case "errors.access_window": return t("Outside the delegation period — assignments are possible only inside it.");
     case "errors.qualification_missing": return t("{name}’s qualification is not valid for this slot (revoked or expiring, FORBIDDEN) — choose another technician.", { name: tech });
-    case "errors.technician_out_of_scope": case "errors.technician_not_allowed": return t("{name} cannot be assigned to this unit (FORBIDDEN).", { name: tech });
+    case "errors.technician_out_of_scope": case "errors.technician_not_allowed": return t("{name} cannot be assigned to this unit.", { name: tech });
     case "error.invalidState": return t("The job can no longer be scheduled in its current state — the latest state is shown.");
     case "error.versionConflict": return t("The job changed elsewhere — the latest version is shown; check and confirm again.");
   }

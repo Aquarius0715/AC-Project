@@ -89,8 +89,8 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
       done: a.status !== "resolved" ? null : [t("Resolved {time} — {reason}.", { time: when(a.resolvedAt ?? a.detectedAt), reason: a.resolutionReason ? resolutionText(a.resolutionReason, t) : t("no reason recorded") }), a.acknowledgedAt ? t("Acknowledged {time}.", { time: when(a.acknowledgedAt) }) : ""].filter(Boolean).join(" "),
       note: a.status === "resolved" ? t("Completing the job alone never resolves an alert. If the condition returns, a new alert is created with previousAlertId = {id}.", { id: a.id.slice(0, 8) })
         : t("Recurrence after resolution creates a new alert with previousAlertId linking back to this one."),
-      forbidden: words ? t("Not resolved (FORBIDDEN) — you don’t have alert.resolve. The alert resolves automatically once a remeasurement stays {recovery}, or ask a permitted user.", { recovery: words.recovery })
-        : t("Not resolved (FORBIDDEN) — you don’t have alert.resolve. Ask a permitted user to resolve it."),
+      forbidden: words ? t("Not resolved — you don’t have alert.resolve. The alert resolves automatically once a remeasurement stays {recovery}, or ask a permitted user.", { recovery: words.recovery })
+        : t("Not resolved — you don’t have alert.resolve. Ask a permitted user to resolve it."),
     },
     history,
     related: [
