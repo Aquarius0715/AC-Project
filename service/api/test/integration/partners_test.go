@@ -61,7 +61,8 @@ func TestContractorRegister(t *testing.T) {
 	code, resp := write(srv, hq(), "contractors.save", body(""), 0)
 
 	contractor := data(resp)
-	if code != 200 || contractor["status"] != statusActive || contractor["registrationNo"] != "REG-1" ||
+	if code != 200 || contractor["status"] != statusActive ||
+		contractor["registrationNo"] != "REG-1" ||
 		contractor["name"] == "" ||
 		contractor["kpis"] == nil ||
 		contractor["rateCardId"] != nil {
@@ -79,7 +80,8 @@ func TestContractorRegister(t *testing.T) {
 		srv,
 		hq(),
 		"contractors.save",
-		body(`,"id":"` + contractorID + `"`)[:len(body(""))-len(`"insuranceValidUntil":null}`)]+`"insuranceValidUntil":"`+until+
+		body(`,"id":"` + contractorID + `"`)[:len(body(""))-len(`"insuranceValidUntil":null}`)]+`"insuranceValidUntil":"`+
+			until+
 			`","id":"`+contractorID+`"}`,
 		1,
 	); code != 200 ||

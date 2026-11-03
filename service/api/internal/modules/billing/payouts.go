@@ -236,6 +236,11 @@ func payoutLines(ctx context.Context, call *ops.Call, statementID uuid.UUID) ([]
 
 	rows.Close()
 
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, apperr.Wrap(rowsErr, "select billing.payout_lines")
+	}
+
 	return lines, nil
 }
 

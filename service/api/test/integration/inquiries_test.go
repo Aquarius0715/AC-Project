@@ -150,7 +150,13 @@ func TestInquiries(t *testing.T) {
 	}
 
 	answer := func(reply string, v int) (int, map[string]any) {
-		return write(srv, hq(), "inquiries.answer", `{"inquiryId":"`+inquiryID+`","reply":"`+reply+`"}`, v)
+		return write(
+			srv,
+			hq(),
+			"inquiries.answer",
+			`{"inquiryId":"`+inquiryID+`","reply":"`+reply+`"}`,
+			v,
+		)
 	}
 	if code, m := answer(" ", 1); code != 422 || fields(m) != "reply=error.length" {
 		t.Errorf("blank reply: %d %s", code, fields(m))

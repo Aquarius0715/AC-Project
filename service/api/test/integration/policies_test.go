@@ -714,7 +714,11 @@ func TestPolicies(t *testing.T) {
 
 	_, detail = post(srv, customerA(), "units.get", `{"id":"`+unit+`"}`)
 	if len(asArr(t, data(detail)["alertPolicyIds"])) != 0 || ver(t, detail) != unitVersion+1 {
-		t.Fatalf("unit detached with a new version: %v %d", data(detail)["alertPolicyIds"], ver(t, detail))
+		t.Fatalf(
+			"unit detached with a new version: %v %d",
+			data(detail)["alertPolicyIds"],
+			ver(t, detail),
+		)
 	}
 
 	if code, _ := post(srv, customerA(), "policies.get", `{"policyId":"`+pid+`"}`); code != 404 {

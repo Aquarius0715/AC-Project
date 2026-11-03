@@ -128,11 +128,27 @@ func TestPlans(t *testing.T) {
 		}
 
 		created := save("", 3, next, 0)
-		if created = save(asStr(t, created["id"]), 3, later, 1); asNum(t, created["anchorDay"]) != 29 {
+		if created = save(
+			asStr(t, created["id"]),
+			3,
+			later,
+			1,
+		); asNum(
+			t,
+			created["anchorDay"],
+		) != 29 {
 			t.Errorf("re-anchored: %v", created)
 		}
 
-		if created = save(asStr(t, created["id"]), 6, later, 2); asNum(t, created["anchorDay"]) != 29 {
+		if created = save(
+			asStr(t, created["id"]),
+			6,
+			later,
+			2,
+		); asNum(
+			t,
+			created["anchorDay"],
+		) != 29 {
 			t.Errorf("anchor kept: %v", created)
 		}
 	}

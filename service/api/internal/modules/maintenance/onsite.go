@@ -573,7 +573,8 @@ func pendingAssignment(ctx context.Context, call *ops.Call, jobID uuid.UUID) (uu
 		end time.Time
 	)
 
-	err := call.Tx.QueryRow(ctx, `SELECT id, acknowledgement, upper(scheduled) FROM maintenance.assignments WHERE job_id = $1
+	err := call.Tx.QueryRow(ctx, `SELECT id, acknowledgement, upper(scheduled) FROM maintenance.assignments WHERE job_id =
+		$1
 		AND technician_membership_id = $2
 		AND status = 'active' AND created_at <= $3 FOR UPDATE`, jobID, call.Principal.MembershipID, call.Now).
 		Scan(&aid, &ack, &end)

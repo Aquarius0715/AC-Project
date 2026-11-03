@@ -414,11 +414,17 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 
 		for rows.Next() {
 			var (
-				alert  row
+				alert   row
 				alertID uuid.UUID
 			)
 
-			err := rows.Scan(&alertID, &alert.status, &alert.reason, &alert.evidence, &alert.previous)
+			err := rows.Scan(
+				&alertID,
+				&alert.status,
+				&alert.reason,
+				&alert.evidence,
+				&alert.previous,
+			)
 			if err != nil {
 				t.Fatal(err)
 			}

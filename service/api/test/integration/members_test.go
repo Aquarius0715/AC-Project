@@ -499,7 +499,8 @@ func TestMembersListCarriesEachMembersOwn(t *testing.T) {
 	}
 
 	at := func(v time.Time) string { return v.Format(time.RFC3339) }
-	if len(grants[firstTech]) != 1 || grants[firstTech]["test.ir496.a"] != at(revokedA) || len(grants[secondTech]) != 1 ||
+	if len(grants[firstTech]) != 1 || grants[firstTech]["test.ir496.a"] != at(revokedA) ||
+		len(grants[secondTech]) != 1 ||
 		grants[secondTech]["test.ir496.b"] != at(revokedB) {
 		t.Fatalf("each member carries only its own grant with its own revocation: %v", grants)
 	}

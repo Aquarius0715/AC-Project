@@ -155,7 +155,11 @@ func (m Summaries) get(ctx context.Context, call *ops.Call, input *Input) (Summa
 }
 
 // customerCounts counts the customer's equipment narrowed by the filters.
-func (m Summaries) customerCounts(ctx context.Context, call *ops.Call, filters json.RawMessage) (Counts, error) {
+func (m Summaries) customerCounts(
+	ctx context.Context,
+	call *ops.Call,
+	filters json.RawMessage,
+) (Counts, error) {
 	var filter struct {
 		CustomerID *uuid.UUID   `json:"customerId,omitempty"`
 		PropertyID *uuid.UUID   `json:"propertyId,omitempty"`
@@ -212,7 +216,11 @@ func (m Summaries) customerCounts(ctx context.Context, call *ops.Call, filters j
 
 // jobSummaryCounts counts a partner's or technician's jobs (maintenance); a technician also gets the counts of the
 // assigned equipment.
-func (m Summaries) jobSummaryCounts(ctx context.Context, call *ops.Call, input *Input) (Counts, error) {
+func (m Summaries) jobSummaryCounts(
+	ctx context.Context,
+	call *ops.Call,
+	input *Input,
+) (Counts, error) {
 	jobCounts, err := ops.Ask[maintenance.JobCounts](
 		ctx,
 		m.Registry,

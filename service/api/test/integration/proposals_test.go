@@ -389,7 +389,13 @@ func TestSlotProposals(t *testing.T) {
 		t.Fatal("expired proposal")
 	}
 
-	if code, _ := respond(customerA(), job4, proposalOf(job4), `"decision":"accept"`, 2); code != 409 {
+	if code, _ := respond(
+		customerA(),
+		job4,
+		proposalOf(job4),
+		`"decision":"accept"`,
+		2,
+	); code != 409 {
 		t.Error("accept an expired proposal")
 	}
 }
@@ -447,7 +453,13 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 			version,
 		)
 	}
-	if code, _ := proposePartner(contrA(), slotJSON(101, 2), "tech-internal-a", "busy", 2); code != 403 {
+	if code, _ := proposePartner(
+		contrA(),
+		slotJSON(101, 2),
+		"tech-internal-a",
+		"busy",
+		2,
+	); code != 403 {
 		t.Error("other organization's technician")
 	}
 
@@ -462,7 +474,13 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		t.Errorf("blank reason: %d %s", code, fields(res))
 	}
 
-	if code, _ := proposePartner(contrB(), slotJSON(101, 2), "tech-external-b", "busy", 2); code != 404 {
+	if code, _ := proposePartner(
+		contrB(),
+		slotJSON(101, 2),
+		"tech-external-b",
+		"busy",
+		2,
+	); code != 404 {
 		t.Error("other contractor")
 	}
 
@@ -477,7 +495,13 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		t.Fatalf("partner proposal: %d %v", code, res)
 	}
 
-	if code, _ := proposePartner(contrA(), slotJSON(125, 2), "tech-external-a", "again", 3); code != 409 {
+	if code, _ := proposePartner(
+		contrA(),
+		slotJSON(125, 2),
+		"tech-external-a",
+		"again",
+		3,
+	); code != 409 {
 		t.Error("second partner proposal")
 	}
 
@@ -1097,7 +1121,10 @@ func TestPartnerProposalRefusals(t *testing.T) {
 		clock().Add(-time.Minute),
 	)
 
-	if code, m := proposePartner(slotJSON(101, 2)); code != 409 || m["messageKey"] != "errors.offer_expired" {
+	if code, m := proposePartner(
+		slotJSON(101, 2),
+	); code != 409 ||
+		m["messageKey"] != "errors.offer_expired" {
 		t.Errorf("an expired offer: %d %v", code, m)
 	}
 

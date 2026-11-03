@@ -132,7 +132,8 @@ type SiteAddresses interface {
 
 // offers returns the contractor's JobOfferSummary rows valid now (IR124 item 2); job limits the result to one job.
 func (m Jobs) offers(ctx context.Context, call *ops.Call, job *uuid.UUID) ([]OfferSummary, error) {
-	stmt := `SELECT j.id, j.version, j.type, j.unit_id, lower(j.requested_slot), upper(j.requested_slot), j.due_at, j.origin,
+	stmt := `SELECT j.id, j.version, j.type, j.unit_id, lower(j.requested_slot), upper(j.requested_slot), j.due_at,
+		j.origin,
 		o.id, o.decision, o.offer_expires_at, o.terms_version, lower(o.visit_slot), upper(o.visit_slot), o.offered_at,
 		o.access_valid_from, o.access_valid_until
 		FROM maintenance.offers o JOIN maintenance.jobs j ON j.id = o.job_id
@@ -249,7 +250,8 @@ func (m Jobs) histories(ctx context.Context, call *ops.Call, job *uuid.UUID) ([]
 		kind, owner = "membership", call.Principal.MembershipID
 	}
 
-	stmt := `SELECT job_id, as_of, type, status, contractor_org_id, completed_at, has_report, acceptance, decision_event_ids
+	stmt := `SELECT job_id, as_of, type, status, contractor_org_id, completed_at, has_report, acceptance,
+		decision_event_ids
 		FROM maintenance.job_history_snapshots WHERE owner_kind = $1 AND owner_id = $2`
 	args := []any{kind, owner}
 
@@ -434,7 +436,8 @@ func (m Jobs) extraProjections(
 			filters.Origin != nil ||
 			(filters.Type != nil && *filters.Type != history.Type) ||
 			(filters.OverdueOnly != nil && *filters.OverdueOnly) ||
-			(filters.OrganizationID != nil && (history.ContractorOrgID == nil || *history.ContractorOrgID != *filters.OrganizationID)) {
+			(filters.OrganizationID != nil &&
+				(history.ContractorOrgID == nil || *history.ContractorOrgID != *filters.OrganizationID)) {
 			continue
 		}
 

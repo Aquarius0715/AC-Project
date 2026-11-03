@@ -169,11 +169,23 @@ func TestScheduleAutomationsFire(t *testing.T) {
 		t.Fatalf("disabled rule fired: %d", n)
 	}
 	// delete (Figma 03g–03i): version checked, the rule is gone, its Commands stay
-	if code, _ := write(srv, customerB(), "automations.delete", `{"id":"`+automationID+`"}`, 1); code != 409 {
+	if code, _ := write(
+		srv,
+		customerB(),
+		"automations.delete",
+		`{"id":"`+automationID+`"}`,
+		1,
+	); code != 409 {
 		t.Fatalf("stale version: %d", code)
 	}
 
-	if code, _ := write(srv, customerA(), "automations.delete", `{"id":"`+automationID+`"}`, 2); code != 404 {
+	if code, _ := write(
+		srv,
+		customerA(),
+		"automations.delete",
+		`{"id":"`+automationID+`"}`,
+		2,
+	); code != 404 {
 		t.Fatalf("other customer: %d", code)
 	}
 
@@ -192,7 +204,13 @@ func TestScheduleAutomationsFire(t *testing.T) {
 		t.Fatalf("deleted rule listed: %v", items(t, resp))
 	}
 
-	if code, _ := write(srv, customerB(), "automations.delete", `{"id":"`+automationID+`"}`, 3); code != 404 {
+	if code, _ := write(
+		srv,
+		customerB(),
+		"automations.delete",
+		`{"id":"`+automationID+`"}`,
+		3,
+	); code != 404 {
 		t.Fatalf("already deleted: %d", code)
 	}
 
@@ -225,7 +243,9 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 
 	automationID := asStr(t, data(res)["id"])
 
-	t.Cleanup(func() { write(srv, customerB(), "automations.delete", `{"id":"`+automationID+`"}`, 1) })
+	t.Cleanup(
+		func() { write(srv, customerB(), "automations.delete", `{"id":"`+automationID+`"}`, 1) },
+	)
 	setWatermark(t, clock())
 
 	_, err := schedTick(
@@ -771,7 +791,11 @@ func TestScheduleBoundaries(t *testing.T) {
 		automationCommands(t, lost),
 	); archivedCommands != 0 ||
 		lostCommands != 0 {
-		t.Fatalf("skipped rules sent commands: archived %d, unknown zone %d", archivedCommands, lostCommands)
+		t.Fatalf(
+			"skipped rules sent commands: archived %d, unknown zone %d",
+			archivedCommands,
+			lostCommands,
+		)
 	}
 
 	type run struct{ rule, trigger, outcome, reason string }

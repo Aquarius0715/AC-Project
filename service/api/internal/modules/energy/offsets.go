@@ -137,7 +137,7 @@ func customerOf(
 ) (uuid.UUID, uuid.UUID, error) {
 	var (
 		customerID, org uuid.UUID
-		err     error
+		err             error
 	)
 
 	switch {
@@ -223,7 +223,11 @@ func previewQuote(ctx context.Context, call *ops.Call, input *QuoteInput) (Quote
 	}
 
 	return scanQuote(
-		call.Tx.QueryRow(ctx, "SELECT "+quoteCols+" FROM energy.offset_quotes q WHERE q.id = $1", quoteID),
+		call.Tx.QueryRow(
+			ctx,
+			"SELECT "+quoteCols+" FROM energy.offset_quotes q WHERE q.id = $1",
+			quoteID,
+		),
 	)
 }
 
@@ -444,7 +448,8 @@ func listRecords(
 		&filter,
 	)
 	if err != nil ||
-		(filter.Status != nil && !strings.Contains(" demo_requested demo_purchased demo_retired failed ", " "+*filter.Status+" ")) {
+		(filter.Status != nil &&
+			!strings.Contains(" demo_requested demo_purchased demo_retired failed ", " "+*filter.Status+" ")) {
 		return paging.Page[Record]{}, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
 	}
 
@@ -819,7 +824,8 @@ func simulate(ctx context.Context, call *ops.Call, input *SimulateInput) (Record
 		}
 
 		err = newAttempt(ctx, call, record.ID, "retirement")
-	case input.Event == "retire" && record.State == "demo_purchased" && cur.Stage == "retirement" && cur.Status == "pending":
+	case input.Event == "retire" && record.State == "demo_purchased" && cur.Stage == "retirement" &&
+		cur.Status == "pending":
 		finishErr := finish("succeeded")
 		if finishErr != nil {
 			return record, finishErr

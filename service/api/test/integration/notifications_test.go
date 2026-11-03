@@ -272,8 +272,8 @@ func TestMarkAllRead(t *testing.T) {
 
 	state := func(notificationID string) (bool, int) {
 		var (
-			readAt *time.Time
-			version      int
+			readAt  *time.Time
+			version int
 		)
 		ownerScan(
 			t,

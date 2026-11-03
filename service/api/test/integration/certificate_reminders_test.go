@@ -111,7 +111,8 @@ func TestCertificateReminders(t *testing.T) {
 		severity, to        string
 	}
 
-	sent := func(certificateID string) []reminder { // the certificate's reminders, the earliest first, with their notifications
+	sent := func(certificateID string) []reminder {
+		// the certificate's reminders, the earliest first, with their notifications
 		t.Helper()
 
 		var total int

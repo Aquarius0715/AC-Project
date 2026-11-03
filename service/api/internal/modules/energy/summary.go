@@ -175,7 +175,10 @@ func Compute(
 	var factor *big.Rat
 
 	if emissionFactor != nil {
-		out.FactorRef, out.FactorSnapshot = &Ref{emissionFactor.ID, emissionFactor.Version}, emissionFactor
+		out.FactorRef, out.FactorSnapshot = &Ref{
+			emissionFactor.ID,
+			emissionFactor.Version,
+		}, emissionFactor
 		factor = new(big.Rat).SetFloat64(emissionFactor.KgCO2ePerKWh)
 	} else {
 		out.QualityWarnings = append(out.QualityWarnings, "factor_missing")
@@ -223,7 +226,12 @@ func Compute(
 
 // Comparable applies D07 / SR29: a value, the same unit set, boundary and minute count, actual coverage 1 and a
 // modeled value or measured coverage 1.
-func Comparable(baseline *Baseline, units []uuid.UUID, from, to time.Time, integration Integration) bool {
+func Comparable(
+	baseline *Baseline,
+	units []uuid.UUID,
+	from, to time.Time,
+	integration Integration,
+) bool {
 	var quality struct {
 		Kind     string   `json:"kind"`
 		Coverage *float64 `json:"coverage"`
@@ -231,7 +239,8 @@ func Comparable(baseline *Baseline, units []uuid.UUID, from, to time.Time, integ
 
 	_ = jsonUnmarshal(baseline.Quality, &quality)
 
-	return baseline.BaselineKWh != nil && sameSet(baseline.UnitIDs, units) && baseline.BoundaryID == Boundary &&
+	return baseline.BaselineKWh != nil && sameSet(baseline.UnitIDs, units) &&
+		baseline.BoundaryID == Boundary &&
 		baseline.Period.To.Sub(baseline.Period.From) == to.Sub(from) &&
 		integration.ExpectedSlots > 0 &&
 		integration.ValidSlots == integration.ExpectedSlots &&
@@ -321,7 +330,8 @@ func summary(ctx context.Context, call *ops.Call, input *SummaryInput) (Summary,
 
 	var known int
 
-	err := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, input.UnitIDs).
+	err := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT
+		archived`, input.UnitIDs).
 		Scan(&known)
 	if err != nil {
 		return Summary{}, apperr.Wrap(err, "select energy.ref_units")

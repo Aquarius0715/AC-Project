@@ -146,7 +146,13 @@ func TestLastOwnerAtOnce(t *testing.T) {
 		}
 
 		t.Cleanup(
-			func() { owner(t, `DELETE FROM identity.client_users WHERE id = ANY($1::uuid[])`, []string{firstOwner, secondOwner}) },
+			func() {
+				owner(
+					t,
+					`DELETE FROM identity.client_users WHERE id = ANY($1::uuid[])`,
+					[]string{firstOwner, secondOwner},
+				)
+			},
 		)
 		race(t, round, "errors.last_owner",
 			func() (int, map[string]any) {
@@ -154,7 +160,8 @@ func TestLastOwnerAtOnce(t *testing.T) {
 					srv,
 					hq(),
 					"clientUsers.save",
-					`{"id":"`+firstOwner+`","customerId":"`+cust.String()+`","email":"owner-`+firstOwner[:8]+`@example.com","clientRole":"member",`+
+					`{"id":"`+firstOwner+`","customerId":"`+cust.String()+`","email":"owner-`+firstOwner[:8]+`@example.com",`+
+						`"clientRole":"member",`+
 						`"status":"active","reason":"no longer an owner"}`,
 					1,
 				)
@@ -226,7 +233,13 @@ func TestLastContractorAtOnce(t *testing.T) {
 		}
 
 		t.Cleanup(
-			func() { owner(t, `DELETE FROM identity.partner_users WHERE id = ANY($1::uuid[])`, []string{firstContractor, secondContractor}) },
+			func() {
+				owner(
+					t,
+					`DELETE FROM identity.partner_users WHERE id = ANY($1::uuid[])`,
+					[]string{firstContractor, secondContractor},
+				)
+			},
 		)
 		race(t, round, "errors.last_contractor",
 			func() (int, map[string]any) {
@@ -234,7 +247,8 @@ func TestLastContractorAtOnce(t *testing.T) {
 					srv,
 					contrA(),
 					"partnerUsers.save",
-					`{"id":"`+firstContractor+`","email":"boss-`+firstContractor[:8]+`@example.com","partnerRole":"contractor","status":"disabled","reason":"on `+
+					`{"id":"`+firstContractor+`","email":"boss-`+firstContractor[:8]+`@example.com","partnerRole":"contractor",`+
+						`"status":"disabled","reason":"on `+
 						`leave"}`,
 					1,
 				)
@@ -344,7 +358,10 @@ func TestLastIdentityAdminAtOnce(t *testing.T) {
 	srv := server(t)
 	identityAdmins(t)
 
-	operatorID, managerID := seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()
+	operatorID, managerID := seed.ID("hq-operator").
+		String(),
+		seed.ID("hq-restriction-manager").
+			String()
 
 	dropIdentityWrite := func(b map[string]any) { withoutIdentityWrite(t, b) }
 	for round := range 5 {
@@ -386,7 +403,10 @@ func TestLastIdentityAdminStartLater(t *testing.T) {
 	srv := server(t)
 	identityAdmins(t)
 
-	operation, managerID := seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()
+	operation, managerID := seed.ID("hq-operator").
+		String(),
+		seed.ID("hq-restriction-manager").
+			String()
 
 	var opFrom, rmFrom time.Time
 	ownerScan(

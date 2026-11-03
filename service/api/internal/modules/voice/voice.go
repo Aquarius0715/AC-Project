@@ -232,7 +232,10 @@ func (v Voice) resolve(ctx context.Context, call *ops.Call, input *Input) (Inten
 
 	switch {
 	case input.SelectedUnitID != nil: // must be one of the candidates of this request (IR65)
-		if !slices.ContainsFunc(cands, func(x Candidate) bool { return x.UnitID == *input.SelectedUnitID }) {
+		if !slices.ContainsFunc(
+			cands,
+			func(x Candidate) bool { return x.UnitID == *input.SelectedUnitID },
+		) {
 			return Intent{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
@@ -313,7 +316,12 @@ func temperatureIntent(ctx context.Context, call *ops.Call, unit uuid.UUID) (Int
 }
 
 // changeIntent proposes the set point change with the unit's observed state and version to confirm against.
-func changeIntent(ctx context.Context, call *ops.Call, unit uuid.UUID, celsius *int) (Intent, error) {
+func changeIntent(
+	ctx context.Context,
+	call *ops.Call,
+	unit uuid.UUID,
+	celsius *int,
+) (Intent, error) {
 	var (
 		before  []byte
 		version int

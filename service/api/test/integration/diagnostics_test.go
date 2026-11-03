@@ -124,7 +124,14 @@ func TestDiagnosticRuns(t *testing.T) {
 		"stale job":      {powerOn, off, 5, currentUnitVersion, currentJobVersion + 3, 409},
 		"bad end action": {powerOn, `{"kind":"dance"}`, 5, currentUnitVersion, currentJobVersion, 422},
 	} {
-		code, m := run(techInt(), testCase.start, testCase.end, testCase.mins, testCase.u, testCase.j)
+		code, m := run(
+			techInt(),
+			testCase.start,
+			testCase.end,
+			testCase.mins,
+			testCase.u,
+			testCase.j,
+		)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
 		} else if code != testCase.code {
@@ -265,7 +272,15 @@ func TestDiagnosticRuns(t *testing.T) {
 		unit,
 	)
 
-	if code, _ := run(techInt(), powerOn, off, 5, currentUnitVersion, currentJobVersion); code != 403 && code != 409 {
+	if code, _ := run(
+		techInt(),
+		powerOn,
+		off,
+		5,
+		currentUnitVersion,
+		currentJobVersion,
+	); code != 403 &&
+		code != 409 {
 		t.Errorf("start action prohibited or busy: %d", code)
 	}
 

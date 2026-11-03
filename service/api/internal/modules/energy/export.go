@@ -133,7 +133,8 @@ func exportReport(ctx context.Context, call *ops.Call, input *ExportInput) (Repo
 
 	var own int
 
-	scanErr := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_properties WHERE id = ANY($1) AND customer_org_id = $2
+	scanErr := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_properties WHERE id = ANY($1) AND customer_org_id =
+		$2
 		AND NOT archived`, input.PropertyIDs, call.Principal.OrgID).
 		Scan(&own)
 	if scanErr != nil {
@@ -226,7 +227,8 @@ func exportReport(ctx context.Context, call *ops.Call, input *ExportInput) (Repo
 		case "alerts_maintenance":
 			var alerts, jobs int
 
-			err := call.Tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM energy.ref_alerts WHERE unit_id = ANY($1) AND detected_at >=
+			err := call.Tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM energy.ref_alerts WHERE unit_id = ANY($1) AND detected_at
+				>=
 				$2 AND detected_at < $3),
 				(SELECT count(*) FROM energy.ref_jobs WHERE unit_id = ANY($1) AND status = 'completed' AND updated_at >= $2 AND
 				updated_at < $3)`, units, start, end).

@@ -351,7 +351,9 @@ func (p Policy) MarshalJSON() ([]byte, error) {
 	}
 	switch p.Kind {
 	case "alert":
-		fields["customerId"], fields["recipientMembershipIds"], fields["channels"] = p.CustomerID, p.RecipientMembershipIDs, p.Channels
+		fields["customerId"] = p.CustomerID
+		fields["recipientMembershipIds"] = p.RecipientMembershipIDs
+		fields["channels"] = p.Channels
 		fields["escalateAfterMinutes"], fields["cooldownMinutes"] = p.EscalateAfterMinutes, p.CooldownMinutes
 		fields["metric"], fields["operator"] = p.Condition.Metric, p.Condition.Operator
 		fields["threshold"], fields["recoveryThreshold"] = p.Condition.Threshold, p.Condition.RecoveryThreshold

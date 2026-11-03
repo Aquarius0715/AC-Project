@@ -109,7 +109,10 @@ func TestSearchIsLiteral(t *testing.T) {
 		{opContractorsList, fieldName, "s_arch", ""},
 		{opContractorsList, fieldName, "reg_t", "Search Test 50%_Cooling"},
 	} {
-		if got := strings.Join(found(testCase.op, testCase.field, testCase.term), ","); got != testCase.want {
+		if got := strings.Join(
+			found(testCase.op, testCase.field, testCase.term),
+			",",
+		); got != testCase.want {
 			t.Errorf("%s search %q: %q, want %q", testCase.op, testCase.term, got, testCase.want)
 		}
 	}

@@ -201,7 +201,12 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		t.Error("stale version")
 	}
 
-	if code, m := set(hq(), ``, unitVersion); code != 200 || len(asArr(t, data(m)["alertPolicyIds"])) != 0 {
+	if code, m := set(
+		hq(),
+		``,
+		unitVersion,
+	); code != 200 ||
+		len(asArr(t, data(m)["alertPolicyIds"])) != 0 {
 		t.Fatalf("detach all: %d", code)
 	}
 

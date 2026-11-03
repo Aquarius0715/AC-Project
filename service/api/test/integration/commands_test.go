@@ -147,7 +147,12 @@ func TestCommands(t *testing.T) {
 	keepObserved(t, commandID)
 
 	beginFuncErr := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		acknowledged, err = control.Acknowledge(ctx, tx, uuid.MustParse(commandID), clock().Add(5*time.Second))
+		acknowledged, err = control.Acknowledge(
+			ctx,
+			tx,
+			uuid.MustParse(commandID),
+			clock().Add(5*time.Second),
+		)
 
 		return apperr.Wrap(err, "control.Acknowledge")
 	})
@@ -208,7 +213,12 @@ func TestCommands(t *testing.T) {
 	keepObserved(t, id2)
 
 	beginFuncErr = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		acknowledged, err = control.Acknowledge(ctx, tx, uuid.MustParse(id2), clock().Add(40*time.Second))
+		acknowledged, err = control.Acknowledge(
+			ctx,
+			tx,
+			uuid.MustParse(id2),
+			clock().Add(40*time.Second),
+		)
 
 		return apperr.Wrap(err, "control.Acknowledge")
 	})

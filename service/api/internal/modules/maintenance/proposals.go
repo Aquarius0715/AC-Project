@@ -575,7 +575,8 @@ func (m Proposals) respondJob(
 		holdRaw        []byte
 	)
 
-	err = call.Tx.QueryRow(ctx, `SELECT status, source, lower(slot), upper(slot), hold FROM maintenance.slot_proposals WHERE
+	err = call.Tx.QueryRow(ctx, `SELECT status, source, lower(slot), upper(slot), hold FROM maintenance.slot_proposals
+		WHERE
 		id = $1 AND job_id = $2 FOR UPDATE`,
 		input.ProposalID, input.JobID).
 		Scan(&status, &source, &slot.StartAt, &slot.EndAt, &holdRaw)
@@ -1162,7 +1163,8 @@ func (m Proposals) partnerProposal(
 		slot             Slot
 	)
 
-	stmt := `SELECT p.status, p.offer_id, lower(p.slot), upper(p.slot), p.technician_membership_id, o.contractor_org_id FROM
+	stmt := `SELECT p.status, p.offer_id, lower(p.slot), upper(p.slot), p.technician_membership_id, o.contractor_org_id
+		FROM
 		maintenance.partner_slot_proposals p
 		JOIN maintenance.offers o ON o.id = p.offer_id WHERE p.id = $1 AND o.job_id = $2`
 	args := []any{input.ProposalID, input.JobID}

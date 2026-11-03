@@ -226,7 +226,13 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
-	r, err := scheduler.TryTickDomains(ctx, maintSrv.DB, clock().Add(time.Hour), maint, maintSrv.Registry)
+	r, err := scheduler.TryTickDomains(
+		ctx,
+		maintSrv.DB,
+		clock().Add(time.Hour),
+		maint,
+		maintSrv.Registry,
+	)
 	if err != nil || r.Skipped < 1 || r.ExpiredOffers != 0 || status(job) != statusOffered {
 		t.Fatalf("the background tick skips the held tenant: %+v %v %v", r, err, status(job))
 	}
@@ -234,7 +240,13 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 	done := make(chan scheduler.Result, 1)
 
 	go func() {
-		r, err := scheduler.TickDomains(ctx, maintSrv.DB, clock().Add(time.Hour), maint, maintSrv.Registry)
+		r, err := scheduler.TickDomains(
+			ctx,
+			maintSrv.DB,
+			clock().Add(time.Hour),
+			maint,
+			maintSrv.Registry,
+		)
 		if err != nil {
 			t.Error(err)
 		}

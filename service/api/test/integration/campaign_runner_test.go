@@ -359,7 +359,8 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	tick(61 * time.Second) // the unanswered install times out (IR67)
 	tick(time.Second)
 
-	if status, _ := state(); status != statusPaused || results()[5].key != "errors.install_timeout" ||
+	if status, _ := state(); status != statusPaused ||
+		results()[5].key != "errors.install_timeout" ||
 		statuses() != eachDevice(
 			"succeeded",
 			"succeeded",

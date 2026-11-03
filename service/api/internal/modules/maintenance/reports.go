@@ -796,7 +796,9 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 			reportMeasurement.Quality, reportMeasurement.Value = "missing", nil
 		case MetricUnits[measurement.Metric] != measurement.Unit:
 			reason := "unit_mismatch"
-			reportMeasurement.Quality, reportMeasurement.QualityReason, reportMeasurement.RawUnit = "suspect", &reason, &measurement.Unit
+			reportMeasurement.Quality = "suspect"
+			reportMeasurement.QualityReason = &reason
+			reportMeasurement.RawUnit = &measurement.Unit
 		}
 
 		meas = append(meas, reportMeasurement)
@@ -1436,7 +1438,8 @@ func (m Reports) reviewJob(ctx context.Context, call *ops.Call, input *ReviewInp
 		state    string
 	)
 
-	err = call.Tx.QueryRow(ctx, `SELECT id, author_id, state FROM maintenance.work_reports WHERE job_id = $1 ORDER BY version
+	err = call.Tx.QueryRow(ctx, `SELECT id, author_id, state FROM maintenance.work_reports WHERE job_id = $1 ORDER BY
+		version
 		DESC LIMIT 1 FOR UPDATE`, input.JobID).
 		Scan(&reportID, &author, &state)
 	if errors.Is(err, pgx.ErrNoRows) || status != statusSubmitted {
@@ -1511,7 +1514,8 @@ func (m Reports) reviewJob(ctx context.Context, call *ops.Call, input *ReviewInp
 		return Job{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
-	if jobStatus == statusCompleted { // DEC-73 / IR234: completion releases the assignment; a return keeps it for the rework
+	if jobStatus == statusCompleted {
+		// DEC-73 / IR234: completion releases the assignment; a return keeps it for the rework
 		err := ReleaseOnCompletion(ctx, call.Tx, input.JobID, call.Now)
 		if err != nil {
 			return Job{}, err

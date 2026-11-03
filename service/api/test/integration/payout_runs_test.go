@@ -147,7 +147,12 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 	}
 	// HQ approves; a later run of August leaves the approved statement
 	var version int
-	ownerScan(t, `SELECT version FROM billing.payout_statements WHERE id = $1`, []any{draft}, &version)
+	ownerScan(
+		t,
+		`SELECT version FROM billing.payout_statements WHERE id = $1`,
+		[]any{draft},
+		&version,
+	)
 
 	if code, res := write(
 		srv,

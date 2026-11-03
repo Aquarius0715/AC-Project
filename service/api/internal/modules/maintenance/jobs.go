@@ -99,7 +99,7 @@ type Assignment struct {
 }
 
 // MaintenanceJob is MaintenanceJob of service-contracts.ts: what a job write answers (IR392).
-type MaintenanceJob struct { //nolint:revive // the contract's name (service-contracts.ts), which the API description shows
+type MaintenanceJob struct { //nolint:revive // the name service-contracts.ts and the API description use
 	ID                  uuid.UUID       `json:"id"`
 	TenantID            uuid.UUID       `json:"tenantId"`
 	Version             int             `json:"version"`
@@ -308,7 +308,8 @@ func jobScope(call *ops.Call, args *[]any) string {
 		return sqlTrue
 	case roleClient:
 		return "j.customer_org_id = " + add(principal.OrgID)
-	case roleTechnician: // IR49 viewing window; external technicians also inside the accepted Offer's access window (IR124)
+	case roleTechnician:
+		// IR49 viewing window; external technicians also inside the accepted Offer's access window (IR124)
 		now := add(call.Now)
 
 		cond := "EXISTS (SELECT 1 FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active' AND " +
@@ -598,7 +599,8 @@ func insertRequest(
 		preferred_slots, preference_round, due_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'requested',
 		'client_request', $4, $5,
 		tstzrange($6, $7), $8, 1, $9) RETURNING
-		id`, input.UnitID, org, input.Type, input.Symptom, contactWindow, input.RequestedStart, input.RequestedEnd, pref, due).
+		id`, input.UnitID, org, input.Type, input.Symptom, contactWindow, input.RequestedStart, input.RequestedEnd, pref,
+		due).
 		Scan(&jobID)
 
 	return jobID, apperr.Wrap(err, "insert maintenance.jobs")
@@ -1069,9 +1071,11 @@ func (m Jobs) assignmentWhere(
 		lower(scheduled), upper(scheduled), status, reason, acknowledgement, acknowledged_at, cant_make_reason,
 		lower(alternative_slot), upper(alternative_slot)
 		FROM maintenance.assignments WHERE job_id = $1 AND `+cond, job).
-		Scan(&loaded.ID, &loaded.TenantID, &loaded.Version, &loaded.CreatedAt, &loaded.UpdatedAt, &loaded.JobID, &loaded.TechnicianMembershipID, &loaded.ValidFrom,
+		Scan(&loaded.ID, &loaded.TenantID, &loaded.Version, &loaded.CreatedAt, &loaded.UpdatedAt, &loaded.JobID,
+			&loaded.TechnicianMembershipID, &loaded.ValidFrom,
 			&loaded.ValidUntil,
-			&loaded.ScheduledStart, &loaded.ScheduledEnd, &loaded.Status, &loaded.Reason, &loaded.Acknowledgement, &loaded.AcknowledgedAt, &loaded.CantMakeReason,
+			&loaded.ScheduledStart, &loaded.ScheduledEnd, &loaded.Status, &loaded.Reason, &loaded.Acknowledgement,
+			&loaded.AcknowledgedAt, &loaded.CantMakeReason,
 			&altStart, &altEnd)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return loaded, false, nil
@@ -2170,7 +2174,12 @@ func decodeEventPeriod(raw json.RawMessage) (eventPeriod, error) {
 
 // eventsWhere is the jobs.events condition on job_events e and its arguments: the job's events the caller reads, in
 // the period.
-func eventsWhere(call *ops.Call, jobID uuid.UUID, ownOnly bool, period eventPeriod) (string, []any) {
+func eventsWhere(
+	call *ops.Call,
+	jobID uuid.UUID,
+	ownOnly bool,
+	period eventPeriod,
+) (string, []any) {
 	args := []any{jobID}
 
 	where := "e.job_id = $1"

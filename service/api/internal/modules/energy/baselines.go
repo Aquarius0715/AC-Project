@@ -173,7 +173,8 @@ func listBaselines(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&filter) != nil || (filter.Method != nil && !slices.Contains(methods, *filter.Method)) ||
+		if dec.Decode(&filter) != nil ||
+			(filter.Method != nil && !slices.Contains(methods, *filter.Method)) ||
 			(filter.BoundaryID != nil && !slices.Contains(boundaries, *filter.BoundaryID)) {
 			return paging.Page[Baseline]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
@@ -425,7 +426,8 @@ const modeledQuality = `{"kind":"modeled","coverage":null,"expectedSlots":null,"
 func saveBaseline(ctx context.Context, call *ops.Call, input *BaselineInput) (Baseline, error) {
 	var known int
 
-	err := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, input.UnitIDs).
+	err := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT
+		archived`, input.UnitIDs).
 		Scan(&known)
 	if err != nil {
 		return Baseline{}, apperr.Wrap(err, "select energy.ref_units")

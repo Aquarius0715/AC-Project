@@ -71,7 +71,8 @@ func (m FollowUps) lock(ctx context.Context, call *ops.Call, jobID uuid.UUID) (j
 
 	err := call.Tx.QueryRow(ctx, `SELECT status, customer_org_id, unit_id, completed_at, rating, follow_up_class,
 		warranty_claims, version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, jobID).
-		Scan(&state.status, &state.org, &state.unit, &state.completedAt, &state.rating, &state.followUp, &state.claims, &version)
+		Scan(&state.status, &state.org, &state.unit, &state.completedAt, &state.rating, &state.followUp, &state.claims,
+			&version)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == roleClient && state.org != call.Principal.OrgID) {
 		return state, apperr.E(apperr.NotFound, apperr.KeyNotFound)
@@ -819,7 +820,8 @@ func (m FollowUps) extendAccessJob(
 		until             time.Time
 	)
 
-	err := call.Tx.QueryRow(ctx, `SELECT id, access_valid_until, contractor_org_id FROM maintenance.offers WHERE job_id = $1
+	err := call.Tx.QueryRow(ctx, `SELECT id, access_valid_until, contractor_org_id FROM maintenance.offers WHERE job_id =
+		$1
 		AND decision = 'accept' ORDER BY decided_at DESC LIMIT 1 FOR UPDATE`, input.JobID).
 		Scan(&offer, &until, &contractor)
 	if errors.Is(err, pgx.ErrNoRows) {

@@ -209,7 +209,10 @@ func TestAutomationSchedules(t *testing.T) {
 		srv,
 		customerB(),
 		"automations.save",
-		scheduleRule(unit, map[string]string{"id": `"` + automationID + `"`, fieldName: `"Edited"`}),
+		scheduleRule(
+			unit,
+			map[string]string{"id": `"` + automationID + `"`, fieldName: `"Edited"`},
+		),
 		1,
 	)
 	if code != 200 || ver(t, resp) != 2 || data(resp)["disabledReason"] != "capability_changed" {
@@ -220,7 +223,10 @@ func TestAutomationSchedules(t *testing.T) {
 		srv,
 		customerB(),
 		"automations.save",
-		scheduleRule(unit, map[string]string{"id": `"` + automationID + `"`, fieldEnabled: jsonTrue}),
+		scheduleRule(
+			unit,
+			map[string]string{"id": `"` + automationID + `"`, fieldEnabled: jsonTrue},
+		),
 		2,
 	)
 	if code != 200 || data(resp)["enabled"] != true || data(resp)["disabledReason"] != nil {

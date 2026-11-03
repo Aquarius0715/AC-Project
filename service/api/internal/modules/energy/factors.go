@@ -56,7 +56,12 @@ func scanFactor(r pgx.Row) (Factor, error) {
 }
 
 // LoadFactor returns a factor version (current when version is nil).
-func LoadFactor(ctx context.Context, c *ops.Call, factorID uuid.UUID, version *int) (Factor, error) {
+func LoadFactor(
+	ctx context.Context,
+	c *ops.Call,
+	factorID uuid.UUID,
+	version *int,
+) (Factor, error) {
 	stmt, args := "SELECT "+factorCols+" FROM energy.emission_factors f WHERE f.id = $1 AND f.is_current", []any{
 		factorID,
 	}

@@ -75,7 +75,7 @@ func Integrate(
 
 	for rows.Next() {
 		var (
-			value                     *float64
+			value                 *float64
 			unit, origin, quality string
 			boundary              *string
 		)

@@ -536,7 +536,8 @@ func TestAdminSummary(t *testing.T) {
 	_, res = adminSummary(hq(), `,"propertyId":"`+prop+`"`)
 
 	forecast = asObj(t, data(res)["energyForecast"])
-	if asNum(t, forecast["predictedBaselineKWh"]) != 10 || asNum(t, forecast["predictedActualKWh"]) != 5 ||
+	if asNum(t, forecast["predictedBaselineKWh"]) != 10 ||
+		asNum(t, forecast["predictedActualKWh"]) != 5 ||
 		asNum(t, forecast["forecastSavedKWh"]) != 5 ||
 		asNum(t, forecast["forecastSavingPercentage"]) != 50 ||
 		asNum(t, forecast["expectedUnitMinutes"]) != 5 ||

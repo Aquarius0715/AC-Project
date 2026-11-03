@@ -253,7 +253,10 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		&firmware,
 	)
 
-	if st, code := opState(back); st != statusFailed || code != codeUnavailable || firmware != "v2" {
+	if st, code := opState(
+		back,
+	); st != statusFailed || code != codeUnavailable ||
+		firmware != "v2" {
 		t.Fatalf("failed firmware keeps the old version: %s %s %s", st, code, firmware)
 	}
 	// REV19-018: control work patched in after creation fails the start with CONFLICT; an undelivered restriction
@@ -406,8 +409,8 @@ func TestDeviceEvents(t *testing.T) {
 	eventOf := func(eventID string) (string, []uuid.UUID, *time.Time, string) {
 		var (
 			eventRowID, evidence string
-			alerts       []uuid.UUID
-			restored     *time.Time
+			alerts               []uuid.UUID
+			restored             *time.Time
 		)
 		ownerScan(
 			t,

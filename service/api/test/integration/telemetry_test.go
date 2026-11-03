@@ -187,8 +187,8 @@ func TestTelemetry(t *testing.T) {
 	}
 
 	for body, want := range map[string]string{
-		`{` + rng + `,"unitIds":[]}`:                                             refusedUnitIDsInvalid,
-		`{` + rng + `,"unitIds":["` + online + `"],"metric":"x"}`:                refusedMetricInvalid,
+		`{` + rng + `,"unitIds":[]}`:                                                refusedUnitIDsInvalid,
+		`{` + rng + `,"unitIds":["` + online + `"],"metric":"x"}`:                   refusedMetricInvalid,
 		`{"from":"` + until + `","to":"` + from + `","unitIds":["` + online + `"]}`: refusedToRange,
 	} {
 		code, m := post(srv, customerA(), "telemetry.summary", body)

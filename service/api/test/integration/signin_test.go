@@ -97,7 +97,7 @@ func TestLastSignIn(t *testing.T) {
 	mark()
 	request(signedIn(signedAt), "session.get")                 // the same sign-in again
 	request(signedIn(signedAt.Add(-time.Hour)), "session.get") // an older session's token
-	request(customerA(), "session.get")                  // a token without a sign-in time
+	request(customerA(), "session.get")                        // a token without a sign-in time
 
 	if last, _ := read(); last == nil || !last.Equal(earlier) {
 		t.Fatalf("must not move: %v", last)
@@ -106,7 +106,8 @@ func TestLastSignIn(t *testing.T) {
 	secondSignIn := signedAt.Add(time.Hour)
 	request(signedIn(secondSignIn), "session.get")
 
-	if last, auth := read(); last == nil || last.Equal(earlier) || auth == nil || !auth.Equal(secondSignIn) {
+	if last, auth := read(); last == nil || last.Equal(earlier) || auth == nil ||
+		!auth.Equal(secondSignIn) {
 		t.Fatalf("a later sign-in: %v %v", last, auth)
 	}
 
@@ -118,7 +119,8 @@ func TestLastSignIn(t *testing.T) {
 		"units.list",
 	) // another service: identity-api records it through the principal call
 
-	if last, auth := read(); last == nil || last.Equal(earlier) || auth == nil || !auth.Equal(thirdSignIn) {
+	if last, auth := read(); last == nil || last.Equal(earlier) || auth == nil ||
+		!auth.Equal(thirdSignIn) {
 		t.Fatalf("through another service: %v %v", last, auth)
 	}
 }

@@ -162,7 +162,8 @@ func queryHash(conditions any, sortSpec *SortSpec, limit int) (string, error) {
 	return hex.EncodeToString(sum[:8]), nil
 }
 
-// cursorOffset is the offset in a cursor of the query with that hash, at the scope and snapshot versions of the request.
+// cursorOffset is the offset in a cursor of the query with that hash, at the scope and snapshot versions of the
+// request.
 func cursorOffset(token, hash string, scopeVersion, snapshot int) (int, error) {
 	raw, err := base64.RawURLEncoding.DecodeString(token)
 

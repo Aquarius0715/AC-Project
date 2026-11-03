@@ -125,7 +125,8 @@ func TestLiveSiteSeeds(t *testing.T) {
 		t.Fatalf("model: %v", scanErr)
 	}
 
-	if !control || modeControl || fanControl || !noTemperature || manufacturer != site.Manufacturer ||
+	if !control || modeControl || fanControl || !noTemperature ||
+		manufacturer != site.Manufacturer ||
 		model != site.Model {
 		t.Errorf(
 			"the live model %s %s offers control %t, mode %t, fan %t, no temperature %t; want the power only",
@@ -157,7 +158,10 @@ func TestLiveSiteSeeds(t *testing.T) {
 		seed.ID(site.Capability),
 		site.UnitName,
 	); total != 1 {
-		t.Errorf("the live unit is not the live customer's in its room on the live model (%d)", total)
+		t.Errorf(
+			"the live unit is not the live customer's in its room on the live model (%d)",
+			total,
+		)
 	}
 
 	var (

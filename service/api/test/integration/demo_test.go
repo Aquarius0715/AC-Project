@@ -125,7 +125,13 @@ func TestDemoOperations(t *testing.T) {
 		for measurementRows.Next() {
 			var scanned row
 
-			err := measurementRows.Scan(&scanned.quality, &scanned.seq, &scanned.value, &scanned.reason, &scanned.rawUn)
+			err := measurementRows.Scan(
+				&scanned.quality,
+				&scanned.seq,
+				&scanned.value,
+				&scanned.reason,
+				&scanned.rawUn,
+			)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -43,7 +43,8 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Format(
 				time.RFC3339,
 			)+
-				`","eventType":"restriction_observation","restrictionId":"`+restrictionID+`","unitId":"`+unit+`","observed":`+observed+`}`,
+				`","eventType":"restriction_observation",`+
+				`"restrictionId":"`+restrictionID+`","unitId":"`+unit+`","observed":`+observed+`}`,
 			0,
 		); code != 200 {
 			t.Fatalf("observation: %d %v", code, resp)
@@ -132,7 +133,8 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	code, res := reconcile(overrider()) // override-only may handle terminal recovery (IR03)
 
 	casesBefore, _ := data(res)["recoveryCases"].([]any)
-	if code != 200 || len(casesBefore) != 1 || asObj(t, casesBefore[0])["state"] != statusRemoving ||
+	if code != 200 || len(casesBefore) != 1 ||
+		asObj(t, casesBefore[0])["state"] != statusRemoving ||
 		len(asArr(t, asObj(t, casesBefore[0])["commandIds"])) != 1 {
 		t.Fatalf("reconcile terminal: %d %v", code, res)
 	}

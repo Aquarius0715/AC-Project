@@ -55,7 +55,8 @@ func webTitles() (map[string]bool, error) {
 	end := strings.Index(source[start:], "};")
 
 	keys := map[string]bool{}
-	for _, k := range regexp.MustCompile(`"?([a-z_]+(?:\.[a-z_]+)?)"?\s*:\s*"`).FindAllStringSubmatch(source[start:start+end],
+	for _, k := range regexp.MustCompile(`"?([a-z_]+(?:\.[a-z_]+)?)"?\s*:\s*"`).FindAllStringSubmatch(
+		source[start:start+end],
 		-1) {
 		keys[k[1]] = true
 	}

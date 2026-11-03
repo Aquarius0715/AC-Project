@@ -41,7 +41,10 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 		owner(t, `DELETE FROM identity.memberships WHERE id = $1`, member)
 	})
 
-	asMember := actor{"tok-a", "test-member-a"} // customer A's user, signed in with the member membership
+	asMember := actor{
+		"tok-a",
+		"test-member-a",
+	} // customer A's user, signed in with the member membership
 	if code, res := post(srv, &asMember, "session.get", `{}`); code != 200 {
 		t.Fatalf("the member signs in: %d %v", code, res)
 	}

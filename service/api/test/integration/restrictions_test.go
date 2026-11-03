@@ -365,7 +365,11 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Error("execute twice")
 	}
 
-	if !ackCommand(t, asStr(t, asArr(t, onlineState["applyCommandIds"])[0]), clock().Add(time.Second)) {
+	if !ackCommand(
+		t,
+		asStr(t, asArr(t, onlineState["applyCommandIds"])[0]),
+		clock().Add(time.Second),
+	) {
 		t.Fatal("ack apply")
 	}
 
@@ -438,7 +442,12 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Errorf("bad state filter: %d %s", code, fields(res))
 	}
 
-	if code, _ := post(srv, customerB(), "restrictions.get", `{"id":"`+restrictionID+`"}`); code != 403 {
+	if code, _ := post(
+		srv,
+		customerB(),
+		"restrictions.get",
+		`{"id":"`+restrictionID+`"}`,
+	); code != 403 {
 		t.Error("client get")
 	}
 
@@ -495,7 +504,8 @@ func TestRestrictionLifecycle(t *testing.T) {
 	}
 
 	onlineState, off = unitState(t, resp, online), unitState(t, resp, offline)
-	if onlineState["releaseState"] != statusRequested || len(asArr(t, onlineState["releaseCommandIds"])) != 1 ||
+	if onlineState["releaseState"] != statusRequested ||
+		len(asArr(t, onlineState["releaseCommandIds"])) != 1 ||
 		off["applyState"] != statusNotApplied ||
 		off["releaseState"] != "not_required" {
 		t.Fatalf("release eval: %v %v", onlineState, off)
@@ -517,7 +527,11 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Error("cancel idempotent while release_requested")
 	}
 
-	if !ackCommand(t, asStr(t, asArr(t, onlineState["releaseCommandIds"])[0]), clock().Add(2*time.Second)) {
+	if !ackCommand(
+		t,
+		asStr(t, asArr(t, onlineState["releaseCommandIds"])[0]),
+		clock().Add(2*time.Second),
+	) {
 		t.Fatal("ack remove")
 	}
 
@@ -652,7 +666,8 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		srv,
 		restrMgr(),
 		"payments.recordManual",
-		`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+restrictionID[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
+		`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+restrictionID[:8]+`","confirmedAmountMinor":5000,`+
+			`"currency":"MYR",`+
 			`"reason":"bank transfer"}`,
 		1,
 	)
@@ -1061,7 +1076,8 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 		srv,
 		restrMgr(),
 		"restrictions.retry",
-		`{"restrictionId":"`+restrictionID+`","unitIds":["`+unit+`"],"phase":"apply","confirmedRulesVersion":"rules-1","reason":"r"}`,
+		`{"restrictionId":"`+restrictionID+`","unitIds":["`+unit+`"],"phase":"apply","confirmedRulesVersion":"rules-1",`+
+			`"reason":"r"}`,
 		ver(t, get()),
 	); code != 409 {
 		t.Error("retry apply of sent_unknown")
@@ -1274,7 +1290,12 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 		return out
 	}
 
-	_, clientView := post(srv, customerB(), "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{}}`)
+	_, clientView := post(
+		srv,
+		customerB(),
+		"restrictions.forInvoice",
+		`{"invoiceId":"`+inv+`","query":{}}`,
+	)
 	if hq := actions(
 		asArr(t, data(get())["events"]),
 	); !hq["restrictions.reconcile"] ||
@@ -1517,7 +1538,13 @@ func TestRestrictionExplicitRelease(t *testing.T) {
 		return m
 	}
 	release := func(v int) (int, map[string]any) {
-		return write(srv, restrMgr(), "restrictions.release", `{"restrictionId":"`+restrictionID+`"}`, v)
+		return write(
+			srv,
+			restrMgr(),
+			"restrictions.release",
+			`{"restrictionId":"`+restrictionID+`"}`,
+			v,
+		)
 	}
 
 	owner(
@@ -1527,7 +1554,10 @@ func TestRestrictionExplicitRelease(t *testing.T) {
 	) // paid outside the payment flow, which would release by itself
 
 	version := ver(t, get())
-	if code, m := release(version + 1); code != 409 || m["messageKey"] != apperr.KeyVersionConflict {
+	if code, m := release(
+		version + 1,
+	); code != 409 ||
+		m["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("release on a stale version: %d %v", code, m)
 	}
 
@@ -1548,7 +1578,8 @@ func TestRestrictionExplicitRelease(t *testing.T) {
 		srv,
 		restrMgr(),
 		"audit.list",
-		`{"filters":{`+day+`,"action":"restrictions.release","targetKind":"restriction","targetId":"`+restrictionID+`"},"limit":10}`,
+		`{"filters":{`+day+`,"action":"restrictions.release","targetKind":"restriction",`+
+			`"targetId":"`+restrictionID+`"},"limit":10}`,
 	)
 	if len(items(t, res)) != 1 {
 		t.Errorf("audit of the release: %v", items(t, res))
@@ -1681,7 +1712,12 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 		group.Wait()
 
 		var state string
-		ownerScan(t, `SELECT state FROM restrictions.restrictions WHERE id = $1`, []any{restrictionID}, &state)
+		ownerScan(
+			t,
+			`SELECT state FROM restrictions.restrictions WHERE id = $1`,
+			[]any{restrictionID},
+			&state,
+		)
 
 		if state != statusCancelled {
 			t.Fatalf(
@@ -1784,7 +1820,12 @@ func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 	}
 
 	var state string
-	ownerScan(t, `SELECT state FROM restrictions.restrictions WHERE id = $1`, []any{restrictionID}, &state)
+	ownerScan(
+		t,
+		`SELECT state FROM restrictions.restrictions WHERE id = $1`,
+		[]any{restrictionID},
+		&state,
+	)
 
 	if state != statusApplied {
 		t.Fatalf("both units applied, the restriction is %s", state)

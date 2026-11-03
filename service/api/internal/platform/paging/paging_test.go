@@ -27,7 +27,12 @@ func TestResolveDefaults(t *testing.T) {
 
 	cond := map[string]any{"propertyId": "p1"}
 
-	window, err := paging.Resolve(paging.Query{Cursor: nil, Limit: nil, Sort: nil, Filters: nil}, cond, 1, 1)
+	window, err := paging.Resolve(
+		paging.Query{Cursor: nil, Limit: nil, Sort: nil, Filters: nil},
+		cond,
+		1,
+		1,
+	)
 	if err != nil || window.Limit != 25 || window.Offset != 0 {
 		t.Fatalf("defaults: %+v %v", window, err)
 	}
@@ -42,21 +47,32 @@ func TestResolveAndNext(t *testing.T) {
 
 	cond := map[string]any{"propertyId": "p1"}
 
-	window, _ := paging.Resolve(paging.Query{Limit: new(2), Cursor: nil, Sort: nil, Filters: nil}, cond, 1, 1)
+	window, _ := paging.Resolve(
+		paging.Query{Limit: new(2), Cursor: nil, Sort: nil, Filters: nil},
+		cond,
+		1,
+		1,
+	)
 
 	next := window.Next(5)
 	if next == nil {
 		t.Fatal("next")
 	}
 
-	w2, err := paging.Resolve(paging.Query{Limit: new(2), Cursor: next, Sort: nil, Filters: nil}, cond, 1, 1)
+	w2, err := paging.Resolve(
+		paging.Query{Limit: new(2), Cursor: next, Sort: nil, Filters: nil},
+		cond,
+		1,
+		1,
+	)
 	if err != nil || w2.Offset != 2 {
 		t.Fatalf("second page: %+v %v", w2, err)
 	}
 
 	if w3 := w2.Next(5); w3 == nil {
 		t.Fatal("third page")
-	} else if w4, _ := paging.Resolve(paging.Query{Limit: new(2), Cursor: w3, Sort: nil, Filters: nil}, cond, 1, 1); w4.Next(5) != nil ||
+	} else if w4, _ := paging.Resolve(paging.Query{Limit: new(2), Cursor: w3, Sort: nil, Filters: nil}, cond, 1,
+		1); w4.Next(5) != nil ||
 		w4.Offset != 4 {
 		t.Fatal("last page")
 	}
@@ -66,7 +82,12 @@ func TestResolveRefuses(t *testing.T) {
 	t.Parallel()
 
 	cond := map[string]any{"propertyId": "p1"}
-	window, _ := paging.Resolve(paging.Query{Limit: new(2), Cursor: nil, Sort: nil, Filters: nil}, cond, 1, 1)
+	window, _ := paging.Resolve(
+		paging.Query{Limit: new(2), Cursor: nil, Sort: nil, Filters: nil},
+		cond,
+		1,
+		1,
+	)
 	next := window.Next(5)
 
 	cases := []struct {
@@ -75,8 +96,18 @@ func TestResolveRefuses(t *testing.T) {
 		sv   int
 		want apperr.Code
 	}{
-		{paging.Query{Limit: new(0), Cursor: nil, Sort: nil, Filters: nil}, cond, 1, apperr.Validation},
-		{paging.Query{Limit: new(101), Cursor: nil, Sort: nil, Filters: nil}, cond, 1, apperr.Validation},
+		{
+			paging.Query{Limit: new(0), Cursor: nil, Sort: nil, Filters: nil},
+			cond,
+			1,
+			apperr.Validation,
+		},
+		{
+			paging.Query{Limit: new(101), Cursor: nil, Sort: nil, Filters: nil},
+			cond,
+			1,
+			apperr.Validation,
+		},
 		{
 			paging.Query{
 				Sort:    &paging.SortSpec{Field: "id", Direction: "up"},
@@ -144,7 +175,11 @@ func TestOrderBy(t *testing.T) {
 		t.Fatal(s)
 	}
 
-	if s, _ := paging.OrderBy(&paging.SortSpec{Field: "id", Direction: sortDesc}, allowed, ""); s != "id DESC" {
+	if s, _ := paging.OrderBy(
+		&paging.SortSpec{Field: "id", Direction: sortDesc},
+		allowed,
+		"",
+	); s != "id DESC" {
 		t.Fatal(s)
 	}
 
@@ -166,7 +201,10 @@ func TestOrderByDirection(t *testing.T) {
 	t.Parallel()
 
 	allowed := map[string]string{"id": "r.id", sortCreatedAt: "r.created_at"}
-	for dir, want := range map[string]string{"asc": "r.created_at ASC, r.id ASC", sortDesc: "r.created_at DESC, r.id ASC"} {
+	for dir, want := range map[string]string{
+		"asc":    "r.created_at ASC, r.id ASC",
+		sortDesc: "r.created_at DESC, r.id ASC",
+	} {
 		got, err := paging.OrderBy(
 			&paging.SortSpec{Field: sortCreatedAt, Direction: dir},
 			allowed,
@@ -179,7 +217,11 @@ func TestOrderByDirection(t *testing.T) {
 	}
 
 	for _, dir := range []string{"DESC", "", "sideways", "desc, (SELECT pg_sleep(5))", "asc; DROP TABLE x --"} {
-		got, err := paging.OrderBy(&paging.SortSpec{Field: sortCreatedAt, Direction: dir}, allowed, "")
+		got, err := paging.OrderBy(
+			&paging.SortSpec{Field: sortCreatedAt, Direction: dir},
+			allowed,
+			"",
+		)
 
 		var de *apperr.DomainError
 		if got != "" || !errors.As(err, &de) ||

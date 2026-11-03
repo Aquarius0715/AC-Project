@@ -285,7 +285,11 @@ func operatingRate(powerOn, powerOff int) *float64 {
 
 // activeCustomerCount counts the customers whose Customer and Organization are both active (IR40; organization
 // status from identity); the filters narrow it to the matching customer.
-func (m Summaries) activeCustomerCount(ctx context.Context, call *ops.Call, input *AdminInput) (int, error) {
+func (m Summaries) activeCustomerCount(
+	ctx context.Context,
+	call *ops.Call,
+	input *AdminInput,
+) (int, error) {
 	cargs := []any{}
 	cadd := func(v any) string {
 		cargs = append(cargs, v)
@@ -350,7 +354,11 @@ func (m Summaries) activeCustomerCount(ctx context.Context, call *ops.Call, inpu
 
 // overdueBilling returns the number and the amounts by currency of the unpaid invoices past due on contracts
 // covering the units (billing).
-func (m Summaries) overdueBilling(ctx context.Context, call *ops.Call, units []uuid.UUID) (int, []Money, error) {
+func (m Summaries) overdueBilling(
+	ctx context.Context,
+	call *ops.Call,
+	units []uuid.UUID,
+) (int, []Money, error) {
 	overdue, err := ops.Ask[[]billing.Overdue](
 		ctx,
 		m.Registry,

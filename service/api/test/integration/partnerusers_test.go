@@ -337,8 +337,8 @@ func TestPartnerUserAccess(t *testing.T) {
 	srv := server(t)
 	// the seed technician holds an active assignment: closing that account is refused (IR421)
 	var (
-		booked string
-		bookedVersion     int
+		booked        string
+		bookedVersion int
 	)
 	ownerScan(
 		t,
@@ -421,7 +421,7 @@ func TestPartnerUserAccess(t *testing.T) {
 
 	var (
 		partnerUserID, email string
-		userVersion         int
+		userVersion          int
 	)
 	ownerScan(
 		t,
@@ -713,8 +713,8 @@ func TestPartnerAccountCreated(t *testing.T) {
 	)
 
 	var (
-		status string
-		version      int
+		status  string
+		version int
 	)
 	ownerScan(
 		t,
@@ -1232,7 +1232,7 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 
 	var (
 		account string
-		version       int
+		version int
 	)
 	ownerScan(
 		t,
@@ -1241,6 +1241,7 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 		&account,
 		&version,
 	)
+
 	status := func(state string, userVersion int) {
 		t.Helper()
 
@@ -1257,7 +1258,12 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 	status("disabled", version)
 
 	var membershipVersion int
-	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &membershipVersion)
+	ownerScan(
+		t,
+		`SELECT version FROM identity.memberships WHERE id = $1`,
+		[]any{membership},
+		&membershipVersion,
+	)
 
 	if code, res := write(
 		srv,
@@ -1285,7 +1291,12 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 		)
 	}
 
-	ownerScan(t, `SELECT version FROM identity.partner_users WHERE id = $1`, []any{account}, &version)
+	ownerScan(
+		t,
+		`SELECT version FROM identity.partner_users WHERE id = $1`,
+		[]any{account},
+		&version,
+	)
 	status("active", version)
 	ownerScan(
 		t,

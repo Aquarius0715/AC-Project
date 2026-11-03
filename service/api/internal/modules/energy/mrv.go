@@ -290,7 +290,12 @@ func latestVersion(ctx context.Context, c *ops.Call, id uuid.UUID) (int, error) 
 }
 
 // LoadReport returns a report version (latest when version is nil).
-func LoadReport(ctx context.Context, call *ops.Call, reportID uuid.UUID, version *int) (Report, error) {
+func LoadReport(
+	ctx context.Context,
+	call *ops.Call,
+	reportID uuid.UUID,
+	version *int,
+) (Report, error) {
 	reportVersion := 0
 	if version != nil {
 		reportVersion = *version
@@ -583,7 +588,11 @@ func (in *VersionsInput) Validate() map[string]string {
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/mrv/{id}/versions [get]
-func versions(ctx context.Context, call *ops.Call, input *VersionsInput) (paging.Page[Report], error) {
+func versions(
+	ctx context.Context,
+	call *ops.Call,
+	input *VersionsInput,
+) (paging.Page[Report], error) {
 	if input.Query.HasFilters() { // no filters (query catalog)
 		return paging.Page[Report]{}, apperr.Fields(
 			map[string]string{"query.filters": apperr.KeyInvalid},

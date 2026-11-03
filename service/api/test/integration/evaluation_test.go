@@ -63,7 +63,8 @@ func TestAutomationEvaluation(t *testing.T) {
 		) + `","quality":"valid"}`
 	}
 	input := func(units, facts, phase string) string {
-		return `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + stamp + `","unitIds":[` + units + `],"facts":[` + facts +
+		return `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + stamp + `","unitIds":[` + units + `],"facts":[` +
+			facts +
 			`],"phase":"` + phase + `"}`
 	}
 	decision := func(m map[string]any, unit string) map[string]any {

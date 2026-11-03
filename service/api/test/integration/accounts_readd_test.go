@@ -338,7 +338,9 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 			srv,
 			contrB(),
 			"partnerUsers.save",
-			`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"technician","status":"`+status+`","reason":"on leave"}`,
+			`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"technician",`+
+				`"status":"`+status+`","reason":"on `+
+				`leave"}`,
 			version,
 		); code != 200 {
 			t.Fatalf("%s: %d %v", status, code, res)

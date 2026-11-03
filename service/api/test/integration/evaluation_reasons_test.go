@@ -80,7 +80,10 @@ func TestAutomationDecideReasons(t *testing.T) {
 	occupied := fact("occupied", "true", "boolean")
 
 	// invalid_capability: the saved action is patched to a fan level the model does not offer
-	ruleID, version := rule(`{"type":"occupancy","occupied":true}`, `{"kind":"set_fan","fanLevel":"high"}`)
+	ruleID, version := rule(
+		`{"type":"occupancy","occupied":true}`,
+		`{"kind":"set_fan","fanLevel":"high"}`,
+	)
 	owner(
 		t,
 		`UPDATE control.automations SET definition = jsonb_set(definition, '{action}',
@@ -95,7 +98,10 @@ func TestAutomationDecideReasons(t *testing.T) {
 	remove(ruleID, version)
 
 	// owner_forbidden: the owner is a membership of another organization (no control.execute on this unit)
-	ruleID, version = rule(`{"type":"occupancy","occupied":true}`, `{"kind":"set_temperature","celsius":24}`)
+	ruleID, version = rule(
+		`{"type":"occupancy","occupied":true}`,
+		`{"kind":"set_temperature","celsius":24}`,
+	)
 	owner(
 		t,
 		`UPDATE control.automations SET owner_membership_id = $2 WHERE id = $1`,
@@ -129,7 +135,10 @@ func TestAutomationDecideReasons(t *testing.T) {
 		}
 	}
 
-	ruleID, version = rule(`{"type":"location","event":"arrival"}`, `{"kind":"set_power","power":true}`)
+	ruleID, version = rule(
+		`{"type":"location","event":"arrival"}`,
+		`{"kind":"set_power","power":true}`,
+	)
 
 	owner(
 		t,

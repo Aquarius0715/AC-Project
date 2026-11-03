@@ -95,7 +95,13 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 	meter := attach(job1, report1, "Meter.png", "ready", input)
 	panel := attach(job1, report1, "panel.png", "ready", input.Add(30*time.Minute))
 	attach(job1, report1, "scanning.png", "processing", input.Add(10*time.Minute)) // not ready
-	attach(job1, report1, "old.png", "ready", from.Add(-time.Minute))              // before the period
+	attach(
+		job1,
+		report1,
+		"old.png",
+		"ready",
+		from.Add(-time.Minute),
+	) // before the period
 	attach(
 		job1,
 		report1,

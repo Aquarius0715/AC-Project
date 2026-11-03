@@ -396,7 +396,14 @@ func TestOfferAcceptAssign(t *testing.T) {
 		jobBody(other, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
-	if code, _ := asg(hq(), asStr(t, data(resp)["id"]), "tech-internal-a", slot1, 1, ""); code != 403 {
+	if code, _ := asg(
+		hq(),
+		asStr(t, data(resp)["id"]),
+		"tech-internal-a",
+		slot1,
+		1,
+		"",
+	); code != 403 {
 		t.Error("technician out of scope")
 	}
 

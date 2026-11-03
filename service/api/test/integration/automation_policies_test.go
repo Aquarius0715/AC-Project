@@ -320,7 +320,12 @@ func TestAutomationPolicies(t *testing.T) {
 		t.Fatal("automation customerId filter excludes")
 	}
 
-	if code, _ := post(srv, customerA(), "policies.get", `{"policyId":"`+policyID+`"}`); code != 404 {
+	if code, _ := post(
+		srv,
+		customerA(),
+		"policies.get",
+		`{"policyId":"`+policyID+`"}`,
+	); code != 404 {
 		t.Error("clients do not see automation policies")
 	}
 

@@ -232,43 +232,46 @@ func clusterFacade(t *testing.T, base apiserver.Config, verifier auth.Verifier) 
 		Echo:      nil,
 	}
 	app := echo.New()
-	app.Any("/*", echo.WrapHandler(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-		if !strings.HasPrefix(req.URL.Path, "/v1/") {
-			all.Echo.ServeHTTP(writer, req)
+	app.Any(
+		"/*",
+		echo.WrapHandler(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			if !strings.HasPrefix(req.URL.Path, "/v1/") {
+				all.Echo.ServeHTTP(writer, req)
 
-			return
-		}
-
-		err := facade.DrainEvents(
-			req.Context(),
-		)
-		if err != nil { // direct SQL of the test and worker paths (BeforeDispatch)
-			http.Error(writer, "drain before: "+err.Error(), http.StatusInternalServerError)
-
-			return
-		}
-
-		rec := &statusRecorder{ResponseWriter: writer, status: 0}
-		front.ServeHTTP(rec, req)
-
-		if req.URL.Path == "/v1/demo/advance-clock" && rec.status == http.StatusOK &&
-			base.DemoClock != nil { // the workers' tick on the new time
-			_, err := cluster.tick(
-				context.WithoutCancel(req.Context()),
-				base.DemoClock.Now(),
-			)
-			if err != nil {
-				panic("tick after the jump: " + err.Error())
+				return
 			}
-		}
 
-		err = facade.DrainEvents(
-			context.WithoutCancel(req.Context()),
-		)
-		if err != nil { // the write's events (AfterCommit)
-			panic("drain after: " + err.Error())
-		}
-	})))
+			err := facade.DrainEvents(
+				req.Context(),
+			)
+			if err != nil { // direct SQL of the test and worker paths (BeforeDispatch)
+				http.Error(writer, "drain before: "+err.Error(), http.StatusInternalServerError)
+
+				return
+			}
+
+			rec := &statusRecorder{ResponseWriter: writer, status: 0}
+			front.ServeHTTP(rec, req)
+
+			if req.URL.Path == "/v1/demo/advance-clock" && rec.status == http.StatusOK &&
+				base.DemoClock != nil { // the workers' tick on the new time
+				_, err := cluster.tick(
+					context.WithoutCancel(req.Context()),
+					base.DemoClock.Now(),
+				)
+				if err != nil {
+					panic("tick after the jump: " + err.Error())
+				}
+			}
+
+			err = facade.DrainEvents(
+				context.WithoutCancel(req.Context()),
+			)
+			if err != nil { // the write's events (AfterCommit)
+				panic("drain after: " + err.Error())
+			}
+		})),
+	)
 	facade.Echo = app
 	facades[base.DemoOps] = facade
 	clusters[facade] = cluster

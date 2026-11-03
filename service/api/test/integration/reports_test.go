@@ -33,7 +33,8 @@ func draftBody(job, result string, extra map[string]string) string {
 
 			items = append(
 				items,
-				`{"componentGroup":"`+group.Group+`","componentKey":"`+key+`","result":`+resultJSON+`,"reason":null,"evidenceIds":[]}`,
+				`{"componentGroup":"`+group.Group+`","componentKey":"`+key+`","result":`+resultJSON+`,"reason":null,`+
+					`"evidenceIds":[]}`,
 			)
 		}
 	}

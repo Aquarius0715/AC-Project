@@ -79,7 +79,13 @@ func TestAlerts(t *testing.T) {
 		`{"filters":{"unitId":"` + unit + `","customerId":"` + uuid.NewString() +
 			`"}}`: 0,
 	} {
-		if code, m := post(srv, hq(), "alerts.list", body); code != 200 || len(items(t, m)) != want {
+		if code, m := post(
+			srv,
+			hq(),
+			"alerts.list",
+			body,
+		); code != 200 ||
+			len(items(t, m)) != want {
 			t.Errorf("%s: %d want %d", body, len(items(t, m)), want)
 		}
 	}
@@ -223,7 +229,10 @@ func TestAlerts(t *testing.T) {
 	}
 
 	_, detail = post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
-	if asNum(t, data(detail)["activeAlertCount"]) != 0 { // only the normal alert is left open (IR51)
+	if asNum(
+		t,
+		data(detail)["activeAlertCount"],
+	) != 0 { // only the normal alert is left open (IR51)
 		t.Fatal("resolved alerts are not active")
 	}
 }

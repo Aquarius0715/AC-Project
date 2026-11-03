@@ -485,7 +485,8 @@ func TestClientUsersByOwner(t *testing.T) {
 
 	email2 := email
 	if code, m := save(
-		`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","reason":"not an owner"}`,
+		`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","reason":"not an `+
+			`owner"}`,
 		1,
 	); code != 200 ||
 		data(m)["clientRole"] != clientRoleMember {
@@ -493,7 +494,8 @@ func TestClientUsersByOwner(t *testing.T) {
 	}
 
 	if code, m := save(
-		`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","status":"active","reason":"x"}`,
+		`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","status":"active",`+
+			`"reason":"x"}`,
 		2,
 	); code != 409 ||
 		m["messageKey"] != "errors.invite_pending" {
@@ -710,7 +712,7 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 
 	var (
 		clientUserID string
-		version  int
+		version      int
 	)
 	ownerScan(
 		t,
@@ -724,7 +726,8 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 		srv,
 		customerB(),
 		"clientUsers.save",
-		`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"`+user+`@ac.local","clientRole":"member","status":"disabled",`+
+		`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"`+user+`@ac.local","clientRole":"member",`+
+			`"status":"disabled",`+
 			`"reason":"left"}`,
 		version,
 	); code != 200 {
@@ -732,7 +735,12 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 	}
 
 	var membershipVersion int
-	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &membershipVersion)
+	ownerScan(
+		t,
+		`SELECT version FROM identity.memberships WHERE id = $1`,
+		[]any{membership},
+		&membershipVersion,
+	)
 
 	later := clock().Add(90 * 24 * time.Hour).Format(time.RFC3339)
 	if code, resp := write(

@@ -223,7 +223,10 @@ func TestPaymentSimulation(t *testing.T) {
 		t.Fatalf("confirm: %d %v", code, m)
 	}
 
-	if code, _ := sim(`{"event":"fail","paymentId":"`+pay+`"`+eventFields("fail")+`}`, 3); code != 409 {
+	if code, _ := sim(
+		`{"event":"fail","paymentId":"`+pay+`"`+eventFields("fail")+`}`,
+		3,
+	); code != 409 {
 		t.Error("fail after confirmed")
 	}
 

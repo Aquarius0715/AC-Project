@@ -116,7 +116,11 @@ func TestOffsets(t *testing.T) {
 		return `{"event":"` + event + `","recordId":"` + rid + `","attemptId":"` + attempt + `","eventId":"` + eventID +
 			`","demoConfirmed":true}`
 	}
-	if code, _ := sim(customerB(), eventBody("purchase_confirm", att, uuid.NewString()), 1); code != 403 {
+	if code, _ := sim(
+		customerB(),
+		eventBody("purchase_confirm", att, uuid.NewString()),
+		1,
+	); code != 403 {
 		t.Error("client confirms purchase")
 	}
 	// purchase fails → retry → purchase → retire

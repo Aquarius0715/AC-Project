@@ -113,7 +113,8 @@ func (m Delivery) load(ctx context.Context, call *ops.Call, jobID uuid.UUID) (jo
 		upper(requested_slot), preferred_slots,
 		lower(scheduled_slot), upper(scheduled_slot), assignment_id, version FROM maintenance.jobs WHERE id = $1 FOR
 		UPDATE`, jobID).
-		Scan(&job.status, &job.unit, &job.contractor, &job.planID, &job.occurrence, &job.requested.StartAt, &job.requested.EndAt, &pref,
+		Scan(&job.status, &job.unit, &job.contractor, &job.planID, &job.occurrence, &job.requested.StartAt,
+			&job.requested.EndAt, &pref,
 			&schedStart, &schedEnd, &job.assignment, &job.version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return job, apperr.E(apperr.NotFound, apperr.KeyNotFound)

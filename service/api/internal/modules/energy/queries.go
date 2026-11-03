@@ -37,7 +37,15 @@ func RegisterQueries(r *ops.Registry) {
 				return Actuals{}, err
 			}
 
-			energySummary, integ, err := Compute(ctx, call, input.UnitIDs, input.From, input.To, f, nil)
+			energySummary, integ, err := Compute(
+				ctx,
+				call,
+				input.UnitIDs,
+				input.From,
+				input.To,
+				f,
+				nil,
+			)
 			if err != nil {
 				return Actuals{}, err
 			}

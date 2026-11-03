@@ -98,7 +98,8 @@ describe("partner job history", () => {
 describe("the actions a client does not read (IR442, IR506)", () => {
   it("match the Core API's clientHiddenActions", () => {
     const go = readFileSync(new URL("../../../../api/internal/modules/maintenance/jobs.go", import.meta.url), "utf8");
-    const list = /var clientHiddenActions = \[\]string\{([^}]*)\}/.exec(go)?.[1] ?? "";
-    expect([...list.matchAll(/"([^"]+)"/g)].map((m) => m[1])).toEqual(CLIENT_HIDDEN_ACTIONS);
+    // the Go side is the SQL list itself: const clientHiddenActions = "'job.costs_saved','…'" + "…"
+    const list = /const clientHiddenActions = ((?:"[^"]*"\s*\+?\s*)+)/.exec(go)?.[1] ?? "";
+    expect([...list.matchAll(/'([^']+)'/g)].map((m) => m[1])).toEqual(CLIENT_HIDDEN_ACTIONS);
   });
 });

@@ -724,7 +724,14 @@ func TestForeignTargets(t *testing.T) {
 		// the scope is checked before the expected version: a stale version gets the same refusal, so the answer
 		// never tells that the record exists
 		if spec.Mode == ops.Write && testCase.version > 0 {
-			if code, reply := write(srv, testCase.who, testCase.op, testCase.body, 97); code != 403 && code != 404 {
+			if code, reply := write(
+				srv,
+				testCase.who,
+				testCase.op,
+				testCase.body,
+				97,
+			); code != 403 &&
+				code != 404 {
 				t.Errorf(
 					"%s as %s with a stale version: %d %v",
 					testCase.op,
