@@ -29,7 +29,7 @@ const TEMPLATES: [RegExp, string, (m: RegExpMatchArray) => Params][] = [
 ];
 
 /** Resolution reasons the system writes: a cleaned filter, a recovery case resolved, a policy's sustained recovery
- * (D08). A reason a person typed when resolving stays as written. */
+(D08). A reason a person typed when resolving stays as written. */
 const REASONS = new Set(["filter cleaned", "recovery resolved"]);
 const REASON_TEMPLATES: typeof TEMPLATES = [
   [/^Recovered: (\S+) (\S+) ([<>]) (\S+) for (\d+) s \(D08\)$/, "Recovered: {metric} {value} {dir} {threshold} for {seconds} s", (m) => ({ metric: m[1], value: m[2], dir: m[3], threshold: m[4], seconds: m[5] })],

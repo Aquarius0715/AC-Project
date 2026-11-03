@@ -42,7 +42,7 @@ test("the report autosaves once, 20 s after the last edit", async ({ browser }) 
     const firstSave = saves[0];
     expect(firstSave - edited).toBeGreaterThanOrEqual(18_000);
     await page.waitForTimeout(3000);
-    expect(saves.length).toBe(1);
+    expect(saves).toHaveLength(1);
   } finally {
     await ctx.close();
   }

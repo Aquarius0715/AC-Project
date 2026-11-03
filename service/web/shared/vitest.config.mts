@@ -1,11 +1,10 @@
 // Vitest of the shared package, as in the Next.js docs (Testing › Vitest): the React plugin and a jsdom environment
 // so component tests can follow the pure-function tests of lib/. `@ac/web/*` resolves to this package (the apps
 // import it through the workspace link).
-import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
-const here = fileURLToPath(new URL(".", import.meta.url)).replace(/\/$/, "");
+const here = import.meta.dirname.replace(/\/$/, "");
 
 export default defineConfig({
   plugins: [react()],

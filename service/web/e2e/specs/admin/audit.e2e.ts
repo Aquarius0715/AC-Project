@@ -35,12 +35,12 @@ test("the audit log keeps its filters and the open entry in the URL", async ({ p
   const op = (await second.locator("b").innerText()).trim();
   await second.click();
   await page.waitForURL(/entryId=[0-9a-f-]{36}/);
-  const detail = card(page, new RegExp(`^${op.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  const detail = card(page, new RegExp(`^${RegExp.escape(op)}`));
   await expect(detail.first()).toBeVisible();
   const entryId = new URL(page.url()).searchParams.get("entryId");
   await expect(fact(detail.first(), "Role at the time")).toContainText("kept as recorded, not rewritten by the current membership");
   const target = (await fact(detail.first(), "Target").locator("span.font-mono").innerText()).trim(); // "kind · id"
-  const [kind, id] = target.split(" · ");
+  const [kind, id] = target.split(" · ", 2);
 
   // Filter by target keeps the entry open; every shown entry has that target; the chip clears it
   await detail.first().getByRole("button", { name: "Filter by target" }).click();

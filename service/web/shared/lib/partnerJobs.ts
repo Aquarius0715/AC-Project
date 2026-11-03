@@ -19,7 +19,7 @@ export const tabOf = (v?: string): TabId => (TABS.find((t) => t.id === v)?.id ??
 /** The jobs.list filters of a tab within the period. */
 export function tabFilters(tab: TabId, fromAt: string, toAt: string): NonNullable<OpInput<"jobs.list">["filters"]> {
   const statuses = TABS.find((t) => t.id === tab)!.statuses;
-  return { from: fromAt, to: toAt, ...(statuses ? { statuses: [...statuses] } : {}) };
+  return { from: fromAt, to: toAt, ...(statuses && { statuses: [...statuses] }) };
 }
 
 export const SORTS = [
@@ -29,16 +29,16 @@ export const SORTS = [
 ] as const;
 export type SortId = (typeof SORTS)[number]["id"];
 export const sortOf = (v?: string): SortId => (SORTS.find((s) => s.id === v)?.id ?? "status:asc");
-export const sortSpec = (id: SortId): NonNullable<OpInput<"jobs.list">["sort"]> => { const [field, direction] = id.split(":"); return { field, direction } as NonNullable<OpInput<"jobs.list">["sort"]>; }; // SortId names only the catalog's sorts
+export const sortSpec = (id: SortId): NonNullable<OpInput<"jobs.list">["sort"]> => { const [field, direction] = id.split(":", 2); return { field, direction } as NonNullable<OpInput<"jobs.list">["sort"]>; }; // SortId names only the catalog's sorts
 
 export const PAGE_SIZE = 25;
 
 type Tone = "primary" | "ok" | "warn" | "crit" | "muted";
-export type JobRow = {
+export interface JobRow {
   id: string; title: string; origin: string | null; line: string; href: string;
   /** `subTone` colours the line under the name (a technician who can't make the slot); "Unassigned" colours only the name. */
   tech: { name: string; sub: string; tone?: Tone; subTone?: Tone }; slot: { main: string; sub: string; tone?: Tone }; badge: { text: string; tone: Tone };
-};
+}
 
 const typeText: Record<string, string> = { periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance" };
 const ack: Record<string, { sub: string; tone?: Tone }> = { pending: { sub: "awaiting the technician’s acceptance" }, accepted: { sub: "accepted" }, cant_make: { sub: "can’t make it — reassign", tone: "warn" } };
@@ -66,7 +66,7 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
       id: j.id, title, origin, href: detail,
       line: pending ? t("Time change proposed · waiting for HQ and the client") : t("Offered by HQ · visit {slot} (fixed)", { slot: raw.visitSlot ? span(raw.visitSlot) : "—" }),
       tech: { name: "—", sub: t("not assignable before acceptance") },
-      slot: { main: t("Answer by {time}", { time: at(raw.offerExpiresAt) }), sub: Date.parse(raw.offerExpiresAt) <= now ? left : t("{left} left", { left }), tone: Date.parse(raw.offerExpiresAt) - now < 6 * 3600_000 ? "warn" : undefined },
+      slot: { main: t("Answer by {time}", { time: at(raw.offerExpiresAt) }), sub: Date.parse(raw.offerExpiresAt) <= now ? left : t("{left} left", { left }), tone: Date.parse(raw.offerExpiresAt) - now < 6 * 3_600_000 ? "warn" : undefined },
       badge: pending ? { text: t("Time proposed"), tone: "warn" } : { text: t("Offered"), tone: "primary" },
     };
   }
@@ -80,7 +80,7 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
     };
   }
   if (raw.projection === "history") {
-    const status = historyStatus[raw.status] ? t(historyStatus[raw.status]) : raw.status.replace(/_/g, " ");
+    const status = historyStatus[raw.status] ? t(historyStatus[raw.status]) : raw.status.replaceAll('_', " ");
     return {
       id: j.id, title, origin: null, href: `/partner/history?jobId=${j.id}`,
       line: t("{status} · delegation ended, history only", { status }),
@@ -91,16 +91,20 @@ export function jobRow(raw: ApiPartnerJob, now: number, units: Map<string, strin
   }
   const due = j.dueAt ? t("Due {time}", { time: at(j.dueAt) }) : "";
   const known = ack[(raw as { assignmentAcknowledgement?: string | null }).assignmentAcknowledgement ?? ""];
-  const technician = tech ? { name: tech, ...(known ? { sub: t(known.sub), ...(known.tone ? { tone: known.tone, subTone: known.tone } : {}) } : { sub: t("assigned") }) } : null;
+  const technician = tech ? { name: tech, ...(known ? { sub: t(known.sub), ...(known.tone && { tone: known.tone, subTone: known.tone }) } : { sub: t("assigned") }) } : null;
   switch (b) {
-    case "unassigned":
+    case "unassigned": {
       return { id: j.id, title, origin, href: `/partner/schedule?jobId=${j.id}`, line: t("Accepted · assign a technician for the agreed time"), tech: { name: t("Unassigned"), sub: t("assign before the delegation ends"), tone: "warn" }, slot: { main: due || "—", sub: t("Assign a technician") }, badge: { text: t("Accepted"), tone: "primary" } };
-    case "overdue":
+    }
+    case "overdue": {
       return { id: j.id, title, origin, href: detail, line: t("Work window ended {time} · report not submitted", { time: at(j.slot!.endAt) }), tech: technician ?? none, slot: { main: t("Ended {time}", { time: at(j.slot!.endAt) }), sub: t("Extend or reassign"), tone: "crit" }, badge: { text: t("Overdue"), tone: "crit" } };
-    case "review":
+    }
+    case "review": {
       return { id: j.id, title, origin, href: `/partner/jobs/${j.id}/review`, line: tech ? t("Submitted by {name} · awaiting your review", { name: tech }) : t("Submitted · awaiting your review"), tech: tech ? { name: tech, sub: t("report author") } : none, slot: { main: t("Report submitted"), sub: due }, badge: { text: t("Submitted"), tone: "primary" } };
-    case "completed":
+    }
+    case "completed": {
       return { id: j.id, title, origin, href: detail, line: t("Quality review accepted · report visible to the customer"), tech: tech ? { name: tech, sub: t("report author") } : none, slot: { main: t("Completed"), sub: due }, badge: { text: t("Completed"), tone: "ok" } };
+    }
   }
   const slot = j.slot ? { main: span(j.slot), sub: due } : { main: due || "—", sub: "" };
   if (j.status === "in_progress") return { id: j.id, title, origin, href: detail, line: tech ? t("In progress · {name} on site", { name: tech }) : t("In progress"), tech: technician ?? none, slot, badge: { text: t("In progress"), tone: "primary" } };

@@ -13,15 +13,15 @@ import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import { inspectionRows, readingRows, resultText, reworkItems, type ApiWorkReport } from "@ac/web/lib/partnerReview";
 
-export type ApiHqRow = {
+export interface ApiHqRow {
   projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; dueAt: string; requestedSlot: Slot; scheduledSlot: Slot | null;
   assignmentId: string | null; origin: string; preferredSlots: Slot[]; severity: string; displayStatus: string; assignmentAcknowledgement: "pending" | "accepted" | "cant_make" | null;
   technicianMembershipId: string | null; accessValidFrom: string | null; accessValidUntil: string | null;
   createdAt: string; followUpOfJobId: string | null; followUpClass: "pending" | "rework" | "new_request" | null;
-};
-export type ApiSlotProposal = { id: string; source: "hq" | "contractor"; slot: Slot; hold: { kind: "internal"; membershipId: string } | { kind: "contractor"; contractorOrgId: string; technicianMembershipId: string | null }; message: string; replyBy: string; status: string; decidedAt: string | null; declineReason: string | null; declineComment: string | null };
-export type ApiPartnerProposal = { id: string; offerId: string; slot: Slot; technicianMembershipId: string; reason: string; sentAt: string; status: string };
-export type ApiHqJob = {
+}
+export interface ApiSlotProposal { id: string; source: "hq" | "contractor"; slot: Slot; hold: { kind: "internal"; membershipId: string } | { kind: "contractor"; contractorOrgId: string; technicianMembershipId: string | null }; message: string; replyBy: string; status: string; decidedAt: string | null; declineReason: string | null; declineComment: string | null }
+export interface ApiPartnerProposal { id: string; offerId: string; slot: Slot; technicianMembershipId: string; reason: string; sentAt: string; status: string }
+export interface ApiHqJob {
   projection: "detail"; id: string; version: number; unitId: string; type: string; status: string; symptom: string; contactWindow: string | null; origin: string; planId: string | null; occurrenceAt: string | null;
   requestedSlot: Slot; preferredSlots: Slot[]; preferenceRound: number; slotProposal: ApiSlotProposal | null; partnerSlotProposal: ApiPartnerProposal | null; scheduledSlot: Slot | null;
   dueAt: string; startedAt: string | null; completedAt: string | null; contractorOrgId: string | null; createdAt: string; followUpOfJobId: string | null; followUpClass: "pending" | "rework" | "new_request" | null;
@@ -30,8 +30,8 @@ export type ApiHqJob = {
   assignment: { technicianMembershipId: string; scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: string; cantMakeReason: string | null; alternativeSlot: Slot | null } | null;
   offer: { id: string; contractorOrgId: string; visitSlot: Slot; offerExpiresAt: string; accessValidFrom: string; accessValidUntil: string; decision: string | null; decidedAt: string | null; declineReason: string | null } | null;
   reportRefs: { reportId: string; reportVersion: number }[]; draftReportRef: { reportId: string; reportVersion: number } | null; costs: CostLine[] | null;
-};
-export type Names = { units: Map<string, string>; customers: Map<string, string>; people: Map<string, string>; orgs: Map<string, string> };
+}
+export interface Names { units: Map<string, string>; customers: Map<string, string>; people: Map<string, string>; orgs: Map<string, string> }
 
 type Tone = "ok" | "warn" | "crit" | "primary" | "muted";
 const en = translator("en");
@@ -43,7 +43,7 @@ export const longSlot = (s: Slot, i: I18n = EN) => showSpan(s.startAt, s.endAt, 
 export const zonedInput = (iso: string, zone: string) => { const p = zonedParts(iso, zone); return `${p.date}T${p.time}`; };
 export const fromZonedInput = (v: string, zone: string) => zonedInstant(v.slice(0, 10), v.slice(11, 16), zone);
 /** Tomorrow in the display time zone (YYYY-MM-DD): the date the time dialogs start on. A time from 10:00 that day always
- * starts on a later Kuala Lumpur day than now, which IR113 item 2 asks of new preferred times. */
+starts on a later Kuala Lumpur day than now, which IR113 item 2 asks of new preferred times. */
 export const tomorrowIn = (now: number, zone: string) => zonedParts(new Date(now + 86_400_000).toISOString(), zone).date;
 
 /** The pipeline stages with their jobs.list filter; Time proposed is a requested job with a pending SlotProposal (IR113). */
@@ -61,9 +61,9 @@ export const SORTS = [{ id: "status", text: "Status, earliest stage first", fiel
 export type HqSort = (typeof SORTS)[number]["id"];
 export const sortOf = (v?: string): HqSort => (SORTS.some((s) => s.id === v) ? (v as HqSort) : "status");
 
-export type Query = { customerId?: string; propertyId?: string; unitId?: string; origin?: string; delivery?: string; assignee?: string; overdue?: string; type?: string; stage?: string; from?: string; to?: string };
+export interface Query { customerId?: string; propertyId?: string; unitId?: string; origin?: string; delivery?: string; assignee?: string; overdue?: string; type?: string; stage?: string; from?: string; to?: string }
 /** The requested-time period of the list (URL from / to, ISO instants; the HQ overview's job counts, IR245): both valid
- * and from < to, else none. */
+and from < to, else none. */
 export function periodOfQuery(q: Pick<Query, "from" | "to">): { from: string; to: string } | null {
   const f = q.from ? Date.parse(q.from) : NaN, t = q.to ? Date.parse(q.to) : NaN;
   return Number.isFinite(f) && Number.isFinite(t) && f < t ? { from: new Date(f).toISOString(), to: new Date(t).toISOString() } : null;
@@ -72,16 +72,16 @@ export function periodOfQuery(q: Pick<Query, "from" | "to">): { from: string; to
 export const periodChip = (p: { from: string; to: string }, i: I18n = EN) => i.t("Requested time {span}", { span: showSpan(p.from, p.to, i.display) });
 /** Every status but cancelled: the list without a stage tile, and the jobs counted "in scope" (no tile names cancelled). */
 export const LISTED = ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "on_hold"];
-const TYPE_IDS = ["reactive", "periodic", "preventive"];
+const TYPE_IDS = new Set(["reactive", "periodic", "preventive"]);
 /** The jobs.list filters of the scope and the filter bar; delivery is the HQ organization (internal) or a contractor.
- * The type and the default "not cancelled" are filters of jobs.list too (IR290), so its total counts what the list shows. */
+The type and the default "not cancelled" are filters of jobs.list too (IR290), so its total counts what the list shows. */
 export function filtersOf(q: Query, hqOrgId: string | null, withStage = true): Record<string, unknown> {
   const f: Record<string, unknown> = {};
   if (q.customerId) f.customerId = q.customerId;
   if (q.propertyId) f.propertyId = q.propertyId;
   if (q.unitId) f.unitId = q.unitId;
   if (q.origin === "client_request" || q.origin === "periodic_plan") f.origin = q.origin;
-  if (q.type && TYPE_IDS.includes(q.type)) f.type = q.type;
+  if (q.type && TYPE_IDS.has(q.type)) f.type = q.type;
   if (q.delivery === "internal" && hqOrgId) f.organizationId = hqOrgId;
   else if (q.delivery && q.delivery !== "internal") f.organizationId = q.delivery;
   if (q.assignee) f.membershipId = q.assignee;
@@ -94,44 +94,55 @@ export function filtersOf(q: Query, hqOrgId: string | null, withStage = true): R
   return f;
 }
 
-export type HqRow = { id: string; short: string; title: string; customer: string; type: string; origin: string; status: string; badge: { status: string; overdue: boolean }; line: string; lineTone?: Tone };
-const ack = (a: string | null, t: T) => t(a === "accepted" ? "accepted" : a === "cant_make" ? "can’t make it" : "awaiting acceptance");
+export interface HqRow { id: string; short: string; title: string; customer: string; type: string; origin: string; status: string; badge: { status: string; overdue: boolean }; line: string; lineTone?: Tone }
+const ack = (a: string | null, t: T) => t(a === "accepted" ? "accepted" : (a === "cant_make" ? "can’t make it" : "awaiting acceptance"));
 /** One job of the list: unit, customer, type, origin, status (Time proposed derived, IR89 overdue) and what is next. */
 export function hqRow(j: ApiHqRow, now: number, n: Names, unitOrg: Map<string, string>, i: I18n = EN): HqRow {
   const { t } = i;
   const tech = j.technicianMembershipId ? n.people.get(j.technicianMembershipId) ?? t("technician") : null;
-  const overdue = (j.status === "assigned" || j.status === "in_progress") && !!j.scheduledSlot && Date.parse(j.scheduledSlot.endAt) <= now;
-  const ended = overdue ? ` · ${t("window ended")}` : "";
+  const isOverdue = (j.status === "assigned" || j.status === "in_progress") && !!j.scheduledSlot && Date.parse(j.scheduledSlot.endAt) <= now;
+  const ended = isOverdue ? ` · ${t("window ended")}` : "";
   let line = "", lineTone: Tone | undefined;
   switch (j.displayStatus === "time_proposed" ? "time_proposed" : j.status) {
-    case "requested": line = j.preferredSlots.length ? t(j.preferredSlots.length === 1 ? "1 preferred time · book one or propose" : "{n} preferred times · book one or propose", { n: j.preferredSlots.length })
-      : j.origin === "periodic_plan" ? t("plan occurrence {slot} · book it", { slot: slotText(j.requestedSlot, i) }) : t("due {time} · unassigned", { time: showTime(j.dueAt, i.display) }); break;
-    case "time_proposed": line = t("Time proposed · waiting for the client"); break;
-    case "offered": line = j.scheduledSlot ? t("Offer open · {slot}", { slot: slotText(j.scheduledSlot, i) }) : t("Offer open"); break;
-    case "accepted": line = t("Contractor accepted · assigning their technician"); break;
-    case "assigned": [line, lineTone] = [`${tech ?? t("technician")} · ${ack(j.assignmentAcknowledgement, t)}${ended}`, j.assignmentAcknowledgement === "cant_make" ? "warn" : undefined]; break;
-    case "in_progress": line = `${t("{name} on site", { name: tech ?? t("technician") })}${ended}`; break;
-    case "submitted": line = t(j.accessValidUntil ? "report submitted · contractor review first" : "report submitted · awaiting HQ review"); break;
-    case "rework_requested": line = t("returned for rework"); break;
-    case "on_hold": [line, lineTone] = [t("on hold — scheduling and reports blocked"), "warn"]; break;
-    case "completed": line = statusWord("completed", t); break;
-    case "cancelled": line = statusWord("cancelled", t); break;
+    case "requested": { line = j.preferredSlots.length > 0 ? t(j.preferredSlots.length === 1 ? "1 preferred time · book one or propose" : "{n} preferred times · book one or propose", { n: j.preferredSlots.length })
+      : (j.origin === "periodic_plan" ? t("plan occurrence {slot} · book it", { slot: slotText(j.requestedSlot, i) }) : t("due {time} · unassigned", { time: showTime(j.dueAt, i.display) })); break;
+    }
+    case "time_proposed": { line = t("Time proposed · waiting for the client"); break;
+    }
+    case "offered": { line = j.scheduledSlot ? t("Offer open · {slot}", { slot: slotText(j.scheduledSlot, i) }) : t("Offer open"); break;
+    }
+    case "accepted": { line = t("Contractor accepted · assigning their technician"); break;
+    }
+    case "assigned": { [line, lineTone] = [`${tech ?? t("technician")} · ${ack(j.assignmentAcknowledgement, t)}${ended}`, j.assignmentAcknowledgement === "cant_make" ? "warn" : undefined]; break;
+    }
+    case "in_progress": { line = `${t("{name} on site", { name: tech ?? t("technician") })}${ended}`; break;
+    }
+    case "submitted": { line = t(j.accessValidUntil ? "report submitted · contractor review first" : "report submitted · awaiting HQ review"); break;
+    }
+    case "rework_requested": { line = t("returned for rework"); break;
+    }
+    case "on_hold": { [line, lineTone] = [t("on hold — scheduling and reports blocked"), "warn"]; break;
+    }
+    case "completed": { line = statusWord("completed", t); break;
+    }
+    case "cancelled": { line = statusWord("cancelled", t); break;
+    }
   }
   // a client's follow-up waits for HQ's classification within one business day (IR114, Figma Admin 06-17)
   if (j.followUpClass === "pending" && j.followUpOfJobId) [line, lineTone] = [t("Follow-up of {id} · classify by {time}", { id: j.followUpOfJobId.slice(0, 8), time: classifyBy(j.createdAt, i) }), "warn"];
   return {
     id: j.id, short: j.id.slice(0, 8), title: n.units.get(j.unitId) ?? t("Unit"), customer: n.customers.get(unitOrg.get(j.unitId) ?? "") ?? t("customer"),
-    type: typeLabel(j.type, t), origin: j.origin, status: j.displayStatus === "time_proposed" ? "time_proposed" : j.status, badge: { status: j.displayStatus === "time_proposed" ? "time_proposed" : j.status, overdue }, line, lineTone,
+    type: typeLabel(j.type, t), origin: j.origin, status: j.displayStatus === "time_proposed" ? "time_proposed" : j.status, badge: { status: j.displayStatus === "time_proposed" ? "time_proposed" : j.status, overdue: isOverdue }, line, lineTone,
   };
 }
 
-export type Step = { label: string; state: "done" | "current" | "todo" };
+export interface Step { label: string; state: "done" | "current" | "todo" }
 /** The status stepper: internal delivery skips Offered / Accepted (DD-A06 item 6). */
 export function stepper(status: string, internal: boolean, t: T = en): Step[] {
   const all = internal ? ["requested", "assigned", "in_progress", "submitted", "completed"] : ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "completed"];
   const labels: Record<string, string> = { requested: "Requested", offered: "Offered", accepted: "Accepted", assigned: "Assigned", in_progress: "In progress", submitted: "Submitted", completed: "Completed" };
-  const at = status === "rework_requested" || status === "on_hold" ? all.indexOf("in_progress") : status === "cancelled" ? -1 : all.indexOf(status);
-  return all.map((s, k) => ({ label: t(labels[s]), state: status === "completed" || k < at ? "done" : k === at ? "current" : "todo" }));
+  const at = status === "rework_requested" || status === "on_hold" ? all.indexOf("in_progress") : (status === "cancelled" ? -1 : all.indexOf(status));
+  return all.map((s, k) => ({ label: t(labels[s]), state: status === "completed" || k < at ? "done" : (k === at ? "current" : "todo") }));
 }
 
 /** The four facts of the detail: requested window, due, scheduled slot, symptom with the contact window. */
@@ -139,13 +150,13 @@ export function facts(j: ApiHqJob, n: Names, i: I18n = EN): { label: string; val
   const { t } = i;
   return [
     { label: t("Requested window"), value: slotText(j.requestedSlot, i), sub: t(j.origin === "periodic_plan" ? "the plan occurrence" : "the client’s 1st preferred time") },
-    { label: t("Due"), value: showTime(j.dueAt, i.display), sub: t(j.dueAt === j.requestedSlot.endAt ? "= requested end" : j.type === "reactive" ? "reactive SLA" : "plan occurrence") },
-    { label: t("Scheduled"), value: j.scheduledSlot ? slotText(j.scheduledSlot, i) : t("not booked"), sub: j.assignment ? n.people.get(j.assignment.technicianMembershipId) ?? t("technician") : j.offer ? n.orgs.get(j.offer.contractorOrgId) ?? t("contractor") : "—" },
+    { label: t("Due"), value: showTime(j.dueAt, i.display), sub: t(j.dueAt === j.requestedSlot.endAt ? "= requested end" : (j.type === "reactive" ? "reactive SLA" : "plan occurrence")) },
+    { label: t("Scheduled"), value: j.scheduledSlot ? slotText(j.scheduledSlot, i) : t("not booked"), sub: j.assignment ? n.people.get(j.assignment.technicianMembershipId) ?? t("technician") : (j.offer ? n.orgs.get(j.offer.contractorOrgId) ?? t("contractor") : "—") },
     { label: t("Symptom"), value: j.symptom || "—", sub: j.contactWindow ? t("contact {window}", { window: j.contactWindow }) : t("no contact window") },
   ];
 }
 
-export type Delivery = { kind: "internal" | "contractor"; title: string; lines: [string, string][]; ack: { tone: Tone; text: string } | null; cantMake: boolean };
+export interface Delivery { kind: "internal" | "contractor"; title: string; lines: [string, string][]; ack: { tone: Tone; text: string } | null; cantMake: boolean }
 /** Who does the work: the internal assignment, or the contractor's offer with its access window and the technician. */
 export function delivery(j: ApiHqJob, n: Names, now: number, i: I18n = EN): Delivery | null {
   const { t, display } = i;
@@ -159,7 +170,7 @@ export function delivery(j: ApiHqJob, n: Names, now: number, i: I18n = EN): Deli
       : { tone: "primary" as Tone, text: t("Waiting for {name} to accept.", { name: tech }) }) : null;
   if (o && j.contractorOrgId) {
     const org = n.orgs.get(o.contractorOrgId) ?? t("contractor");
-    const state = o.decision === "accept" ? (o.decidedAt ? t("accepted {time}", { time: showTime(o.decidedAt, display) }) : t("accepted")) : Date.parse(o.offerExpiresAt) <= now ? t("expired") : t("offer open · expires {time}", { time: showTime(o.offerExpiresAt, display) });
+    const state = o.decision === "accept" ? (o.decidedAt ? t("accepted {time}", { time: showTime(o.decidedAt, display) }) : t("accepted")) : (Date.parse(o.offerExpiresAt) <= now ? t("expired") : t("offer open · expires {time}", { time: showTime(o.offerExpiresAt, display) }));
     return {
       kind: "contractor", title: t("Delivery · contractor {name}", { name: org }),
       lines: [[t("Visit"), `${slotText(o.visitSlot, i)} · ${state}`], [t("Access"), `${showSpan(o.accessValidFrom, o.accessValidUntil, display)}${o.decision === "accept" && Date.parse(o.accessValidUntil) <= now ? ` · ${t("ended")}` : ""}`],
@@ -167,54 +178,52 @@ export function delivery(j: ApiHqJob, n: Names, now: number, i: I18n = EN): Deli
       ack: ackLine, cantMake: a?.status !== "completed" && a?.acknowledgement === "cant_make",
     };
   }
-  if (a) return { kind: "internal", title: t("Delivery · internal"), lines: [[t("Technician"), `${tech} · ${t("assignment {slot}", { slot: window })}${done}`]], ack: ackLine, cantMake: a.status !== "completed" && a.acknowledgement === "cant_make" };
-  return null;
+  return a ? { kind: "internal", title: t("Delivery · internal"), lines: [[t("Technician"), `${tech} · ${t("assignment {slot}", { slot: window })}${done}`]], ack: ackLine, cantMake: a.status !== "completed" && a.acknowledgement === "cant_make" } : null;
 }
 
 /** The times HQ may book (IR113): the client's preferred times, or — for a plan's job without them — the plan
- * occurrence (the requested window the plan generated, D16). */
-export const agreedSlots = (j: Pick<ApiHqJob, "preferredSlots" | "planId" | "occurrenceAt" | "requestedSlot">): Slot[] => (j.preferredSlots.length ? j.preferredSlots : j.planId && j.occurrenceAt ? [j.requestedSlot] : []);
+occurrence (the requested window the plan generated, D16). */
+export const agreedSlots = (j: Pick<ApiHqJob, "preferredSlots" | "planId" | "occurrenceAt" | "requestedSlot">): Slot[] => (j.preferredSlots.length > 0 ? j.preferredSlots : (j.planId && j.occurrenceAt ? [j.requestedSlot] : []));
 
-export type PreferredRow = { rank: number; slot: Slot; text: string; hq: string; fits: boolean; people: { id: string; displayName: string }[]; plan: boolean };
+export interface PreferredRow { rank: number; slot: Slot; text: string; hq: string; fits: boolean; people: { id: string; displayName: string }[]; plan: boolean }
 /** The agreed times with the HQ technicians free and qualified for each (members.eligible). */
 export function preferredRows(j: ApiHqJob, eligible: { id: string; displayName: string }[][], now: number, i: I18n = EN): PreferredRow[] {
   const { t } = i;
-  const plan = !j.preferredSlots.length;
+  const isPlan = j.preferredSlots.length === 0;
   return agreedSlots(j).map((s, k) => {
     const people = eligible[k] ?? [];
-    const past = Date.parse(s.startAt) <= now;
-    return { rank: k + 1, slot: s, text: longSlot(s, i), hq: past ? t("in the past") : people.length ? people.map((p) => p.displayName).join(", ") : t("no qualified HQ technician free"), fits: !past && people.length > 0, people: past ? [] : people, plan };
+    const isPast = Date.parse(s.startAt) <= now;
+    return { rank: k + 1, slot: s, text: longSlot(s, i), hq: isPast ? t("in the past") : (people.length > 0 ? people.map((p) => p.displayName).join(", ") : t("no qualified HQ technician free")), fits: !isPast && people.length > 0, people: isPast ? [] : people, plan: isPlan };
   });
 }
 
 /** The active contractors any agreed time can be offered to, by name: the first three and how many more, so the
- * booking table keeps its times and HQ technicians readable however many companies HQ works with (IR572). */
+booking table keeps its times and HQ technicians readable however many companies HQ works with (IR572). */
 export function contractorNames(names: string[], t: T = en): string {
   const sorted = [...names].sort((a, b) => a.localeCompare(b));
-  if (sorted.length > 3) return t("{names} and {n} more", { names: sorted.slice(0, 3).join(", "), n: sorted.length - 3 });
-  return sorted.join(", ") || "—";
+  return sorted.length > 3 ? t("{names} and {n} more", { names: sorted.slice(0, 3).join(", "), n: sorted.length - 3 }) : sorted.join(", ") || "—";
 }
 
 /** The default windows of an HQ offer (IR141 item 2): answer within 24 h (not after the visit), access from now to a day after. */
 export function offerDefaults(slot: Slot, now: number): { offerExpiresAt: string; accessValidFrom: string; accessValidUntil: string } {
-  const expires = Math.min(now + 24 * 3600_000, Date.parse(slot.startAt));
-  return { offerExpiresAt: new Date(expires).toISOString(), accessValidFrom: new Date(now).toISOString(), accessValidUntil: new Date(Date.parse(slot.endAt) + 24 * 3600_000).toISOString() };
+  const expires = Math.min(now + 24 * 3_600_000, Date.parse(slot.startAt));
+  return { offerExpiresAt: new Date(expires).toISOString(), accessValidFrom: new Date(now).toISOString(), accessValidUntil: new Date(Date.parse(slot.endAt) + 24 * 3_600_000).toISOString() };
 }
 
 /** Which of hold / resume / cancel HQ may use (IR56; hold only from in progress or submitted). */
 export function controls(status: string, t: T = en): { hold: boolean; resume: boolean; cancel: boolean; cancelWhy: string | null } {
-  const cancel = ["requested", "offered", "accepted", "assigned", "on_hold", "rework_requested"].includes(status);
-  const cancelWhy = cancel ? null : t(status === "in_progress" || status === "submitted" ? "Put the job on hold first." : "Completed and cancelled jobs cannot be cancelled.");
-  return { hold: status === "in_progress" || status === "submitted", resume: status === "on_hold", cancel, cancelWhy };
+  const isCancel = ["requested", "offered", "accepted", "assigned", "on_hold", "rework_requested"].includes(status);
+  const cancelWhy = isCancel ? null : t(status === "in_progress" || status === "submitted" ? "Put the job on hold first." : "Completed and cancelled jobs cannot be cancelled.");
+  return { hold: status === "in_progress" || status === "submitted", resume: status === "on_hold", cancel: isCancel, cancelWhy };
 }
 
 /** The classify-by time of a follow-up: one business day (Mon–Fri in Kuala Lumpur) after it was created, as an instant
- * in the display time zone (display only, IR114). */
+in the display time zone (display only, IR114). */
 export function classifyBy(createdAt: string, i: I18n = EN): string {
-  const d = new Date(Date.parse(createdAt) + 8 * 3600_000);
+  const d = new Date(Date.parse(createdAt) + 8 * 3_600_000);
   let add = 1;
   while (add > 0) { d.setUTCDate(d.getUTCDate() + 1); if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6) add--; }
-  return showTime(new Date(d.getTime() - 8 * 3600_000).toISOString(), i.display);
+  return showTime(new Date(d.getTime() - 8 * 3_600_000).toISOString(), i.display);
 }
 
 /** The HQ job refusals in words, by message key (English keys of the display-language dictionary). */
@@ -251,13 +260,13 @@ export const HQ_REFUSAL_KEYS = [...Object.values(HQ_REFUSAL_TEXT), ...Object.val
 export function hqRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   const word = (k: string | undefined) => (k ? t(k) : undefined);
   const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${fieldName(k)}: ${word(HQ_FIELD_TEXT[`${k}:${v}`]) ?? word(HQ_REFUSAL_TEXT[v]) ?? v}`);
-  if (fields.length) return fields.join(" · ");
+  if (fields.length > 0) return fields.join(" · ");
   if (HQ_REFUSAL_TEXT[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: t(HQ_REFUSAL_TEXT[f.messageKey]) }) : `${t(HQ_REFUSAL_TEXT[f.messageKey])}.`;
   if (f.code === "NOT_FOUND") return t("The job no longer exists in your scope.");
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }
 
-export type CostLine = { kind: "estimate" | "actual"; description: string; visibility: "internal" | "customer"; amountMinor: number; currency: "MYR" | "USD" };
+export interface CostLine { kind: "estimate" | "actual"; description: string; visibility: "internal" | "customer"; amountMinor: number; currency: "MYR" | "USD" }
 /** “80.00 MYR” from minor units. */
 export { money } from "@ac/web/lib/money";
 import { money } from "@ac/web/lib/money";
@@ -266,7 +275,7 @@ export function costTotals(lines: CostLine[]): { estimate: string; actual: strin
   const total = (kind: CostLine["kind"]) => {
     const by = new Map<string, number>();
     for (const l of lines) if (l.kind === kind) by.set(l.currency, (by.get(l.currency) ?? 0) + l.amountMinor);
-    return by.size ? [...by.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([c, v]) => money(v, c)).join(" + ") : "—";
+    return by.size > 0 ? [...by].sort(([a], [b]) => a.localeCompare(b)).map(([c, v]) => money(v, c)).join(" + ") : "—";
   };
   return { estimate: total("estimate"), actual: total("actual") };
 }
@@ -282,7 +291,7 @@ export function costLineOf(f: { kind: string; description: string; visibility: s
 export const reviewModeOf = (j: Pick<ApiHqJob, "contractorOrgId">) => (j.contractorOrgId ? "hq_escalation" : "normal") as "normal" | "hq_escalation";
 
 /** The New job form (DD-A06 item 8): symptom 10–2000, the 1st preferred time plus up to two more (IR113 item 2: future,
- * on a later calendar day than today, 1–4 hours, distinct). */
+on a later calendar day than today, 1–4 hours, distinct). */
 export function newJobErrors(f: { unitId: string; symptom: string; slots: Slot[]; contactWindow?: string }, now: number, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!f.unitId) e.unitId = t("Choose the unit.");
@@ -292,46 +301,46 @@ export function newJobErrors(f: { unitId: string; symptom: string; slots: Slot[]
   // - ( ) + tabs are removed
   const contact = (f.contactWindow ?? "").trim();
   if ([...contact].length > 200) e.contactWindow = t("Up to 200 characters.");
-  else if (contact.includes("@") || /\d{7,}/.test(contact.replace(/[ \-()+\t]/g, ""))) e.contactWindow = t("No e-mail addresses or phone numbers in the contact window.");
-  const today = new Date(now + 8 * 3600_000).toISOString().slice(0, 10);
+  else if (contact.includes("@") || /\d{7,}/.test(contact.replaceAll(/[ \-()+\t]/g, ""))) e.contactWindow = t("No e-mail addresses or phone numbers in the contact window.");
+  const today = new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
   const keys = new Set<string>();
-  f.slots.forEach((x, i) => {
-    const h = (Date.parse(x.endAt) - Date.parse(x.startAt)) / 3600_000;
-    const day = new Date(Date.parse(x.startAt) + 8 * 3600_000).toISOString().slice(0, 10);
+  for (const [i, x] of f.slots.entries()) {
+    const h = (Date.parse(x.endAt) - Date.parse(x.startAt)) / 3_600_000;
+    const day = new Date(Date.parse(x.startAt) + 8 * 3_600_000).toISOString().slice(0, 10);
     if (!(h >= 1 && h <= 4)) e[`slot${i}`] = t("Each time is 1–4 hours long.");
     else if (day <= today) e[`slot${i}`] = t("Times start on a later day than today (Kuala Lumpur).");
     else if (keys.has(x.startAt + x.endAt)) e[`slot${i}`] = t("The times must differ.");
     keys.add(x.startAt + x.endAt);
-  });
+  }
   return e;
 }
 
 /** The default new end of an access extension: one day after the current end. */
-export const extendDefault = (until: string) => new Date(Date.parse(until) + 24 * 3600_000).toISOString();
+export const extendDefault = (until: string) => new Date(Date.parse(until) + 24 * 3_600_000).toISOString();
 
 /** The submitted report card (Figma 06-1 “Work report · version 1”): who submitted it when, checks and photos, each
- * inspection result and reading, and whether HQ may decide — a normal review of an internal job, an escalation (reason
- * required) of a contractor's job, never a version the reviewer authored (IR31). */
-export type ReportCard = {
+inspection result and reading, and whether HQ may decide — a normal review of an internal job, an escalation (reason
+required) of a contractor's job, never a version the reviewer authored (IR31). */
+export interface ReportCard {
   id: string; version: number; title: string; sub: string; author: string; rows: { id: string; label: string; result: string; tone: Tone; reason: string | null; photos: string[] }[]; readings: [string, string][];
   workText: string; mode: "normal" | "hq_escalation"; decide: boolean; note: string; tone: "primary" | "warn" | "ok" | "muted"; rework: { label: string; checked: boolean }[];
   reviews: { text: string; tone: Tone }[];
   /** The rest of the report for “Open report →”: parts and refrigerant, the next action and the customer's sign-off. */
   parts: [string, string][]; next: string; signOff: string;
-};
+}
 export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, string>, i: I18n = EN): ReportCard {
   const { t, display } = i;
   const author = byUser.get(r.authorId) ?? t("technician");
   const photos = r.attachmentRefs.filter((a) => a.status === "ready").length;
   const mode = reviewModeOf(j);
   const av = r.reviewAvailability;
-  const decide = j.status === "submitted" && av.allowed;
+  const isDecide = j.status === "submitted" && av.allowed;
   const note = t(j.status === "completed" ? "Accepted — the job is completed. Completion does not resolve linked alerts."
     : j.status === "rework_requested" ? "Returned for rework — the technician works on the next version."
-    : j.status !== "submitted" ? "The report is not under review in the job’s current state."
-    : !av.allowed ? (av.reason === "self_authored" ? "You submitted this report version, so you cannot accept or return it (self-approval is rejected)." : av.reason === "not_current" ? "A newer report version exists — reload to review it." : "Reviewing needs the job.write permission.")
-    : mode === "hq_escalation" ? "The contractor reviews its own reports first. HQ may accept or return this one only by escalation, with a reason."
-    : "You did not contribute to this report, so you can review it (self-approval is rejected).");
+    : j.status === "submitted" ? av.allowed ? mode === "hq_escalation" ? "The contractor reviews its own reports first. HQ may accept or return this one only by escalation, with a reason."
+    : "You did not contribute to this report, so you can review it (self-approval is rejected)."
+    : (av.reason === "self_authored" ? "You submitted this report version, so you cannot accept or return it (self-approval is rejected)." : av.reason === "not_current" ? "A newer report version exists — reload to review it." : "Reviewing needs the job.write permission.")
+    : "The report is not under review in the job’s current state.");
   const rows = inspectionRows(r.items, t, r.attachmentRefs).map((it) => {
     const x = it.result ? resultText[it.result] : { label: "No result", tone: "crit" as const };
     return { id: it.id, label: it.label, result: t(x.label), tone: x.tone, reason: it.reason, photos: it.photos };
@@ -339,22 +348,24 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
   const readings = readingRows(r.measurements, t);
   const submitted = r.submittedAt ? t(j.reportRefs.length > 1 ? "Resubmitted {time}" : "Submitted {time}", { time: showTime(r.submittedAt, display) }) : t("Not submitted");
   return {
-    id: r.id, version: r.version, title: t("Work report · version {version}", { version: r.version }), author, rows, readings, workText: r.workText, mode, decide, note,
+    id: r.id, version: r.version, title: t("Work report · version {version}", { version: r.version }), author, rows, readings, workText: r.workText, mode, decide: isDecide, note,
     sub: t("{submitted} by {author} · {checks} · {photos}", {
       submitted, author, checks: t(r.items.length === 1 ? "1 check" : "{n} checks", { n: r.items.length }), photos: t(photos === 1 ? "1 photo" : "{n} photos", { n: photos }),
     }),
-    tone: decide ? (mode === "hq_escalation" ? "warn" : "primary") : j.status === "completed" ? "ok" : "muted",
+    tone: isDecide ? (mode === "hq_escalation" ? "warn" : "primary") : (j.status === "completed" ? "ok" : "muted"),
     // Figma 06-1 “Items that need rework”: the items needing attention (ticked), the readings, and the photos (shared with
     // the contractor's dialog, IR609)
     rework: reworkItems(inspectionRows(r.items, t, r.attachmentRefs), readings, photos, t),
-    parts: [...r.parts.map((p): [string, string] => [`${p.name} × ${p.quantity}`, `${p.source.replace(/_/g, " ")}${p.replacesComponentKey ? ` · ${t("replaces {part}", { part: p.replacesComponentKey.replace(/_/g, " ") })}` : ""}`]),
-      ...r.refrigerant.map((x): [string, string] => [t("{refrigerant} · cylinder {id}", { refrigerant: x.refrigerant, id: x.cylinderId }), t("recovered {recovered} kg · charged {charged} kg · leak check {check}", { recovered: x.recoveredKg, charged: x.chargedKg, check: x.leakCheck.replace(/_/g, " ") })])],
+    parts: [...r.parts.map((p): [string, string] => [`${p.name} × ${p.quantity}`, `${p.source.replaceAll('_', " ")}${p.replacesComponentKey ? ` · ${t("replaces {part}", { part: p.replacesComponentKey.replaceAll('_', " ") })}` : ""}`]),
+      ...r.refrigerant.map((x): [string, string] => [t("{refrigerant} · cylinder {id}", { refrigerant: x.refrigerant, id: x.cylinderId }), t("recovered {recovered} kg · charged {charged} kg · leak check {check}", { recovered: x.recoveredKg, charged: x.chargedKg, check: x.leakCheck.replaceAll('_', " ") })])],
     next: r.nextAction?.kind === "follow_up" ? t("Follow-up {date} — {note}", { date: r.nextAction.date.slice(0, 10), note: r.nextAction.note }) : t("No follow-up needed"),
     signOff: r.signOff ? (r.signOff.absentReason ? t("Customer absent — {reason}", { reason: r.signOff.absentReason }) : t("Signed by {name} {time}", { name: r.signOff.signerName, time: showTime(r.signOff.signedAt, display) })) : t("Not signed"),
-    reviews: [...r.reviewHistory].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).map((h) => ({
-      text: `${t(h.decision === "accept" ? "v{version} accepted {time} by {name}" : "v{version} returned {time} by {name}", { version: h.reportVersion, time: showTime(h.occurredAt, display), name: byUser.get(h.reviewerUserId) ?? t("reviewer") })}${h.reason ? ` — “${h.reason}”` : ""}`,
-      tone: h.decision === "accept" ? "ok" : "warn",
-    })),
+    reviews: [...r.reviewHistory].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).map((h) => {
+      return {
+        text: `${t(h.decision === "accept" ? "v{version} accepted {time} by {name}" : "v{version} returned {time} by {name}", { version: h.reportVersion, time: showTime(h.occurredAt, display), name: byUser.get(h.reviewerUserId) ?? t("reviewer") })}${h.reason ? ` — “${h.reason}”` : ""}`,
+        tone: h.decision === "accept" ? "ok" : "warn",
+      };
+    }),
   };
 }
 export { returnReason } from "@ac/web/lib/partnerReview"; // the HQ dialog's reason, shared with the contractor's (IR609)

@@ -7,7 +7,7 @@ test("pages carry the CSP with a fresh nonce and the static security headers", a
   const res = await page.goto(app.home);
   const h = res!.headers();
   const csp = h["content-security-policy"] ?? "";
-  const nonce = csp.match(/'nonce-([^']+)'/)?.[1] ?? "";
+  const nonce = (/'nonce-([^']+)'/.exec(csp))?.[1] ?? "";
   expect(nonce, "a nonce in the CSP").not.toBe("");
   for (const d of ["default-src 'self'", "object-src 'none'", "base-uri 'self'", "frame-ancestors 'none'", "connect-src 'self'"]) expect(csp).toContain(d);
   expect(csp).not.toContain("unsafe-eval"); // a production build
@@ -18,8 +18,9 @@ test("pages carry the CSP with a fresh nonce and the static security headers", a
   expect(html.match(/<script(?![^>]*nonce=)[^>]*>/g) ?? [], "scripts without the nonce").toEqual([]);
   const again = await page.request.get(app.home);
   expect(again.headers()["content-security-policy"]).not.toContain(`'nonce-${nonce}'`); // a fresh nonce per request
-  const css = await page.locator("link[rel=stylesheet]").first().getAttribute("href");
-  expect(css, "the app's stylesheet").toBeTruthy();
+  const stylesheet = page.locator("link[rel=stylesheet]").first();
+  await expect(stylesheet, "the app's stylesheet").toHaveAttribute("href", /./);
+  const css = await stylesheet.getAttribute("href");
   expect((await page.request.get(css!)).headers()["x-content-type-options"]).toBe("nosniff");
 });
 

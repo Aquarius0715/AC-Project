@@ -71,8 +71,8 @@ test("a technician the contractor adds sets a password from the e-mail and signs
       await form.fill(password);
       await me.locator("#kc-login").click();
     }
-    await expect(refused).toBeVisible({ timeout: 5_000 });
-  }).toPass({ timeout: 90_000, intervals: [1_000, 5_000] });
+    await expect(refused).toBeVisible({ timeout: 5000 });
+  }).toPass({ timeout: 90_000, intervals: [1000, 5000] });
   await own.close();
 
   // the contractor removes them

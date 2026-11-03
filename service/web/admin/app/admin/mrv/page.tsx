@@ -13,8 +13,7 @@ import { withAccess } from "@ac/web/lib/withAccess";
 import { MRVDemo } from "./_components/mrv-demo";
 import { MRVView, type MRVLive } from "./_components/mrv-view";
 
-type Page<T> = { items: T[] };
-type Unit = { id: string; displayName: string; customerOrgId: string; archived: boolean };
+interface Unit { id: string; displayName: string; customerOrgId: string; archived: boolean }
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
 export default async function AdminMRVPage(props: PageProps<"/admin/mrv">) {
@@ -42,6 +41,7 @@ async function AdminMRVPageContent({ searchParams }: PageProps<"/admin/mrv">) {
     orgs: customers, units: unitOptions, baselines: baselineRows(baselines.items, i.t), factors: factors.items,
   };
   if (tab === "reports") {
+    interface Page<T> { items: T[] }
     const status = one("status") === "draft" || one("status") === "demo_reviewed" ? one("status") : undefined;
     const filters = {
       ...(one("organizationId") && { organizationId: one("organizationId") }), ...(one("unitId") && { unitId: one("unitId") }), ...(status && { status }),

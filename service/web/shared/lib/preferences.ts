@@ -29,10 +29,10 @@ export function zoneOptions(saved: string, at: Date): { id: string; label: strin
   });
 }
 
-export type Consent = { id: string; version: number; granted: boolean; grantedAt: string | null; revokedAt: string | null };
+export interface Consent { id: string; version: number; granted: boolean; grantedAt: string | null; revokedAt: string | null }
 
 /** The location consent line: when it was granted or withdrawn (dates as recorded, UTC), or that it never was; `t`
- * puts it in the display language (IR258). */
+puts it in the display language (IR258). */
 export function consentNote(c: Consent | null, t: T = translator("en")): string {
   if (c?.granted) return t("Granted {date}", { date: c.grantedAt?.slice(0, 10) ?? "" }).trim();
   if (c?.revokedAt) return t("Withdrawn {date}", { date: c.revokedAt.slice(0, 10) });

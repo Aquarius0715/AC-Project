@@ -12,7 +12,7 @@ const NOW = Date.parse("2026-09-15T01:00:00Z");
 const session: Session = { accessToken: "access-1", refreshToken: "r-1", tenantId: "t-1", membershipId: "m-1", role: "client", expiresAt: NOW / 1000 + 300 };
 type Call = [string, RequestInit & { headers: Record<string, string> }];
 /** The CoreError a call is refused with (a call that succeeds fails the test). */
-const refusal = (p: Promise<unknown>) => p.then(() => { throw new Error("the call succeeded"); }, (e: unknown) => e as CoreError);
+const refusal = (p: Promise<unknown>) => p.then(() => { throw new Error("the call succeeded"); }, (error: unknown) => error as CoreError);
 const reply = (...bodies: [number, unknown][]) => {
   const f = vi.fn(async () => {
     const [status, body] = bodies.length > 1 ? bodies.shift()! : bodies[0];

@@ -16,14 +16,16 @@ import {
 } from "@ac/web/lib/customerMaintenance";
 import { filterLines, reminderForm, reminderLines, type ApiFilterSettings, type ApiFilterStatus } from "@ac/web/lib/customerFilterCare";
 
-type Unit = { id: string; displayName: string; propertyId: string; spaceId: string | null; archived: boolean; connection: string };
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-const quiet = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
-  if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN")) return fallback;
-  throw e;
-});
+const quiet = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
+  return p.catch((error) => {
+    if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) return fallback;
+    throw error;
+  });
+};
 
 export async function loadMaintenance(sp: Record<string, string | string[] | undefined>) {
+  interface Unit { id: string; displayName: string; propertyId: string; spaceId: string | null; archived: boolean; connection: string }
   const page = one(sp.tab) === "filter-care" || one(sp.tab) === "filters" ? "filters" as const : "requests" as const;
   const [now, me, units, properties, spaces, display] = await Promise.all([
     coreNow(), corePrincipal(), coreAll<Unit>("units.list"), coreAll<{ id: string; name: string }>("properties.list"),

@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const verifier = randomBytes(32).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
   const returnTo = req.nextUrl.searchParams.get("returnTo");
-  const reauth = req.nextUrl.searchParams.get("reauth") === "1";
+  const isReauth = req.nextUrl.searchParams.get("reauth") === "1";
   const url = new URL(`${cfg.issuer}/protocol/openid-connect/auth`);
   url.search = new URLSearchParams({
     client_id: cfg.clientId,
@@ -21,10 +21,10 @@ export async function GET(req: NextRequest) {
     state,
     code_challenge: challenge,
     code_challenge_method: "S256",
-    ...(req.nextUrl.searchParams.get("login_hint") ? { login_hint: req.nextUrl.searchParams.get("login_hint")! } : {}),
-    ...(reauth ? { prompt: "login" } : {}),
+    ...(req.nextUrl.searchParams.get("login_hint") && { login_hint: req.nextUrl.searchParams.get("login_hint")! }),
+    ...(isReauth && { prompt: "login" }),
   }).toString();
   const res = NextResponse.redirect(url);
-  res.cookies.set(OIDC_COOKIE, seal({ state, verifier, returnTo: safeReturnTo(returnTo), reauth }), oidcCookieOptions());
+  res.cookies.set(OIDC_COOKIE, seal({ state, verifier, returnTo: safeReturnTo(returnTo), reauth: isReauth }), oidcCookieOptions());
   return res;
 }

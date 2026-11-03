@@ -15,14 +15,14 @@ type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
 /** jobs.assign: assign, reassign or extend; refreshes the page on success and on CONFLICT. */
 export async function assignTechnician(jobId: string, jobVersion: number, technicianMembershipId: string, slot: { startAt: string; endAt: string }, reason: string): Promise<Result<{ slot: string }>> {
   try {
-    await coreOp("jobs.assign", { jobId, technicianMembershipId, startAt: slot.startAt, endAt: slot.endAt, ...(reason.trim() ? { reason: reason.trim() } : {}) }, { write: true, expectedVersion: jobVersion });
+    await coreOp("jobs.assign", { jobId, technicianMembershipId, startAt: slot.startAt, endAt: slot.endAt, ...(reason.trim() && { reason: reason.trim() }) }, { write: true, expectedVersion: jobVersion });
     refresh();
     return { ok: true, value: { slot: showSpan(slot.startAt, slot.endAt, await coreDisplay()) } };
-  } catch (e) {
-    if (e instanceof CoreError) {
-      if (e.error.code === "CONFLICT") refresh(); // overlap, changed state or another version: show the latest
-      return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
+  } catch (error) {
+    if (error instanceof CoreError) {
+      if (error.error.code === "CONFLICT") refresh(); // overlap, changed state or another version: show the latest
+      return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
     }
-    throw e;
+    throw error;
   }
 }

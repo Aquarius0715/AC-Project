@@ -3,9 +3,9 @@
 // #23), and the URL never follows; choosing again until it does keeps the test about the screen, not the timing.
 import { expect, type Locator, type Page } from "@playwright/test";
 
-export async function selectForURL(page: Page, select: Locator, option: { label: string } | string, url: RegExp): Promise<void> {
+export async function selectForURL(page: Page, select: Locator, option: string | { label: string }, url: RegExp): Promise<void> {
   await expect(async () => {
     await select.selectOption(option);
-    await page.waitForURL(url, { timeout: 5_000 });
+    await page.waitForURL(url, { timeout: 5000 });
   }).toPass({ timeout: 60_000 });
 }

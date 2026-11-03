@@ -59,7 +59,7 @@ export function Badge({ tone = "muted", icon, children, className }: { tone?: To
 // the state badges speak the display language (IR258); the state values themselves stay as stored
 export function PowerBadge({ s }: { s: "running" | "stopped" | "unknown" }) {
   const t = useT();
-  return s === "running" ? <Badge tone="ok" icon="running">{t("Running")}</Badge> : s === "stopped" ? <Badge tone="muted" icon="stopped">{t("Stopped")}</Badge> : <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge>;
+  return s === "running" ? <Badge tone="ok" icon="running">{t("Running")}</Badge> : (s === "stopped" ? <Badge tone="muted" icon="stopped">{t("Stopped")}</Badge> : <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge>);
 }
 export function ConnBadge({ s }: { s: "online" | "offline" | "connecting" | "unknown" | "error" }) {
   const t = useT();
@@ -68,7 +68,7 @@ export function ConnBadge({ s }: { s: "online" | "offline" | "connecting" | "unk
 }
 export function SeverityBadge({ s }: { s: "critical" | "warning" | "normal" }) {
   const t = useT();
-  return s === "critical" ? <Badge tone="crit" icon="critical">{t("Critical")}</Badge> : s === "warning" ? <Badge tone="warn" icon="warning">{t("Warning")}</Badge> : <Badge tone="primary" icon="info">{t("Info")}</Badge>;
+  return s === "critical" ? <Badge tone="crit" icon="critical">{t("Critical")}</Badge> : (s === "warning" ? <Badge tone="warn" icon="warning">{t("Warning")}</Badge> : <Badge tone="primary" icon="info">{t("Info")}</Badge>);
 }
 export function OnOffBadge({ on }: { on: boolean }) {
   const t = useT();
@@ -101,7 +101,7 @@ export function Page({ children, className, narrow }: { children: React.ReactNod
 }
 
 /** A card: the shadcn/ui Card. The title stays a level-2 heading; `pad={false}` lets a table reach the edges; the
- * overflow stays visible for the menus that still open inside a card. */
+overflow stays visible for the menus that still open inside a card. */
 export function Card({ title, sub, action, children, className, pad = true, tone }: { title?: React.ReactNode; sub?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode; className?: string; pad?: boolean; tone?: "crit" | "warn" | "ok" }) {
   return (
     <UICard className={cn("min-w-0 overflow-visible", !pad && "pb-0", tone === "crit" && "ring-crit", tone === "warn" && "ring-[#fdba74]", tone === "ok" && "ring-[#86efac]", className)}>
@@ -134,20 +134,20 @@ export function PageHead({ title, sub, action }: { title: React.ReactNode; sub?:
 }
 
 /** A part that scrolls sideways when the screen is narrower than its content (a wide table, a board). While it overflows
- * it can take the focus, so a keyboard can scroll it (WCAG 2.1.1, axe scrollable-region-focusable); with a label it is a
- * named region. On a wide screen nothing overflows and it adds no tab stop. */
+it can take the focus, so a keyboard can scroll it (WCAG 2.1.1, axe scrollable-region-focusable); with a label it is a
+named region. On a wide screen nothing overflows and it adds no tab stop. */
 export function ScrollX({ label, className, children }: { label?: string; className?: string; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [overflows, setOverflows] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const check = () => setOverflows(el.scrollWidth > el.clientWidth + 1);
+    const check = () => { setOverflows(el.scrollWidth > el.clientWidth + 1); };
     check();
     const observer = new ResizeObserver(check);
     observer.observe(el);
     for (const child of el.children) observer.observe(child);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, []);
   // relative: an absolutely positioned descendant (a visually hidden column header) is clipped with the table instead
   // of widening the page (IR501)
@@ -238,8 +238,8 @@ export function Steps({ steps, current }: { steps: string[]; current: number }) 
   return (
     <ol className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold">
       {steps.map((s, i) => (
-        <li key={s} className={cx("flex items-center gap-1.5", i === current ? "text-primary" : i < current ? "text-ok" : "text-muted-foreground")}>
-          <span className={cx("grid h-5 w-5 place-items-center rounded-full text-[11px]", i === current ? "bg-primary text-white" : i < current ? "bg-ok-soft" : "bg-surface2")}>{i < current ? <Icon name="check" /> : i + 1}</span>
+        <li key={s} className={cx("flex items-center gap-1.5", i === current ? "text-primary" : (i < current ? "text-ok" : "text-muted-foreground"))}>
+          <span className={cx("grid h-5 w-5 place-items-center rounded-full text-[11px]", i === current ? "bg-primary text-white" : (i < current ? "bg-ok-soft" : "bg-surface2"))}>{i < current ? <Icon name="check" /> : i + 1}</span>
           {s}
         </li>
       ))}
@@ -268,7 +268,7 @@ export function Timeline({ items }: { items: { time: string; title: React.ReactN
 /** A tab bar: the shadcn/ui Tabs (tablist and tabs; the screens draw the panels). `count` is a badge after the label. */
 export function Tabs<T extends string>({ tabs, value, onChange, className }: { tabs: { id: T; label: string; count?: number | string }[]; value: T; onChange: (v: T) => void; className?: string }) {
   return (
-    <UITabs value={value} onValueChange={(v) => onChange(v as T)} className={cn("max-w-full", className)}>
+    <UITabs value={value} onValueChange={(v) => { onChange(v as T); }} className={cn("max-w-full", className)}>
       <TabsList className="max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto">
         {tabs.map((t) => (
           <TabsTrigger key={t.id} value={t.id} className="flex-none px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">
@@ -286,28 +286,30 @@ export function Field({ label, hint, error, children, className, labelHidden }: 
   // Only a single form control sits inside a <label>. Anything else — choice buttons, a set of checkboxes or buttons, a
   // read-only box — is a labelled group: inside a <label> a button takes the label as its name (IR230, IR238).
   // `labelHidden` keeps the label for assistive technology only, for a group that shows labels of its own.
-  const control = isValidElement(children) && (children.type === Input || children.type === Select || children.type === Textarea || ["input", "select", "textarea"].includes(children.type as string));
-  const group = !control;
-  const Tag = group ? "div" : "label";
+  const isControl = isValidElement(children) && (children.type === Input || children.type === Select || children.type === Textarea || ["input", "select", "textarea"].includes(children.type as string));
+  const isGroup = !isControl;
+  const Tag = isGroup ? "div" : "label";
   // an error marks its control invalid, so assistive technology tells which field to fix; the error text is part of
   // the label, and so of the control's name (IR573)
-  const field = control && error ? cloneElement(children as React.ReactElement<{ "aria-invalid"?: boolean }>, { "aria-invalid": true }) : children;
+  const field = isControl && error ? cloneElement(children as React.ReactElement<{ "aria-invalid"?: boolean }>, { "aria-invalid": true }) : children;
   return (
-    <Tag role={group ? "group" : undefined} aria-label={group ? label : undefined} className={cx("flex min-w-0 flex-col gap-1 text-xs text-ink", className)}>
-      <span aria-hidden={group || undefined} className={cx("font-semibold", labelHidden && "sr-only")}>{label}</span>
+    <Tag role={isGroup ? "group" : undefined} aria-label={isGroup ? label : undefined} className={cx("flex min-w-0 flex-col gap-1 text-xs text-ink", className)}>
+      <span aria-hidden={isGroup || undefined} className={cx("font-semibold", labelHidden && "sr-only")}>{label}</span>
       {field}
-      {error ? <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{error}</span> : hint ? <span className="font-normal text-muted-foreground">{hint}</span> : null}
+      {error ? <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{error}</span> : (hint ? <span className="font-normal text-muted-foreground">{hint}</span> : null)}
     </Tag>
   );
 }
 // The form controls are the shadcn/ui Input, Textarea and NativeSelect. A width in className (w-auto, w-40) replaces the
 // default one (cn merges), and a select stays a native select, so the platform's own picker works everywhere.
 export const Input = ({ className, ...p }: React.ComponentProps<"input">) => <UIInput {...p} className={className} />; // React 19: ref is a prop
-export const Select = ({ className, children, ...p }: Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "size">) => (
-  <NativeSelect {...p} className={cn("w-full", className)}>{children}</NativeSelect>
-);
+export const Select = ({ className, children, ...p }: Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "size">) => {
+  return (
+    <NativeSelect {...p} className={cn("w-full", className)}>{children}</NativeSelect>
+  );
+};
 /** A row's actions behind the "more" icon: the shadcn/ui DropdownMenu. The actions are written as <option value>
- * children (shown only when they apply); `onChoose` gets the chosen value. */
+children (shown only when they apply); `onChoose` gets the chosen value. */
 export function ActionMenu({ label, disabled, onChoose, children }: { label: string; disabled?: boolean; onChoose: (value: string) => void; children: React.ReactNode }) {
   const items = Children.toArray(children).filter((c): c is React.ReactElement<{ value: string; children: React.ReactNode }> => isValidElement(c) && c.type === "option");
   return (
@@ -316,34 +318,36 @@ export function ActionMenu({ label, disabled, onChoose, children }: { label: str
         <Icon name="more" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-44">
-        {items.map((o) => <DropdownMenuItem key={o.props.value} onClick={() => onChoose(o.props.value)}>{o.props.children}</DropdownMenuItem>)}
+        {items.map((o) => <DropdownMenuItem key={o.props.value} onClick={() => { onChoose(o.props.value); }}>{o.props.children}</DropdownMenuItem>)}
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 export const Textarea = ({ className, ...p }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <UITextarea {...p} className={cn("min-h-[84px] resize-y", className)} />;
 /** A button with no look of its own, like the browser's button under Tailwind's reset: the text, size and layout come from
- * its parent and its classes (the 44 px touch height of IR615 too), except that a chip or a tab is touch-sized (IR617). A screen uses it for a selectable card, a chip or a text action, so the shadcn Button's
- * height, padding, radius and weight are reset here rather than in each screen. */
+its parent and its classes (the 44 px touch height of IR615 too), except that a chip or a tab is touch-sized (IR617). A screen uses it for a selectable card, a chip or a text action, so the shadcn Button's
+height, padding, radius and weight are reset here rather than in each screen. */
 export const Plain = ({ className, touch, ...p }: React.ComponentProps<typeof Button> & { touch?: boolean }) => {
   // a chip (aria-pressed) or a tab (role tab) is a control of its own: on a touch screen it is 44 px tall like the
   // shared ones, its label centred (IR617); so is an action marked `touch` — an icon or a text action — 44×44 (IR618)
-  const control = touch || p["aria-pressed"] !== undefined || p.role === "tab";
+  const isControl = touch || p["aria-pressed"] !== undefined || p.role === "tab";
   return <Button {...p} data-plain="" variant="ghost" className={cn("inline-block h-auto min-w-0 pointer-coarse:min-h-0 shrink gap-0 rounded-none p-0 font-[inherit] whitespace-normal justify-start leading-[inherit] [font-size:inherit] [letter-spacing:inherit] active:translate-y-0 disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto",
-    control && "pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center", touch && "pointer-coarse:min-w-11 pointer-coarse:justify-center", className)} />;
+    isControl && "pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center", touch && "pointer-coarse:min-w-11 pointer-coarse:justify-center", className)} />;
 };
 /** A one-time code as separate boxes (Figma 10g): one transparent input over the boxes, so typing, pasting and the
- * browser's one-time-code autofill all work; the box for the next digit is outlined while the input has focus. */
+browser's one-time-code autofill all work; the box for the next digit is outlined while the input has focus. */
 export function CodeInput({ value, onChange, label, length = 6, autoFocus }: { value: string; onChange: (v: string) => void; label: string; length?: number; autoFocus?: boolean }) {
   const [focused, setFocused] = useState(false);
   const next = Math.min(value.length, length - 1);
   return (
     <div className="relative inline-flex gap-2">
-      {Array.from({ length }, (_, i) => (
-        <span key={i} aria-hidden className={cx("grid h-10 w-10 place-items-center rounded-lg border bg-surface text-lg font-semibold", focused && i === next ? "border-primary ring-2 ring-primary/20" : "border-line")}>{value[i] ?? ""}</span>
-      ))}
+      {Array.from({ length }, (_, i) => {
+        return (
+          <span key={i} aria-hidden className={cx("grid h-10 w-10 place-items-center rounded-lg border bg-surface text-lg font-semibold", focused && i === next ? "border-primary ring-2 ring-primary/20" : "border-line")}>{value[i] ?? ""}</span>
+        );
+      })}
       <input aria-label={label} inputMode="numeric" autoComplete="one-time-code" maxLength={length} value={value} autoFocus={autoFocus}
-        onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, length))} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        onChange={(e) => { onChange(e.target.value.replaceAll(/\D/g, "").slice(0, length)); }} onFocus={() => { setFocused(true); }} onBlur={() => { setFocused(false); }}
         className="absolute inset-0 h-full w-full cursor-text opacity-0" />
     </div>
   );
@@ -360,14 +364,14 @@ export function QrCode({ qr, label, className }: { qr: { size: number; path: str
 export function Check({ label, checked, onChange, disabled }: { label: React.ReactNode; checked?: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
   return (
     <label className="inline-flex items-center gap-2 text-[13px]">
-      <Checkbox checked={checked} disabled={disabled} onCheckedChange={(v) => onChange?.(v === true)} className="size-5" />
+      <Checkbox checked={checked} disabled={disabled} onCheckedChange={(v) => onChange?.(v)} className="size-5" />
       {label}
     </label>
   );
 }
 /** An on/off switch: the shadcn/ui Switch, named by `label`. */
 export function Toggle({ on, onChange, label, disabled }: { on: boolean; onChange: (v: boolean) => void; label?: string; disabled?: boolean }) {
-  return <Switch checked={on} onCheckedChange={(v) => onChange(v)} aria-label={label} disabled={disabled} />;
+  return <Switch checked={on} onCheckedChange={(v) => { onChange(v); }} aria-label={label} disabled={disabled} />;
 }
 /** One choice of a few, shown as pressed buttons: the shadcn/ui ToggleGroup. The chosen one stays chosen when pressed again. */
 export function Choice<T extends string>({ options, value, onChange, disabled }: { options: { id: T; label: string }[]; value: T; onChange: (v: T) => void; disabled?: boolean }) {
@@ -381,14 +385,14 @@ export function Search({ placeholder, value, onChange }: { placeholder: string; 
   return (
     <span className="relative flex w-full min-w-0 items-center">
       <Icon name="search" className="pointer-events-none absolute left-3 text-muted-foreground" />
-      <Input type="search" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className="pl-8" />
+      <Input type="search" placeholder={placeholder} value={value} onChange={(e) => { onChange(e.target.value); }} className="pl-8" />
     </span>
   );
 }
 
 /** A select for long lists (DD-A03 search-selects): the shadcn/ui Combobox. Typing narrows the options, the first
- * `limit` matches are listed, the arrow keys and Enter choose one and Escape closes; closed, it shows the chosen
- * option. `label` names the input and its list. */
+`limit` matches are listed, the arrow keys and Enter choose one and Escape closes; closed, it shows the chosen
+option. `label` names the input and its list. */
 export function SearchSelect({ value, onChange, options, label, placeholder, limit = 20, className }: {
   value: string; onChange: (id: string) => void; options: { id: string; label: string }[]; label: string; placeholder?: string; limit?: number; className?: string;
 }) {
@@ -401,7 +405,7 @@ export function SearchSelect({ value, onChange, options, label, placeholder, lim
   return (
     <Combobox items={options} filteredItems={matches} limit={limit} value={current} openOnInputClick
       itemToStringLabel={(o: { id: string; label: string }) => o.label} isItemEqualToValue={(a: { id: string }, b: { id: string }) => a.id === b.id}
-      onInputValueChange={(q) => setQuery(q)} onValueChange={(o) => { if (o && o.id !== value) onChange(o.id); }}>
+      onInputValueChange={(q) => { setQuery(q); }} onValueChange={(o) => { if (o && o.id !== value) onChange(o.id); }}>
       {/* the input opens the list (a click, the arrow keys); the chevron only shows that it is a list */}
       <ComboboxInput aria-label={label} placeholder={placeholder ?? t("Type to search…")} showTrigger={false} className={cn("w-full min-w-0", className)}>
         <InputGroupAddon align="inline-end" aria-hidden><Icon name="chevronDown" className="text-muted-foreground" /></InputGroupAddon>
@@ -419,23 +423,25 @@ export function SearchSelect({ value, onChange, options, label, placeholder, lim
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** A modal dialog: the shadcn/ui Dialog, as the WAI-ARIA dialog pattern and UX-06 ask (IR361). On open, focus moves into
- * it: the first field or control of the body, else the first footer button (Cancel), else the close button. Tab stays
- * inside, Escape or a press outside closes it, and focus returns to what had it before (the trigger) — or to what
- * `finalFocus` returns, where the dialog's own action takes the trigger away (a removed row, IR612). That element
- * itself takes the focus, also a list region outside the Tab order: Base UI would pass it on to the region's first
- * control, another row's button (IR620). */
+it: the first field or control of the body, else the first footer button (Cancel), else the close button. Tab stays
+inside, Escape or a press outside closes it, and focus returns to what had it before (the trigger) — or to what
+`finalFocus` returns, where the dialog's own action takes the trigger away (a removed row, IR612). That element
+itself takes the focus, also a list region outside the Tab order: Base UI would pass it on to the region's first
+control, another row's button (IR620). */
 export function Modal({ open, title, onClose, children, footer, wide, finalFocus }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean; finalFocus?: () => HTMLElement | true | null }) {
   const t = useT();
   const popup = useRef<HTMLDivElement>(null);
   const firstStop = () => {
-    const stop = (part: string) => [...(popup.current?.querySelectorAll<HTMLElement>(`[data-part="${part}"] :is(${FOCUSABLE})`) ?? [])]
-      .find((el) => !(el as HTMLButtonElement).disabled && el.tabIndex >= 0);
+    const stop = (part: string) => {
+      return [...(popup.current?.querySelectorAll<HTMLElement>(`[data-part="${CSS.escape(part)}"] :is(${FOCUSABLE})`) ?? [])]
+        .find((el) => !(el as HTMLButtonElement).disabled && el.tabIndex >= 0);
+    };
     return stop("body") ?? stop("footer") ?? stop("header") ?? true;
   };
   const returnTo = finalFocus && (() => {
     const el = finalFocus();
     if (!(el instanceof HTMLElement)) return el ?? true;
-    queueMicrotask(() => el.focus({ preventScroll: true }));
+    queueMicrotask(() => { el.focus({ preventScroll: true }); });
     return false;
   });
   return (
@@ -457,14 +463,26 @@ export function Modal({ open, title, onClose, children, footer, wide, finalFocus
 const ToastCtx = createContext<(msg: string, tone?: Tone) => void>(() => {});
 export const useToast = () => useContext(ToastCtx);
 /** The toasts: shadcn/ui's Sonner. Sonner announces through one polite region, so an error carries its text in an alert
- * (announced at once) and every other result in a status (UX-06, IR362). */
+(announced at once) and every other result in a status (UX-06, IR362). */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const push = useCallback((msg: string, tone: Tone = "ok") => {
     const body = <span role={tone === "crit" ? "alert" : "status"}>{msg}</span>;
-    if (tone === "crit") toast.error(body);
-    else if (tone === "warn") toast.warning(body);
-    else if (tone === "ok") toast.success(body);
-    else toast.info(body);
+    switch (tone) {
+    case "crit": {
+    toast.error(body);
+    break;
+    }
+    case "warn": {
+    toast.warning(body);
+    break;
+    }
+    case "ok": {
+    toast.success(body);
+    break;
+    }
+    default: { toast.info(body);
+    }
+    }
   }, []);
   return (
     <ToastCtx.Provider value={push}>
@@ -475,18 +493,18 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 /* ───────────── Data display ───────────── */
-export type Col<T> = { key: string; label: string; render: (r: T) => React.ReactNode; className?: string; hideBelow?: "sm" | "md" };
+export interface Col<T> { key: string; label: string; render: (r: T) => React.ReactNode; className?: string; hideBelow?: "sm" | "md" }
 // TanStack Table builds the rows and cells (shadcn/ui's data table, DEC-75); a column carries its classes as meta
 const tableFx = tableFeatures({ columnMeta: {} as { className?: string; hideBelow?: "sm" | "md" } });
-const hideCls = (m?: { hideBelow?: "sm" | "md" }) => (m?.hideBelow === "sm" ? "max-sm:hidden" : m?.hideBelow === "md" ? "max-md:hidden" : undefined);
+const hideCls = (m?: { hideBelow?: "sm" | "md" }) => (m?.hideBelow === "sm" ? "max-sm:hidden" : (m?.hideBelow === "md" ? "max-md:hidden" : undefined));
 /** A cell's content under one component type for good. A column's `render` is a new function on every render of the
- * page, and FlexRender mounts a function as a component, so each render remounted every cell: a row's button that
- * opened a dialog was gone when the dialog closed, and focus fell to the page (IR620). */
+page, and FlexRender mounts a function as a component, so each render remounted every cell: a row's button that
+opened a dialog was gone when the dialog closed, and focus fell to the page (IR620). */
 function Cell<T>({ render, row }: { render: (r: T) => React.ReactNode; row: T }) {
   return render(row);
 }
 /** Responsive table: scrolls horizontally if needed; optional columns hide on narrow containers. A row that opens a
- * record (`onRowClick`) is focusable and opens with Enter or Space as well as a click (keyboard access, IR294). */
+record (`onRowClick`) is focusable and opens with Enter or Space as well as a click (keyboard access, IR294). */
 export function DataTable<T extends RowData>({ cols, rows, rowKey, onRowClick, selectedKey }: { cols: Col<T>[]; rows: T[]; rowKey: (r: T) => string; onRowClick?: (r: T) => void; selectedKey?: string }) {
   const t = useT();
   const columns = cols.map((c): ColumnDef<typeof tableFx, T> => ({ id: c.key, header: c.label, meta: { className: c.className, hideBelow: c.hideBelow } }));
@@ -509,10 +527,14 @@ export function DataTable<T extends RowData>({ cols, rows, rowKey, onRowClick, s
         <TableBody>
           {table.getRowModel().rows.map((row) => {
             const r = row.original;
-            const selected = selectedKey === row.id;
+            const isSelected = selectedKey === row.id;
             return (
-              <TableRow key={row.id} onClick={onRowClick && (() => onRowClick(r))} tabIndex={onRowClick ? 0 : undefined} aria-current={selected ? "true" : undefined} data-state={selected ? "selected" : undefined}
-                onKeyDown={onRowClick && ((e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onRowClick(r); } })}
+              <TableRow key={row.id} onClick={onRowClick && (() => { onRowClick(r); })} tabIndex={onRowClick ? 0 : undefined} aria-current={isSelected ? "true" : undefined} data-state={isSelected ? "selected" : undefined}
+                onKeyDown={onRowClick && ((e) => { if (!(e.target === e.currentTarget && (e.key === "Enter" || e.key === " "))) {
+                  return;
+                }
+
+                e.preventDefault(); onRowClick(r); })}
                 className={cx("data-[state=selected]:bg-primary-soft/60", onRowClick && "cursor-pointer outline-none focus-visible:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary")}>
                 {row.getAllCells().map((cell) => (
                   <TableCell key={cell.id} className={cx("px-3 py-2.5 whitespace-normal", hideCls(cell.column.columnDef.meta), cell.column.columnDef.meta?.className)}>
@@ -534,8 +556,7 @@ export function DataTable<T extends RowData>({ cols, rows, rowKey, onRowClick, s
 /** Selectable list row used by master/detail panes. */
 export function ListRow({ id, selected, onClick, href, children, className }: { id?: string; selected?: boolean; onClick?: () => void; href?: string; children: React.ReactNode; className?: string }) {
   const cls = cx("flex w-full min-w-0 items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors", selected ? "border-primary bg-primary-soft/60" : "border-line bg-surface hover:bg-surface2/70", className);
-  if (href) return <Link id={id} href={href} className={cls}>{children}</Link>;
-  return <button id={id} type="button" onClick={onClick} aria-pressed={selected} className={cls}>{children}</button>;
+  return href ? <Link id={id} href={href} className={cls}>{children}</Link> : <button id={id} type="button" onClick={onClick} aria-pressed={selected} className={cls}>{children}</button>;
 }
 
 /* ───────────── Charts: shadcn/ui's chart on Recharts (DEC-75); full width, `height` pixels tall ───────────── */
@@ -562,7 +583,7 @@ export function BarChart({ labels, series, names, unit, height = 160, colors = [
 }
 
 /** A line chart; null points are gaps, never joined (a value between two gaps is a dot). `labels` spread evenly under
- * the chart, `ticks` draw gridlines with their values, `shadeGaps` shades the gaps; `name` names the value in the tooltip. */
+the chart, `ticks` draw gridlines with their values, `shadeGaps` shades the gaps; `name` names the value in the tooltip. */
 export function LineChart({ points, min, max, threshold, height = 120, color = "var(--color-primary)", labels, ticks, shadeGaps, name }: { points: (number | null)[]; min?: number; max?: number; threshold?: number; height?: number; color?: string; labels?: string[]; ticks?: number[]; shadeGaps?: boolean; name?: string }) {
   const t = useT();
   const vals = points.filter((p): p is number => p !== null);
@@ -571,11 +592,11 @@ export function LineChart({ points, min, max, threshold, height = 120, color = "
   const last = Math.max(0, points.length - 1);
   const data = points.map((v, i) => ({ i, v }));
   const gaps: [number, number][] = [];
-  points.forEach((p, i) => {
-    if (p !== null) return;
-    if (gaps.length && gaps[gaps.length - 1][1] === i - 1) gaps[gaps.length - 1][1] = i;
+  for (const [i, p] of points.entries()) {
+    if (p !== null) continue;
+    if (gaps.length > 0 && gaps[gaps.length - 1][1] === i - 1) gaps[gaps.length - 1][1] = i;
     else gaps.push([i, i]);
-  });
+  }
   const isolated = (i: number) => points[i] !== null && (i === 0 || points[i - 1] === null) && (i === last || points[i + 1] === null);
   // the labels sit evenly from the first point to the last, the outer ones flush with the ends
   const at = (k: number) => (labels && labels.length > 1 ? (last * k) / (labels.length - 1) : 0);
@@ -584,7 +605,7 @@ export function LineChart({ points, min, max, threshold, height = 120, color = "
       <RLineChart data={data} margin={{ top: 8, right: 6, bottom: labels ? 0 : 4, left: 6 }} title={t("Line chart")}>
         {ticks && <CartesianGrid vertical={false} />}
         <XAxis type="number" dataKey="i" domain={[0, last]} hide={!labels} ticks={labels?.map((_, k) => at(k))} interval={0} tickLine={false} axisLine={false}
-          tick={({ x, y, index }) => <text x={x} y={y} dy={8} fontSize={10} className="fill-muted-foreground" textAnchor={index === 0 ? "start" : index === (labels?.length ?? 0) - 1 ? "end" : "middle"}>{labels?.[index]}</text>} />
+          tick={({ x, y, index }) => <text x={x} y={y} dy={8} fontSize={10} className="fill-muted-foreground" textAnchor={index === 0 ? "start" : (index === (labels?.length ?? 0) - 1 ? "end" : "middle")}>{labels?.[index]}</text>} />
         <YAxis domain={[lo, hi]} hide={!ticks} ticks={ticks} mirror tickLine={false} axisLine={false} tick={axisTick} />
         {shadeGaps && vals.length > 0 && gaps.map(([a, b]) => <ReferenceArea key={a} x1={Math.max(0, a - 0.5)} x2={Math.min(last, b + 0.5)} fill="#94a3b8" fillOpacity={0.14} />)}
         {threshold !== undefined && <ReferenceLine y={threshold} stroke="var(--color-crit)" strokeDasharray="4 3" />}

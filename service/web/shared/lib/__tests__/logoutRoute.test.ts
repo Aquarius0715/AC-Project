@@ -8,17 +8,19 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }) }));
 // the session store, used only where a test sets SESSION_STORE_URL (IR382)
 const kv = vi.hoisted(() => new Map<string, string>());
-vi.mock("@redis/client", () => ({
-  createClient: () => {
-    const c = {
-      on: () => c, connect: async () => c,
-      getEx: async (k: string) => kv.get(k) ?? null,
-      set: async (k: string, v: string, o: { condition?: string }) => (o.condition === "XX" && !kv.has(k) ? null : (kv.set(k, v), "OK")),
-      del: async (k: string) => (kv.delete(k) ? 1 : 0),
-    };
-    return c;
-  },
-}));
+vi.mock("@redis/client", () => {
+  return {
+    createClient: () => {
+      const c = {
+        on: () => c, connect: async () => c,
+        getEx: async (k: string) => kv.get(k) ?? null,
+        set: async (k: string, v: string, o: { condition?: string }) => (o.condition === "XX" && !kv.has(k) ? null : (kv.set(k, v), "OK")),
+        del: async (k: string) => (kv.delete(k) ? 1 : 0),
+      };
+      return c;
+    },
+  };
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -26,7 +28,7 @@ afterEach(() => {
 });
 
 const session: Session = { accessToken: "a.b.c", refreshToken: "r-1", tenantId: "t-1", membershipId: "m-1", role: "client", expiresAt: 9_999_999_999 };
-const signOut = (cookie?: string, extra: Record<string, string> = {}) => POST(new NextRequest("http://localhost:3000/bff/auth/logout", { method: "POST", headers: { ...(cookie ? { cookie: `${SESSION_COOKIE}=${cookie}` } : {}), ...extra } }));
+const signOut = (cookie?: string, extra: Record<string, string> = {}) => POST(new NextRequest("http://localhost:3000/bff/auth/logout", { method: "POST", headers: { ...(cookie && { cookie: `${SESSION_COOKIE}=${cookie}` }), ...extra } }));
 const dropped = (res: Response) => (res.headers.get("set-cookie") ?? "").startsWith(`${SESSION_COOKIE}=;`);
 
 // IR357: sign-out ends the identity provider's session of the sign-in, then drops the BFF session
@@ -59,7 +61,7 @@ describe("POST /bff/auth/logout", () => {
       method: "POST", headers: { cookie: `${s.SESSION_COOKIE}=${s.seal(session)}`, origin: "https://ac.example.com", host: "ac.example.com", "sec-fetch-site": "same-origin" },
     }));
     const set = res.headers.get("set-cookie") ?? "";
-    expect([res.status, set.startsWith("__Host-ac_session_client=;"), /;\s*Secure/i.test(set), /;\s*Path=\/(;|$)/.test(set), /Max-Age=0/.test(set)]).toEqual([303, true, true, true, true]);
+    expect([res.status, set.startsWith("__Host-ac_session_client=;"), /;\s*Secure/i.test(set), /;\s*Path=\/(;|$)/.test(set), set.includes('Max-Age=0')]).toEqual([303, true, true, true, true]);
     vi.resetModules();
   });
   it("refuses a sign-out another site posts (CSRF, IR358)", async () => {
@@ -78,7 +80,7 @@ describe("POST /bff/auth/logout with the session store", () => {
     const fetch = vi.fn(async () => new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetch);
     const cookie = await createSessionCookie(session);
-    const copy = `${cookie}`;
+    const copy = cookie;
     const res = await signOut(cookie);
     expect([res.status, dropped(res), kv.size]).toEqual([303, true, 0]);
     expect(new URLSearchParams(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body)).get("refresh_token")).toBe("r-1");

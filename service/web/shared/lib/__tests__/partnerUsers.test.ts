@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { accessEnd, accessError, addDays, nameError, partnerInviteError, partnerUserRows, reasonError, statusFilter, type ApiPartnerUser } from "@ac/web/lib/partnerUsers";
 import { PARTNER_USERS_SEED } from "@ac/web/lib/partnerUsersDemo";
 
-const user = (p: Partial<ApiPartnerUser>): ApiPartnerUser => ({
-  id: "u", version: 1, organizationId: "org", membershipId: null, email: "x@example.com", displayName: null, partnerRole: "technician", status: "invited",
-  lastSignInAt: null, accessUntil: null, invitedAt: "2026-09-12T02:00:00Z", invitedByMembershipId: "contractor-a", ...p,
-});
+const user = (p: Partial<ApiPartnerUser>): ApiPartnerUser => {
+  return {
+    id: "u", version: 1, organizationId: "org", membershipId: null, email: "x@example.com", displayName: null, partnerRole: "technician", status: "invited",
+    lastSignInAt: null, accessUntil: null, invitedAt: "2026-09-12T02:00:00Z", invitedByMembershipId: "contractor-a", ...p,
+  };
+};
 
 describe("partnerUserRows (FR-P11)", () => {
   it("sorts by name, marks the caller's own account and gives it no actions", () => {

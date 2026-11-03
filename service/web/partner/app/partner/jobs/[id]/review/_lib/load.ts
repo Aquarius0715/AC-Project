@@ -13,13 +13,13 @@ import {
 } from "@ac/web/lib/partnerReview";
 import type { ReviewLive } from "../_components/review-view";
 
-type Member = { userId: string; displayName: string | null };
-const quiet = <T,>(p: Promise<T>) => p.catch((e) => { // outside the caller's scope or window the row reads as absent
-  if (e instanceof CoreError && (e.error.code === "FORBIDDEN" || e.error.code === "NOT_FOUND")) return null;
-  throw e;
+const quiet = <T,>(p: Promise<T>) => p.catch((error) => { // outside the caller's scope or window the row reads as absent
+  if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
+  throw error;
 });
 
 export async function loadReview(jobId: string): Promise<ReviewLive> {
+  interface Member { userId: string; displayName: string | null }
   const [job, me, members, display] = await Promise.all([coreOp<ApiReviewJob>("jobs.get", { jobId }), corePrincipal(), coreAll<Member>("members.list"), coreDisplay()]);
   const i = i18nOf(display);
   const { t } = i;
@@ -28,7 +28,7 @@ export async function loadReview(jobId: string): Promise<ReviewLive> {
   const id = job.id ?? job.jobId ?? jobId;
   const unit = job.projection === "detail" && job.unitId ? await quiet(coreOp<ApiUnitDetail>("units.get", { id: job.unitId })) : null;
   const base = {
-    job: { id, version: job.version ?? 0, status: job.status, type: job.type, unit: unit ? `${unit.displayName} · ${unit.location.pathLabels.join(" › ")}` : job.unitId ? t("unit {id}", { id: job.unitId.slice(0, 8) }) : null },
+    job: { id, version: job.version ?? 0, status: job.status, type: job.type, unit: unit ? `${unit.displayName} · ${unit.location.pathLabels.join(" › ")}` : (job.unitId ? t("unit {id}", { id: job.unitId.slice(0, 8) }) : null) },
     reviewer: me.userId, report: null,
   };
   const ref = job.projection === "detail" ? job.reportRefs?.[job.reportRefs.length - 1] : undefined;
@@ -45,7 +45,7 @@ export async function loadReview(jobId: string): Promise<ReviewLive> {
   const check = evidenceCheck(r, names, t);
   const last = [...r.reviewHistory].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0] ?? null;
   // a follow-up is a calendar date the technician picked: written as it is, in the user's language
-  const followDay = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString(intlTag(display.locale), { timeZone: "UTC", dateStyle: "medium" }).replace(/[\u00a0\u2009\u202f]/g, " ");
+  const followDay = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString(intlTag(display.locale), { timeZone: "UTC", dateStyle: "medium" }).replaceAll(/[\u00A0\u2009\u202F]/g, " ");
   const next = r.nextAction?.kind === "follow_up" ? t("follow-up {date} — {note}", { date: followDay(r.nextAction.date), note: r.nextAction.note }) : t("no follow-up needed");
   return {
     ...base,

@@ -31,11 +31,13 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
 
   // NFR-07 / IR44 key check: the English texts the code translates and the dictionary's keys are the same set
   const root = resolve(__dirname, "../../..");
-  const sources = (dir: string): string[] => readdirSync(dir).flatMap((f) => {
-    const path = join(dir, f);
-    if (["node_modules", ".next", "__tests__", "e2e"].includes(f)) return [];
-    return statSync(path).isDirectory() ? sources(path) : /\.tsx?$/.test(f) && !f.endsWith("i18n-ms.ts") ? [path] : [];
-  });
+  const sources = (dir: string): string[] => {
+    return readdirSync(dir).flatMap((f) => {
+      const path = join(dir, f);
+      if (["node_modules", ".next", "__tests__", "e2e"].includes(f)) return [];
+      return statSync(path).isDirectory() ? sources(path) : (/\.tsx?$/.test(f) && !f.endsWith("i18n-ms.ts") ? [path] : []);
+    });
+  };
   const code = ["shared", "customer/app", "partner/app", "technician/app", "admin/app"].flatMap((d) => sources(join(root, d))).map((f) => readFileSync(f, "utf8")).join("\n");
 
   it("has a Malay text for every literal the code translates", () => {
@@ -55,15 +57,17 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
 
   // it searches the whole code once per key: seconds of work, beyond the default 5 s while the other files run beside it
   it("has no Malay entry the code no longer shows", () => {
-    const dynamic = new Set(Object.values(ROLES).flatMap((cfg) => [cfg.sub, cfg.chip.split(" — ")[0], ...cfg.nav.map((i) => i.label)]));
+    const dynamic = new Set(Object.values(ROLES).flatMap((cfg) => [cfg.sub, cfg.chip.split(" — ", 1)[0], ...cfg.nav.map((i) => i.label)]));
     expect(Object.keys(ms).filter((key) => !dynamic.has(key) && !code.includes(JSON.stringify(key)))).toEqual([]);
   }, 30_000);
 
   it("speaks to customers, contractors, technicians and HQ without error codes or spec IDs (IR584, IR585, IR587, IR590, IR591, IR595, IR622, IR626)", () => {
     const files = ["customer/app", "partner/app", "technician/app", "admin/app", "shared/lib", "shared/components", "shared/screens"].flatMap((d) => sources(join(root, d)));
-    const strings = files.flatMap((f) => [...readFileSync(f, "utf8").matchAll(/"((?:[^"\\\n]|\\.)*)"/g)].flatMap((m) => {
-      try { return [JSON.parse(`"${m[1]}"`) as string]; } catch { return []; }
-    }));
+    const strings = files.flatMap((f) => {
+      return [...readFileSync(f, "utf8").matchAll(/"((?:[^"\\\n]|\\.)*)"/g)].flatMap((m) => {
+        try { return [JSON.parse(`"${m[1]}"`) as string]; } catch { return []; }
+      });
+    });
     const texts = [...new Set(strings.filter((text) => text in ms))]; // every literal the dictionary translates, maps of texts included
     expect(texts.length).toBeGreaterThan(100);
     // screen IDs as well ("Access & roles (A03)")
@@ -81,19 +85,19 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   // such as kWh and kgCO₂e and the {placeholders} are not names of this kind
   it("shows no field name, operation name or IR number in a text the apps translate", () => {
     const named = /\b(?!kWh\b|kgCO)[a-z]+[A-Z][a-z][A-Za-z]*\b|\b[a-z]+\.[a-z]+[A-Z][A-Za-z]*\b|\bIR\d+\b/;
-    expect(Object.keys(ms).filter((text) => named.test(text.replace(/\{\w+\}/g, "")))).toEqual([]);
+    expect(Object.keys(ms).filter((text) => named.test(text.replaceAll(/\{\w+\}/g, "")))).toEqual([]);
   });
 
   // IR624: the apps speak English and Malay; a Japanese term of the specification ("受領") once reached the partner's schedule
   it("shows no Japanese term in a text the apps translate", () => {
-    expect(Object.keys(ms).filter((text) => /[\u3040-\u30ff\u4e00-\u9fff]/.test(text))).toEqual([]);
+    expect(Object.keys(ms).filter((text) => /[\u3040-\u30FF\u4E00-\u9FFF]/.test(text))).toEqual([]);
   });
 
   it("names every sidebar item and the role words of the four apps in Malay", () => {
     for (const cfg of Object.values(ROLES)) {
       for (const item of cfg.nav.filter((i) => i.label !== "MRV")) expect(ms[item.label], item.label).toBeTruthy();
       expect(ms[cfg.sub], cfg.sub).toBeTruthy();
-      const word = cfg.chip.split(" — ")[0]; // the role chip of the header
+      const word = cfg.chip.split(" — ", 1)[0]; // the role chip of the header
       expect(ms[word], word).toBeTruthy();
     }
   });
@@ -119,7 +123,7 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   it("shows a span in one line, with plain spaces whatever the ICU (no hydration difference)", () => {
     const span = showSpan("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z", { locale: "ms", timeZone: "Asia/Tokyo" }, true);
     expect(span).toBe("Rab, 16 Sep, 11:00 PG – 1:00 PTG GMT+9");
-    expect(/[\u00a0\u2009\u202f]/.test(span + showTime("2026-09-16T02:00:00Z"))).toBe(false);
+    expect(/[\u00A0\u2009\u202F]/.test(span + showTime("2026-09-16T02:00:00Z"))).toBe(false);
     expect(showSpan("2026-09-14T00:00:00Z", "2026-09-20T00:00:00Z")).toBe("14 Sept, 8:00 am – 20 Sept, 8:00 am MYT");
   });
 

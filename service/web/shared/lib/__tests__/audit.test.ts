@@ -7,15 +7,19 @@ import { EN, i18nOf, translator } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-15T01:00:00Z"); // 09:00 in Kuala Lumpur, 10:00 in Tokyo
-const entry = (over: Partial<ApiAudit>): ApiAudit => ({
-  id: "a1", actorId: "user-0001", actorName: "hq-operator", actorRoleAtTime: "admin", action: "restrictions.defer", targetRef: { kind: "restriction", id: "r1" }, previousVersion: 3, nextVersion: 4,
-  occurredAt: "2026-09-15T00:30:00Z", correlationId: "corr-1", result: "success", maskedBefore: { state: "applied", contactPhone: "***" }, maskedAfter: { state: "applied", "exception.until": "2026-09-20T00:00:00Z", contactPhone: "***" },
-  reason: "Invoice under review", ...over,
-});
-const event = (over: Partial<ApiAuditDeviceEvent>): ApiAuditDeviceEvent => ({
-  id: "e42", version: 1, deviceId: "d1", eventType: "tamper", evidenceSource: "tamper_signal", sequence: 42, occurredAt: "2026-09-15T00:41:00Z", restoredAt: null, alertIds: ["al1"], recovery: null,
-  responseNotes: [{ actorId: "user-0001", message: "Customer confirms nobody touched the unit.", at: "2026-09-15T00:50:00Z" }], unitIdAtOccurrence: "u1", ...over,
-});
+const entry = (over: Partial<ApiAudit>): ApiAudit => {
+  return {
+    id: "a1", actorId: "user-0001", actorName: "hq-operator", actorRoleAtTime: "admin", action: "restrictions.defer", targetRef: { kind: "restriction", id: "r1" }, previousVersion: 3, nextVersion: 4,
+    occurredAt: "2026-09-15T00:30:00Z", correlationId: "corr-1", result: "success", maskedBefore: { state: "applied", contactPhone: "***" }, maskedAfter: { state: "applied", "exception.until": "2026-09-20T00:00:00Z", contactPhone: "***" },
+    reason: "Invoice under review", ...over,
+  };
+};
+const event = (over: Partial<ApiAuditDeviceEvent>): ApiAuditDeviceEvent => {
+  return {
+    id: "e42", version: 1, deviceId: "d1", eventType: "tamper", evidenceSource: "tamper_signal", sequence: 42, occurredAt: "2026-09-15T00:41:00Z", restoredAt: null, alertIds: ["al1"], recovery: null,
+    responseNotes: [{ actorId: "user-0001", message: "Customer confirms nobody touched the unit.", at: "2026-09-15T00:50:00Z" }], unitIdAtOccurrence: "u1", ...over,
+  };
+};
 
 describe("HQ audit log (FR-A16, DD-A16, SCR-A16)", () => {
   it("reads the filters from the URL; the default period is 30 days up to tomorrow in the display time zone", () => {

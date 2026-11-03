@@ -5,10 +5,12 @@ import {
   type ApiAutoPolicy, type AutoDraft,
 } from "@ac/web/lib/automation";
 
-const policy = (over: Partial<ApiAutoPolicy>): ApiAutoPolicy => ({
-  id: "p1", version: 2, kind: "automation", name: "Peak saver", unitIds: ["u1"], ownerMembershipId: "m-hq", timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 60,
-  disabledReason: null, condition: { type: "tariff", operator: "gt", value: 0.6, unit: "MYR_per_kWh" }, action: { kind: "set_temperature", celsius: 26 }, ...over,
-});
+const policy = (over: Partial<ApiAutoPolicy>): ApiAutoPolicy => {
+  return {
+    id: "p1", version: 2, kind: "automation", name: "Peak saver", unitIds: ["u1"], ownerMembershipId: "m-hq", timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 60,
+    disabledReason: null, condition: { type: "tariff", operator: "gt", value: 0.6, unit: "MYR_per_kWh" }, action: { kind: "set_temperature", celsius: 26 }, ...over,
+  };
+};
 const customerOf = new Map([["u1", "Demo Customer A"], ["u2", "Demo Customer B"]]);
 
 describe("HQ automation policies (FR-A11, DD-A11)", () => {

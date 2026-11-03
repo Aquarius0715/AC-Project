@@ -14,10 +14,10 @@ import { Icon } from "@ac/web/components/Icon";
 const dot: Record<string, string> = { ok: "bg-ok", crit: "bg-crit", warn: "bg-warn", primary: "bg-primary", muted: "bg-line" };
 
 /** IoT devices (DD-A04, Figma Admin 246:2): the list sorted by serial with the state chips and the search, and the
- * deviceId detail as the technician's device screen draws it — tiles, the bound unit, the actions, the firmware card,
- * sensors with Calibrate… (a small button like the device actions, IR576), the operation and calibration history and the events. Register, bind, connection check,
- * calibration and firmware update are Server Actions. Texts in the display language; times in the user's display time
- * zone; metric and evidence codes stay codes (IR295, IR319). */
+deviceId detail as the technician's device screen draws it — tiles, the bound unit, the actions, the firmware card,
+sensors with Calibrate… (a small button like the device actions, IR576), the operation and calibration history and the events. Register, bind, connection check,
+calibration and firmware update are Server Actions. Texts in the display language; times in the user's display time
+zone; metric and evidence codes stay codes (IR295, IR319). */
 export function DeviceTab({ live }: { live: DevicesLive }) {
   const t = useT();
   const nav = useUrlPatch();
@@ -35,7 +35,7 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
   const shown = rows.filter(filterOf(filter)).filter((x) => !q || `${x.serial} ${x.id} ${x.unit}`.toLowerCase().includes(q.toLowerCase()));
   const dv = live.device;
   const close = () => { setModal(null); setTried(false); };
-  const busy = !!dv?.detail.activeOperation;
+  const isBusy = !!dv?.detail.activeOperation;
 
   const register = () => {
     setTried(true);
@@ -43,11 +43,11 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
     run(() => registerDevice(reg.serial.trim(), reg.sensors, reg.unitId), t("Device registered — bind it to the unit once it is installed"), (id) => { close(); setReg({ serial: "", unitId: "", sensors: [] }); nav({ deviceId: id }); });
   };
   // the first binding connects the device to its planned unit; a rebinding moves it (D05, IR467)
-  const first = !!dv && !dv.row.unitId;
+  const isFirst = !!dv && !dv.row.unitId;
   const rebind = () => {
     setTried(true);
     if (!dv || !bind.unitId || !bind.reason.trim()) return;
-    run(() => bindDevice(dv.detail.id, dv.detail.version, bind.unitId, bind.reason.trim()), first ? t("Device bound to the unit — it is connected now") : t("Device bound — new sensor IDs issued"), close);
+    run(() => bindDevice(dv.detail.id, dv.detail.version, bind.unitId, bind.reason.trim()), t(isFirst ? "Device bound to the unit — it is connected now" : "Device bound — new sensor IDs issued"), close);
   };
   const calibrate = () => {
     setTried(true);
@@ -68,26 +68,26 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
         <div className="flex flex-wrap gap-2">{counts.map(({ f, label, n }) => (
           <Plain key={f} type="button" aria-pressed={filter === f} onClick={() => { setFilter(f); const next = followFilter(rows, f, dv?.row.id ?? null); if (next) nav({ deviceId: next }); }}
             className={cx("flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold", filter === f ? "border-ink bg-ink text-white" : "border-line bg-surface")}>
-            {f !== "all" && f !== "nosensors" && <span className={cx("h-2 w-2 rounded-full", f === "online" ? "bg-ok" : f === "offline" ? "bg-crit" : "bg-warn")} />}{label} <span className="text-xs opacity-70">{n}</span>
+            {f !== "all" && f !== "nosensors" && <span className={cx("h-2 w-2 rounded-full", f === "online" ? "bg-ok" : (f === "offline" ? "bg-crit" : "bg-warn"))} />}{label} <span className="text-xs opacity-70">{n}</span>
           </Plain>
         ))}</div>
         <div className="flex flex-wrap items-center gap-2"><div className="w-64"><Search placeholder={t("Search serial, device or unit…")} value={q} onChange={setQ} /></div>
-          {live.canWrite && <Btn variant="primary" onClick={() => setModal("register")}><Icon name="add" /> {t("Register device")}</Btn>}</div>
+          {live.canWrite && <Btn variant="primary" onClick={() => { setModal("register"); }}><Icon name="add" /> {t("Register device")}</Btn>}</div>
       </div>
       <div className="split-rev">
         <Card title={t("Devices")} sub={t("sorted by serial")} className="self-start">
           {shown.length === 0 ? <EmptyState title={t("No devices")}>{t(q || filter !== "all" ? "No device matches." : "Register the first device.")}</EmptyState> : (
             <div className="flex flex-col gap-2">{shown.map((x) => (
-              <ListRow key={x.id} selected={dv?.row.id === x.id} onClick={() => nav({ deviceId: x.id })}>
+              <ListRow key={x.id} selected={dv?.row.id === x.id} onClick={() => { nav({ deviceId: x.id }); }}>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2"><b className="whitespace-nowrap text-[13px]">{x.serial}</b><span className="flex flex-wrap items-center justify-end gap-1"><ConnBadge s={x.conn} />{x.tamper && <Badge tone="warn">{t("Tamper")}</Badge>}{x.connText && <span className="text-[10px] text-muted-foreground">{x.connText}</span>}</span></div>
-                  <div className="flex justify-between gap-2 text-[11px] text-muted-foreground"><span className="truncate">{x.unit}</span><span>{x.sensors ? t("fw {version}", { version: x.fw }) : t("fw {version} · no sensors", { version: x.fw })}</span></div>
+                  <div className="flex justify-between gap-2 text-[11px] text-muted-foreground"><span className="truncate">{x.unit}</span><span>{t(x.sensors ? "fw {version}" : "fw {version} · no sensors", { version: x.fw })}</span></div>
                 </div>
               </ListRow>
             ))}</div>
           )}
         </Card>
-        {!dv ? <Card title={t("Device")}><EmptyState title={t("No device selected")}>{t("Choose a device.")}</EmptyState></Card> : (
+        {dv ? (
           <Card>
             <div className="flex flex-col gap-4">
               <div><h2 className="text-lg font-bold">{dv.row.serial}</h2><p className="text-xs text-muted-foreground">{dv.detail.id.slice(0, 8)} · {dv.row.unit} · {t("Device v{v}", { v: dv.detail.version })}</p></div>
@@ -101,29 +101,29 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
                 ))}
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
-                <div className="text-[13px]"><div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t(first ? "Not bound yet" : "Bound to unit")}</div>
+                <div className="text-[13px]"><div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t(isFirst ? "Not bound yet" : "Bound to unit")}</div>
                   {dv.unit ? <><b>{dv.unit.name}</b><div className="text-xs text-muted-foreground">{dv.unit.place} · {t("model {model}", { model: dv.unit.model })}</div></> : <b>{dv.row.unit}</b>}
-                  {first && <div className="text-xs text-muted-foreground">{t("Registered only: bind it once it is installed, then the unit's data and controls use it.")}</div>}</div>
-                {live.canWrite && (first
+                  {isFirst && <div className="text-xs text-muted-foreground">{t("Registered only: bind it once it is installed, then the unit's data and controls use it.")}</div>}</div>
+                {live.canWrite && (isFirst
                   ? <Btn size="sm" variant="primary" disabled={pending} onClick={() => { setBind({ unitId: dv.row.targetUnitId ?? "", reason: t("Installed on site") }); setModal("bind"); }}>{t("Bind…")}</Btn>
                   : <Btn size="sm" disabled={pending} onClick={() => { setBind({ unitId: "", reason: "" }); setModal("bind"); }}>{t("Rebind…")}</Btn>)}
               </div>
               {live.canWrite && (
                 <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
                   {[
-                    { label: t("Check connection"), sub: t("ping the device"), act: () => run(() => checkDevice(dv.detail.id, dv.detail.version), t("Connection check queued")), off: false },
-                    { label: t("Calibrate sensor"), sub: t("reference vs measured"), act: () => calibrateOf(dv.detail.sensors[0]?.id ?? ""), off: dv.detail.sensors.length === 0 },
-                    { label: t("Update firmware"), sub: dv.detail.activeOperation?.kind === "firmware" ? t("running…") : dv.firmware.length ? t("{version} available", { version: dv.firmware.join(", ") }) : t("no newer candidate"), act: () => { setFw(dv.firmware[dv.firmware.length - 1] ?? ""); setModal("firmware"); }, off: dv.firmware.length === 0 },
+                    { label: t("Check connection"), sub: t("ping the device"), act: () => { run(() => checkDevice(dv.detail.id, dv.detail.version), t("Connection check queued")); }, off: false },
+                    { label: t("Calibrate sensor"), sub: t("reference vs measured"), act: () => { calibrateOf(dv.detail.sensors[0]?.id ?? ""); }, off: dv.detail.sensors.length === 0 },
+                    { label: t("Update firmware"), sub: dv.detail.activeOperation?.kind === "firmware" ? t("running…") : (dv.firmware.length > 0 ? t("{version} available", { version: dv.firmware.join(", ") }) : t("no newer candidate")), act: () => { setFw(dv.firmware[dv.firmware.length - 1] ?? ""); setModal("firmware"); }, off: dv.firmware.length === 0 },
                   ].map((a) => (
-                    <Plain key={a.label} type="button" disabled={pending || busy || a.off} onClick={a.act} className="rounded-xl border border-line px-3 py-2 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50">
+                    <Plain key={a.label} type="button" disabled={pending || isBusy || a.off} onClick={a.act} className="rounded-xl border border-line px-3 py-2 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50">
                       <div className="text-[13px] font-semibold">{a.label}</div><div className="text-[11px] text-muted-foreground">{a.sub}</div>
                     </Plain>
                   ))}
                 </div>
               )}
-              {busy && <p className="-mt-2 text-xs text-muted-foreground">{t("One operation at a time: check, calibration and firmware update are disabled until the active one finishes.")}</p>}
+              {isBusy && <p className="-mt-2 text-xs text-muted-foreground">{t("One operation at a time: check, calibration and firmware update are disabled until the active one finishes.")}</p>}
               {dv.firmwareCard && (
-                <div className={cx("rounded-xl border p-3", dv.firmwareCard.tone === "crit" ? "border-crit bg-crit-soft/40" : dv.firmwareCard.tone === "ok" ? "border-[#86efac] bg-ok-soft/40" : "border-primary bg-primary-soft/40")}>
+                <div className={cx("rounded-xl border p-3", dv.firmwareCard.tone === "crit" ? "border-crit bg-crit-soft/40" : (dv.firmwareCard.tone === "ok" ? "border-[#86efac] bg-ok-soft/40" : "border-primary bg-primary-soft/40"))}>
                   <div className="flex items-center justify-between gap-2"><b className="text-[13px]">{dv.firmwareCard.title}</b><Badge tone={dv.firmwareCard.tone}>{dv.firmwareCard.status}</Badge></div>
                   {dv.firmwareCard.tone === "primary" && <div className="mt-2 h-1.5 rounded-full bg-primary" />}
                   <p className="mt-1 text-[11px] text-muted-foreground">{dv.firmwareCard.text}</p>
@@ -136,7 +136,7 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
                     <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><th /></tr></thead>
                     <tbody>{dv.sensors.map((x) => (
                       <tr key={x.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{x.metric}</td><td>{x.unit}</td><td>{x.stale}</td><td className="text-xs">{x.calibrated}</td>
-                        <td className="pr-3 text-right">{live.canWrite && <Btn size="sm" disabled={pending || busy} onClick={() => calibrateOf(x.id)}>{t("Calibrate…")}</Btn>}</td></tr>
+                        <td className="pr-3 text-right">{live.canWrite && <Btn size="sm" disabled={pending || isBusy} onClick={() => { calibrateOf(x.id); }}>{t("Calibrate…")}</Btn>}</td></tr>
                     ))}</tbody>
                   </table></ScrollX>
                 )}
@@ -148,7 +148,7 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
                     <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Kind")}</th><th>{t("Started")}</th><th>{t("Detail")}</th><th>{t("Status")}</th></tr></thead>
                     <tbody>{dv.operations.map((o) => (
                       <tr key={o.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{o.kind}</td><td className="text-xs">{o.time}</td><td className="text-xs">{o.detail}</td>
-                        <td className="pr-3"><Badge tone={o.status === "succeeded" ? "ok" : o.status === "failed" ? "crit" : "primary"}>{o.statusText}</Badge></td></tr>
+                        <td className="pr-3"><Badge tone={o.status === "succeeded" ? "ok" : (o.status === "failed" ? "crit" : "primary")}>{o.statusText}</Badge></td></tr>
                     ))}</tbody>
                   </table></ScrollX>
                 )}
@@ -174,25 +174,25 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
               </div>
             </div>
           </Card>
-        )}
+        ) : <Card title={t("Device")}><EmptyState title={t("No device selected")}>{t("Choose a device.")}</EmptyState></Card>}
       </div>
       <Modal open={modal === "register"} onClose={close} title={t("Register device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={register}>{t("Register")}</Btn></>}>
-        <Field label={t("Serial")} error={tried && !reg.serial.trim() ? t("Serial is required") : undefined}><Input value={reg.serial} onChange={(e) => setReg({ ...reg, serial: e.target.value })} placeholder="AC-DEMO-0006" /></Field>
-        <Field label={t("Planned unit")} hint={t("Registering reserves the device for this unit; Bind connects it once it is installed.")} error={tried && !reg.unitId ? t("Choose a unit") : undefined}><Select value={reg.unitId} onChange={(e) => setReg({ ...reg, unitId: e.target.value })}><option value="">{t("Select…")}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
-        <div><p className="mb-1 text-[13px] font-semibold">{t("Sensors")}</p><p className="mb-2 text-xs text-muted-foreground">{t("Each must be defined in the unit model’s capability; none is allowed.")}</p><div className="flex flex-wrap gap-x-5 gap-y-1.5">{metrics.map((m) => <Check key={m} label={`${m} (${metricUnit[m]})`} checked={reg.sensors.includes(m)} onChange={(on) => setReg({ ...reg, sensors: on ? [...reg.sensors, m] : reg.sensors.filter((x) => x !== m) })} />)}</div></div>
+        <Field label={t("Serial")} error={tried && !reg.serial.trim() ? t("Serial is required") : undefined}><Input value={reg.serial} onChange={(e) => { setReg({ ...reg, serial: e.target.value }); }} placeholder="AC-DEMO-0006" /></Field>
+        <Field label={t("Planned unit")} hint={t("Registering reserves the device for this unit; Bind connects it once it is installed.")} error={tried && !reg.unitId ? t("Choose a unit") : undefined}><Select value={reg.unitId} onChange={(e) => { setReg({ ...reg, unitId: e.target.value }); }}><option value="">{t("Select…")}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
+        <div><p className="mb-1 text-[13px] font-semibold">{t("Sensors")}</p><p className="mb-2 text-xs text-muted-foreground">{t("Each must be defined in the unit model’s capability; none is allowed.")}</p><div className="flex flex-wrap gap-x-5 gap-y-1.5">{metrics.map((m) => <Check key={m} label={`${m} (${metricUnit[m]})`} checked={reg.sensors.includes(m)} onChange={(on) => { setReg({ ...reg, sensors: on ? [...reg.sensors, m] : reg.sensors.filter((x) => x !== m) }); }} />)}</div></div>
       </Modal>
-      <Modal open={modal === "bind"} onClose={close} title={t(first ? "Bind device" : "Rebind device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={rebind}>{t(first ? "Bind" : "Rebind")}</Btn></>}>
-        <Field label={t(first ? "Unit" : "New unit")} error={tried && !bind.unitId ? t("Choose a unit") : undefined}><Select value={bind.unitId} onChange={(e) => setBind({ ...bind, unitId: e.target.value })}><option value="">{t("Select…")}</option>{live.units.filter((u) => u.id !== dv?.row.unitId).map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
-        <Field label={t("Reason")} error={tried && !bind.reason.trim() ? t("A reason is required") : undefined}><Textarea value={bind.reason} maxLength={1000} onChange={(e) => setBind({ ...bind, reason: e.target.value })} /></Field>
-        <p className="text-[11px] text-muted-foreground">{t(first ? "The device's sensors start reporting for this unit." : "History stays with the previous binding; the device gets new sensor IDs on the new unit.")}</p>
+      <Modal open={modal === "bind"} onClose={close} title={t(isFirst ? "Bind device" : "Rebind device")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={rebind}>{t(isFirst ? "Bind" : "Rebind")}</Btn></>}>
+        <Field label={t(isFirst ? "Unit" : "New unit")} error={tried && !bind.unitId ? t("Choose a unit") : undefined}><Select value={bind.unitId} onChange={(e) => { setBind({ ...bind, unitId: e.target.value }); }}><option value="">{t("Select…")}</option>{live.units.filter((u) => u.id !== dv?.row.unitId).map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
+        <Field label={t("Reason")} error={tried && !bind.reason.trim() ? t("A reason is required") : undefined}><Textarea value={bind.reason} maxLength={1000} onChange={(e) => { setBind({ ...bind, reason: e.target.value }); }} /></Field>
+        <p className="text-[11px] text-muted-foreground">{t(isFirst ? "The device's sensors start reporting for this unit." : "History stays with the previous binding; the device gets new sensor IDs on the new unit.")}</p>
       </Modal>
       <Modal open={modal === "calibrate"} onClose={close} title={t("Calibrate sensor")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={calibrate}>{t("Record")}</Btn></>}>
-        <Field label={t("Sensor")}><Select value={cal.sensorId} onChange={(e) => setCal({ ...cal, sensorId: e.target.value })}>{dv?.detail.sensors.map((s) => <option key={s.id} value={s.id}>{metricText(s.metric, t)} ({s.unit})</option>)}</Select></Field>
-        <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}><Field label={t("Reference")} error={tried && (cal.reference.trim() === "" || !Number.isFinite(+cal.reference)) ? t("Enter a number") : undefined}><Input type="number" value={cal.reference} onChange={(e) => setCal({ ...cal, reference: e.target.value })} /></Field><Field label={t("Measured")} error={tried && (cal.measured.trim() === "" || !Number.isFinite(+cal.measured)) ? t("Enter a number") : undefined}><Input type="number" value={cal.measured} onChange={(e) => setCal({ ...cal, measured: e.target.value })} /></Field></div>
+        <Field label={t("Sensor")}><Select value={cal.sensorId} onChange={(e) => { setCal({ ...cal, sensorId: e.target.value }); }}>{dv?.detail.sensors.map((s) => <option key={s.id} value={s.id}>{metricText(s.metric, t)} ({s.unit})</option>)}</Select></Field>
+        <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}><Field label={t("Reference")} error={tried && (cal.reference.trim() === "" || !Number.isFinite(+cal.reference)) ? t("Enter a number") : undefined}><Input type="number" value={cal.reference} onChange={(e) => { setCal({ ...cal, reference: e.target.value }); }} /></Field><Field label={t("Measured")} error={tried && (cal.measured.trim() === "" || !Number.isFinite(+cal.measured)) ? t("Enter a number") : undefined}><Input type="number" value={cal.measured} onChange={(e) => { setCal({ ...cal, measured: e.target.value }); }} /></Field></div>
         <p className="text-[11px] text-muted-foreground">{t("Recorded at the current time as a demo calibration.")}</p>
       </Modal>
       <Modal open={modal === "firmware"} onClose={close} title={t("Update firmware")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || !fw} onClick={firmware}>{t("Queue update")}</Btn></>}>
-        {dv && dv.firmware.length === 0 ? <p className="text-xs text-muted-foreground">{t("The unit model lists no firmware candidates.")}</p> : <Field label={t("Target version")} error={tried && !fw ? t("Choose a version") : undefined}><Select value={fw} onChange={(e) => setFw(e.target.value)}><option value="">{t("Select…")}</option>{dv?.firmware.map((v) => <option key={v} value={v} disabled={v === dv.detail.firmwareVersion}>{v === dv.detail.firmwareVersion ? t("{version} (current)", { version: v }) : v}</option>)}</Select></Field>}
+        {dv && dv.firmware.length === 0 ? <p className="text-xs text-muted-foreground">{t("The unit model lists no firmware candidates.")}</p> : <Field label={t("Target version")} error={tried && !fw ? t("Choose a version") : undefined}><Select value={fw} onChange={(e) => { setFw(e.target.value); }}><option value="">{t("Select…")}</option>{dv?.firmware.map((v) => <option key={v} value={v} disabled={v === dv.detail.firmwareVersion}>{v === dv.detail.firmwareVersion ? t("{version} (current)", { version: v }) : v}</option>)}</Select></Field>}
         <p className="text-[11px] text-muted-foreground">{t("Only an online device accepts an update; a failure keeps the current version.")}</p>
       </Modal>
     </div>

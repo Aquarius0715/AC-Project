@@ -13,15 +13,19 @@ const a = member("m-a", "tech-external-a", [grant("demo_outdoor"), grant("demo_e
 const a2 = member("m-b", "tech-external-a2", [grant("demo_indoor", "2027-01-31T00:00:00Z")]);
 const old = member("m-c", "tech-external-old", [grant("demo_outdoor", "2026-08-01T00:00:00Z")], "2026-08-01T00:00:00+08:00");
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
-const cap = (id: string, date: string, assigned: [string, string][], available: number | null = 480, unavailability: string | null = null): ApiCapacity => ({
-  membershipId: id, date, availableSlots: available ? [slot(`${date}T01:00:00Z`, `${date}T09:00:00Z`)] : [], assignedSlots: assigned.map(([s, e]) => slot(s, e)),
-  availableMinutes: available, assignedMinutes: assigned.reduce((m, [s, e]) => m + (Date.parse(e) - Date.parse(s)) / 60_000, 0), unavailability,
-});
+const cap = (id: string, date: string, assigned: [string, string][], available: number | null = 480, unavailability: string | null = null): ApiCapacity => {
+  return {
+    membershipId: id, date, availableSlots: available ? [slot(`${date}T01:00:00Z`, `${date}T09:00:00Z`)] : [], assignedSlots: assigned.map(([s, e]) => slot(s, e)),
+    availableMinutes: available, assignedMinutes: assigned.reduce((m, [s, e]) => m + (Date.parse(e) - Date.parse(s)) / 60_000, 0), unavailability,
+  };
+};
 const dates = ["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19", "2026-09-20"];
-const week = dates.map((d, k) => k >= 5 ? [cap("m-a", d, [], 0), cap("m-b", d, [], 0)] : [
-  cap("m-a", d, k === 1 ? [["2026-09-15T01:00:00Z", "2026-09-15T05:00:00Z"]] : []),
-  cap("m-b", d, k === 1 ? [["2026-09-15T05:00:00Z", "2026-09-15T09:00:00Z"]] : [], 480, k === 3 ? "annual_leave" : null),
-]);
+const week = dates.map((d, k) => {
+  return k >= 5 ? [cap("m-a", d, [], 0), cap("m-b", d, [], 0)] : [
+    cap("m-a", d, k === 1 ? [["2026-09-15T01:00:00Z", "2026-09-15T05:00:00Z"]] : []),
+    cap("m-b", d, k === 1 ? [["2026-09-15T05:00:00Z", "2026-09-15T09:00:00Z"]] : [], 480, k === 3 ? "annual_leave" : null),
+  ];
+});
 const job: TeamJob = { jobId: "job-p12-full", short: "job-p12", technicianId: "m-b", slot: slot("2026-09-15T05:00:00Z", "2026-09-15T09:00:00Z"), text: "15 Sept, 1:00 pm – 5:00 pm MYT" };
 
 describe("partner team & capacity", () => {

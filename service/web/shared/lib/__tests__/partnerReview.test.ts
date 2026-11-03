@@ -9,14 +9,16 @@ import { i18nOf } from "@ac/web/lib/i18n";
 const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
 const item = (over: Partial<ApiInspectionItem> = {}): ApiInspectionItem => ({ id: over.componentKey ?? "x", componentGroup: "indoor", componentKey: "filter", result: "normal", reason: null, evidenceIds: [], authorId: "tech-a", observedAt: "2026-09-14T01:00:00Z", ...over });
-const report = (over: Partial<ApiWorkReport> = {}): ApiWorkReport => ({
-  id: "rep", version: 2, jobId: "job", authorId: "tech-a", reviewAvailability: { allowed: true, reason: null },
-  items: [item({ componentGroup: "electrical", componentKey: "wiring", result: "not_applicable", reason: "No exposed wiring" }), item(), item({ componentGroup: "outdoor", componentKey: "compressor", result: "attention", reason: "Noisy" })],
-  measurements: [{ id: "m1", componentKey: "refrigerant_pipe", metric: "refrigerant_pressure", value: 460, unit: "kPa", quality: "valid", observedAt: "2026-09-14T01:00:00Z" }],
-  parts: [], refrigerant: [], signOff: null, workText: "Cleaned the coil.", nextAction: { kind: "none" },
-  attachmentRefs: [{ id: "a1", name: "p1.png", mime: "image/png", size: 10, status: "ready" }, { id: "a2", name: "p2.png", mime: "image/png", size: 10, status: "processing" }],
-  submittedAt: "2026-09-14T01:09:00Z", acceptedAt: null, reviewHistory: [], ...over,
-});
+const report = (over: Partial<ApiWorkReport> = {}): ApiWorkReport => {
+  return {
+    id: "rep", version: 2, jobId: "job", authorId: "tech-a", reviewAvailability: { allowed: true, reason: null },
+    items: [item({ componentGroup: "electrical", componentKey: "wiring", result: "not_applicable", reason: "No exposed wiring" }), item(), item({ componentGroup: "outdoor", componentKey: "compressor", result: "attention", reason: "Noisy" })],
+    measurements: [{ id: "m1", componentKey: "refrigerant_pipe", metric: "refrigerant_pressure", value: 460, unit: "kPa", quality: "valid", observedAt: "2026-09-14T01:00:00Z" }],
+    parts: [], refrigerant: [], signOff: null, workText: "Cleaned the coil.", nextAction: { kind: "none" },
+    attachmentRefs: [{ id: "a1", name: "p1.png", mime: "image/png", size: 10, status: "ready" }, { id: "a2", name: "p2.png", mime: "image/png", size: 10, status: "processing" }],
+    submittedAt: "2026-09-14T01:09:00Z", acceptedAt: null, reviewHistory: [], ...over,
+  };
+};
 const job = (over: Partial<ApiReviewJob> = {}): ApiReviewJob => ({ projection: "detail", id: "job", version: 6, status: "submitted", type: "preventive", reportRefs: [{ reportId: "rep", reportVersion: 2 }], ...over });
 const names = new Map([["tech-a", "tech-external-a"], ["me", "you"]]);
 
@@ -30,7 +32,7 @@ describe("inspection rows", () => {
   it("names each item and result as the technician's checklist does (IR597)", () => {
     // the reviewer reads the words the technician chose from: “refrigerant pipe” is an item, its pressure a reading
     for (const { group, keys } of componentGroups) for (const key of keys) {
-      const label = inspectionRows([item({ componentGroup: group, componentKey: key })])[0].label.split(" — ")[1];
+      const label = inspectionRows([item({ componentGroup: group, componentKey: key })])[0].label.split(" — ", 2)[1];
       expect(label.startsWith(componentLabel[key].toLowerCase()), `${key}: ${label}`).toBe(true);
     }
     expect(Object.values(resultText).map((x) => x.label)).toEqual(["Normal", "Attention", "Not inspected", "Not applicable"]);

@@ -22,13 +22,13 @@ export function RouteError({ what, error, retry }: { what: string; error: Error 
   // a page that failed because the session was refused (IR385): the DAL dropped it, so sign in again and come back
   useEffect(() => {
     fetch("/bff/session", { cache: "no-store" }).then((r) => r.json()).then((s: { dataSource?: string; signedIn?: boolean }) => {
-      if (s.dataSource === "api" && !s.signedIn) window.location.assign(signInAgainHref("expired", window.location.pathname + window.location.search));
+      if (s.dataSource === "api" && !s.signedIn) location.assign(signInAgainHref("expired", location.pathname + location.search));
     }).catch(() => {});
   }, []);
   return (
     <Page className="max-w-3xl">
       <Card title={t("{what} could not be loaded", { what: t(what) })} sub={error.digest ? t("Reference {id}", { id: error.digest }) : t("Please try again.")}>
-        <Btn variant="primary" onClick={() => retry()}>{t("Try again")}</Btn>
+        <Btn variant="primary" onClick={() => { retry(); }}>{t("Try again")}</Btn>
       </Card>
     </Page>
   );

@@ -8,19 +8,19 @@ import { Icon } from "@ac/web/components/Icon";
 
 const days = ["Mon 14", "Tue 15", "Wed 16", "Thu 17", "Fri 18", "Sat 19", "Sun 20"];
 const perUnit: Record<string, { actual: number[]; base: number[] }> = {
-  "Bedroom AC": { actual: [10.2, 11.4, 10.8, 12.3, 11.0, 12.6, 11.7], base: [14, 14, 14, 14, 14, 14, 14] },
+  "Bedroom AC": { actual: [10.2, 11.4, 10.8, 12.3, 11, 12.6, 11.7], base: [14, 14, 14, 14, 14, 14, 14] },
   "Bedroom AC #2": { actual: [6, 5.2, 6.1, 5.8, 6.4, 7, 6.6], base: [8, 8, 8, 8, 8, 8, 8] },
   "Living room AC": { actual: [9, 8.7, 9.3, 9.9, 10.1, 11.2, 10.5], base: [12, 12, 12, 12, 12, 12, 12] },
   "Kitchen AC": { actual: [7, 7.5, 6.8, 7.2, 7.9, 8.1, 7.4], base: [9, 9, 9, 9, 9, 9, 9] },
 };
 
-/** The Phase 1A demo of /customer/energy (fixtures; DATA_SOURCE≠api). */
+/** The Phase 1A demo of /customer/energy (fixtures; DATA_SOURCE≠API). */
 export function EnergyDemo() {
   const [range, setRange] = useState<"today" | "7d" | "30d" | "custom">("7d");
   const [sel, setSel] = useState<string[]>(["Bedroom AC"]);
   const [view, setView] = useState<"chart" | "table">("chart");
   const [exp, setExp] = useState(false);
-  const toggle = (u: string) => setSel((s) => (s.includes(u) ? (s.length > 1 ? s.filter((x) => x !== u) : s) : s.length >= 4 ? s : [...s, u]));
+  const toggle = (u: string) => { setSel((s) => (s.includes(u) ? (s.length > 1 ? s.filter((x) => x !== u) : s) : (s.length >= 4 ? s : [...s, u]))); };
   const actual = days.map((_, i) => +sel.reduce((a, u) => a + perUnit[u].actual[i], 0).toFixed(1));
   const base = days.map((_, i) => sel.reduce((a, u) => a + perUnit[u].base[i], 0));
   const sumA = +actual.reduce((a, b) => a + b, 0).toFixed(1);
@@ -30,11 +30,11 @@ export function EnergyDemo() {
     <Page>
       <Card>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <Btn size="sm" className="order-last ml-auto" onClick={() => setExp(true)}><Icon name="download" />Export</Btn>
+          <Btn size="sm" className="order-last ml-auto" onClick={() => { setExp(true); }}><Icon name="download" />Export</Btn>
           <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">Period</span><Tabs value={range} onChange={setRange} tabs={[{ id: "today", label: "Today" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }, { id: "custom", label: "Custom" }]} /></div>
           <span className="text-xs text-muted-foreground">Sep 14 00:00 – Sep 21 00:00 (7 days) · Asia/Kuala_Lumpur</span>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-[13px]"><span className="text-xs text-muted-foreground">Units (up to 4)</span>{Object.keys(perUnit).map((u) => <Check key={u} label={u} checked={sel.includes(u)} onChange={() => toggle(u)} />)}</div>
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-[13px]"><span className="text-xs text-muted-foreground">Units (up to 4)</span>{Object.keys(perUnit).map((u) => <Check key={u} label={u} checked={sel.includes(u)} onChange={() => { toggle(u); }} />)}</div>
       </Card>
       <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
         <Kpi label="Actual energy" value={sumA.toFixed(1)} unit="kWh" sub={`${sel.length === 1 ? sel[0] : sel.length + " units"} · 7 days · coverage 100%`} />
@@ -58,7 +58,7 @@ export function EnergyDemo() {
         </div>
         <p className="mt-3 text-[11px] text-muted-foreground">Estimates only. Savings are not a tradable balance and are not converted into carbon credits.</p>
       </Card>
-    <ExportReportModal open={exp} onClose={() => setExp(false)} />
+    <ExportReportModal open={exp} onClose={() => { setExp(false); }} />
     </Page>
   );
 }

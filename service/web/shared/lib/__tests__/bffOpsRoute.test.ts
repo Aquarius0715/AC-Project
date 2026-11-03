@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 import { POST } from "@ac/web/bff/ops/[operation]/route";
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined, set: vi.fn(), delete: vi.fn() }) }));
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => {}, set: vi.fn(), delete: vi.fn() }) }));
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -19,7 +19,7 @@ describe("POST /bff/ops/<operation>", () => {
   it("relays a read to its Core API route", async () => {
     vi.stubEnv("DATA_SOURCE", "api");
     vi.stubEnv("CORE_API_URL", "http://core:8080");
-    const fetch = vi.fn(async () => new Response(JSON.stringify({ data: { id: "u-1" } }), { status: 200 }));
+    const fetch = vi.fn(async () => Response.json({ data: { id: "u-1" } }, { status: 200 }));
     vi.stubGlobal("fetch", fetch);
     const res = await relay("units.get", { id: "00000000-0000-4000-8000-000000000001" });
     expect([res.status, await res.json()]).toEqual([200, { data: { id: "u-1" } }]);

@@ -24,7 +24,7 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     // IR469: an invoice period overlapping an invoiced one says what to do
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "errors.invoice_period_exists" }))).toBe("This contract already has an invoice for part of this period — choose a period after it");
     // IR464: the accounts added per day say when more can be added (rounded up to hours)
-    expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "errors.too_many_accounts", retryAfterSeconds: 81060 }))).toBe("Many users were added in the last 24 hours — you can add more in 23 h");
+    expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "errors.too_many_accounts", retryAfterSeconds: 81_060 }))).toBe("Many users were added in the last 24 hours — you can add more in 23 h");
     // IR462: an address someone with access holds says what to do; a nested field is named by its last part
     expect(actionMessage(failure({ fieldErrors: { "newUser.email": "errors.email_taken" } }))).toBe("Email belongs to someone who still has access — use another address or ask HQ");
     // a notice the person does not get on that channel reads in words, not "Recipient membership id — recipient ineligible" (IR578)

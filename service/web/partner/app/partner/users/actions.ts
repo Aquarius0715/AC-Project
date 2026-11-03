@@ -13,9 +13,8 @@ export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messa
 async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
-  } catch (e) {
-    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds };
-    return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+  } catch (error) {
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     refresh();
   }
@@ -23,7 +22,7 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
 
 /** Adds a user; a technician needs an access end (IR461). */
 export async function invitePartnerUser(email: string, partnerRole: PartnerRole, displayName: string, accessUntil: string | null) {
-  return run(() => coreOp("partnerUsers.save", { email: email.trim(), partnerRole, displayName: displayName.trim(), ...(accessUntil ? { accessUntil } : {}) }, { write: true }).then(() => null));
+  return run(() => coreOp("partnerUsers.save", { email: email.trim(), partnerRole, displayName: displayName.trim(), ...(accessUntil && { accessUntil }) }, { write: true }).then(() => null));
 }
 /** A technician's access end (its e-mail and role are sent unchanged). */
 export async function setPartnerAccess(id: string, version: number, email: string, partnerRole: PartnerRole, accessUntil: string, reason: string) {

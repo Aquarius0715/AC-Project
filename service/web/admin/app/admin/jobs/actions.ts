@@ -15,26 +15,26 @@ import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import type { CostLine } from "@ac/web/lib/adminJobs";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
-type Slot = { startAt: string; endAt: string };
+interface Slot { startAt: string; endAt: string }
 type Result = { ok: true; value: null } | ({ ok: false } & ActionFailure);
 const run = async (fn: () => Promise<unknown>): Promise<Result> => {
   try {
     await fn();
     refresh();
     return { ok: true, value: null };
-  } catch (e) {
-    if (e instanceof CoreError) {
-      if (e.error.code === "CONFLICT") refresh();
-      return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
+  } catch (error) {
+    if (error instanceof CoreError) {
+      if (error.error.code === "CONFLICT") refresh();
+      return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
     }
-    throw e;
+    throw error;
   }
 };
 const write = (version: number) => ({ write: true, expectedVersion: version });
 
 /** jobs.assign: an internal technician for the agreed time (also a reassignment at the same slot with a reason). */
 export async function assignInternal(jobId: string, version: number, technicianMembershipId: string, slot: Slot, reason?: string) {
-  return run(() => coreOp("jobs.assign", { jobId, technicianMembershipId, startAt: slot.startAt, endAt: slot.endAt, ...(reason?.trim() ? { reason: reason.trim() } : {}) }, write(version)));
+  return run(() => coreOp("jobs.assign", { jobId, technicianMembershipId, startAt: slot.startAt, endAt: slot.endAt, ...(reason?.trim() && { reason: reason.trim() }) }, write(version)));
 }
 
 /** jobs.offer: the agreed time offered to a contractor with the offer and access windows and the terms version. */
@@ -54,7 +54,7 @@ export async function withdrawProposal(jobId: string, version: number, proposalI
 
 /** jobs.resolvePartnerSlot: send the contractor's time to the client (reply deadline) or keep the agreed time. */
 export async function resolvePartnerSlot(jobId: string, version: number, proposalId: string, decision: "send_to_client" | "keep", replyBy?: string) {
-  return run(() => coreOp("jobs.resolvePartnerSlot", { jobId, proposalId, decision, ...(decision === "send_to_client" ? { replyBy } : {}) }, write(version)));
+  return run(() => coreOp("jobs.resolvePartnerSlot", { jobId, proposalId, decision, ...((decision === "send_to_client") && { replyBy }) }, write(version)));
 }
 
 /** jobs.hold / jobs.resumeHold / jobs.cancel with their reason (1–1000). */
@@ -68,9 +68,9 @@ export async function classifyFollowUp(jobId: string, version: number, classific
 }
 
 /** jobs.review on the latest submitted report: normal for an internal job, hq_escalation with a reason for a
- * contractor's job (IR31, D06); a reviewer who contributed to the version is refused (no self-review). */
+contractor's job (IR31, D06); a reviewer who contributed to the version is refused (no self-review). */
 export async function reviewReport(jobId: string, version: number, reportVersion: number, decision: "accept" | "return", reviewMode: "normal" | "hq_escalation", reason: string) {
-  return run(() => coreOp("jobs.review", { jobId, reportVersion, decision, reviewMode, ...(reason.trim() ? { reason: reason.trim() } : {}) }, write(version)));
+  return run(() => coreOp("jobs.review", { jobId, reportVersion, decision, reviewMode, ...(reason.trim() && { reason: reason.trim() }) }, write(version)));
 }
 
 /** jobs.saveCost: the whole list of cost lines replaces the stored one (estimate / actual, per currency). */
@@ -84,18 +84,18 @@ export async function extendAccess(jobId: string, version: number, accessValidUn
 }
 
 /** jobs.create on a customer's behalf (DD-A06 item 8): the 1st preferred time is the requested window, up to two
- * more, due at or after the requested end, an optional contact window. Returns the new job's id. */
+more, due at or after the requested end, an optional contact window. Returns the new job's id. */
 export async function createJob(input: { unitId: string; type: OpInput<"jobs.create">["type"]; symptom: string; slots: Slot[]; dueAt: string | null; contactWindow: string }): Promise<{ ok: true; value: { id: string } } | ({ ok: false } & ActionFailure)> {
   const [first, ...alternatives] = input.slots;
   try {
     const job = await coreOp<{ id: string }>("jobs.create", {
       unitId: input.unitId, type: input.type, symptom: input.symptom.trim(), requestedStart: first.startAt, requestedEnd: first.endAt, alternativeSlots: alternatives,
-      ...(input.dueAt ? { dueAt: input.dueAt } : {}), ...(input.contactWindow.trim() ? { contactWindow: input.contactWindow.trim() } : {}),
+      ...(input.dueAt && { dueAt: input.dueAt }), ...(input.contactWindow.trim() && { contactWindow: input.contactWindow.trim() }),
     }, { write: true });
     return { ok: true, value: { id: job.id } };
-  } catch (e) {
-    if (e instanceof CoreError) return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
-    throw e;
+  } catch (error) {
+    if (error instanceof CoreError) return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
+    throw error;
   }
 }
 
@@ -109,37 +109,37 @@ const failure = (e: unknown, conflictRefresh = true): Failure => {
 };
 
 /** plans.save: a new plan for a unit, or the plan's recurrence and next date (monthly, every 1–12 months, the next date in
- * the future, stored in UTC with its UTC day as the anchor day). Returns the plan id. */
-export async function savePlan(input: { id: string | null; version: number | null; unitId: string; intervalMonths: number; nextDueAt: string }): Promise<{ ok: true; value: { id: string } } | Failure> {
+the future, stored in UTC with its UTC day as the anchor day). Returns the plan id. */
+export async function savePlan(input: { id: string | null; version: number | null; unitId: string; intervalMonths: number; nextDueAt: string }): Promise<Failure | { ok: true; value: { id: string } }> {
   try {
-    const p = await coreOp<{ id: string }>("plans.save", { ...(input.id ? { id: input.id } : {}), unitId: input.unitId, recurrence: { kind: "monthly", intervalMonths: input.intervalMonths }, nextDueAt: input.nextDueAt },
+    const p = await coreOp<{ id: string }>("plans.save", { ...(input.id && { id: input.id }), unitId: input.unitId, recurrence: { kind: "monthly", intervalMonths: input.intervalMonths }, nextDueAt: input.nextDueAt },
       input.id ? write(input.version!) : { write: true });
     refresh();
     return { ok: true, value: { id: p.id } };
-  } catch (e) {
-    return failure(e);
+  } catch (error) {
+    return failure(error);
   }
 }
 
 /** plans.generateNext: one periodic job (requested) for the saved next date; a date that already has its job, or a plan
- * that changed meanwhile, is CONFLICT and the page shows the latest plan. Returns the job id. */
-export async function generateJob(planId: string, version: number, occurrenceDate: string): Promise<{ ok: true; value: { id: string } } | Failure> {
+that changed meanwhile, is CONFLICT and the page shows the latest plan. Returns the job id. */
+export async function generateJob(planId: string, version: number, occurrenceDate: string): Promise<Failure | { ok: true; value: { id: string } }> {
   try {
     const j = await coreOp<{ id: string }>("plans.generateNext", { id: planId, occurrenceDate }, write(version));
     refresh();
     return { ok: true, value: { id: j.id } };
-  } catch (e) {
-    return failure(e);
+  } catch (error) {
+    return failure(error);
   }
 }
 
-const value = async <T,>(fn: () => Promise<T>): Promise<{ ok: true; value: T } | Failure> => {
+const value = async <T,>(fn: () => Promise<T>): Promise<Failure | { ok: true; value: T }> => {
   try {
     const v = await fn();
     refresh();
     return { ok: true, value: v };
-  } catch (e) {
-    return failure(e);
+  } catch (error) {
+    return failure(error);
   }
 };
 
@@ -154,7 +154,7 @@ export async function createContractorOrganization(name: string) {
 /** contractors.save: a new profile for a contractor organization, or the profile (with its version). */
 export async function saveContractor(input: { id: string | null; version: number | null; organizationId: string; registrationNo: string; serviceAreas: string[]; contactEmail: string; insuranceValidUntil: string | null }) {
   return value(async () => {
-    const p = await coreOp<{ id: string }>("contractors.save", { ...(input.id ? { id: input.id } : {}), organizationId: input.organizationId, registrationNo: input.registrationNo.trim(),
+    const p = await coreOp<{ id: string }>("contractors.save", { ...(input.id && { id: input.id }), organizationId: input.organizationId, registrationNo: input.registrationNo.trim(),
       serviceAreas: input.serviceAreas, contactEmail: input.contactEmail.trim(), insuranceValidUntil: input.insuranceValidUntil }, input.id ? write(input.version!) : { write: true });
     return { id: p.id };
   });
@@ -172,7 +172,7 @@ export async function saveRateCard(input: OpInput<"rateCards.save">) {
 
 /** certificates.verify: approve an uploaded certificate (it then counts as the qualification) or reject it with a reason. */
 export async function verifyCertificate(certificateId: string, version: number, decision: "approve" | "reject", reason: string) {
-  return value(async () => { await coreOp("certificates.verify", { certificateId, decision, ...(decision === "reject" ? { reason: reason.trim() } : {}) }, write(version)); return null; });
+  return value(async () => { await coreOp("certificates.verify", { certificateId, decision, ...((decision === "reject") && { reason: reason.trim() }) }, write(version)); return null; });
 }
 
 /** sla.saveTargets: a plan type's new targets from now or later (jobs created afterwards use them; IR131 item 4). */

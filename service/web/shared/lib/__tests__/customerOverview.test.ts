@@ -9,20 +9,26 @@ import { i18nOf } from "@ac/web/lib/i18n";
 const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
 const NOW = Date.parse("2026-09-14T01:12:30Z"); // Mon 09:12:30 KL
-const m = (metric: string, value: number | null, over: Record<string, unknown> = {}) => ({
-  id: metric, unitId: "u1", sensorId: "s", metric, value, unit: metric === "power" ? "kW" : metric === "temperature" ? "°C" : "%", observedAt: "2026-09-14T01:12:00Z", origin: "measured" as const, quality: "valid" as const, qualityReason: null, ...over,
-});
-const unit = (id: string, over: Partial<OverviewUnit> = {}): OverviewUnit => ({
-  id, version: 1, customerOrgId: "o", propertyId: "home", spaceId: null, displayName: `AC ${id}`, modelId: "m", type: "split", installedAt: null, serviceScope: ["indoor"], alertPolicyIds: [],
-  archived: false, capabilityVersion: 1, connection: "online", lastSeenAt: "2026-09-14T01:12:00Z", warrantyEndsAt: null, effectivePowerState: "on", activeAlertCount: 0, latestMeasurements: [], ...over,
-});
+const m = (metric: string, value: number | null, over: Record<string, unknown> = {}) => {
+  return {
+    id: metric, unitId: "u1", sensorId: "s", metric, value, unit: metric === "power" ? "kW" : (metric === "temperature" ? "°C" : "%"), observedAt: "2026-09-14T01:12:00Z", origin: "measured" as const, quality: "valid" as const, qualityReason: null, ...over,
+  };
+};
+const unit = (id: string, over: Partial<OverviewUnit> = {}): OverviewUnit => {
+  return {
+    id, version: 1, customerOrgId: "o", propertyId: "home", spaceId: null, displayName: `AC ${id}`, modelId: "m", type: "split", installedAt: null, serviceScope: ["indoor"], alertPolicyIds: [],
+    archived: false, capabilityVersion: 1, connection: "online", lastSeenAt: "2026-09-14T01:12:00Z", warrantyEndsAt: null, effectivePowerState: "on", activeAlertCount: 0, latestMeasurements: [], ...over,
+  };
+};
 const props = [{ id: "home", version: 1, customerOrgId: "o", kind: "home" as const, name: "Home A", address: null, accessInstructions: null, archived: false, updatedAt: "" },
   { id: "office", version: 1, customerOrgId: "o", kind: "office" as const, name: "Office A", address: null, accessInstructions: null, archived: false, updatedAt: "" }];
-const sum = (kWh: number | null, over: Partial<ApiEnergySummary["totals"]> = {}, factor = true) => ({
-  period: { from: "", to: "" }, unitIds: [], currency: "MYR", baselineRef: null, factorRef: null, baselineSnapshot: null, tariffVersion: "t", boundaryId: "ac_input_electricity", boundary: "", coverage: 1, qualityWarnings: [],
-  totals: { kWh, amountMinor: null, savedKWh: null, deltaKWh: null, savingPercentage: null, savedAmountMinor: null, emissionsKg: kWh === null ? null : kWh * 0.7, savedEmissionsKg: null, ...over },
-  factorSnapshot: factor ? { id: "f", version: 1, region: "MY", year: 2026, kgCO2ePerKWh: 0.7, source: "demo" } : null,
-} as ApiEnergySummary);
+const sum = (kWh: number | null, over: Partial<ApiEnergySummary["totals"]> = {}, factor = true) => {
+  return ({
+    period: { from: "", to: "" }, unitIds: [], currency: "MYR", baselineRef: null, factorRef: null, baselineSnapshot: null, tariffVersion: "t", boundaryId: "ac_input_electricity", boundary: "", coverage: 1, qualityWarnings: [],
+    totals: { kWh, amountMinor: null, savedKWh: null, deltaKWh: null, savingPercentage: null, savedAmountMinor: null, emissionsKg: kWh === null ? null : kWh * 0.7, savedEmissionsKg: null, ...over },
+    factorSnapshot: factor ? { id: "f", version: 1, region: "MY", year: 2026, kgCO2ePerKWh: 0.7, source: "demo" } : null,
+  } as ApiEnergySummary);
+};
 const alert = (id: string, unitId: string, severity: ApiAlert["severity"], status: string, detectedAt: string, over: Partial<ApiAlert> = {}): ApiAlert =>
   ({ id, unitId, type: "sensor", severity, status, causeCode: "unknown", evidenceKind: "inferred", evidenceText: "", detectedAt, ...over });
 
@@ -78,7 +84,7 @@ describe("customer overview", () => {
   });
 
   it("plots the hourly averages of the last 24 h, rounded, an hour without a valid reading empty (IR607)", () => {
-    const hours = Array.from({ length: 24 }, (_, k) => ({ value: k === 23 ? 1000.4 : k === 5 ? 712.6 : null }));
+    const hours = Array.from({ length: 24 }, (_, k) => ({ value: k === 23 ? 1000.4 : (k === 5 ? 712.6 : null) }));
     const pts = bucketPoints(hours);
     expect([pts.length, pts[23], pts[5], pts.filter((p) => p !== null).length]).toEqual([24, 1000, 713, 2]);
   });

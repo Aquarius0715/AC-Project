@@ -15,7 +15,7 @@ function domainError(status: number, code: string, messageKey: string, fieldErro
 const MAX_INPUT_BYTES = 1 << 20;
 
 /** The request body as text, or null when it is larger than max: by its Content-Length, or as soon as reading it passes
- * max (a chunked body says no length). */
+max (a chunked body says no length). */
 async function readCapped(req: NextRequest, max: number): Promise<string | null> {
   if (Number(req.headers.get("content-length") ?? 0) > max) return null;
   if (!req.body) return "";
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ operation:
   const call = coreRequest(operation, input);
   if (!call) return domainError(404, "NOT_FOUND", "error.unknownOperation");
   const session = await readSession();
-  const headers: Record<string, string> = call.body !== undefined ? { "Content-Type": "application/json" } : {};
+  const headers: Record<string, string> = call.body === undefined ? {} : { "Content-Type": "application/json" };
   if (session) {
     headers.Authorization = `Bearer ${session.accessToken}`;
     headers["X-Tenant-Id"] = session.tenantId;

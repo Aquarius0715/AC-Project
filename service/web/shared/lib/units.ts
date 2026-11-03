@@ -10,11 +10,11 @@ type Mode = "cool" | "dry" | "fan";
 type Fan = "low" | "mid" | "high";
 export type UnitAction = { kind: "set_power"; power: boolean } | { kind: "set_temperature"; celsius: number } | { kind: "set_mode"; mode: Mode } | { kind: "set_fan"; fanLevel: Fan };
 /** What a stored command did (Command.action): a setting of the remote control, ventilation (an automation) or a
- * restriction's apply / remove (IR314). */
+restriction's apply / remove (IR314). */
 export type CommandAction = AnyUnitAction | RestrictionAction;
 
 /** UnitDetail of service-contracts.ts (fields shown on the control screen). */
-export type ApiUnitDetail = {
+export interface ApiUnitDetail {
   id: string;
   version: number;
   spaceId: string | null;
@@ -38,19 +38,19 @@ export type ApiUnitDetail = {
   capabilityVersion: number;
   serviceScope: ("indoor" | "outdoor" | "electrical")[];
   components: string[];
-};
+}
 
 /** What the unit page's remote control offers for a model (deterministic contracts, AT-X06; IR524, IR530): nothing
- * without control; the temperature row needs a range, the mode and fan rows their control and list only the model's
- * own values; the change summary and its review bar need a setting to change (the power is sent at once). Without a
- * model (the demo screen), every control of a full model. */
-export type ControlLayout = {
+without control; the temperature row needs a range, the mode and fan rows their control and list only the model's
+own values; the change summary and its review bar need a setting to change (the power is sent at once). Without a
+model (the demo screen), every control of a full model. */
+export interface ControlLayout {
   control: boolean;
   temperature: { min: number; max: number; step: number } | null;
   modes: Mode[];
   fans: Fan[];
   review: boolean;
-};
+}
 export function controlLayout(cap: ApiUnitDetail["capabilities"] | null): ControlLayout {
   if (!cap) return { control: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry", "fan"], fans: ["low", "mid", "high"], review: true };
   if (!cap.control) return { control: false, temperature: null, modes: [], fans: [], review: false };
@@ -60,12 +60,12 @@ export function controlLayout(cap: ApiUnitDetail["capabilities"] | null): Contro
 }
 
 /** Whether the unit page's remote control sets the model's temperature (its temperature row): only then do other
- * screens point a temperature to Unit Control (IR544). */
+screens point a temperature to Unit Control (IR544). */
 export function setsTemperature(cap: ApiUnitDetail["capabilities"] | null): boolean {
   return controlLayout(cap).temperature !== null;
 }
 
-export type ApiCommand = { id: string; action: CommandAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; acknowledgedAt?: string | null; expiresAt?: string; failureCode: string | null; source?: string };
+export interface ApiCommand { id: string; action: CommandAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; acknowledgedAt?: string | null; expiresAt?: string; failureCode: string | null; source?: string }
 
 const en = translator("en");
 
@@ -76,20 +76,27 @@ export const FAN_LABEL: Record<Fan, string> = { low: "Low", mid: "Mid", high: "H
 /** A command as a sentence in the display language (IR258); every kind of the contract has its words (IR314). */
 export function actionText(a: CommandAction, t: T = en): string {
   switch (a.kind) {
-    case "set_power":
+    case "set_power": {
       return t(a.power ? "Set power ON" : "Set power OFF");
-    case "set_temperature":
+    }
+    case "set_temperature": {
       return t("Set temperature {celsius}°C", { celsius: a.celsius });
-    case "set_mode":
+    }
+    case "set_mode": {
       return t("Set mode {mode}", { mode: t(MODE_LABEL[a.mode]).toUpperCase() });
-    case "set_fan":
+    }
+    case "set_fan": {
       return t("Set fan {level}", { level: t(FAN_LABEL[a.fanLevel]).toUpperCase() });
-    case "ventilate":
+    }
+    case "ventilate": {
       return t("Set ventilation {level}", { level: t(FAN_LABEL[a.level]).toUpperCase() });
-    case "apply_restriction":
+    }
+    case "apply_restriction": {
       return t("Apply restriction: {policy}", { policy: policyText(a.policy, t) });
-    case "remove_restriction":
+    }
+    case "remove_restriction": {
       return t("Remove restriction");
+    }
   }
 }
 
@@ -98,16 +105,16 @@ const sourceText: Record<string, string> = { voice: " · by voice", automation: 
 
 /** One command history row: the sentence, its state and who sent it, and when it was requested (IR44 time). */
 export function historyRow(c: ApiCommand, t: T = en, display: Display = DEFAULT_DISPLAY) {
-  const bad = c.status === "failed" || c.status === "expired";
+  const isBad = c.status === "failed" || c.status === "expired";
   const by = c.source && sourceText[c.source] ? t(sourceText[c.source]) : "";
-  return { id: c.id.slice(0, 8), text: `${actionText(c.action, t)} — ${t(statusText[c.status])}${c.failureCode && c.status === "failed" ? ` (${c.failureCode})` : ""}${by}`, when: showTime(c.requestedAt, display), bad };
+  return { id: c.id.slice(0, 8), text: `${actionText(c.action, t)} — ${t(statusText[c.status])}${c.failureCode && c.status === "failed" ? ` (${c.failureCode})` : ""}${by}`, when: showTime(c.requestedAt, display), bad: isBad };
 }
 
 const qualityText: Record<string, string> = { missing: "missing", stale: "stale", suspect: "suspect" };
 
 /** The latest reading of a metric as text (IR213): a stale or suspect value keeps its quality beside it — shown, never
- * as a current value (D07); null without a reading or with a null value (no fallback to an older one). The time is the
- * IR44 time of day in the user's display time zone, with its date when it is not the scenario's today (`nowMs`, IR613). */
+as a current value (D07); null without a reading or with a null value (no fallback to an older one). The time is the
+IR44 time of day in the user's display time zone, with its date when it is not the scenario's today (`nowMs`, IR613). */
 export function latest(d: ApiUnitDetail, metric: string, t: T = en, display: Display = DEFAULT_DISPLAY, nowMs?: number): { text: string; at: string } | null {
   const m = d.latestMeasurements.find((x) => x.metric === metric);
   // with the scenario's now, a reading of another day keeps its date (IR613)
@@ -119,7 +126,7 @@ export function latest(d: ApiUnitDetail, metric: string, t: T = en, display: Dis
 // ComponentKeys are techJob's componentGroups.
 /** Buckets measurements into n equal slots (latest value per slot; null where no valid measurement). */
 export function bucket(items: { value: number | null; observedAt: string; quality?: string }[], from: Date, to: Date, n = 12): (number | null)[] {
-  const out: (number | null)[] = Array(n).fill(null);
+  const out: (number | null)[] = new Array(n).fill(null);
   const span = to.getTime() - from.getTime();
   for (const m of [...items].sort((a, b) => a.observedAt.localeCompare(b.observedAt))) {
     if (m.value === null || (m.quality && m.quality !== "valid")) continue;

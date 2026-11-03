@@ -46,7 +46,7 @@ describe("the server-side session store", () => {
     const cookie = await createSessionCookie(session());
     const id = unseal<{ sid: string }>(cookie)?.sid ?? "";
     expect([Object.keys(unseal<object>(cookie) ?? {}), id.length]).toEqual([["sid"], 43]);
-    const [key, rec] = [...kv.data.entries()][0];
+    const [key, rec] = [...kv.data][0];
     expect(key).toBe(`ac:session:${createHash("sha256").update(id).digest("hex")}`); // the key reveals no cookie
     // the markers hold ":" and "." around words, which base64url ciphertext cannot reproduce by chance
     expect([rec.value.includes("header.claims.sig"), rec.value.includes("refresh:r-1"), kv.data.size]).toEqual([false, false, 1]);
@@ -55,7 +55,7 @@ describe("the server-side session store", () => {
 
   it("revokes the session at sign-out: a copy of the cookie stops working at once", async () => {
     const cookie = await createSessionCookie(session());
-    const copy = `${cookie}`;
+    const copy = cookie;
     await dropSession(cookie);
     expect([await loadSession(copy), kv.data.size]).toEqual([null, 0]);
   });
@@ -98,7 +98,7 @@ describe("the server-side session store", () => {
 
   it("refuses a cookie that carries the session itself, an altered cookie and a short ID", async () => {
     const cookie = await createSessionCookie(session());
-    const [iv, body] = cookie.split(".");
+    const [iv, body] = cookie.split(".", 2);
     expect([await loadSession(seal(session())), await loadSession(`${iv}.${body.slice(0, -2)}xx`), await loadSession(seal({ sid: "short" })), await loadSession(undefined)])
       .toEqual([null, null, null, null]);
   });

@@ -14,10 +14,10 @@ import { baselineLabel, baselinesFor, compareRow, dayRanges, periodKinds, period
 import { EnergyDemo } from "./_components/energy-demo";
 import { EnergyView, type EnergyLive } from "./_components/energy-view";
 
-type Unit = { id: string; displayName: string };
-type Preferences = { locale: string; timezone: string; monthlyReportEmail: boolean };
 
 export default async function CustomerEnergyPage({ searchParams }: PageProps<"/customer/energy">) {
+  interface Preferences { locale: string; timezone: string; monthlyReportEmail: boolean }
+  interface Unit { id: string; displayName: string }
   await connection();
   if (!apiMode()) return <EnergyDemo />;
   const sp = await searchParams;
@@ -40,17 +40,17 @@ export default async function CustomerEnergyPage({ searchParams }: PageProps<"/c
     summary: null, daily: [], compare: null, properties, prefs, lastMonth,
     query: selectionQuery({ unitIds, period: kind, from: one("from"), to: one("to"), baselineId: baseline?.id }),
   };
-  if (unitIds.length && !period.error) {
+  if (unitIds.length > 0 && !period.error) {
     try {
       const days = dayRanges(period.from, period.to, display.locale);
-      const sum = (u: string[], from: string, to: string, b?: string) => coreOp<ApiEnergySummary>("energy.summary", { from, to, unitIds: u, ...(b ? { baselineId: b } : {}) });
+      const sum = (u: string[], from: string, to: string, b?: string) => coreOp<ApiEnergySummary>("energy.summary", { from, to, unitIds: u, ...(b && { baselineId: b }) });
       const [total, perDay] = await Promise.all([sum(unitIds, period.from, period.to, baseline?.id), Promise.all(days.map((d) => sum(unitIds, d.from, d.to)))]);
-      const minutes = (Date.parse(period.to) - Date.parse(period.from)) / 60000;
+      const minutes = (Date.parse(period.to) - Date.parse(period.from)) / 60_000;
       // a comparable baseline is shown as an even daily share of its value (display only; savings come from the API)
-      const base = total.totals.savedKWh !== null ? total.baselineSnapshot?.baselineKWh ?? null : null;
+      const base = total.totals.savedKWh === null ? null : total.baselineSnapshot?.baselineKWh ?? null;
       live.summary = summaryView(total, i);
       live.raw = { kWh: total.totals.kWh, baseline: base, tariff: total.tariffVersion, factor: total.factorSnapshot ? i.t("{region} {year} · {factor} kgCO₂e/kWh (demo factor)", { region: total.factorSnapshot.region, year: total.factorSnapshot.year, factor: total.factorSnapshot.kgCO2ePerKWh }) : null, coverage: total.coverage };
-      live.daily = days.map((d, i) => ({ label: d.label, actual: perDay[i].totals.kWh, baseline: base === null ? null : (base * (Date.parse(d.to) - Date.parse(d.from))) / 60000 / minutes }));
+      live.daily = days.map((d, i) => ({ label: d.label, actual: perDay[i].totals.kWh, baseline: base === null ? null : (base * (Date.parse(d.to) - Date.parse(d.from))) / 60_000 / minutes }));
       if (unitIds.length > 1) {
         const rows = await Promise.all(unitIds.map(async (u) => {
           const b = baselinesFor(baselines, [u])[0];
@@ -59,9 +59,9 @@ export default async function CustomerEnergyPage({ searchParams }: PageProps<"/c
         }));
         live.compare = { rows: rows.map((r) => r.row), series: rows.every((r) => r.byDay) ? rows.map((r) => r.byDay!) : null };
       }
-    } catch (e) {
-      if (!(e instanceof CoreError) || e.error.code !== "VALIDATION") throw e; // an unusable period or unit set shows on the page
-      live.error = actionMessage({ code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds }, i.t);
+    } catch (error) {
+      if (!(error instanceof CoreError) || error.error.code !== "VALIDATION") throw error; // an unusable period or unit set shows on the page
+      live.error = actionMessage({ code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds }, i.t);
     }
   }
   return <EnergyView live={live} />;

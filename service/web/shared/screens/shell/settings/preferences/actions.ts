@@ -15,17 +15,17 @@ const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
     const value = await fn();
     refresh();
     return { ok: true, value };
-  } catch (e) {
-    if (e instanceof CoreError) {
-      if (e.error.code === "CONFLICT") refresh();
-      return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
+  } catch (error) {
+    if (error instanceof CoreError) {
+      if (error.error.code === "CONFLICT") refresh();
+      return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
     }
-    throw e;
+    throw error;
   }
 };
 
 /** preferences.update with the display language and time zone (and a client's monthly report e-mail); a changed
- * location consent goes with it. */
+location consent goes with it. */
 export async function savePreferences(input: { locale: "en" | "ms"; timezone: string; monthlyReportEmail?: boolean }, consent: { granted: boolean; version: number } | null) {
   return run(async () => {
     await coreOp("preferences.update", input, { write: true });

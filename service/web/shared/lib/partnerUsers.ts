@@ -7,25 +7,25 @@ import { klDate, klStart } from "@ac/web/lib/partnerTeam";
 export type PartnerRole = "contractor" | "technician";
 export type PartnerStatus = "invited" | "active" | "disabled";
 /** PartnerUser of service-contracts.ts. */
-export type ApiPartnerUser = {
+export interface ApiPartnerUser {
   id: string; version: number; organizationId: string; membershipId: string | null; email: string; displayName: string | null; partnerRole: PartnerRole;
   status: PartnerStatus; lastSignInAt: string | null; accessUntil: string | null; invitedAt: string; invitedByMembershipId: string;
   /** an active technician who holds an assigned job (IR432); absent in the demo data */
   booked?: boolean;
   /** HQ ended the access in Access & roles: only HQ gives it back (IR508); absent in the demo data */
   revokedAt?: string | null;
-};
+}
 /** What a row may do: nothing on the caller's own account; the last active contractor, and a technician who holds an
- * assigned job (IR421, IR432), cannot be disabled or removed. `access` changes a technician's access end (IR461). */
-export type RowActions = { resend: boolean; access: boolean; disable: boolean; enable: boolean; remove: boolean };
-export type PartnerUserRow = {
+assigned job (IR421, IR432), cannot be disabled or removed. `access` changes a technician's access end (IR461). */
+export interface RowActions { resend: boolean; access: boolean; disable: boolean; enable: boolean; remove: boolean }
+export interface PartnerUserRow {
   id: string; version: number; email: string; name: string | null; role: PartnerRole; status: PartnerStatus; sub: string; access: string; lastSignIn: string;
   you: boolean; lastContractor: boolean; booked: boolean; ended: boolean; actions: RowActions;
   /** HQ ended the access (IR508): nothing gives it back here — no access end, enabling or set-up e-mail */
   revoked: boolean;
   /** the access end's Kuala Lumpur date, for the access dialog */
   accessDate: string | null;
-};
+}
 
 export const PARTNER_ROLES: PartnerRole[] = ["contractor", "technician"];
 export const roleLabel: Record<PartnerRole, string> = { contractor: "Contractor", technician: "Technician" };
@@ -33,27 +33,27 @@ export const statusLabel: Record<PartnerStatus, string> = { invited: "Not signed
 export const PARTNER_STATUSES: PartnerStatus[] = ["active", "invited", "disabled"];
 
 /** The rows by name (one without a name by its e-mail), the caller's own account marked and without actions. An account whose
- * access end has passed by `now` (the business clock) reads as ended: nothing to disable or resend, a technician's
- * access end can move again (IR461), and it can be removed. */
+access end has passed by `now` (the business clock) reads as ended: nothing to disable or resend, a technician's
+access end can move again (IR461), and it can be removed. */
 export function partnerUserRows(us: ApiPartnerUser[], self: string | null, i: I18n = EN, now?: Date): PartnerUserRow[] {
   const { t } = i;
   const contractors = us.filter((u) => u.partnerRole === "contractor" && u.status === "active").length;
   return [...us].sort((a, b) => (a.displayName ?? a.email).localeCompare(b.displayName ?? b.email)).map((u) => {
-    const you = !!self && u.membershipId === self;
-    const lastContractor = u.partnerRole === "contractor" && u.status === "active" && contractors === 1;
-    const invited = u.status === "invited";
-    const ended = u.status !== "disabled" && !!now && !!u.accessUntil && Date.parse(u.accessUntil) <= now.getTime();
-    const booked = !!u.booked && u.status === "active";
-    const revoked = !!u.revokedAt;
+    const isYou = !!self && u.membershipId === self;
+    const isLastContractor = u.partnerRole === "contractor" && u.status === "active" && contractors === 1;
+    const isInvited = u.status === "invited";
+    const isEnded = u.status !== "disabled" && !!now && !!u.accessUntil && Date.parse(u.accessUntil) <= now.getTime();
+    const isBooked = !!u.booked && u.status === "active";
+    const isRevoked = !!u.revokedAt;
     return {
-      id: u.id, version: u.version, email: u.email, name: u.displayName, role: u.partnerRole, status: u.status, you, lastContractor, booked, ended, revoked,
+      id: u.id, version: u.version, email: u.email, name: u.displayName, role: u.partnerRole, status: u.status, you: isYou, lastContractor: isLastContractor, booked: isBooked, ended: isEnded, revoked: isRevoked,
       sub: u.displayName ? u.email : t("invited {date}", { date: showDate(u.invitedAt, i.display) }),
-      access: u.accessUntil ? showDate(u.accessUntil, i.display) : invited ? "—" : t("No end date"),
+      access: u.accessUntil ? showDate(u.accessUntil, i.display) : (isInvited ? "—" : t("No end date")),
       lastSignIn: u.lastSignInAt ? showTime(u.lastSignInAt, i.display) : "—",
       accessDate: u.accessUntil ? klDate(u.accessUntil) : null,
-      actions: you
+      actions: isYou
         ? { resend: false, access: false, disable: false, enable: false, remove: false }
-        : { resend: invited && !!u.membershipId && !ended && !revoked, access: u.partnerRole === "technician" && !!u.membershipId && !revoked, disable: u.status === "active" && !lastContractor && !booked && !ended, enable: u.status === "disabled" && !revoked, remove: !lastContractor && !booked },
+        : { resend: isInvited && !!u.membershipId && !isEnded && !isRevoked, access: u.partnerRole === "technician" && !!u.membershipId && !isRevoked, disable: u.status === "active" && !isLastContractor && !isBooked && !isEnded, enable: u.status === "disabled" && !isRevoked, remove: !isLastContractor && !isBooked },
     };
   });
 }

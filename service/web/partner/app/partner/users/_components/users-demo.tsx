@@ -9,7 +9,7 @@ import { UsersView, type UsersOps } from "./users-view";
 const done = (refused: string | undefined): Promise<Awaited<ReturnType<UsersOps["invite"]>>> => {
   if (!refused) return Promise.resolve({ ok: true, value: null });
   const fieldErrors: Record<string, string> = refused === "errors.email_taken" ? { email: refused } : {};
-  return Promise.resolve({ ok: false, code: refused === "error.notFound" ? "NOT_FOUND" : refused === "errors.email_taken" ? "VALIDATION" : "CONFLICT", messageKey: refused, fieldErrors });
+  return Promise.resolve({ ok: false, code: refused === "error.notFound" ? "NOT_FOUND" : (refused === "errors.email_taken" ? "VALIDATION" : "CONFLICT"), messageKey: refused, fieldErrors });
 };
 
 const ops: UsersOps = {

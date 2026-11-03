@@ -2,7 +2,7 @@
 // code / messageKey / fieldErrors of service-contracts.ts.
 import type { OpArgs } from "@ac/web/lib/opTypes";
 
-export type DomainError = { code: string; messageKey: string; fieldErrors: Record<string, string>; correlationId: string; retryAfterSeconds: number | null };
+export interface DomainError { code: string; messageKey: string; fieldErrors: Record<string, string>; correlationId: string; retryAfterSeconds: number | null }
 
 export class OpError extends Error {
   constructor(public readonly status: number, public readonly error: DomainError) {
@@ -10,14 +10,14 @@ export class OpError extends Error {
   }
 }
 
-export type WriteOptions = { expectedVersion?: number; idempotencyKey?: string };
+export interface WriteOptions { expectedVersion?: number; idempotencyKey?: string }
 
 /** One operation through the BFF; the input is typed by the contract (IR313). */
 export async function callOp<T>(...[operation, input, opts = {}]: OpArgs<WriteOptions & { write?: boolean }>): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (opts.write) headers["Idempotency-Key"] = opts.idempotencyKey ?? crypto.randomUUID();
   if (opts.expectedVersion !== undefined) headers["X-Expected-Version"] = String(opts.expectedVersion);
-  const res = await fetch(`/bff/ops/${operation}`, { method: "POST", headers, body: JSON.stringify(input ?? {}), credentials: "same-origin" });
+  const res = await fetch(`/bff/ops/${operation}`, { method: "POST", headers, body: JSON.stringify(input ?? {})});
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     throw new OpError(res.status, body ?? { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });

@@ -11,7 +11,7 @@
 // Pure code: the DAL (server) and the BFF relay share it; Vitest covers it.
 import { coreRoutes, type CoreRoute } from "@ac/web/lib/routes.gen";
 
-export type CoreRequest = { method: CoreRoute["method"]; path: string; body?: string };
+export interface CoreRequest { method: CoreRoute["method"]; path: string; body?: string }
 
 type Json = Record<string, unknown>;
 const isObject = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -42,11 +42,13 @@ function pick(routes: readonly CoreRoute[], input: Json): CoreRoute {
   for (const r of routes) {
     if (r.fixed && text(input[r.fixed[0]]) !== r.fixed[1]) continue;
     const names = pathParams(r.path);
-    const held = names.every((n) => { const v = lookup(input, n.split(".")); return v !== undefined && v !== null && v !== ""; });
-    if (held && names.length > score) {
-      best = r;
-      score = names.length;
+    const isHeld = names.every((n) => { const v = lookup(input, n.split(".")); return v !== undefined && v !== null && v !== ""; });
+    if (!(isHeld && names.length > score)) {
+      continue;
     }
+
+    best = r;
+    score = names.length;
   }
   return best;
 }

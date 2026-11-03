@@ -18,13 +18,13 @@ import { Icon } from "@ac/web/components/Icon";
 
 type Detail = NonNullable<PlansLive["detail"]>;
 /** What the last write on a plan left to show: saved, generated (the box names the job), a refused Generate job (the
- * CONFLICT banner reads the refreshed plan) or another refusal. Kept here because a write re-keys the detail. */
+CONFLICT banner reads the refreshed plan) or another refusal. Kept here because a write re-keys the detail. */
 type Notice = { planId: string } & ({ kind: "saved"; text: string } | { kind: "generated"; occurrenceAt: string; jobId: string } | { kind: "conflict"; attempted: string } | { kind: "error"; text: string });
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 /** HQ maintenance plans (FR-A06 Plans tab, DD-A06 item 9, D16, Figma Admin 06 283:2 / 360:414) from the Core API. Texts
- * in the display language; the next date is typed and shown in the display time zone, the first render's dates come
- * from the loader (IR291). */
+in the display language; the next date is typed and shown in the display time zone, the first render's dates come
+from the loader (IR291). */
 export function PlansView({ live }: { live: PlansLive }) {
   const t = useT();
   const [creating, setCreating] = useState(false);
@@ -33,7 +33,7 @@ export function PlansView({ live }: { live: PlansLive }) {
   const href = (id: string) => `/admin/jobs?${new URLSearchParams({ ...Object.fromEntries(Object.entries(live.q).filter(([, v]) => v) as [string, string][]), tab: "plans", planId: id })}`;
   return (
     <Page className="max-w-[1440px]">
-      <JobsTabs tab="plans" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => setCreating(true)}><Icon name="add" /> {t("New plan")}</Btn>} />
+      <JobsTabs tab="plans" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => { setCreating(true); }}><Icon name="add" /> {t("New plan")}</Btn>} />
       <ScopeBar scope={live.scope} q={live.q} text={t(live.plansTotal === 1 ? "1 plan in scope" : "{n} plans in scope", { n: live.plansTotal })} clear="planId" />
       <div className="split-rev">
         <Card title={t("Recurring plans")} sub={t("next due, soonest first")} className="self-start">
@@ -50,9 +50,9 @@ export function PlansView({ live }: { live: PlansLive }) {
           )}
         </Card>
         {sel ? <PlanDetail key={`${sel.plan.id}:${sel.plan.version}`} d={sel} now={Date.parse(live.now)} notice={notice?.planId === sel.plan.id ? notice : null} setNotice={setNotice} />
-          : <Card title={t("Plan")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That plan no longer exists in your scope." : live.rows.length ? "Pick a plan." : "No plan yet.")}</p></Card>}
+          : <Card title={t("Plan")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That plan no longer exists in your scope." : (live.rows.length > 0 ? "Pick a plan." : "No plan yet."))}</p></Card>}
       </div>
-      {creating && <NewPlanModal live={live} onClose={() => setCreating(false)} onCreated={(id) => { setCreating(false); setNotice({ planId: id, kind: "saved", text: t("Plan created — Generate job creates the job of its first occurrence.") }); }} href={href} />}
+      {creating && <NewPlanModal live={live} onClose={() => { setCreating(false); }} onCreated={(id) => { setCreating(false); setNotice({ planId: id, kind: "saved", text: t("Plan created — Generate job creates the job of its first occurrence.") }); }} href={href} />}
     </Page>
   );
 }
@@ -64,23 +64,25 @@ function PlanDetail({ d, now, notice, setNotice }: { d: Detail; now: number; not
   const [every, setEvery] = useState(p.recurrence.intervalMonths);
   const [next, setNext] = useState(zonedInput(p.nextDueAt, zone));
   const nextIso = next ? fromZonedInput(next, zone) || null : null;
-  const nextChanged = !!nextIso && Date.parse(nextIso) !== Date.parse(p.nextDueAt);
-  const dirty = every !== p.recurrence.intervalMonths || nextChanged;
-  const errors = planErrors({ unitId: p.unitId, every, nextDueAt: nextChanged ? nextIso : p.nextDueAt }, now, t);
-  const anchor = nextIso ? anchorOf(nextChanged ? null : p, nextChanged ? nextIso : p.nextDueAt) : p.anchorDay;
+  const isNextChanged = !!nextIso && Date.parse(nextIso) !== Date.parse(p.nextDueAt);
+  const isDirty = every !== p.recurrence.intervalMonths || isNextChanged;
+  const errors = planErrors({ unitId: p.unitId, every, nextDueAt: isNextChanged ? nextIso : p.nextDueAt }, now, t);
+  const anchor = nextIso ? anchorOf(isNextChanged ? null : p, isNextChanged ? nextIso : p.nextDueAt) : p.anchorDay;
   // the saved plan's following date comes from the loader; an edit computes it here
-  const then = !dirty ? d.texts.then : nextIso ? planDate(nextOccurrence(nextChanged ? nextIso : p.nextDueAt, every, anchor), i.display) : null;
-  const box = nextBox(p, now, dirty, notice?.kind === "generated" ? notice : null, i, d.texts.next);
+  const then = isDirty ? (nextIso ? planDate(nextOccurrence(isNextChanged ? nextIso : p.nextDueAt, every, anchor), i.display) : null) : d.texts.then;
+  const box = nextBox(p, now, isDirty, notice?.kind === "generated" ? notice : null, i, d.texts.next);
   const conflict = notice?.kind === "conflict" ? generateConflict(p, notice.attempted, i) : null;
   const save = () => {
-    if (Object.keys(errors).length) return;
-    const nextDueAt = nextChanged ? nextIso! : p.nextDueAt;
+    if (Object.keys(errors).length > 0) return;
+    const nextDueAt = isNextChanged ? nextIso! : p.nextDueAt;
     run(() => savePlan({ id: p.id, version: p.version, unitId: p.unitId, intervalMonths: every, nextDueAt }), t("Plan saved"),
-      () => setNotice({ planId: p.id, kind: "saved", text: t("Plan saved — {every}, next due {date} (anchor day {n}).", { every: everyText(every, t).toLowerCase(), date: planDate(nextDueAt, i.display), n: anchor }) }), (f) => setNotice({ planId: p.id, kind: "error", text: planRefusal(f, t) }));
+      () => { setNotice({ planId: p.id, kind: "saved", text: t("Plan saved — {every}, next due {date} (anchor day {n}).", { every: everyText(every, t).toLowerCase(), date: planDate(nextDueAt, i.display), n: anchor }) }); }, (f) => { setNotice({ planId: p.id, kind: "error", text: planRefusal(f, t) }); });
   };
-  const generate = () => run(() => generateJob(p.id, p.version, p.nextDueAt), t("Job generated"),
-    (v) => setNotice({ planId: p.id, kind: "generated", occurrenceAt: p.nextDueAt, jobId: v.id }),
-    (f) => setNotice(f.code === "CONFLICT" ? { planId: p.id, kind: "conflict", attempted: p.nextDueAt } : { planId: p.id, kind: "error", text: planRefusal(f, t) }));
+  const generate = () => {
+    run(() => generateJob(p.id, p.version, p.nextDueAt), t("Job generated"),
+      (v) => { setNotice({ planId: p.id, kind: "generated", occurrenceAt: p.nextDueAt, jobId: v.id }); },
+      (f) => { setNotice(f.code === "CONFLICT" ? { planId: p.id, kind: "conflict", attempted: p.nextDueAt } : { planId: p.id, kind: "error", text: planRefusal(f, t) }); });
+  };
   return (
     <div className="flex min-w-0 flex-col gap-4">
       {notice?.kind === "saved" && <Banner tone="ok">{notice.text}</Banner>}
@@ -89,8 +91,8 @@ function PlanDetail({ d, now, notice, setNotice }: { d: Detail; now: number; not
         {conflict && <div className="mb-3"><Banner tone="warn"><b>{conflict.title}</b><br />{conflict.text}</Banner></div>}
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
           <Field label={t("Repeat")} hint={t("Only monthly recurrence is supported")}><Input value={t("Monthly")} disabled /></Field>
-          <Field label={t("Every")} hint="1–12" error={errors.every}><Select value={String(every)} onChange={(e) => setEvery(Number(e.target.value))}>{MONTHS.map((m) => <option key={m} value={m}>{t(m === 1 ? "1 month" : "{n} months", { n: m })}</option>)}</Select></Field>
-          <Field label={t("Next due")} hint={then ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: then, zone }) : t("Anchor day {n} · Recurrence uses UTC · times in {zone}", { n: anchor, zone })} error={errors.nextDueAt}><Input type="datetime-local" value={next} onChange={(e) => setNext(e.target.value)} /></Field>
+          <Field label={t("Every")} hint="1–12" error={errors.every}><Select value={String(every)} onChange={(e) => { setEvery(Number(e.target.value)); }}>{MONTHS.map((m) => <option key={m} value={m}>{t(m === 1 ? "1 month" : "{n} months", { n: m })}</option>)}</Select></Field>
+          <Field label={t("Next due")} hint={then ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: then, zone }) : t("Anchor day {n} · Recurrence uses UTC · times in {zone}", { n: anchor, zone })} error={errors.nextDueAt}><Input type="datetime-local" value={next} onChange={(e) => { setNext(e.target.value); }} /></Field>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#b9cdf5] bg-primary-soft p-4">
           <div className="min-w-0 flex-1"><b className="text-[13px]">{box.title}</b><p className="text-xs text-muted-foreground">{box.text}</p></div>
@@ -111,8 +113,8 @@ function PlanDetail({ d, now, notice, setNotice }: { d: Detail; now: number; not
           </table></ScrollX>
         )}
         <div className="mt-4 flex items-center justify-end gap-2">
-          {dirty && <Btn disabled={pending} onClick={() => { setEvery(p.recurrence.intervalMonths); setNext(zonedInput(p.nextDueAt, zone)); }}>{t("Discard")}</Btn>}
-          <Btn variant="primary" disabled={pending || !dirty || Object.keys(errors).length > 0} onClick={save}>{t("Save plan")}</Btn>
+          {isDirty && <Btn disabled={pending} onClick={() => { setEvery(p.recurrence.intervalMonths); setNext(zonedInput(p.nextDueAt, zone)); }}>{t("Discard")}</Btn>}
+          <Btn variant="primary" disabled={pending || !isDirty || Object.keys(errors).length > 0} onClick={save}>{t("Save plan")}</Btn>
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">{t("Generating creates one job for the saved next date only — no automatic generation or catch-up. Saving does not change jobs already generated.")}</p>
       </Card>
@@ -137,20 +139,20 @@ function NewPlanModal({ live, onClose, onCreated, href }: { live: PlansLive; onC
   const save = () => {
     setTried(true);
     setRefusal(null);
-    if (Object.keys(errors).length) return;
-    run(() => savePlan({ id: null, version: null, unitId, intervalMonths: every, nextDueAt: nextIso! }), t("Plan created"), (v) => { onCreated(v.id); router.push(href(v.id)); }, (f) => setRefusal(planRefusal(f, t)));
+    if (Object.keys(errors).length > 0) return;
+    run(() => savePlan({ id: null, version: null, unitId, intervalMonths: every, nextDueAt: nextIso! }), t("Plan created"), (v) => { onCreated(v.id); router.push(href(v.id)); }, (f) => { setRefusal(planRefusal(f, t)); });
   };
   const groups = [...new Set(live.units.map((u) => u.customer))];
   const anchor = nextIso ? new Date(nextIso).getUTCDate() : null;
   return (
     <Modal open onClose={onClose} title={t("New maintenance plan")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Create plan")}</Btn></>}>
       {refusal && <Banner tone="crit">{refusal}</Banner>}
-      <Field label={t("Unit · required")} error={tried ? errors.unitId : undefined} hint={existing.length ? t(existing.length === 1 ? "This unit already has 1 plan ({plans})." : "This unit already has {n} plans ({plans}).", { n: existing.length, plans: existing.map((r) => r.line.toLowerCase()).join("; ") }) : undefined}>
-        <Select value={unitId} onChange={(e) => setUnitId(e.target.value)}>{groups.map((g) => <optgroup key={g} label={g}>{live.units.filter((u) => u.customer === g).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>)}</Select>
+      <Field label={t("Unit · required")} error={tried ? errors.unitId : undefined} hint={existing.length > 0 ? t(existing.length === 1 ? "This unit already has 1 plan ({plans})." : "This unit already has {n} plans ({plans}).", { n: existing.length, plans: existing.map((r) => r.line.toLowerCase()).join("; ") }) : undefined}>
+        <Select value={unitId} onChange={(e) => { setUnitId(e.target.value); }}>{groups.map((g) => <optgroup key={g} label={g}>{live.units.filter((u) => u.customer === g).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>)}</Select>
       </Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-        <Field label={t("Every")} hint={t("Monthly recurrence, 1–12 months")} error={tried ? errors.every : undefined}><Select value={String(every)} onChange={(e) => setEvery(Number(e.target.value))}>{MONTHS.map((m) => <option key={m} value={m}>{t(m === 1 ? "1 month" : "{n} months", { n: m })}</option>)}</Select></Field>
-        <Field label={t("First visit · next due")} hint={nextIso && anchor ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: planDate(nextOccurrence(nextIso, every, anchor), i.display), zone }) : undefined} error={tried ? errors.nextDueAt : undefined}><Input type="datetime-local" value={next} onChange={(e) => setNext(e.target.value)} /></Field>
+        <Field label={t("Every")} hint={t("Monthly recurrence, 1–12 months")} error={tried ? errors.every : undefined}><Select value={String(every)} onChange={(e) => { setEvery(Number(e.target.value)); }}>{MONTHS.map((m) => <option key={m} value={m}>{t(m === 1 ? "1 month" : "{n} months", { n: m })}</option>)}</Select></Field>
+        <Field label={t("First visit · next due")} hint={nextIso && anchor ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: planDate(nextOccurrence(nextIso, every, anchor), i.display), zone }) : undefined} error={tried ? errors.nextDueAt : undefined}><Input type="datetime-local" value={next} onChange={(e) => { setNext(e.target.value); }} /></Field>
       </div>
       <Banner>{t("Each occurrence becomes a periodic job (requested) at this time of day when HQ presses Generate job; HQ then books it like any agreed time.")}</Banner>
     </Modal>

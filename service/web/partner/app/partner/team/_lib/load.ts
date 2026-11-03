@@ -14,18 +14,20 @@ import { qualificationLabel, requiredFor } from "@ac/web/lib/partnerJobDetail";
 import { activeNow, grantRows, KL, listed, memberRows, QUALIFICATION_CODES, technicianNames, teamQuery, teamStats, UNAVAILABILITY_TYPES, unavailabilityRows, weekday, weekRows, type ApiTeamMember, type ApiUnavailability, type TeamJob } from "@ac/web/lib/partnerTeam";
 import { CERT_STATUSES, certKpis, certQuery, certRows, impact, WINDOWS, type ApiCert, type CertJob } from "@ac/web/lib/partnerCertificates";
 
-type Page<T> = { items: T[]; total: number };
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
-  if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
-  throw e;
-});
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
+  return p.catch((error) => {
+    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+    throw error;
+  });
+};
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const noon = (date: string) => `${date}T04:00:00Z`; // 12:00 in Kuala Lumpur
 const STATUS_TEXT: Record<string, string> = { valid: "Valid", expiring: "Expiring", expired: "Expired", pending: "Pending HQ verification", rejected: "Rejected", not_held: "Not held" };
 
-type TeamParams = { date?: string; qualification?: string; activeOnly?: string; orgId?: string; membershipId?: string; status?: string; expiringWithinDays?: string };
+interface TeamParams { date?: string; qualification?: string; activeOnly?: string; orgId?: string; membershipId?: string; status?: string; expiringWithinDays?: string }
 
 export async function loadTeam(sp: TeamParams) {
+  interface Page<T> { items: T[]; total: number }
   const [now, display, who, principal] = await Promise.all([coreNow(), coreDisplay(), coreIdentity(), corePrincipal()]);
   const i = i18nOf(display);
   const { t } = i;

@@ -22,9 +22,9 @@ export default async function CustomerAutomationsPage({ searchParams }: PageProp
   const [prefs, rules, units, properties, spaces, consent, display] = await Promise.all([
     coreOp<{ timezone: string }>("preferences.get", {}), coreAll<ApiAutomation>("automations.list"), coreAll<ApiUnitRow>("units.list"),
     coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"),
-    coreOp<ApiConsent>("consents.get", { purpose: "location_automation" }).catch((e) => {
-      if (e instanceof CoreError && e.error.code === "NOT_FOUND") return null; // no consent record: location rules unavailable
-      throw e;
+    coreOp<ApiConsent>("consents.get", { purpose: "location_automation" }).catch((error) => {
+      if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null; // no consent record: location rules unavailable
+      throw error;
     }), coreDisplay(),
   ]);
   const i = i18nOf(display);
@@ -36,17 +36,17 @@ export default async function CustomerAutomationsPage({ searchParams }: PageProp
   const ac = new Map(acs.map((u) => [u.id, u]));
   const nextRuns = new Map(await Promise.all(rules.filter((r) => r.kind === "schedule" && r.enabled).map(async (r) =>
     [r.id, (await coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: r.id, count: 8 })).find((o) => o.phase === "schedule_start")?.at ?? null] as const)));
-  const granted = consent?.granted ?? false;
+  const isGranted = consent?.granted ?? false;
   const location = rules.filter((r) => triggerOf(r) === "location");
   // the editor's ACs with their capabilities (action options), read only while editing
   const caps: Record<string, Caps | null> = {};
   if (editing) {
     const details = await Promise.all(acs.map((u) => coreOp<ApiUnitDetail>("units.get", { id: u.id }).catch(() => null)));
-    details.forEach((d, i) => { caps[acs[i].id] = d?.capabilities ?? null; });
+    for (const [i, d] of details.entries()) { caps[acs[i].id] = d?.capabilities ?? null; }
   }
   const live: AutomationsLive = {
     rules, acs, caps, timezone: prefs.timezone || "Asia/Kuala_Lumpur", editing,
-    cards: rules.map((r) => ruleCard(r, ac.get(r.unitIds[0]) ?? null, nextRuns.get(r.id) ?? null, granted, i)),
+    cards: rules.map((r) => ruleCard(r, ac.get(r.unitIds[0]) ?? null, nextRuns.get(r.id) ?? null, isGranted, i)),
     consent: consent ? { version: consent.version, ...consentCard(consent, location.length, location.filter((r) => r.disabledReason === "consent_revoked").length, i) } : { version: null, ...consentCard(null, 0, 0, i) },
     nextRuns: Object.fromEntries(nextRuns),
   };

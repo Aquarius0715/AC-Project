@@ -9,20 +9,20 @@ import { contentSecurityPolicy, HSTS, newNonce, originOf } from "@ac/web/lib/sec
 const sharedAreas = ["/notifications", "/settings"]; // shared pages that need a session but no particular role
 
 /** The optimistic check of one role's app: signed-out users go to sign-in, sessions of another role are ignored. Every
- * page response also carries the Content-Security-Policy with this request's nonce, which Next.js reads from the request
- * headers to put on its scripts and styles (Next.js CSP guide, network architecture §6, IR354). */
+page response also carries the Content-Security-Policy with this request's nonce, which Next.js reads from the request
+headers to put on its scripts and styles (Next.js CSP guide, network architecture §6, IR354). */
 export async function authProxy(req: NextRequest, appRole: Session["role"]) {
-  const https = req.nextUrl.protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
+  const isHttps = req.nextUrl.protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
   const nonce = newNonce();
   const idp = originOf(oidcConfig().issuer);
-  const csp = contentSecurityPolicy(nonce, { dev: process.env.NODE_ENV === "development", https, formActions: idp ? [idp] : [] });
+  const csp = contentSecurityPolicy(nonce, { dev: process.env.NODE_ENV === "development", https: isHttps, formActions: idp ? [idp] : [] });
   const headers = new Headers(req.headers);
   headers.set("x-nonce", nonce);
   headers.set("x-pathname", req.nextUrl.pathname); // the root layout names the page in the document title (IR490)
   headers.set("Content-Security-Policy", csp);
   const secure = (res: NextResponse) => {
     res.headers.set("Content-Security-Policy", csp);
-    if (https) res.headers.set("Strict-Transport-Security", HSTS);
+    if (isHttps) res.headers.set("Strict-Transport-Security", HSTS);
     return res;
   };
   if (process.env.DATA_SOURCE !== "api") return secure(NextResponse.next({ request: { headers } }));
@@ -50,9 +50,9 @@ export async function authProxy(req: NextRequest, appRole: Session["role"]) {
   };
   const path = req.nextUrl.pathname;
   const home = roleHome[appRole];
-  const area = path === home || path.startsWith(home + "/");
-  const shared = sharedAreas.some((p) => path === p || path.startsWith(p + "/"));
-  if (!area && !shared) return pass();
+  const isArea = path === home || path.startsWith(home + "/");
+  const isShared = sharedAreas.some((p) => path === p || path.startsWith(p + "/"));
+  if (!isArea && !isShared) return pass();
   if (!session) {
     const login = new URL("/login", req.nextUrl);
     login.searchParams.set("returnTo", path + req.nextUrl.search);

@@ -25,13 +25,13 @@ export default async function CustomerOffsetsPage({ searchParams }: PageProps<"/
   const kind = periodKinds.find((k) => k === one("period")) ?? "7d";
   const period = periodRange(kind, now, { from: one("from"), to: one("to") }, i);
   let estimate: { emissions: string; savedEmissions: string; factor: string; comparable: boolean } | null = null;
-  if (unitIds.length && !period.error) {
+  if (unitIds.length > 0 && !period.error) {
     try {
-      const s = await coreOp<ApiEnergySummary>("energy.summary", { from: period.from, to: period.to, unitIds, ...(one("baselineId") ? { baselineId: one("baselineId") } : {}) });
+      const s = await coreOp<ApiEnergySummary>("energy.summary", { from: period.from, to: period.to, unitIds, ...(one("baselineId") && { baselineId: one("baselineId") }) });
       const v = summaryView(s, i);
       estimate = { emissions: v.emissions, savedEmissions: v.savedEmissions, comparable: v.comparable, factor: s.factorSnapshot ? `${s.factorSnapshot.region} ${s.factorSnapshot.year}` : i.t("emission factor missing") };
-    } catch (e) {
-      if (!(e instanceof CoreError) || e.error.code !== "VALIDATION") throw e;
+    } catch (error) {
+      if (!(error instanceof CoreError) || error.error.code !== "VALIDATION") throw error;
     }
   }
   const name = new Map(units.map((u) => [u.id, u.displayName]));

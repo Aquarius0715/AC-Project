@@ -12,11 +12,12 @@ import { alertChoices, alertView, selectAlert, type ApiTechAlert } from "@ac/web
 import { evidenceRows, type ApiEvidenceCandidate } from "@ac/web/lib/alertEvidence";
 import type { TechJobRead } from "@ac/web/lib/techJob";
 
-type Page<T> = { items: T[] };
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
-  if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
-  throw e;
-});
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
+  return p.catch((error) => {
+    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+    throw error;
+  });
+};
 const UNAVAILABLE: Record<string, string> = {
   "errors.assignment_ended": "Your work window on this unit has ended.",
   "errors.assignment_required": "You need an active assignment on this unit to see its alerts.",
@@ -24,14 +25,15 @@ const UNAVAILABLE: Record<string, string> = {
 };
 
 export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?: string }) {
+  interface Page<T> { items: T[] }
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const i = i18nOf(display);
   const { t } = i;
   const nowMs = now.getTime();
   const unitHref = `/technician/units/${unitId}${sp.jobId ? `?jobId=${sp.jobId}` : ""}`;
-  const alerts = await coreOp<Page<ApiTechAlert>>("alerts.list", { limit: 50, filters: { unitId } }).then((r) => r.items).catch((e) => {
-    if (e instanceof CoreError && e.status < 500) return e.error;
-    throw e; // error.tsx
+  const alerts = await coreOp<Page<ApiTechAlert>>("alerts.list", { limit: 50, filters: { unitId } }).then((r) => r.items).catch((error) => {
+    if (error instanceof CoreError && error.status < 500) return error.error;
+    throw error; // error.tsx
   });
   if (!Array.isArray(alerts)) {
     if (alerts.messageKey === "errors.assignment_not_started") { // IR76: the start time from the URL's job

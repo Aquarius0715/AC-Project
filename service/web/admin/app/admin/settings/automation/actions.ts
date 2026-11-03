@@ -8,14 +8,13 @@ import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
-type Decision = { unitId: string; decision: string; ruleId: string | null; reason: string | null; commandId?: string | null };
+interface Decision { unitId: string; decision: string; ruleId: string | null; reason: string | null; commandId?: string | null }
 
 async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
-  } catch (e) {
-    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds };
-    return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+  } catch (error) {
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     if (rerender) refresh();
   }
@@ -26,7 +25,7 @@ export async function saveAutoPolicy(input: OpInput<"policies.save">, version?: 
 }
 type Evaluation = OpInput<"automations.simulate">;
 /** The current minute of the Core API clock: an evaluation is for the current tick (IR21), so the time the page loaded
- * would be refused once a minute had passed (IR491). */
+would be refused once a minute had passed (IR491). */
 async function tick(): Promise<string> {
   return new Date(Math.floor((await coreNow()).getTime() / 60_000) * 60_000).toISOString();
 }
@@ -37,7 +36,7 @@ export async function simulateAuto(input: Evaluation) {
   return run(async () => coreOp<{ results: Decision[] }>("automations.simulate", atTick(input, await tick())).then((r) => r.results), false);
 }
 /** automations.fire (demo): the event ID is the one-time key. A new event takes the current tick; a repeat sends its
- * event's tick (`at`), so the Core API returns the stored result. */
+event's tick (`at`), so the Core API returns the stored result. */
 export async function fireAuto(input: Evaluation, at?: string) {
   return run(async () => {
     const when = at ?? (await tick());

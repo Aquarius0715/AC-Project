@@ -15,7 +15,7 @@ test("the panel is labelled demo and shows the Core API clock", async ({ page })
 test("the clock moves forward by a minute", async ({ page }) => {
   test.skip(!process.env.E2E_ADVANCE_CLOCK, "moves the shared demo clock for good; set E2E_ADVANCE_CLOCK=1");
   await page.goto("/demo");
-  const read = async () => new Date(((await page.getByRole("main").innerText()).match(/(\d{4}-\d\d-\d\d) (\d\d:\d\d) UTC/) ?? []).slice(1).join("T") + ":00Z").getTime();
+  const read = async () => new Date(((/(\d{4}-\d\d-\d\d) (\d\d:\d\d) UTC/.exec((await page.getByRole("main").innerText()))) ?? []).slice(1).join("T") + ":00Z").getTime();
   const before = await read();
   await page.getByRole("button", { name: "+1 min" }).click();
   await expect(page.getByText("Clock advanced 1 minute")).toBeVisible();
@@ -28,10 +28,10 @@ test("a device loses its connection and gets it back", async ({ page }) => {
   test.skip((await select.count()) === 0, "no device this role can manage now");
   const options = await select.locator("option").allInnerTexts();
   // a seed device: the IoT demo's mock fleet ("Mock · …") reconnects with its next heartbeat
-  const online = options.findIndex((o) => / · online$/.test(o) && !o.startsWith("Mock · "));
-  test.skip(online < 0, "no online device to take offline");
+  const online = options.findIndex((o) => o.endsWith(' · online') && !o.startsWith("Mock · "));
+  test.skip(online === -1, "no online device to take offline");
   await select.selectOption({ index: online });
-  const unit = options[online].split(" · ")[0];
+  const unit = options[online].split(" · ", 1)[0];
   await page.getByRole("button", { name: /Device offline/ }).click();
   await expect(page.getByText(`${unit}: connection lost`)).toBeVisible();
   await expect(select.locator("option:checked")).toHaveText(/ · offline · fault open$/);

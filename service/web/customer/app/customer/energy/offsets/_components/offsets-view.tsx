@@ -11,17 +11,17 @@ import { useDisplay, useT } from "@ac/web/components/I18n";
 import { getQuote, requestOffset } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 
-type Live = {
+interface Live {
   unitIds: string[]; subject: string; period: { from: string; to: string; label: string }; estimate: { emissions: string; savedEmissions: string; factor: string; comparable: boolean } | null; back: string;
   records: { id: string; amountKg: number; state: ApiOffsetRecord["state"]; proof: string | null; createdAt: string }[];
-};
-type Quote = ApiQuote & { estimatedAmountMinor: number | null; currency: string | null };
+}
 const stateLabel: Record<ApiOffsetRecord["state"], string> = { demo_requested: "Demo requested", demo_purchased: "Demo purchased", demo_retired: "Demo retired", failed: "Failed" };
 const stateTone = { demo_requested: "primary", demo_purchased: "primary", demo_retired: "ok", failed: "crit" } as const;
 
 /** Carbon offsets (FR-C13) in API mode: a demo quote (offsets.preview, no record) and a demo request (offsets.simulate
- * request) for the energy selection. Nothing real is bought or retired; savings never become a tradable balance. */
+request) for the energy selection. Nothing real is bought or retired; savings never become a tradable balance. */
 export function OffsetsView({ live }: { live: Live }) {
+  type Quote = ApiQuote & { estimatedAmountMinor: number | null; currency: string | null };
   const t = useT();
   const display = useDisplay();
   // the quote's period is the energy selection's Kuala Lumpur days; its expiry and the records are instants in the user's zone
@@ -35,11 +35,17 @@ export function OffsetsView({ live }: { live: Live }) {
   const [done, setDone] = useState<ApiOffsetRecord | null>(null);
   const [explain, setExplain] = useState(false);
   const n = Number(amountKg);
-  const amountError = !/^\d+(\.\d{1,3})?$/.test(amountKg.trim()) || !(n > 0 && n <= 100000) ? t("Above 0, at most 100000, up to 3 decimals") : undefined;
-  const purposeError = purpose.trim().length < 1 || purpose.trim().length > 1000 ? t("1–1000 characters") : undefined;
-  const ask = () => run(() => getQuote({ purpose: purpose.trim(), amountKg: n, period: { from: live.period.from, to: live.period.to }, unitIds: live.unitIds }), t("Demo quote ready — no record was created"), (q) => { setQuote(q); setStep(1); });
-  const confirm = () => quote && run(() => requestOffset(quote.id, quote.version), t("Demo request recorded"), (r) => { setDone(r); setStep(3); },
-    (f) => { if (f.code === "CONFLICT") { setQuote(null); setStep(0); } }); // an expired or used quote: get a new one
+  const amountError = /^\d+(\.\d{1,3})?$/.test(amountKg.trim()) && (n > 0 && n <= 100_000) ? undefined : t("Above 0, at most 100000, up to 3 decimals");
+  const purposeError = purpose.trim().length === 0 || purpose.trim().length > 1000 ? t("1–1000 characters") : undefined;
+  const ask = () => { run(() => getQuote({ purpose: purpose.trim(), amountKg: n, period: { from: live.period.from, to: live.period.to }, unitIds: live.unitIds }), t("Demo quote ready — no record was created"), (q) => { setQuote(q); setStep(1); }); };
+  const confirm = () => {
+    return quote && run(() => requestOffset(quote.id, quote.version), t("Demo request recorded"), (r) => { setDone(r); setStep(3); },
+      (f) => { if (f.code !== "CONFLICT") {
+        return;
+      }
+
+      setQuote(null); setStep(0); });
+  }; // an expired or used quote: get a new one
   const restart = () => { setDone(null); setQuote(null); setAck(false); setStep(0); };
   return (
     <Page>
@@ -49,7 +55,7 @@ export function OffsetsView({ live }: { live: Live }) {
       <Card title={t("Based on Energy & cost")} sub={`${live.subject} · ${live.period.label}${live.estimate ? ` · ${live.estimate.factor}` : ""}`}>
         {live.estimate ? <div className="flex flex-wrap gap-x-8 gap-y-1 text-[13px]"><span>{t("Estimated emissions")} <b>{live.estimate.emissions}</b></span><span>{t("Estimated savings")} <b className={live.estimate.comparable ? "text-ok" : "text-muted-foreground"}>{live.estimate.savedEmissions}</b></span></div>
           : <p className="text-[13px] text-muted-foreground">{t("No estimate for this selection — the emission factor or valid readings are missing.")}</p>}
-        <Plain touch type="button" className="mt-2 text-xs font-semibold text-primary" aria-expanded={explain} onClick={() => setExplain((e) => !e)}><Icon name="info" /> {t("What is a carbon offset?")} <Icon name={explain ? "chevronDown" : "chevronRight"} /></Plain>
+        <Plain touch type="button" className="mt-2 text-xs font-semibold text-primary" aria-expanded={explain} onClick={() => { setExplain((e) => !e); }}><Icon name="info" /> {t("What is a carbon offset?")} <Icon name={explain ? "chevronDown" : "chevronRight"} /></Plain>
         {explain && <p className="mt-1 text-xs text-muted-foreground">{t("An offset retires a carbon credit to compensate emissions. Here it is simulated — nothing real is purchased, and no market, price or balance exists.")}</p>}
       </Card>
       {done ? (
@@ -60,8 +66,8 @@ export function OffsetsView({ live }: { live: Live }) {
       ) : step === 0 ? (
         <Card title={t("How much would you like to offset?")}>
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-            <Field label={t("Amount (kgCO₂e, > 0)")} hint={t("Up to 3 decimals")} error={amountError}><Input inputMode="decimal" value={amountKg} onChange={(e) => setAmountKg(e.target.value)} /></Field>
-            <Field label={t("Purpose")} error={purposeError}><Input value={purpose} onChange={(e) => setPurpose(e.target.value)} /></Field>
+            <Field label={t("Amount (kgCO₂e, > 0)")} hint={t("Up to 3 decimals")} error={amountError}><Input inputMode="decimal" value={amountKg} onChange={(e) => { setAmountKg(e.target.value); }} /></Field>
+            <Field label={t("Purpose")} error={purposeError}><Input value={purpose} onChange={(e) => { setPurpose(e.target.value); }} /></Field>
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{t("Getting a quote creates no record.")}</span><Btn variant="primary" disabled={pending || !!amountError || !!purposeError} onClick={ask}>{t("Get demo quote")}</Btn></div>
         </Card>
@@ -72,13 +78,13 @@ export function OffsetsView({ live }: { live: Live }) {
             [t("Quote ID"), t("{id} (demo)", { id: quote.id.slice(0, 8) })], [t("Estimated amount"), quote.estimatedAmountMinor !== null && quote.currency ? t("{amount} (demo)", { amount: amount(quote.estimatedAmountMinor, quote.currency) }) : t("No price — no offset provider is selected in this demo")],
             [t("Expires"), showTime(quote.expiresAt, display)], [t("Records created"), t("None yet")],
           ]} />
-          <div className="mt-3 flex gap-2"><Btn onClick={() => setStep(0)}><Icon name="arrowLeft" /> {t("Back")}</Btn><Btn variant="primary" onClick={() => setStep(2)}>{t("Continue")}</Btn></div>
+          <div className="mt-3 flex gap-2"><Btn onClick={() => { setStep(0); }}><Icon name="arrowLeft" /> {t("Back")}</Btn><Btn variant="primary" onClick={() => { setStep(2); }}>{t("Continue")}</Btn></div>
         </Card>
       ) : quote ? (
         <Card title={t("Confirm demo request")}>
           <SummaryList items={[[t("Amount"), `${kg3(quote.amountKg)} kgCO₂e`], [t("Quote"), t("{id} · expires {when}", { id: quote.id.slice(0, 8), when: showTime(quote.expiresAt, display) })], [t("Result"), t("A demo record “Demo requested” is created. Proof stays “Not issued”.")]]} />
           <div className="mt-3"><Check checked={ack} onChange={setAck} label={t("I understand this is a simulated request — not a real purchase.")} /></div>
-          <div className="mt-3 flex gap-2"><Btn onClick={() => setStep(1)}><Icon name="arrowLeft" /> {t("Back")}</Btn><Btn variant="primary" disabled={!ack || pending} onClick={confirm}>{t("Submit demo request")}</Btn></div>
+          <div className="mt-3 flex gap-2"><Btn onClick={() => { setStep(1); }}><Icon name="arrowLeft" /> {t("Back")}</Btn><Btn variant="primary" disabled={!ack || pending} onClick={confirm}>{t("Submit demo request")}</Btn></div>
         </Card>
       ) : null}
       <Card title={t("Demo offset records")} sub={t("Demo retirement ≠ certified credit")}>

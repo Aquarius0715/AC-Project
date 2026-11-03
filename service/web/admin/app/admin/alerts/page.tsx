@@ -11,16 +11,16 @@ import { adminAlertRows, policyRows, type AlertState, type ApiAdminAlert, type A
 import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { AdminAlertsView } from "./_components/alerts-view";
 
-type Page<T> = { items: T[] };
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => { // names the session may not read (no identity.read or job.read)
-  if (e instanceof CoreError && e.error.code === "FORBIDDEN") return fallback;
-  throw e;
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error) => { // names the session may not read (no identity.read or job.read)
+  if (error instanceof CoreError && error.error.code === "FORBIDDEN") return fallback;
+  throw error;
 });
 const SEVERITIES: Severity[] = ["critical", "warning", "normal"];
 const STATES: AlertState[] = ["open", "acknowledged", "resolved"];
 
 export default async function AdminAlertsPage({ searchParams }: PageProps<"/admin/alerts">) {
+  interface Page<T> { items: T[] }
   await connection();
   if (!apiMode()) return <AdminAlertsView />;
   const sp = await searchParams;
@@ -29,17 +29,19 @@ export default async function AdminAlertsPage({ searchParams }: PageProps<"/admi
     customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId), severity,
     status: STATES.find((s) => s === one(sp.status)) ?? "open", alertId: one(sp.alertId) ?? null,
   };
-  const scope = { ...(q.customerId ? { customerId: q.customerId } : {}), ...(q.propertyId ? { propertyId: q.propertyId } : {}), ...(q.unitId ? { unitId: q.unitId } : {}) };
-  const filters = { ...scope, ...(severity ? { severity } : {}) };
+  const scope = { ...(q.customerId && { customerId: q.customerId }), ...(q.propertyId && { propertyId: q.propertyId }), ...(q.unitId && { unitId: q.unitId }) };
+  const filters = { ...scope, ...(severity && { severity }) };
   // the policies in the same scope (DD-A05 item 8). The default policy is read on its own, without the scope: a property
   // or unit scope leaves it out though it runs on every unit (Figma 268:2), and a customer scope would keep only that
   // customer's rule settings, while its editor switches the rules for every customer (item 9)
   // a read the role may not make answers the permission it needs: the first one missing names the page's state, instead
   // of a failure with Try again (IR581)
-  const need = <T,>(p: Promise<T>, permission: string): Promise<T | { missing: string }> => p.catch((e) => {
-    if (e instanceof CoreError && e.error.code === "FORBIDDEN") return { missing: permission };
-    throw e;
-  });
+  const need = <T,>(p: Promise<T>, permission: string): Promise<T | { missing: string }> => {
+    return p.catch((error) => {
+      if (error instanceof CoreError && error.error.code === "FORBIDDEN") return { missing: permission };
+      throw error;
+    });
+  };
   const [now, perms, display, alertsRead, unitsRead, customersRead, propertiesRead, policiesRead, members, defaultsRead] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
     need(coreOp<Page<ApiAdminAlert>>("alerts.list", { limit: 100, filters }), "alert.read"), // every status in the scope: the tiles count them

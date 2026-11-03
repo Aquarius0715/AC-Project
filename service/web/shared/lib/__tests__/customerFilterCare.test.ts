@@ -6,9 +6,11 @@ import {
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const NOW = Date.parse("2026-09-14T01:00:00Z"); // Mon 09:00 KL
-const st = (over: Partial<ApiFilterStatus>): ApiFilterStatus => ({
-  unitId: "u1", runHoursSinceCleaning: 212, thresholdHours: 250, fallbackDays: 30, lastCleanedAt: "2026-08-30T02:00:00Z", lastCleanedBy: "customer", lastCleaningJobId: null, status: "due_soon", ...over,
-});
+const st = (over: Partial<ApiFilterStatus>): ApiFilterStatus => {
+  return {
+    unitId: "u1", runHoursSinceCleaning: 212, thresholdHours: 250, fallbackDays: 30, lastCleanedAt: "2026-08-30T02:00:00Z", lastCleanedBy: "customer", lastCleaningJobId: null, status: "due_soon", ...over,
+  };
+};
 const unit = (id: string, over: Partial<FilterUnit> = {}): FilterUnit => ({ id, name: `AC ${id}`, place: "Home A › 1F", spaceId: "s-1f", connection: "online", ...over });
 const settings: ApiFilterSettings = { id: "", version: 0, customerId: "c", thresholdHours: null, fallbackDays: 30, recipients: "owners", channels: ["inApp"] };
 

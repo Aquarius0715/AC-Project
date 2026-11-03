@@ -19,8 +19,8 @@ const failed = (e: unknown): Result<never> => {
 const run = async <T,>(fn: () => Promise<T>, reload = false): Promise<Result<T>> => {
   try {
     return { ok: true, value: await fn() };
-  } catch (e) {
-    return failed(e);
+  } catch (error) {
+    return failed(error);
   } finally {
     if (reload) refresh();
   }
@@ -30,23 +30,22 @@ const reportState = (r: ApiTechReport): Report => ({ id: r.id, version: r.versio
 
 /** jobs.acknowledgeAssignment: accept, or "can't make this time" with a reason and an optional other slot. */
 export async function acknowledge(jobId: string, version: number, decision: "accept" | "cant_make", reason: string | null, alternativeSlot: { startAt: string; endAt: string } | null) {
-  return run(() => coreOp("jobs.acknowledgeAssignment", { jobId, decision, ...(decision === "cant_make" ? { ...(reason ? { reason } : {}), alternativeSlot } : {}) }, { write: true, expectedVersion: version }), true);
+  return run(() => coreOp("jobs.acknowledgeAssignment", { jobId, decision, ...((decision === "cant_make") && { ...(reason && { reason }), alternativeSlot }) }, { write: true, expectedVersion: version }), true);
 }
 
 /** jobs.checkIn (IR111): location ≤ 200 m with the scanned unit QR, or manual with a reason; checking in starts the
- * work. The QR code is resolved with units.resolveQr first (the label's unit must be the job's unit): a label it does
- * not find among the technician's assigned units is refused as the check-in refuses another unit's label (IR486). */
+work. The QR code is resolved with units.resolveQr first (the label's unit must be the job's unit): a label it does
+not find among the technician's assigned units is refused as the check-in refuses another unit's label (IR486). */
 export async function checkIn(jobId: string, version: number, method: "location_qr" | "manual", distanceMeters: number | null, qrCode: string | null, reason: string | null): Promise<Result<unknown>> {
   let qrUnitId: string | null = null;
   if (method === "location_qr" && qrCode) {
     try {
       qrUnitId = (await coreOp<{ unitId: string }>("units.resolveQr", { code: qrCode })).unitId;
-    } catch (e) {
-      if (e instanceof CoreError && e.error.code === "NOT_FOUND") return { ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { qrUnitId: "errors.qr_unit_mismatch" } };
-      return failed(e);
+    } catch (error) {
+      return error instanceof CoreError && error.error.code === "NOT_FOUND" ? { ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { qrUnitId: "errors.qr_unit_mismatch" } } : failed(error);
     }
   }
-  return run(() => coreOp("jobs.checkIn", { jobId, method, distanceMeters: method === "location_qr" ? distanceMeters : null, qrUnitId, ...(method === "manual" && reason !== null ? { reason } : {}) }, { write: true, expectedVersion: version }), true);
+  return run(() => coreOp("jobs.checkIn", { jobId, method, distanceMeters: method === "location_qr" ? distanceMeters : null, qrUnitId, ...(method === "manual" && reason !== null && { reason }) }, { write: true, expectedVersion: version }), true);
 }
 
 /** jobs.pauseWork: pause or resume the time on site. */
@@ -56,7 +55,7 @@ export async function pauseWork(jobId: string, version: number, paused: boolean)
 
 /** jobs.saveDraft: the first save creates the draft (no version); later saves carry the draft version. */
 export async function saveDraft(body: OpInput<"jobs.saveDraft">, reportVersion: number | null) {
-  return run(async () => reportState(await coreOp<ApiTechReport>("jobs.saveDraft", body, { write: true, ...(body.reportId ? { expectedVersion: reportVersion ?? 0 } : {}) })));
+  return run(async () => reportState(await coreOp<ApiTechReport>("jobs.saveDraft", body, { write: true, ...(body.reportId && { expectedVersion: reportVersion ?? 0 }) })));
 }
 
 /** attachments.add: one JPEG/PNG photo (≤ 5 MiB) from a form field; the draft version moves on and the sign-off is cleared. */
@@ -72,7 +71,7 @@ export async function uploadPhoto(form: FormData) {
 }
 
 /** reports.signOff (FR-T15): the customer's signature (PNG drawn on the device), or an absence reason with a site
- * photo, bound to this draft version (a later save clears it). */
+photo, bound to this draft version (a later save clears it). */
 export async function signOff(form: FormData) {
   const jobId = String(form.get("jobId")), reportId = String(form.get("reportId")), reportVersion = Number(form.get("reportVersion"));
   const signerName = String(form.get("signerName") ?? "").trim();
@@ -80,9 +79,11 @@ export async function signOff(form: FormData) {
   const signature = typeof png === "string" && png ? { name: "signature.png", mime: "image/png" as const, size: Buffer.from(png, "base64").length, bytes: png } : null;
   const photoBytes = photo instanceof File && photo.size > 0 ? Buffer.from(await photo.arrayBuffer()) : null;
   const sitePhoto = photo instanceof File && photoBytes ? { name: uploadName(photo.name), mime: uploadType(photoBytes, photo.type) as OpInput<"attachments.add">["file"]["mime"], size: photo.size, bytes: photoBytes.toString("base64") } : undefined;
-  return run(async () => reportState(await coreOp<ApiTechReport>("reports.signOff", {
-    jobId, reportId, reportVersion, signerName, signature, ...(signature ? {} : { absentReason: absent, sitePhoto }),
-  }, { write: true, expectedVersion: reportVersion })));
+  return run(async () => {
+    return reportState(await coreOp<ApiTechReport>("reports.signOff", {
+      jobId, reportId, reportVersion, signerName, signature, ...(!signature && { absentReason: absent, sitePhoto }),
+    }, { write: true, expectedVersion: reportVersion }));
+  });
 }
 
 /** jobs.submit: the current draft version; the job version is the expected version. */

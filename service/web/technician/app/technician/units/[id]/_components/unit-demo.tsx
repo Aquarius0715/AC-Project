@@ -9,13 +9,13 @@ const comps = { Indoor: ["Filter: attention (2026-06-12)"], Outdoor: ["All norma
 const counts = { Indoor: 8, Outdoor: 5, Electrical: 5 };
 
 /** The Phase 1A demo of the technician unit page (fixture values; “preview: communication lost” toggles the offline
- * state). */
+state). */
 export function TechUnitDemo({ id }: { id: string }) {
   const [tab, setTab] = useState<"register" | "monitoring">("register");
   const [win, setWin] = useState<"1h" | "24h" | "7d">("24h");
   const [lost, setLost] = useState(false);
   if (id === "unit-other-customer") return <Page className="max-w-xl"><Card title="This page isn’t available" sub="Not in your assignments (NOT_FOUND)." /></Page>;
-  const missing = id === "unit-non-rto";
+  const isMissing = id === "unit-non-rto";
   const temp = [26, 26, 25, 25, null, null, 26, 27, 28, 29, 30, 30.4];
   return (
     <Page>
@@ -24,13 +24,13 @@ export function TechUnitDemo({ id }: { id: string }) {
       {tab === "register" ? (
         <div className="split">
           <div className="flex min-w-0 flex-col gap-4">
-            <Card title="Unit register"><SummaryList cols={2} items={[["Location", "customer-a · Home A › 1F › Bedroom"], ["Manufacturer / model", missing ? "Not registered" : "AC-Co / ventilation-demo v3"], ["Configuration", missing ? "Not registered" : "Split · 2.5 kW · R32"], ["Installed", missing ? "Not registered" : "2025-03-01"], ["Capability version", "3"], ["Maintenance scope", "Indoor · Outdoor · Electrical"]]} /><p className="mt-2 text-xs text-muted-foreground">18 components across 3 groups (8 indoor, 5 outdoor, 5 electrical) — see Job Workspace for inspection.</p></Card>
+            <Card title="Unit register"><SummaryList cols={2} items={[["Location", "customer-a · Home A › 1F › Bedroom"], ["Manufacturer / model", isMissing ? "Not registered" : "AC-Co / ventilation-demo v3"], ["Configuration", isMissing ? "Not registered" : "Split · 2.5 kW · R32"], ["Installed", isMissing ? "Not registered" : "2025-03-01"], ["Capability version", "3"], ["Maintenance scope", "Indoor · Outdoor · Electrical"]]} /><p className="mt-2 text-xs text-muted-foreground">18 components across 3 groups (8 indoor, 5 outdoor, 5 electrical) — see Job Workspace for inspection.</p></Card>
             <Card title="Components (18) · last inspection"><div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>{(Object.keys(comps) as (keyof typeof comps)[]).map((g) => <div key={g} className="rounded-xl bg-surface2 p-3"><b className="text-[13px]">{g} · {counts[g]} components</b>{comps[g].map((c) => <div key={c} className="text-xs text-muted-foreground">{c}</div>)}</div>)}</div></Card>
             <Card title="Maintenance history">{[["job-contractor-a · Reactive", "today 10:00–12:00 · you"], ["job-c01 · Preventive", "2026-06-12 · filter replaced"], ["job-a17 · Installation check", "2025-03-01 · commissioning"]].map(([a, b]) => <div key={a} className="border-t border-line py-2 text-[13px] first:border-0"><b>{a}</b><div className="text-xs text-muted-foreground">{b}</div></div>)}</Card>
           </div>
           <div className="flex min-w-0 flex-col gap-4">
             <Card title="Open alerts (1)" action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${id}/alerts`}>Evidence <Icon name="arrowRight" /></Link>}><b className="text-[13px]">Bedroom too hot</b> <SeverityBadge s="warning" /><p className="text-xs text-muted-foreground">30.4 °C since 09:12 · policy ≥ 30 °C</p><p className="mt-1 text-xs text-muted-foreground">Acknowledged by nobody yet. Completing the job does not resolve it.</p></Card>
-            <Card title="Live"><SummaryList items={[["Temperature", "24.5°C · updated 2s ago"], ["Power", "1200 W · updated 2s ago"], ["Connection", lost ? "Offline" : "Online · last seen 09:41"]]} /><Plain className="mt-2 text-[11px] text-muted-foreground underline" onClick={() => setLost((l) => !l)}>preview: communication lost</Plain></Card>
+            <Card title="Live"><SummaryList items={[["Temperature", "24.5°C · updated 2s ago"], ["Power", "1200 W · updated 2s ago"], ["Connection", lost ? "Offline" : "Online · last seen 09:41"]]} /><Plain className="mt-2 text-[11px] text-muted-foreground underline" onClick={() => { setLost((l) => !l); }}>preview: communication lost</Plain></Card>
             <Card title="Diagnostics"><Link href={`/technician/units/${id}/control`} className="text-xs font-semibold text-primary">Open diagnostic control <Icon name="arrowRight" /></Link></Card>
           </div>
         </div>

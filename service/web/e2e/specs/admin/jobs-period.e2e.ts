@@ -7,8 +7,8 @@ test("a job-status row opens the Jobs tab for that period", async ({ page }) => 
   const rows = page.locator("main a[href^='/admin/jobs?'][href*='stage=']");
   await expect(rows.first()).toBeVisible();
   const texts = await rows.allInnerTexts();
-  const i = Math.max(0, texts.findIndex((t) => /\s[1-9]\d*$/.test(t.replace(/\s+/g, " ").trim())));
-  const count = Number(texts[i].replace(/\s+/g, " ").trim().match(/(\d+)$/)?.[1] ?? 0);
+  const i = Math.max(0, texts.findIndex((t) => /\s[1-9]\d*$/.test(t.replaceAll(/\s+/g, " ").trim())));
+  const count = Number((/(\d+)$/.exec(texts[i].replaceAll(/\s+/g, " ").trim()))?.[1] ?? 0);
   const href = (await rows.nth(i).getAttribute("href"))!;
   expect(href).toMatch(/[?&]from=.+&to=.+/);
   await rows.nth(i).click();

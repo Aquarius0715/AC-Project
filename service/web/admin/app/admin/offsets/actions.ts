@@ -12,9 +12,8 @@ export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messa
 async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
-  } catch (e) {
-    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds };
-    return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+  } catch (error) {
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     if (rerender) refresh();
   }

@@ -23,13 +23,13 @@ const statusWord: Record<string, string> = {
 const connectionWord: Record<string, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
 
 /** The contractor's offer or job (FR-P02, FR-P08, Figma Contractor 02-7…02-14) from the Core API, by projection.
- * Texts in the user's display language; the times come formatted from the loader (IR272). */
+Texts in the user's display language; the times come formatted from the loader (IR272). */
 export function JobDetailView({ live }: { live: JobDetailLive }) {
   const t = useT();
   if (live.kind === "offer") return <OfferView live={live} />;
   if (live.kind === "detail") return <DetailView live={live} />;
   const h = live.job;
-  const status = statusWord[h.status] ? t(statusWord[h.status]) : h.status.replace(/_/g, " ");
+  const status = statusWord[h.status] ? t(statusWord[h.status]) : h.status.replaceAll('_', " ");
   return (
     <Page narrow>
       <Crumb text={t("{id} · history", { id: h.jobId.slice(0, 8) })} />
@@ -37,7 +37,7 @@ export function JobDetailView({ live }: { live: JobDetailLive }) {
       <Card title={`${h.jobId.slice(0, 8)} · ${typeLabel(h.type, t)}`} action={<Badge tone={h.status === "completed" ? "ok" : "muted"}>{status}</Badge>}>
         <SummaryList items={[[t("Job type"), typeLabel(h.type, t)], [t("Status"), status], [t("Completed"), live.text.completed], [t("Snapshot"), live.text.snapshot]]} />
         <h3 className="mb-1 mt-4 text-[13px] font-semibold">{t("Your company’s decisions")}</h3>
-        {live.text.events.length ? <ul className="flex flex-col gap-1 text-xs">{live.text.events.map((e) => <li key={e.id}><span className="text-muted-foreground">{e.at}</span> · {e.text}</li>)}</ul> : <p className="text-xs text-muted-foreground">{t("No decision recorded.")}</p>}
+        {live.text.events.length > 0 ? <ul className="flex flex-col gap-1 text-xs">{live.text.events.map((e) => <li key={e.id}><span className="text-muted-foreground">{e.at}</span> · {e.text}</li>)}</ul> : <p className="text-xs text-muted-foreground">{t("No decision recorded.")}</p>}
       </Card>
     </Page>
   );
@@ -79,9 +79,9 @@ function OfferView({ live }: { live: Extract<JobDetailLive, { kind: "offer" }> }
   const [modal, setModal] = useState<null | "decline" | "propose">(null);
   const [refused, setRefused] = useState<string | null>(null);
   const [declined, setDeclined] = useState(false);
-  const failed = (f: ActionFailure) => setRefused(decisionRefusal(f, t));
+  const failed = (f: ActionFailure) => { setRefused(decisionRefusal(f, t)); };
   const p = j.partnerSlotProposal;
-  const open = !!p && (p.status === "pending" || p.status === "sent_to_client");
+  const isOpen = !!p && (p.status === "pending" || p.status === "sent_to_client");
   const short = j.jobId.slice(0, 8);
   const quals = j.requiredQualifications.map((q) => qualificationLabel(q, t));
   if (declined) {
@@ -91,7 +91,7 @@ function OfferView({ live }: { live: Extract<JobDetailLive, { kind: "offer" }> }
     <Page narrow>
       <Crumb text={`${short} · ${j.siteAddress ?? typeLabel(j.type, t)} · ${t(j.status === "offered" ? "offer" : "accepted")}`} />
       {refused && <Banner tone="crit">{refused}</Banner>}
-      {open && <Banner tone="warn">{t(p!.status === "sent_to_client" ? "HQ asked the client about your proposed time ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered." : "Your proposed time is with HQ ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered.", { slot: x.proposal ?? "", name: live.names[p!.technicianMembershipId] ?? t("technician") })}</Banner>}
+      {isOpen && <Banner tone="warn">{t(p!.status === "sent_to_client" ? "HQ asked the client about your proposed time ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered." : "Your proposed time is with HQ ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered.", { slot: x.proposal ?? "", name: live.names[p!.technicianMembershipId] ?? t("technician") })}</Banner>}
       {p?.status === "approved" && <Banner tone="ok">{t("The client approved your proposed time — the visit is now {slot}. Accept the offer to continue.", { slot: x.visit })}</Banner>}
       {(p?.status === "declined" || p?.status === "kept") && <Banner tone="warn">{t("Your time change was not taken — the agreed time stays {slot}. Accept or decline.", { slot: x.visit })}</Banner>}
       {j.status === "accepted" && <Banner tone="ok" action={<LinkBtn size="sm" variant="primary" href={`/partner/schedule?jobId=${j.jobId}`}>{t("Assign technician")} <Icon name="arrowRight" /></LinkBtn>}>{t("Accepted — the delegation period starts {time}; unit details open then. Assign your technician for exactly {slot}.", { time: x.accessFrom, slot: x.visit })}</Banner>}
@@ -109,12 +109,12 @@ function OfferView({ live }: { live: Extract<JobDetailLive, { kind: "offer" }> }
         {j.status === "offered" && (
           <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4">
             <Field label={t("Decline reason (required if declining, 1–1000 characters)")} error={tried && !reason.trim() ? t("A reason is required to decline (1–1000 characters)") : undefined}>
-              <Input value={reason} maxLength={1000} onChange={(e) => setReason(e.target.value)} placeholder={t("No qualified technician available in this window.")} />
+              <Input value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} placeholder={t("No qualified technician available in this window.")} />
             </Field>
             <Btn variant="danger" disabled={pending} onClick={() => { setTried(true); if (reason.trim()) setModal("decline"); }}>{t("Decline")}</Btn>
-            {open ? <Btn disabled={pending} onClick={() => run(() => withdrawProposal(j.jobId, p!.id, j.jobVersion), t("Proposal withdrawn"), () => setRefused(null), failed)}>{t("Withdraw my proposal")}</Btn>
-              : <Btn disabled={pending || !live.technicians.length} onClick={() => setModal("propose")}>{t("Propose another time…")}</Btn>}
-            <Btn variant="primary" disabled={pending || open || Date.parse(j.offerExpiresAt) <= now} onClick={() => run(() => acceptOffer(j.jobId, j.offerId, j.termsVersion, j.jobVersion), t("Offer accepted — assign a technician next"), () => setRefused(null), failed)}>{t("Accept job")}</Btn>
+            {isOpen ? <Btn disabled={pending} onClick={() => { run(() => withdrawProposal(j.jobId, p!.id, j.jobVersion), t("Proposal withdrawn"), () => { setRefused(null); }, failed); }}>{t("Withdraw my proposal")}</Btn>
+              : <Btn disabled={pending || live.technicians.length === 0} onClick={() => { setModal("propose"); }}>{t("Propose another time…")}</Btn>}
+            <Btn variant="primary" disabled={pending || isOpen || Date.parse(j.offerExpiresAt) <= now} onClick={() => { run(() => acceptOffer(j.jobId, j.offerId, j.termsVersion, j.jobVersion), t("Offer accepted — assign a technician next"), () => { setRefused(null); }, failed); }}>{t("Accept job")}</Btn>
           </div>
         )}
       </Card>
@@ -126,11 +126,11 @@ function OfferView({ live }: { live: Extract<JobDetailLive, { kind: "offer" }> }
           <span><span className="block uppercase text-muted-foreground">{t("Open offers")}</span>{t("1 of {n} · answer within {left}", { n: x.offers, left: x.left })}</span>
         </div>} />
       {modal === "decline" && (
-        <Modal open onClose={() => setModal(null)} title={t("Decline offer {id}?", { id: short })} footer={<><Btn onClick={() => setModal(null)}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={() => run(() => declineOffer(j.jobId, j.offerId, j.jobVersion, reason.trim()), t("Offer declined"), () => { setModal(null); setDeclined(true); }, (f) => { setModal(null); failed(f); })}>{t("Confirm decline")}</Btn></>}>
+        <Modal open onClose={() => { setModal(null); }} title={t("Decline offer {id}?", { id: short })} footer={<><Btn onClick={() => { setModal(null); }}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { run(() => declineOffer(j.jobId, j.offerId, j.jobVersion, reason.trim()), t("Offer declined"), () => { setModal(null); setDeclined(true); }, (f) => { setModal(null); failed(f); }); }}>{t("Confirm decline")}</Btn></>}>
           <p className="text-[13px]">{t("The job returns to HQ with your reason: “{reason}”. A new offer would get a new offer ID.", { reason: reason.trim() })}</p>
         </Modal>
       )}
-      {modal === "propose" && <ProposeModal j={j} x={x} technicians={live.technicians} onClose={() => setModal(null)} onSend={(slot, tech, why) => run(() => proposeSlot(j.jobId, j.offerId, j.jobVersion, slot, tech, why), t("Sent to HQ — waiting for the client"), () => { setModal(null); setRefused(null); }, (f) => { setModal(null); failed(f); })} pending={pending} />}
+      {modal === "propose" && <ProposeModal j={j} x={x} technicians={live.technicians} onClose={() => { setModal(null); }} onSend={(slot, tech, why) => { run(() => proposeSlot(j.jobId, j.offerId, j.jobVersion, slot, tech, why), t("Sent to HQ — waiting for the client"), () => { setModal(null); setRefused(null); }, (f) => { setModal(null); failed(f); }); }} pending={pending} />}
     </Page>
   );
 }
@@ -145,17 +145,17 @@ function ProposeModal({ j, x, technicians, onClose, onSend, pending }: { j: ApiO
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   const startAt = zonedInstant(date, from, x.propose.zone), endAt = zonedInstant(date, to, x.propose.zone);
-  const order = !!startAt && !!endAt && startAt < endAt;
+  const isOrder = !!startAt && !!endAt && startAt < endAt;
   return (
-    <Modal open onClose={onClose} title={t("Propose another time")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!reason.trim() || !order || !tech) return; onSend({ startAt, endAt }, tech, reason.trim()); }}>{t("Send to HQ")}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Propose another time")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!reason.trim() || !isOrder || !tech) return; onSend({ startAt, endAt }, tech, reason.trim()); }}>{t("Send to HQ")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{t("{id} · agreed with the client: {slot} · times in {zone}", { id: j.jobId.slice(0, 8), slot: x.visit, zone: x.propose.zone })}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
-        <Field label={t("Date")}><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
-        <Field label={t("From")}><Input type="time" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
-        <Field label={t("To")} error={tried && !order ? t("The end must be after the start") : undefined}><Input type="time" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+        <Field label={t("Date")}><Input type="date" value={date} onChange={(e) => { setDate(e.target.value); }} /></Field>
+        <Field label={t("From")}><Input type="time" value={from} onChange={(e) => { setFrom(e.target.value); }} /></Field>
+        <Field label={t("To")} error={tried && !isOrder ? t("The end must be after the start") : undefined}><Input type="time" value={to} onChange={(e) => { setTo(e.target.value); }} /></Field>
       </div>
-      <Field label={t("Technician (own company, qualified)")}><Select value={tech} onChange={(e) => setTech(e.target.value)}>{technicians.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</Select></Field>
-      <Field label={t("Reason (sent to HQ and the client) · required, 1–1000 characters")} error={tried && !reason.trim() ? t("A reason is required") : undefined}><Textarea value={reason} maxLength={1000} onChange={(e) => setReason(e.target.value)} placeholder={t("Our qualified technician is on a certificate course that morning.")} /></Field>
+      <Field label={t("Technician (own company, qualified)")}><Select value={tech} onChange={(e) => { setTech(e.target.value); }}>{technicians.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</Select></Field>
+      <Field label={t("Reason (sent to HQ and the client) · required, 1–1000 characters")} error={tried && !reason.trim() ? t("A reason is required") : undefined}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} placeholder={t("Our qualified technician is on a certificate course that morning.")} /></Field>
       <Banner>{t("HQ forwards this to the client for approval. The offer stays reserved for you until the client answers; if they decline, HQ may keep the original time with another partner.")}</Banner>
     </Modal>
   );
@@ -168,10 +168,10 @@ function DetailView({ live }: { live: Extract<JobDetailLive, { kind: "detail" }>
   const u = live.unit;
   const now = Date.parse(live.now);
   const short = j.id.slice(0, 8);
-  const settled = j.status === "submitted" || j.status === "completed" || j.status === "cancelled"; // the work is done: no technician to find any more
+  const isSettled = j.status === "submitted" || j.status === "completed" || j.status === "cancelled"; // the work is done: no technician to find any more
   const reading = u?.latestMeasurements?.find((m) => m.value !== null);
-  const needsTech = j.status === "accepted" || (j.assignment?.acknowledgement === "cant_make") || (!!j.assignment && Date.parse(j.assignment.scheduledEnd) <= now && (j.status === "assigned" || j.status === "in_progress"));
-  const status = statusWord[j.status] ? t(statusWord[j.status]) : j.status.replace(/_/g, " ");
+  const isNeedsTech = j.status === "accepted" || (j.assignment?.acknowledgement === "cant_make") || (!!j.assignment && Date.parse(j.assignment.scheduledEnd) <= now && (j.status === "assigned" || j.status === "in_progress"));
+  const status = statusWord[j.status] ? t(statusWord[j.status]) : j.status.replaceAll('_', " ");
   const connection = u ? (connectionWord[u.connection] ? t(connectionWord[u.connection]) : u.connection) : "";
   return (
     <Page>
@@ -192,7 +192,7 @@ function DetailView({ live }: { live: Extract<JobDetailLive, { kind: "detail" }>
               [t("Scheduled slot"), x.scheduled ? `${x.scheduled} · ${x.tech}` : <b key="n" className="text-crit">{t("Not assigned yet")}</b>],
             ]} />
             <div className="mt-4 flex flex-wrap gap-2">
-              {needsTech && <LinkBtn variant="primary" href={`/partner/schedule?jobId=${j.id}`}>{t(j.assignment ? "Reassign technician" : "Assign technician")}<Icon name="arrowRight" /></LinkBtn>}
+              {isNeedsTech && <LinkBtn variant="primary" href={`/partner/schedule?jobId=${j.id}`}>{t(j.assignment ? "Reassign technician" : "Assign technician")}<Icon name="arrowRight" /></LinkBtn>}
               {j.status === "submitted" && <LinkBtn variant="primary" href={`/partner/jobs/${j.id}/review`}>{t("Review report")} <Icon name="arrowRight" /></LinkBtn>}
               <LinkBtn href={`/partner/units/${j.unitId}?jobId=${j.id}`}>{t("Open unit")} <Icon name="arrowRight" /></LinkBtn>
               <LinkBtn href={`/partner/history?jobId=${j.id}`}>{t("Job history")} <Icon name="arrowRight" /></LinkBtn>
@@ -208,8 +208,8 @@ function DetailView({ live }: { live: Extract<JobDetailLive, { kind: "detail" }>
                     [t("Connection"), x.seen ? t("{state} · seen {time}", { state: connection, time: x.seen }) : connection],
                   ]} />
                   <SummaryList items={[
-                    [t("Open alerts"), live.alerts.length ? <span key="a" className="text-crit">{live.alerts.length} · {alertTitle(live.alerts[0], t)}</span> : t("none")],
-                    [t("Last reading"), reading ? `${reading.metric.replace(/_/g, " ")} ${reading.value} ${reading.unit}` : "—"],
+                    [t("Open alerts"), live.alerts.length > 0 ? <span key="a" className="text-crit">{live.alerts.length} · {alertTitle(live.alerts[0], t)}</span> : t("none")],
+                    [t("Last reading"), reading ? `${reading.metric.replaceAll('_', " ")} ${reading.value} ${reading.unit}` : "—"],
                     [t("Maintenance scope"), u.serviceScope.map((s) => (scopeLabel[s] ? t(scopeLabel[s]) : s)).join(" · ")],
                   ]} />
                 </div>
@@ -223,15 +223,15 @@ function DetailView({ live }: { live: Extract<JobDetailLive, { kind: "detail" }>
             <ol className="flex flex-col gap-2">
               {x.steps.map((s, i) => (
                 <li key={s.label} className="flex items-start gap-2 text-xs">
-                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${s.state === "done" ? "bg-primary text-white" : s.state === "current" ? "border-2 border-primary text-primary" : "border border-line text-muted-foreground"}`}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span>
-                  <span><b className={s.state === "todo" ? "text-muted-foreground" : s.state === "current" ? "text-primary" : ""}>{s.label}</b><span className="block text-[11px] text-muted-foreground">{s.atText ?? (s.state === "todo" ? t("next") : "")} · {s.sub}</span></span>
+                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${s.state === "done" ? "bg-primary text-white" : (s.state === "current" ? "border-2 border-primary text-primary" : "border border-line text-muted-foreground")}`}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span>
+                  <span><b className={s.state === "todo" ? "text-muted-foreground" : (s.state === "current" ? "text-primary" : "")}>{s.label}</b><span className="block text-[11px] text-muted-foreground">{s.atText ?? (s.state === "todo" ? t("next") : "")} · {s.sub}</span></span>
                 </li>
               ))}
             </ol>
             <p className="mt-2 text-[11px] text-muted-foreground">{t("Live unit values are visible only within the delegation period. After it ends this page shows a minimal history snapshot.")}</p>
-            {settled && x.delegation && <p className="mt-2 text-[11px] text-muted-foreground">{x.delegation.left}</p>}
+            {isSettled && x.delegation && <p className="mt-2 text-[11px] text-muted-foreground">{x.delegation.left}</p>}
           </Card>
-          {!settled && <FitCard title={t("Who can take it")} rows={live.fits} note={t("Own-company technicians: qualification for the unit’s scope and free hours from the visit day (members.capacity).")}
+          {!isSettled && <FitCard title={t("Who can take it")} rows={live.fits} note={t("Own-company technicians: qualification for the unit’s scope and free hours from the visit day (members.capacity).")}
             footer={j.offer && x.delegation && <p className={`mt-2 text-[11px] ${!j.assignment || Date.parse(j.offer.accessValidUntil) - now < 2 * 86_400_000 ? "text-crit" : "text-muted-foreground"}`}>{j.assignment ? x.delegation.left : x.delegation.toSchedule}</p>} />}
         </div>
       </div>

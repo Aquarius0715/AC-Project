@@ -18,16 +18,16 @@ const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
     const value = await fn();
     refresh();
     return { ok: true, value };
-  } catch (e) {
-    if (e instanceof CoreError) return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
-    throw e;
+  } catch (error) {
+    if (error instanceof CoreError) return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
+    throw error;
   }
 };
 const invalid = (field: string): Result<never> => ({ ok: false, code: "VALIDATION", messageKey: "error.validation", fieldErrors: { [field]: "error.invalid" } });
 
 /** demo.advanceClock to the scenario clock now plus one minute or one hour (forward only, IR36). Every service reads the
- * shared offset at most a second late (IR168), so the action waits until session.get shows the jump before the page
- * renders again. */
+shared offset at most a second late (IR168), so the action waits until session.get shows the jump before the page
+renders again. */
 export async function advanceClock(minutes: number) {
   if (minutes !== 1 && minutes !== 60) return invalid("minutes");
   return run(async () => {

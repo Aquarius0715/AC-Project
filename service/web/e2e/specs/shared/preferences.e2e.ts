@@ -7,6 +7,7 @@ import { expectAccessible } from "../../fixtures/a11y";
 
 // English and the earlier zone come back at the end of the language test, or here when it fails (also on a timeout)
 let zoneBefore: string | null = null;
+
 test.afterEach(async ({ page }) => {
   if (zoneBefore) await setDisplay(page, ENGLISH, zoneBefore);
   zoneBefore = null;

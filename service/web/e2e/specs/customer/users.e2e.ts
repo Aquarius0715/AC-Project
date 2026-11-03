@@ -15,7 +15,7 @@ test("the owner's own row shows the last sign-in", async ({ page }) => {
 test("the add dialog refuses a missing name, a bad or existing address and adds nobody when cancelled", async ({ page }) => {
   await page.goto("/customer/users");
   const me = page.locator("main tr", { hasText: "(you)" });
-  const email = ((await me.locator("td").first().innerText()).match(/\S+@\S+/) ?? [""])[0];
+  const email = ((/\S+@\S+/.exec((await me.locator("td").first().innerText()))) ?? [""])[0];
   expect(email).not.toBe("");
   await page.getByRole("button", { name: "Add user" }).click();
   const dialog = page.getByRole("dialog");

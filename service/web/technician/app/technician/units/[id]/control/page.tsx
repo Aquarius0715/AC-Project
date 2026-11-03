@@ -20,8 +20,5 @@ export default async function TechnicianControlPage({ params, searchParams }: Pa
   const jobId = typeof sp.jobId === "string" && sp.jobId ? sp.jobId : null; // the job the commands belong to (IR94)
   const live = await loadControl(id, jobId);
   if (!live) notFound();
-  if (live.kind === "not_started") {
-    return <Page className="max-w-xl"><Card title={live.title} sub={live.text}><LinkBtn href={live.unitHref} size="sm"><Icon name="arrowLeft" />{live.back}</LinkBtn></Card></Page>;
-  }
-  return <ControlView live={live} />;
+  return live.kind === "not_started" ? <Page className="max-w-xl"><Card title={live.title} sub={live.text}><LinkBtn href={live.unitHref} size="sm"><Icon name="arrowLeft" />{live.back}</LinkBtn></Card></Page> : <ControlView live={live} />;
 }

@@ -22,10 +22,10 @@ type Tone = "crit" | "warn" | "ok" | "primary" | "muted";
 const ended = (s: Slot | null, now: number) => !!s && Date.parse(s.endAt) <= now;
 const ACKS: Record<string, string> = { accepted: "accepted", cant_make: "can’t make it" };
 
-export type ScheduleRow = {
+export interface ScheduleRow {
   id: string; short: string; title: string; line: string; tone?: Tone;
   window: { from: string; until: string } | null; windowText: string; left: string; ended: boolean; leftTone: Tone; elapsedPct: number;
-};
+}
 /** One job of the list and its delegation window (“14 h left”, “Ended”; the bar is the elapsed share). */
 export function scheduleRow(j: ApiPartnerJob, now: number, units: Map<string, string>, names: Map<string, string>, i: I18n = EN): ScheduleRow | null {
   const { t, display } = i;
@@ -45,12 +45,12 @@ export function scheduleRow(j: ApiPartnerJob, now: number, units: Map<string, st
   else line = t("Rework · {name}", { name });
   const span = from && to ? Date.parse(to) - Date.parse(from) : 0;
   const elapsedPct = span > 0 ? Math.min(100, Math.max(0, Math.round(((now - Date.parse(from!)) / span) * 100))) : 0;
-  const over = !!to && Date.parse(to) <= now;
-  const soon = !!to && Date.parse(to) - now < 24 * 3600_000;
+  const isOver = !!to && Date.parse(to) <= now;
+  const isSoon = !!to && Date.parse(to) - now < 24 * 3_600_000;
   return {
     id, short: id.slice(0, 8), title: j.projection === "offer" ? j.siteAddress ?? t("Accepted job") : units.get(j.unitId) ?? t("Unit"),
     line, tone, window: from && to ? { from, until: to } : null, windowText: from && to ? showSpan(from, to, display) : "—",
-    left: !to ? "—" : over ? t("Ended") : t("{left} left", { left: until(to, now, t) }), ended: over, leftTone: over ? "crit" : soon ? "warn" : "primary", elapsedPct,
+    left: to ? (isOver ? t("Ended") : t("{left} left", { left: until(to, now, t) })) : "—", ended: isOver, leftTone: isOver ? "crit" : (isSoon ? "warn" : "primary"), elapsedPct,
   };
 }
 
@@ -58,8 +58,8 @@ export type FormMode =
   | { kind: "assign" | "reassign" | "extend"; title: string; slot: Slot; endEditable: boolean; reasonRequired: boolean; button: string; banner?: { tone: Tone; text: string }; currentTech: string | null }
   | { kind: "blocked"; title: string; slot: Slot | null; banner: { tone: Tone; text: string } };
 /** What the form of the selected job allows (IR123 item 4): the agreed visit time from accepted, the same slot from
- * assigned, an extension (same start, later end, reason) while in progress, on hold or in rework; an accepted offer
- * before its delegation period and an assigned job whose agreed time has passed cannot be booked here. */
+assigned, an extension (same start, later end, reason) while in progress, on hold or in rework; an accepted offer
+before its delegation period and an assigned job whose agreed time has passed cannot be booked here. */
 export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, names: Map<string, string>, i: I18n = EN): FormMode {
   const { t, display } = i;
   const span = (s: Slot) => showSpan(s.startAt, s.endAt, display);
@@ -71,8 +71,9 @@ export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, na
   const slot = j.assignment ? { startAt: j.assignment.scheduledStart, endAt: j.assignment.scheduledEnd } : j.scheduledSlot ?? j.offer?.visitSlot ?? null;
   if (!slot) return { kind: "blocked", title: assign, slot: null, banner: { tone: "warn", text: t("No agreed visit time — HQ agrees one with the client first.") } };
   switch (j.status) {
-    case "accepted":
+    case "accepted": {
       return { kind: "assign", title: assign, slot, endEditable: false, reasonRequired: false, button: t("Confirm assignment"), currentTech: null };
+    }
     case "assigned": {
       if (ended(slot, now)) {
         return { kind: "blocked", title: reschedule, slot, banner: { tone: "crit", text: t("Work window ended; reassignment required. The agreed time {slot} passed while the job is still “assigned”. A new time needs the client’s agreement — HQ proposes it; tell HQ in the job history.", { slot: span(slot) }) } };
@@ -90,18 +91,19 @@ export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, na
     }
     case "in_progress":
     case "on_hold":
-    case "rework_requested":
+    case "rework_requested": {
       return {
-        kind: "extend", title: ended(slot, now) ? reschedule : t("Reassign — {job} ({state})", { job: label, state: t(j.status === "in_progress" ? "in progress" : j.status === "on_hold" ? "on hold" : "rework") }), slot, endEditable: true, reasonRequired: true,
+        kind: "extend", title: ended(slot, now) ? reschedule : t("Reassign — {job} ({state})", { job: label, state: t(j.status === "in_progress" ? "in progress" : (j.status === "on_hold" ? "on hold" : "rework")) }), slot, endEditable: true, reasonRequired: true,
         button: t("Confirm reassignment"), currentTech: current,
         banner: ended(slot, now) ? { tone: "crit", text: t("Work window ended; reassignment required. The work window {slot} ended while the job is “{status}” — keep the start and set a later end (same or another technician).", { slot: span(slot), status: statusWord(j.status, t) }) } : undefined,
       };
+    }
   }
   return { kind: "blocked", title: assign, slot, banner: { tone: "muted", text: t("The job is {status} — nothing to schedule.", { status: statusWord(j.status, t) }) } };
 }
 
 /** The free spans of a capacity day in Kuala Lumpur hours: the available slots minus the assigned ones
- * (["10:00–12:00", "14:00–17:00"]; [] when nothing is free or no hours are set). */
+(["10:00–12:00", "14:00–17:00"]; [] when nothing is free or no hours are set). */
 export function freeSlots(c: ApiCapacity | undefined): string[] {
   const parts: string[] = [];
   if (!c) return parts;
@@ -120,16 +122,16 @@ export function freeSlots(c: ApiCapacity | undefined): string[] {
 }
 /** The free time of a capacity day in Kuala Lumpur hours (“free 10:00–17:00”, “no hours”, “fully booked”). */
 export function freeText(c: ApiCapacity | undefined, t: T = en): string {
-  if (!c || !c.availableSlots.length) return t("no hours");
+  if (!c?.availableSlots.length) return t("no hours");
   const parts = freeSlots(c);
-  return parts.length ? t("free {hours}", { hours: parts.join(", ") }) : t("fully booked");
+  return parts.length > 0 ? t("free {hours}", { hours: parts.join(", ") }) : t("fully booked");
 }
 
-export type Candidate = { id: string; name: string; sub: string; badge: { text: string; tone: Tone }; eligible: boolean };
+export interface Candidate { id: string; name: string; sub: string; badge: { text: string; tone: Tone }; eligible: boolean }
 /** The company's technicians for the slot: eligible ones (members.eligible) first, the others with the reason. */
 /** The technicians the schedule offers and shows: those who can still work (IR575), and the job's current technician
- * even when their access has ended, so the form can name whom it replaces. A former technician, whose access ended or
- * HQ revoked, can take no job and stays out of the choice and the week (IR624). */
+even when their access has ended, so the form can name whom it replaces. A former technician, whose access ended or
+HQ revoked, can take no job and stays out of the choice and the week (IR624). */
 export function scheduleTeam(members: ApiMember[], now: number, currentId: string | null): ApiMember[] {
   const team = new Set(onTeam(members, now).map((m) => m.id));
   return members.filter((m) => m.role === "technician" && (team.has(m.id) || m.id === currentId));
@@ -144,22 +146,21 @@ export function candidates(members: ApiMember[], eligible: Set<string>, required
     const sub = `${quals} · ${freeText(c, t)}`;
     if (eligible.has(m.id)) return { id: m.id, name: m.displayName, sub, badge: m.id === currentId ? { text: t("Current"), tone: "primary" } : { text: t("Qualified"), tone: "ok" }, eligible: true };
     const missing = required.filter((r) => !qualified(m, [r], slot.startAt)).map((code) => qualificationLabel(code, t));
-    const badge = missing.length ? { text: t("Missing: {list}", { list: missing.join(", ") }), tone: "warn" as Tone }
-      : c?.unavailability ? { text: t("Unavailable ({reason})", { reason: unavailabilityLabel(c.unavailability, t) }), tone: "warn" as Tone }
-      : c?.assignedSlots.some((s) => overlaps(s, slot)) ? { text: t(m.id === currentId ? "Current · booked here" : "Busy at this time"), tone: "muted" as Tone }
-      : { text: t("Not eligible"), tone: "muted" as Tone };
+    const badge = missing.length > 0 ? { text: t("Missing: {list}", { list: missing.join(", ") }), tone: "warn" as Tone }
+      : (c?.unavailability ? { text: t("Unavailable ({reason})", { reason: unavailabilityLabel(c.unavailability, t) }), tone: "warn" as Tone }
+      : ({ text: c?.assignedSlots.some((s) => overlaps(s, slot)) ? t(m.id === currentId ? "Current · booked here" : "Busy at this time") : t("Not eligible"), tone: "muted" as Tone }));
     return { id: m.id, name: m.displayName, sub, badge, eligible: false };
   });
   return rows.sort((a, b) => Number(b.eligible) - Number(a.eligible) || a.name.localeCompare(b.name));
 }
 
-export type WeekCell = { kind: "booked" | "free" | "leave" | "none" | "proposal"; text: string; sub?: string };
-export type WeekRow = { id: string; name: string; sub: string; cells: WeekCell[] };
-const KL = 8 * 3600_000;
+export interface WeekCell { kind: "booked" | "free" | "leave" | "none" | "proposal"; text: string; sub?: string }
+export interface WeekRow { id: string; name: string; sub: string; cells: WeekCell[] }
+const KL = 8 * 3_600_000;
 const LEAVE = new Set(["annual_leave", "sick"]);
 /** The team's week (Mon–Sun, Kuala Lumpur days and hours): per technician and day the booked blocks with their job,
- * leave or other unavailability, no hours or free; the selected technician's cell of the proposed slot is “This
- * proposal”. */
+leave or other unavailability, no hours or free; the selected technician's cell of the proposed slot is “This
+proposal”. */
 export function weekGrid(dates: string[], members: ApiMember[], capacity: ApiCapacity[][], jobsOf: Map<string, { short: string; slot: Slot }[]>, proposal: { technicianId: string; slot: Slot; short: string } | null, t: T = en): WeekRow[] {
   const dayOf = (iso: string) => new Date(Date.parse(iso) + KL).toISOString().slice(0, 10);
   return members.filter((m) => m.role === "technician").map((m) => {
@@ -169,8 +170,8 @@ export function weekGrid(dates: string[], members: ApiMember[], capacity: ApiCap
       avail += c?.availableMinutes ?? 0;
       if (proposal && proposal.technicianId === m.id && dayOf(proposal.slot.startAt) === date) return { kind: "proposal", text: `${hhmm(proposal.slot.startAt)}–${hhmm(proposal.slot.endAt)}`, sub: proposal.short };
       if (c?.unavailability) return { kind: "leave", text: t(LEAVE.has(c.unavailability) ? "Leave" : "Unavailable"), sub: unavailabilityLabel(c.unavailability, t) };
-      if (!c || !c.availableMinutes) return { kind: "none", text: t("no hours") };
-      if (c.assignedSlots.length) {
+      if (!c?.availableMinutes) return { kind: "none", text: t("no hours") };
+      if (c.assignedSlots.length > 0) {
         const s = c.assignedSlots[0];
         const job = (jobsOf.get(m.id) ?? []).find((j) => Date.parse(j.slot.startAt) < Date.parse(s.endAt) && Date.parse(s.startAt) < Date.parse(j.slot.endAt));
         return { kind: "booked", text: `${hhmm(s.startAt)}–${hhmm(c.assignedSlots[c.assignedSlots.length - 1].endAt)}`, sub: [job?.short ?? t("booked"), c.assignedSlots.length > 1 ? `+${c.assignedSlots.length - 1}` : ""].filter(Boolean).join(" ") };
@@ -191,12 +192,18 @@ const FIELD_ERRORS: Record<string, string> = {
 /** Readable refusals of jobs.assign (DD-P03 boundary cases), in the display language. */
 export function assignRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, tech: string, t: T = en): string {
   switch (f.messageKey) {
-    case "errors.assignment_overlap": return t("Overlaps a confirmed schedule for {name} — choose another technician.", { name: tech });
-    case "errors.access_window": return t("Outside the delegation period — assignments are possible only inside it.");
-    case "errors.qualification_missing": return t("{name}’s qualification is not valid for this slot (revoked or expiring, FORBIDDEN) — choose another technician.", { name: tech });
-    case "errors.technician_out_of_scope": case "errors.technician_not_allowed": return t("{name} cannot be assigned to this unit.", { name: tech });
-    case "error.invalidState": return t("The job can no longer be scheduled in its current state — the latest state is shown.");
-    case "error.versionConflict": return t("The job changed elsewhere — the latest version is shown; check and confirm again.");
+    case "errors.assignment_overlap": { return t("Overlaps a confirmed schedule for {name} — choose another technician.", { name: tech });
+    }
+    case "errors.access_window": { return t("Outside the delegation period — assignments are possible only inside it.");
+    }
+    case "errors.qualification_missing": { return t("{name}’s qualification is not valid for this slot (revoked or expiring, FORBIDDEN) — choose another technician.", { name: tech });
+    }
+    case "errors.technician_out_of_scope": case "errors.technician_not_allowed": { return t("{name} cannot be assigned to this unit.", { name: tech });
+ }
+    case "error.invalidState": { return t("The job can no longer be scheduled in its current state — the latest state is shown.");
+    }
+    case "error.versionConflict": { return t("The job changed elsewhere — the latest version is shown; check and confirm again.");
+    }
   }
   if (f.code === "NOT_FOUND") return t("The job is no longer delegated to your company.");
   if (f.code === "VALIDATION") {

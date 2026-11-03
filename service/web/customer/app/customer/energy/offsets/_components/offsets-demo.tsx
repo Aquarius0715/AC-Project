@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Banner, Btn, Card, Check, DemoBadge, Field, Input, Page, Steps, SummaryList, useToast, Plain } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 
-/** The Phase 1A demo of /customer/energy/offsets (fixtures; DATA_SOURCE≠api). */
+/** The Phase 1A demo of /customer/energy/offsets (fixtures; DATA_SOURCE≠API). */
 export function OffsetsDemo() {
   const toast = useToast();
   const [step, setStep] = useState(0);
@@ -13,7 +13,7 @@ export function OffsetsDemo() {
   const [ack, setAck] = useState(false);
   const [done, setDone] = useState(false);
   const [explain, setExplain] = useState(false);
-  const valid = +amount > 0;
+  const isValid = +amount > 0;
   return (
     <Page>
       <div className="text-[13px] text-muted-foreground"><Link href="/customer/energy" className="font-semibold text-primary"><Icon name="arrowLeft" /> Energy & cost</Link> › Carbon offsets (demo)</div>
@@ -21,7 +21,7 @@ export function OffsetsDemo() {
       <Steps steps={["Amount", "Quote", "Confirm"]} current={done ? 3 : step} />
       <Card title="Based on Energy & cost" sub="Bedroom AC · Sep 14–20 · factor-demo-2026">
         <div className="flex flex-wrap gap-x-8 gap-y-1 text-[13px]"><span>Estimated emissions <b>40.0</b> kgCO2e</span><span>Estimated savings <b className="text-ok">10.0</b> kgCO2e</span></div>
-        <Plain className="mt-2 text-xs font-semibold text-primary" aria-expanded={explain} onClick={() => setExplain((e) => !e)}><Icon name="info" /> What is a carbon offset? <Icon name={explain ? "chevronDown" : "chevronRight"} /></Plain>
+        <Plain className="mt-2 text-xs font-semibold text-primary" aria-expanded={explain} onClick={() => { setExplain((e) => !e); }}><Icon name="info" /> What is a carbon offset? <Icon name={explain ? "chevronDown" : "chevronRight"} /></Plain>
         {explain && <p className="mt-1 text-xs text-muted-foreground">An offset retires a carbon credit to compensate emissions. Here it is simulated — nothing real is purchased.</p>}
       </Card>
       {done ? (
@@ -29,21 +29,21 @@ export function OffsetsDemo() {
       ) : step === 0 ? (
         <Card title="How much would you like to offset?">
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-            <Field label="Amount (kgCO2e, > 0)" error={valid ? undefined : "Positive numbers only"} hint="Positive numbers only"><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
+            <Field label="Amount (kgCO2e, > 0)" error={isValid ? undefined : "Positive numbers only"} hint="Positive numbers only"><Input type="number" value={amount} onChange={(e) => { setAmount(e.target.value); }} /></Field>
             <Field label="Purpose"><Input value="Demo offset" readOnly /></Field>
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted-foreground">Getting a quote creates no record.</span><Btn variant="primary" disabled={!valid} onClick={() => setStep(1)}>Get demo quote</Btn></div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted-foreground">Getting a quote creates no record.</span><Btn variant="primary" disabled={!isValid} onClick={() => { setStep(1); }}>Get demo quote</Btn></div>
         </Card>
       ) : step === 1 ? (
         <Card title="Demo quote">
           <SummaryList items={[["Amount", `${amount} kgCO2e`], ["Period / units", "Sep 14–20 · Bedroom AC"], ["Quote ID", "quote-0107 (demo)"], ["Expires", "09:55 (15 minutes from now)"], ["Records created", "None yet"]]} />
-          <div className="mt-3 flex gap-2"><Btn onClick={() => setStep(0)}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={() => setStep(2)}>Continue</Btn></div>
+          <div className="mt-3 flex gap-2"><Btn onClick={() => { setStep(0); }}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={() => { setStep(2); }}>Continue</Btn></div>
         </Card>
       ) : (
         <Card title="Confirm demo request">
           <SummaryList items={[["Amount", `${amount} kgCO2e`], ["Quote", "quote-0107 · expires 09:55"], ["Result", "A demo record “Demo requested” is created. Proof stays “Not issued”."]]} />
           <div className="mt-3"><Check checked={ack} onChange={setAck} label="I understand this is a simulated request — not a real purchase." /></div>
-          <div className="mt-3 flex gap-2"><Btn onClick={() => setStep(1)}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" disabled={!ack} onClick={() => { setDone(true); toast("Demo request recorded"); }}>Confirm demo request</Btn></div>
+          <div className="mt-3 flex gap-2"><Btn onClick={() => { setStep(1); }}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" disabled={!ack} onClick={() => { setDone(true); toast("Demo request recorded"); }}>Confirm demo request</Btn></div>
         </Card>
       )}
       <Card title="Demo offset records" sub="Demo retirement ≠ certified credit">

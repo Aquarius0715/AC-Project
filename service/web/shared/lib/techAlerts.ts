@@ -14,25 +14,25 @@ import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 
 /** AlertRule of service-contracts.ts: the condition of the alert's policy or default rule. */
-export type ApiAlertRule = { name: string; metric: string; operator: "gt" | "gte" | "lt" | "lte"; threshold: number; recoveryThreshold: number; durationSeconds: number };
+export interface ApiAlertRule { name: string; metric: string; operator: "gt" | "gte" | "lt" | "lte"; threshold: number; recoveryThreshold: number; durationSeconds: number }
 /** Alert of service-contracts.ts (the fields this screen shows). */
-export type ApiTechAlert = {
+export interface ApiTechAlert {
   id: string; version: number; unitId: string; type: string; severity: "critical" | "warning" | "normal"; status: "open" | "acknowledged" | "resolved"; causeCode: string;
   evidenceKind: string; evidenceText: string; observedAt: string; detectedAt: string; acknowledgedAt: string | null; resolvedAt: string | null; resolutionReason: string | null;
   previousAlertId: string | null; policyId: string | null; rule?: ApiAlertRule | null;
-};
+}
 type Tone = "ok" | "warn" | "crit" | "primary" | "muted";
 
 const OP: Record<string, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
 /** A duration in its largest whole unit from two of them up: “60 s”, “10 min”, “3 h”. */
-export const durationText = (s: number, t: T) => (s >= 7200 && s % 3600 === 0 ? t("{n} h", { n: s / 3600 }) : s >= 120 && s % 60 === 0 ? t("{n} min", { n: s / 60 }) : t("{n} s", { n: s }));
+export const durationText = (s: number, t: T) => (s >= 7200 && s % 3600 === 0 ? t("{n} h", { n: s / 3600 }) : (s >= 120 && s % 60 === 0 ? t("{n} min", { n: s / 60 }) : t("{n} s", { n: s })));
 const value = (metric: string, v: number) => `${airNumber(metric, v)} ${metricUnit[metric] ?? ""}`.trim();
-const label = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]) : metric.replace(/_/g, " "));
+const label = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]) : metric.replaceAll('_', " "));
 /** The words of a rule (Figma: “Policy: temperature ≥ 30 °C, recovery < 28 °C, duration 60 s”); recovery is below the
- * recovery threshold for a high limit and above it for a low one (D08). */
+recovery threshold for a high limit and above it for a low one (D08). */
 export function ruleWords(r: ApiAlertRule, t: T) {
-  const up = r.operator === "gt" || r.operator === "gte";
-  const recovery = `${up ? "<" : ">"} ${value(r.metric, r.recoveryThreshold)}`, duration = durationText(r.durationSeconds, t);
+  const isUp = r.operator === "gt" || r.operator === "gte";
+  const recovery = `${isUp ? "<" : ">"} ${value(r.metric, r.recoveryThreshold)}`, duration = durationText(r.durationSeconds, t);
   return {
     policy: t("Policy: {metric} {op} {threshold}, recovery {recovery}, duration {duration}", { metric: label(r.metric, t), op: OP[r.operator] ?? r.operator, threshold: value(r.metric, r.threshold), recovery, duration }),
     recovery: t("{recovery} for {duration}", { recovery, duration }), raise: `${label(r.metric, t)} ${OP[r.operator] ?? r.operator} ${value(r.metric, r.threshold)}`,
@@ -44,17 +44,17 @@ const ORIGIN: Record<string, string> = { measured: "Measured", estimated: "Estim
 const QUALITY: Record<string, string> = { valid: "good", stale: "stale", suspect: "suspect", missing: "missing" };
 const STATE: Record<string, [string, Tone]> = { open: ["Open", "crit"], acknowledged: ["Acknowledged", "warn"], resolved: ["Resolved", "ok"] };
 
-export type EvidenceCard = { kind: string; title: string; value: string; sub: string };
-export type AlertView = {
+export interface EvidenceCard { kind: string; title: string; value: string; sub: string }
+export interface AlertView {
   id: string; version: number; status: ApiTechAlert["status"]; severity: ApiTechAlert["severity"]; policyless: boolean;
   banner: { title: string; sub: string; tone: Tone; state: string | null };
   cards: EvidenceCard[];
   resolution: { info: string | null; done: string | null; note: string; forbidden: string };
   history: { id: string; time: string; title: string; sub: string; badge: { text: string; tone: Tone } }[];
   related: [string, string][];
-};
+}
 /** The selected alert as the screen shows it. `latest` is the unit's latest reading of the rule's metric (units.get);
- * `job` the URL's job (jobs.get); `canResolve` whether the user holds alert.resolve. */
+`job` the URL's job (jobs.get); `canResolve` whether the user holds alert.resolve. */
 export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: ApiUnitDetail | null; job: { id: string; type: string } | null; canResolve: boolean }, nowMs: number, i: I18n = EN): AlertView {
   const { t, display } = i;
   const when = (iso: string) => relativeTime(iso, nowMs, i);
@@ -74,8 +74,8 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
   if (a.acknowledgedAt) history.push({ id: "acknowledged", time: when(a.acknowledgedAt), title: t("Acknowledged"), sub: "", badge: { text: t("Acknowledged"), tone: "primary" } });
   history.push({ id: "raised", time: when(a.detectedAt), title: t("Raised"), sub: [evidenceText(a.evidenceText, t), words && t("{condition} for {duration}", { condition: words.raise, duration: durationText(rule!.durationSeconds, t) })].filter(Boolean).join(" · "), badge: { text: t(KIND[a.evidenceKind] ?? "Evidence"), tone: "primary" } });
   const prev = a.previousAlertId ? ctx.alerts.find((x) => x.id === a.previousAlertId) : undefined;
-  const unit = ctx.unit ? `${ctx.unit.displayName}${ctx.unit.location.pathLabels.length ? ` · ${ctx.unit.location.pathLabels.join(" › ")}` : ""}` : a.unitId.slice(0, 8);
-  const resolver = a.status === "resolved" ? t("done {time}", { time: when(a.resolvedAt ?? a.detectedAt) }) : ctx.canResolve ? t(rule ? "with a reason, or by a remeasurement" : "with a reason") : rule ? t("with a remeasurement only") : t("no — ask a user with alert.resolve");
+  const unit = ctx.unit ? `${ctx.unit.displayName}${ctx.unit.location.pathLabels.length > 0 ? ` · ${ctx.unit.location.pathLabels.join(" › ")}` : ""}` : a.unitId.slice(0, 8);
+  const resolver = a.status === "resolved" ? t("done {time}", { time: when(a.resolvedAt ?? a.detectedAt) }) : (ctx.canResolve ? t(rule ? "with a reason, or by a remeasurement" : "with a reason") : t(rule ? "with a remeasurement only" : "no — ask a user with alert.resolve"));
   return {
     id: a.id, version: a.version, status: a.status, severity: a.severity, policyless: !a.policyId,
     banner: {
@@ -84,9 +84,9 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
     },
     cards,
     resolution: {
-      info: a.status === "resolved" ? null : words ? t("Automatic resolution needs a remeasurement {recovery} — or a reason below with alert.resolve.", { recovery: words.recovery })
-        : t("No remeasurement resolves this alert — it has no policy. Resolve it with a reason below with alert.resolve."),
-      done: a.status !== "resolved" ? null : [t("Resolved {time} — {reason}.", { time: when(a.resolvedAt ?? a.detectedAt), reason: a.resolutionReason ? resolutionText(a.resolutionReason, t) : t("no reason recorded") }), a.acknowledgedAt ? t("Acknowledged {time}.", { time: when(a.acknowledgedAt) }) : ""].filter(Boolean).join(" "),
+      info: a.status === "resolved" ? null : (words ? t("Automatic resolution needs a remeasurement {recovery} — or a reason below with alert.resolve.", { recovery: words.recovery })
+        : t("No remeasurement resolves this alert — it has no policy. Resolve it with a reason below with alert.resolve.")),
+      done: a.status === "resolved" ? [t("Resolved {time} — {reason}.", { time: when(a.resolvedAt ?? a.detectedAt), reason: a.resolutionReason ? resolutionText(a.resolutionReason, t) : t("no reason recorded") }), a.acknowledgedAt ? t("Acknowledged {time}.", { time: when(a.acknowledgedAt) }) : ""].filter(Boolean).join(" ") : null,
       note: a.status === "resolved" ? t("Completing the job alone never resolves an alert. If the condition returns, a new alert is created that links back to alert {id}.", { id: a.id.slice(0, 8) })
         : t("If it recurs after it is resolved, a new alert is created that links back to this one."),
       forbidden: words ? t("Not resolved — you don’t have alert.resolve. The alert resolves automatically once a remeasurement stays {recovery}, or ask a permitted user.", { recovery: words.recovery })
@@ -95,7 +95,7 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
     history,
     related: [
       [t("Job"), ctx.job ? `${ctx.job.id.slice(0, 8)} · ${typeLabel(ctx.job.type, t)}` : "—"], [t("Unit"), unit], [t("Policy"), rule ? rule.name : t("No policy")],
-      [t("Recovery rule"), words ? words.recovery : "—"], [t("Previous alert"), prev ? `${showDate(prev.detectedAt, display)} · ${statusWord(prev.status, t)}` : a.previousAlertId ? a.previousAlertId.slice(0, 8) : t("none")],
+      [t("Recovery rule"), words ? words.recovery : "—"], [t("Previous alert"), prev ? `${showDate(prev.detectedAt, display)} · ${statusWord(prev.status, t)}` : (a.previousAlertId ? a.previousAlertId.slice(0, 8) : t("none"))],
       [t("You can resolve"), resolver],
     ],
   };
@@ -110,9 +110,11 @@ export function selectAlert(alerts: ApiTechAlert[], alertId?: string): ApiTechAl
 /** The unit's alerts to choose from: title, state and when each was detected, unresolved first. */
 export function alertChoices(alerts: ApiTechAlert[], nowMs: number, i: I18n = EN) {
   const { t } = i;
-  return [...alerts].sort((a, b) => Number(a.status === "resolved") - Number(b.status === "resolved") || b.detectedAt.localeCompare(a.detectedAt)).map((a) => ({
-    id: a.id, title: a.rule?.name ?? alertTitle(a, t), sub: `${t((STATE[a.status] ?? STATE.open)[0])} · ${relativeTime(a.detectedAt, nowMs, i)}`, severity: a.severity,
-  }));
+  return [...alerts].sort((a, b) => Number(a.status === "resolved") - Number(b.status === "resolved") || b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
+    return {
+      id: a.id, title: a.rule?.name ?? alertTitle(a, t), sub: `${t((STATE[a.status] ?? STATE.open)[0])} · ${relativeTime(a.detectedAt, nowMs, i)}`, severity: a.severity,
+    };
+  });
 }
 
 const REFUSED: Record<string, string> = {

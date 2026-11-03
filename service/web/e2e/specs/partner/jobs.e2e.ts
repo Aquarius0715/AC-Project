@@ -14,7 +14,7 @@ test("the status tabs keep the URL and open the jobs they list", async ({ page }
     await expect(tabs.nth(i)).toHaveAttribute("aria-selected", "true");
     if (i > 0) await page.waitForURL(/[?&]tab=/);
     else await page.waitForURL((u) => !u.searchParams.has("tab"));
-    const count = Number(names[i].match(/(\d+)\s*$/)?.[1] ?? NaN);
+    const count = Number((/(\d+)\s*$/.exec(names[i]))?.[1] ?? NaN);
     const jobs = page.locator("main a[href^='/partner/jobs/'], main a[href^='/partner/history?jobId=']");
     if (count === 0) await expect(jobs).toHaveCount(0);
     else if (count > 0) await expect(jobs.first()).toBeVisible();
@@ -23,6 +23,6 @@ test("the status tabs keep the URL and open the jobs they list", async ({ page }
   test.skip((await first.count()) === 0, "no jobs for this contractor");
   const href = (await first.getAttribute("href"))!;
   await first.click();
-  await page.waitForURL((u) => u.pathname === href.split("?")[0]);
+  await page.waitForURL((u) => u.pathname === href.split("?", 1)[0]);
   await expect(page.getByRole("main")).not.toContainText("This page isn’t available");
 });

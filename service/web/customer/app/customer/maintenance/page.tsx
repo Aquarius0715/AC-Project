@@ -13,6 +13,5 @@ export default async function CustomerMaintenancePage({ searchParams }: PageProp
   await connection();
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-  if (!apiMode()) return <MaintenanceDemo jobId={one(sp.jobId)} initialTab={one(sp.tab)} />;
-  return <MaintenanceView live={await loadMaintenance(sp)} />;
+  return apiMode() ? <MaintenanceView live={await loadMaintenance(sp)} /> : <MaintenanceDemo jobId={one(sp.jobId)} initialTab={one(sp.tab)} />;
 }

@@ -12,8 +12,8 @@ export async function attachmentResponse(input: { jobId: string; reportId: strin
     return new Response(Buffer.from(blob.bytes, "base64"), {
       headers: { "Content-Type": blob.mime, "Cache-Control": "no-store", "Content-Disposition": contentDisposition(blob.name) },
     });
-  } catch (e) {
-    if (e instanceof CoreError) return new Response(e.error.messageKey, { status: e.error.code === "FORBIDDEN" ? 403 : e.error.code === "NOT_FOUND" ? 404 : 502 });
-    throw e;
+  } catch (error) {
+    if (error instanceof CoreError) return new Response(error.error.messageKey, { status: error.error.code === "FORBIDDEN" ? 403 : (error.error.code === "NOT_FOUND" ? 404 : 502) });
+    throw error;
   }
 }

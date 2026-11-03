@@ -17,7 +17,7 @@ import {
 import { acknowledge, checkIn, pauseWork, resumeRework, saveDraft, signOff, submitReport, uploadPhoto } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 
-export type WorkspaceLive = {
+export interface WorkspaceLive {
   now: string; known: Known; zone: string;
   job: {
     id: string; version: number; status: string; type: string; unitId: string; symptom: string; alertCount: number; origin: string;
@@ -30,8 +30,7 @@ export type WorkspaceLive = {
   components: { group: Group; key: string }[];
   report: ApiTechReport | null; reportRefused: string | null;
   parts: { code: string; name: string; vanStockQuantity: number | null }[];
-};
-type Rep = Pick<ApiTechReport, "id" | "version" | "attachmentRefs" | "signOff">;
+}
 
 const results: { id: NonNullable<Result>; label: string; tone: "ok" | "warn" | "muted" | "crit" }[] = [
   { id: "normal", label: "Normal", tone: "ok" }, { id: "attention", label: "Attention", tone: "warn" }, { id: "not_inspected", label: "Not inspected", tone: "crit" }, { id: "not_applicable", label: "Not applicable", tone: "muted" },
@@ -41,19 +40,21 @@ const sources: { id: DraftPart["source"]; label: string }[] = [{ id: "van_stock"
 const FORBIDDEN: Record<string, string> = {
   "errors.assignment_not_started": "your work window has not started", "errors.assignment_ended": "your work window has ended", "errors.assignment_required": "you are not assigned to this job",
 };
-const refusal = (f: ActionFailure, t: T): string =>
-  f.messageKey === "errors.report_version_changed" || f.messageKey === "error.versionConflict" ? t("The report or job changed elsewhere; reload the page to continue from the latest version.")
+const refusal = (f: ActionFailure, t: T): string => {
+  return f.messageKey === "errors.report_version_changed" || f.messageKey === "error.versionConflict" ? t("The report or job changed elsewhere; reload the page to continue from the latest version.")
     : f.code === "CONFLICT" ? t("The job is not in a state that allows this (on hold, submitted or cancelled); the page shows the latest state.")
-    : f.code === "FORBIDDEN" ? t("Not allowed: {reason}.", { reason: FORBIDDEN[f.messageKey] ? t(FORBIDDEN[f.messageKey]) : f.messageKey.replace(/^errors?\./, "").replace(/_/g, " ") })
-    : f.code === "UNAVAILABLE" ? t("Not sent; your draft is kept on this page. Try again.") : actionMessage(f, t); // field errors, the write limit's wait and other codes (IR380)
+    : f.code === "FORBIDDEN" ? t("Not allowed: {reason}.", { reason: FORBIDDEN[f.messageKey] ? t(FORBIDDEN[f.messageKey]) : f.messageKey.replace(/^errors?\./, "").replaceAll('_', " ") })
+    : f.code === "UNAVAILABLE" ? t("Not sent; your draft is kept on this page. Try again.") : actionMessage(f, t);
+}; // field errors, the write limit's wait and other codes (IR380)
 const LEAK: Record<string, string> = { pass: "passed", fail: "failed", not_done: "not done" };
 const MAX_PHOTOS = 10, MAX_BYTES = 5 << 20;
 
 /** The technician's job workspace (FR-T04–T06, T08, T09, T13–T15): assignment, check-in, the inspection checklist of the
- * unit's service scope, readings, parts and refrigerant, photos, the work report with its next action, the customer's
- * sign-off and the submission for quality review. The draft lives on this page until saved (autosave after edits).
- * Texts in the user's display language; the times the page loaded with come formatted from the loader (IR282). */
+unit's service scope, readings, parts and refrigerant, photos, the work report with its next action, the customer's
+sign-off and the submission for quality review. The draft lives on this page until saved (autosave after edits).
+Texts in the user's display language; the times the page loaded with come formatted from the loader (IR282). */
 export function WorkspaceView({ live }: { live: WorkspaceLive }) {
+  type Rep = Pick<ApiTechReport, "id" | "version" | "attachmentRefs" | "signOff">;
   const { job } = live;
   const i18n = useI18n();
   const { t } = i18n;
@@ -63,8 +64,8 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   const [now, setNow] = useState(() => Date.parse(live.now));
   useEffect(() => {
     const offset = Date.parse(live.now) - Date.now();
-    const t = setInterval(() => setNow(Date.now() + offset), 30_000);
-    return () => clearInterval(t);
+    const t = setInterval(() => { setNow(Date.now() + offset); }, 30_000);
+    return () => { clearInterval(t); };
   }, [live.now]);
   const editableReport = job.draftReportRef && live.report && live.report.version === job.draftReportRef.reportVersion ? live.report : null;
   const [draft, setDraft] = useState<Draft>(() => draftFrom(editableReport ?? (job.status === "in_progress" ? null : live.report), live.components));
@@ -94,13 +95,13 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   // the visit and its start alone: the banners name the time once (UX-03); the Work window line keeps the full state
   const visit = job.assignment ? f.span(job.assignment.scheduledStart, job.assignment.scheduledEnd) : "";
   const opens = job.assignment ? f.stamp(job.assignment.scheduledStart) : "";
-  const inWork = job.status === "in_progress";
-  const paused = !!job.timeOnSite?.pauses?.some((p) => !p.to);
-  const editable = inWork && win.phase !== "ended" && win.phase !== "before";
+  const isInWork = job.status === "in_progress";
+  const isPaused = !!job.timeOnSite?.pauses?.some((p) => !p.to);
+  const isEditable = isInWork && win.phase !== "ended" && win.phase !== "before";
   // the unit's alert evidence and diagnostics open for an active job inside its window: in progress, assigned or
   // returned for rework (IR94, IR283; Figma Technician 423:604)
-  const unitOpen = ["assigned", "in_progress", "rework_requested"].includes(job.status) && win.phase !== "ended" && win.phase !== "before";
-  const failed = (x: ActionFailure) => setRefused(refusal(x, t));
+  const isUnitOpen = ["assigned", "in_progress", "rework_requested"].includes(job.status) && win.phase !== "ended" && win.phase !== "before";
+  const failed = (x: ActionFailure) => { setRefused(refusal(x, t)); };
   const edit = (fn: (d: Draft) => Draft) => { setDraft(fn); setDirty(true); };
   const photos = (rep ?? live.report)?.attachmentRefs.filter((a) => a.id !== (rep ?? live.report)?.signOff?.signatureAttachmentId) ?? [];
   const issues: Issue[] | null = checked ? submitIssues(draft, photos, now, t) : null;
@@ -109,18 +110,20 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
     return r ? `/technician/jobs/${job.id}/photos/${a.id}?reportId=${r.id}&reportVersion=${r.version}` : "";
   };
 
-  const save = (after?: (r: Rep) => void) => run(() => saveDraft(draftInput(job.id, rep?.id ?? null, draft), rep?.version ?? null), t("Draft saved"), (r) => {
-    setRep(r); setDirty(false); setSavedAt(new Date(now).toISOString()); setRefused(null); after?.(r);
-  }, failed);
+  const save = (after?: (r: Rep) => void) => {
+    run(() => saveDraft(draftInput(job.id, rep?.id ?? null, draft), rep?.version ?? null), t("Draft saved"), (r) => {
+      setRep(r); setDirty(false); setSavedAt(new Date(now).toISOString()); setRefused(null); after?.(r);
+    }, failed);
+  };
   // autosave 20 s after the last edit while the work window is open (the API keeps every saved version)
   // the timer restarts with each edit, not with every render; the save it runs reads the latest draft (useEffectEvent)
-  const autosave = useEffectEvent(() => save());
+  const autosave = useEffectEvent(() => { save(); });
   useEffect(() => {
-    if (!dirty || !editable || pending) return;
-    const t = setTimeout(() => autosave(), 20_000);
-    return () => clearTimeout(t);
-  }, [draft, dirty, editable, pending]);
-  const withSaved = (fn: (r: Rep) => void) => (dirty || !rep ? save(fn) : fn(rep));
+    if (!dirty || !isEditable || pending) return;
+    const t = setTimeout(() => { autosave(); }, 20_000);
+    return () => { clearTimeout(t); };
+  }, [draft, dirty, isEditable, pending]);
+  const withSaved = (fn: (r: Rep) => void) => { if (dirty || !rep) save(fn); else fn(rep); };
   const addPhotos = (files: FileList | null) => {
     if (!files?.length) return;
     const file = files[0];
@@ -138,7 +141,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   const trySubmit = () => {
     const found = submitIssues(draft, photos, now, t);
     setChecked(true);
-    if (found.length) {
+    if (found.length > 0) {
       const first = found.find((i) => i.group);
       if (first?.group) setTab(first.group);
       // focus the first item to fix once its tab shows it, so a phone does not have to scroll up to it (IR594)
@@ -147,7 +150,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
     }
     setModal("submit");
   };
-  const submit = () => withSaved((r) => run(() => submitReport(job.id, job.version, r.version), t("Report v{version} submitted", { version: r.version }), () => setModal(null), failed));
+  const submit = () => { withSaved((r) => { run(() => submitReport(job.id, job.version, r.version), t("Report v{version} submitted", { version: r.version }), () => { setModal(null); }, failed); }); };
 
   const head = (
     <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
@@ -167,14 +170,14 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   );
   const label = (key: string) => t(componentLabel[key] ?? key);
   const netKg = draft.refrigerant.reduce((s, r) => s + r.chargedKg - r.recoveredKg, 0);
-  const addReading = (key: string) => edit((d) => ({ ...d, readings: [...d.readings, { componentKey: key, metric: "temperature", value: "", observedAt: new Date(now).toISOString() }] }));
+  const addReading = (key: string) => { edit((d) => ({ ...d, readings: [...d.readings, { componentKey: key, metric: "temperature", value: "", observedAt: new Date(now).toISOString() }] })); };
   // a finding's own readings and linked report photos, with “+ Add reading” and “+ Link photo” on a finding that needs
   // attention or already has evidence (Figma Technician 423:204, DD-T04–T06 step 1, IR352)
   const evidence = (it: Draft["items"][number]) => {
     const own = draft.readings.filter((m) => m.componentKey === it.componentKey);
     const ph = itemPhotos(draft, it.componentKey, photos);
-    const actions = editable && (it.result === "attention" || own.length > 0 || ph.linked.length > 0);
-    if (!actions && own.length === 0 && ph.linked.length === 0) return null;
+    const isActions = isEditable && (it.result === "attention" || own.length > 0 || ph.linked.length > 0);
+    if (!isActions && own.length === 0 && ph.linked.length === 0) return null;
     const name = label(it.componentKey);
     return (
       <div className="mt-1.5 flex flex-col gap-1.5">
@@ -187,18 +190,18 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
           <div className="flex flex-wrap gap-1.5">{ph.linked.map((x) => (
             <span key={x.id} className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2 py-0.5 text-xs">
               <Icon name="camera" /> {x.status === "missing" ? x.name : <a href={photoUrl(x)} target="_blank" rel="noreferrer" className="font-semibold text-primary">{x.name}</a>}
-              {editable && <Plain type="button" aria-label={t("Unlink {photo} from {item}", { photo: x.name, item: name })} className="text-muted-foreground hover:text-ink" onClick={() => edit((d) => linkPhoto(d, it.componentKey, x.id, false))}><Icon name="close" /></Plain>}
+              {isEditable && <Plain type="button" aria-label={t("Unlink {photo} from {item}", { photo: x.name, item: name })} className="text-muted-foreground hover:text-ink" onClick={() => { edit((d) => linkPhoto(d, it.componentKey, x.id, false)); }}><Icon name="close" /></Plain>}
             </span>
           ))}</div>
         )}
-        {actions && (
+        {isActions && (
           <div className="flex flex-wrap gap-2">
             <Btn size="sm" onClick={() => { addReading(it.componentKey); setView("readings"); }}><Icon name="add" /> {t("Add reading")}</Btn>
-            <Btn size="sm" disabled={ph.free.length === 0} aria-expanded={linking === it.componentKey} onClick={() => setLinking((k) => (k === it.componentKey ? null : it.componentKey))}><Icon name="add" /> {t("Link photo")}</Btn>
+            <Btn size="sm" disabled={ph.free.length === 0} aria-expanded={linking === it.componentKey} onClick={() => { setLinking((k) => (k === it.componentKey ? null : it.componentKey)); }}><Icon name="add" /> {t("Link photo")}</Btn>
           </div>
         )}
-        {actions && !photos.some((x) => x.status === "ready") && <p className="text-[11px] text-muted-foreground">{t("Add a photo under Photos first, then link it to this finding.")}</p>}
-        {actions && linking === it.componentKey && ph.free.length > 0 && (
+        {isActions && photos.every((x) => x.status !== "ready") && <p className="text-[11px] text-muted-foreground">{t("Add a photo under Photos first, then link it to this finding.")}</p>}
+        {isActions && linking === it.componentKey && ph.free.length > 0 && (
           <div role="group" aria-label={t("Report photos to link to {item}", { item: name })} className="flex flex-wrap gap-1.5 rounded-lg border border-line p-2">
             {ph.free.map((x) => <Btn key={x.id} size="sm" variant="ghost" onClick={() => { edit((d) => linkPhoto(d, it.componentKey, x.id, true)); setLinking(null); }}><Icon name="camera" />{x.name}</Btn>)}
           </div>
@@ -211,15 +214,15 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
     <Page>
       {head}
       {refused && <Banner tone="crit">{refused}</Banner>}
-      {job.status === "assigned" && ack === "pending" && <Banner tone="primary" action={<span className="flex gap-2"><Btn size="sm" variant="primary" disabled={pending} onClick={() => run(() => acknowledge(job.id, job.version, "accept", null, null), t("Assignment accepted"), () => { remountFocus = { jobId: job.id, id: "job-title" }; }, failed)}><Icon name="check" />{t("Accept assignment")}</Btn><Btn size="sm" disabled={pending} onClick={() => setModal("cant")}>{t("Can’t make this time…")}</Btn></span>}>{t("New assignment for {window}. Accepting tells your coordinator and HQ you will attend; the client then sees your name.", { window: visit })}</Banner>}
+      {job.status === "assigned" && ack === "pending" && <Banner tone="primary" action={<span className="flex gap-2"><Btn size="sm" variant="primary" disabled={pending} onClick={() => { run(() => acknowledge(job.id, job.version, "accept", null, null), t("Assignment accepted"), () => { remountFocus = { jobId: job.id, id: "job-title" }; }, failed); }}><Icon name="check" />{t("Accept assignment")}</Btn><Btn size="sm" disabled={pending} onClick={() => { setModal("cant"); }}>{t("Can’t make this time…")}</Btn></span>}>{t("New assignment for {window}. Accepting tells your coordinator and HQ you will attend; the client then sees your name.", { window: visit })}</Banner>}
       {job.status === "assigned" && ack === "cant_make" && <Banner tone="warn">{job.assignment?.cantMakeReason ? t("You said you can’t make this time (“{reason}”). Your coordinator reassigns the job or asks the client for another time.", { reason: job.assignment.cantMakeReason }) : t("You said you can’t make this time. Your coordinator reassigns the job or asks the client for another time.")}</Banner>}
-      {job.status === "assigned" && ack === "accepted" && <Banner tone={win.phase === "before" ? "primary" : "ok"} action={<Btn size="sm" variant="primary" disabled={pending || win.phase !== "open" && win.phase !== "ending"} onClick={() => { setCheckInErr({}); setModal("checkin"); }}>{t("Start job (check in)")}</Btn>}>{win.phase === "before" ? t("Read-only until the window opens at {time} — Start is disabled before then.", { time: opens }) : win.phase === "ended" ? t("The work window has ended — ask your coordinator to reschedule.") : t("On site: Start job opens Check in (location + unit QR); checking in starts the work.")}</Banner>}
+      {job.status === "assigned" && ack === "accepted" && <Banner tone={win.phase === "before" ? "primary" : "ok"} action={<Btn size="sm" variant="primary" disabled={pending || win.phase !== "open" && win.phase !== "ending"} onClick={() => { setCheckInErr({}); setModal("checkin"); }}>{t("Start job (check in)")}</Btn>}>{win.phase === "before" ? t("Read-only until the window opens at {time} — Start is disabled before then.", { time: opens }) : (t(win.phase === "ended" ? "The work window has ended — ask your coordinator to reschedule." : "On site: Start job opens Check in (location + unit QR); checking in starts the work."))}</Banner>}
       {job.status === "on_hold" && <Banner tone="warn">{t("On hold by HQ — saving and submitting are blocked. Your saved draft is kept; continue when HQ resumes the job.")}</Banner>}
       {job.status === "submitted" && <Banner tone="ok">{t("Submitted v{version} — read-only, awaiting quality review.", { version: job.reportRefs[job.reportRefs.length - 1]?.reportVersion ?? "" })}</Banner>}
       {job.status === "completed" && <Banner tone="ok">{t("Accepted — the job is completed and the report is visible to the customer.")}</Banner>}
-      {job.status === "rework_requested" && <Banner tone="warn" action={<Btn size="sm" variant="primary" disabled={pending || win.phase === "ended"} onClick={() => run(() => resumeRework(job.id, job.version), t("Rework resumed — continue in the new draft"), () => { remountFocus = { jobId: job.id, id: "job-title" }; }, failed)}>{t("Resume rework")}</Btn>}>{live.report?.reviewHistory.at(-1)?.reason ? t("Returned for rework — “{reason}”. Resume to continue as a new draft version; the returned version stays as it was.", { reason: live.report.reviewHistory.at(-1)!.reason! }) : t("Returned for rework. Resume to continue as a new draft version; the returned version stays as it was.")}</Banner>}
-      {inWork && win.phase === "ended" && <Banner tone="crit">{t("The work window ended — unsaved input was discarded and the job can no longer be edited. Ask your coordinator.")}</Banner>}
-      {live.reportRefused && <Banner tone="warn">{t("The report is not readable now ({reason}).", { reason: FORBIDDEN[live.reportRefused] ? t(FORBIDDEN[live.reportRefused]) : live.reportRefused.replace(/^errors?\./, "").replace(/_/g, " ") })}</Banner>}
+      {job.status === "rework_requested" && <Banner tone="warn" action={<Btn size="sm" variant="primary" disabled={pending || win.phase === "ended"} onClick={() => { run(() => resumeRework(job.id, job.version), t("Rework resumed — continue in the new draft"), () => { remountFocus = { jobId: job.id, id: "job-title" }; }, failed); }}>{t("Resume rework")}</Btn>}>{live.report?.reviewHistory.at(-1)?.reason ? t("Returned for rework — “{reason}”. Resume to continue as a new draft version; the returned version stays as it was.", { reason: live.report.reviewHistory.at(-1)!.reason! }) : t("Returned for rework. Resume to continue as a new draft version; the returned version stays as it was.")}</Banner>}
+      {isInWork && win.phase === "ended" && <Banner tone="crit">{t("The work window ended — unsaved input was discarded and the job can no longer be edited. Ask your coordinator.")}</Banner>}
+      {live.reportRefused && <Banner tone="warn">{t("The report is not readable now ({reason}).", { reason: FORBIDDEN[live.reportRefused] ? t(FORBIDDEN[live.reportRefused]) : live.reportRefused.replace(/^errors?\./, "").replaceAll('_', " ") })}</Banner>}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4 xl:col-span-2">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -229,15 +232,15 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                   <li key={it.componentKey} className="py-2.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-[13px] font-semibold">{label(it.componentKey)}</span>
-                      {editable ? (
-                        <div className="w-44"><Select id={`result-${it.componentKey}`} aria-label={t("Result of {item}", { item: label(it.componentKey) })} value={it.result ?? ""} onChange={(e) => edit((d) => ({ ...d, items: d.items.map((x) => (x.componentKey === it.componentKey ? { ...x, result: (e.target.value || null) as Result } : x)) }))}>
+                      {isEditable ? (
+                        <div className="w-44"><Select id={`result-${it.componentKey}`} aria-label={t("Result of {item}", { item: label(it.componentKey) })} value={it.result ?? ""} onChange={(e) => { edit((d) => ({ ...d, items: d.items.map((x) => (x.componentKey === it.componentKey ? { ...x, result: (e.target.value || null) as Result } : x)) })); }}>
                           <option value="">{t("— Select result")}</option>{results.map((r) => <option key={r.id} value={r.id}>{t(r.label)}</option>)}
                         </Select></div>
                       ) : readOnlyResult(it.result)}
                     </div>
-                    {it.result && it.result !== "normal" && (editable
-                      ? <div className="mt-1.5"><Input placeholder={t("Reason (required for {result})", { result: t(results.find((r) => r.id === it.result)?.label ?? "") })} maxLength={1000} value={it.reason} onChange={(e) => edit((d) => ({ ...d, items: d.items.map((x) => (x.componentKey === it.componentKey ? { ...x, reason: e.target.value } : x)) }))} /></div>
-                      : it.reason ? <div className="text-xs text-muted-foreground">{t("Reason: {reason}", { reason: it.reason })}</div> : null)}
+                    {it.result && it.result !== "normal" && (isEditable
+                      ? <div className="mt-1.5"><Input placeholder={t("Reason (required for {result})", { result: t(results.find((r) => r.id === it.result)?.label ?? "") })} maxLength={1000} value={it.reason} onChange={(e) => { edit((d) => ({ ...d, items: d.items.map((x) => (x.componentKey === it.componentKey ? { ...x, reason: e.target.value } : x)) })); }} /></div>
+                      : (it.reason ? <div className="text-xs text-muted-foreground">{t("Reason: {reason}", { reason: it.reason })}</div> : null))}
                     {evidence(it)}
                     {issueOf(it.componentKey) && <p className="mt-1 text-xs text-crit">{issueOf(it.componentKey)}</p>}
                   </li>
@@ -247,20 +250,22 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
             </Card>
             <div className="flex min-w-0 flex-col gap-4">
               <Card title={t("Checklist progress")}>
-                {groups.map((g) => (
-                  <div key={g.group} className="mb-2"><div className="mb-1 flex justify-between text-xs"><b>{g.label}</b><span className="text-muted-foreground">{g.done} / {g.total}</span></div><UtilBar pct={g.total ? (g.done / g.total) * 100 : 0} tone={g.issues ? "warn" : "primary"}  label={`${g.label} ${g.done} / ${g.total}`} /></div>
-                ))}
-                {editable && <p className="text-[11px] text-muted-foreground">{issues?.length ? t(issues.length === 1 ? "1 issue blocks submit — it is listed above Submit report." : "{n} issues block submit — they are listed above Submit report.", { n: issues.length }) : t("{n} items still empty — each needs a result, or not inspected / not applicable with a reason, before submit.", { n: draft.items.filter((x) => x.result === null).length })}</p>}
+                {groups.map((g) => {
+                  return (
+                    <div key={g.group} className="mb-2"><div className="mb-1 flex justify-between text-xs"><b>{g.label}</b><span className="text-muted-foreground">{g.done} / {g.total}</span></div><UtilBar pct={g.total ? (g.done / g.total) * 100 : 0} tone={g.issues ? "warn" : "primary"}  label={`${g.label} ${g.done} / ${g.total}`} /></div>
+                  );
+                })}
+                {isEditable && <p className="text-[11px] text-muted-foreground">{issues?.length ? t(issues.length === 1 ? "1 issue blocks submit — it is listed above Submit report." : "{n} issues block submit — they are listed above Submit report.", { n: issues.length }) : t("{n} items still empty — each needs a result, or not inspected / not applicable with a reason, before submit.", { n: draft.items.filter((x) => x.result === null).length })}</p>}
               </Card>
               <Card title={t("Job & unit")} action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${job.unitId}?jobId=${job.id}`}>{t("Unit")} <Icon name="arrowRight" /></Link>}>
                 <SummaryList items={[
                   [t("Window"), <span key="w" className={win.phase === "ending" || win.phase === "ended" ? "font-semibold text-crit" : undefined}>{job.assignment ? f.span(job.assignment.scheduledStart, job.assignment.scheduledEnd) : "—"}</span>],
                   [t("Site"), live.unit?.place ?? (live.unitRefused ? t("opens at the start of your window") : "—")], [t("Access"), live.unit?.access ?? "—"], [t("Unit"), live.unit ? `${live.unit.name} · ${live.unit.model}` : live.unitName ?? job.unitId.slice(0, 8)],
                   [t("Job"), `${typeLabel(job.type, t)} · ${t(job.origin === "periodic_plan" ? "periodic plan" : "client request")}`], [t("Request"), job.symptom ? `“${job.symptom}”` : "—"],
-                  ...(job.problemPhotos.length ? [[t("Client’s photos"), <span key="p" className="flex flex-wrap gap-x-3">{job.problemPhotos.map((p) => <a key={p.id} href={`/technician/jobs/${job.id}/problem-photos/${p.id}`} target="_blank" rel="noreferrer" className="font-semibold text-primary">{p.name}</a>)}</span>] as [string, React.ReactNode]] : []),
+                  ...(job.problemPhotos.length > 0 ? [[t("Client’s photos"), <span key="p" className="flex flex-wrap gap-x-3">{job.problemPhotos.map((p) => <a key={p.id} href={`/technician/jobs/${job.id}/problem-photos/${p.id}`} target="_blank" rel="noreferrer" className="font-semibold text-primary">{p.name}</a>)}</span>] as [string, React.ReactNode]] : []),
                   [t("Linked alerts"), job.alertCount ? <Link key="a" className="font-semibold text-crit" href={`/technician/units/${job.unitId}/alerts?jobId=${job.id}`}>{t(job.alertCount === 1 ? "1 alert" : "{n} alerts", { n: job.alertCount })} <Icon name="arrowRight" /></Link> : t("none")],
                 ]} />
-                {unitOpen && (
+                {isUnitOpen && (
                   <div className="mt-3 flex flex-wrap gap-3 text-xs font-semibold">
                     <Link className="text-primary" href={`/technician/units/${job.unitId}/alerts?jobId=${job.id}`}>{t("Alert evidence")} <Icon name="arrowRight" /></Link>
                     <Link className="text-primary" href={`/technician/units/${job.unitId}/control?jobId=${job.id}`}>{t("Diagnostics")} <Icon name="arrowRight" /></Link>
@@ -270,19 +275,19 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
             </div>
           </div>
           <Card title={<Tabs value={view} onChange={setView} tabs={[{ id: "readings", label: t("Readings"), count: draft.readings.length }, { id: "parts", label: t("Parts & refrigerant"), count: draft.parts.length + draft.refrigerant.length }, { id: "time", label: t("Time on site") }]} />}
-            action={view === "readings" && editable ? <Btn size="sm" onClick={() => addReading(tab === "outdoor" ? "refrigerant_pipe" : live.components[0]?.key ?? "filter")}><Icon name="add" /> {t("Add reading")}</Btn>
-              : view === "parts" && editable ? <span className="flex gap-2"><Btn size="sm" onClick={() => setModal("part")}><Icon name="add" /> {t("Add part")}</Btn><Btn size="sm" onClick={() => setModal("refrigerant")}><Icon name="add" /> {t("Refrigerant")}</Btn></span> : null}>
+            action={view === "readings" && isEditable ? <Btn size="sm" onClick={() => { addReading(tab === "outdoor" ? "refrigerant_pipe" : live.components[0]?.key ?? "filter"); }}><Icon name="add" /> {t("Add reading")}</Btn>
+              : (view === "parts" && isEditable ? <span className="flex gap-2"><Btn size="sm" onClick={() => { setModal("part"); }}><Icon name="add" /> {t("Add part")}</Btn><Btn size="sm" onClick={() => { setModal("refrigerant"); }}><Icon name="add" /> {t("Refrigerant")}</Btn></span> : null)}>
             {view === "readings" && (draft.readings.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No readings yet. Record each measurement with its unit and the component it belongs to — an unmeasured value is left empty, never 0.")}</p> : (
               <ScrollX><table className="w-full min-w-[560px] text-[13px]">
                 <thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th className="py-1">{t("Metric")}</th><th>{t("Value")}</th><th>{t("Unit")}</th><th>{t("Linked item")}</th><th>{t("Observed")}</th><th /></tr></thead>
                 <tbody>{draft.readings.map((m, i) => (
                   <tr key={i} className="border-t border-line align-middle">
-                    <td className="py-1.5 pr-2">{editable ? <Select aria-label={t("Metric")} value={m.metric} onChange={(e) => edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, metric: e.target.value as Metric } : x)) }))}>{readingMetrics.map((x) => <option key={x.metric} value={x.metric}>{t(x.label)}</option>)}</Select> : t(readingMetrics.find((x) => x.metric === m.metric)?.label ?? m.metric)}</td>
-                    <td className="pr-2">{editable ? <Input inputMode="decimal" value={m.value} aria-invalid={m.value.trim() !== "" && !Number.isFinite(Number(m.value))} onChange={(e) => edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, value: e.target.value } : x)) }))} /> : m.value || "—"}</td>
+                    <td className="py-1.5 pr-2">{isEditable ? <Select aria-label={t("Metric")} value={m.metric} onChange={(e) => { edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, metric: e.target.value as Metric } : x)) })); }}>{readingMetrics.map((x) => <option key={x.metric} value={x.metric}>{t(x.label)}</option>)}</Select> : t(readingMetrics.find((x) => x.metric === m.metric)?.label ?? m.metric)}</td>
+                    <td className="pr-2">{isEditable ? <Input inputMode="decimal" value={m.value} aria-invalid={m.value.trim() !== "" && !Number.isFinite(Number(m.value))} onChange={(e) => { edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, value: e.target.value } : x)) })); }} /> : m.value || "—"}</td>
                     <td className="pr-2 text-muted-foreground">{metricUnit[m.metric]}</td>
-                    <td className="pr-2">{editable ? <Select aria-label={t("Linked item")} value={m.componentKey} onChange={(e) => edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, componentKey: e.target.value } : x)) }))}>{live.components.map((c) => <option key={c.key} value={c.key}>{t(groupLabel[c.group])} › {label(c.key)}</option>)}</Select> : label(m.componentKey)}</td>
+                    <td className="pr-2">{isEditable ? <Select aria-label={t("Linked item")} value={m.componentKey} onChange={(e) => { edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, componentKey: e.target.value } : x)) })); }}>{live.components.map((c) => <option key={c.key} value={c.key}>{t(groupLabel[c.group])} › {label(c.key)}</option>)}</Select> : label(m.componentKey)}</td>
                     <td className="pr-2 text-xs text-muted-foreground">{f.clock(m.observedAt)}</td>
-                    <td>{editable && <Plain type="button" className="text-xs font-semibold text-primary" onClick={() => edit((d) => ({ ...d, readings: d.readings.filter((_, k) => k !== i) }))}>{t("Remove")}</Plain>}</td>
+                    <td>{isEditable && <Plain type="button" className="text-xs font-semibold text-primary" onClick={() => { edit((d) => ({ ...d, readings: d.readings.filter((_, k) => k !== i) })); }}>{t("Remove")}</Plain>}</td>
                   </tr>
                 ))}</tbody>
               </table></ScrollX>
@@ -294,12 +299,12 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                     { key: "p", label: t("Part"), render: (p) => <div><b>{p.name}</b><div className="text-[11px] text-muted-foreground">{p.catalogCode ?? t("custom")}{p.replacesComponentKey ? ` · ${t("replaces {part}", { part: label(p.replacesComponentKey) })}` : ""}</div></div> },
                     { key: "s", label: t("Source"), render: (p) => t(sources.find((x) => x.id === p.source)?.label ?? p.source) }, { key: "q", label: t("Qty"), render: (p) => p.quantity },
                     { key: "l", label: t("Lot / serial"), render: (p) => p.lotSerial ?? "—" },
-                    { key: "x", label: "", render: (p) => editable ? <Plain type="button" className="text-xs font-semibold text-primary" onClick={() => edit((d) => ({ ...d, parts: d.parts.filter((x) => x !== p) }))}>{t("Remove")}</Plain> : null },
+                    { key: "x", label: "", render: (p) => isEditable ? <Plain type="button" className="text-xs font-semibold text-primary" onClick={() => { edit((d) => ({ ...d, parts: d.parts.filter((x) => x !== p) })); }}>{t("Remove")}</Plain> : null },
                   ]} />
                 )}
                 {draft.refrigerant.map((r, i) => (
                   <div key={i}>
-                    <div className="mb-1 flex items-center justify-between"><b className="text-[13px]">{t("Refrigerant ({kind}) — cylinder {id}", { kind: r.refrigerant, id: r.cylinderId })}</b>{editable && <Plain type="button" className="text-xs font-semibold text-primary" onClick={() => edit((d) => ({ ...d, refrigerant: d.refrigerant.filter((_, k) => k !== i) }))}>{t("Remove")}</Plain>}</div>
+                    <div className="mb-1 flex items-center justify-between"><b className="text-[13px]">{t("Refrigerant ({kind}) — cylinder {id}", { kind: r.refrigerant, id: r.cylinderId })}</b>{isEditable && <Plain type="button" className="text-xs font-semibold text-primary" onClick={() => { edit((d) => ({ ...d, refrigerant: d.refrigerant.filter((_, k) => k !== i) })); }}>{t("Remove")}</Plain>}</div>
                     <div className="grid-fluid" style={{ ["--min" as string]: "120px" }}>{[[t("Recovered"), `${r.recoveredKg.toFixed(2)} kg`], [t("Charged"), `${r.chargedKg.toFixed(2)} kg`], [t("Net added"), `${r.chargedKg - r.recoveredKg >= 0 ? "+" : "−"}${Math.abs(r.chargedKg - r.recoveredKg).toFixed(2)} kg`], [t("Leak check"), `${t(LEAK[r.leakCheck] ?? r.leakCheck)}${r.leakCheckMethod ? ` · ${r.leakCheckMethod}` : ""}`]].map(([k, v]) => <div key={k} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{k}</div><div className="font-bold">{v}</div></div>)}</div>
                   </div>
                 ))}
@@ -309,50 +314,50 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
             {view === "time" && (
               <div>
                 <SummaryList items={timeRows(job.timeOnSite, now, f)} />
-                {inWork && <div className="mt-3"><Btn id="pause-toggle" size="sm" disabled={pending || !editable} onClick={() => withSaved(() => run(() => pauseWork(job.id, job.version, !paused), t(paused ? "Work resumed" : "Work paused"), () => { remountFocus = { jobId: job.id, id: "pause-toggle" }; }, failed))}>{t(paused ? "Resume work" : "Pause work")}</Btn></div>}
+                {isInWork && <div className="mt-3"><Btn id="pause-toggle" size="sm" disabled={pending || !isEditable} onClick={() => { withSaved(() => { run(() => pauseWork(job.id, job.version, !isPaused), t(isPaused ? "Work resumed" : "Work paused"), () => { remountFocus = { jobId: job.id, id: "pause-toggle" }; }, failed); }); }}>{t(isPaused ? "Resume work" : "Pause work")}</Btn></div>}
                 <p className="mt-2 text-[11px] text-muted-foreground">{t("Arrival inside the window counts toward the SLA. Times are part of the report and visible to the contractor and HQ.")}</p>
               </div>
             )}
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={t("Work report — {version}", { version: rep ? t("draft v{version}", { version: rep.version }) : live.report ? `v${live.report.version}` : t("not started") })}>
+          <Card title={t("Work report — {version}", { version: rep ? t("draft v{version}", { version: rep.version }) : (live.report ? `v${live.report.version}` : t("not started")) })}>
             {issues && issues.length > 0 && <Banner tone="crit"><b>{t(issues.length === 1 ? "Not submitted — 1 issue:" : "Not submitted — {n} issues:", { n: issues.length })}</b> {issues.slice(0, 6).map((x) => x.text).join(" · ")}{issues.length > 6 ? " · …" : ""}. {t("The draft is kept.")}</Banner>}
-            {editable && win.notice && <div className="mt-2"><Banner tone="warn">{win.notice}</Banner></div>}
-            {!inWork && !live.report && <p className="text-[13px] text-muted-foreground">{t("The report opens when you check in at the site.")}</p>}
-            {(inWork || live.report) && (
+            {isEditable && win.notice && <div className="mt-2"><Banner tone="warn">{win.notice}</Banner></div>}
+            {!isInWork && !live.report && <p className="text-[13px] text-muted-foreground">{t("The report opens when you check in at the site.")}</p>}
+            {(isInWork || live.report) && (
               <div className="mt-2 flex flex-col gap-3">
-                <Field label={t("Work performed & next action (10–4000 characters)")}>{editable ? <Textarea value={draft.workText} maxLength={4000} className="min-h-[110px]" onChange={(e) => edit((d) => ({ ...d, workText: e.target.value }))} /> : <p className="font-normal">{draft.workText || "—"}</p>}</Field>
-                <p className="text-[13px] font-semibold">{t(draft.parts.length === 1 ? "Replacement parts: 1 line" : "Replacement parts: {n} lines", { n: draft.parts.length })}{draft.refrigerant.length ? ` · ${draft.refrigerant[0].refrigerant} ${netKg >= 0 ? "+" : "−"}${Math.abs(netKg).toFixed(2)} kg` : ""} <Plain type="button" className="text-xs text-primary" onClick={() => setView("parts")}>{t("(see Parts & refrigerant)")}</Plain></p>
+                <Field label={t("Work performed & next action (10–4000 characters)")}>{isEditable ? <Textarea value={draft.workText} maxLength={4000} className="min-h-[110px]" onChange={(e) => { edit((d) => ({ ...d, workText: e.target.value })); }} /> : <p className="font-normal">{draft.workText || "—"}</p>}</Field>
+                <p className="text-[13px] font-semibold">{t(draft.parts.length === 1 ? "Replacement parts: 1 line" : "Replacement parts: {n} lines", { n: draft.parts.length })}{draft.refrigerant.length > 0 ? ` · ${draft.refrigerant[0].refrigerant} ${netKg >= 0 ? "+" : "−"}${Math.abs(netKg).toFixed(2)} kg` : ""} <Plain type="button" className="text-xs text-primary" onClick={() => { setView("parts"); }}>{t("(see Parts & refrigerant)")}</Plain></p>
                 <div>
                   <p className="mb-1 text-xs font-semibold">{t("Photos (JPEG/PNG, ≤5 MiB, ≤{max})", { max: MAX_PHOTOS })}</p>
                   <div className="flex flex-wrap gap-2">
                     {photos.map((a) => <Photo key={a.id} src={photoUrl(a)} name={a.name} />)}
-                    {editable && photos.length < MAX_PHOTOS && (
+                    {isEditable && photos.length < MAX_PHOTOS && (
                       <label className={cx("grid h-16 w-20 cursor-pointer place-items-center rounded-lg border border-dashed border-line text-xl text-muted-foreground hover:bg-surface2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary", pending && "pointer-events-none opacity-50")}>
                         +<Input type="file" aria-label={t("Add photos")} accept="image/jpeg,image/png" className="sr-only h-px w-px" onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
                       </label>
                     )}
-                    {!editable && photos.length === 0 && <span className="text-xs text-muted-foreground">{t("No photos.")}</span>}
+                    {!isEditable && photos.length === 0 && <span className="text-xs text-muted-foreground">{t("No photos.")}</span>}
                   </div>
                   {photoError && <div className="mt-2"><Banner tone="crit">{photoError}</Banner></div>}
                 </div>
                 <Field label={t("Next action")}>
-                  {editable ? (
+                  {isEditable ? (
                     <div className="flex flex-col gap-2">
-                      <Select aria-label={t("Next action")} value={draft.nextAction.kind} onChange={(e) => edit((d) => ({ ...d, nextAction: e.target.value === "none" ? { kind: "none" } : { kind: "follow_up", date: "", note: "" } }))}><option value="none">{t("None")}</option><option value="follow_up">{t("Follow-up visit")}</option></Select>
+                      <Select aria-label={t("Next action")} value={draft.nextAction.kind} onChange={(e) => { edit((d) => ({ ...d, nextAction: e.target.value === "none" ? { kind: "none" } : { kind: "follow_up", date: "", note: "" } })); }}><option value="none">{t("None")}</option><option value="follow_up">{t("Follow-up visit")}</option></Select>
                       {draft.nextAction.kind === "follow_up" && <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
-                        <Input type="date" aria-label={t("Follow-up date")} value={draft.nextAction.date.slice(0, 10)} onChange={(e) => edit((d) => ({ ...d, nextAction: { kind: "follow_up", date: e.target.value ? new Date(`${e.target.value}T09:00:00+08:00`).toISOString() : "", note: d.nextAction.kind === "follow_up" ? d.nextAction.note : "" } }))} />
-                        <Input aria-label={t("What to do (required)")} placeholder={t("What to do (required)")} maxLength={1000} value={draft.nextAction.note} onChange={(e) => edit((d) => ({ ...d, nextAction: { kind: "follow_up", date: d.nextAction.kind === "follow_up" ? d.nextAction.date : "", note: e.target.value } }))} />
+                        <Input type="date" aria-label={t("Follow-up date")} value={draft.nextAction.date.slice(0, 10)} onChange={(e) => { edit((d) => ({ ...d, nextAction: { kind: "follow_up", date: e.target.value ? new Date(`${e.target.value}T09:00:00+08:00`).toISOString() : "", note: d.nextAction.kind === "follow_up" ? d.nextAction.note : "" } })); }} />
+                        <Input aria-label={t("What to do (required)")} placeholder={t("What to do (required)")} maxLength={1000} value={draft.nextAction.note} onChange={(e) => { edit((d) => ({ ...d, nextAction: { kind: "follow_up", date: d.nextAction.kind === "follow_up" ? d.nextAction.date : "", note: e.target.value } })); }} />
                       </div>}
                     </div>
                   ) : <p className="font-normal">{followUpText(draft.nextAction, i18n)}</p>}
                 </Field>
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3">
                   <div><b className="text-[13px]">{t("Customer sign-off")}</b><div>{(rep ?? live.report)?.signOff ? <Badge tone="ok">{t("Signed · {name} · {time}", { name: (rep ?? live.report)!.signOff!.signerName, time: f.clock((rep ?? live.report)!.signOff!.signedAt) })}</Badge> : <Badge tone="warn">{t("Not signed")}</Badge>}</div></div>
-                  {editable && <Btn size="sm" disabled={pending} onClick={() => setModal("sign")}>{t((rep ?? live.report)?.signOff ? "Sign again" : "Get signature")}</Btn>}
+                  {isEditable && <Btn size="sm" disabled={pending} onClick={() => { setModal("sign"); }}>{t((rep ?? live.report)?.signOff ? "Sign again" : "Get signature")}</Btn>}
                 </div>
-                {editable && <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || !dirty && !!rep} onClick={() => save()}>{t("Save draft")}</Btn><Btn variant="primary" disabled={pending} onClick={trySubmit}>{t("Submit report")}</Btn></div>}
+                {isEditable && <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || !dirty && !!rep} onClick={() => { save(); }}>{t("Save draft")}</Btn><Btn variant="primary" disabled={pending} onClick={trySubmit}>{t("Submit report")}</Btn></div>}
                 <p className="text-[11px] text-muted-foreground">{t("Submitted versions become read-only. A report returned for rework continues as a new draft version. Saving again clears the sign-off.")}</p>
               </div>
             )}
@@ -365,21 +370,21 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
           </Card>
         </div>
       </div>
-      <CheckInModal open={modal === "checkin"} unitId={job.unitId} pending={pending} errors={checkInErr} setErrors={setCheckInErr} onClose={() => setModal(null)}
-        onCheckIn={(method, distance, qr, reason) => run(() => checkIn(job.id, job.version, method, distance, qr, reason), t("Checked in — the job has started"), () => { remountFocus = { jobId: job.id, id: "job-title" }; setModal(null); }, (f) => {
+      <CheckInModal open={modal === "checkin"} unitId={job.unitId} pending={pending} errors={checkInErr} setErrors={setCheckInErr} onClose={() => { setModal(null); }}
+        onCheckIn={(method, distance, qr, reason) => { run(() => checkIn(job.id, job.version, method, distance, qr, reason), t("Checked in — the job has started"), () => { remountFocus = { jobId: job.id, id: "job-title" }; setModal(null); }, (f) => {
           // a refusal of a field (too far, another unit's label) shows under that field, which takes the focus (IR621)
           const fields = fieldErrorTexts(f, CHECK_IN_API_FIELDS, t);
           const first = CHECK_IN_FIELDS.find((k) => fields[k]);
-          if (!first) return failed(f);
+          if (!first) { failed(f); return; }
           setCheckInErr(fields);
           focusField(CHECK_IN_IDS[first]);
-        })} />
-      <CantMakeModal open={modal === "cant"} pending={pending} zone={live.zone} onClose={() => setModal(null)} onSend={(reason, slot) => run(() => acknowledge(job.id, job.version, "cant_make", reason, slot), t("Sent to your coordinator"), () => setModal(null), failed)} />
-      <PartModal open={modal === "part"} parts={live.parts} components={live.components} onClose={() => setModal(null)} onAdd={(p) => { edit((d) => ({ ...d, parts: [...d.parts, p] })); setModal(null); }} />
-      <RefrigerantModal open={modal === "refrigerant"} onClose={() => setModal(null)} onAdd={(r) => { edit((d) => ({ ...d, refrigerant: [...d.refrigerant, r] })); setModal(null); }} />
-      <SignModal open={modal === "sign"} pending={pending} summary={t("{version} · {done} / {total} results · {parts} parts", { version: rep ? t("draft v{version}", { version: rep.version }) : t("new draft"), done: draft.items.filter((x) => x.result).length, total: draft.items.length, parts: draft.parts.length })} onClose={() => setModal(null)}
-        onSign={(form) => withSaved((r) => { form.set("jobId", job.id); form.set("reportId", r.id); form.set("reportVersion", String(r.version)); run(() => signOff(form), t("Sign-off saved for this report version"), (next) => { setRep(next); setModal(null); }, failed); })} />
-      <Modal open={modal === "submit"} onClose={() => setModal(null)} title={t("Submit report v{version}?", { version: rep?.version ?? 1 })} footer={<><Btn onClick={() => setModal(null)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={submit}>{t("Submit")}</Btn></>}>
+        }); }} />
+      <CantMakeModal open={modal === "cant"} pending={pending} zone={live.zone} onClose={() => { setModal(null); }} onSend={(reason, slot) => { run(() => acknowledge(job.id, job.version, "cant_make", reason, slot), t("Sent to your coordinator"), () => { setModal(null); }, failed); }} />
+      <PartModal open={modal === "part"} parts={live.parts} components={live.components} onClose={() => { setModal(null); }} onAdd={(p) => { edit((d) => ({ ...d, parts: [...d.parts, p] })); setModal(null); }} />
+      <RefrigerantModal open={modal === "refrigerant"} onClose={() => { setModal(null); }} onAdd={(r) => { edit((d) => ({ ...d, refrigerant: [...d.refrigerant, r] })); setModal(null); }} />
+      <SignModal open={modal === "sign"} pending={pending} summary={t("{version} · {done} / {total} results · {parts} parts", { version: rep ? t("draft v{version}", { version: rep.version }) : t("new draft"), done: draft.items.filter((x) => x.result).length, total: draft.items.length, parts: draft.parts.length })} onClose={() => { setModal(null); }}
+        onSign={(form) => { withSaved((r) => { form.set("jobId", job.id); form.set("reportId", r.id); form.set("reportVersion", String(r.version)); run(() => signOff(form), t("Sign-off saved for this report version"), (next) => { setRep(next); setModal(null); }, failed); }); }} />
+      <Modal open={modal === "submit"} onClose={() => { setModal(null); }} title={t("Submit report v{version}?", { version: rep?.version ?? 1 })} footer={<><Btn onClick={() => { setModal(null); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={submit}>{t("Submit")}</Btn></>}>
         <p className="text-[13px]">{t("Submitted versions become read-only; the quality review by your company or HQ follows.")}</p>
         {!(rep ?? live.report)?.signOff && <Banner tone="warn">{t("No customer sign-off yet — the report can still be submitted; the reviewer sees “not signed”.")}</Banner>}
       </Modal>
@@ -389,8 +394,8 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
 
 type CheckInErrors = Partial<Record<CheckInField, string>>;
 /** The page keys the view by the job's version, so an action that moves the job on mounts it again and drops the focus:
- * the check-in, accepting and resuming rework send it to the job's title, pausing to the same Pause / Resume button
- * (IR621, IR625). The job's next view takes it. */
+the check-in, accepting and resuming rework send it to the job's title, pausing to the same Pause / Resume button
+(IR621, IR625). The job's next view takes it. */
 let remountFocus: { jobId: string; id: string } | null = null;
 type View = "readings" | "parts" | "time";
 /** The checklist group and the view each job had open, for its next view after a remount (IR625). */
@@ -411,7 +416,7 @@ function CheckInModal({ open, unitId, pending, errors, setErrors, onClose, onChe
     setErrors(e);
     // a refused check-in takes the focus to the first field to fix, top to bottom (IR586, IR621)
     const bad = CHECK_IN_FIELDS.find((k) => e[k]);
-    if (bad) return focusField(CHECK_IN_IDS[bad]);
+    if (bad) { focusField(CHECK_IN_IDS[bad]); return; }
     if (method === "manual") onCheckIn("manual", null, null, reason.trim());
     else onCheckIn("location_qr", Number(distance), qr.trim(), null);
   };
@@ -436,16 +441,16 @@ function CantMakeModal({ open, pending, zone, onClose, onSend }: { open: boolean
   const [window, setWindow] = useState("10:00-12:00");
   const [error, setError] = useState<string | null>(null);
   const send = () => {
-    if (reason.trim().length < 1) return setError(t("Tell your coordinator why (1–1000 characters)"));
-    const [from, to] = window.split("-");
+    if (reason.trim().length === 0) { setError(t("Tell your coordinator why (1–1000 characters)")); return; }
+    const [from, to] = window.split("-", 2);
     onSend(reason.trim(), date ? { startAt: zonedInstant(date, from, zone), endAt: zonedInstant(date, to, zone) } : null); // typed in the display time zone (NFR-08)
   };
   return (
     <Modal open={open} onClose={onClose} title={t("Can’t make this time")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t("Send to coordinator")}</Btn></>}>
-      <Field label={t("Reason (required)")} error={error ?? undefined}><Textarea value={reason} maxLength={1000} placeholder={t("Medical appointment on that morning")} onChange={(e) => setReason(e.target.value)} /></Field>
+      <Field label={t("Reason (required)")} error={error ?? undefined}><Textarea value={reason} maxLength={1000} placeholder={t("Medical appointment on that morning")} onChange={(e) => { setReason(e.target.value); }} /></Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}>
-        <Field label={t("A time you could do instead (optional)")} hint={t("Times in {zone}.", { zone })}><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
-        <Field label={t("Window")}><Select value={window} onChange={(e) => setWindow(e.target.value)}>{["08:00-10:00", "10:00-12:00", "12:00-14:00", "14:00-16:00", "16:00-18:00"].map((w) => <option key={w}>{w}</option>)}</Select></Field>
+        <Field label={t("A time you could do instead (optional)")} hint={t("Times in {zone}.", { zone })}><Input type="date" value={date} onChange={(e) => { setDate(e.target.value); }} /></Field>
+        <Field label={t("Window")}><Select value={window} onChange={(e) => { setWindow(e.target.value); }}>{["08:00-10:00", "10:00-12:00", "12:00-14:00", "14:00-16:00", "16:00-18:00"].map((w) => <option key={w}>{w}</option>)}</Select></Field>
       </div>
       <Banner>{t("Your coordinator reassigns the job or proposes a new time — the client must approve any change.")}</Banner>
     </Modal>
@@ -469,22 +474,22 @@ function PartModal({ open, parts, components, onClose, onAdd }: { open: boolean;
     setErrors(e);
     // a refused part takes the focus to the field to fix (IR625, as IR621)
     const bad = PART_FIELDS.find((k) => e[k]);
-    if (bad) return focusField(`part-${bad}`);
+    if (bad) { focusField(`part-${bad}`); return; }
     onAdd({ name: label, quantity: Number(qty), catalogCode: picked?.code ?? null, source, lotSerial: lot.trim() || null, replacesComponentKey: replaces || null, oldPartDisposal: replaces ? (disposal || "disposed_on_site") : null, receiptAttachmentId: null });
     setCode(""); setName(""); setQty("1"); setLot(""); setReplaces(""); setDisposal("");
   };
   return (
     <Modal open={open} onClose={onClose} title={t("Add part")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" onClick={add}>{t("Add")}</Btn></>}>
-      <Field label={t("Part (catalog)")}><Select value={code} onChange={(e) => setCode(e.target.value)}><option value="">{t("Not in the catalog…")}</option>{parts.map((p) => <option key={p.code} value={p.code}>{p.name} · {p.code}{p.vanStockQuantity !== null ? ` · ${t("{n} in van", { n: p.vanStockQuantity })}` : ""}</option>)}</Select></Field>
+      <Field label={t("Part (catalog)")}><Select value={code} onChange={(e) => { setCode(e.target.value); }}><option value="">{t("Not in the catalog…")}</option>{parts.map((p) => <option key={p.code} value={p.code}>{p.name} · {p.code}{p.vanStockQuantity === null ? "" : ` · ${t("{n} in van", { n: p.vanStockQuantity })}`}</option>)}</Select></Field>
       {!picked && <Field label={t("Part name")} error={errors.name}><Input id="part-name" value={name} maxLength={120} onChange={(e) => { setName(e.target.value); setErrors({ ...errors, name: undefined }); }} /></Field>}
       <div className="grid-fluid" style={{ ["--min" as string]: "130px" }}>
         <Field label={t("Qty")} error={errors.qty}><Input id="part-qty" inputMode="numeric" value={qty} onChange={(e) => { setQty(e.target.value); setErrors({ ...errors, qty: undefined }); }} /></Field>
-        <Field label={t("Source")}><Select value={source} onChange={(e) => setSource(e.target.value as DraftPart["source"])}>{sources.map((x) => <option key={x.id} value={x.id}>{t(x.label)}</option>)}</Select></Field>
-        <Field label={t("Lot / serial")}><Input value={lot} onChange={(e) => setLot(e.target.value)} /></Field>
+        <Field label={t("Source")}><Select value={source} onChange={(e) => { setSource(e.target.value as DraftPart["source"]); }}>{sources.map((x) => <option key={x.id} value={x.id}>{t(x.label)}</option>)}</Select></Field>
+        <Field label={t("Lot / serial")}><Input value={lot} onChange={(e) => { setLot(e.target.value); }} /></Field>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
-        <Field label={t("Replaces checklist item (optional)")}><Select value={replaces} onChange={(e) => setReplaces(e.target.value)}><option value="">—</option>{components.map((c) => <option key={c.key} value={c.key}>{t(groupLabel[c.group])} › {t(componentLabel[c.key] ?? c.key)}</option>)}</Select></Field>
-        {replaces && <Field label={t("Old part")}><Select value={disposal} onChange={(e) => setDisposal(e.target.value as typeof disposal)}><option value="">{t("Disposed on site")}</option><option value="returned">{t("Returned")}</option></Select></Field>}
+        <Field label={t("Replaces checklist item (optional)")}><Select value={replaces} onChange={(e) => { setReplaces(e.target.value); }}><option value="">—</option>{components.map((c) => <option key={c.key} value={c.key}>{t(groupLabel[c.group])} › {t(componentLabel[c.key] ?? c.key)}</option>)}</Select></Field>
+        {replaces && <Field label={t("Old part")}><Select value={disposal} onChange={(e) => { setDisposal(e.target.value as typeof disposal); }}><option value="">{t("Disposed on site")}</option><option value="returned">{t("Returned")}</option></Select></Field>}
       </div>
       {source === "bought_locally" && <p className="text-[11px] text-muted-foreground">{t("Keep the receipt — attach a photo of it with the report photos.")}</p>}
     </Modal>
@@ -500,26 +505,26 @@ function RefrigerantModal({ open, onClose, onAdd }: { open: boolean; onClose: ()
   const [leak, setLeak] = useState<DraftRefrigerant["leakCheck"]>("pass");
   const [method, setMethod] = useState("electronic detector");
   const [errors, setErrors] = useState<Partial<Record<(typeof REFRIGERANT_FIELDS)[number], string>>>({});
-  const clear = (k: (typeof REFRIGERANT_FIELDS)[number]) => setErrors((x) => ({ ...x, [k]: undefined }));
+  const clear = (k: (typeof REFRIGERANT_FIELDS)[number]) => { setErrors((x) => ({ ...x, [k]: undefined })); };
   const add = () => {
     const e = refrigerantErrors(cylinder, recovered, charged, t);
     setErrors(e);
     // a refused line takes the focus to the field to fix (IR625, as IR621)
     const bad = REFRIGERANT_FIELDS.find((k) => e[k]);
-    if (bad) return focusField(`refrigerant-${bad}`);
+    if (bad) { focusField(`refrigerant-${bad}`); return; }
     onAdd({ refrigerant: kind, cylinderId: cylinder.trim(), recoveredKg: Number(recovered), chargedKg: Number(charged), leakCheck: leak, leakCheckMethod: leak === "not_done" ? null : method.trim() || null });
   };
   return (
     <Modal open={open} onClose={onClose} title={t("Refrigerant")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" onClick={add}>{t("Add")}</Btn></>}>
       <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
-        <Field label={t("Refrigerant")}><Select value={kind} onChange={(e) => setKind(e.target.value as DraftRefrigerant["refrigerant"])}><option>R32</option><option>R410A</option></Select></Field>
+        <Field label={t("Refrigerant")}><Select value={kind} onChange={(e) => { setKind(e.target.value as DraftRefrigerant["refrigerant"]); }}><option>R32</option><option>R410A</option></Select></Field>
         <Field label={t("Cylinder ID")} error={errors.cylinder}><Input id="refrigerant-cylinder" value={cylinder} maxLength={64} placeholder="CYL-R32-0182" onChange={(e) => { setCylinder(e.target.value); clear("cylinder"); }} /></Field>
         <Field label={t("Recovered (kg)")} error={errors.recovered}><Input id="refrigerant-recovered" inputMode="decimal" value={recovered} onChange={(e) => { setRecovered(e.target.value); clear("recovered"); }} /></Field>
         <Field label={t("Charged (kg)")} error={errors.charged}><Input id="refrigerant-charged" inputMode="decimal" value={charged} onChange={(e) => { setCharged(e.target.value); clear("charged"); }} /></Field>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
-        <Field label={t("Leak check")}><Select value={leak} onChange={(e) => setLeak(e.target.value as DraftRefrigerant["leakCheck"])}><option value="pass">{t("Pass")}</option><option value="fail">{t("Fail")}</option><option value="not_done">{t("Not done")}</option></Select></Field>
-        {leak !== "not_done" && <Field label={t("Method")}><Input value={method} onChange={(e) => setMethod(e.target.value)} /></Field>}
+        <Field label={t("Leak check")}><Select value={leak} onChange={(e) => { setLeak(e.target.value as DraftRefrigerant["leakCheck"]); }}><option value="pass">{t("Pass")}</option><option value="fail">{t("Fail")}</option><option value="not_done">{t("Not done")}</option></Select></Field>
+        {leak !== "not_done" && <Field label={t("Method")}><Input value={method} onChange={(e) => { setMethod(e.target.value); }} /></Field>}
       </div>
     </Modal>
   );
@@ -541,16 +546,16 @@ function SignModal({ open, pending, summary, onClose, onSign }: { open: boolean;
   };
   const clear = () => { canvas.current?.getContext("2d")?.clearRect(0, 0, canvas.current.width, canvas.current.height); setDrawn(false); };
   const sign = () => {
-    if (!name.trim()) return setError(t("The signer's name is required"));
+    if (!name.trim()) { setError(t("The signer's name is required")); return; }
     const form = new FormData();
     form.set("signerName", name.trim());
     if (absent) {
-      if (!reason.trim()) return setError(t("Say why the customer could not sign"));
-      if (!photo || !["image/jpeg", "image/png"].includes(photo.type) || photo.size > 5 << 20) return setError(t("A site photo (JPEG/PNG, ≤5 MiB) is required when the customer is not available"));
+      if (!reason.trim()) { setError(t("Say why the customer could not sign")); return; }
+      if (!photo || !["image/jpeg", "image/png"].includes(photo.type) || photo.size > 5 << 20) { setError(t("A site photo (JPEG/PNG, ≤5 MiB) is required when the customer is not available")); return; }
       form.set("absentReason", reason.trim()); form.set("sitePhoto", photo);
     } else {
-      if (!drawn || !canvas.current) return setError(t("Ask the customer to sign in the box"));
-      form.set("signature", canvas.current.toDataURL("image/png").split(",")[1]);
+      if (!drawn || !canvas.current) { setError(t("Ask the customer to sign in the box")); return; }
+      form.set("signature", canvas.current.toDataURL("image/png").split(",", 2)[1]);
     }
     setError(null);
     onSign(form);
@@ -558,12 +563,12 @@ function SignModal({ open, pending, summary, onClose, onSign }: { open: boolean;
   return (
     <Modal open={open} onClose={onClose} title={t("Customer sign-off")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={sign}>{t("Save sign-off")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{t("Report {summary}", { summary })}</p>
-      <Field label={t("Signer name")}><Input value={name} maxLength={120} placeholder="Ms Tan" onChange={(e) => setName(e.target.value)} /></Field>
-      <Field label={t("How")}><Choice value={absent ? "absent" : "sign"} onChange={(v) => setAbsent(v === "absent")} options={[{ id: "sign", label: t("Signature") }, { id: "absent", label: t("Customer not available") }]} /></Field>
+      <Field label={t("Signer name")}><Input value={name} maxLength={120} placeholder="Ms Tan" onChange={(e) => { setName(e.target.value); }} /></Field>
+      <Field label={t("How")}><Choice value={absent ? "absent" : "sign"} onChange={(v) => { setAbsent(v === "absent"); }} options={[{ id: "sign", label: t("Signature") }, { id: "absent", label: t("Customer not available") }]} /></Field>
       {absent ? (
         <>
-          <Field label={t("Why the customer could not sign")}><Textarea value={reason} maxLength={1000} onChange={(e) => setReason(e.target.value)} /></Field>
-          <Field label={t("Site photo (JPEG/PNG)")}><Input type="file" accept="image/jpeg,image/png" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} /></Field>
+          <Field label={t("Why the customer could not sign")}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} /></Field>
+          <Field label={t("Site photo (JPEG/PNG)")}><Input type="file" accept="image/jpeg,image/png" onChange={(e) => { setPhoto(e.target.files?.[0] ?? null); }} /></Field>
         </>
       ) : (
         <div>
@@ -586,5 +591,5 @@ function Photo({ src, name }: { src: string; name: string }) {
   const [broken, setBroken] = useState(false);
   if (broken) return <span title={name} className="grid h-16 w-20 place-items-center rounded-lg border border-dashed border-line bg-surface2 px-1 text-center text-[10px] leading-tight text-muted-foreground">{t("Photo unavailable")}</span>;
   // eslint-disable-next-line @next/next/no-img-element -- streamed through the DAL route (attachments.getContent)
-  return <img src={src} alt={name} onError={() => setBroken(true)} className="h-16 w-20 rounded-lg bg-surface2 object-cover" />;
+  return <img src={src} alt={name} onError={() => { setBroken(true); }} className="h-16 w-20 rounded-lg bg-surface2 object-cover" />;
 }

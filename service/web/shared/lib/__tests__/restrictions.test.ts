@@ -8,11 +8,13 @@ import {
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-15T01:00:00Z"); // 09:00 in Kuala Lumpur, 10:00 in Tokyo
 const unit = (over: Partial<PerUnit>): PerUnit => ({ unitId: "u1", applyState: "applied", releaseState: "none", applyCommandIds: [], releaseCommandIds: [], observedRestriction: null, observedAt: null, pendingReason: null, ...over });
-const restriction = (over: Partial<ApiRestriction>): ApiRestriction => ({
-  id: "r1234567-aaaa", version: 3, createdAt: "2026-09-12T00:00:00Z", unitIds: ["u1", "u2"], rulesVersion: "demo-v1", policy: { kind: "temperature_limit", minimumCoolingSetpoint: 26 },
-  state: "applied", perUnit: [unit({}), unit({ unitId: "u2", applyState: "not_applied", pendingReason: "offline" })], recoveryCases: [],
-  noticeAt: "2026-09-12T00:00:00Z", executeAfter: "2026-09-13T00:00:00Z", releaseIntent: null, contractId: "k1", causeInvoiceIds: ["i1"], ...over,
-});
+const restriction = (over: Partial<ApiRestriction>): ApiRestriction => {
+  return {
+    id: "r1234567-aaaa", version: 3, createdAt: "2026-09-12T00:00:00Z", unitIds: ["u1", "u2"], rulesVersion: "demo-v1", policy: { kind: "temperature_limit", minimumCoolingSetpoint: 26 },
+    state: "applied", perUnit: [unit({}), unit({ unitId: "u2", applyState: "not_applied", pendingReason: "offline" })], recoveryCases: [],
+    noticeAt: "2026-09-12T00:00:00Z", executeAfter: "2026-09-13T00:00:00Z", releaseIntent: null, contractId: "k1", causeInvoiceIds: ["i1"], ...over,
+  };
+};
 
 describe("HQ restrictions (FR-A09, FR-A10)", () => {
   it("words states, policies, progress and the rows", () => {

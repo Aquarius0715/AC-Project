@@ -1,0 +1,120 @@
+// The web's lint, shared by the four apps, the shared package and the E2E specs. It enables every rule set the user
+// asked for on 2026-11-03 ("全部入り"):
+// - Next.js's own rules: core-web-vitals and typescript, set up as the Next.js docs do.
+// - typescript-eslint strictTypeChecked and stylisticTypeChecked, with type information.
+// - jsx-a11y strict, react recommended and jsx-runtime, and react-hooks recommended-latest (the React Compiler rules).
+// - import recommended and typescript, plus checks for cycles and duplicates.
+// - Every rule of unicorn, sonarjs and security.
+// - vitest's recommended rules for the unit tests (playwright's come with the E2E config).
+// The scripts run ESLint with --max-warnings=0, so every finding fails the lint.
+import vitest from "@vitest/eslint-plugin";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+import security from "eslint-plugin-security";
+import sonarjs from "eslint-plugin-sonarjs";
+import unicorn from "eslint-plugin-unicorn";
+import { defineConfig, globalIgnores } from "eslint/config";
+import tseslint from "typescript-eslint";
+
+// eslint-config-next registers react, react-hooks, import and jsx-a11y; their rule sets come from those same plugin
+// objects (a second copy of a plugin under the same name is an error in flat config)
+const nextPlugins = Object.assign({}, ...[...nextVitals, ...nextTs].map((c) => c.plugins ?? {}));
+
+// every rule of a plugin that is not deprecated (a deprecated rule names its replacement, which is on)
+const everyRule = (prefix, plugin) =>
+  Object.fromEntries(
+    Object.entries(plugin.rules)
+      .filter(([, rule]) => !rule.meta?.deprecated)
+      .map(([name]) => [`${prefix}/${name}`, "error"]),
+  );
+
+/** @param {string} tsconfigRootDir the directory of the tsconfig.json the files belong to */
+export function webConfig(tsconfigRootDir) {
+  return defineConfig([
+    ...nextVitals,
+    ...nextTs,
+    tseslint.configs.strictTypeChecked,
+    tseslint.configs.stylisticTypeChecked,
+    {
+      languageOptions: {
+        parserOptions: { projectService: { allowDefaultProject: ["*.config.mts"] }, tsconfigRootDir },
+      },
+    },
+    { files: ["**/*.{js,mjs,cjs}"], extends: [tseslint.configs.disableTypeChecked] }, // config files have no types
+    { rules: nextPlugins["jsx-a11y"].flatConfigs.strict.rules },
+    { rules: { ...nextPlugins.react.configs.recommended.rules, ...nextPlugins.react.configs["jsx-runtime"].rules } },
+    { rules: nextPlugins["react-hooks"].configs.flat["recommended-latest"].rules },
+    {
+      rules: {
+        ...nextPlugins.import.flatConfigs.recommended.rules,
+        ...nextPlugins.import.flatConfigs.typescript.rules,
+        "import/no-cycle": "error",
+        "import/no-duplicates": "error",
+        "import/no-self-import": "error",
+        "import/no-useless-path-segments": "error",
+      },
+    },
+    unicorn.configs.all,
+    { plugins: { sonarjs }, rules: everyRule("sonarjs", sonarjs) },
+    { plugins: { security }, rules: everyRule("security", security) },
+    { files: ["**/__tests__/**", "**/*.test.{ts,tsx}"], ...vitest.configs.recommended },
+    // Where a rule needs a fact of this project, or contradicts a contract or platform it has to follow:
+    {
+      rules: {
+        // a consistency rule: this code writes (x) => …, so its options say so
+        "sonarjs/arrow-function-convention": ["error", { requireParameterParentheses: true, requireBodyBraces: false }],
+        // checks for a configured file header; the project has none
+        "sonarjs/file-header": "off",
+        // a consistency rule: this code writes a one-line doc comment on one line (/** … */), so its option says so
+        "unicorn/single-line-block-comment-style": ["error", "single-line"],
+        // React components are functions whose names start with a capital (JSX reads a lower-case name as a tag)
+        "sonarjs/function-name": ["error", { format: "^(?:[_a-z][a-zA-Z0-9]*|[A-Z][a-zA-Z0-9]*)$" }],
+        // React and the DOM name the class attribute className
+        "unicorn/no-keyword-prefix": ["error", { disallowedPrefixes: ["new"] }],
+        // the Core API contract (service-contracts.ts) uses null in request and response bodies (JSON.stringify drops
+        // undefined), and a React component renders nothing for null
+        "unicorn/no-null": "off",
+        // Next.js targets Safari 16.4 and later, and Safari has no Temporal
+        "unicorn/prefer-temporal": "off",
+        // TypeScript's lib does not declare Iterator.concat yet, so a call to it does not type-check
+        "unicorn/prefer-iterator-concat": "off",
+      },
+    },
+    {
+      // code that also runs in the browser: Next.js targets Safari 16.4 and later, which lacks these newer built-ins
+      // (Iterator helpers, RegExp.escape, Uint8Array base64/hex, explicit resource management); the tests and the E2E
+      // specs run on Node and keep the rules
+      ignores: ["**/__tests__/**", "**/*.test.{ts,tsx}", "e2e/**", "**/*.e2e.ts"],
+      rules: {
+        "unicorn/prefer-dispose": "off",
+        "unicorn/prefer-iterator-to-array": "off",
+        "unicorn/prefer-regexp-escape": "off",
+        "unicorn/prefer-uint8array-base64": "off",
+        "unicorn/prefer-uint8array-hex": "off",
+      },
+    },
+    {
+      // TypeScript resolves every reference, including the route types Next.js generates (PageProps, LayoutProps)
+      files: ["**/*.{ts,tsx,mts,cts}"],
+      rules: { "sonarjs/no-reference-error": "off" },
+    },
+    {
+      // Next.js fixes these file names; the default export names the route's own component
+      files: [
+        "**/app/**/{page,layout,template,default,error,global-error,loading,not-found,forbidden,unauthorized,route}.{ts,tsx}",
+      ],
+      rules: { "sonarjs/file-name-differ-from-class": "off" },
+    },
+    { linterOptions: { reportUnusedDisableDirectives: "error" } },
+    // generated files are fixed by their generators (make swagger / go run ./cmd/gen/ops), never by hand or by a fix
+    globalIgnores([
+      ".next/**",
+      "out/**",
+      "build/**",
+      "next-env.d.ts",
+      "playwright-report/**",
+      "test-results/**",
+      "**/*.gen.ts",
+    ]),
+  ]);
+}

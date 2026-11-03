@@ -14,9 +14,9 @@ import {
 import { PaymentsDemo } from "./_components/payments-demo";
 import { PaymentsView } from "./_components/payments-view";
 
-type Unit = { id: string; displayName: string; propertyId: string; spaceId: string | null };
 
 export default async function CustomerPaymentsPage({ searchParams }: PageProps<"/customer/payments">) {
+  interface Unit { id: string; displayName: string; propertyId: string; spaceId: string | null }
   await connection();
   if (!apiMode()) return <PaymentsDemo />;
   const sp = await searchParams;
@@ -38,7 +38,7 @@ export default async function CustomerPaymentsPage({ searchParams }: PageProps<"
     : [[], []];
   // the active restriction of the contract, found through one of its invoices (the customer has no restriction list)
   let notice: (RestrictionNotice & { invoiceId: string }) | null = null;
-  if (sel && sel.restrictionIds.length) {
+  if (sel && sel.restrictionIds.length > 0) {
     for (const i of [...all].sort((a, b) => (a.status === "paid" ? 1 : 0) - (b.status === "paid" ? 1 : 0)).slice(0, 3)) {
       const page = await coreOp<{ items: ApiRestriction[] }>("restrictions.forInvoice", { invoiceId: i.id, query: { limit: 10 } });
       const r = page.items.find((x) => sel.restrictionIds.includes(x.id));

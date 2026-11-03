@@ -6,8 +6,8 @@ const bytes = (...b: (number | string)[]) => Uint8Array.from(b.flatMap((x) => (t
 describe("the type of an upload is the type of its bytes (IR308)", () => {
   it("names PNG, JPEG and PDF by their leading bytes, whatever the file name says", () => {
     expect([
-      uploadType(bytes(0x89, "PNG\r\n", 0x1a, "\n", "rest"), "image/jpeg"),
-      uploadType(bytes(0xff, 0xd8, 0xff, 0xe0, "rest"), "image/png"), // a JPEG photo renamed to .png
+      uploadType(bytes(0x89, "PNG\r\n", 0x1A, "\n", "rest"), "image/jpeg"),
+      uploadType(bytes(0xFF, 0xD8, 0xFF, 0xE0, "rest"), "image/png"), // a JPEG photo renamed to .png
       uploadType(bytes("%PDF-1.7\n"), "application/octet-stream"),
     ]).toEqual(["image/png", "image/jpeg", "application/pdf"]);
   });
@@ -24,8 +24,8 @@ describe("the type of an upload is the type of its bytes (IR308)", () => {
 
 describe("file names (IR368)", () => {
   it("cleans a browser file name to what the API accepts", () => {
-    expect([uploadName("photo.jpg"), uploadName("写真 1.jpg"), uploadName("  padded.png  "), uploadName("a\r\nb.png"), uploadName("photo\u202egpj.exe"),
-      uploadName("dir/sub\\x.png"), uploadName("\u0000\u200e"), uploadName("")]).toEqual(["photo.jpg", "写真 1.jpg", "padded.png", "ab.png", "photogpj.exe", "dir_sub_x.png", "upload", "upload"]);
+    expect([uploadName("photo.jpg"), uploadName("写真 1.jpg"), uploadName("  padded.png  "), uploadName("a\r\nb.png"), uploadName("photo\u{202E}gpj.exe"),
+      uploadName("dir/sub\\x.png"), uploadName("\0\u{200E}"), uploadName("")]).toEqual(["photo.jpg", "写真 1.jpg", "padded.png", "ab.png", "photogpj.exe", "dir_sub_x.png", "upload", "upload"]);
     const long = uploadName("x".repeat(300) + ".jpeg");
     expect([Array.from(long).length, long.endsWith(".jpeg")]).toEqual([200, true]);
     expect(Array.from(uploadName("写".repeat(250))).length).toBe(200);
@@ -38,6 +38,6 @@ describe("file names (IR368)", () => {
     expect(() => new Headers({ "Content-Disposition": `inline; filename="写真.jpg"` })).toThrow();
     expect(new Headers({ "Content-Disposition": value }).get("Content-Disposition")).toBe(value);
     expect(contentDisposition('a"b\\c\r\nSet-Cookie: x.png', "attachment")).toBe(`attachment; filename="abcSet-Cookie: x.png"; filename*=UTF-8''a%22b%5CcSet-Cookie%3A%20x.png`);
-    expect(contentDisposition("\u202e")).toBe(`inline; filename="file"; filename*=UTF-8''file`);
+    expect(contentDisposition("\u{202E}")).toBe(`inline; filename="file"; filename*=UTF-8''file`);
   });
 });

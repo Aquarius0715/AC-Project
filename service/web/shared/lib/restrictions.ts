@@ -1,4 +1,4 @@
-// HQ restrictions (FR-A09, FR-A10, DATA_SOURCE=api): restrictions with their units, cause invoices and commands
+// HQ restrictions (FR-A09, FR-A10, DATA_SOURCE=API): restrictions with their units, cause invoices and commands
 // projected for /admin/restrictions and /admin/restrictions/[id], with the transition rules of IR35 / IR96 / IR141 for
 // the action availability. Pure code shared by the Server Components and the client views. Texts in the display
 // language and instants in the display time zone (`t` / `i`, IR301); the customer's notice uses the same words (IR267).
@@ -8,20 +8,20 @@ const en = translator("en");
 
 export type RestrictionState = "scheduled" | "requested" | "applied" | "release_requested" | "released" | "cancelled";
 export type Policy = { kind: "temperature_limit"; minimumCoolingSetpoint: number } | { kind: "power_off" };
-export type PerUnit = {
+export interface PerUnit {
   unitId: string; applyState: "not_sent" | "sent_unknown" | "applied" | "not_applied"; releaseState: "none" | "waiting_reconcile" | "requested" | "released" | "not_required" | "failed";
   applyCommandIds: string[]; releaseCommandIds: string[]; observedRestriction: { restrictionId: string; rulesVersion: string } | null; observedAt: string | null; pendingReason: string | null;
-};
-type Recovery = { id: string; unitId: string; state: "pending" | "removing" | "resolved"; successorRestrictionId: string | null };
+}
+interface Recovery { id: string; unitId: string; state: "pending" | "removing" | "resolved"; successorRestrictionId: string | null }
 type ReleaseIntent = { source: "payment" | "exception" | "override" | "manual" | "cancel"; at: string; actorMembershipId?: string } | null;
 /** Restriction (canonical) or RestrictionReleaseView (override-only callers, IR03) of service-contracts.ts. */
-export type ApiRestriction = {
+export interface ApiRestriction {
   id: string; version: number; createdAt: string; unitIds: string[]; rulesVersion: string; policy: Policy; state: RestrictionState; perUnit: PerUnit[]; recoveryCases: Recovery[];
   noticeAt: string; executeAfter: string; releaseIntent: ReleaseIntent; projection?: "release";
   contractId?: string; contractVersion?: number; causeInvoiceIds?: string[]; reason?: string; exception?: { until: string; reason: string | null } | null; graceUntil?: string | null;
   noticeNotificationIds?: string[]; events?: { action: string; occurredAt: string; actorId: string; actorRoleAtTime: string; reason: string | null; result: string }[];
-};
-export type ApiCommand = { id: string; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; delivery: string; requestedAt: string; failureCode: string | null };
+}
+export interface ApiCommand { id: string; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; delivery: string; requestedAt: string; failureCode: string | null }
 
 export const states: RestrictionState[] = ["scheduled", "requested", "applied", "release_requested", "released", "cancelled"];
 /** The steps of the lifecycle (cancelled is off the path). */
@@ -46,7 +46,7 @@ export function activePeriod(r: ApiRestriction, now: Date, i: I18n = EN): string
   return null;
 }
 
-export type RestrictionRow = { id: string; version: number; state: RestrictionState; label: string; policy: string; units: number; progress: string };
+export interface RestrictionRow { id: string; version: number; state: RestrictionState; label: string; policy: string; units: number; progress: string }
 
 export function progressText(r: ApiRestriction, i: I18n = EN): string {
   const { t } = i;
@@ -67,7 +67,7 @@ export function restrictionRows(rs: ApiRestriction[], contractLabel: (id?: strin
 }
 
 /** Per-unit rows of the detail with the actions each unit allows (IR141 items 4–5, SR26). */
-export type UnitRow = { unitId: string; name: string; apply: string; release: string; observed: string; pending: string | null; retryApply: boolean; retryRelease: boolean; reconcile: boolean; commands: string };
+export interface UnitRow { unitId: string; name: string; apply: string; release: string; observed: string; pending: string | null; retryApply: boolean; retryRelease: boolean; reconcile: boolean; commands: string }
 export function unitRows(r: ApiRestriction, names: Map<string, string>, commands: Map<string, ApiCommand>, i: I18n = EN): UnitRow[] {
   const { t } = i;
   const apply: Record<PerUnit["applyState"], string> = { not_sent: t("not sent"), sent_unknown: t("sent, result unknown"), applied: t("applied"), not_applied: t("not applied") };
@@ -75,16 +75,16 @@ export function unitRows(r: ApiRestriction, names: Map<string, string>, commands
     none: t("none"), waiting_reconcile: t("waiting for reconciliation"), requested: t("requested"), released: t("released"), not_required: t("not required"), failed: t("failed"),
   };
   const command: Record<ApiCommand["status"], string> = { requested: t("requested"), sent: t("sent"), acknowledged: t("acknowledged"), failed: t("failed"), expired: t("expired"), cancelled: t("cancelled") };
-  const pending = (p: string | null) => (p === "offline" ? t("offline") : p === "device_operation_running" ? t("a device operation is running") : p);
+  const pending = (p: string | null) => (p === "offline" ? t("offline") : (p === "device_operation_running" ? t("a device operation is running") : p));
   return r.perUnit.map((u) => {
-    const last = (ids: string[]) => (ids.length ? commands.get(ids[ids.length - 1]) : undefined);
+    const last = (ids: string[]) => (ids.length > 0 ? commands.get(ids[ids.length - 1]) : undefined);
     const a = last(u.applyCommandIds);
     const rel = last(u.releaseCommandIds);
     const status = (c: ApiCommand) => `${command[c.status] ?? c.status}${c.failureCode ? ` (${c.failureCode})` : ""}`;
     return {
       unitId: u.unitId, name: names.get(u.unitId) ?? u.unitId.slice(0, 8), apply: apply[u.applyState] ?? u.applyState, release: release[u.releaseState] ?? u.releaseState, pending: pending(u.pendingReason),
       observed: u.observedRestriction
-        ? `${u.observedRestriction.restrictionId === r.id ? t("this restriction") : t("another restriction")}${u.observedAt ? ` · ${showTime(u.observedAt, i.display)}` : ""}` : t("none observed"),
+        ? `${t(u.observedRestriction.restrictionId === r.id ? "this restriction" : "another restriction")}${u.observedAt ? ` · ${showTime(u.observedAt, i.display)}` : ""}` : t("none observed"),
       retryApply: r.state === "requested" && (u.applyState === "not_sent" || u.applyState === "not_applied"),
       retryRelease: r.state === "release_requested" && (u.releaseState === "failed" || (u.releaseState === "none" && u.applyState === "applied")),
       reconcile: ["requested", "applied", "release_requested"].includes(r.state) && u.applyState === "sent_unknown",
@@ -94,7 +94,7 @@ export function unitRows(r: ApiRestriction, names: Map<string, string>, commands
 }
 
 /** Execute is enabled only for scheduled restrictions at or after executeAfter and 24 h after the notice, without an
- * active grace period or exception (IR140 item 2); otherwise the reason. */
+active grace period or exception (IR140 item 2); otherwise the reason. */
 export function executeBlocker(r: ApiRestriction, now: Date, i: I18n = EN): string | null {
   const { t } = i;
   if (r.state !== "scheduled") return t("Only a scheduled restriction can be executed");
@@ -117,22 +117,22 @@ export function releaseBlocker(r: ApiRestriction, allPaid: boolean, now: Date, i
 /** The outcome of each exception action for the current state (IR96, IR35 items 2 and 3, IR141 items 1 and 3). */
 export type ActionKind = "defer" | "exempt" | "cancel" | "override";
 export function actionOutcome(kind: ActionKind, s: RestrictionState, t: T = en): { allowed: boolean; result: string } {
-  const terminal = s === "released" || s === "cancelled";
-  if (terminal) return { allowed: false, result: t("Not possible — the restriction is {state}", { state: stateWord(s, t).toLowerCase() }) };
+  const isTerminal = s === "released" || s === "cancelled";
+  if (isTerminal) return { allowed: false, result: t("Not possible — the restriction is {state}", { state: stateWord(s, t).toLowerCase() }) };
   const state = stateWord(s, t);
   switch (kind) {
     case "defer":
-    case "exempt":
+    case "exempt": {
       return s === "scheduled" ? { allowed: true, result: t("Stays scheduled; execution waits until the date passes") }
-        : s === "release_requested" ? { allowed: true, result: t("Records the period only (release already requested)") }
-        : { allowed: true, result: t("{state} → Release requested (source: exception)", { state }) };
-    case "cancel":
+        : (({ allowed: true, result: s === "release_requested" ? t("Records the period only (release already requested)") : t("{state} → Release requested (source: exception)", { state }) }));
+    }
+    case "cancel": {
       return s === "scheduled" ? { allowed: true, result: t("Scheduled → Cancelled; no commands are sent") }
-        : s === "release_requested" ? { allowed: true, result: t("No change — release already requested (idempotent)") }
-        : { allowed: true, result: t("{state} → Release requested (source: cancel); application may already have happened", { state }) };
-    case "override":
+        : (({ allowed: true, result: s === "release_requested" ? t("No change — release already requested (idempotent)") : t("{state} → Release requested (source: cancel); application may already have happened", { state }) }));
+    }
+    case "override": {
       return s === "scheduled" ? { allowed: false, result: t("Not possible for a scheduled restriction — cancel it instead") }
-        : s === "release_requested" ? { allowed: true, result: t("No change — release already requested (idempotent)") }
-        : { allowed: true, result: t("{state} → Release requested (source: override); the invoices stay unpaid", { state }) };
+        : (({ allowed: true, result: s === "release_requested" ? t("No change — release already requested (idempotent)") : t("{state} → Release requested (source: override); the invoices stay unpaid", { state }) }));
+    }
   }
 }

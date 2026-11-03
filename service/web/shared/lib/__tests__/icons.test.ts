@@ -18,9 +18,9 @@ import { describe, expect, it } from "vitest";
 // The Malay dictionary is a source file too, so its keys and texts are held to the same rules.
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const DIRS = ["customer", "partner", "technician", "admin", "shared"];
-const SYMBOL = /[\u2139\u203C\u2049\u2205\u2295-\u22A1\u22EF\u2300-\u23FF\u2460-\u24FF\u25A0-\u25FF\u2600-\u26FF\u2700-\u27BF\u2B00-\u2BFF]/u;
+const SYMBOL = /[\u{2139}\u{203C}\u{2049}\u{2205}\u{2295}-\u{22A1}\u{22EF}\u{2300}-\u{23FF}\u{2460}-\u{24FF}\u{25A0}-\u{25FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2B00}-\u{2BFF}]/u;
 const PICTOGRAPH = /\p{Extended_Pictographic}/u;
-const ARROW = /[\u2190-\u21FF\u27F0-\u27FF\u2900-\u297F\u2039\u203A]/u;
+const ARROW = /[\u{2190}-\u{21FF}\u{27F0}-\u{27FF}\u{2900}-\u{297F}\u{2039}\u{203A}]/u;
 const TYPOGRAPHY = new Set(["©", "®", "™"]); // pictographs to Unicode, plain marks in a text
 
 const iconChar = (c: string) => SYMBOL.test(c) || (PICTOGRAPH.test(c) && !ARROW.test(c) && !TYPOGRAPHY.has(c));
@@ -30,13 +30,13 @@ export function iconProblem(text: string): string | null {
   const symbol = [...text].find(iconChar);
   if (symbol) return `the symbol ${symbol} (U+${symbol.codePointAt(0)!.toString(16).toUpperCase()})`;
   const chars = [...text.trim()];
-  if (!chars.length) return null;
+  if (chars.length === 0) return null;
   const first = chars[0], last = chars[chars.length - 1];
-  const lead = text.match(/^[ \t]*/)![0], trail = text.match(/[ \t]*$/)![0];
-  const separatorFirst = lead.length > 0 && /^[ \t]/.test(text.slice(lead.length + first.length));
-  const separatorLast = trail.length > 0 && /[ \t]$/.test(text.slice(0, text.length - trail.length - last.length));
-  if (ARROW.test(first) && !separatorFirst) return `the arrow ${first} before the text`;
-  if (ARROW.test(last) && !separatorLast) return `the arrow ${last} after the text`;
+  const lead = /^[ \t]*/.exec(text)![0], trail = /[ \t]*$/.exec(text)![0];
+  const isSeparatorFirst = lead.length > 0 && /^[ \t]/.test(text.slice(lead.length + first.length));
+  const isSeparatorLast = trail.length > 0 && /[ \t]$/.test(text.slice(0, text.length - trail.length - last.length));
+  if (ARROW.test(first) && !isSeparatorFirst) return `the arrow ${first} before the text`;
+  if (ARROW.test(last) && !isSeparatorLast) return `the arrow ${last} after the text`;
   if (/^\s*\+ \p{Lu}/u.test(text)) return `"+ " before the label`;
   return null;
 }
@@ -67,8 +67,8 @@ function texts(file: string): { line: number; text: string; button?: boolean }[]
     if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n) || ts.isTemplateHead(n) || ts.isTemplateMiddle(n) || ts.isTemplateTail(n) || ts.isJsxText(n)) {
       // a JSX text that is a button's only content
       const parent = ts.isJsxText(n) && ts.isJsxElement(n.parent) ? n.parent : null;
-      const button = !!parent && BUTTONS.has(parent.openingElement.tagName.getText(sf)) && parent.children.every((c) => c === n || (ts.isJsxText(c) && !c.text.trim()));
-      out.push({ line: sf.getLineAndCharacterOfPosition(n.getStart()).line + 1, text: n.text, button });
+      const isButton = !!parent && BUTTONS.has(parent.openingElement.tagName.getText(sf)) && parent.children.every((c) => c === n || (ts.isJsxText(c) && !c.text.trim()));
+      out.push({ line: sf.getLineAndCharacterOfPosition(n.getStart()).line + 1, text: n.text, button: isButton });
     }
     ts.forEachChild(n, visit);
   };
@@ -91,10 +91,12 @@ describe("one icon library (DEC-74)", () => {
   it("no UI string of the four apps uses a character as an icon", () => {
     const files = sources();
     expect(files.length).toBeGreaterThan(400);
-    const problems = files.flatMap((file) => texts(file).flatMap(({ line, text, button }) => {
-      const why = iconProblem(text) ?? (button && signButton(text) ? `the sign ${text.trim()} as a button's only content` : null);
-      return why ? [`${relative(root, file)}:${line} ${JSON.stringify(text.trim().slice(0, 60))} — ${why}; use <Icon name="…" /> (shared/components/Icon.tsx)`] : [];
-    }));
+    const problems = files.flatMap((file) => {
+      return texts(file).flatMap(({ line, text, button }) => {
+        const why = iconProblem(text) ?? (button && signButton(text) ? `the sign ${text.trim()} as a button's only content` : null);
+        return why ? [`${relative(root, file)}:${line} ${JSON.stringify(text.trim().slice(0, 60))} — ${why}; use <Icon name="…" /> (shared/components/Icon.tsx)`] : [];
+      });
+    });
     expect(problems).toEqual([]);
   });
 });

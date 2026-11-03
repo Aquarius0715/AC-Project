@@ -4,17 +4,19 @@ import { i18nOf, translator } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
-const unit = (id: string, over: Partial<ApiUnitDetail> = {}): ApiUnitDetail => ({
-  id, version: 1, spaceId: "room", displayName: `AC ${id}`, alertPolicyIds: [], connection: "online", effectivePowerState: "on",
-  observedState: { power: true, celsius: 26, mode: "cool", fanLevel: "mid", observedAt: "2026-09-14T01:00:00Z" }, lastSeenAt: "2026-09-14T01:10:00Z",
-  latestMeasurements: [
-    { id: "m1", unitId: id, sensorId: "s1", metric: "temperature", value: 27.04, unit: "°C", observedAt: "2026-09-14T01:10:00Z", origin: "measured", quality: "valid", qualityReason: null },
-    { id: "m2", unitId: id, sensorId: "s2", metric: "power", value: 0.68, unit: "kW", observedAt: "2026-09-14T01:10:00Z", origin: "measured", quality: "valid", qualityReason: null },
-  ],
-  capabilities: { manufacturer: "Demo", model: "M", control: true, modeControl: true, fanControl: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry", "fan"], fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [] },
-  effectiveControlPolicy: { state: "unrestricted" }, controlAvailability: { state: "available" }, pendingCommands: [],
-  location: { pathLabels: ["Home A", "1F", "Bedroom"], address: null, accessInstructions: null }, installedAt: null, capabilityVersion: 1, serviceScope: ["indoor"], components: [], ...over,
-});
+const unit = (id: string, over: Partial<ApiUnitDetail> = {}): ApiUnitDetail => {
+  return {
+    id, version: 1, spaceId: "room", displayName: `AC ${id}`, alertPolicyIds: [], connection: "online", effectivePowerState: "on",
+    observedState: { power: true, celsius: 26, mode: "cool", fanLevel: "mid", observedAt: "2026-09-14T01:00:00Z" }, lastSeenAt: "2026-09-14T01:10:00Z",
+    latestMeasurements: [
+      { id: "m1", unitId: id, sensorId: "s1", metric: "temperature", value: 27.04, unit: "°C", observedAt: "2026-09-14T01:10:00Z", origin: "measured", quality: "valid", qualityReason: null },
+      { id: "m2", unitId: id, sensorId: "s2", metric: "power", value: 0.68, unit: "kW", observedAt: "2026-09-14T01:10:00Z", origin: "measured", quality: "valid", qualityReason: null },
+    ],
+    capabilities: { manufacturer: "Demo", model: "M", control: true, modeControl: true, fanControl: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry", "fan"], fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [] },
+    effectiveControlPolicy: { state: "unrestricted" }, controlAvailability: { state: "available" }, pendingCommands: [],
+    location: { pathLabels: ["Home A", "1F", "Bedroom"], address: null, accessInstructions: null }, installedAt: null, capabilityVersion: 1, serviceScope: ["indoor"], components: [], ...over,
+  };
+};
 const ch: GroupChange = { power: true, celsius: 24, mode: "dry", fan: "high" };
 
 describe("units & locations: the room list and group control (FR-C02, FR-C14, IR263)", () => {

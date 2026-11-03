@@ -4,10 +4,12 @@ import { inboxRow, NOTIFICATION_KEYS, type ApiNotification } from "@ac/web/lib/n
 import { i18nOf } from "@ac/web/lib/i18n";
 import { ms } from "@ac/web/lib/i18n-ms";
 
-const note = (over: Partial<ApiNotification>): ApiNotification => ({
-  id: "n1", version: 1, type: "job_update", sourceAlertId: null, target: { kind: "job", id: "job-1" }, templateKey: "job_update",
-  params: { targetName: "job-1", at: "2026-09-14T01:00:00Z", status: "requested", reason: null, message: null }, channel: "inApp", occurredAt: "2026-09-14T01:00:00Z", readAt: null, ...over,
-});
+const note = (over: Partial<ApiNotification>): ApiNotification => {
+  return {
+    id: "n1", version: 1, type: "job_update", sourceAlertId: null, target: { kind: "job", id: "job-1" }, templateKey: "job_update",
+    params: { targetName: "job-1", at: "2026-09-14T01:00:00Z", status: "requested", reason: null, message: null }, channel: "inApp", occurredAt: "2026-09-14T01:00:00Z", readAt: null, ...over,
+  };
+};
 
 describe("inbox rows and alert rows", () => {
   it("titles by template, links the target and hides the in-app channel", () => {
@@ -46,7 +48,7 @@ describe("inbox rows and alert rows", () => {
     // an access-release notice (IR439): the job is back to accepted and the reason is a code
     const released = note({ params: { ...note({}).params, status: "accepted", reason: "technician_access_ended" } });
     expect(inboxRow(released, "contractor").d).toBe("Technician’s access ended — to be reassigned · Accepted");
-    expect(inboxRow(released, "contractor", malay).d).toBe(`${ms["Technician’s access ended — to be reassigned"]} · ${ms["Accepted"]}`);
+    expect(inboxRow(released, "contractor", malay).d).toBe(`${ms["Technician’s access ended — to be reassigned"]} · ${ms.Accepted}`);
     expect(inboxRow(note({ params: { ...note({}).params, status: "in_progress" } }), "technician").d).toBe("In progress");
     // a status the API filled in from the type (a seeded alert notification has none) is left out; an unknown one stays
     expect(inboxRow(note({ type: "fault", templateKey: "alert", params: { ...note({}).params, status: "fault" } }), "client").d).toBe("");
@@ -62,7 +64,7 @@ describe("inbox rows and alert rows", () => {
 
   it("names the amount of a payment reminder (IR488)", () => {
     const n = note({ type: "payment_reminder", templateKey: "payment_reminder", target: { kind: "invoice", id: "i1" },
-      params: { targetName: "INV-2026-09-0003", at: "2026-09-14T01:00:00Z", status: "payment_reminder", reason: null, message: null, amountMinor: 12000, currency: "MYR" } });
+      params: { targetName: "INV-2026-09-0003", at: "2026-09-14T01:00:00Z", status: "payment_reminder", reason: null, message: null, amountMinor: 12_000, currency: "MYR" } });
     expect([inboxRow(n, "client").t, inboxRow(n, "client").d, inboxRow(n, "client").href]).toEqual(["Payment reminder — INV-2026-09-0003", "Amount due 120.00 MYR", "/customer/payments/i1"]);
     expect(inboxRow(n, "client", { locale: "ms", timeZone: "UTC" }).d).toBe("Jumlah perlu dibayar 120.00 MYR");
     expect(inboxRow(note({ ...n, params: { ...n.params, amountMinor: null } }), "client").d).toBe(""); // no amount, no line
@@ -87,9 +89,11 @@ describe("inbox rows and alert rows", () => {
   });
 
   it("lists alerts with their status and the read state of their notifications (DD-C08, IR242)", () => {
-    const alert = (id: string, severity: ApiAlert["severity"], status: string, over: Partial<ApiAlert> = {}): ApiAlert => ({
-      id, unitId: "u1", type: "sensor", severity, status, causeCode: "unknown", evidenceKind: "inferred", evidenceText: "Cleaning due (250 h of run time since the last cleaning). Not a fault.", detectedAt: "2026-09-14T01:00:00Z", ...over,
-    });
+    const alert = (id: string, severity: ApiAlert["severity"], status: string, over: Partial<ApiAlert> = {}): ApiAlert => {
+      return {
+        id, unitId: "u1", type: "sensor", severity, status, causeCode: "unknown", evidenceKind: "inferred", evidenceText: "Cleaning due (250 h of run time since the last cleaning). Not a fault.", detectedAt: "2026-09-14T01:00:00Z", ...over,
+      };
+    };
     const rows = inboxAlerts([
       alert("rem", "normal", "open", { type: "maintenance" }), alert("old", "critical", "resolved", { resolvedAt: "2026-09-14T02:00:00Z", resolutionReason: "filter cleaned" }),
       alert("win", "warning", "acknowledged", { causeCode: "window_open", acknowledgedAt: "2026-09-14T01:30:00Z", detectedAt: "2026-09-14T00:30:00Z" }), alert("hot", "critical", "open"),
@@ -101,12 +105,12 @@ describe("inbox rows and alert rows", () => {
     expect(rows.map((r) => r.status.state)).toEqual(["open", "acknowledged", "resolved", "open"]);
     // a load cause is only suspected, never a fault (Figma 06a, DD-C08, IR315); an inspection record says so first
     expect(rows.map((r) => r.kind)).toEqual(["Fault", "Load cause (possible)", "Fault", "Maintenance reminder"]);
-    expect(inboxAlerts([alert("ins", "normal", "open", { causeCode: "insulation_loss", evidenceKind: "inspection" }), alert("loss", "warning", "open", { causeCode: "insulation_loss" })], [], () => undefined).map((r) => r.kind))
+    expect(inboxAlerts([alert("ins", "normal", "open", { causeCode: "insulation_loss", evidenceKind: "inspection" }), alert("loss", "warning", "open", { causeCode: "insulation_loss" })], [], () => {}).map((r) => r.kind))
       .toEqual(["Load cause (possible)", "Inspection record"]);
     // the user's language and display time zone (IR261); a resolution reason the system wrote is worded too (IR481)
     const [, win, old] = inboxAlerts([alert("hot", "critical", "open"), alert("win", "warning", "acknowledged", { causeCode: "window_open", acknowledgedAt: "2026-09-14T01:30:00Z" }), alert("old", "critical", "resolved", { resolvedAt: "2026-09-14T02:00:00Z", resolutionReason: "filter cleaned" })],
       [], () => ({ name: "Bedroom AC", place: "" }), i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" }));
-    expect([win.title, win.kind, win.status.text, win.status.detail, old.status.detail, old.where, old.evidence.split(":")[0]]).toEqual([
+    expect([win.title, win.kind, win.status.text, win.status.detail, old.status.detail, old.where, old.evidence.split(":", 1)[0]]).toEqual([
       "Kemungkinan tingkap terbuka", "Punca beban (mungkin)", "Diakui", "Diakui 14 Sep 2026, 10:30 PG GMT+9 · masih belum selesai", "Diselesaikan 14 Sep 2026, 11:00 PG GMT+9 · penapis dibersihkan", "Bedroom AC · dikesan 14 Sep 2026, 10:00 PG GMT+9", "Bukti (disimpulkan)",
     ]);
   });

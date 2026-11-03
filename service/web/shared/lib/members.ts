@@ -1,4 +1,4 @@
-// HQ access and roles (FR-A03, DATA_SOURCE=api): memberships of HQ, contractor and technician users projected for
+// HQ access and roles (FR-A03, DATA_SOURCE=API): memberships of HQ, contractor and technician users projected for
 // /admin/settings/access, with the 38 canonical permissions (BR-A03, IR107) and the members.save rules (IR members.save
 // item 1). Pure code shared by the Server Component and the client view. Texts in the display language; the valid period
 // is shown and typed in the display time zone (`t` / `i` / `zone`, IR302).
@@ -9,18 +9,18 @@ import type { Permission } from "@ac/web/lib/contracts.gen";
 const en = translator("en");
 
 export type Role = "admin" | "contractor" | "technician";
-export type ScopeRef = { kind: "tenant" | "organization" | "property" | "unit"; id: string };
+export interface ScopeRef { kind: "tenant" | "organization" | "property" | "unit"; id: string }
 /** Membership of service-contracts.ts. */
-export type ApiMember = {
+export interface ApiMember {
   id: string; version: number; updatedAt: string; userId: string; displayName: string; organizationId: string; role: Role | "client"; employment: "internal" | "external" | null;
   permissions: string[]; scopes: ScopeRef[]; scopeVersion: number; validFrom: string; validUntil: string | null;
   /** HQ revoked the access: the sign-in is off until HQ gives the access back (IR508) */
   revokedAt?: string | null;
-};
-export type ApiOrganization = { id: string; name: string; kind: "customer" | "contractor" | "operator"; status: string };
+}
+export interface ApiOrganization { id: string; name: string; kind: "customer" | "contractor" | "operator"; status: string }
 
 /** The permission matrix: one row per resource with Read / Write and independent actions (IR107). */
-export type PermissionRow = { res: string; read?: string; write?: string; actions?: string[] };
+export interface PermissionRow { res: string; read?: string; write?: string; actions?: string[] }
 export const permissionRows: PermissionRow[] = [
   { res: "Dashboard", read: "dashboard.read" },
   { res: "Customers & units", read: "asset.read", write: "asset.write" },
@@ -51,7 +51,7 @@ export function resourceWord(res: string, t: T = en): string {
 }
 /** A role (and a technician's employment) as the screen words it. */
 export const roleWord = (role: Role, employment: ApiMember["employment"], t: T = en) =>
-  role === "admin" ? t("Admin") : role === "contractor" ? t("Contractor") : employment === "external" ? t("Technician · external") : t("Technician · internal");
+  role === "admin" ? t("Admin") : (role === "contractor" ? t("Contractor") : t(employment === "external" ? "Technician · external" : "Technician · internal"));
 export const allPermissions = permissionRows.flatMap((r) => [r.read, r.write, ...(r.actions ?? [])].filter((p): p is string => !!p));
 /** Permissions each role may hold (members.save rules). */
 export const allowedFor: Record<Role, string[]> = {
@@ -65,7 +65,7 @@ export const selfBlocked = ["identity.write", "restriction.override"];
 
 export const isActive = (m: Pick<ApiMember, "validFrom" | "validUntil">, now: Date) => Date.parse(m.validFrom) <= now.getTime() && (!m.validUntil || Date.parse(m.validUntil) > now.getTime());
 
-export type MemberRow = { id: string; version: number; name: string; role: Role; label: string; org: string; active: boolean; revoked: boolean; validity: string; m: ApiMember };
+export interface MemberRow { id: string; version: number; name: string; role: Role; label: string; org: string; active: boolean; revoked: boolean; validity: string; m: ApiMember }
 /** The memberships (clients are managed elsewhere), with the valid period in the display time zone. */
 export function memberRows(ms: ApiMember[], orgs: ApiOrganization[], now: Date, i: I18n = EN): MemberRow[] {
   const { t } = i;
@@ -79,11 +79,11 @@ export function memberRows(ms: ApiMember[], orgs: ApiOrganization[], now: Date, 
   });
 }
 
-export type MemberDraft = {
+export interface MemberDraft {
   userId: string; organizationId: string; role: Role; employment: "internal" | "external"; permissions: string[]; scopes: ScopeRef[]; validFrom: string; validUntil: string; reason: string;
   /** a person created with the membership instead of an existing user (IR461) */
   newUser: boolean; newEmail: string; newName: string;
-};
+}
 /** An instant as the datetime-local value of the form in a time zone ("2026-09-14T08:00"). */
 export const zonedLocal = (iso: string, zone: string) => {
   const p = zonedParts(iso, zone);
@@ -95,7 +95,7 @@ const zonedFrom = (local: string, zone: string) => zonedInstant(local.slice(0, 1
 const NO_USER = "00000000-0000-0000-0000-000000000000";
 
 /** The form of a membership; the valid period is typed in the display time zone (NFR-08). A new one starts `now` (the
- * business clock), as most do, so the period needs only its end (IR622). */
+business clock), as most do, so the period needs only its end (IR622). */
 export function memberDraft(m?: ApiMember, tenantId = "", zone = "Asia/Kuala_Lumpur", now?: string): MemberDraft {
   if (!m || m.role === "client") return { userId: "", organizationId: "", role: "contractor", employment: "internal", permissions: roleDefaults.contractor, scopes: [], validFrom: now ? zonedLocal(now, zone) : "", validUntil: "", reason: "", newUser: false, newEmail: "", newName: "" };
   return {
@@ -123,22 +123,22 @@ export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?
   } else if (!d.userId) e.userId = t("Choose a user");
   if (!d.organizationId) e.organizationId = t("Choose the organization");
   const bad = d.permissions.filter((p) => !allowedFor[d.role].includes(p));
-  if (bad.length) e.permissions = t("Not allowed for this role: {list}", { list: bad.join(", ") });
+  if (bad.length > 0) e.permissions = t("Not allowed for this role: {list}", { list: bad.join(", ") });
   for (const r of permissionRows) if (r.write && d.permissions.includes(r.write) && r.read && !d.permissions.includes(r.read)) e.permissions = t("{write} needs {read}", { write: r.write, read: r.read });
   const gained = d.permissions.filter((p) => selfBlocked.includes(p) && !(ctx.current?.permissions ?? []).includes(p));
-  if (!d.newUser && d.userId === ctx.selfUserId && gained.length) e.permissions = t("Another identity administrator must grant {list} to you", { list: gained.join(", ") });
+  if (!d.newUser && d.userId === ctx.selfUserId && gained.length > 0) e.permissions = t("Another identity administrator must grant {list} to you", { list: gained.join(", ") });
   if (d.role === "technician" && d.scopes.length === 0) e.scopes = t("Add at least one unit, property or customer organization");
   if (!d.validFrom) e.validFrom = t("Required");
   if (d.validUntil && d.validFrom && d.validUntil <= d.validFrom) e.validUntil = t("Must be after valid from");
   if (d.role === "technician" && d.employment === "external" && !d.validUntil) e.validUntil = t("External technicians need an end date");
-  if ([...d.reason.trim()].length < 1 || d.reason.length > 1000) e.reason = t("A change reason is required (1–1000 characters)");
+  if ([...d.reason.trim()].length === 0 || d.reason.length > 1000) e.reason = t("A change reason is required (1–1000 characters)");
   return e;
 }
 
 /** members.save input; the valid period typed in `zone` becomes instants. */
 export function memberInput(d: MemberDraft, id?: string, zone = "Asia/Kuala_Lumpur"): OpInput<"members.save"> {
   return {
-    ...(id ? { id } : {}), organizationId: d.organizationId, role: d.role, employment: d.role === "technician" ? d.employment : null,
+    ...(id && { id }), organizationId: d.organizationId, role: d.role, employment: d.role === "technician" ? d.employment : null,
     // a new person goes as newUser, with no user ID yet (IR461)
     ...(!id && d.newUser ? { userId: NO_USER, newUser: { email: d.newEmail.trim(), displayName: d.newName.trim() } } : { userId: d.userId }),
     permissions: d.permissions as Permission[], scopes: d.scopes, validFrom: zonedFrom(d.validFrom, zone), validUntil: d.validUntil ? zonedFrom(d.validUntil, zone) : null, reason: d.reason.trim(),

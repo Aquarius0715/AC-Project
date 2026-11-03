@@ -1,14 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { APP_ROLE, cookieOptions, createSessionCookie, OIDC_COOKIE, oidcConfig, oidcCookieOptions, roleHome, SESSION_COOKIE, sessionFromTokens, unseal, type Session } from "@ac/web/lib/session";
 
-type Pending = { state: string; verifier: string; returnTo: string | null; reauth?: boolean };
+interface Pending { state: string; verifier: string; returnTo: string | null; reauth?: boolean }
 
 /** True when the Core API refuses this sign-in because HQ signed the user out everywhere after it (IR384): the identity
- * provider's single sign-on answered with the old sign-in. Any other answer, or none, lets the sign-in go on. */
+provider's single sign-on answered with the old sign-in. Any other answer, or none, lets the sign-in go on. */
 async function revokedSignIn(s: Session): Promise<boolean> {
   try {
     const r = await fetch(`${process.env.CORE_API_URL ?? "http://localhost:8080"}/v1/session`, {
-      method: "GET", cache: "no-store", signal: AbortSignal.timeout(3000),
+      cache: "no-store", signal: AbortSignal.timeout(3000),
       headers: { Authorization: `Bearer ${s.accessToken}`, "X-Tenant-Id": s.tenantId, "X-Membership-Id": s.membershipId },
     });
     return r.status === 401 && ((await r.json().catch(() => null)) as { messageKey?: string } | null)?.messageKey === "errors.session_revoked";

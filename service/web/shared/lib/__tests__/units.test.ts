@@ -26,7 +26,7 @@ describe("unit commands and readings in the display language and time zone (FR-X
     expect(historyRow(cmd({ status: "failed", failureCode: "device_rejected", source: "automation" }), ms, { locale: "ms", timeZone: "Asia/Tokyo" }))
       .toEqual({ id: "cmd-1234", text: "Tetapkan suhu 24°C — gagal (device_rejected) · oleh automasi", when: "14 Sep 2026, 10:00 PG GMT+9", bad: true });
     expect(historyRow(cmd({ status: "expired" }), undefined, tokyo)).toMatchObject({ text: "Set temperature 24°C — no device response (expired)", when: "14 Sept 2026, 10:00 am GMT+9", bad: true });
-    // the assistant's confirmed change (IR306); a command from Unit Control (ui) carries no label
+    // the assistant's confirmed change (IR306); a command from Unit Control (UI) carries no label
     expect([historyRow(cmd({ source: "voice" })).text, historyRow(cmd({ source: "voice" }), ms).text, historyRow(cmd({ source: "ui" })).text])
       .toEqual(["Set temperature 24°C — acknowledged by device · by voice", "Tetapkan suhu 24°C — disahkan oleh peranti · melalui suara", "Set temperature 24°C — acknowledged by device"]);
   });
@@ -47,10 +47,12 @@ describe("unit commands and readings in the display language and time zone (FR-X
 });
 
 describe("the remote control a model offers (deterministic contracts, AT-X06; IR524, IR530)", () => {
-  const model = (over: Partial<ApiUnitDetail["capabilities"]>): ApiUnitDetail["capabilities"] => ({
-    manufacturer: "DemoAir", model: "SPL-100", control: true, modeControl: true, fanControl: true, temperature: { min: 16, max: 30, step: 1 },
-    modes: ["cool", "dry", "fan"], fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [], ...over,
-  });
+  const model = (over: Partial<ApiUnitDetail["capabilities"]>): ApiUnitDetail["capabilities"] => {
+    return {
+      manufacturer: "DemoAir", model: "SPL-100", control: true, modeControl: true, fanControl: true, temperature: { min: 16, max: 30, step: 1 },
+      modes: ["cool", "dry", "fan"], fanLevels: ["low", "mid", "high"], ventilation: false, ventilationLevels: [], sensors: [], ...over,
+    };
+  };
 
   it("offers every setting of a full model, and the demo screen's without a model", () => {
     expect(controlLayout(model({}))).toEqual({ control: true, temperature: { min: 16, max: 30, step: 1 }, modes: ["cool", "dry", "fan"], fans: ["low", "mid", "high"], review: true });

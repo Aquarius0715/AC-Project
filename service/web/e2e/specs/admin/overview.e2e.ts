@@ -46,5 +46,5 @@ test("Waiting for HQ opens the requests to book, with no period", async ({ page 
   const count = (await tile.locator("div").filter({ hasText: /^\d+$/ }).first().innerText()).trim();
   await link.click();
   await page.waitForURL(/\/admin\/jobs\?stage=requested$/);
-  await expect(main.getByRole("button", { name: new RegExp(`^Requested ${count}`) }).or(main.getByText(new RegExp(`^Requested\\s*${count}$`))).first()).toBeVisible();
+  await expect(main.getByRole("button", { name: new RegExp(`^Requested ${count}`) }).or(main.getByText(new RegExp(String.raw`^Requested\s*${count}$`))).first()).toBeVisible();
 });

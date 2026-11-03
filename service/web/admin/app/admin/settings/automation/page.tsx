@@ -12,7 +12,7 @@ import { withAccess } from "@ac/web/lib/withAccess";
 import { AutomationDemo } from "./_components/automation-demo";
 import { AutomationView } from "./_components/automation-view";
 
-type Unit = { id: string; displayName: string; customerOrgId: string; propertyId: string; modelId: string; archived: boolean };
+interface Unit { id: string; displayName: string; customerOrgId: string; propertyId: string; modelId: string; archived: boolean }
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
 export default async function AdminAutomationPage(props: PageProps<"/admin/settings/automation">) {

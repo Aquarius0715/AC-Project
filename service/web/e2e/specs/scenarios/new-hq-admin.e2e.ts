@@ -39,6 +39,7 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
   const password = `E2e-${crypto.randomUUID()}`;
   let key = "";
   const me = await open(browser, app("admin"), false);
+
   await test.step("the set-up e-mail sets the password and a one-time-code device", async () => {
     await me.goto(await setupLink(email));
     // the identity provider may list the actions first: wait for that page or the first step (isVisible does not wait)
@@ -81,7 +82,7 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
     await expect(me.locator("#otp")).toBeVisible(); // two steps
     // a code is accepted once per 30 s window: the set-up used this window's, so take the next one when it starts
     const window = Math.floor(Date.now() / 30_000);
-    await expect.poll(() => Math.floor(Date.now() / 30_000), { timeout: 35_000, intervals: [1_000] }).toBeGreaterThan(window);
+    await expect.poll(() => Math.floor(Date.now() / 30_000), { timeout: 35_000, intervals: [1000] }).toBeGreaterThan(window);
     await me.locator("#otp").fill(totpBase32(key));
     await me.locator("#kc-login").click();
     await me.waitForURL((u) => u.origin === new URL(hq.url).origin && (u.pathname === hq.home || u.pathname.startsWith(hq.home + "/")));
@@ -97,5 +98,6 @@ test("a new HQ administrator sets a password and a one-time-code device, then si
     await dialog.getByRole("button", { name: "Revoke", exact: true }).click();
     await expect(admin.getByText("Access revoked — the membership is now inactive").first()).toBeVisible();
   });
+
   await admin.context().close();
 });

@@ -15,24 +15,23 @@ const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
     const value = await fn();
     refresh();
     return { ok: true, value };
-  } catch (e) {
-    if (e instanceof CoreError) {
-      if (e.error.code === "CONFLICT") refresh();
-      return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
+  } catch (error) {
+    if (error instanceof CoreError) {
+      if (error.error.code === "CONFLICT") refresh();
+      return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
     }
-    throw e;
+    throw error;
   }
 };
 
 /** Marks the alert's unread notifications read in one write (one already read meanwhile is skipped); returns why they
- * were not marked (the view words it, IR380) or null. */
+were not marked (the view words it, IR380) or null. */
 export async function readAlert(ids: string[]): Promise<ActionFailure | null> {
   try {
     await coreOp("notifications.markAllRead", { ids }, { write: true });
     return null;
-  } catch (e) {
-    if (e instanceof CoreError) return { code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
-    return { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} };
+  } catch (error) {
+    return error instanceof CoreError ? { code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds } : { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} };
   } finally {
     refresh();
   }

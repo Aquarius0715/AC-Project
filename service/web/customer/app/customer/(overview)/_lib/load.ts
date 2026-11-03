@@ -21,10 +21,10 @@ import {
   attentionCard, bucketPoints, emissionsCard, energyCard, nextRunText, overviewRows, overviewScope, periodLabel, periodNote, periodOf, previousRange, type OverviewUnit,
 } from "@ac/web/lib/customerOverview";
 
-type Summary = { counts: { total: number; powerOn: number; powerOff: number; powerUnknown: number; alertCount: number }; asOf: string };
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export async function loadOverview(sp: Record<string, string | string[] | undefined>) {
+  interface Summary { counts: { total: number; powerOn: number; powerOff: number; powerUnknown: number; alertCount: number }; asOf: string }
   const kind = periodOf(one(sp.period));
   const [now, units, properties, spaces, alerts, automations, baselines, consent, display] = await Promise.all([
     coreNow(), coreAll<OverviewUnit>("units.list"), coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"),
@@ -40,10 +40,10 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const period = periodRange(kind, now);
   const prev = previousRange(period);
   const week = dayRanges(periodRange("7d", now).from, period.to, display.locale).slice(-7);
-  const filters = sel.unitId ? { unitId: sel.unitId } : sel.propertyId ? { propertyId: sel.propertyId } : {};
+  const filters = sel.unitId ? { unitId: sel.unitId } : (sel.propertyId ? { propertyId: sel.propertyId } : {});
   const baseline = baselinesFor(baselines, ids)[0];
-  const sum = (from: string, to: string, b?: string) => coreOp<ApiEnergySummary>("energy.summary", { from, to, unitIds: ids, ...(b ? { baselineId: b } : {}) });
-  const energy = ids.length ? Promise.all([
+  const sum = (from: string, to: string, b?: string) => coreOp<ApiEnergySummary>("energy.summary", { from, to, unitIds: ids, ...(b && { baselineId: b }) });
+  const energy = ids.length > 0 ? Promise.all([
     sum(period.from, period.to, baseline?.id), sum(prev.from, prev.to),
     Promise.all(week.map((d) => sum(d.from, d.to))), Promise.all(week.map((d) => sum(new Date(Date.parse(d.from) - 7 * 86_400_000).toISOString(), new Date(Date.parse(d.to) - 7 * 86_400_000).toISOString()))),
   ]) : Promise.resolve(null);
@@ -69,7 +69,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
       if (r) restriction = { r, invoiceId };
     }
     return dueNotice(overdue, restriction, i);
-  })().catch((e) => { if (e instanceof CoreError && (e.error.code === "FORBIDDEN" || e.error.code === "NOT_FOUND")) return null; throw e; });
+  })().catch((error) => { if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null; throw error; });
   const inScope = automations.filter((a) => a.unitIds.some((u) => ids.includes(u))).sort((a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name));
   const shown = inScope.slice(0, 3);
   const [summary, sums, co2, nexts, dueLines] = await Promise.all([
@@ -79,8 +79,8 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const unitName = new Map(units.map((u) => [u.id, u.displayName]));
   const n = sel.scope.length;
   const scopeText = sel.unitId ? unitName.get(sel.unitId)!
-    : sel.propertyName ? t(n === 1 ? "{n} unit in {property}" : "{n} units in {property}", { n, property: sel.propertyName })
-    : t(n === 1 ? "all {n} unit" : "all {n} units", { n });
+    : (sel.propertyName ? t(n === 1 ? "{n} unit in {property}" : "{n} units in {property}", { n, property: sel.propertyName })
+    : t(n === 1 ? "all {n} unit" : "all {n} units", { n }));
   const roomOf = (u: OverviewUnit) => (u.spaceId ? spaces.find((s) => s.id === u.spaceId)?.name : null) ?? properties.find((p) => p.id === u.propertyId)?.name ?? t("Room");
   return {
     due: dueLines,
@@ -89,7 +89,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
     units: sel.inProperty.map((u) => ({ id: u.id, name: u.displayName })), unitId: sel.unitId,
     counts: summary.counts,
     rows: overviewRows(sel.scope, (u) => place.get(u.id)?.place ?? "", i),
-    energy: sums ? energyCard(kind, sums[0], sums[1], week.map((d, k) => ({ label: d.label.split(" ")[0], kWh: sums[2][k].totals.kWh })), sums[3].map((s) => s.totals.kWh), scopeText, i) : null,
+    energy: sums ? energyCard(kind, sums[0], sums[1], week.map((d, k) => ({ label: d.label.split(" ", 1)[0], kWh: sums[2][k].totals.kWh })), sums[3].map((s) => s.totals.kWh), scopeText, i) : null,
     emissions: sums ? { ...emissionsCard(sums[0], baseline ? baseline.method : null, i), scope: scopeText } : null,
     air: air ? {
       id: air.id, room: roomOf(air), unit: air.displayName, co2: metricCard("co2", air.latestMeasurements.find((m) => m.metric === "co2"), true, i),
@@ -102,7 +102,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
         const u = units.find((x) => x.id === a.unitIds[0]);
         const card = ruleCard(a, u ? { name: u.displayName, path: place.get(u.id)?.place ?? "", property: properties.find((p) => p.id === u.propertyId)?.name ?? "" } : null, nexts[k], !!consent?.granted, i);
         const line = nexts[k] ? t("Next run: {when} · {unit}", { when: nextRunText(nexts[k]!, nowMs, i), unit: u?.displayName ?? "AC" })
-          : triggerOf(a) === "location" ? t("{when} · location consent: {state}", { when: card.when, state: t(consent?.granted ? "granted" : "not granted") }) : card.when;
+          : (triggerOf(a) === "location" ? t("{when} · location consent: {state}", { when: card.when, state: t(consent?.granted ? "granted" : "not granted") }) : card.when);
         return { id: a.id, name: a.name, line, status: card.status };
       }),
     },

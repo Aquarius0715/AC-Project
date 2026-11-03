@@ -1,4 +1,4 @@
-// The customer assistant (FR-X02, D09, IR65, DATA_SOURCE=api; Figma Client 09a–09g): the fixed en/ms grammar's
+// The customer assistant (FR-X02, D09, IR65, DATA_SOURCE=API; Figma Client 09a–09g): the fixed en/ms grammar's
 // examples, voice.resolveIntent results and the command's progress as the panel's words. Pure code shared by the panel
 // and its tests. The assistant speaks its chosen language — the display language unless the panel switches it (IR306).
 import { one } from "@ac/web/lib/energy";
@@ -6,7 +6,7 @@ import { showClock, type Display, type Locale, type T } from "@ac/web/lib/i18n";
 import { actionText, controlLayout, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 
 /** ResolvedIntent of service-contracts.ts. */
-export type Measurement = { value: number | null; unit: string; observedAt: string; quality: "valid" | "missing" | "stale" | "suspect" };
+export interface Measurement { value: number | null; unit: string; observedAt: string; quality: "valid" | "missing" | "stale" | "suspect" }
 export type ResolvedIntent =
   | { kind: "unsupported" }
   | { kind: "help"; messageKey: "voice.help" }
@@ -15,14 +15,15 @@ export type ResolvedIntent =
   | { kind: "change"; unitId: string; celsius: number; before: { power: boolean | null; celsius: number | null; observedAt: string | null }; expectedVersion: number };
 
 /** The microphone consent of this device (Preferences), kept in this browser and not on the account. "off" leaves the
- * assistant text only, and turning it off while listening discards the voice request (FR-X02, AT-X02-E item 3, D09). */
+assistant text only, and turning it off while listening discards the voice request (FR-X02, AT-X02-E item 3, D09). */
 export const MICROPHONE = "ac-voice-microphone";
 
 /** Sentences the fixed grammar accepts (D09): the suggestions and the simulated voice transcript (no real microphone). */
-export const examples = (locale: Locale) =>
-  locale === "ms"
+export const examples = (locale: Locale) => {
+  return locale === "ms"
     ? { temperature: "suhu Bedroom", change: "tetapkan Bedroom kepada 24 darjah", help: "bantuan" }
     : { temperature: "temperature Bedroom", change: "set Bedroom to 24 degrees", help: "help" };
+};
 
 /** The grammar's own help (voice.help): what can be asked, in the assistant's language. */
 export const helpText = (t: T) =>
@@ -32,9 +33,9 @@ export const helpText = (t: T) =>
 export const placeOf = (u: Pick<ApiUnitDetail, "displayName" | "location">) => [...u.location.pathLabels, u.displayName].join(" › ");
 
 /** The candidates of an ambiguous room by room (Figma 09d): each matched room's path (“Home A › 1F › Bedroom”), then
- * the ACs placed in it. ACs with the same name in one room also show their ID, since nothing else tells them apart
- * (IR101). The order is the API's (by path label). */
-export type CandidateGroup = { path: string; units: { unitId: string; name: string; label: string }[] };
+the ACs placed in it. ACs with the same name in one room also show their ID, since nothing else tells them apart
+(IR101). The order is the API's (by path label). */
+export interface CandidateGroup { path: string; units: { unitId: string; name: string; label: string }[] }
 export function candidateGroups(candidates: { unitId: string; pathLabel: string }[]): CandidateGroup[] {
   const rooms = new Map<string, { unitId: string; name: string }[]>();
   for (const c of candidates) {
@@ -43,9 +44,11 @@ export function candidateGroups(candidates: { unitId: string; pathLabel: string 
     const path = parts.join(" › ");
     rooms.set(path, [...(rooms.get(path) ?? []), { unitId: c.unitId, name }]);
   }
-  return [...rooms].map(([path, units]) => ({
-    path, units: units.map((u) => ({ ...u, label: units.filter((x) => x.name === u.name).length > 1 ? `${u.name} · ${u.unitId.slice(0, 8)}` : u.name })),
-  }));
+  return [...rooms].map(([path, units]) => {
+    return {
+      path, units: units.map((u) => ({ ...u, label: units.filter((x) => x.name === u.name).length > 1 ? `${u.name} · ${u.unitId.slice(0, 8)}` : u.name })),
+    };
+  });
 }
 /** A room choice's ACs, “2 ACs: Bedroom AC, Bedroom AC #2”. */
 export const groupSummary = (g: CandidateGroup, t: T) =>
@@ -74,7 +77,7 @@ export function changeCard(intent: Extract<ResolvedIntent, { kind: "change" }>, 
 }
 
 /** The command's progress after Confirm (Figma 09e–09g); while sending, the command and its state as rows. */
-export type Progress = { tone: "info" | "ok" | "crit"; title: string; detail: string; rows?: [string, string][] };
+export interface Progress { tone: "info" | "ok" | "crit"; title: string; detail: string; rows?: [string, string][] }
 export function progressOf(c: ApiCommand, unit: string, celsius: number, before: number | null, measured: number | null, t: T, display: Display): Progress {
   const time = showClock(c.requestedAt, display);
   if (c.status === "acknowledged") {
@@ -88,7 +91,7 @@ export function progressOf(c: ApiCommand, unit: string, celsius: number, before:
     const kept = before === null ? t("Nothing changed.") : t("Nothing changed — the confirmed setting is still {value} °C.", { value: before });
     const ttl = c.expiresAt ? Math.round((Date.parse(c.expiresAt) - Date.parse(c.requestedAt)) / 1000) : null;
     const why = c.status === "expired" ? (ttl ? t("The device did not answer within {seconds} s (expired).", { seconds: ttl }) : t("The device did not answer in time (expired)."))
-      : c.status === "cancelled" ? t("The command was cancelled.") : t("The device refused it ({code}).", { code: c.failureCode ?? "—" });
+      : (c.status === "cancelled" ? t("The command was cancelled.") : t("The device refused it ({code}).", { code: c.failureCode ?? "—" }));
     return { tone: "crit", title: t("Couldn’t change {unit}", { unit }), detail: `${why} ${kept}` };
   }
   return {

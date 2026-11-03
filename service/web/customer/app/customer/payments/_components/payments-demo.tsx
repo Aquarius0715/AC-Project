@@ -11,18 +11,18 @@ const contracts = [
   { id: "contract-es-a", name: "Energy service", sub: "contract-es-a · 2025", period: "2025", plan: "Energy service", units: [["Living room AC", "Home A › 1F"]], invoices: [] },
 ];
 
-/** The Phase 1A demo of /customer/payments (fixtures; DATA_SOURCE≠api). */
+/** The Phase 1A demo of /customer/payments (fixtures; DATA_SOURCE≠API). */
 export function PaymentsDemo() {
   const [sel, setSel] = useState(contracts[0]);
   return (
     <Page>
       <div className="split-rev">
         <Card title={`CONTRACTS (${contracts.length})`} className="self-start">
-          <div className="flex flex-col gap-2">{contracts.map((c) => <ListRow key={c.id} selected={sel.id === c.id} onClick={() => setSel(c)}><div className="min-w-0"><b>{c.name}</b><div className="truncate text-xs text-muted-foreground">{c.sub}</div></div></ListRow>)}</div>
+          <div className="flex flex-col gap-2">{contracts.map((c) => <ListRow key={c.id} selected={sel.id === c.id} onClick={() => { setSel(c); }}><div className="min-w-0"><b>{c.name}</b><div className="truncate text-xs text-muted-foreground">{c.sub}</div></div></ListRow>)}</div>
           <p className="mt-3 text-[11px] text-muted-foreground">Contract expiry does not stop monitoring or control.</p>
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={sel.name} sub={`${sel.id} · plan type ${sel.plan.split(" ")[0]}`}>
+          <Card title={sel.name} sub={`${sel.id} · plan type ${sel.plan.split(" ", 1)[0]}`}>
             <SummaryList items={[["Period", sel.period], ["Plan", sel.plan]]} />
             <h3 className="mt-4 mb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Contract scope — equipment this contract relates to</h3>
             <div className="flex flex-col divide-y divide-line">{sel.units.map(([n, l]) => <div key={n} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[13px]"><span><b>{n}</b><span className="block text-xs text-muted-foreground">{l}</span></span><TextLink href="/customer/properties">View unit <Icon name="chevronRight" /></TextLink></div>)}</div>

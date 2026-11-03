@@ -7,20 +7,20 @@ import { coveragePct, warningShort } from "@ac/web/lib/energy";
 import { money as formatMoney } from "@ac/web/lib/money";
 
 const en = translator("en");
-export type ApiForecast = {
+export interface ApiForecast {
   period: { from: string; to: string }; unitIds: string[]; baselineRef: { id: string; version: number } | null;
   baselineSnapshot: { id: string; version: number; method: string; baselineKWh: number | null; period: { from: string; to: string } } | null;
   expectedUnitMinutes: number; validUnitMinutes: number; actualKWhOnValidSlots: number | null; predictedBaselineKWh: number | null; predictedActualKWh: number | null;
   forecastSavedKWh: number | null; forecastSavingPercentage: number | null; qualityWarnings: string[];
-};
-export type AdminSummary = {
+}
+export interface AdminSummary {
   customerCount: number; total: number; online: number; offline: number; unknown: number; powerOn: number; powerOff: number; powerUnknown: number;
   operatingRate: number | null; alertCount: number; jobCounts: Record<string, number>; overdueInvoiceCount: number | null;
   amountsByCurrency: { amountMinor: number; currency: string }[] | null; billingVisibility: "allowed" | "forbidden";
   energySummary: { totals: { kWh: number | null; amountMinor: number | null }; coverage: number | null } | null;
   energyForecast?: ApiForecast | null; asOf?: string;
-};
-export type Kpis = { customers: number; units: number; on: number; off: number; unknown: number; rate: string; alerts: number; kwh: string; kwhSub: string; billing: string; billingSub: string; jobs: number; online: number; offline: number; connUnknown: number };
+}
+export interface Kpis { customers: number; units: number; on: number; off: number; unknown: number; rate: string; alerts: number; kwh: string; kwhSub: string; billing: string; billingSub: string; jobs: number; online: number; offline: number; connUnknown: number }
 export const mockKpis: Kpis = { customers: 2, units: 5, on: 2, off: 2, unknown: 1, rate: "50.0%", alerts: 1, kwh: "9.0 kWh", kwhSub: "measured · coverage 40% · cost 3.29 MYR", billing: "120.00 MYR", billingSub: "1 overdue invoice · unpaid, per currency", jobs: 2, online: 5, offline: 0, connUnknown: 0 };
 const money = (m: { amountMinor: number; currency: string }) => formatMoney(m.amountMinor, m.currency);
 export function kpisFrom(a: AdminSummary, t: T = en): Kpis {
@@ -45,20 +45,20 @@ const kwh = (v: number) => `${(Math.round(v * 10) / 10).toFixed(1)} kWh`;
 const thousands = (v: number) => v.toLocaleString("en-US");
 
 /** “As of 9:00 am MYT · 14 Sept, 00:00 – 14 Sept, 09:00 (1 day) · Asia/Kuala_Lumpur”: the summary's time in the display
- * time zone and the period's Kuala Lumpur days (periodRange labels them). */
+time zone and the period's Kuala Lumpur days (periodRange labels them). */
 export const asOfText = (asOf: string, period: string, i: I18n = EN) => i.t("As of {time} · {period}", { time: showClock(asOf, i.display), period });
 
 /** The drill-down links (IR50, SR06): current-state lists carry the customer / property but not the period; the job
- * links carry the period too (the counts are the jobs whose requested time starts in it, IR245). */
+links carry the period too (the counts are the jobs whose requested time starts in it, IR245). */
 export function overviewLinks(q: { customerId: string | null; propertyId: string | null; period?: { from: string; to: string } }) {
   const scope = (extra: Record<string, string> = {}) => {
-    const p = new URLSearchParams({ ...(q.customerId ? { customerId: q.customerId } : {}), ...(q.propertyId ? { propertyId: q.propertyId } : {}), ...extra });
-    return p.size ? `?${p}` : "";
+    const p = new URLSearchParams({ ...(q.customerId && { customerId: q.customerId }), ...(q.propertyId && { propertyId: q.propertyId }), ...extra });
+    return p.size > 0 ? `?${p}` : "";
   };
   return {
     units: `/admin/units${scope()}`, power: (state: "on" | "off" | "unknown") => `/admin/units${scope({ powerState: state })}`,
     connection: (c: string) => `/admin/units${scope({ connections: c })}`, alerts: "/admin/alerts", billing: "/admin/billing?overdueOnly=true",
-    jobs: (stage?: string) => `/admin/jobs${scope({ ...(stage ? { stage } : {}), ...(q.period ? { from: q.period.from, to: q.period.to } : {}) })}`, energy: "/admin/energy",
+    jobs: (stage?: string) => `/admin/jobs${scope({ ...(stage && { stage }), ...(q.period && { from: q.period.from, to: q.period.to }) })}`, energy: "/admin/energy",
     // the requests waiting for HQ, whatever their requested time (DEC-90, IR611)
     waiting: `/admin/jobs${scope({ stage: "requested" })}`,
   };
@@ -68,15 +68,17 @@ export type ForecastView =
   | { state: "ok"; saved: { text: string; tone: "ok" | "crit" | "muted" }; rate: { text: string; tone: "ok" | "crit" | "muted" }; baseline: { value: string; sub: string };
       actual: { value: string; sub: string }; coverage: string; warnings: string[] }
   | { state: "none"; text: string; warnings: string[] };
-const direction = (v: number, unit: string, t: T) => (v > 0 ? { text: t("Expected reduction {value}", { value: unit === "%" ? `${v.toFixed(1)}%` : kwh(v) }), tone: "ok" as const }
-  : v < 0 ? { text: t("Expected increase {value}", { value: unit === "%" ? `${Math.abs(v).toFixed(1)}%` : kwh(Math.abs(v)) }), tone: "crit" as const } : { text: t("No change 0.0"), tone: "muted" as const });
+const direction = (v: number, unit: string, t: T) => {
+  return (v > 0 ? { text: t("Expected reduction {value}", { value: unit === "%" ? `${v.toFixed(1)}%` : kwh(v) }), tone: "ok" as const }
+    : (v < 0 ? { text: t("Expected increase {value}", { value: unit === "%" ? `${Math.abs(v).toFixed(1)}%` : kwh(Math.abs(v)) }), tone: "crit" as const } : { text: t("No change 0.0"), tone: "muted" as const }));
+};
 /** The energy-saving forecast card (IR78): a forecast from a prorated demo_fixed baseline, never a measured saving. */
 export function forecastView(f: ApiForecast | null | undefined, t: T = en): ForecastView {
   if (!f || f.forecastSavedKWh === null || f.predictedBaselineKWh === null || f.predictedActualKWh === null) {
     const w = f?.qualityWarnings ?? [];
-    const why = w.includes("no_units") ? "no_units" : w.includes("baseline_unavailable") ? "baseline_unavailable" : null;
+    const why = w.includes("no_units") ? "no_units" : (w.includes("baseline_unavailable") ? "baseline_unavailable" : null);
     // the badges name the other warnings in words; the one the title already says is not repeated (IR577)
-    return { state: "none", text: t(why === "no_units" ? "No target equipment" : why === "baseline_unavailable" ? "Baseline not set" : "Cannot calculate"), warnings: w.filter((x) => x !== why).map((x) => warningShort(x, t)) };
+    return { state: "none", text: t(why === "no_units" ? "No target equipment" : (why === "baseline_unavailable" ? "Baseline not set" : "Cannot calculate")), warnings: w.filter((x) => x !== why).map((x) => warningShort(x, t)) };
   }
   const b = f.baselineSnapshot;
   return {
@@ -87,7 +89,7 @@ export function forecastView(f: ApiForecast | null | undefined, t: T = en): Fore
   };
 }
 
-export type AxisRow = { label: string; count: number; pct: number; tone: "primary" | "muted" | "warn" | "ok" | "crit"; href: string; key: string };
+export interface AxisRow { label: string; count: number; pct: number; tone: "primary" | "muted" | "warn" | "ok" | "crit"; href: string; key: string }
 /** The power-state and connection cards (SR27): one row per class with its share of the bar and its list link. */
 export function axisRows(s: AdminSummary, links: ReturnType<typeof overviewLinks>, t: T = en) {
   const pct = (n: number, of: number) => (of ? (n / of) * 100 : 0);
@@ -117,6 +119,5 @@ export function jobRows(counts: Record<string, number>, links: ReturnType<typeof
 
 /** The billing card: overdue invoices and one row per currency, never summed across currencies; forbidden without billing.read. */
 export function billingView(s: AdminSummary) {
-  if (s.billingVisibility === "forbidden") return { forbidden: true as const };
-  return { forbidden: false as const, overdue: s.overdueInvoiceCount ?? 0, rows: (s.amountsByCurrency ?? []).map((m) => ({ currency: m.currency, text: money(m) })) };
+  return s.billingVisibility === "forbidden" ? { forbidden: true as const } : { forbidden: false as const, overdue: s.overdueInvoiceCount ?? 0, rows: (s.amountsByCurrency ?? []).map((m) => ({ currency: m.currency, text: money(m) })) };
 }

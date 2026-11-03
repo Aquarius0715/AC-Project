@@ -19,15 +19,13 @@ import { withAccess } from "@ac/web/lib/withAccess";
 import { DevicesDemo } from "./_components/devices-demo";
 import { DevicesView, type DevicesLive } from "./_components/devices-view";
 
-type Page<T> = { items: T[] };
-type Operation = ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string };
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => { // members the session may not read (no identity.read)
-  if (e instanceof CoreError && e.error.code === "FORBIDDEN") return fallback;
-  throw e;
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error) => { // members the session may not read (no identity.read)
+  if (error instanceof CoreError && error.error.code === "FORBIDDEN") return fallback;
+  throw error;
 });
-const absent = <T,>(p: Promise<T>) => p.catch((e) => { // an alert or unit HQ cannot read (archived, another tenant) reads as absent
-  if (e instanceof CoreError && (e.error.code === "FORBIDDEN" || e.error.code === "NOT_FOUND")) return null;
-  throw e;
+const absent = <T,>(p: Promise<T>) => p.catch((error) => { // an alert or unit HQ cannot read (archived, another tenant) reads as absent
+  if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
+  throw error;
 });
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
@@ -36,11 +34,12 @@ export default async function AdminDevicesPage(props: PageProps<"/admin/devices"
 }
 
 async function AdminDevicesPageContent({ searchParams }: PageProps<"/admin/devices">) {
+  interface Page<T> { items: T[] }
   await connection();
   if (!apiMode()) return <DevicesDemo />;
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
-  const tab = one("tab") === "devices" ? "devices" : one("tab") === "firmware" ? "firmware" : "models";
+  const tab = one("tab") === "devices" ? "devices" : (one("tab") === "firmware" ? "firmware" : "models");
   const [now, perms, display, caps, units, devices] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
     coreAll<ApiCapability>("capabilities.list").then((items) => ({ items, total: items.length })),
@@ -62,6 +61,7 @@ async function AdminDevicesPageContent({ searchParams }: PageProps<"/admin/devic
     live.rows = techDeviceRows(devices.items, names, now.getTime(), i.t);
     const id = live.rows.find((r) => r.id === one("deviceId"))?.id ?? live.rows[0]?.id;
     if (id) {
+      type Operation = ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string };
       const q = { limit: 20 };
       const [d, ops, cals, events] = await Promise.all([
         coreOp<ApiDeviceDetail & { activeOperation: Operation | null }>("devices.get", { id }),

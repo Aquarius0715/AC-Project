@@ -8,16 +8,16 @@ import { stateTone } from "@ac/web/lib/restrictions";
 import type { ClientInvoiceRow, ContractCard, RestrictionNotice, StatusFilter } from "@ac/web/lib/clientBilling";
 import { Icon } from "@ac/web/components/Icon";
 
-export type PaymentsLive = {
+export interface PaymentsLive {
   cards: ContractCard[]; selected: string | null; status: StatusFilter; invoices: ClientInvoiceRow[]; total: number; notice: (RestrictionNotice & { invoiceId: string }) | null;
   /** The display time zone is not Kuala Lumpur, so the page says the dates are Kuala Lumpur business days. */
   otherZone: boolean;
-};
+}
 const statusTone = { Overdue: "crit", Unpaid: "warn", Processing: "primary", Paid: "ok" } as const;
 const contractTone = { Active: "ok", Upcoming: "primary", Expired: "muted" } as const;
 
 /** Contracts & payments (FR-C10) in API mode: the contract and the invoice status filter live in the URL; the page is
- * read-only — payments start on the invoice page. Texts in the user's display language (IR267). */
+read-only — payments start on the invoice page. Texts in the user's display language (IR267). */
 export function PaymentsView({ live }: { live: PaymentsLive }) {
   const t = useT();
   const nav = useUrlPatch();
@@ -31,7 +31,7 @@ export function PaymentsView({ live }: { live: PaymentsLive }) {
         <Card title={t("CONTRACTS ({n})", { n: live.cards.length })} className="self-start">
           <div className="flex flex-col gap-2">
             {live.cards.map((c) => (
-              <ListRow key={c.id} selected={c.id === sel.id} onClick={() => nav({ contractId: c.id, status: null })}>
+              <ListRow key={c.id} selected={c.id === sel.id} onClick={() => { nav({ contractId: c.id, status: null }); }}>
                 <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate">{c.name}</b><Badge tone={contractTone[c.status]}>{t(c.status)}</Badge></div><div className="truncate text-xs text-muted-foreground">{c.sub}</div></div>
               </ListRow>
             ))}
@@ -49,12 +49,12 @@ export function PaymentsView({ live }: { live: PaymentsLive }) {
             )}
           </Card>
           <Card title={t("Invoices for this contract")} sub={t(live.total === 1 ? "{shown} of {n} invoice" : "{shown} of {n} invoices", { shown: live.invoices.length, n: live.total })}
-            action={<Choice value={live.status} onChange={(v: StatusFilter) => nav({ status: v === "all" ? null : v })} options={[{ id: "all", label: t("All") }, { id: "unpaid", label: t("Unpaid") }, { id: "overdue", label: t("Overdue") }, { id: "processing", label: t("Processing") }, { id: "paid", label: t("Paid") }]} />}>
+            action={<Choice value={live.status} onChange={(v: StatusFilter) => { nav({ status: v === "all" ? null : v }); }} options={[{ id: "all", label: t("All") }, { id: "unpaid", label: t("Unpaid") }, { id: "overdue", label: t("Overdue") }, { id: "processing", label: t("Processing") }, { id: "paid", label: t("Paid") }]} />}>
             <div className="flex flex-col gap-2">
               {live.invoices.map((i) => (
                 <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
                   <div><b>{i.number}</b><div className="text-xs text-muted-foreground">{i.due}</div></div>
-                  <div className="flex items-center gap-3"><b>{i.amount}</b><Badge tone={statusTone[i.status]} icon={i.status === "Overdue" ? "alert" : i.status === "Paid" ? "check" : undefined}>{t(i.status)}</Badge>
+                  <div className="flex items-center gap-3"><b>{i.amount}</b><Badge tone={statusTone[i.status]} icon={i.status === "Overdue" ? "alert" : (i.status === "Paid" ? "check" : undefined)}>{t(i.status)}</Badge>
                     {i.payable ? <LinkBtn size="sm" variant="primary" href={`/customer/payments/${i.id}`}>{t("Pay now")}</LinkBtn> : <Link href={`/customer/payments/${i.id}`} className="text-muted-foreground" aria-label={t("Open {number}", { number: i.number })}><Icon name="chevronRight" /></Link>}</div>
                 </div>
               ))}

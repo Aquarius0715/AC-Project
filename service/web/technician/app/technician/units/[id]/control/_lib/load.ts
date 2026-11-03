@@ -13,17 +13,17 @@ import {
   blockedText, capabilityText, connectionText, historyRows, observedText, restrictionText, runActive, runBanner, stateTiles, windowText, type ApiCommandRow, type ApiRun,
 } from "@ac/web/lib/techControl";
 
-type JobRead = TechJobRead<{ id: string; version: number; status: string; assignment: { scheduledStart: string; scheduledEnd: string; status: string } | null }>;
 const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || !!e.error.fieldErrors.id || !!e.error.fieldErrors.jobId);
 
 export async function loadControl(unitId: string, jobId: string | null) {
+  type JobRead = TechJobRead<{ id: string; version: number; status: string; assignment: { scheduledStart: string; scheduledEnd: string; status: string } | null }>;
   const [now, display, perms] = await Promise.all([coreNow(), coreDisplay(), corePermissions()]);
   const i = i18nOf(display);
   const { t } = i;
-  const d = await coreOp<ApiUnitDetail>("units.get", { id: unitId }).catch((e) => {
-    if (e instanceof CoreError && e.error.messageKey === "errors.assignment_not_started") return "not_started" as const;
-    if (gone(e)) return null;
-    throw e;
+  const d = await coreOp<ApiUnitDetail>("units.get", { id: unitId }).catch((error) => {
+    if (error instanceof CoreError && error.error.messageKey === "errors.assignment_not_started") return "not_started" as const;
+    if (gone(error)) return null;
+    throw error;
   });
   const unitHref = `/technician/units/${unitId}${jobId ? `?jobId=${jobId}` : ""}`;
   if (d === null) return null; // not in the technician's assignments: not found (IR169)
@@ -41,7 +41,7 @@ export async function loadControl(unitId: string, jobId: string | null) {
   };
   const base = { kind: "live" as const, unitHref, unit, canDiagnose: perms.has("control.diagnose") };
   if (!jobId) return { ...base, job: null, run: null, banner: null, active: false, history: [] };
-  const read = await coreOp<JobRead>("jobs.get", { jobId }).catch((e) => { if (gone(e)) return null; throw e; });
+  const read = await coreOp<JobRead>("jobs.get", { jobId }).catch((error) => { if (gone(error)) return null; throw error; });
   const job = read?.projection === "detail" ? read : null;
   if (!job) return null; // a refused job, or one whose window ended (a history snapshot): not the technician's to control
   const [runs, cmds] = await Promise.all([
@@ -50,10 +50,10 @@ export async function loadControl(unitId: string, jobId: string | null) {
   ]);
   const run = runs.items[0] ?? null;
   const a = job.assignment;
-  const inWindow = !!a && a.status === "active" && Date.parse(a.scheduledStart) <= now.getTime() && now.getTime() < Date.parse(a.scheduledEnd);
+  const isInWindow = !!a && a.status === "active" && Date.parse(a.scheduledStart) <= now.getTime() && now.getTime() < Date.parse(a.scheduledEnd);
   return {
     ...base, run, banner: runBanner(run, i), active: runActive(run) || cmds.items.some((c) => c.status === "requested" || c.status === "sent"),
-    job: { id: job.id, version: job.version, status: job.status, window: a ? windowText(a.scheduledStart, a.scheduledEnd, i) : t("no assignment"), inWindow },
+    job: { id: job.id, version: job.version, status: job.status, window: a ? windowText(a.scheduledStart, a.scheduledEnd, i) : t("no assignment"), inWindow: isInWindow },
     history: historyRows(cmds.items, runs.items, i),
   };
 }

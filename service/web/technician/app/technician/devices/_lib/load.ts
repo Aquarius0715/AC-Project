@@ -15,15 +15,15 @@ import {
 } from "@ac/web/lib/techDevices";
 import type { TechDevicesLive } from "../_components/devices-view";
 
-type UnitRow = { id: string; displayName: string; archived: boolean };
-type JobRow = { projection: string; id?: string; unitId?: string; status?: string };
-type Unit = ApiUnitDetail & { capabilities: ApiUnitDetail["capabilities"] & { firmwareCandidates?: string[] } };
-const quiet = <T,>(p: Promise<T>) => p.catch((e) => { // a unit before the work window or outside the job scope reads as absent
-  if (e instanceof CoreError && (e.error.code === "FORBIDDEN" || e.error.code === "NOT_FOUND")) return null;
-  throw e;
+const quiet = <T,>(p: Promise<T>) => p.catch((error) => { // a unit before the work window or outside the job scope reads as absent
+  if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
+  throw error;
 });
 
 export async function loadDevices(opts: { selected?: string; unitId?: string; jobId?: string; events: boolean }): Promise<TechDevicesLive> {
+  type Unit = ApiUnitDetail & { capabilities: ApiUnitDetail["capabilities"] & { firmwareCandidates?: string[] } };
+  interface JobRow { projection: string; id?: string; unitId?: string; status?: string }
+  interface UnitRow { id: string; displayName: string; archived: boolean }
   const [now, display, perms, devices, units, jobs] = await Promise.all([
     coreNow(), coreDisplay(), corePermissions(), coreAll<ApiDevice>("devices.list"), coreAll<UnitRow>("units.list"), coreAll<JobRow>("jobs.list"),
   ]);
@@ -50,10 +50,10 @@ export async function loadDevices(opts: { selected?: string; unitId?: string; jo
   const unit = d.unitId ? await quiet(coreOp<Unit>("units.get", { id: d.unitId })) : null;
   const jobId = (opts.jobId && myJobs.some((j) => j.id === opts.jobId && j.unitId === d.unitId) ? opts.jobId : null) ?? jobFor(d.unitId, myJobs);
   const candidates = unit?.capabilities.firmwareCandidates ?? [];
-  const maintain = live.canMaintain && !!jobId;
+  const isMaintain = live.canMaintain && !!jobId;
   const [ops, cals, evs] = await Promise.all([
-    maintain && !opts.events ? quiet(coreOp<{ items: (ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string })[] }>("devices.operations", { deviceId: id, query: { limit: 20, sort: { field: "createdAt", direction: "desc" } } })) : null,
-    maintain && !opts.events ? quiet(coreOp<{ items: ApiCalibration[] }>("devices.calibrations", { deviceId: id, query: { limit: 20, sort: { field: "createdAt", direction: "desc" } } })) : null,
+    isMaintain && !opts.events ? quiet(coreOp<{ items: (ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string })[] }>("devices.operations", { deviceId: id, query: { limit: 20, sort: { field: "createdAt", direction: "desc" } } })) : null,
+    isMaintain && !opts.events ? quiet(coreOp<{ items: ApiCalibration[] }>("devices.calibrations", { deviceId: id, query: { limit: 20, sort: { field: "createdAt", direction: "desc" } } })) : null,
     opts.events ? quiet(coreOp<{ items: ApiDeviceEventFull[] }>("devices.events", { id, query: { limit: 50 } })) : null, // FORBIDDEN without an assignment on the unit
 
   ]);

@@ -25,9 +25,11 @@ const report: ApiMRVReport = {
 };
 const orgs = [{ id: "org-a", name: "Demo Customer A" }];
 const units = [{ id: "u1", label: "Lobby AC" }, { id: "u2", label: "Bedroom AC" }];
-const draft = (over: Partial<MRVDraft>): MRVDraft => ({
-  organizationId: "org-a", unitIds: ["u1"], from: "2026-09-01T00:00", to: "2026-09-08T00:00", baseline: versionKey("b1", 2), factor: versionKey("f1", 1), boundaryId: "ac_input_electricity", boundary: " AC input ", ...over,
-});
+const draft = (over: Partial<MRVDraft>): MRVDraft => {
+  return {
+    organizationId: "org-a", unitIds: ["u1"], from: "2026-09-01T00:00", to: "2026-09-08T00:00", baseline: versionKey("b1", 2), factor: versionKey("f1", 1), boundaryId: "ac_input_electricity", boundary: " AC input ", ...over,
+  };
+};
 
 describe("HQ digital MRV (FR-A14, DD-A14)", () => {
   it("lists reports with their Kuala Lumpur period and result, or says the calculation is incomplete", () => {

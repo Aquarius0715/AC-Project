@@ -7,7 +7,7 @@
 import { STYLE_HASHES } from "./styleHashes.gen";
 
 /** The Content-Security-Policy of one page response. `dev` adds what `next dev` needs (eval, inline styles); `https`
- * upgrades subresource requests once the app is served over HTTPS. */
+upgrades subresource requests once the app is served over HTTPS. */
 export function contentSecurityPolicy(nonce: string, o: { dev: boolean; https: boolean; formActions: string[] }): string {
   return [
     "default-src 'self'",
@@ -41,9 +41,9 @@ export function originOf(url: string): string | null {
 export const HSTS = "max-age=63072000; includeSubDomains";
 
 /** Whether a browser request comes from this app's own pages (CSRF protection of the BFF's POST routes, backend
- * architecture §6, IR358), as Next.js checks Server Actions: a `Sec-Fetch-Site` other than same-origin, or an `Origin`
- * whose host is not the request's host (`X-Forwarded-Host` behind the edge), is refused. A request with neither header
- * does not come from a browser page, so it carries no victim's cookie and passes. */
+architecture §6, IR358), as Next.js checks Server Actions: a `Sec-Fetch-Site` other than same-origin, or an `Origin`
+whose host is not the request's host (`X-Forwarded-Host` behind the edge), is refused. A request with neither header
+does not come from a browser page, so it carries no victim's cookie and passes. */
 export function sameOriginRequest(h: Headers): boolean {
   const site = h.get("sec-fetch-site");
   if (site && site !== "same-origin" && site !== "none") return false;

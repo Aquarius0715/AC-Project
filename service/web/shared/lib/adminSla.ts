@@ -13,15 +13,15 @@ import type { IconName } from "@ac/web/components/Icon";
 const en = translator("en");
 
 type PlanType = "rto" | "general" | "energy" | "environment";
-export type ApiSlaMetrics = { responseWithinTarget: number | null; arrivalInWindow: number | null; firstTimeFix: number | null; averageRating: number | null; ratingCount: number; openOverdue: number };
-export type ApiTargetView = { planType: PlanType; responseHours: number; arrivalInWindowPercent: number; firstTimeFixPercent: number; version: number; effectiveFrom: string | null; state: "in_effect" | "default" | "scheduled" };
-export type ApiBreach = { jobId: string; customerId: string; kind: "response" | "arrival" | "first_time_fix" | "overdue"; detail: string; tookMinutes?: number | null; limitMinutes?: number | null };
-export type ApiScorecard = {
+export interface ApiSlaMetrics { responseWithinTarget: number | null; arrivalInWindow: number | null; firstTimeFix: number | null; averageRating: number | null; ratingCount: number; openOverdue: number }
+export interface ApiTargetView { planType: PlanType; responseHours: number; arrivalInWindowPercent: number; firstTimeFixPercent: number; version: number; effectiveFrom: string | null; state: "in_effect" | "default" | "scheduled" }
+export interface ApiBreach { jobId: string; customerId: string; kind: "response" | "arrival" | "first_time_fix" | "overdue"; detail: string; tookMinutes?: number | null; limitMinutes?: number | null }
+export interface ApiScorecard {
   period: { from: string; to: string }; contractorOrgId: string | null; totals: ApiSlaMetrics;
   customers: (ApiSlaMetrics & { customerId: string; planType: PlanType; jobCount: number; status: "on_track" | "at_risk" | "breached" })[];
   breaches: ApiBreach[];
   targets: ApiTargetView[];
-};
+}
 type Tone = "ok" | "warn" | "crit" | "muted";
 
 export const PERIODS = [{ id: "30", label: "last 30 days", days: 30 }, { id: "90", label: "last 90 days", days: 90 }, { id: "365", label: "last 12 months", days: 365 }] as const;
@@ -35,7 +35,7 @@ const plans = (targets: ApiTargetView[], used: PlanType[]) => targets.filter((x)
 /** “target 95 %” for one plan type, “targets 85–95 % by plan” when the customers' plans differ. */
 function targetText(values: number[], t: T): string {
   const u = [...new Set(values)].sort((a, b) => a - b);
-  return !u.length ? t("no target") : u.length === 1 ? t("target {n} %", { n: u[0] }) : t("targets {from}–{to} % by plan", { from: u[0], to: u[u.length - 1] });
+  return u.length === 0 ? t("no target") : (u.length === 1 ? t("target {n} %", { n: u[0] }) : t("targets {from}–{to} % by plan", { from: u[0], to: u[u.length - 1] }));
 }
 /** The plan type's name in the user's language. */
 const planName = (plan: string, t: T) => (planLabel[plan as PlanType] ? t(planLabel[plan as PlanType]) : plan);
@@ -43,7 +43,7 @@ const planName = (plan: string, t: T) => (planLabel[plan as PlanType] ? t(planLa
 /** The KPI tiles (Figma 06-10) with the targets of the plan types of the customers in the scorecard; no data is “—”. */
 export function slaTiles(sc: ApiScorecard, t: T = en): { label: string; value: string; icon?: IconName; sub: string; tone?: "warn" | "crit" }[] {
   const used = [...new Set(sc.customers.map((c) => c.planType))];
-  const ts = plans(sc.targets, used.length ? used : ["general"]);
+  const ts = plans(sc.targets, used.length > 0 ? used : ["general"]);
   const hours = [...new Set(ts.map((x) => x.responseHours))].sort((a, b) => a - b);
   const m = sc.totals;
   const below = (v: number | null, target: number) => (v !== null && v < target ? (target - v > 10 ? "crit" : "warn") : undefined);
@@ -58,7 +58,7 @@ export function slaTiles(sc: ApiScorecard, t: T = en): { label: string; value: s
   ];
 }
 
-export type SlaRow = { id: string; name: string; sub: string; plan: string; jobs: number; response: string; arrival: string; ftf: string; rating: string; overdue: number; status: { label: string; tone: Tone } };
+export interface SlaRow { id: string; name: string; sub: string; plan: string; jobs: number; response: string; arrival: string; ftf: string; rating: string; overdue: number; status: { label: string; tone: Tone } }
 const STATUS: Record<string, { label: string; tone: Tone }> = { on_track: { label: "On track", tone: "ok" }, at_risk: { label: "At risk", tone: "warn" }, breached: { label: "Breached", tone: "crit" } };
 /** One customer of the scorecard (Figma “customer-a · Home A, Office A · 5 units”). */
 export function slaRows(sc: ApiScorecard, customers: { id: string; name: string; organizationId: string }[], properties: { name: string; customerOrgId: string }[], units: { customerOrgId: string }[], t: T = en): SlaRow[] {
@@ -82,7 +82,7 @@ const duration = (min: number, t: T) => (min % 60 === 0 ? t("{n} h", { n: Math.f
 /** A breach in words from its kind and response minutes (IR291); the API's English detail when it has neither. */
 export function breachText(b: ApiBreach, t: T = en): string {
   if (b.kind === "response" && b.limitMinutes != null) {
-    return b.tookMinutes != null ? t("response {took} vs {limit}", { took: duration(b.tookMinutes, t), limit: duration(b.limitMinutes, t) }) : t("no response within {limit}", { limit: duration(b.limitMinutes, t) });
+    return b.tookMinutes == null ? t("no response within {limit}", { limit: duration(b.limitMinutes, t) }) : t("response {took} vs {limit}", { took: duration(b.tookMinutes, t), limit: duration(b.limitMinutes, t) });
   }
   const fixed: Record<string, string> = { arrival: "arrival outside the scheduled window", first_time_fix: "not fixed the first time", overdue: "open past its due time" };
   return fixed[b.kind] ? t(fixed[b.kind]) : b.detail;
@@ -121,7 +121,7 @@ export function targetErrors(f: { responseHours: string; arrival: string; ftf: s
 }
 
 /** The customers table as CSV (Export CSV, client-side): quoted fields, the header first, in the user's language; the
- * period's ends are dates in the display time zone. */
+period's ends are dates in the display time zone. */
 export function slaCsv(rows: SlaRow[], period: { from: string; to: string }, i: I18n = EN): string {
   const { t, display } = i;
   const day = (iso: string) => zonedParts(iso, display.timeZone).date;
@@ -134,7 +134,7 @@ export function slaRefusal(f: { code: string; messageKey: string; fieldErrors: R
   const keys: Record<string, string> = { "errors.targets_exist": "targets for this plan already start at that time", "error.past": "must be now or later", "error.range": "out of range", "error.invalid": "not a valid value", "error.required": "required" };
   const word = (k: string) => (keys[k] ? t(keys[k]) : k);
   const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${word(v)}`);
-  if (fields.length) return fields.join(" · ");
+  if (fields.length > 0) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

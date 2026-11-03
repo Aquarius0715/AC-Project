@@ -7,16 +7,20 @@ import { i18nOf } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = Date.parse("2026-09-14T01:00:00Z"); // 09:00 in Kuala Lumpur
-const alert = (over: Partial<ApiAdminAlert>): ApiAdminAlert => ({
-  id: "alert-1", version: 1, unitId: "u1", policyId: "pol-1", type: "temperature", severity: "warning", status: "open", causeCode: "window_open", evidenceKind: "inferred",
-  evidenceText: "cooling load rose", observedAt: "2026-09-14T00:50:00Z", evidenceIds: [], detectedAt: "2026-09-14T00:55:00Z", acknowledgedAt: null, resolvedAt: null, resolutionReason: null, ...over,
-});
+const alert = (over: Partial<ApiAdminAlert>): ApiAdminAlert => {
+  return {
+    id: "alert-1", version: 1, unitId: "u1", policyId: "pol-1", type: "temperature", severity: "warning", status: "open", causeCode: "window_open", evidenceKind: "inferred",
+    evidenceText: "cooling load rose", observedAt: "2026-09-14T00:50:00Z", evidenceIds: [], detectedAt: "2026-09-14T00:55:00Z", acknowledgedAt: null, resolvedAt: null, resolutionReason: null, ...over,
+  };
+};
 const units = [{ id: "u1", displayName: "Bedroom AC", customerOrgId: "org-a" }];
 const customers = [{ id: "c-a", name: "Demo Customer A", organizationId: "org-a" }];
-const policy = (over: Partial<ApiPolicy>): ApiPolicy => ({
-  id: "pol-1", version: 2, kind: "alert", name: "Bedroom too hot", unitIds: ["u1", "u2"], timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 50, customerId: "c-a",
-  recipientMembershipIds: ["m-1"], channels: ["inApp"], escalateAfterMinutes: 60, cooldownMinutes: 5, metric: "temperature", operator: "gte", threshold: 30, recoveryThreshold: 28, durationSeconds: 60, severity: "warning", ...over,
-});
+const policy = (over: Partial<ApiPolicy>): ApiPolicy => {
+  return {
+    id: "pol-1", version: 2, kind: "alert", name: "Bedroom too hot", unitIds: ["u1", "u2"], timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 50, customerId: "c-a",
+    recipientMembershipIds: ["m-1"], channels: ["inApp"], escalateAfterMinutes: 60, cooldownMinutes: 5, metric: "temperature", operator: "gte", threshold: 30, recoveryThreshold: 28, durationSeconds: 60, severity: "warning", ...over,
+  };
+};
 
 describe("HQ alerts and alert policies", () => {
   it("orders the alerts unresolved first and tells each one's story", () => {
@@ -108,15 +112,17 @@ describe("HQ alerts in Malay with the display time zone (IR292)", () => {
 });
 
 describe("the default policy's rules and the customers' switches (DD-A05 item 9, Figma 268:2, IR347)", () => {
-  const def = (over: Partial<ApiPolicy> = {}): ApiPolicy => ({
-    id: "def", version: 3, kind: "default_alert", name: "Default policy", unitIds: [], timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 0, customerId: null,
-    rules: [
-      { ruleKey: "refrigerant_low_pressure", name: "Refrigerant low pressure", category: "fault", metric: "refrigerant_pressure", operator: "lte", threshold: 350, recoveryThreshold: 380, durationSeconds: 120, severity: "critical", activeWindow: null },
-      { ruleKey: "ac_offline", name: "AC offline", category: "connection", metric: "heartbeat_gap", operator: "gte", threshold: 15, recoveryThreshold: 1, durationSeconds: 1, severity: "warning", activeWindow: null },
-    ],
-    ruleSettings: [{ ruleKey: "ac_offline", customerId: "c-b", enabled: false, version: 2, reason: "rooftop unit replaced", changedByMembershipId: "m-hq", updatedAt: "2026-09-25T02:00:00Z" }],
-    ...over,
-  });
+  const def = (over: Partial<ApiPolicy> = {}): ApiPolicy => {
+    return {
+      id: "def", version: 3, kind: "default_alert", name: "Default policy", unitIds: [], timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 0, customerId: null,
+      rules: [
+        { ruleKey: "refrigerant_low_pressure", name: "Refrigerant low pressure", category: "fault", metric: "refrigerant_pressure", operator: "lte", threshold: 350, recoveryThreshold: 380, durationSeconds: 120, severity: "critical", activeWindow: null },
+        { ruleKey: "ac_offline", name: "AC offline", category: "connection", metric: "heartbeat_gap", operator: "gte", threshold: 15, recoveryThreshold: 1, durationSeconds: 1, severity: "warning", activeWindow: null },
+      ],
+      ruleSettings: [{ ruleKey: "ac_offline", customerId: "c-b", enabled: false, version: 2, reason: "rooftop unit replaced", changedByMembershipId: "m-hq", updatedAt: "2026-09-25T02:00:00Z" }],
+      ...over,
+    };
+  };
   const [p] = policyRows([def()], customers, [{ id: "m-hq", displayName: "hq-operator", role: "admin" }]);
 
   it("keeps each rule's condition and names who switched a rule for a customer", () => {

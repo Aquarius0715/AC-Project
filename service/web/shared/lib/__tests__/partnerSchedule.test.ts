@@ -19,11 +19,13 @@ const members = [
 ] as unknown as ApiMember[];
 const names = new Map(members.map((m) => [m.id, m.displayName]));
 const units = new Map([["u1", "Lobby AC"]]);
-const summary = (over: Record<string, unknown>) => ({
-  projection: "summary", id: "job-1-aaaa", version: 3, unitId: "u1", type: "reactive", status: "accepted", dueAt: "2026-09-25T00:00:00Z", requestedSlot: visit,
-  scheduledSlot: null, assignmentId: null, displayStatus: "accepted", technicianMembershipId: null, assignmentAcknowledgement: null,
-  accessValidFrom: "2026-09-20T01:30:00Z", accessValidUntil: "2026-09-22T01:30:00Z", ...over,
-}) as unknown as ApiPartnerJob;
+const summary = (over: Record<string, unknown>) => {
+  return ({
+    projection: "summary", id: "job-1-aaaa", version: 3, unitId: "u1", type: "reactive", status: "accepted", dueAt: "2026-09-25T00:00:00Z", requestedSlot: visit,
+    scheduledSlot: null, assignmentId: null, displayStatus: "accepted", technicianMembershipId: null, assignmentAcknowledgement: null,
+    accessValidFrom: "2026-09-20T01:30:00Z", accessValidUntil: "2026-09-22T01:30:00Z", ...over,
+  }) as unknown as ApiPartnerJob;
+};
 const cap = (id: string, date: string, avail: [string, string][], assigned: [string, string][], am: number, unavailability: string | null = null): ApiCapacity =>
   ({ membershipId: id, date, availableSlots: avail.map(([s, e]) => slot(s, e)), assignedSlots: assigned.map(([s, e]) => slot(s, e)), availableMinutes: am, assignedMinutes: 0, unavailability });
 const workday = (d: string): [string, string] => [`${d}T01:00:00Z`, `${d}T09:00:00Z`];

@@ -12,19 +12,19 @@ import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { uploadName, uploadType } from "@ac/web/lib/files";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
-type Slot = { startAt: string; endAt: string };
+interface Slot { startAt: string; endAt: string }
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
 const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
   try {
     const value = await fn();
     refresh();
     return { ok: true, value };
-  } catch (e) {
-    if (e instanceof CoreError) {
-      if (e.error.code === "CONFLICT") refresh();
-      return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
+  } catch (error) {
+    if (error instanceof CoreError) {
+      if (error.error.code === "CONFLICT") refresh();
+      return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
     }
-    throw e;
+    throw error;
   }
 };
 const write = (version: number) => ({ write: true, expectedVersion: version });
@@ -35,7 +35,7 @@ export async function createRequest(input: { unitId: string; type: "reactive" | 
     const [first, ...alternativeSlots] = input.slots;
     const j = await coreOp<{ id: string }>("jobs.create", {
       unitId: input.unitId, type: input.type, symptom: input.symptom.trim(), requestedStart: first.startAt, requestedEnd: first.endAt, alternativeSlots,
-      ...(input.contactWindow.trim() ? { contactWindow: input.contactWindow.trim() } : {}),
+      ...(input.contactWindow.trim() && { contactWindow: input.contactWindow.trim() }),
     }, { write: true });
     return { id: j.id };
   });
@@ -45,14 +45,14 @@ export async function createRequest(input: { unitId: string; type: "reactive" | 
 export async function respondProposal(jobId: string, version: number, proposalId: string, answer: { decision: "accept" } | { decision: "decline"; declineReason: "not_home" | "too_late" | "other"; comment: string; slots: Slot[] }) {
   return run(async () => {
     await coreOp("jobs.respondProposal", answer.decision === "accept" ? { jobId, proposalId, decision: "accept" }
-      : { jobId, proposalId, decision: "decline", declineReason: answer.declineReason, ...(answer.comment.trim() ? { comment: answer.comment.trim() } : {}), ...(answer.slots.length ? { preferredSlots: answer.slots } : {}) }, write(version));
+      : { jobId, proposalId, decision: "decline", declineReason: answer.declineReason, ...(answer.comment.trim() && { comment: answer.comment.trim() }), ...((answer.slots.length > 0) && { preferredSlots: answer.slots }) }, write(version));
     return null;
   });
 }
 
 /** jobs.requestReschedule: 3 preferred times for a plan visit, at least 48 h before it. */
 export async function requestReschedule(jobId: string, version: number, slots: Slot[], comment: string) {
-  return run(async () => { await coreOp("jobs.requestReschedule", { jobId, preferredSlots: slots, ...(comment.trim() ? { comment: comment.trim() } : {}) }, write(version)); return null; });
+  return run(async () => { await coreOp("jobs.requestReschedule", { jobId, preferredSlots: slots, ...(comment.trim() && { comment: comment.trim() }) }, write(version)); return null; });
 }
 
 /** jobs.cancel: a request that has no booked time yet, with a reason. */
@@ -67,11 +67,10 @@ export async function addNote(jobId: string, version: number, message: string) {
 
 /** jobs.rate: 1–5 stars, tags and an optional comment; editable for 7 days. */
 export async function rateJob(jobId: string, version: number, stars: OpInput<"jobs.rate">["stars"], tags: string[], comment: string) {
-  return run(async () => { await coreOp("jobs.rate", { jobId, stars, tags, ...(comment.trim() ? { comment: comment.trim() } : {}) }, write(version)); return null; });
+  return run(async () => { await coreOp("jobs.rate", { jobId, stars, tags, ...(comment.trim() && { comment: comment.trim() }) }, write(version)); return null; });
 }
 
-/** jobs.reportProblem: a reason, details 10–2000, up to 5 JPEG/PNG photos and an optional preferred visit; returns the
- * follow-up request's id. The photos arrive as files in the form data. */
+/** jobs.reportProblem: a reason, details 10–2000, up to 5 JPEG/PNG photos and an optional preferred visit; returns the follow-up request's id. The photos arrive as files in the form data. */
 export async function reportProblem(form: FormData) {
   return run(async () => {
     const photos = await Promise.all(form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0).map(async (f) => {
@@ -93,7 +92,7 @@ export async function markCleaned(unitId: string) {
 }
 
 /** filterCare.saveSettings (owner only): remind at the model default or 50–2000 h, every 7–180 days when run time is
- * unknown, to the owners or all users, in the app and optionally by e-mail. */
+unknown, to the owners or all users, in the app and optionally by e-mail. */
 export async function saveReminders(input: { thresholdHours: number | null; fallbackDays: number; recipients: "owners" | "all_users"; channels: ("inApp" | "email")[] }) {
   return run(async () => { await coreOp("filterCare.saveSettings", input, { write: true }); return null; });
 }

@@ -13,8 +13,8 @@ export function csvText(v: string | number): string {
 /** A cell quoted only when it needs it (a quote, comma or line break inside). */
 export function csvCell(v: string | number): string {
   const s = csvText(v);
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  return /[",\r\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
 }
 
 /** A cell always quoted. */
-export const csvQuoted = (v: string | number): string => `"${csvText(v).replace(/"/g, '""')}"`;
+export const csvQuoted = (v: string | number): string => `"${csvText(v).replaceAll('"', '""')}"`;

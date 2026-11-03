@@ -1,5 +1,5 @@
 // The test object of the suite: every project passes its app (fixtures/apps.ts) as the `app` option.
-import { test as base, expect } from "@playwright/test";
+import { test as base,  } from "@playwright/test";
 import { APPS, type App } from "./apps";
 
 export const test = base.extend<object, { app: App }>({
@@ -10,16 +10,18 @@ export const test = base.extend<object, { app: App }>({
     const goto = page.goto.bind(page);
     page.goto = async (url, options) => {
       const response = await goto(url, options);
-      const own = !baseURL || new URL(page.url()).origin === new URL(baseURL).origin; // not the identity provider's pages
-      if (own && response?.headers()["content-type"]?.includes("text/html")) {
-        await page.waitForFunction(() => document.documentElement.dataset.hydrated === "1", null, { timeout: 15_000 }).catch(() => undefined);
+      const isOwn = !baseURL || new URL(page.url()).origin === new URL(baseURL).origin; // not the identity provider's pages
+      if (isOwn && response?.headers()["content-type"]?.includes("text/html")) {
+        await page.waitForFunction(() => document.documentElement.dataset.hydrated === "1", null, { timeout: 15_000 }).catch(() => {});
       }
       return response;
     };
     await use(page);
   },
 });
-export { expect };
+
 
 /** Text that means a page failed instead of rendering (error boundary, not-found, framework error). */
 export const FAILED_PAGE = /This page isn’t available|Application error|Something went wrong|Unhandled Runtime Error/;
+
+export {expect} from "@playwright/test";

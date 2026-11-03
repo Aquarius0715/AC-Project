@@ -16,7 +16,7 @@ import { NewJobModal } from "./jobs-view";
 import { Icon } from "@ac/web/components/Icon";
 
 /** HQ SLA by customer (FR-A22, DD-A22, Figma Admin 06-10) from the Core API. Texts in the display language; a target's
- * start is typed and shown in the display time zone (IR291). */
+start is typed and shown in the display time zone (IR291). */
 export function SlaView({ live }: { live: SlaLive }) {
   const i = useI18n(), { t } = i;
   const patch = useUrlPatch();
@@ -30,16 +30,16 @@ export function SlaView({ live }: { live: SlaLive }) {
   };
   return (
     <Page className="max-w-[1440px]">
-      <JobsTabs tab="sla" counts={live.counts} q={{}} action={<Btn variant="primary" size="sm" onClick={() => setModal("job")}><Icon name="add" /> {t("New job")}</Btn>} />
+      <JobsTabs tab="sla" counts={live.counts} q={{}} action={<Btn variant="primary" size="sm" onClick={() => { setModal("job"); }}><Icon name="add" /> {t("New job")}</Btn>} />
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
-        <Select aria-label={t("Period")} className="w-auto" value={live.period.id} onChange={(e) => patch({ period: e.target.value === "90" ? null : e.target.value })}>{live.periods.map((p) => <option key={p.id} value={p.id}>{t("Period: {label}", { label: p.label })}</option>)}</Select>
-        <Select aria-label={t("Contractor")} className="w-auto" value={live.contractorId} onChange={(e) => patch({ contractorId: e.target.value || null })}><option value="">{t("Contractor: All")}</option>{live.contractors.map((c) => <option key={c.id} value={c.id}>{t("Contractor: {name}", { name: c.name })}</option>)}</Select>
-        <Btn size="sm" className="ml-auto" onClick={() => setModal("targets")}>{t("Edit SLA targets")}</Btn>
+        <Select aria-label={t("Period")} className="w-auto" value={live.period.id} onChange={(e) => { patch({ period: e.target.value === "90" ? null : e.target.value }); }}>{live.periods.map((p) => <option key={p.id} value={p.id}>{t("Period: {label}", { label: p.label })}</option>)}</Select>
+        <Select aria-label={t("Contractor")} className="w-auto" value={live.contractorId} onChange={(e) => { patch({ contractorId: e.target.value || null }); }}><option value="">{t("Contractor: All")}</option>{live.contractors.map((c) => <option key={c.id} value={c.id}>{t("Contractor: {name}", { name: c.name })}</option>)}</Select>
+        <Btn size="sm" className="ml-auto" onClick={() => { setModal("targets"); }}>{t("Edit SLA targets")}</Btn>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>{live.tiles.map((k) => <Kpi key={k.label} label={k.label} value={k.value} icon={k.icon} sub={k.sub} tone={k.tone} />)}</div>
       <div className="split">
-        <Card title={t("Customers")} action={<Btn size="sm" disabled={!live.rows.length} onClick={exportCsv}>{t("Export CSV")}</Btn>}>
+        <Card title={t("Customers")} action={<Btn size="sm" disabled={live.rows.length === 0} onClick={exportCsv}>{t("Export CSV")}</Btn>}>
           {live.rows.length === 0 ? <EmptyState title={t("No jobs in this period")}>{t(live.contractorId ? "The scorecard counts jobs created in the period and delivered by the contractor." : "The scorecard counts jobs created in the period.")}</EmptyState> : (
             <ScrollX><table className="w-full min-w-[760px] text-[13px]">
               <thead><tr className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><th className="px-2 py-1.5">{t("Customer")}</th><th>{t("Plan")}</th><th>{t("Jobs")}</th><th>{t("Response")}</th><th>{t("Arrival")}</th><th>{t("First-time fix")}</th><th>{t("Rating")}</th><th>{t("Overdue")}</th><th>{t("Status")}</th></tr></thead>
@@ -65,7 +65,7 @@ export function SlaView({ live }: { live: SlaLive }) {
         </Card>
       </div>
       {modal === "targets" && <TargetsModal live={live} onClose={(text) => { setModal(null); if (text) setResult({ tone: "ok", text }); }} onFail={(text) => { setModal(null); setResult({ tone: "crit", text }); }} />}
-      {modal === "job" && <NewJobModal live={{ now: live.now, units: live.units, q: {} }} onClose={() => setModal(null)} />}
+      {modal === "job" && <NewJobModal live={{ now: live.now, units: live.units, q: {} }} onClose={() => { setModal(null); }} />}
     </Page>
   );
 }
@@ -87,21 +87,21 @@ function TargetsModal({ live, onClose, onFail }: { live: SlaLive; onClose: (text
   };
   const save = () => {
     setTried(true);
-    if (Object.keys(errors).length) return;
+    if (Object.keys(errors).length > 0) return;
     run(() => saveSlaTargets({ planType: plan, responseHours: Number(f.responseHours), arrivalInWindowPercent: Number(f.arrival), firstTimeFixPercent: Number(f.ftf), effectiveFrom: effectiveFrom! }), t("SLA targets saved"),
-      (v) => onClose(t("{plan} targets v{v} saved — jobs created from {time} use them.", { plan: cur.label, v: v.version, time: showTime(effectiveFrom, i.display) })), (r) => onFail(slaRefusal(r, t)));
+      (v) => { onClose(t("{plan} targets v{v} saved — jobs created from {time} use them.", { plan: cur.label, v: v.version, time: showTime(effectiveFrom, i.display) })); }, (r) => { onFail(slaRefusal(r, t)); });
   };
   return (
-    <Modal open wide onClose={() => onClose()} title={t("Edit SLA targets")} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save targets")}</Btn></>}>
+    <Modal open wide onClose={() => { onClose(); }} title={t("Edit SLA targets")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save targets")}</Btn></>}>
       <ul className="flex flex-col gap-1 text-xs">{live.targets.map((x) => <li key={x.plan}><b>{x.label}</b> — {x.line}{x.scheduled.map((s) => <span key={s} className="block pl-3 text-muted-foreground">{t("next: {target}", { target: s })}</span>)}</li>)}</ul>
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
-        <Field label={t("Plan type")}><Select value={plan} onChange={(e) => pick(e.target.value)}>{live.targets.map((x) => <option key={x.plan} value={x.plan}>{x.label}</option>)}</Select></Field>
-        <Field label={t("Effective from")} hint={t("Jobs created from then on · times in {zone}", { zone })} error={tried ? errors.effectiveFrom : undefined}><Input type="datetime-local" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></Field>
+        <Field label={t("Plan type")}><Select value={plan} onChange={(e) => { pick(e.target.value); }}>{live.targets.map((x) => <option key={x.plan} value={x.plan}>{x.label}</option>)}</Select></Field>
+        <Field label={t("Effective from")} hint={t("Jobs created from then on · times in {zone}", { zone })} error={tried ? errors.effectiveFrom : undefined}><Input type="datetime-local" value={f.from} onChange={(e) => { setF({ ...f, from: e.target.value }); }} /></Field>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
-        <Field label={t("Response within (hours)")} hint={t("1–168; every job should be answered within it")} error={tried ? errors.responseHours : undefined}><Input inputMode="numeric" value={f.responseHours} onChange={(e) => setF({ ...f, responseHours: e.target.value })} /></Field>
-        <Field label={t("Arrival in window (%)")} hint="0–100" error={tried ? errors.arrival : undefined}><Input inputMode="decimal" value={f.arrival} onChange={(e) => setF({ ...f, arrival: e.target.value })} /></Field>
-        <Field label={t("First-time fix (%)")} hint="0–100" error={tried ? errors.ftf : undefined}><Input inputMode="decimal" value={f.ftf} onChange={(e) => setF({ ...f, ftf: e.target.value })} /></Field>
+        <Field label={t("Response within (hours)")} hint={t("1–168; every job should be answered within it")} error={tried ? errors.responseHours : undefined}><Input inputMode="numeric" value={f.responseHours} onChange={(e) => { setF({ ...f, responseHours: e.target.value }); }} /></Field>
+        <Field label={t("Arrival in window (%)")} hint="0–100" error={tried ? errors.arrival : undefined}><Input inputMode="decimal" value={f.arrival} onChange={(e) => { setF({ ...f, arrival: e.target.value }); }} /></Field>
+        <Field label={t("First-time fix (%)")} hint="0–100" error={tried ? errors.ftf : undefined}><Input inputMode="decimal" value={f.ftf} onChange={(e) => { setF({ ...f, ftf: e.target.value }); }} /></Field>
       </div>
       <Banner>{t("A saved target never changes — each save is a new version for the plan type. A job keeps the target in effect when it was created; without one the default is 4 h / 90 % / 85 %.")}</Banner>
     </Modal>

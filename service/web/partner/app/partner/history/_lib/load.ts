@@ -11,13 +11,15 @@ import { i18nOf } from "@ac/web/lib/i18n";
 import { byUser, eventItem, HISTORY_STATUSES, historyRow, noteMode, PERIODS, periodOf, SORTS, sortOf, tabCounts, TABS, tabOf, visibleRows, type ApiEvent, type HistoryRow } from "@ac/web/lib/partnerHistory";
 import type { ApiMember, ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 
-type Page<T> = { items: T[]; total: number };
-export type ApiRecipient = { id: string; role: string; displayLabel: string; allowedChannels: string[] };
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
-  if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
-  throw e;
-});
+export interface ApiRecipient { id: string; role: string; displayLabel: string; allowedChannels: string[] }
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
+  return p.catch((error) => {
+    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+    throw error;
+  });
+};
 export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: string; period?: string }) {
+  interface Page<T> { items: T[]; total: number }
   const [now, display, who] = await Promise.all([coreNow(), coreDisplay(), coreIdentity()]);
   const nowMs = now.getTime();
   const i = i18nOf(display);
@@ -27,7 +29,7 @@ export async function loadHistory(sp: { jobId?: string; tab?: string; sort?: str
   const names = new Map(members.map((m) => [m.id, m.displayName]));
   const unitNames = new Map(units.map((u) => [u.id, u.displayName]));
   const collect = async (withPeriod: boolean) => {
-    const filters = { statuses: [...HISTORY_STATUSES], ...(withPeriod ? { from: new Date(nowMs - 90 * 86_400_000).toISOString() } : {}) };
+    const filters = { statuses: [...HISTORY_STATUSES], ...(withPeriod && { from: new Date(nowMs - 90 * 86_400_000).toISOString() }) };
     // the latest 100 jobs: IDs are UUIDv7, so the newest first by ID; the page then sorts them as asked (IR494)
     const list = await coreOp<Page<ApiPartnerJob>>("jobs.list", { filters, sort: { field: "id", direction: "desc" }, limit: 100 });
     const rows = list.items.map((j) => historyRow(j, nowMs, unitNames, names, i)).filter((r): r is HistoryRow => !!r); // offers drop out

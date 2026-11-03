@@ -23,7 +23,7 @@ const NEW_COMPANY = "new";
 type ModalState = null | { kind: "profile"; organizationId: string | null } | { kind: "status" } | { kind: "rates" } | { kind: "verify" } | { kind: "job" };
 
 /** HQ contractor register (FR-A21, DD-A21, Figma Admin 06-9) from the Core API. Texts in the display language; the
- * register's dates are Kuala Lumpur days, typed and shown so, and said so in another display time zone (IR291). */
+register's dates are Kuala Lumpur days, typed and shown so, and said so in another display time zone (IR291). */
 export function ContractorsView({ live }: { live: ContractorsLive }) {
   const t = useT();
   const [modal, setModal] = useState<ModalState>(null);
@@ -33,10 +33,10 @@ export function ContractorsView({ live }: { live: ContractorsLive }) {
   const fail = (f: ActionFailure) => { setModal(null); setResult({ tone: f.code === "CONFLICT" ? "warn" : "crit", text: contractorRefusal(f, t) }); };
   return (
     <Page className="max-w-[1440px]">
-      <JobsTabs tab="contractors" counts={live.counts} q={{}} action={<Btn variant="primary" size="sm" onClick={() => setModal({ kind: "job" })}><Icon name="add" /> {t("New job")}</Btn>} />
+      <JobsTabs tab="contractors" counts={live.counts} q={{}} action={<Btn variant="primary" size="sm" onClick={() => { setModal({ kind: "job" }); }}><Icon name="add" /> {t("New job")}</Btn>} />
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
       <div className="split-rev">
-        <Card title={t("Contractors")} className="self-start" action={<Btn size="sm" onClick={() => setModal({ kind: "profile", organizationId: live.withoutProfile[0]?.id ?? null })}><Icon name="add" /> {t("Add contractor")}</Btn>}>
+        <Card title={t("Contractors")} className="self-start" action={<Btn size="sm" onClick={() => { setModal({ kind: "profile", organizationId: live.withoutProfile[0]?.id ?? null }); }}><Icon name="add" /> {t("Add contractor")}</Btn>}>
           {live.rows.length === 0 ? <EmptyState title={t("No contractor organizations")}>{t("Add contractor creates the first company with its profile; its staff are added afterwards.")}</EmptyState> : (
             <div className="flex flex-col gap-1.5">{live.rows.map((r) => (
               <ListRow key={r.id} selected={d?.org.id === r.id} href={`/admin/jobs?tab=contractors&contractorId=${r.id}`}>
@@ -53,7 +53,7 @@ export function ContractorsView({ live }: { live: ContractorsLive }) {
       {modal?.kind === "status" && d?.profile && <StatusModal d={d} onClose={close} onFail={fail} />}
       {modal?.kind === "rates" && d && <RatesModal d={d} now={Date.parse(live.now)} onClose={close} onFail={fail} />}
       {modal?.kind === "verify" && d && <VerifyModal d={d} onClose={close} onFail={fail} />}
-      {modal?.kind === "job" && <NewJobModal live={{ now: live.now, units: live.units, q: {} }} onClose={() => setModal(null)} />}
+      {modal?.kind === "job" && <NewJobModal live={{ now: live.now, units: live.units, q: {} }} onClose={() => { setModal(null); }} />}
     </Page>
   );
 }
@@ -67,8 +67,8 @@ function ContractorDetail({ d, open }: { d: Detail; open: (m: ModalState) => voi
       {d.kpis && <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>{d.kpis.map((k) => <Kpi key={k.label} label={k.label} value={k.value} icon={k.icon} sub={k.sub} tone={k.tone} />)}</div>}
       <div className="split">
         <Card title={d.org.name} sub={p ? undefined : t("No contractor profile yet — offers still work; add one to record its registration, areas and insurance")}
-          action={p ? <span className="flex gap-2"><Btn size="sm" onClick={() => open({ kind: "profile", organizationId: p.organizationId })}>{t("Edit")}</Btn><Btn size="sm" variant={p.status === "active" ? "danger" : "primary"} onClick={() => open({ kind: "status" })}>{t(p.status === "active" ? "Suspend offers" : "Resume offers")}</Btn></span>
-            : <Btn size="sm" variant="primary" onClick={() => open({ kind: "profile", organizationId: d.org.id })}><Icon name="add" /> {t("Add profile")}</Btn>}>
+          action={p ? <span className="flex gap-2"><Btn size="sm" onClick={() => { open({ kind: "profile", organizationId: p.organizationId }); }}>{t("Edit")}</Btn><Btn size="sm" variant={p.status === "active" ? "danger" : "primary"} onClick={() => { open({ kind: "status" }); }}>{t(p.status === "active" ? "Suspend offers" : "Resume offers")}</Btn></span>
+            : <Btn size="sm" variant="primary" onClick={() => { open({ kind: "profile", organizationId: d.org.id }); }}><Icon name="add" /> {t("Add profile")}</Btn>}>
           {p?.status === "suspended" && <div className="mb-3"><Banner tone="crit">{p.suspendedReason ? t("Offers suspended — “{reason}”. New offers to {name} are refused; open offers and jobs continue.", { reason: p.suspendedReason, name: p.name }) : t("Offers suspended. New offers to {name} are refused; open offers and jobs continue.", { name: p.name })}</Banner></div>}
           {d.facts && <SummaryList items={d.facts} />}
           <p className="mt-3 text-[13px] font-bold">{r.current ? r.current.title : t("No rate card in effect")}</p>
@@ -79,14 +79,14 @@ function ContractorDetail({ d, open }: { d: Detail; open: (m: ModalState) => voi
             </table></ScrollX>
           )}
           {r.scheduled.map((s) => <p key={s.id} className="mt-2 text-xs text-muted-foreground">{t("Next: {title} — {lines}", { title: s.title, lines: s.lines.map((l) => `${l.label} ${l.amount}`).join(" · ") })}</p>)}
-          <div className="mt-3"><Btn size="sm" onClick={() => open({ kind: "rates" })}>{t("Edit rate card")}</Btn></div>
+          <div className="mt-3"><Btn size="sm" onClick={() => { open({ kind: "rates" }); }}>{t("Edit rate card")}</Btn></div>
         </Card>
         <Card title={t("Technicians & certificates")}>
           {d.techs.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technician memberships in this organization.")}</p> : (
             <ul className="divide-y divide-line">{d.techs.map((x) => <li key={x.id} className="flex items-center justify-between gap-2 py-2"><span className="min-w-0"><b className="block text-[13px]">{x.name}</b><span className="text-[11px] text-muted-foreground">{x.sub}</span></span><Badge tone={x.badge.tone}>{x.badge.label}</Badge></li>)}</ul>
           )}
-          <div className="mt-3"><Banner>{d.pending.length ? t(d.pending.length === 1 ? "1 renewal upload is waiting for verification." : "{n} renewal uploads are waiting for verification.", { n: d.pending.length }) : t("No renewal uploads are waiting for verification.")} {t("Certificates uploaded by the contractor need HQ verification before they count.")}</Banner></div>
-          <div className="mt-3"><Btn size="sm" variant={d.pending.length ? "primary" : "secondary"} disabled={!d.pending.length} onClick={() => open({ kind: "verify" })}>{t("Verify uploads ({n})", { n: d.pending.length })}</Btn></div>
+          <div className="mt-3"><Banner>{d.pending.length > 0 ? t(d.pending.length === 1 ? "1 renewal upload is waiting for verification." : "{n} renewal uploads are waiting for verification.", { n: d.pending.length }) : t("No renewal uploads are waiting for verification.")} {t("Certificates uploaded by the contractor need HQ verification before they count.")}</Banner></div>
+          <div className="mt-3"><Btn size="sm" variant={d.pending.length > 0 ? "primary" : "secondary"} disabled={d.pending.length === 0} onClick={() => { open({ kind: "verify" }); }}>{t("Verify uploads ({n})", { n: d.pending.length })}</Btn></div>
           <p className="mt-2 text-[11px] text-muted-foreground">{t("KPIs: last 90 days. Customer rating comes from the Client “Confirm & rate” step after completion; SLA targets per plan are in the SLA tab.")}{i.display.timeZone !== KL && ` ${t("The days are Kuala Lumpur days.")}`}</p>
         </Card>
       </div>
@@ -94,7 +94,7 @@ function ContractorDetail({ d, open }: { d: Detail; open: (m: ModalState) => voi
   );
 }
 
-type ModalProps = { onClose: (text?: string) => void; onFail: (f: ActionFailure) => void };
+interface ModalProps { onClose: (text?: string) => void; onFail: (f: ActionFailure) => void }
 
 function ProfileModal({ live, d, organizationId, onClose, onFail }: ModalProps & { live: ContractorsLive; d: Detail | null; organizationId: string | null }) {
   const t = useT();
@@ -114,33 +114,33 @@ function ProfileModal({ live, d, organizationId, onClose, onFail }: ModalProps &
   const companyError = org === NEW_COMPANY && (companyLength < 1 || companyLength > 120) ? t("A company name of 1–120 characters") : undefined;
   const save = () => {
     setTried(true);
-    if (Object.keys(errors).length || !org || companyError) return;
+    if (Object.keys(errors).length > 0 || !org || companyError) return;
     const insuranceValidUntil = f.insurance ? klStart(f.insurance) : null; // the start of that Kuala Lumpur day
-    let made = false; // this attempt created the company: a refused profile keeps the dialog open on it
+    let isMade = false; // this attempt created the company: a refused profile keeps the dialog open on it
     run(async () => {
       let target = org;
       if (target === NEW_COMPANY) {
         const o = await createContractorOrganization(company);
         if (!o.ok) return o;
         target = o.value.id;
-        made = true;
+        isMade = true;
         setCreated(o.value);
         setOrg(target);
       }
       const r = await saveContractor({ id: existing?.id ?? null, version: existing?.version ?? null, organizationId: target, registrationNo: f.registrationNo, serviceAreas: areasOf(f.serviceAreas), contactEmail: f.contactEmail, insuranceValidUntil });
       return r.ok ? { ok: true as const, value: { organizationId: target } } : r;
     }, t(existing ? "Profile saved" : "Contractor profile created"), (v) => { onClose(t(existing ? "Profile saved." : "Contractor profile created — its KPIs, rate card and certificates show here.")); if (!existing) router.push(`/admin/jobs?tab=contractors&contractorId=${v.organizationId}`); },
-    (r) => { if (made) router.refresh(); else onFail(r); }); // the new company exists: fix the profile and save again
+    (r) => { if (isMade) router.refresh(); else onFail(r); }); // the new company exists: fix the profile and save again
   };
   return (
-    <Modal open onClose={() => onClose()} title={existing ? t("Edit {name}", { name: existing.name }) : t("Add contractor")} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t(existing ? "Save" : "Add contractor")}</Btn></>}>
-      <Field label={t("Contractor organization")} hint={t(existing ? "A profile’s organization cannot change." : "A company without a profile, or a new company.")}><Select value={org} disabled={!!existing} onChange={(e) => setOrg(e.target.value)}>{choices.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}{!existing && <option value={NEW_COMPANY}>{t("New company…")}</option>}</Select></Field>
-      {org === NEW_COMPANY && <Field label={t("Company name · required")} hint={t("The contractor company is created with this name, then its profile")} error={tried ? companyError : undefined}><Input value={company} maxLength={120} onChange={(e) => setCompany(e.target.value)} placeholder="Lim Aircon Services Sdn Bhd" /></Field>}
-      <Field label={t("Registration number · required")} error={tried ? errors.registrationNo : undefined}><Input value={f.registrationNo} maxLength={64} onChange={(e) => setF({ ...f, registrationNo: e.target.value })} placeholder="SSM 202301012345" /></Field>
-      <Field label={t("Service areas · required")} hint={t("Comma-separated, 1–20")} error={tried ? errors.serviceAreas : undefined}><Input value={f.serviceAreas} onChange={(e) => setF({ ...f, serviceAreas: e.target.value })} placeholder="Kuala Lumpur, Selangor" /></Field>
+    <Modal open onClose={() => { onClose(); }} title={existing ? t("Edit {name}", { name: existing.name }) : t("Add contractor")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t(existing ? "Save" : "Add contractor")}</Btn></>}>
+      <Field label={t("Contractor organization")} hint={t(existing ? "A profile’s organization cannot change." : "A company without a profile, or a new company.")}><Select value={org} disabled={!!existing} onChange={(e) => { setOrg(e.target.value); }}>{choices.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}{!existing && <option value={NEW_COMPANY}>{t("New company…")}</option>}</Select></Field>
+      {org === NEW_COMPANY && <Field label={t("Company name · required")} hint={t("The contractor company is created with this name, then its profile")} error={tried ? companyError : undefined}><Input value={company} maxLength={120} onChange={(e) => { setCompany(e.target.value); }} placeholder="Lim Aircon Services Sdn Bhd" /></Field>}
+      <Field label={t("Registration number · required")} error={tried ? errors.registrationNo : undefined}><Input value={f.registrationNo} maxLength={64} onChange={(e) => { setF({ ...f, registrationNo: e.target.value }); }} placeholder="SSM 202301012345" /></Field>
+      <Field label={t("Service areas · required")} hint={t("Comma-separated, 1–20")} error={tried ? errors.serviceAreas : undefined}><Input value={f.serviceAreas} onChange={(e) => { setF({ ...f, serviceAreas: e.target.value }); }} placeholder="Kuala Lumpur, Selangor" /></Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-        <Field label={t("Contact e-mail · required")} error={tried ? errors.contactEmail : undefined}><Input type="email" value={f.contactEmail} onChange={(e) => setF({ ...f, contactEmail: e.target.value })} placeholder="ops@contractor.example" /></Field>
-        <Field label={t("Insurance valid until")} hint={t("A Kuala Lumpur day · empty: not recorded — the delegation then runs a year")}><Input type="date" value={f.insurance} onChange={(e) => setF({ ...f, insurance: e.target.value })} /></Field>
+        <Field label={t("Contact e-mail · required")} error={tried ? errors.contactEmail : undefined}><Input type="email" value={f.contactEmail} onChange={(e) => { setF({ ...f, contactEmail: e.target.value }); }} placeholder="ops@contractor.example" /></Field>
+        <Field label={t("Insurance valid until")} hint={t("A Kuala Lumpur day · empty: not recorded — the delegation then runs a year")}><Input type="date" value={f.insurance} onChange={(e) => { setF({ ...f, insurance: e.target.value }); }} /></Field>
       </div>
       <Banner>{t("The delegation period runs from the profile’s creation to the insurance end (or one year).")}</Banner>
     </Modal>
@@ -153,17 +153,17 @@ function StatusModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   const [pending, run] = useAction();
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
-  const suspend = p.status === "active";
+  const isSuspend = p.status === "active";
   const confirm = () => {
     setTried(true);
     if (!reason.trim()) return;
-    run(() => setOfferStatus(p.organizationId, p.version, suspend ? "suspended" : "active", reason), t(suspend ? "Offers suspended" : "Offers resumed"),
-      () => onClose(t(suspend ? "Offers to {name} suspended — open offers and jobs continue." : "Offers to {name} resumed.", { name: p.name })), onFail);
+    run(() => setOfferStatus(p.organizationId, p.version, isSuspend ? "suspended" : "active", reason), t(isSuspend ? "Offers suspended" : "Offers resumed"),
+      () => { onClose(t(isSuspend ? "Offers to {name} suspended — open offers and jobs continue." : "Offers to {name} resumed.", { name: p.name })); }, onFail);
   };
   return (
-    <Modal open onClose={() => onClose()} title={t(suspend ? "Suspend offers to {name}" : "Resume offers to {name}", { name: p.name })} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant={suspend ? "danger" : "primary"} disabled={pending} onClick={confirm}>{t(suspend ? "Suspend offers" : "Resume offers")}</Btn></>}>
-      <Field label={t("Reason · required (1–1000)")} error={tried && !reason.trim() ? t("A reason is required") : undefined}><Textarea value={reason} maxLength={1000} onChange={(e) => setReason(e.target.value)} placeholder={t(suspend ? "Insurance certificate expired; offers paused until renewal." : "Insurance renewed.")} /></Field>
-      <Banner tone={suspend ? "warn" : undefined}>{t(suspend ? "New offers to this contractor are refused. Open offers, accepted jobs and their assignments are unchanged." : "HQ can offer jobs to this contractor again.")}</Banner>
+    <Modal open onClose={() => { onClose(); }} title={t(isSuspend ? "Suspend offers to {name}" : "Resume offers to {name}", { name: p.name })} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant={isSuspend ? "danger" : "primary"} disabled={pending} onClick={confirm}>{t(isSuspend ? "Suspend offers" : "Resume offers")}</Btn></>}>
+      <Field label={t("Reason · required (1–1000)")} error={tried && !reason.trim() ? t("A reason is required") : undefined}><Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} placeholder={t(isSuspend ? "Insurance certificate expired; offers paused until renewal." : "Insurance renewed.")} /></Field>
+      <Banner tone={isSuspend ? "warn" : undefined}>{t(isSuspend ? "New offers to this contractor are refused. Open offers, accepted jobs and their assignments are unchanged." : "HQ can offer jobs to this contractor again.")}</Banner>
     </Modal>
   );
 }
@@ -173,34 +173,36 @@ function RatesModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now: 
   const [pending, run] = useAction();
   const base = d.rates.current;
   const [from, setFrom] = useState(klDate(nextMonthStart(now)));
-  const [currency, setCurrency] = useState<"MYR" | "USD">((base?.currency as "MYR" | "USD") ?? "MYR");
-  const [lines, setLines] = useState(() => WORK_TYPES.map((w) => {
-    const l = base?.lines.find((x) => x.workType === w.id);
-    return { workType: w.id as WorkType, on: !!l || !base, amount: l ? l.amount.replace("− ", "") : "", note: l?.note ?? "" };
-  }));
+  const [currency, setCurrency] = useState<"MYR" | "USD">(base?.currency ?? "MYR");
+  const [lines, setLines] = useState(() => {
+    return WORK_TYPES.map((w) => {
+      const l = base?.lines.find((x) => x.workType === w.id);
+      return { workType: w.id as WorkType, on: !!l || !base, amount: l ? l.amount.replace("− ", "") : "", note: l?.note ?? "" };
+    });
+  });
   const [tried, setTried] = useState(false);
   const chosen = lines.filter((l) => l.on);
   const effectiveFrom = from ? klStart(from) : null; // the start of that Kuala Lumpur day
   const errors = rateCardErrors({ effectiveFrom, lines: chosen }, now, t);
   const save = () => {
     setTried(true);
-    if (Object.keys(errors).length) return;
+    if (Object.keys(errors).length > 0) return;
     run(() => saveRateCard({ contractorOrgId: d.org.id, effectiveFrom: effectiveFrom!, currency, lines: chosen.map((l) => ({ workType: l.workType, amountMinor: Math.round(Number(l.amount) * 100), note: l.note.trim() || null })) }),
-      t("Rate card saved"), () => onClose(t("Rate card v{v} saved — effective from {date}.", { v: d.rates.nextVersion, date: businessDay(effectiveFrom!, i.display.locale) })), onFail);
+      t("Rate card saved"), () => { onClose(t("Rate card v{v} saved — effective from {date}.", { v: d.rates.nextVersion, date: businessDay(effectiveFrom!, i.display.locale) })); }, onFail);
   };
   return (
-    <Modal open wide onClose={() => onClose()} title={t("New rate card for {name} · v{v}", { name: d.org.name, v: d.rates.nextVersion })} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save rate card")}</Btn></>}>
+    <Modal open wide onClose={() => { onClose(); }} title={t("New rate card for {name} · v{v}", { name: d.org.name, v: d.rates.nextVersion })} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save rate card")}</Btn></>}>
       <p className="text-xs text-muted-foreground">{base ? `${t("Starts from {card}.", { card: base.since })} ` : ""}{t("A rate card never changes once saved — each edit is a new version from a future date.")}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-        <Field label={t("Effective from · required")} hint={t("A Kuala Lumpur day, from 00:00")} error={tried ? errors.effectiveFrom : undefined}><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
-        <Field label={t("Currency")}><Select value={currency} onChange={(e) => setCurrency(e.target.value as "MYR" | "USD")}><option value="MYR">MYR</option><option value="USD">USD</option></Select></Field>
+        <Field label={t("Effective from · required")} hint={t("A Kuala Lumpur day, from 00:00")} error={tried ? errors.effectiveFrom : undefined}><Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); }} /></Field>
+        <Field label={t("Currency")}><Select value={currency} onChange={(e) => { setCurrency(e.target.value as "MYR" | "USD"); }}><option value="MYR">MYR</option><option value="USD">USD</option></Select></Field>
       </div>
       <div className="flex flex-col gap-2">
         {lines.map((l, n) => (
           <div key={l.workType} className="flex flex-wrap items-end gap-2">
-            <label className="mb-2 flex w-60 items-center gap-2 text-[13px] font-semibold"><Checkbox checked={l.on} onCheckedChange={(v) => setLines(lines.map((x, k) => (k === n ? { ...x, on: v === true } : x)))} />{t(WORK_TYPES[n].label)}</label>
-            <Field label={t("Amount {n}", { n: n + 1 })}><Input inputMode="decimal" disabled={!l.on} value={l.amount} onChange={(e) => setLines(lines.map((x, k) => (k === n ? { ...x, amount: e.target.value } : x)))} placeholder="0.00" /></Field>
-            <Field label={t("Note {n}", { n: n + 1 })}><Input disabled={!l.on} value={l.note} maxLength={200} onChange={(e) => setLines(lines.map((x, k) => (k === n ? { ...x, note: e.target.value } : x)))} /></Field>
+            <label className="mb-2 flex w-60 items-center gap-2 text-[13px] font-semibold"><Checkbox checked={l.on} onCheckedChange={(v) => { setLines(lines.map((x, k) => (k === n ? { ...x, on: v } : x))); }} />{t(WORK_TYPES[n].label)}</label>
+            <Field label={t("Amount {n}", { n: n + 1 })}><Input inputMode="decimal" disabled={!l.on} value={l.amount} onChange={(e) => { setLines(lines.map((x, k) => (k === n ? { ...x, amount: e.target.value } : x))); }} placeholder="0.00" /></Field>
+            <Field label={t("Note {n}", { n: n + 1 })}><Input disabled={!l.on} value={l.note} maxLength={200} onChange={(e) => { setLines(lines.map((x, k) => (k === n ? { ...x, note: e.target.value } : x))); }} /></Field>
           </div>
         ))}
         {tried && errors.lines && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{errors.lines}</p>}
@@ -218,16 +220,16 @@ function VerifyModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   const decide = (c: Detail["pending"][number], decision: "approve" | "reject") => {
     if (decision === "reject") { setTried(c.id); if (!reasons[c.id]?.trim()) return; }
     run(() => verifyCertificate(c.id, c.version, decision, reasons[c.id] ?? ""), t(decision === "approve" ? "Certificate approved" : "Certificate rejected"),
-      () => onClose(t(decision === "approve" ? "Approved {name} for {technician} — it now counts as the qualification." : "Rejected {name} for {technician}.", { name: c.name, technician: c.technician })), onFail);
+      () => { onClose(t(decision === "approve" ? "Approved {name} for {technician} — it now counts as the qualification." : "Rejected {name} for {technician}.", { name: c.name, technician: c.technician })); }, onFail);
   };
   const day = (iso: string) => businessDay(iso, i.display.locale);
   return (
-    <Modal open wide onClose={() => onClose()} title={t("Verify uploads · {name}", { name: d.org.name })} footer={<Btn onClick={() => onClose()}>{t("Close")}</Btn>}>
+    <Modal open wide onClose={() => { onClose(); }} title={t("Verify uploads · {name}", { name: d.org.name })} footer={<Btn onClick={() => { onClose(); }}>{t("Close")}</Btn>}>
       {d.pending.map((c) => (
         <Card key={c.id} title={`${c.technician} · ${c.name}`} sub={[c.code.replace(/^demo_/, ""), t("no. {number}", { number: c.number }), `${day(c.issuedAt)} → ${day(c.expiresAt)}`, ...(c.renewal ? [t("renewal")] : []), ...(c.fileName ? [c.fileName] : [])].join(" · ")}>
           {c.fileName && <p className="mb-2 text-[13px]"><a href={`/admin/certificates/${c.id}/document`} target="_blank" rel="noreferrer" className="font-semibold text-primary"><Icon name="external" /> {t("Open the document")}</a></p>}
-          <Field label={t("Reason (to reject)")} error={tried === c.id && !reasons[c.id]?.trim() ? t("A reason is required to reject") : undefined}><Input value={reasons[c.id] ?? ""} maxLength={1000} onChange={(e) => setReasons({ ...reasons, [c.id]: e.target.value })} /></Field>
-          <div className="mt-2 flex justify-end gap-2"><Btn size="sm" variant="danger" disabled={pending} onClick={() => decide(c, "reject")}>{t("Reject")}</Btn><Btn size="sm" variant="primary" disabled={pending} onClick={() => decide(c, "approve")}>{t("Approve")}</Btn></div>
+          <Field label={t("Reason (to reject)")} error={tried === c.id && !reasons[c.id]?.trim() ? t("A reason is required to reject") : undefined}><Input value={reasons[c.id] ?? ""} maxLength={1000} onChange={(e) => { setReasons({ ...reasons, [c.id]: e.target.value }); }} /></Field>
+          <div className="mt-2 flex justify-end gap-2"><Btn size="sm" variant="danger" disabled={pending} onClick={() => { decide(c, "reject"); }}>{t("Reject")}</Btn><Btn size="sm" variant="primary" disabled={pending} onClick={() => { decide(c, "approve"); }}>{t("Approve")}</Btn></div>
         </Card>
       ))}
     </Modal>

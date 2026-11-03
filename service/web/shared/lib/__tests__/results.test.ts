@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 // The input side is typed by OpArgs (IR313) and contract.test.ts.
 const web = fileURLToPath(new URL("../../../", import.meta.url));
 const projects = ["shared", "customer", "partner", "technician", "admin"];
-const calls = ["coreOp", "coreAll", "callOp", "useOp"];
+const calls = new Set(["coreOp", "coreAll", "callOp", "useOp"]);
 
 function check(): { checked: number; problems: string[] } {
   const seen = new Set<string>();
@@ -61,19 +61,19 @@ function check(): { checked: number; problems: string[] } {
       if (c.isTypeAssignableTo(c.getNullType(), src) && !c.isTypeAssignableTo(c.getNullType(), dst)) out.push(`${at}: may be null in the contract`);
       const s = c.getNonNullableType(src), d = c.getNonNullableType(dst);
       if (c.isTypeAssignableTo(s, d)) return;
-      if (c.isArrayType(s) && c.isArrayType(d)) return compare(c.getTypeArguments(s as ts.TypeReference)[0], c.getTypeArguments(d as ts.TypeReference)[0], `${path}[]`, depth + 1, out, top);
+      if (c.isArrayType(s) && c.isArrayType(d)) { compare(c.getTypeArguments(s as ts.TypeReference)[0], c.getTypeArguments(d as ts.TypeReference)[0], `${path}[]`, depth + 1, out, top); return; }
       if (s.isUnion() && !(s.flags & ts.TypeFlags.Boolean) && variants(s).some(isObject)) {
         const sv = variants(s), dv = variants(d);
         const keys = sv.every(isObject)
           ? [...literals(sv[0]).keys()].filter((k) => sv.every((m) => literals(m).has(k)) && sv.every((m, i) => sv.every((n, j) => i === j || !overlap(literals(m).get(k)!, literals(n).get(k)!))))
           : [];
-        if (top && !keys.length) { // the input picks the variant
+        if (top && keys.length === 0) { // the input picks the variant
           if (sv.some((m) => c.isTypeAssignableTo(m, d))) return;
           const tries = sv.map((m) => { const o: string[] = []; compare(m, d, path, depth + 1, o, false); return o; });
           out.push(...tries.reduce((a, b) => (b.length < a.length ? b : a)));
           return;
         }
-        if (top && !dv.some((x) => isObject(x) && keys.some((k) => !!x.getProperty(k)))) {
+        if (top && dv.every((x) => !(isObject(x) && keys.some((k) => !!x.getProperty(k))))) {
           out.push(`${at}: name the ${keys.join(" / ")} the screen reads (the contract has ${sv.map((m) => str(literals(m).get(keys[0])!)).join(", ")})`);
           return;
         }
@@ -87,14 +87,14 @@ function check(): { checked: number; problems: string[] } {
       }
       if (d.isUnion() && isObject(s)) {
         const own = variants(d).find((x) => isObject(x) && fits(s, x));
-        if (own) return compare(s, own, path, depth + 1, out, false);
+        if (own) { compare(s, own, path, depth + 1, out, false); return; }
       }
       if (isObject(s) && isObject(d) && !c.isArrayType(d)) {
-        const page = top && !!s.getProperty("nextCursor");
+        const isPage = top && !!s.getProperty("nextCursor");
         for (const f of c.getPropertiesOfType(d)) {
           const name = f.getName(), sf = s.getProperty(name), field = `${path}${path ? "." : ""}${name}`;
           if (!sf) { out.push(`${field}: not in the contract`); continue; }
-          compare(c.getTypeOfSymbol(sf), c.getTypeOfSymbol(f), field, depth + 1, out, page && name === "items");
+          compare(c.getTypeOfSymbol(sf), c.getTypeOfSymbol(f), field, depth + 1, out, isPage && name === "items");
         }
         return;
       }
@@ -105,7 +105,7 @@ function check(): { checked: number; problems: string[] } {
       if (!f.startsWith(dir + "/") || /node_modules|\/\.next\/|__tests__|\.d\.ts$/.test(f) || seen.has(f)) continue; // shared files once, by shared
       seen.add(f);
       const visit = (n: ts.Node) => {
-        if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && calls.includes(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
+        if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && calls.has(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
           const op = n.arguments[0].text, fn = n.expression.text;
           const where = `${relative(web, f)}:${sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1} ${op}`;
           let result = resultOf(op);
@@ -126,7 +126,7 @@ function check(): { checked: number; problems: string[] } {
             checked++;
             const out: string[] = [];
             compare(result, own, "", 0, out, true);
-            if (out.length) problems.push(`${where}: ${[...new Set(out)].join("; ")}`);
+            if (out.length > 0) problems.push(`${where}: ${[...new Set(out)].join("; ")}`);
           }
         }
         ts.forEachChild(n, visit);

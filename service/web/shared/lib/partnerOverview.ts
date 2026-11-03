@@ -8,7 +8,7 @@ import { EN, intlTag, relativeTime, showTime, translator, type I18n, type Locale
 
 const en = translator("en");
 
-export type Slot = { startAt: string; endAt: string };
+export interface Slot { startAt: string; endAt: string }
 
 /** jobs.list rows of a contractor (IR23): the offer before the access window, the summary inside it, the history after. */
 export type ApiPartnerJob =
@@ -16,20 +16,20 @@ export type ApiPartnerJob =
   | { projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; dueAt: string; requestedSlot: Slot; scheduledSlot: Slot | null; assignmentId: string | null; displayStatus: string; technicianMembershipId: string | null; assignmentAcknowledgement?: "pending" | "accepted" | "cant_make" | null; accessValidFrom?: string | null; accessValidUntil?: string | null; origin?: string; eventSummary: ApiEventSummary }
   | { projection: "history"; jobId: string; type: string; status: string; completedAt: string | null; asOf: string; ownDecisionEvents: ApiJobEvent[] };
 /** jobs.list's count of a summary's events (IR506): what the caller reads with jobs.events, and what the customer reads. */
-export type ApiEventSummary = { count: number; customerVisible: number; notes: number; latest: { action: string; occurredAt: string } | null };
-export type ApiCounts = { offerCount: number; activeCount: number; reviewCount: number; overdueCount: number };
-export type ApiCapacity = { membershipId: string; date: string; availableSlots: Slot[]; assignedSlots: Slot[]; availableMinutes: number | null; assignedMinutes: number; unavailability: string | null };
-export type ApiMember = { id: string; userId: string; displayName: string; role: string; qualifications?: { code: string; validFrom?: string; validUntil?: string | null; revokedAt?: string | null }[]; revokedAt?: string | null; validUntil?: string | null };
-export type ApiJobEvent = { id: string; jobId: string; actorUserId: string | null; action: string; occurredAt: string };
+export interface ApiEventSummary { count: number; customerVisible: number; notes: number; latest: { action: string; occurredAt: string } | null }
+export interface ApiCounts { offerCount: number; activeCount: number; reviewCount: number; overdueCount: number }
+export interface ApiCapacity { membershipId: string; date: string; availableSlots: Slot[]; assignedSlots: Slot[]; availableMinutes: number | null; assignedMinutes: number; unavailability: string | null }
+export interface ApiMember { id: string; userId: string; displayName: string; role: string; qualifications?: { code: string; validFrom?: string; validUntil?: string | null; revokedAt?: string | null }[]; revokedAt?: string | null; validUntil?: string | null }
+export interface ApiJobEvent { id: string; jobId: string; actorUserId: string | null; action: string; occurredAt: string }
 
 /** One job of the company as the overview shows it. */
-export type PartnerJob = {
+export interface PartnerJob {
   id: string; short: string; status: string; type: string; unit: string | null; address: string | null;
   slot: Slot | null; dueAt: string | null; offerExpiresAt: string | null; assignmentId: string | null; technicianId: string | null;
-};
+}
 
-const KL_OFFSET = 8 * 3600_000; // Asia/Kuala_Lumpur, no daylight saving
-const day = 24 * 3600_000;
+const KL_OFFSET = 8 * 3_600_000; // Asia/Kuala_Lumpur, no daylight saving
+const day = 24 * 3_600_000;
 const ymd = (ms: number) => new Date(ms + KL_OFFSET).toISOString().slice(0, 10);
 
 /** The Monday–Sunday week (KL dates) of an instant. */
@@ -60,15 +60,15 @@ export function shift(p: { from: string; to: string }, n: number) {
 }
 
 /** A Kuala Lumpur date (YYYY-MM-DD) as “21 Sept”, or “Mon 21 Sept” with the weekday, in the user's language. Call it
- * on the server: a browser's ICU can write a month differently, and the page would not hydrate. */
+on the server: a browser's ICU can write a month differently, and the page would not hydrate. */
 export function klDay(d: string, locale: Locale, weekday = false): string {
-  return new Date(`${d}T00:00:00Z`).toLocaleDateString(intlTag(locale), { timeZone: "UTC", day: "numeric", month: "short", ...(weekday ? { weekday: "short" } : {}) })
-    .replace(/[\u00a0\u2009\u202f]/g, " ").replace(",", "");
+  return new Date(`${d}T00:00:00Z`).toLocaleDateString(intlTag(locale), { timeZone: "UTC", day: "numeric", month: "short", ...(weekday && { weekday: "short" }) })
+    .replaceAll(/[\u00A0\u2009\u202F]/g, " ").replace(",", "");
 }
 /** The period inside section titles ("Job progress — this week"). */
 const periodWord: Record<string, string> = { "This week": "this week", "Last week": "last week", "Next week": "next week" };
 /** The period choice of the overview and the job list (IR270): the URL's period, its words for the titles and the
- * three weeks around now, with Kuala Lumpur dates in the user's language. */
+three weeks around now, with Kuala Lumpur dates in the user's language. */
 export function periodChoice(p: { from: string; to: string; label: string }, nowIso: string, i: I18n = EN) {
   const { t, display: { locale } } = i;
   const week = weekOf(nowIso);
@@ -98,20 +98,26 @@ export type Bucket = "offered" | "unassigned" | "active" | "overdue" | "review" 
 /** The progress bucket of a job: overdue is an assigned or started job whose work window has ended (IR89). */
 export function bucket(j: PartnerJob, now: number): Bucket {
   switch (j.status) {
-    case "offered":
+    case "offered": {
       return "offered";
-    case "accepted":
+    }
+    case "accepted": {
       return j.assignmentId ? "active" : "unassigned";
+    }
     case "assigned":
-    case "in_progress":
+    case "in_progress": {
       return j.slot && Date.parse(j.slot.endAt) <= now ? "overdue" : "active";
+    }
     case "rework_requested":
-    case "on_hold":
+    case "on_hold": {
       return "active";
-    case "submitted":
+    }
+    case "submitted": {
       return "review";
-    case "completed":
+    }
+    case "completed": {
       return "completed";
+    }
   }
   return "other";
 }
@@ -129,9 +135,9 @@ export function until(iso: string, now: number, t: T = en): string {
   return h % 24 ? t("{d} d {h} h", { d: Math.floor(h / 24), h: h % 24 }) : t("{d} d", { d: Math.floor(h / 24) });
 }
 
-export type KpiTile = { label: string; value: number; sub: string; href: string; link: string; tone?: "warn" | "crit" };
+export interface KpiTile { label: string; value: number; sub: string; href: string; link: string; tone?: "warn" | "crit" }
 /** The five KPI tiles (DD-P01): offers, review and overdue from summaries.get; the accepted jobs without a technician
- * from the list, and in progress / scheduled as the summary's active jobs without them. Each opens the job list. */
+from the list, and in progress / scheduled as the summary's active jobs without them. Each opens the job list. */
 export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: Map<string, string>, period?: { from: string; to: string }, i: I18n = EN): KpiTile[] {
   const { t } = i;
   const list = (tab: string) => `/partner/jobs?tab=${tab}${period ? `&from=${period.from}&to=${period.to}` : ""}`; // the list with the same period
@@ -144,7 +150,7 @@ export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: 
   const who = (id: string | null) => names.get(id ?? "") ?? t("Technician");
   return [
     { label: t("Offers to answer"), value: counts.offerCount, sub: offers[0] ? t("{job} · expires in {left}", { job: offers[0].short, left: until(offers[0].offerExpiresAt!, now, t) }) : t("No open offers"), href: list("offered"), link: t("link::Open offers") },
-    { label: t("Awaiting assignment"), value: unassigned.length, sub: unassigned.length ? t("Accepted, no technician yet") : "—", href: "/partner/schedule", link: t("Assign"), tone: unassigned.length ? "warn" : undefined },
+    { label: t("Awaiting assignment"), value: unassigned.length, sub: unassigned.length > 0 ? t("Accepted, no technician yet") : "—", href: "/partner/schedule", link: t("Assign"), tone: unassigned.length > 0 ? "warn" : undefined },
     {
       label: t("In progress / scheduled"), value: active, href: list("active"), link: t("View jobs"),
       sub: next ? t(next.status === "in_progress" ? "{name} on site from {time}" : "{name} starts {time}", { name: who(next.technicianId), time: relativeTime(next.slot!.startAt, now, i) }) : "—",
@@ -170,7 +176,7 @@ export function progress(jobs: PartnerJob[], now: number) {
   return { counts, total, completedPct: total ? Math.round((counts.completed / total) * 100) : 0 };
 }
 
-export type ActionRow = { kind: "offer" | "overdue" | "review" | "unassigned"; badge: string; title: string; detail: string; href: string; button: string };
+export interface ActionRow { kind: "offer" | "overdue" | "review" | "unassigned"; badge: string; title: string; detail: string; href: string; button: string }
 /** Needs your action (DD-P01): offers to answer, ended work windows, submitted reports, accepted jobs without a technician. */
 export function actions(jobs: PartnerJob[], now: number, names: Map<string, string>, i: I18n = EN): ActionRow[] {
   const { t, display } = i;
@@ -197,26 +203,26 @@ export function actions(jobs: PartnerJob[], now: number, names: Map<string, stri
 export const DAY_START = 8, DAY_END = 18; // the timeline runs 08:00–18:00 in Kuala Lumpur
 /** Position (0–100 %) of an instant on the date's 08:00–18:00 timeline, clamped. */
 export function timelinePct(iso: string, date: string): number {
-  const start = Date.parse(`${date}T00:00:00Z`) - KL_OFFSET + DAY_START * 3600_000;
-  return Math.min(100, Math.max(0, ((Date.parse(iso) - start) / ((DAY_END - DAY_START) * 3600_000)) * 100));
+  const start = Date.parse(`${date}T00:00:00Z`) - KL_OFFSET + DAY_START * 3_600_000;
+  return Math.min(100, Math.max(0, ((Date.parse(iso) - start) / ((DAY_END - DAY_START) * 3_600_000)) * 100));
 }
 
 const SHORT_QUALIFICATIONS: Record<string, string> = { demo_indoor: "Indoor", demo_outdoor: "Outdoor", demo_electrical: "Electrical" };
 /** A qualification in a compact list (“Indoor, Electrical”); an unknown code reads as its words. */
-export const shortQualification = (code: string, t: T = en) => (SHORT_QUALIFICATIONS[code] ? t(SHORT_QUALIFICATIONS[code]) : code.replace(/^demo_/, "").replace(/_/g, " "));
+export const shortQualification = (code: string, t: T = en) => (SHORT_QUALIFICATIONS[code] ? t(SHORT_QUALIFICATIONS[code]) : code.replace(/^demo_/, "").replaceAll('_', " "));
 const UNAVAILABILITY: Record<string, string> = { annual_leave: "annual leave", sick: "sick leave", training: "training", public_holiday: "public holiday", other: "other" };
 /** Why a technician is unavailable on a day (the members.setUnavailability types), in running text. */
-export const unavailabilityLabel = (type: string, t: T = en) => (UNAVAILABILITY[type] ? t(UNAVAILABILITY[type]) : type.replace(/_/g, " "));
+export const unavailabilityLabel = (type: string, t: T = en) => (UNAVAILABILITY[type] ? t(UNAVAILABILITY[type]) : type.replaceAll('_', " "));
 
 /** The technicians who can still work: access neither revoked by HQ nor past its end (IR575). The overview's timeline
- * and capacity list them; a former technician stays in Team & capacity and in job history. */
+and capacity list them; a former technician stays in Team & capacity and in job history. */
 export const onTeam = (members: ApiMember[], now: number) => members.filter((m) => m.role === "technician" && !m.revokedAt && (!m.validUntil || Date.parse(m.validUntil) > now));
 /** How many technicians each overview card shows; the rest are one link away (IR575). */
 export const OVERVIEW_ROWS = 8;
 
-export type TimelineRow = { id: string; name: string; sub: string; blocks: { left: number; width: number; text: string }[]; off: string | null };
+export interface TimelineRow { id: string; name: string; sub: string; blocks: { left: number; width: number; text: string }[]; off: string | null }
 /** Today's timeline per technician from members.capacity of the date (assigned slots inside 08:00–18:00), in Kuala
- * Lumpur hours like its axis: those with work or away first, by their first slot, then the free ones by name (IR575). */
+Lumpur hours like its axis: those with work or away first, by their first slot, then the free ones by name (IR575). */
 export function timeline(today: ApiCapacity[], members: ApiMember[], date: string, t: T = en): TimelineRow[] {
   const cap = new Map(today.map((c) => [c.membershipId, c]));
   return members.filter((m) => m.role === "technician").map((m) => {
@@ -227,12 +233,12 @@ export function timeline(today: ApiCapacity[], members: ApiMember[], date: strin
     }).filter((b) => b.width > 0);
     const quals = (m.qualifications ?? []).filter((q) => !q.revokedAt).map((q) => shortQualification(q.code, t));
     return { id: m.id, name: m.displayName, sub: quals.slice(0, 2).join(", ") || t("Technician"), blocks, off: c?.unavailability ? unavailabilityLabel(c.unavailability, t) : null };
-  }).sort((a, b) => Number(!a.blocks.length && !a.off) - Number(!b.blocks.length && !b.off) || (a.blocks[0]?.left ?? 100) - (b.blocks[0]?.left ?? 100) || a.name.localeCompare(b.name));
+  }).sort((a, b) => Number(a.blocks.length === 0 && !a.off) - Number(b.blocks.length === 0 && !b.off) || (a.blocks[0]?.left ?? 100) - (b.blocks[0]?.left ?? 100) || a.name.localeCompare(b.name));
 }
 
-export type CapacityRow = { id: string; name: string; text: string; pct: number | null };
+export interface CapacityRow { id: string; name: string; text: string; pct: number | null }
 /** The period's team capacity: assigned ÷ available hours per technician (undefined availability shows “—”), the most
- * assigned first, then by name (IR575). */
+assigned first, then by name (IR575). */
 export function capacity(days: ApiCapacity[][], members: ApiMember[], t: T = en): CapacityRow[] {
   const sum = new Map<string, { assigned: number; available: number | null }>();
   for (const list of days) {
@@ -265,16 +271,16 @@ export const jobEventTitle: Record<string, string> = {
   "partner_proposal.kept": "HQ kept the agreed time",
 };
 
-export type ActivityRow = { id: string; time: string; text: string; href: string };
+export interface ActivityRow { id: string; time: string; text: string; href: string }
 /** The latest job events of the company's jobs, newest first, with the actor's name when it is a member; the time is
- * “today …” on the days next to now (IR44). */
+“today …” on the days next to now (IR44). */
 export function activity(events: ApiJobEvent[], jobs: Map<string, PartnerJob>, members: ApiMember[], now: number, max = 6, i: I18n = EN): ActivityRow[] {
   const { t } = i;
   const byUser = new Map(members.map((m) => [m.userId, m.displayName]));
   return [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id)).slice(0, max).map((e) => {
     const j = jobs.get(e.jobId);
     const who = e.actorUserId ? byUser.get(e.actorUserId) : null;
-    const title = jobEventTitle[e.action] ? t(jobEventTitle[e.action]) : e.action.replace(/[._]/g, " ");
+    const title = jobEventTitle[e.action] ? t(jobEventTitle[e.action]) : e.action.replaceAll(/[._]/g, " ");
     return { id: e.id, time: relativeTime(e.occurredAt, now, i), text: `${title} — ${j ? label(j, t) : e.jobId.slice(0, 8)}${who ? ` (${who})` : ""}`, href: `/partner/history?jobId=${e.jobId}` };
   });
 }

@@ -12,17 +12,17 @@ import type { MaintenanceLive } from "../_lib/load";
 
 type Filters = NonNullable<MaintenanceLive["filters"]>;
 /** The New request modal opened from a row: the unit, type preventive and a symptom line. */
-export type CleaningPrefill = { unitId: string; symptom: string; type?: "reactive" | "preventive" };
-type Props = { f: Filters; owner: boolean; onRequest: (p: CleaningPrefill) => void; onDone: (text: string) => void; onFail: (f: ActionFailure) => void };
+export interface CleaningPrefill { unitId: string; symptom: string; type?: "reactive" | "preventive" }
+interface Props { f: Filters; owner: boolean; onRequest: (p: CleaningPrefill) => void; onDone: (text: string) => void; onFail: (f: ActionFailure) => void }
 
 /** Filter care (FR-C18, DD-C18, Figma Client 07j) from the Core API: run time since the cleaning per AC, areas with many
- * ACs folded into a summary row, Request cleaning / Mark cleaned and the owner's reminder settings. */
+ACs folded into a summary row, Request cleaning / Mark cleaned and the owner's reminder settings. */
 export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
   const t = useT();
   const [open, setOpen] = useState<string[]>([]);
   const [edit, setEdit] = useState(false);
   const [pending, run] = useAction();
-  const mark = (r: FilterRow) => run(() => markCleaned(r.unitId), t("Marked cleaned"), () => onDone(t("{unit}: marked cleaned — the counter restarts at 0 h and your technician sees it.", { unit: r.unit })), onFail);
+  const mark = (r: FilterRow) => { run(() => markCleaned(r.unitId), t("Marked cleaned"), () => { onDone(t("{unit}: marked cleaned — the counter restarts at 0 h and your technician sees it.", { unit: r.unit })); }, onFail); };
   const unitRow = (r: FilterRow, inner = false) => (
     <tr key={r.unitId} className="border-t border-line">
       <td className={cx("px-3 py-2.5 align-middle", inner && "pl-8")}>
@@ -34,26 +34,26 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
       <td className="px-3 py-2.5"><Badge tone={filterStatus[r.state].badge}>{t(filterStatus[r.state].label)}</Badge></td>
       <td className="px-3 py-2.5">
         <div className="flex justify-end gap-1.5 whitespace-nowrap">
-          {r.state === "overdue" && <Btn size="sm" variant="primary" onClick={() => onRequest({ unitId: r.unitId, symptom: cleaningSymptom(r, t) })}>{t("Request cleaning")}</Btn>}
-          <Btn size="sm" disabled={pending} onClick={() => mark(r)} aria-label={t("Mark cleaned — {unit}", { unit: r.unit })}>{t("Mark cleaned")}</Btn>
+          {r.state === "overdue" && <Btn size="sm" variant="primary" onClick={() => { onRequest({ unitId: r.unitId, symptom: cleaningSymptom(r, t) }); }}>{t("Request cleaning")}</Btn>}
+          <Btn size="sm" disabled={pending} onClick={() => { mark(r); }} aria-label={t("Mark cleaned — {unit}", { unit: r.unit })}>{t("Mark cleaned")}</Btn>
         </div>
       </td>
     </tr>
   );
   const groupRow = (g: FilterGroup) => {
-    const shown = open.includes(g.key);
+    const isShown = open.includes(g.key);
     return (
       <Fragment key={g.key}>
         <tr className="border-t border-line bg-surface2/40">
           <td className="px-3 py-2.5"><b>{g.title}</b><div className="text-[11px] text-muted-foreground">{g.place}</div></td>
           <td className="whitespace-nowrap px-3 py-2.5">{g.run}</td>
-          <td className="px-3 py-2.5 max-sm:hidden"><Progress pct={g.pct} tone={g.badge.tone === "crit" ? "crit" : g.badge.tone === "warn" ? "warn" : "primary"} text={g.progress} /></td>
+          <td className="px-3 py-2.5 max-sm:hidden"><Progress pct={g.pct} tone={g.badge.tone === "crit" ? "crit" : (g.badge.tone === "warn" ? "warn" : "primary")} text={g.progress} /></td>
           <td className="px-3 py-2.5"><Badge tone={g.badge.tone}>{g.badge.label}</Badge></td>
           <td className="px-3 py-2.5 text-right">
-            <Plain type="button" aria-expanded={shown} className="text-[13px] font-semibold text-primary hover:underline" onClick={() => setOpen((s) => (shown ? s.filter((k) => k !== g.key) : [...s, g.key]))}>{shown ? t("Hide") : t("View {n}", { n: g.rows.length })}</Plain>
+            <Plain type="button" aria-expanded={isShown} className="text-[13px] font-semibold text-primary hover:underline" onClick={() => { setOpen((s) => (isShown ? s.filter((k) => k !== g.key) : [...s, g.key])); }}>{isShown ? t("Hide") : t("View {n}", { n: g.rows.length })}</Plain>
           </td>
         </tr>
-        {shown && g.rows.map((r) => unitRow(r, true))}
+        {isShown && g.rows.map((r) => unitRow(r, true))}
       </Fragment>
     );
   };
@@ -79,7 +79,7 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
       <Card title={t("Reminders")} sub={t(f.settings.version === 0 ? "Default settings" : "Set by the account owner")} className="self-start">
         <SummaryList items={f.reminders} />
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Btn size="sm" disabled={!owner} onClick={() => setEdit(true)}>{t("Edit reminders")}</Btn>
+          <Btn size="sm" disabled={!owner} onClick={() => { setEdit(true); }}>{t("Edit reminders")}</Btn>
           {!owner && <span className="text-xs text-warn">{t("Only the account owner can change the reminders.")}</span>}
         </div>
         <div className="mt-3"><Banner>{t("Dirty filters raise power use by up to 15 % and can trigger the “Filter pressure” alert.")}</Banner></div>
@@ -99,30 +99,30 @@ function ReminderModal({ init, onClose, onFail }: { init: ReminderForm; onClose:
   const [tried, setTried] = useState(false);
   const [pending, run] = useAction();
   const err = reminderErrors(form, t);
-  const set = (p: Partial<ReminderForm>) => setForm((s) => ({ ...s, ...p }));
+  const set = (p: Partial<ReminderForm>) => { setForm((s) => ({ ...s, ...p })); };
   const save = () => {
     setTried(true);
     if (err.hours || err.days) return;
-    run(() => saveReminders(reminderInput(form)), t("Reminders saved"), () => onClose(t("Reminder settings saved.")), onFail);
+    run(() => saveReminders(reminderInput(form)), t("Reminders saved"), () => { onClose(t("Reminder settings saved.")); }, onFail);
   };
   return (
-    <Modal open onClose={() => onClose()} title={t("Edit reminders")} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save reminders")}</Btn></>}>
+    <Modal open onClose={() => { onClose(); }} title={t("Edit reminders")} footer={<><Btn onClick={() => { onClose(); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save reminders")}</Btn></>}>
       <Field label={t("Remind at")} error={tried ? err.hours : undefined} hint={t("Hours the AC runs before the filter needs cleaning")}>
         <div className="flex flex-wrap items-center gap-2">
-          <Choice value={form.useDefault ? "default" : "custom"} onChange={(v) => set({ useDefault: v === "default" })} options={[{ id: "default", label: t("Model default ({n} h)", { n: DEFAULT_FILTER_HOURS }) }, { id: "custom", label: t("Custom") }]} />
-          {!form.useDefault && <><Input aria-label={t("Hours of running")} inputMode="numeric" className="w-24" value={form.hours} onChange={(e) => set({ hours: e.target.value })} /><span className="text-[13px] font-normal">h (50–2000)</span></>}
+          <Choice value={form.useDefault ? "default" : "custom"} onChange={(v) => { set({ useDefault: v === "default" }); }} options={[{ id: "default", label: t("Model default ({n} h)", { n: DEFAULT_FILTER_HOURS }) }, { id: "custom", label: t("Custom") }]} />
+          {!form.useDefault && <><Input aria-label={t("Hours of running")} inputMode="numeric" className="w-24" value={form.hours} onChange={(e) => { set({ hours: e.target.value }); }} /><span className="text-[13px] font-normal">h (50–2000)</span></>}
         </div>
       </Field>
       <Field label={t("Also remind every (days, when run time is unknown)")} error={tried ? err.days : undefined} hint={t("7–180 days since the last cleaning — used while an AC is offline or has no power readings")}>
-        <Input inputMode="numeric" className="w-24" value={form.days} onChange={(e) => set({ days: e.target.value })} />
+        <Input inputMode="numeric" className="w-24" value={form.days} onChange={(e) => { set({ days: e.target.value }); }} />
       </Field>
       <Field label={t("Who")}>
-        <Choice value={form.recipients} onChange={(v) => set({ recipients: v })} options={[{ id: "owners", label: t("Owners of the location") }, { id: "all_users", label: t("All users of the location") }]} />
+        <Choice value={form.recipients} onChange={(v) => { set({ recipients: v }); }} options={[{ id: "owners", label: t("Owners of the location") }, { id: "all_users", label: t("All users of the location") }]} />
       </Field>
       <Field label={t("Send by")}>
         <div className="flex flex-col gap-1.5 font-normal">
           <Check label={t("App notification (always on)")} checked disabled />
-          <Check label={t("E-mail")} checked={form.email} onChange={(v) => set({ email: v })} />
+          <Check label={t("E-mail")} checked={form.email} onChange={(v) => { set({ email: v }); }} />
         </div>
       </Field>
       <Banner>{t("When an AC reaches the reminder you get a “Filter cleaning due” maintenance alert by the channels above.")}</Banner>

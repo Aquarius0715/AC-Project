@@ -24,26 +24,26 @@ export async function setUnavailability(input: OpInput<"members.setUnavailabilit
     const u = await coreOp<{ conflictingAssignmentIds?: string[] }>("members.setUnavailability", input, { write: true });
     refresh();
     return { ok: true, value: { conflicts: u.conflictingAssignmentIds?.length ?? 0 } };
-  } catch (e) {
-    return failure(e);
+  } catch (error) {
+    return failure(error);
   }
 }
 
 /** members.clearUnavailability: the row's days from `from` (a Kuala Lumpur day) on are removed; `kept` is false when
- * the whole row went. A CONFLICT or NOT_FOUND reloads the list, since someone else changed it. */
+the whole row went. A CONFLICT or NOT_FOUND reloads the list, since someone else changed it. */
 export async function clearUnavailability(id: string, version: number, from: string): Promise<Result<{ kept: boolean }>> {
   try {
     const r = await coreOp<{ remaining: unknown }>("members.clearUnavailability", { id, from }, { write: true, expectedVersion: version });
     refresh();
     return { ok: true, value: { kept: r.remaining != null } };
-  } catch (e) {
-    if (e instanceof CoreError && (e.error.code === "CONFLICT" || e.error.code === "NOT_FOUND")) refresh();
-    return failure(e);
+  } catch (error) {
+    if (error instanceof CoreError && (error.error.code === "CONFLICT" || error.error.code === "NOT_FOUND")) refresh();
+    return failure(error);
   }
 }
 
 /** certificates.submit: membershipId, code, name, number, the issue and expiry days (Kuala Lumpur), the file and, for a
- * renewal, renewalOf. The certificate starts pending HQ verification. */
+renewal, renewalOf. The certificate starts pending HQ verification. */
 export async function submitCertificate(form: FormData): Promise<Result<{ id: string }>> {
   const file = form.get("file");
   const text = (k: string) => String(form.get(k) ?? "").trim();
@@ -53,12 +53,12 @@ export async function submitCertificate(form: FormData): Promise<Result<{ id: st
     const c = await coreOp<{ id: string }>("certificates.submit", {
       membershipId: text("membershipId"), code: text("code") as OpInput<"certificates.submit">["code"], name: text("name"), number: text("number"), ...certDates({ issued: text("issued"), expires: text("expires") }),
       file: { name: file instanceof File ? uploadName(file.name) : "", mime: (file instanceof File ? uploadType(bytes, file.type) : "") as OpInput<"certificates.submit">["file"]["mime"], size: bytes.length, bytes: bytes.toString("base64") },
-      ...(renewalOf ? { renewalOf } : {}),
+      ...(renewalOf && { renewalOf }),
     }, { write: true });
     refresh();
     return { ok: true, value: { id: c.id } };
-  } catch (e) {
-    return failure(e);
+  } catch (error) {
+    return failure(error);
   }
 }
 
@@ -68,8 +68,8 @@ export async function requestTraining(certificateId: string, version: number, no
     await coreOp("certificates.requestTraining", { certificateId, note: note.trim() }, { write: true, expectedVersion: version });
     refresh();
     return { ok: true, value: null };
-  } catch (e) {
-    if (e instanceof CoreError && e.error.code === "CONFLICT") refresh();
-    return failure(e);
+  } catch (error) {
+    if (error instanceof CoreError && error.error.code === "CONFLICT") refresh();
+    return failure(error);
   }
 }

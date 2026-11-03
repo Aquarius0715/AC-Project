@@ -12,25 +12,27 @@ import { componentsFor, historyCard, knownOf, timeInstants, warnAt, type ApiTech
 import type { WorkspaceLive } from "../_components/workspace-view";
 
 /** jobs.get for the technician: the detail while the job is theirs, the snapshot after the window (IR124); an offer
- * projection is a contractor's and reads as not found here. */
-type JobRead = {
+projection is a contractor's and reads as not found here. */
+type JobRead = ApiTechHistory | {
   projection: "detail"; id: string; version: number; status: string; type: string; unitId: string; symptom: string; alertIds: string[];
   origin: string; dueAt: string | null; timeOnSite: TimeOnSite | null; draftReportRef: { reportId: string; reportVersion: number } | null;
   reportRefs: { reportId: string; reportVersion: number }[]; problemPhotos?: { id: string; name: string; status: string }[];
   assignment: { scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: "pending" | "accepted" | "cant_make"; cantMakeReason: string | null } | null;
-} | ApiTechHistory | { projection: "offer" };
-type Part = { code: string; name: string; vanStockQuantity: number | null };
-type Refused = { refused: string }; // FORBIDDEN / NOT_FOUND with the reason (e.g. errors.assignment_not_started)
-const quiet = <T,>(p: Promise<T>): Promise<T | Refused> => p.catch((e) => {
-  if (e instanceof CoreError && (e.error.code === "FORBIDDEN" || e.error.code === "NOT_FOUND")) return { refused: e.error.messageKey };
-  throw e;
-});
+} | { projection: "offer" };
+interface Refused { refused: string } // FORBIDDEN / NOT_FOUND with the reason (e.g. errors.assignment_not_started)
+const quiet = <T,>(p: Promise<T>): Promise<T | Refused> => {
+  return p.catch((error) => {
+    if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return { refused: error.error.messageKey };
+    throw error;
+  });
+};
 const isRefused = (x: unknown): x is Refused => !!x && typeof x === "object" && "refused" in x;
 
-export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | { kind: "history"; card: ReturnType<typeof historyCard> } | "not_found"> {
-  const job = await coreOp<JobRead>("jobs.get", { jobId }).catch((e) => {
-    if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || e.error.fieldErrors.jobId)) return null;
-    throw e;
+export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | "not_found" | { kind: "history"; card: ReturnType<typeof historyCard> }> {
+  interface Part { code: string; name: string; vanStockQuantity: number | null }
+  const job = await coreOp<JobRead>("jobs.get", { jobId }).catch((error) => {
+    if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN" || error.error.fieldErrors.jobId)) return null;
+    throw error;
   });
   const display = await coreDisplay();
   const i = i18nOf(display);
@@ -40,10 +42,10 @@ export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | { ki
   // before the work window units.get refuses, but units.list still names the unit of the assignment, as the overview does (IR570)
   const listed = isRefused(unit) ? await quiet(coreOp<{ items: { displayName: string }[] }>("units.list", { limit: 1, filters: { unitIds: [job.unitId] } })) : null;
   const ref = job.draftReportRef ?? job.reportRefs[job.reportRefs.length - 1] ?? null;
-  const editable = job.status === "in_progress" && !!job.draftReportRef;
+  const isEditable = job.status === "in_progress" && !!job.draftReportRef;
   const [report, parts] = await Promise.all([
     ref ? quiet(coreOp<ApiTechReport>("reports.get", { jobId, reportId: ref.reportId, reportVersion: ref.reportVersion })) : null,
-    editable || job.status === "in_progress" ? quiet(coreAll<Part>("parts.list")) : [],
+    isEditable || job.status === "in_progress" ? quiet(coreAll<Part>("parts.list")) : [],
   ]);
   const u = isRefused(unit) ? null : unit;
   const r = report === null || isRefused(report) ? null : report;

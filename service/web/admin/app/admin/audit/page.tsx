@@ -17,13 +17,14 @@ import type { ApiAlertLite } from "@ac/web/lib/techDevices";
 import { withAccess } from "@ac/web/lib/withAccess";
 import { AuditView, type AuditLive } from "./_components/audit-view";
 
-type Page<T> = { items: T[]; total: number };
-type Device = { id: string; serial: string; unitId: string | null };
+interface Device { id: string; serial: string; unitId: string | null }
 // a part the session may not read (FORBIDDEN, NOT_FOUND) is left out; UNAVAILABLE and TIMEOUT still fail the page
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
-  if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
-  throw e;
-});
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
+  return p.catch((error) => {
+    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+    throw error;
+  });
+};
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
 export default async function AdminAuditPage(props: PageProps<"/admin/audit">) {
@@ -31,6 +32,7 @@ export default async function AdminAuditPage(props: PageProps<"/admin/audit">) {
 }
 
 async function AdminAuditPageContent({ searchParams }: PageProps<"/admin/audit">) {
+  interface Page<T> { items: T[]; total: number }
   await connection();
   if (!apiMode()) return <AuditView />;
   const sp = await searchParams;
@@ -38,16 +40,16 @@ async function AdminAuditPageContent({ searchParams }: PageProps<"/admin/audit">
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const i = i18nOf(display), zone = display.timeZone;
   const filters = auditFilters(sp, now, zone);
-  const searched = !periodError(filters); // a reversed or too long period searches nothing (Figma Admin 338:602)
+  const isSearched = !periodError(filters); // a reversed or too long period searches nothing (Figma Admin 338:602)
   const tab = one("tab") === "devices" ? "devices" : "log";
   const [page, members] = await Promise.all([
-    searched ? coreOp<Page<ApiAudit>>("audit.list", auditQuery(filters, zone)) : Promise.resolve({ items: [], total: 0 }),
+    isSearched ? coreOp<Page<ApiAudit>>("audit.list", auditQuery(filters, zone)) : Promise.resolve({ items: [], total: 0 }),
     optional(coreAll<{ userId: string; displayName: string }>("members.list"), []),
   ]);
   const rows = page.items.map((a) => auditRow(a, i, now.getTime()));
   const names = new Map(members.map((m) => [m.userId, m.displayName]));
   const live: AuditLive = {
-    tab, rows, total: page.total, filters, searched, actors: actorOptions(members, rows, filters.actorId), kinds: targetKinds(rows, filters.targetKind),
+    tab, rows, total: page.total, filters, searched: isSearched, actors: actorOptions(members, rows, filters.actorId), kinds: targetKinds(rows, filters.targetKind),
     selected: null, entryMissing: false, trace: [], related: null,
   };
   if (tab === "log") {
@@ -72,7 +74,7 @@ async function AdminAuditPageContent({ searchParams }: PageProps<"/admin/audit">
     options: [...devices].sort((a, b) => a.serial.localeCompare(b.serial)).map((x) => ({ id: x.id, label: label(x) })),
     deviceId: d?.id ?? null, missing: !!wanted && !d, label: d ? label(d) : null, total: 0, events: [], selected: null,
   };
-  if (d && searched) {
+  if (d && isSearched) {
     const events = await coreOp<Page<ApiAuditDeviceEvent>>("devices.events", { id: d.id, query: { limit: 50, filters: periodInstants(filters, zone) } });
     const alerts = await Promise.all([...new Set(events.items.flatMap((e) => e.alertIds))].map((id) => optional(coreOp<ApiAlertLite>("alerts.get", { id }), null)));
     const rowsOf = auditDeviceEvents(events.items, new Map(alerts.filter((a): a is ApiAlertLite => !!a).map((a) => [a.id, a])), names, unitName, now.getTime(), i);

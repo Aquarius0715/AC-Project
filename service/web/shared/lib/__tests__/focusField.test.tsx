@@ -5,7 +5,7 @@ import { Check, Field, Input } from "@ac/web/components/ui";
 import { focusField } from "@ac/web/lib/focusField";
 
 afterEach(cleanup);
-const frame = () => new Promise((r) => requestAnimationFrame(() => r(null)));
+const frame = () => new Promise((r) => requestAnimationFrame(() => { r(null); }));
 
 // IR586: a failed save takes focus to the field to fix, whether it is a control or a set of checkboxes.
 describe("focusField", () => {

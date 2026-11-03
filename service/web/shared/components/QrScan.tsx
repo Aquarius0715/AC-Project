@@ -36,21 +36,21 @@ export function QrScan({ open, onClose }: { open: boolean; onClose: () => void }
   const close = () => { setState({ kind: "idle" }); setCode(""); onClose(); };
   const scan = async (raw: string) => {
     const c = scanCode(raw);
-    if (!c) return setState({ kind: "refused", ...qrRefusal({ code: "VALIDATION", messageKey: "error.validation" }, t) });
+    if (!c) { setState({ kind: "refused", ...qrRefusal({ code: "VALIDATION", messageKey: "error.validation" }, t) }); return; }
     setState({ kind: "busy" });
     try {
       const r = await callOp<ApiQrResolution>("units.resolveQr", { code: c });
-      let locked = false;
+      let isLocked = false;
       const [unit, job] = await Promise.all([
-        callOp<ApiQrUnit>("units.get", { id: r.unitId }).catch((e: unknown) => { locked = e instanceof OpError && e.error.code === "FORBIDDEN"; return null; }), // before the work window (IR94)
+        callOp<ApiQrUnit>("units.get", { id: r.unitId }).catch((error: unknown) => { isLocked = error instanceof OpError && error.error.code === "FORBIDDEN"; return null; }), // before the work window (IR94)
         r.jobId ? callOp<ApiQrJob>("jobs.get", { jobId: r.jobId }).catch(() => null) : Promise.resolve(null),
       ]);
       const at = (now ?? new Date()).toISOString();
       const name = units.data.find((u) => u.id === r.unitId)?.displayName;
-      setState({ kind: "matched", code: c, at, match: qrMatch(r, unit, job, Date.parse(at), { name, locked }, i18n) });
-    } catch (e) {
-      if (!(e instanceof OpError)) throw e;
-      setState({ kind: "refused", ...qrRefusal(e.error, t) });
+      setState({ kind: "matched", code: c, at, match: qrMatch(r, unit, job, Date.parse(at), { name, locked: isLocked }, i18n) });
+    } catch (error) {
+      if (!(error instanceof OpError)) throw error;
+      setState({ kind: "refused", ...qrRefusal(error.error, t) });
     }
   };
   const m = state.kind === "matched" ? state.match : null;
@@ -66,7 +66,7 @@ export function QrScan({ open, onClose }: { open: boolean; onClose: () => void }
         <div className="flex flex-col gap-2 rounded-xl bg-ink/90 p-4 text-white">
           <div className="grid h-36 place-items-center rounded-lg border-2 border-dashed border-ok/70 text-[11px] text-white/70">{t("camera (simulated) — point it at the unit label")}</div>
           <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void scan(code); }}>
-            <Input ref={input} aria-label={t("Label code, device serial or unit ID")} value={code} onChange={(e) => setCode(e.target.value)} placeholder={t("Label code, device serial or unit ID")} className="bg-white text-ink" />
+            <Input ref={input} aria-label={t("Label code, device serial or unit ID")} value={code} onChange={(e) => { setCode(e.target.value); }} placeholder={t("Label code, device serial or unit ID")} className="bg-white text-ink" />
             <Btn type="submit" variant="primary" disabled={state.kind === "busy"}>{t("Scan")}</Btn>
           </form>
           {assigned.length > 0 && (

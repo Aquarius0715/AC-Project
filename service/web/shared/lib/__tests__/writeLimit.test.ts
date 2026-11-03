@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { sendPaced } from "@ac/web/lib/writeLimit";
 
-type R = { ok: boolean; code?: string; retryAfterSeconds?: number | null; n?: number };
+interface R { ok: boolean; code?: string; retryAfterSeconds?: number | null; n?: number }
 const limited = (retryAfterSeconds: number | null): R => ({ ok: false, code: "RATE_LIMITED", retryAfterSeconds });
 
 // IR380: Group control sends more commands than the write limit of a minute allows (IR375); a refused one waits and is
@@ -12,7 +12,7 @@ describe("a write paced by the write limit", () => {
     const send = vi.fn(async () => answers.shift()!);
     const onWait = vi.fn(), pause = vi.fn(async () => {});
     expect(await sendPaced(send, onWait, 5, pause)).toEqual({ ok: true, n: 3 });
-    expect([send.mock.calls.length, onWait.mock.calls, pause.mock.calls]).toEqual([3, [[12], [5]], [[12000], [5000]]]);
+    expect([send.mock.calls.length, onWait.mock.calls, pause.mock.calls]).toEqual([3, [[12], [5]], [[12_000], [5000]]]);
   });
   it("keeps the wait within 1–60 s", async () => {
     const answers: R[] = [limited(0), limited(600), { ok: true }];

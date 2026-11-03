@@ -16,12 +16,14 @@ import {
 import { withAccess } from "@ac/web/lib/withAccess";
 import { BillingView, type BillingLive } from "./_components/billing-view";
 
-type Page<T> = { items: T[] };
+interface Page<T> { items: T[] }
 // a part the session may not read (FORBIDDEN, NOT_FOUND) is left out; UNAVAILABLE and TIMEOUT still fail the page
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
-  if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
-  throw e;
-});
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
+  return p.catch((error) => {
+    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+    throw error;
+  });
+};
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
 export default async function AdminBillingPage(props: PageProps<"/admin/billing">) {
@@ -33,7 +35,7 @@ async function AdminBillingPageContent({ searchParams }: PageProps<"/admin/billi
   if (!apiMode()) return <BillingView />;
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
-  const tab = one("tab") === "payouts" ? "payouts" : one("tab") === "inquiries" || (!one("tab") && one("inquiryId") && !one("invoiceId")) ? "inquiries" : "invoices";
+  const tab = one("tab") === "payouts" ? "payouts" : (one("tab") === "inquiries" || (!one("tab") && one("inquiryId") && !one("invoiceId")) ? "inquiries" : "invoices");
   const months = billingMonths(one("from"), one("to"));
   const scope = { customerId: one("customerId"), propertyId: one("propertyId"), contractId: one("contractId"), overdueOnly: one("overdueOnly") === "true", from: months.from, to: months.to };
   const filters = {

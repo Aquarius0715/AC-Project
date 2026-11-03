@@ -18,9 +18,9 @@ const cellTone: Record<WeekCell["kind"], string> = {
 };
 
 /** Team & capacity (FR-P06, Figma Contractor 04-1…04-5, 04-8) from the Core API: the URL's date, qualification and
- * activeOnly, the technicians with the chosen day, the team's week, the qualification grants and unavailable days —
- * added in a dialog, listed while upcoming and removed from a chosen day on (IR612).
- * Texts in the user's display language; every date and time comes formatted from the loader (IR276). */
+activeOnly, the technicians with the chosen day, the team's week, the qualification grants and unavailable days —
+added in a dialog, listed while upcoming and removed from a chosen day on (IR612).
+Texts in the user's display language; every date and time comes formatted from the loader (IR276). */
 export function TeamView({ live }: { live: TeamLive }) {
   const t = useT();
   const [tab, setTab] = useUrlTab<"members" | "certs">({ members: "overview", certs: "certifications" }, "members");
@@ -50,27 +50,27 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
     return <Page>{tabs}<EmptyState title={t("No technicians")}>{t("No technicians in your company yet. Add them in Users.")}</EmptyState></Page>;
   }
   if (tab === "certs") return <Page>{tabs}<Certifications live={live} /></Page>;
-  const none = live.rows.length === 0;
+  const isNone = live.rows.length === 0;
   return (
     <Page>
       {tabs}
       <div className="flex flex-wrap items-center gap-2">
         <Input type="date" aria-label={t("Date")} className="w-auto" value={q.date} onChange={(e) => e.target.value && patch({ date: e.target.value === q.today ? null : e.target.value })} />
-        <Select aria-label={t("Qualification")} className="w-auto" value={q.qualification ?? ""} onChange={(e) => patch({ qualification: e.target.value || null })}>
+        <Select aria-label={t("Qualification")} className="w-auto" value={q.qualification ?? ""} onChange={(e) => { patch({ qualification: e.target.value || null }); }}>
           <option value="">{t("All qualifications")}</option>
           {live.qualifications.map((x) => <option key={x.code} value={x.code}>{x.text}</option>)}
         </Select>
-        <Btn size="sm" aria-pressed={q.activeOnly} className={cx(q.activeOnly && "border-primary bg-primary-soft text-primary")} onClick={() => patch({ activeOnly: q.activeOnly ? "false" : null })}>
+        <Btn size="sm" aria-pressed={q.activeOnly} className={cx(q.activeOnly && "border-primary bg-primary-soft text-primary")} onClick={() => { patch({ activeOnly: q.activeOnly ? "false" : null }); }}>
           {q.activeOnly ? <><Icon name="check" />{t("Active only")}</> : t("Include expired")}
         </Btn>
       </div>
       <Card title={`${t("Technicians — {company}", { company: live.company })}${q.activeOnly ? ` · ${t("{n} active", { n: live.activeCount })}` : ""}`}
-        action={<div className="flex flex-wrap gap-2"><LinkBtn href="/partner/schedule" size="sm">{t("Open schedule")} <Icon name="arrowRight" /></LinkBtn><Btn size="sm" onClick={() => setOpen(true)} disabled={!live.technicians.length}><Icon name="add" /> {t("Unavailable days")}</Btn></div>}>
-        {none ? (
+        action={<div className="flex flex-wrap gap-2"><LinkBtn href="/partner/schedule" size="sm">{t("Open schedule")} <Icon name="arrowRight" /></LinkBtn><Btn size="sm" onClick={() => { setOpen(true); }} disabled={live.technicians.length === 0}><Icon name="add" /> {t("Unavailable days")}</Btn></div>}>
+        {isNone ? (
           <div className="py-6 text-center">
             <b className="text-[13px]">{t("No {company} technicians hold this qualification", { company: live.company })}</b>
             <p className="mt-1 text-xs text-muted-foreground">{t("Qualifications are granted by HQ: upload a renewed certificate under Certifications. Accounts are managed in Users.")}</p>
-            <Btn size="sm" className="mt-3" onClick={() => patch({ qualification: null })}>{t("Clear filter")}</Btn>
+            <Btn size="sm" className="mt-3" onClick={() => { patch({ qualification: null }); }}>{t("Clear filter")}</Btn>
           </div>
         ) : (
           <ul className="divide-y divide-line">
@@ -84,7 +84,7 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
                     <UtilBar pct={r.week.pct} label={`${r.name}: ${r.week.text}`} />
                   </div>
                 )}
-                <div className="min-w-[180px] text-right"><span className={cx("block text-xs", r.day.tone === "crit" ? "text-crit" : r.day.tone === "warn" ? "text-warn" : "text-ink")}>{r.day.main}</span><span className="block text-[11px] text-muted-foreground">{r.day.sub}</span></div>
+                <div className="min-w-[180px] text-right"><span className={cx("block text-xs", r.day.tone === "crit" ? "text-crit" : (r.day.tone === "warn" ? "text-warn" : "text-ink"))}>{r.day.main}</span><span className="block text-[11px] text-muted-foreground">{r.day.sub}</span></div>
                 <div className="w-16 text-right"><b className="block text-lg">{r.util}</b><span className="block text-[10px] text-muted-foreground">{t("utilization")}</span></div>
               </li>
             ))}
@@ -92,7 +92,7 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
         )}
       </Card>
       <p className="text-[11px] text-muted-foreground">{t("Utilization = assigned hours ÷ configured available hours (4 h / 8 h = 50%). Undefined available hours show “—”, not 0%. Accounts are managed in Users.")}</p>
-      {!none && (
+      {!isNone && (
         <div className="split">
           <WeekCard live={live} />
           <Card title={t("Qualifications")}>
@@ -119,7 +119,7 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
               <li key={u.id} className="flex flex-wrap items-center gap-3 py-2.5">
                 <div className="min-w-[220px] flex-1"><b className="block break-words text-[13px]">{u.who}</b><span className="block text-[11px] text-muted-foreground">{u.note ? `${u.type} · ${u.note}` : u.type}</span></div>
                 <span className="min-w-[160px] text-[13px]">{u.days}</span>
-                <Btn size="sm" variant="ghost" aria-label={t("Remove unavailable days of {who}, {days}", { who: u.who, days: u.days })} onClick={() => setRemoving((r) => ({ row: u, open: true, n: (r?.n ?? 0) + 1 }))}><Icon name="delete" />{t("Remove")}</Btn>
+                <Btn size="sm" variant="ghost" aria-label={t("Remove unavailable days of {who}, {days}", { who: u.who, days: u.days })} onClick={() => { setRemoving((r) => ({ row: u, open: true, n: (r?.n ?? 0) + 1 })); }}><Icon name="delete" />{t("Remove")}</Btn>
               </li>
             ))}
           </ul>
@@ -127,15 +127,15 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">{t("Days that have passed stay recorded. Removing days makes the technician available for visits on them again.")}</p>
       </Card>
-      {open && <UnavailableDays live={live} onClose={() => setOpen(false)} />}
-      {removing && <RemoveDays key={removing.n} row={removing.row} open={removing.open} onClose={() => setRemoving((r) => r && { ...r, open: false })} />}
+      {open && <UnavailableDays live={live} onClose={() => { setOpen(false); }} />}
+      {removing && <RemoveDays key={removing.n} row={removing.row} open={removing.open} onClose={() => { setRemoving((r) => r && { ...r, open: false }); }} />}
     </Page>
   );
 }
 
 /** Remove unavailable days (IR612): from the row's first day — or today, once it has started — all of it goes; a later
- * day keeps the days before it. The effect is said before the confirm; members.clearUnavailability sends the row's
- * version, so a row someone changed meanwhile is refused and the list reloads. */
+day keeps the days before it. The effect is said before the confirm; members.clearUnavailability sends the row's
+version, so a row someone changed meanwhile is refused and the list reloads. */
 function RemoveDays({ row, open, onClose }: { row: UnavailabilityRow; open: boolean; onClose: () => void }) {
   const t = useT();
   const locale = useLocale();
@@ -153,7 +153,7 @@ function RemoveDays({ row, open, onClose }: { row: UnavailabilityRow; open: bool
       (f) => { if (f.code !== "VALIDATION") onClose(); });
   };
   return (
-    <Modal open={open} onClose={onClose} title={t("Remove unavailable days")} finalFocus={() => (gone.current ? document.getElementById("unavailable-days") : true)} footer={<>
+    <Modal open={open} onClose={onClose} title={t("Remove unavailable days")} finalFocus={() => (gone.current ? document.querySelector("#unavailable-days") : true)} footer={<>
       <Btn onClick={onClose}>{t("Cancel")}</Btn>
       <Btn variant="danger" disabled={pending} onClick={remove}>{t("Remove")}</Btn>
     </>}>
@@ -183,9 +183,11 @@ function WeekCard({ live }: { live: Live }) {
         </table>
       </ScrollX>
       <dl className="mt-3 flex flex-wrap gap-6 text-xs">
-        {([[t("Assigned"), w.stats.assigned], [t("Available"), w.stats.available], [t("Team utilization"), w.stats.utilization], [w.freeLabel, w.stats.free]] as const).map(([k, v]) => (
-          <div key={k}><dt className="text-[11px] text-muted-foreground">{k}</dt><dd className="text-[15px] font-bold">{v}</dd></div>
-        ))}
+        {([[t("Assigned"), w.stats.assigned], [t("Available"), w.stats.available], [t("Team utilization"), w.stats.utilization], [w.freeLabel, w.stats.free]] as const).map(([k, v]) => {
+          return (
+            <div key={k}><dt className="text-[11px] text-muted-foreground">{k}</dt><dd className="text-[15px] font-bold">{v}</dd></div>
+          );
+        })}
       </dl>
       <p className="mt-2 text-[11px] text-muted-foreground">
         {t("Sat/Sun have no configured available hours, so utilization shows “—”.")}
@@ -196,7 +198,7 @@ function WeekCard({ live }: { live: Live }) {
 }
 
 /** Add unavailable days (Figma 04-8): technician or the whole company, Kuala Lumpur days, type and note; the confirmed
- * assignments in the days are listed before saving and kept by the save (DD-P06). */
+assignments in the days are listed before saving and kept by the save (DD-P06). */
 function UnavailableDays({ live, onClose }: { live: Live; onClose: () => void }) {
   const t = useT();
   const [pending, run] = useAction();
@@ -212,11 +214,13 @@ function UnavailableDays({ live, onClose }: { live: Live; onClose: () => void })
   const list = conflicts.map((c) => `${c.short} · ${form.membershipId ? "" : `${names.get(c.technicianId) ?? ""} · `}${c.text}`).join("; ");
   const save = () => {
     setTried(true);
-    if (Object.keys(unavailabilityErrors(form, t)).length) return;
+    if (Object.keys(unavailabilityErrors(form, t)).length > 0) return;
     run(() => setUnavailability({ membershipId: form.membershipId || null, from: form.from, to: form.to, type: form.type as "annual_leave" | "sick" | "training" | "public_holiday" | "other", note: form.note.trim() || undefined }),
-      (v) => (v.conflicts === 0 ? t("Unavailable days saved — the available hours of those days are 0.")
-        : t(v.conflicts === 1 ? "Unavailable days saved — 1 confirmed assignment overlaps them; reassign it in Schedule & assignments." : "Unavailable days saved — {n} confirmed assignments overlap them; reassign them in Schedule & assignments.", { n: v.conflicts })),
-      () => onClose(),
+      (v) => {
+        return (v.conflicts === 0 ? t("Unavailable days saved — the available hours of those days are 0.")
+          : t(v.conflicts === 1 ? "Unavailable days saved — 1 confirmed assignment overlaps them; reassign it in Schedule & assignments." : "Unavailable days saved — {n} confirmed assignments overlap them; reassign them in Schedule & assignments.", { n: v.conflicts }));
+      },
+      () => { onClose(); },
       (f) => { const r = unavailabilityRefusal(f, t); setServer(r.fields); setRefused(r.text); });
   };
   return (
@@ -226,19 +230,19 @@ function UnavailableDays({ live, onClose }: { live: Live; onClose: () => void })
       <Btn variant="primary" disabled={pending} onClick={save}>{t("Save")}</Btn>
     </>}>
       <Field label={t("Technician")}>
-        <Select value={form.membershipId} onChange={(e) => set({ membershipId: e.target.value })}>
+        <Select value={form.membershipId} onChange={(e) => { set({ membershipId: e.target.value }); }}>
           {live.technicians.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
           <option value="">{t("All technicians (public holiday)")}</option>
         </Select>
       </Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}>
-        <Field label={t("From")} error={err("from")}><Input type="date" value={form.from} onChange={(e) => set({ from: e.target.value })} /></Field>
-        <Field label={t("To")} error={err("to")}><Input type="date" value={form.to} min={form.from} onChange={(e) => set({ to: e.target.value })} /></Field>
+        <Field label={t("From")} error={err("from")}><Input type="date" value={form.from} onChange={(e) => { set({ from: e.target.value }); }} /></Field>
+        <Field label={t("To")} error={err("to")}><Input type="date" value={form.to} min={form.from} onChange={(e) => { set({ to: e.target.value }); }} /></Field>
         <Field label={t("Type")} error={err("type")}>
-          <Select value={form.type} onChange={(e) => set({ type: e.target.value })}>{live.types.map((x) => <option key={x.id} value={x.id}>{x.text}</option>)}</Select>
+          <Select value={form.type} onChange={(e) => { set({ type: e.target.value }); }}>{live.types.map((x) => <option key={x.id} value={x.id}>{x.text}</option>)}</Select>
         </Field>
       </div>
-      <Field label={t("Note (optional)")} error={err("note")}><Input value={form.note} maxLength={500} onChange={(e) => set({ note: e.target.value })} /></Field>
+      <Field label={t("Note (optional)")} error={err("note")}><Input value={form.note} maxLength={500} onChange={(e) => { set({ note: e.target.value }); }} /></Field>
       {conflicts.length > 0 && <Banner tone="warn">{t(conflicts.length === 1 ? "Conflicts with 1 confirmed assignment: {list}. Saving keeps the assignment — reassign it in Schedule & assignments." : "Conflicts with {n} confirmed assignments: {list}. Saving keeps the assignments — reassign them in Schedule & assignments.", { n: conflicts.length, list })}</Banner>}
       {refused && <Banner tone="crit">{refused}</Banner>}
       <p className="text-[11px] text-muted-foreground">

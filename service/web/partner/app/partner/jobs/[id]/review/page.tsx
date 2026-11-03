@@ -13,9 +13,9 @@ export default async function PartnerReviewPage({ params }: PageProps<"/partner/
   const { id } = await params;
   await connection();
   if (!apiMode()) return <ReviewDemo id={id} />;
-  const live = await loadReview(id).catch((e) => {
-    if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || e.error.fieldErrors.jobId)) return null;
-    throw e;
+  const live = await loadReview(id).catch((error) => {
+    if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN" || error.error.fieldErrors.jobId)) return null;
+    throw error;
   });
   if (!live) notFound();
   return <ReviewView live={live} />;

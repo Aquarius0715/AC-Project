@@ -20,7 +20,7 @@ const ctx = { alerts: [base, earlier], unit, job: { id: "job-t07-0000", type: "p
 
 describe("technician alert evidence", () => {
   it("words the rule that raised the alert (IR284, D08)", () => {
-    expect([durationText(60, EN.t), durationText(120, EN.t), durationText(600, EN.t), durationText(3600, EN.t), durationText(10800, EN.t)]).toEqual(["60 s", "2 min", "10 min", "60 min", "3 h"]);
+    expect([durationText(60, EN.t), durationText(120, EN.t), durationText(600, EN.t), durationText(3600, EN.t), durationText(10_800, EN.t)]).toEqual(["60 s", "2 min", "10 min", "60 min", "3 h"]);
     expect(ruleWords(rule, EN.t)).toEqual({ policy: "Policy: Temperature ≥ 30.0 °C, recovery < 28.0 °C, duration 60 s", recovery: "< 28.0 °C for 60 s", raise: "Temperature ≥ 30.0 °C" });
     expect(ruleWords({ name: "Refrigerant low pressure", metric: "refrigerant_pressure", operator: "lte", threshold: 350, recoveryThreshold: 380, durationSeconds: 120 }, EN.t).policy)
       .toBe("Policy: Refrigerant pressure ≤ 350 kPa, recovery > 380 kPa, duration 2 min");

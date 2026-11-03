@@ -18,15 +18,15 @@ import type { Metric } from "@ac/web/lib/contracts.gen";
 
 /** units.get as the technician reads it (ACUnit.type is part of the unit). */
 export type ApiTechUnit = ApiUnitDetail & { type?: string | null };
-export type Point = { value: number | null; observedAt: string; quality?: string };
+export interface Point { value: number | null; observedAt: string; quality?: string }
 type Tone = "ok" | "warn" | "crit" | "primary" | "muted";
 
-const KL = 8 * 3600_000, DAY = 86_400_000, HOUR = 3_600_000;
+const KL = 8 * 3_600_000, DAY = 86_400_000, HOUR = 3_600_000;
 export const PERIODS = ["1h", "24h", "7d"] as const;
 export type Period = (typeof PERIODS)[number];
 export const periodOf = (v?: string): Period => (PERIODS.includes(v as Period) ? (v as Period) : "24h");
 /** The period of the series (DD-T03): 1 h and 24 h roll back from now; 7 days are the Kuala Lumpur calendar days up to
- * today. */
+today. */
 export function periodRange(p: Period, nowMs: number): { from: number; to: number } {
   if (p === "1h") return { from: nowMs - HOUR, to: nowMs };
   if (p === "24h") return { from: nowMs - DAY, to: nowMs };
@@ -38,16 +38,16 @@ export function metricOf(d: ApiTechUnit, v?: string): Metric {
   const measured = d.latestMeasurements.map((m) => m.metric);
   const asked = measured.find((m) => m === v);
   if (asked) return asked;
-  return measured.includes("temperature") || !measured.length ? "temperature" : measured[0];
+  return measured.includes("temperature") || measured.length === 0 ? "temperature" : measured[0];
 }
-const label = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]) : metric.replace(/_/g, " "));
+const label = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]) : metric.replaceAll('_', " "));
 
 const SCOPE: Record<string, string> = { indoor: "Indoor", outdoor: "Outdoor", electrical: "Electrical" };
 const TYPE: Record<string, string> = { split: "Split" };
 const COUNT: Record<Group, string> = { indoor: "{n} indoor", outdoor: "{n} outdoor", electrical: "{n} electrical" };
-export type Register = { rows: [string, string][]; missing: boolean; note: string };
+export interface Register { rows: [string, string][]; missing: boolean; note: string }
 /** The unit register (Figma: location, manufacturer / model, configuration, installed, capability version, maintenance
- * scope). A value the register lacks says “Not registered” — never a similar model's value or today's date (DD-T02). */
+scope). A value the register lacks says “Not registered” — never a similar model's value or today's date (DD-T02). */
 export function registerRows(d: ApiTechUnit, i: I18n = EN): Register {
   const { t, display } = i;
   const none = t("Not registered");
@@ -68,38 +68,40 @@ export function registerRows(d: ApiTechUnit, i: I18n = EN): Register {
   };
 }
 
-export type ComponentCard = { group: Group; title: string; names: string };
+export interface ComponentCard { group: Group; title: string; names: string }
 /** The components of the service scope by group (IR100), in the canonical order. */
 export function componentCards(d: ApiTechUnit, i: I18n = EN): ComponentCard[] {
   const { t } = i;
-  return componentGroups.map(({ group, keys }) => ({ group, keys: keys.filter((k) => d.components.includes(k)) })).filter((g) => g.keys.length).map(({ group, keys }) => ({
-    group, title: t("{group} · {n} components", { group: t(groupLabel[group]), n: keys.length }), names: keys.map((k) => t(componentLabel[k] ?? k)).join(", "),
-  }));
+  return componentGroups.map(({ group, keys }) => ({ group, keys: keys.filter((k) => d.components.includes(k)) })).filter((g) => g.keys.length).map(({ group, keys }) => {
+    return {
+      group, title: t("{group} · {n} components", { group: t(groupLabel[group]), n: keys.length }), names: keys.map((k) => t(componentLabel[k] ?? k)).join(", "),
+    };
+  });
 }
 
-export type Tile = { label: string; value: string; sub: string; tone?: "crit" | "warn" };
+export interface Tile { label: string; value: string; sub: string; tone?: "crit" | "warn" }
 const QUALITY: Record<string, string> = { stale: "stale", suspect: "suspect", missing: "missing" };
 const MODE: Record<string, string> = { cool: "Cooling", dry: "Drying", fan: "Fan only" };
 const CONNECTION: Record<string, string> = { online: "Online", offline: "Offline", unknown: "Unknown", connecting: "Connecting", error: "Error" };
 /** The latest values (Figma tiles): temperature, power, operation and connection, each with its time — “last known”
- * while the unit is not online, so nothing reads as live (DD-T03). A reading of stale, suspect or missing quality keeps
- * its quality beside the value (IR213). */
+while the unit is not online, so nothing reads as live (DD-T03). A reading of stale, suspect or missing quality keeps
+its quality beside the value (IR213). */
 export function liveTiles(d: ApiTechUnit, nowMs: number, i: I18n = EN): Record<"temperature" | "power" | "operation" | "connection", Tile> {
   const { t } = i;
-  const down = d.connection !== "online";
-  const seen = (iso: string | null) => (!iso ? "—" : t(down ? "last known · observed {time}" : "observed {time}", { time: relativeTime(iso, nowMs, i) }));
+  const isDown = d.connection !== "online";
+  const seen = (iso: string | null) => (iso ? t(isDown ? "last known · observed {time}" : "observed {time}", { time: relativeTime(iso, nowMs, i) }) : "—");
   const reading = (metric: string): Tile => {
     const m = d.latestMeasurements.find((x) => x.metric === metric);
     if (!m || m.value === null) return { label: label(metric, t), value: "—", sub: m ? seen(m.observedAt) : t("no reading") };
-    const bad = m.quality !== "valid";
-    return { label: label(metric, t), value: `${airNumber(metric, m.value)} ${m.unit}${bad ? ` (${t(QUALITY[m.quality] ?? m.quality)})` : ""}`, sub: seen(m.observedAt), tone: bad ? "warn" : undefined };
+    const isBad = m.quality !== "valid";
+    return { label: label(metric, t), value: `${airNumber(metric, m.value)} ${m.unit}${isBad ? ` (${t(QUALITY[m.quality] ?? m.quality)})` : ""}`, sub: seen(m.observedAt), tone: isBad ? "warn" : undefined };
   };
   const s = d.observedState;
   return {
     temperature: reading("temperature"), power: reading("power"),
-    operation: { label: t("Operation"), value: s.power === null ? "—" : !s.power ? t("Off") : s.mode && MODE[s.mode] ? t(MODE[s.mode]) : t("On"), sub: seen(s.observedAt) },
+    operation: { label: t("Operation"), value: s.power === null ? "—" : s.power ? s.mode && MODE[s.mode] ? t(MODE[s.mode]) : t("On") : t("Off"), sub: seen(s.observedAt) },
     connection: {
-      label: t("Connection"), value: t(CONNECTION[d.connection] ?? d.connection), tone: down ? "crit" : undefined,
+      label: t("Connection"), value: t(CONNECTION[d.connection] ?? d.connection), tone: isDown ? "crit" : undefined,
       sub: d.lastSeenAt ? t("last seen {time}", { time: relativeTime(d.lastSeenAt, nowMs, i) }) : t("never seen"),
     },
   };
@@ -111,12 +113,12 @@ export function stoppedBanner(d: ApiTechUnit, nowMs: number, i: I18n = EN): stri
     : i.t("No data has reached the server from this unit yet — nothing here is real-time.");
 }
 
-export type SeriesChart = { title: string; points: (number | null)[]; labels: string[]; gap: string | null; count: string | null; cut: string | null; empty: boolean };
+export interface SeriesChart { title: string; points: (number | null)[]; labels: string[]; gap: string | null; count: string | null; cut: string | null; empty: boolean }
 /** One metric over the period: 12 equal slots with the latest valid reading in each (stale, suspect and missing ones
- * are not plotted), the empty slots between readings named as a gap that stays unconnected. A `complete` series — the
- * period's averages (IR606) — counts the period's readings (`total`); otherwise, when the period holds more readings
- * than the screen loaded, it says that the earlier ones are not loaded instead of counting the period (IR598, as IR592
- * on the customer's air chart). The 24 h axis starts with its day. */
+are not plotted), the empty slots between readings named as a gap that stays unconnected. A `complete` series — the
+period's averages (IR606) — counts the period's readings (`total`); otherwise, when the period holds more readings
+than the screen loaded, it says that the earlier ones are not loaded instead of counting the period (IR598, as IR592
+on the customer's air chart). The 24 h axis starts with its day. */
 export function seriesChart(metric: string, unit: string, items: Point[], p: Period, nowMs: number, i: I18n = EN, total = items.length, complete = false): SeriesChart {
   const { t, display } = i;
   const { from, to } = periodRange(p, nowMs);
@@ -124,40 +126,42 @@ export function seriesChart(metric: string, unit: string, items: Point[], p: Per
   const slot = (to - from) / points.length;
   const first = points.findIndex((v) => v !== null), last = points.length - 1 - [...points].reverse().findIndex((v) => v !== null);
   let gap: string | null = null;
-  for (let k = first + 1; first >= 0 && k < last && !gap; k++) {
+  for (let k = first + 1; first !== -1 && k < last && !gap; k++) {
     if (points[k] !== null) continue;
     let end = k;
     while (points[end + 1] === null) end++;
     gap = t("no data {span} (gap not connected)", { span: showSpan(new Date(from + k * slot).toISOString(), new Date(from + (end + 1) * slot).toISOString(), display) });
   }
   const at = new Date(from).toISOString();
-  const start = p === "7d" ? showDayMonth(at, { ...display, timeZone: "Asia/Kuala_Lumpur" }) : p === "24h" ? `${showDayMonth(at, display)}, ${showClock(at, display, false)}` : showClock(at, display, false);
-  const cut = !complete && total > items.length;
+  const start = p === "7d" ? showDayMonth(at, { ...display, timeZone: "Asia/Kuala_Lumpur" }) : (p === "24h" ? `${showDayMonth(at, display)}, ${showClock(at, display, false)}` : showClock(at, display, false));
+  const isCut = !complete && total > items.length;
   const n = complete ? total : items.length;
   const name = `${label(metric, t)}${unit ? ` (${unit})` : ""}`;
   return {
     title: p === "7d" ? t("{metric} · last 7 days (Kuala Lumpur calendar days)", { metric: name }) : t("{metric} · last {period} (rolling)", { metric: name, period: t(p === "1h" ? "1 h" : "24 h") }),
     points, labels: [start, "", "", "", t("now")], gap, empty: points.every((v) => v === null),
-    count: cut ? null : t(n === 1 ? "1 measurement in this period" : "{n} measurements in this period", { n }),
-    cut: cut ? t("Showing the latest {n} of {total} readings — earlier readings in this period are not loaded.", { n: items.length, total }) : null,
+    count: isCut ? null : t(n === 1 ? "1 measurement in this period" : "{n} measurements in this period", { n }),
+    cut: isCut ? t("Showing the latest {n} of {total} readings — earlier readings in this period are not loaded.", { n: items.length, total }) : null,
   };
 }
 
-export type MiniMetric = { metric: string; label: string; value: string; sub: string; points: (number | null)[]; cut: boolean; tone?: "warn" };
+export interface MiniMetric { metric: string; label: string; value: string; sub: string; points: (number | null)[]; cut: boolean; tone?: "warn" }
 /** Up to three other metrics of the unit with their latest value and the period's slots (Figma: humidity, power,
- * supply air); `cut` when the period holds more readings (`totals`) than were loaded (IR598). */
+supply air); `cut` when the period holds more readings (`totals`) than were loaded (IR598). */
 export function otherMetrics(d: ApiTechUnit, shown: string, series: Record<string, Point[]>, p: Period, nowMs: number, i: I18n = EN, totals: Record<string, number> = {}): MiniMetric[] {
   const { t } = i;
   const { from, to } = periodRange(p, nowMs);
-  return d.latestMeasurements.filter((m) => m.metric !== shown).slice(0, 3).map((m) => ({
-    metric: m.metric, label: label(m.metric, t), tone: m.quality !== "valid" ? "warn" as const : undefined,
-    value: m.value === null ? "—" : `${airNumber(m.metric, m.value)} ${m.unit}${m.quality !== "valid" ? ` (${t(QUALITY[m.quality] ?? m.quality)})` : ""}`,
-    sub: t(d.connection !== "online" ? "last known · observed {time}" : "observed {time}", { time: relativeTime(m.observedAt, nowMs, i) }),
-    points: bucket(series[m.metric] ?? [], new Date(from), new Date(to), 12), cut: (totals[m.metric] ?? 0) > (series[m.metric]?.length ?? 0),
-  }));
+  return d.latestMeasurements.filter((m) => m.metric !== shown).slice(0, 3).map((m) => {
+    return {
+      metric: m.metric, label: label(m.metric, t), tone: m.quality === "valid" ? undefined : "warn" as const,
+      value: m.value === null ? "—" : `${airNumber(m.metric, m.value)} ${m.unit}${m.quality === "valid" ? "" : ` (${t(QUALITY[m.quality] ?? m.quality)})`}`,
+      sub: t(d.connection === "online" ? "observed {time}" : "last known · observed {time}", { time: relativeTime(m.observedAt, nowMs, i) }),
+      points: bucket(series[m.metric] ?? [], new Date(from), new Date(to), 12), cut: (totals[m.metric] ?? 0) > (series[m.metric]?.length ?? 0),
+    };
+  });
 }
 
-export type WindowEvent = { id: string; at: string; time: string; title: string; sub: string; badge: { text: string; tone: Tone } };
+export interface WindowEvent { id: string; at: string; time: string; title: string; sub: string; badge: { text: string; tone: Tone } }
 const SEVERITY: Record<string, { text: string; tone: Tone }> = { critical: { text: "Critical", tone: "crit" }, warning: { text: "Warning", tone: "warn" }, normal: { text: "Info", tone: "primary" } };
 const DEVICE: Record<ApiDeviceEventFull["eventType"], [string, string, string, Tone]> = {
   communication_lost: ["Updates stopped", "missed heartbeats — the values are frozen and not shown as live", "Connectivity", "primary"],
@@ -170,8 +174,7 @@ const RESTORED: Record<string, [string, string, string]> = {
   power: ["Power signal restored", "the demo power signal is back", "Power"],
   tamper: ["Tamper cleared", "the cover is closed — the alert stays until it is handled", "Tamper"],
 };
-/** The events of the period, newest first: an alert raised, acknowledged or resolved on the unit, and its device's
- * connection, power and tamper events. */
+/** The events of the period, newest first: an alert raised, acknowledged or resolved on the unit, and its device's connection, power and tamper events. */
 export function windowEvents(alerts: ApiAlert[], events: ApiDeviceEventFull[], p: Period, nowMs: number, i: I18n = EN): WindowEvent[] {
   const { t } = i;
   const { from, to } = periodRange(p, nowMs);
@@ -191,43 +194,48 @@ export function windowEvents(alerts: ApiAlert[], events: ApiDeviceEventFull[], p
   return out.sort((x, y) => y.at.localeCompare(x.at) || x.id.localeCompare(y.id)).map((x) => ({ ...x, time: relativeTime(x.at, nowMs, i) }));
 }
 
-export type HistoryRow = { id: string; title: string; sub: string; badge: { text: string; tone: Tone } };
+export interface HistoryRow { id: string; title: string; sub: string; badge: { text: string; tone: Tone } }
 const CURRENT_TONE: Record<string, Tone> = { assigned: "primary", in_progress: "warn", rework_requested: "warn", on_hold: "warn", submitted: "primary", completed: "ok" };
 /** The technician's jobs on the unit (Figma: maintenance history): the current ones with their visit, then the ended
- * ones with the day they were completed, newest first. */
+ones with the day they were completed, newest first. */
 export function jobRows(jobs: ApiTechJobRow[], i: I18n = EN): HistoryRow[] {
   const { t, display } = i;
   const current = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "summary" }> => j.projection === "summary")
     .sort((a, b) => (b.scheduledSlot?.startAt ?? b.dueAt).localeCompare(a.scheduledSlot?.startAt ?? a.dueAt))
-    .map((j): HistoryRow => ({
-      id: j.id, title: `${j.id.slice(0, 8)} · ${typeLabel(j.type, t)}`, sub: j.scheduledSlot ? showSpan(j.scheduledSlot.startAt, j.scheduledSlot.endAt, display) : t("not scheduled yet"),
-      badge: { text: statusWord(j.status, t), tone: CURRENT_TONE[j.status] ?? "muted" },
-    }));
+    .map((j): HistoryRow => {
+      return {
+        id: j.id, title: `${j.id.slice(0, 8)} · ${typeLabel(j.type, t)}`, sub: j.scheduledSlot ? showSpan(j.scheduledSlot.startAt, j.scheduledSlot.endAt, display) : t("not scheduled yet"),
+        badge: { text: statusWord(j.status, t), tone: CURRENT_TONE[j.status] ?? "muted" },
+      };
+    });
   const ended = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "history" }> => j.projection === "history")
     .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
-    .map((j): HistoryRow => ({
-      id: j.jobId, title: `${j.jobId.slice(0, 8)} · ${typeLabel(j.type, t)}`, sub: j.completedAt ? t("completed {date}", { date: showDate(j.completedAt, display) }) : t("your assignment ended"),
-      badge: { text: statusWord(j.status, t), tone: j.status === "completed" ? "ok" : "muted" },
-    }));
+    .map((j): HistoryRow => {
+      return {
+        id: j.jobId, title: `${j.jobId.slice(0, 8)} · ${typeLabel(j.type, t)}`, sub: j.completedAt ? t("completed {date}", { date: showDate(j.completedAt, display) }) : t("your assignment ended"),
+        badge: { text: statusWord(j.status, t), tone: j.status === "completed" ? "ok" : "muted" },
+      };
+    });
   return [...current, ...ended];
 }
 
 const ACTIVE: Record<string, number> = { in_progress: 0, assigned: 1, rework_requested: 2 };
 /** The job diagnostic control works for (DD-T10, IR94): the URL's job when it is one of the technician's active jobs on
- * the unit, else the one in progress, then assigned or returned for rework; null without one. */
+the unit, else the one in progress, then assigned or returned for rework; null without one. */
 export function controlJob(jobs: ApiTechJobRow[], jobId?: string): string | null {
   const active = jobs.filter((j): j is Extract<ApiTechJobRow, { projection: "summary" }> => j.projection === "summary" && j.status in ACTIVE).sort((a, b) => ACTIVE[a.status] - ACTIVE[b.status]);
   return (active.find((j) => j.id === jobId) ?? active[0])?.id ?? null;
 }
 
-export type OpenAlert = { id: string; title: string; severity: ApiAlert["severity"]; sub: string; ack: string };
+export interface OpenAlert { id: string; title: string; severity: ApiAlert["severity"]; sub: string; ack: string }
 const RANK: Record<string, number> = { critical: 0, warning: 1, normal: 2 };
-/** The unit's unresolved alerts, worst and newest first, each with its evidence and who acknowledged it — finishing the
- * job never resolves one. */
+/** The unit's unresolved alerts, worst and newest first, each with its evidence and who acknowledged it — finishing the job never resolves one. */
 export function openAlerts(alerts: ApiAlert[], nowMs: number, i: I18n = EN): OpenAlert[] {
   const { t } = i;
-  return alerts.filter((a) => a.status !== "resolved").sort((a, b) => RANK[a.severity] - RANK[b.severity] || b.detectedAt.localeCompare(a.detectedAt)).map((a) => ({
-    id: a.id, title: alertTitle(a, t), severity: a.severity, sub: `${evidenceText(a.evidenceText, t)} · ${relativeTime(a.detectedAt, nowMs, i)}`,
-    ack: `${a.acknowledgedAt ? t("Acknowledged {time}.", { time: relativeTime(a.acknowledgedAt, nowMs, i) }) : t("Acknowledged by nobody yet.")} ${t("Completing the job does not resolve it.")}`,
-  }));
+  return alerts.filter((a) => a.status !== "resolved").sort((a, b) => RANK[a.severity] - RANK[b.severity] || b.detectedAt.localeCompare(a.detectedAt)).map((a) => {
+    return {
+      id: a.id, title: alertTitle(a, t), severity: a.severity, sub: `${evidenceText(a.evidenceText, t)} · ${relativeTime(a.detectedAt, nowMs, i)}`,
+      ack: `${a.acknowledgedAt ? t("Acknowledged {time}.", { time: relativeTime(a.acknowledgedAt, nowMs, i) }) : t("Acknowledged by nobody yet.")} ${t("Completing the job does not resolve it.")}`,
+    };
+  });
 }

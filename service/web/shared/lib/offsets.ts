@@ -1,4 +1,4 @@
-// Offset demo (FR-A15, DATA_SOURCE=api): demo quotes and offset records projected for /admin/offsets. Every quote,
+// Offset demo (FR-A15, DATA_SOURCE=API): demo quotes and offset records projected for /admin/offsets. Every quote,
 // purchase and retirement is simulated (demo-only operations). Pure code shared by the Server Component and the view;
 // texts in the display language and instants in the display time zone, while a quote's period stays Kuala Lumpur time
 // (IR298).
@@ -8,27 +8,27 @@ import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 const en = translator("en");
 
 /** OffsetQuote of service-contracts.ts. */
-export type ApiQuote = {
+export interface ApiQuote {
   id: string; version: number; customerId: string; purpose: string; amountKg: number; period: { from: string; to: string }; unitIds: string[]; expiresAt: string;
   provider: "unselected"; scheme: "demo"; marketConcept: { stage: string; providerLabel: string; verificationStatus: string; ledgerStatus: string };
-};
-type Attempt = { id: string; stage: "purchase" | "retirement"; status: "pending" | "succeeded" | "failed"; startedAt: string; completedAt: string | null };
+}
+interface Attempt { id: string; stage: "purchase" | "retirement"; status: "pending" | "succeeded" | "failed"; startedAt: string; completedAt: string | null }
 /** OffsetRecord of service-contracts.ts. */
-export type ApiOffsetRecord = {
+export interface ApiOffsetRecord {
   id: string; version: number; createdAt: string; quoteId: string; customerId: string; amountKg: number; attempts: Attempt[]; currentAttemptId: string | null;
   state: "demo_requested" | "demo_purchased" | "demo_retired" | "failed"; previousState: ApiOffsetRecord["state"] | null; purchaseRef: string | null; retirementRef: string | null;
   demoCertificateRef: string | null; eventHistory: { action: string; occurredAt: string; actorId: string; actorName?: string | null; result: string; reason: string | null }[];
-};
+}
 
 const stageOf: Record<string, number> = { demo_requested: 1, demo_purchased: 2, demo_retired: 3 };
 /** Three decimals for kgCO₂e of offsets (the quantity rule of DD-A15). */
 export const kg3 = (x: number) => new Intl.NumberFormat("en-MY", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(x);
 
-export type TimelineItem = { time: string; title: string; detail: string };
-export type RecordRow = {
+export interface TimelineItem { time: string; title: string; detail: string }
+export interface RecordRow {
   id: string; version: number; customer: string; amount: string; state: ApiOffsetRecord["state"]; stateText: string; stage: number; next: string;
   current: Attempt | null; currentText: string | null; events: TimelineItem[]; r: ApiOffsetRecord;
-};
+}
 
 /** A record state as the screens word it (the customer offsets page uses the same words). */
 export function stateWord(s: ApiOffsetRecord["state"] | null, t: T = en): string {
@@ -40,7 +40,7 @@ export function stateWord(s: ApiOffsetRecord["state"] | null, t: T = en): string
 export function attemptText(a: Attempt, i: I18n = EN): string {
   const { t } = i;
   const status: Record<Attempt["status"], string> = { pending: t("pending"), succeeded: t("succeeded"), failed: t("failed") };
-  return t("{stage} · {status} · started {time}", { stage: a.stage === "purchase" ? t("purchase") : t("retirement"), status: status[a.status] ?? a.status, time: showTime(a.startedAt, i.display) });
+  return t("{stage} · {status} · started {time}", { stage: t(a.stage === "purchase" ? "purchase" : "retirement"), status: status[a.status] ?? a.status, time: showTime(a.startedAt, i.display) });
 }
 
 /** An event of the record's audit history: what was done, its audit result and when, in the display time zone. */
@@ -76,18 +76,20 @@ export function conceptText(m: ApiQuote["marketConcept"], t: T = en): string {
 }
 
 /** The demo quote form (DD-A15 fields). */
-export type QuoteDraft = { customerId: string; unitIds: string[]; from: string; to: string; purpose: string; amountKg: string };
+export interface QuoteDraft { customerId: string; unitIds: string[]; from: string; to: string; purpose: string; amountKg: string }
 export function quoteErrors(d: QuoteDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!d.customerId) e.customerId = t("Choose a customer");
-  if (d.unitIds.length < 1 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
+  if (d.unitIds.length === 0 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
   if (!d.from || !d.to) e.period = t("Enter the start and the end"); // an empty period is not an end before its start (IR586)
   else if (d.from >= d.to) e.period = t("The end must be after the start");
-  if ([...d.purpose.trim()].length < 1 || [...d.purpose.trim()].length > 1000) e.purpose = t("1–1000 characters");
+  if ([...d.purpose.trim()].length === 0 || [...d.purpose.trim()].length > 1000) e.purpose = t("1–1000 characters");
   const n = Number(d.amountKg);
-  if (!/^\d+(\.\d{1,3})?$/.test(d.amountKg.trim()) || !(n > 0 && n <= 100000)) e.amountKg = t("Above 0, at most 100000, up to 3 decimals");
+  if (!/^\d+(\.\d{1,3})?$/.test(d.amountKg.trim()) || !(n > 0 && n <= 100_000)) e.amountKg = t("Above 0, at most 100000, up to 3 decimals");
   return e;
 }
-export const quoteInput = (d: QuoteDraft) => ({
-  customerId: d.customerId, purpose: d.purpose.trim(), amountKg: Number(d.amountKg), period: { from: klInstant(d.from), to: klInstant(d.to) }, unitIds: d.unitIds,
-});
+export const quoteInput = (d: QuoteDraft) => {
+  return {
+    customerId: d.customerId, purpose: d.purpose.trim(), amountKg: Number(d.amountKg), period: { from: klInstant(d.from), to: klInstant(d.to) }, unitIds: d.unitIds,
+  };
+};

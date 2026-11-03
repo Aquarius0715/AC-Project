@@ -5,7 +5,7 @@ import { Icon, type IconName } from "@ac/web/components/Icon";
 const jump = "rounded-control bg-primary-soft px-3 py-2 text-[13px] font-semibold text-ink hover:bg-primary-soft/70 disabled:cursor-not-allowed disabled:opacity-50";
 
 /** The Demo controls layout of Figma Client 10e (FR-X05), shared by the browser demo and API mode: the dashed notice,
- * Demo clock · Scenario · Reset in one row, and the Trigger failures tiles. */
+Demo clock · Scenario · Reset in one row, and the Trigger failures tiles. */
 export function DemoFrame({ clock, scenario, reset, triggers, above }: { clock: React.ReactNode; scenario: React.ReactNode; reset: React.ReactNode; triggers: React.ReactNode; above?: React.ReactNode }) {
   const t = useT();
   return (

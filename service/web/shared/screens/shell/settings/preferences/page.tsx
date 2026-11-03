@@ -14,17 +14,17 @@ export default async function PreferencesPage() {
   await connection();
   if (!apiMode()) return <PreferencesDemo />;
   const session = await getSession();
-  const client = session?.role === "client";
+  const isClient = session?.role === "client";
   const [prefs, twoFactor, consent, now, identity] = await Promise.all([
     coreOp<PreferencesLive["prefs"]>("preferences.get", {}),
     coreOp<PreferencesLive["twoFactor"]>("twoFactor.get", {}),
-    client ? coreOp<NonNullable<PreferencesLive["consent"]>>("consents.get", { purpose: "location_automation" }).catch((e) => {
-      if (e instanceof CoreError && e.error.code === "NOT_FOUND") return null;
-      throw e;
+    isClient ? coreOp<NonNullable<PreferencesLive["consent"]>>("consents.get", { purpose: "location_automation" }).catch((error) => {
+      if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null;
+      throw error;
     }) : Promise.resolve(null),
     coreNow(),
     coreIdentity(),
   ]);
   const qr = !twoFactor.enabled && twoFactor.setupKey ? qrPath(otpauthUri(twoFactor.setupKey, identity.displayName || "account")) : null;
-  return <PreferencesView live={{ prefs, twoFactor, consent, client, hq: session?.role === "admin", zones: zoneOptions(prefs.timezone, now), qr }} />;
+  return <PreferencesView live={{ prefs, twoFactor, consent, client: isClient, hq: session?.role === "admin", zones: zoneOptions(prefs.timezone, now), qr }} />;
 }

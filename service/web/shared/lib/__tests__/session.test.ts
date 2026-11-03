@@ -28,7 +28,7 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
   it("opens what it sealed and refuses anything altered", () => {
     const t = seal({ a: 1, b: "x" });
     expect(unseal(t)).toEqual({ a: 1, b: "x" });
-    const [iv, body] = t.split(".");
+    const [iv, body] = t.split(".", 2);
     const flip = (v: string, i: number) => { const b = Buffer.from(v, "base64url"); b[i] ^= 1; return b.toString("base64url"); };
     expect([unseal(`${flip(iv, 0)}.${body}`), unseal(`${iv}.${flip(body, 0)}`), unseal(`${iv}.${flip(body, Buffer.from(body, "base64url").length - 1)}`),
       unseal(`${iv}.`), unseal(`.${body}`), unseal(iv), unseal(`${t}.x`), unseal(`${iv.slice(2)}.${body}`), unseal(undefined), unseal("")])
@@ -38,7 +38,7 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
   it("keeps the tokens unreadable to the browser and never repeats a value", () => {
     const s = session();
     const t = seal(s);
-    const plain = Buffer.from(t.split(".")[1], "base64url").toString("latin1");
+    const plain = Buffer.from(t.split(".", 2)[1], "base64url").toString("latin1");
     expect([plain.includes("accessToken"), plain.includes("r-1"), t.includes(Buffer.from(JSON.stringify(s)).toString("base64url").slice(0, 16))]).toEqual([false, false, false]);
     expect(seal(s)).not.toBe(t); // a fresh IV each time
     expect(unseal<Session>(t)).toEqual(s);
@@ -105,7 +105,7 @@ describe("a session from the identity provider's tokens", () => {
 });
 
 describe("refreshing the access token", () => {
-  const answer = (status: number, body: unknown) => vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }));
+  const answer = (status: number, body: unknown) => vi.fn(async () => Response.json(body, { status, headers: { "Content-Type": "application/json" } }));
 
   it("is due 30 seconds before the access token expires", () => {
     expect([needsRefresh(session({ expiresAt: NOW / 1000 + 31 })), needsRefresh(session({ expiresAt: NOW / 1000 + 30 })), needsRefresh(session({ expiresAt: NOW / 1000 - 1 }))]).toEqual([false, true, true]);
@@ -150,7 +150,7 @@ describe("ending the identity provider's session", () => {
     expect(init.signal).toBeInstanceOf(AbortSignal); // never waits long for the provider
   });
   it("answers false when the provider refuses or cannot be reached", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "invalid_grant" }), { status: 400 })));
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "invalid_grant" }, { status: 400 })));
     expect(await endIdpSession("r-1")).toBe(false);
     vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
     expect(await endIdpSession("r-1")).toBe(false);
@@ -168,7 +168,7 @@ describe("reading the session in a route handler", () => {
 
   it("refreshes an expiring session and rewrites the cookie", async () => {
     jar.get.mockReturnValue({ value: seal(session({ expiresAt: NOW / 1000 + 10 })) });
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ access_token: token(claims), refresh_token: "r-2", expires_in: 300 }))));
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ access_token: token(claims), refresh_token: "r-2", expires_in: 300 })));
     expect(await readSession()).toMatchObject({ refreshToken: "r-2", expiresAt: NOW / 1000 + 300 });
     const [name, value, options] = jar.set.mock.calls[0];
     expect([name, unseal<Session>(value)?.refreshToken, options.maxAge]).toEqual([SESSION_COOKIE, "r-2", 1800]);
@@ -208,7 +208,7 @@ describe("the cookie names (IR374)", () => {
 describe("where sign-in returns to", () => {
   it("keeps a same-origin path and refuses absolute, protocol-relative, backslash and control-character forms", () => {
     expect([safeReturnTo("/customer/units/u1?tab=history"), safeReturnTo("/")]).toEqual(["/customer/units/u1?tab=history", "/"]);
-    const bad = ["https://evil.example", "//evil.example", "/\\evil.example", "\\\\evil.example", "customer", "/\tevil", "/\nSet-Cookie:x", "/\u0000", "", null, undefined];
+    const bad = ["https://evil.example", "//evil.example", "/\\evil.example", "\\\\evil.example", "customer", "/\tevil", "/\nSet-Cookie:x", "/\0", "", null, undefined];
     expect(bad.map((v) => safeReturnTo(v))).toEqual(bad.map(() => null));
   });
 });

@@ -11,19 +11,19 @@ import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
 
 const en = translator("en");
 
-export type PolicyWindow = { weekdays: number[]; startLocal: string; endLocal: string };
+export interface PolicyWindow { weekdays: number[]; startLocal: string; endLocal: string }
 /** DefaultAlertRule / DefaultRuleSetting / Policy (alert and default_alert kinds) of service-contracts.ts. */
-export type ApiRule = {
+export interface ApiRule {
   ruleKey: string; name: string; category: "air_quality" | "fault" | "maintenance" | "connection"; metric: string; operator: Operator; threshold: number;
   recoveryThreshold: number; durationSeconds: number; activeWindow: PolicyWindow | null; severity: Severity;
-};
-export type ApiRuleSetting = { id: string; version: number; ruleKey: string; customerId: string; enabled: boolean; changedByMembershipId: string; reason: string | null; updatedAt: string };
-export type ApiDefaultPolicy = { id: string; version: number; kind: "default_alert"; name: string; rules: ApiRule[]; ruleSettings: ApiRuleSetting[] };
-export type ApiAlertPolicy = {
+}
+export interface ApiRuleSetting { id: string; version: number; ruleKey: string; customerId: string; enabled: boolean; changedByMembershipId: string; reason: string | null; updatedAt: string }
+export interface ApiDefaultPolicy { id: string; version: number; kind: "default_alert"; name: string; rules: ApiRule[]; ruleSettings: ApiRuleSetting[] }
+export interface ApiAlertPolicy {
   id: string; version: number; kind: "alert"; name: string; unitIds: string[]; timezone: string; enabled: boolean; priority: number; disabledReason: string | null;
   customerId: string; recipientMembershipIds: string[]; channels: Channel[]; escalateAfterMinutes: number; cooldownMinutes: number;
   metric: string; operator: Operator; threshold: number; recoveryThreshold: number; durationSeconds: number; activeWindow: PolicyWindow | null; severity: Severity;
-};
+}
 
 const label: Record<string, string> = {
   temperature: "Room temperature", humidity: "Humidity", co2: "CO₂", pm25: "PM2.5", power: "Power", refrigerant_pressure: "Refrigerant pressure",
@@ -49,7 +49,7 @@ export function conditionText(c: { metric: string; operator: Operator; threshold
 /** “on weekdays”, “on weekends”, “on Mon, Wed”, or "" for every day. */
 const daysText = (weekdays: number[], t: T) => {
   const days = [...weekdays].sort();
-  return days.length === 7 ? "" : days.join() === "1,2,3,4,5" ? t("on weekdays") : days.join() === "6,7" ? t("on weekends") : t("on {days}", { days: days.map((d) => t(dayNames[d - 1])).join(", ") });
+  return days.length === 7 ? "" : days.join(',') === "1,2,3,4,5" ? t("on weekdays") : days.join(',') === "6,7" ? t("on weekends") : t("on {days}", { days: days.map((d) => t(dayNames[d - 1])).join(", ") });
 };
 /** “only 08:00–19:00 on weekdays”, “only 22:00–06:00”, “only 09:00–12:00 on Sat, Sun”. */
 export function windowText(w: PolicyWindow, t: T = en): string {
@@ -57,11 +57,11 @@ export function windowText(w: PolicyWindow, t: T = en): string {
   return `${t("only {from}–{to}", { from: w.startLocal, to: w.endLocal })}${d ? ` ${d}` : ""}`;
 }
 const recoverText = (op: Operator, v: number, metric: string, t: T) => t(op === "gt" || op === "gte" ? "recover below {value} {unit}" : "recover above {value} {unit}", { value: v, unit: metricUnit[metric] ?? "" }).trim();
-const channelText = (cs: Channel[], t: T) => cs.map((c) => t(c === "inApp" ? "in-app" : c === "email" ? "email" : "WhatsApp")).join(" + ");
+const channelText = (cs: Channel[], t: T) => cs.map((c) => t(c === "inApp" ? "in-app" : (c === "email" ? "email" : "WhatsApp"))).join(" + ");
 
-export type DefaultRuleRow = { ruleKey: string; name: string; condition: string; category: ApiRule["category"]; type: string; severity: Severity; enabled: boolean; version: number };
+export interface DefaultRuleRow { ruleKey: string; name: string; condition: string; category: ApiRule["category"]; type: string; severity: Severity; enabled: boolean; version: number }
 /** The default policy's rules with this customer's settings (a rule without a setting is on, version 0); the rule names
- * are HQ's, the rest is in the display language and the day a rule was turned off in the user's display time zone. */
+are HQ's, the rest is in the display language and the day a rule was turned off in the user's display time zone. */
 export function defaultRuleRows(p: ApiDefaultPolicy, customerId: string | null, me: string, i: I18n = EN): { rows: DefaultRuleRow[]; on: number; notes: string[] } {
   const { t } = i;
   const mine = new Map(p.ruleSettings.filter((s) => s.customerId === customerId).map((s) => [s.ruleKey, s]));
@@ -76,10 +76,10 @@ export function defaultRuleRows(p: ApiDefaultPolicy, customerId: string | null, 
   return { rows, on: rows.filter((r) => r.enabled).length, notes };
 }
 
-export type PolicyCard = {
+export interface PolicyCard {
   id: string; version: number; name: string; badge: string; enabled: boolean; when: string; then: string;
   attached: string[]; attachedText: string; note: string | null;
-};
+}
 const groupOf = (metric: string) => (metric === "co2" || metric === "pm25" ? "Air quality" : metric === "temperature" ? "Temperature" : metric === "humidity" ? "Humidity" : metric === "power" ? "Power" : metric);
 /** One card per own policy (Figma 06e): When / Then sentences and the attached ACs (attaching happens on each AC). */
 export function policyCards(ps: ApiAlertPolicy[], unitName: (id: string) => string | undefined, t: T = en): PolicyCard[] {
@@ -89,17 +89,17 @@ export function policyCards(ps: ApiAlertPolicy[], unitName: (id: string) => stri
       id: p.id, version: p.version, name: p.name, badge: t(groupOf(p.metric)), enabled: p.enabled,
       when: [conditionText(p, t), recoverText(p.operator, p.recoveryThreshold, p.metric, t), p.activeWindow ? windowText(p.activeWindow, t) : null].filter(Boolean).join(" · "),
       then: t("{severity} · notify {channels}", { severity: t(severityText[p.severity]), channels: channelText(p.channels, t) }), attached: names,
-      attachedText: names.length ? t(names.length === 1 ? "Attached to {n} AC: {names}" : "Attached to {n} ACs: {names}", { n: names.length, names: names.join(", ") }) : t("Not attached to any AC yet — attach it from an AC’s page"),
-      note: p.disabledReason === "unit_archived" ? t("An attached AC was archived.") : p.disabledReason === "capability_changed" ? t("An attached AC's capabilities changed — check the condition.") : null,
+      attachedText: names.length > 0 ? t(names.length === 1 ? "Attached to {n} AC: {names}" : "Attached to {n} ACs: {names}", { n: names.length, names: names.join(", ") }) : t("Not attached to any AC yet — attach it from an AC’s page"),
+      note: p.disabledReason === "unit_archived" ? t("An attached AC was archived.") : (p.disabledReason === "capability_changed" ? t("An attached AC's capabilities changed — check the condition.") : null),
     };
   });
 }
 
 export type MetricGroup = "temperature" | "humidity" | "air" | "power";
-export type PolicyForm = {
+export interface PolicyForm {
   name: string; group: MetricGroup; metric: string; operator: Operator; threshold: string; recovery: string; duration: string; unit: "s" | "min";
   windowOn: boolean; weekdays: number[]; start: string; end: string; severity: Severity; email: boolean;
-};
+}
 export const metricGroups: { id: MetricGroup; label: string; sub: string }[] = [
   { id: "temperature", label: "Temperature", sub: "°C" }, { id: "humidity", label: "Humidity", sub: "%" }, { id: "air", label: "Air quality", sub: "CO₂ ppm · PM2.5" }, { id: "power", label: "Power", sub: "kW" },
 ];
@@ -109,17 +109,17 @@ export const metricOfGroup = (g: MetricGroup) => groupMetric[g];
 /** The editor's values: an existing policy's, or a new one (room temperature ≥ 30 °C for 1 min, recovering below 28). */
 export function policyForm(p?: ApiAlertPolicy | null): PolicyForm {
   if (!p) return { name: "", group: "temperature", metric: "temperature", operator: "gte", threshold: "30", recovery: "28", duration: "1", unit: "min", windowOn: false, weekdays: [1, 2, 3, 4, 5], start: "08:00", end: "19:00", severity: "warning", email: false };
-  const min = p.durationSeconds % 60 === 0;
+  const isMin = p.durationSeconds % 60 === 0;
   return {
     name: p.name, group: groupOfMetric(p.metric), metric: p.metric, operator: p.operator, threshold: String(p.threshold), recovery: String(p.recoveryThreshold),
-    duration: String(min ? p.durationSeconds / 60 : p.durationSeconds), unit: min ? "min" : "s", windowOn: !!p.activeWindow, weekdays: p.activeWindow?.weekdays ?? [1, 2, 3, 4, 5],
+    duration: String(isMin ? p.durationSeconds / 60 : p.durationSeconds), unit: isMin ? "min" : "s", windowOn: !!p.activeWindow, weekdays: p.activeWindow?.weekdays ?? [1, 2, 3, 4, 5],
     start: p.activeWindow?.startLocal ?? "08:00", end: p.activeWindow?.endLocal ?? "19:00", severity: p.severity, email: p.channels.includes("email"),
   };
 }
 const num = (v: string) => (v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : null);
 const seconds = (f: PolicyForm) => { const d = num(f.duration); return d === null ? null : Math.round(f.unit === "min" ? d * 60 : d); };
 /** The editor's checks (DD-C15; the API checks them again): name 1–120, numbers, the recovery direction, 1 s–24 h, a
- * window with days and different times. */
+window with days and different times. */
 /** The editor's checked fields, top to bottom, and their element ids: a refused save focuses the first one (IR623). */
 export const POLICY_FIELDS = ["name", "threshold", "duration", "recovery", "window"] as const;
 export const policyFieldId = (k: (typeof POLICY_FIELDS)[number]) => `policy-${k}`;
@@ -131,27 +131,27 @@ export function policyErrors(f: PolicyForm, tr: T = en): Partial<Record<"name" |
   if (t === null) e.threshold = tr("Enter a number.");
   if (r === null) e.recovery = tr("Enter a number.");
   else if (t !== null) { const bad = recoveryError(f.operator, t, r, tr); if (bad) e.recovery = bad; }
-  if (s === null || s < 1 || s > 86400) e.duration = tr("Between 1 s and 24 h.");
-  if (f.windowOn && (!f.weekdays.length || !/^([01]\d|2[0-3]):[0-5]\d$/.test(f.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(f.end) || f.start === f.end)) e.window = tr("Pick at least one day and two different times.");
+  if (s === null || s < 1 || s > 86_400) e.duration = tr("Between 1 s and 24 h.");
+  if (f.windowOn && (f.weekdays.length === 0 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(f.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(f.end) || f.start === f.end)) e.window = tr("Pick at least one day and two different times.");
   return e;
 }
 /** The live summary sentence (Figma 06f): “Warn me when CO₂ stays ≥ 1200 ppm for 15 min on weekdays 08:00–19:00. Clears below 1000 ppm.” */
 export function summaryText(f: PolicyForm, t: T = en): string {
-  const verb = t(f.severity === "critical" ? "Alert me (critical)" : f.severity === "warning" ? "Warn me" : "Tell me");
+  const verb = t(f.severity === "critical" ? "Alert me (critical)" : (f.severity === "warning" ? "Warn me" : "Tell me"));
   const unit = metricUnit[f.metric] ?? "";
   const s = seconds(f);
-  const d = f.windowOn && f.weekdays.length ? daysText(f.weekdays, t) : "";
-  const win = f.windowOn && f.weekdays.length ? ` ${d ? `${d} ` : ""}${f.start}–${f.end}` : "";
+  const d = f.windowOn && f.weekdays.length > 0 ? daysText(f.weekdays, t) : "";
+  const win = f.windowOn && f.weekdays.length > 0 ? ` ${d ? `${d} ` : ""}${f.start}–${f.end}` : "";
   const what = f.metric === "co2" || f.metric === "pm25" ? label[f.metric] : (label[f.metric] ? t(label[f.metric]) : f.metric).toLowerCase();
-  const up = f.operator === "gt" || f.operator === "gte";
-  return t(up ? "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears below {recovery} {unit}." : "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears above {recovery} {unit}.",
-    { verb, what, op: opSymbol[f.operator], value: f.threshold || "…", unit, duration: s === null ? "…" : durationText(s), window: win, recovery: f.recovery || "…" }).replace(/ +/g, " ");
+  const isUp = f.operator === "gt" || f.operator === "gte";
+  return t(isUp ? "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears below {recovery} {unit}." : "{verb} when {what} stays {op} {value} {unit} for {duration}{window}. Clears above {recovery} {unit}.",
+    { verb, what, op: opSymbol[f.operator], value: f.threshold || "…", unit, duration: s === null ? "…" : durationText(s), window: win, recovery: f.recovery || "…" }).replaceAll(/ +/g, " ");
 }
 /** policies.save input (AlertPolicyInput): the form plus the hidden fields — new: the session membership as recipient,
- * escalation 60, cooldown 5, the Preferences time zone, priority 50; edit: the policy's own (IR120). */
+escalation 60, cooldown 5, the Preferences time zone, priority 50; edit: the policy's own (IR120). */
 export function policyInput(f: PolicyForm, existing: ApiAlertPolicy | null, ctx: { customerId: string; membershipId: string; timezone: string }): OpInput<"policies.save"> {
   return {
-    ...(existing ? { id: existing.id } : {}), kind: "alert" as const, name: f.name.trim(), customerId: ctx.customerId,
+    ...(existing && { id: existing.id }), kind: "alert" as const, name: f.name.trim(), customerId: ctx.customerId,
     timezone: existing?.timezone ?? ctx.timezone, enabled: existing?.enabled ?? true, priority: existing?.priority ?? 50,
     recipientMembershipIds: existing?.recipientMembershipIds ?? [ctx.membershipId], escalateAfterMinutes: existing?.escalateAfterMinutes ?? 60, cooldownMinutes: existing?.cooldownMinutes ?? 5,
     channels: (f.email ? ["inApp", "email"] : ["inApp"]) as Channel[], metric: f.metric as ContractMetric, operator: f.operator, threshold: Number(f.threshold), recoveryThreshold: Number(f.recovery),
@@ -169,7 +169,7 @@ export function policyRefusal(f: { code: string; messageKey: string; fieldErrors
   const fe = f.fieldErrors ?? {};
   if (fe.recoveryThreshold) return t("Not saved: the recovery value must be on the safe side of the limit.");
   if (fe.durationSeconds) return t("Not saved: the duration is 1 s to 24 h.");
-  if (fe["activeWindow"] || fe["activeWindow.weekdays"]) return t("Not saved: check the days and times of “Only if”.");
+  if (fe.activeWindow || fe["activeWindow.weekdays"]) return t("Not saved: check the days and times of “Only if”.");
   if (fe.channels) return t("Not saved: choose how to be notified.");
   if (fe.name) return t("Not saved: the name is 1–120 characters.");
   return t("Not saved ({code}).", { code: f.code });

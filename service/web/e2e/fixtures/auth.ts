@@ -8,7 +8,7 @@ import { createHmac } from "node:crypto";
 import type { Page } from "@playwright/test";
 import type { App } from "./apps";
 
-type Credential = { type: string; value?: string; secretData?: string };
+interface Credential { type: string; value?: string; secretData?: string }
 const REALM = path.resolve(__dirname, "../../../../docker/keycloak/realm-ac.json");
 
 function credential(user: string, type: string): Credential | undefined {
@@ -35,27 +35,27 @@ export function totp(secret: string, at = Date.now()): string {
   counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
   const h = createHmac("sha1", Buffer.from(secret, "utf8")).update(counter).digest();
   const o = h[h.length - 1] & 15;
-  return String((h.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, "0");
+  return String((h.readUInt32BE(o) & 0x7F_FF_FF_FF) % 1_000_000).padStart(6, "0");
 }
 
 /** RFC 6238 code over a base32 key, as the identity provider shows it when a device is set up (spaces ignored). */
 export function totpBase32(key: string, at = Date.now()): string {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
   let bits = "";
-  for (const ch of key.replace(/[\s=]/g, "").toUpperCase()) bits += alphabet.indexOf(ch).toString(2).padStart(5, "0");
-  const bytes = Buffer.from((bits.match(/.{8}/g) ?? []).map((b) => parseInt(b, 2)));
+  for (const ch of key.replaceAll(/[\s=]/g, "").toUpperCase()) bits += alphabet.indexOf(ch).toString(2).padStart(5, "0");
+  const bytes = Buffer.from((bits.match(/.{8}/g) ?? []).map((b) => Number.parseInt(b, 2)));
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
   const h = createHmac("sha1", bytes).update(counter).digest();
   const o = h[h.length - 1] & 15;
-  return String((h.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, "0");
+  return String((h.readUInt32BE(o) & 0x7F_FF_FF_FF) % 1_000_000).padStart(6, "0");
 }
 
 const home = (app: App) => (u: URL) => u.origin === new URL(app.url).origin && (u.pathname === app.home || u.pathname.startsWith(app.home + "/"));
 
 /** `as` signs in another account of the same role (the identity provider's username field takes it). */
 /** The identity provider asks for the password again (prompt=login, after a revocation, IR385): enter it for `user`.
- * The account may already be shown; the credentials stay in this file's realm reader. */
+The account may already be shown; the credentials stay in this file's realm reader. */
 export async function enterPassword(page: Page, user: string): Promise<void> {
   const name = page.locator("#username");
   await page.locator("#password").waitFor(); // the form is drawn: isVisible does not wait

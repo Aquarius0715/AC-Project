@@ -17,7 +17,7 @@ const en = translator("en");
 export type ApiTechJobRow =
   | { projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; severity: "normal" | "warning" | "critical"; dueAt: string; requestedSlot: Slot; scheduledSlot: Slot | null; origin?: string; assignmentAcknowledgement?: "pending" | "accepted" | "cant_make" | null }
   | { projection: "history"; jobId: string; type: string; status: string; completedAt: string | null };
-export type ApiTechCounts = { total: number; scheduledCount: number; inProgressCount: number; overdueCount: number; assignedCount: number };
+export interface ApiTechCounts { total: number; scheduledCount: number; inProgressCount: number; overdueCount: number; assignedCount: number }
 
 export const TABS = [{ id: "today", label: "Today" }, { id: "all", label: "All assigned" }] as const;
 export type TechTab = (typeof TABS)[number]["id"];
@@ -30,7 +30,7 @@ export type TechSort = (typeof SORTS)[number]["id"];
 export const sortOf = (v?: string): TechSort => (SORTS.some((s) => s.id === v) ? (v as TechSort) : "severity");
 
 type Tone = "ok" | "warn" | "crit" | "primary" | "muted";
-const KL = 8 * 3600_000, DAY = 86_400_000;
+const KL = 8 * 3_600_000, DAY = 86_400_000;
 const klDate = (ms: number) => new Date(ms + KL).toISOString().slice(0, 10);
 const hhmm = (iso: string) => klTime(iso).slice(11);
 /** Whether a slot touches today's Kuala Lumpur calendar date. */
@@ -39,31 +39,30 @@ export function isToday(slot: Slot | null, now: number): boolean {
   const start = Date.parse(`${klDate(now)}T00:00:00Z`) - KL, end = start + DAY;
   return Date.parse(slot.startAt) < end && start < Date.parse(slot.endAt);
 }
-/** “14:00–16:00” today, “09-22 10:00–12:00” on another day, “09-14 08:00 → 09-20 08:00” across days — Kuala Lumpur
- * clock times, for the 08:00–18:00 timeline and the screens not on the display time zone yet. */
+/** “14:00–16:00” today, “09-22 10:00–12:00” on another day, “09-14 08:00 → 09-20 08:00” across days — Kuala Lumpur clock times, for the 08:00–18:00 timeline and the screens not on the display time zone yet. */
 export function windowText(s: Slot, now: number): string {
   const d1 = klDate(Date.parse(s.startAt)), d2 = klDate(Date.parse(s.endAt));
   if (d1 !== d2) return `${klTime(s.startAt).slice(5)} → ${klTime(s.endAt).slice(5)}`;
   return d1 === klDate(now) ? `${hhmm(s.startAt)}–${hhmm(s.endAt)}` : `${klTime(s.startAt).slice(5, 10)} ${hhmm(s.startAt)}–${hhmm(s.endAt)}`;
 }
 
-export type TechJobRow = {
+export interface TechJobRow {
   id: string; short: string; title: string; origin: string | null; line: string; badge: { text: string; tone: Tone }; today: boolean;
   slot: Slot | null; slotText: string; ackPending: boolean; opensAt: string | null; opens: string | null; status: string; severity: string;
-};
+}
 /** One assigned job: what the technician can do now, read from the status, the acknowledgement and the work window. */
 export function techRow(j: ApiTechJobRow, now: number, units: Map<string, string>, i: I18n = EN): TechJobRow | null {
   const { t, display } = i;
   if (j.projection === "history") return null; // past assignments are not part of today's work
   const s = j.scheduledSlot;
-  const before = !!s && Date.parse(s.startAt) > now;
-  const ended = !!s && Date.parse(s.endAt) <= now && (j.status === "assigned" || j.status === "in_progress");
+  const isBefore = !!s && Date.parse(s.startAt) > now;
+  const isEnded = !!s && Date.parse(s.endAt) <= now && (j.status === "assigned" || j.status === "in_progress");
   const ack = j.assignmentAcknowledgement ?? null;
-  const opens = before && s ? relativeTime(s.startAt, now, i) : null;
+  const opens = isBefore && s ? relativeTime(s.startAt, now, i) : null;
   let badge: TechJobRow["badge"], note: string;
   if (j.status === "assigned" && ack === "pending") [badge, note] = [{ text: t("Not accepted"), tone: "warn" }, t("new assignment — review and accept it")];
   else if (j.status === "assigned" && ack === "cant_make") [badge, note] = [{ text: t("Can’t make it"), tone: "warn" }, t("you said you can’t make it — waiting for your contractor or HQ")];
-  else if (ended) [badge, note] = [{ text: t("Work window ended"), tone: "crit" }, t("ask your contractor or HQ to extend or reassign")];
+  else if (isEnded) [badge, note] = [{ text: t("Work window ended"), tone: "crit" }, t("ask your contractor or HQ to extend or reassign")];
   else if (j.status === "assigned") [badge, note] = [{ text: t("Work not started"), tone: "primary" }, opens ? t("opens {time} (read-only until then)", { time: opens }) : t("check in to start")];
   else if (j.status === "in_progress") [badge, note] = [{ text: t("In progress"), tone: "warn" }, t("report draft open")];
   else if (j.status === "on_hold") [badge, note] = [{ text: t("On hold"), tone: "warn" }, t("held by HQ — actions are blocked")];
@@ -71,44 +70,44 @@ export function techRow(j: ApiTechJobRow, now: number, units: Map<string, string
   else if (j.status === "submitted") [badge, note] = [{ text: t("Submitted"), tone: "primary" }, t("awaiting quality review (read-only)")];
   else if (j.status === "completed") [badge, note] = [{ text: t("Completed"), tone: "ok" }, t("accepted in the quality review")];
   else [badge, note] = [{ text: statusWord(j.status, t), tone: "muted" }, ""];
-  const alert = j.severity === "critical" ? t("critical alert on the unit") : j.severity === "warning" ? t("warning on the unit") : "";
+  const alert = j.severity === "critical" ? t("critical alert on the unit") : (j.severity === "warning" ? t("warning on the unit") : "");
   const slotText = s ? showSpan(s.startAt, s.endAt, display) : "";
   // the last 15 minutes of an open window before unsaved input is discarded (IR89, Figma Technician 01)
-  const left = s && !before && !ended && (j.status === "assigned" || j.status === "in_progress") ? Math.ceil((Date.parse(s.endAt) - now) / 60000) : null;
+  const left = s && !isBefore && !isEnded && (j.status === "assigned" || j.status === "in_progress") ? Math.ceil((Date.parse(s.endAt) - now) / 60_000) : null;
   const ending = left !== null && left <= WARN_MINUTES ? t("window ends in {n} min", { n: left }) : "";
   return {
     id: j.id, short: j.id.slice(0, 8), title: units.get(j.unitId) ?? t("Unit"), origin: j.origin ?? null, status: j.status, severity: j.severity,
     line: [typeLabel(j.type, t), s ? t("window {slot}", { slot: slotText }) : "", alert, note, ending].filter(Boolean).join(" · "), badge, today: isToday(s, now), slot: s, slotText,
-    ackPending: j.status === "assigned" && ack === "pending", opensAt: before && s ? s.startAt : null, opens,
+    ackPending: j.status === "assigned" && ack === "pending", opensAt: isBefore && s ? s.startAt : null, opens,
   };
 }
 
-export type KpiTile = { label: string; value: number; sub: string; tone?: "crit" | "warn" | "ok" };
+export interface KpiTile { label: string; value: number; sub: string; tone?: "crit" | "warn" | "ok" }
 /** The three tiles of FR-T01: assigned units, jobs not started, overdue jobs (summaries.get kind=technician). */
 export function kpis(c: ApiTechCounts, rows: TechJobRow[], t: T = en): KpiTile[] {
   const notStarted = rows.filter((r) => r.status === "assigned");
   return [
     { label: t("Assigned units"), value: c.total, sub: t("in your assignments") },
-    { label: t("Not started"), value: c.scheduledCount, sub: notStarted.length ? notStarted.slice(0, 3).map((r) => r.short).join(", ") : "—", tone: c.scheduledCount ? "warn" : undefined },
+    { label: t("Not started"), value: c.scheduledCount, sub: notStarted.length > 0 ? notStarted.slice(0, 3).map((r) => r.short).join(", ") : "—", tone: c.scheduledCount ? "warn" : undefined },
     { label: t("Overdue"), value: c.overdueCount, sub: t(c.overdueCount ? "past the due date" : "No overdue jobs"), tone: c.overdueCount ? "crit" : "ok" },
   ];
 }
 
-export type TimelineBlock = { id: string; short: string; left: number; width: number; text: string; current: boolean };
+export interface TimelineBlock { id: string; short: string; left: number; width: number; text: string; current: boolean }
 const START_H = 8, END_H = 18;
 /** Today's timeline from 08:00 to 18:00 (KL): one block per job slot and the position of now (null outside). */
 export function dayTimeline(rows: TechJobRow[], now: number): { hours: string[]; blocks: TimelineBlock[]; nowPct: number | null; now: string } {
   const day = Date.parse(`${klDate(now)}T00:00:00Z`) - KL;
-  const pct = (ms: number) => Math.min(100, Math.max(0, ((ms - day) / 3600_000 - START_H) / (END_H - START_H) * 100));
+  const pct = (ms: number) => Math.min(100, Math.max(0, ((ms - day) / 3_600_000 - START_H) / (END_H - START_H) * 100));
   const blocks = rows.filter((r) => r.today && r.slot).map((r) => {
     const left = pct(Date.parse(r.slot!.startAt)), right = pct(Date.parse(r.slot!.endAt));
     return { id: r.id, short: r.short, left, width: Math.max(right - left, 2), text: `${windowText(r.slot!, now)} · ${r.short}`, current: r.status === "in_progress" };
   });
-  const n = ((now - day) / 3600_000);
+  const n = ((now - day) / 3_600_000);
   return { hours: ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"], blocks, nowPct: n >= START_H && n <= END_H ? pct(now) : null, now: hhmm(new Date(now).toISOString()) };
 }
 
-export type AlertRow = { id: string; title: string; sub: string; severity: ApiAlert["severity"]; href: string };
+export interface AlertRow { id: string; title: string; sub: string; severity: ApiAlert["severity"]; href: string }
 const ALERT_STATE: Record<string, string> = { open: "open", acknowledged: "acknowledged", resolved: "resolved" };
 /** Open alerts on the assigned units, worst first; each opens the unit's alerts with its job. */
 export function alertRows(alerts: ApiAlert[], units: Map<string, string>, jobOfUnit: Map<string, string>, i: I18n = EN): AlertRow[] {
@@ -123,7 +122,7 @@ export function alertRows(alerts: ApiAlert[], units: Map<string, string>, jobOfU
   });
 }
 
-export type ReportRow = { id: string; title: string; sub: string; badge: { text: string; tone: Tone } };
+export interface ReportRow { id: string; title: string; sub: string; badge: { text: string; tone: Tone } }
 const REPORTS: Record<string, [string, string, Tone]> = {
   in_progress: ["draft in progress", "Draft", "warn"], rework_requested: ["returned — resume as a new version", "Rework", "warn"], submitted: ["awaiting quality review · read-only", "Submitted", "primary"],
 };

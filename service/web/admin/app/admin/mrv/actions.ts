@@ -12,9 +12,8 @@ export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messa
 async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
-  } catch (e) {
-    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds };
-    return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+  } catch (error) {
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     if (rerender) refresh();
   }
@@ -27,8 +26,10 @@ export async function previewReport(conditions: MRVConditions) {
 
 /** mrv.saveDraft: version 1 of a new report, or the next version of one (id + the version it was read at). */
 export async function saveReportDraft(conditions: MRVConditions, evidenceIds: string[], id?: string, version?: number) {
-  return run(() => coreOp<{ id: string; version: number }>("mrv.saveDraft", { ...(id ? { id } : {}), conditions, evidenceIds }, { write: true, expectedVersion: id ? version : undefined })
-    .then((r) => ({ id: r.id, version: r.version })));
+  return run(() => {
+    return coreOp<{ id: string; version: number }>("mrv.saveDraft", { ...(id && { id }), conditions, evidenceIds }, { write: true, expectedVersion: id ? version : undefined })
+      .then((r) => ({ id: r.id, version: r.version }));
+  });
 }
 
 /** mrv.recordReview of the latest version (a demo review, not external certification). */

@@ -16,7 +16,7 @@ export async function setupLink(email: string): Promise<string> {
     return id;
   }, { timeout: 30_000 }).not.toBe("");
   const text = ((await (await fetch(`${MAILPIT}/message/${id}`)).json()) as { Text: string }).Text;
-  const link = text.match(/https?:\/\/\S+\/login-actions\/action-token\?\S+/)?.[0];
+  const link = (/https?:\/\/\S+\/login-actions\/action-token\?\S+/.exec(text))?.[0];
   if (!link) throw new Error("the set-up e-mail has no link");
   return link;
 }

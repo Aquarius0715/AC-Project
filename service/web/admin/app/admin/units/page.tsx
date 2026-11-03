@@ -25,18 +25,16 @@ import {
 import { UnitsDemo } from "./_components/units-demo";
 import { UnitsView, type CustomerLive, type UnitLive, type UnitsLive } from "./_components/units-view";
 
-type Member = { id: string; displayName: string };
-type Job = { projection: "summary"; id: string; type: string; status: string };
-type Device = { id: string; serial: string; unitId: string | null; connection: Connection };
-type Alert = { severity: "critical" | "warning" | "normal" };
-type Audit = { occurredAt: string; actorId: string; reason: string | null };
-type JobForClaim = { projection: "detail"; id: string; version: number; type: string; unitId: string; completedAt: string | null; costs: { kind: "estimate" | "actual"; amountMinor: number; currency: Currency }[]; reportRefs: { reportId: string; reportVersion: number }[] };
-type Report = { parts: { name: string; quantity: number; catalogCode: string | null }[]; acceptedAt: string | null };
-const done = ["completed", "cancelled"];
+interface Audit { occurredAt: string; actorId: string; reason: string | null }
+interface JobForClaim { projection: "detail"; id: string; version: number; type: string; unitId: string; completedAt: string | null; costs: { kind: "estimate" | "actual"; amountMinor: number; currency: Currency }[]; reportRefs: { reportId: string; reportVersion: number }[] }
+interface Report { parts: { name: string; quantity: number; catalogCode: string | null }[]; acceptedAt: string | null }
+const done = new Set(["completed", "cancelled"]);
 const restrictionState: Record<string, string> = { requested: "requested", applied: "applied", release_requested: "release requested" };
 const day = 86_400_000; // audit periods: the last 365 days up to tomorrow (at most 366 days, IR143)
 
 export default async function AdminUnitsPage({ searchParams }: PageProps<"/admin/units">) {
+  interface Alert { severity: "critical" | "warning" | "normal" }
+  interface Member { id: string; displayName: string }
   await connection();
   if (!apiMode()) return <UnitsDemo />;
   const sp = await searchParams;
@@ -63,7 +61,7 @@ export default async function AdminUnitsPage({ searchParams }: PageProps<"/admin
   const rows = customerRows([...active, ...inactive], orgs, properties, units, standingOf, i);
   const live: UnitsLive = {
     now: now.toISOString(), todayKL: klStamp(now.toISOString()).slice(0, 10), canWrite: has("asset.write"), standingKnown: !!(contracts && overdue),
-    rows, kpis: registerKpis(rows, units, t), search: one("search") ?? "", missing: !!one("customerId") && !rows.some((r) => r.id === one("customerId")),
+    rows, kpis: registerKpis(rows, units, t), search: one("search") ?? "", missing: !!one("customerId") && rows.every((r) => r.id !== one("customerId")),
     top: one("tab") === "warranty" ? "warranty" : "customers", activeCustomers: rows.filter((r) => r.status === "active").map((r) => ({ id: r.id, name: r.name })), coverageAttention: null,
   };
   // a unit link without its customer (the audit's related records, IR320) goes to the unit under its customer
@@ -89,7 +87,7 @@ export default async function AdminUnitsPage({ searchParams }: PageProps<"/admin
     has("alert.read", "alert.policy.read")
       ? Promise.all((["open", "acknowledged"] as const).map((status) => coreAll<Alert>("alerts.list", { filters: { customerId: cust.id, status } }))).then((x) => x.flat())
       : Promise.resolve(null),
-    unitId ? coreOp<ApiUnitDetail>("units.get", { id: unitId }).catch((e) => (e instanceof CoreError && e.status === 404 ? null : Promise.reject(e))) : Promise.resolve(null),
+    unitId ? coreOp<ApiUnitDetail>("units.get", { id: unitId }).catch((error) => (error instanceof CoreError && error.status === 404 ? null : Promise.reject(error))) : Promise.resolve(null),
   ]);
   const clientUsers = await coreAll<ApiClientUser>("clientUsers.list", { filters: { customerId: cust.id } });
   const d = detail && detail.customerOrgId === cust.orgId ? detail : null;
@@ -108,7 +106,7 @@ export default async function AdminUnitsPage({ searchParams }: PageProps<"/admin
     }).then((p) => p.items[0] ?? null)
     : null;
   const customer: CustomerLive = {
-    row: cust, tab: one("tab") === "policies" ? "policies" : one("tab") === "users" ? "users" : "overview", tree, selection: sel, places: placeOptions(tree, spaces, t),
+    row: cust, tab: one("tab") === "policies" ? "policies" : (one("tab") === "users" ? "users" : "overview"), tree, selection: sel, places: placeOptions(tree, spaces, t),
     users: clientUserRows(clientUsers, (m) => memberName.get(m) ?? t("{name} owner", { name: cust.name }), undefined, i),
     models: caps.map((k) => ({ id: k.id, label: `${k.manufacturer} ${k.model}` })).sort((a, b) => a.label.localeCompare(b.label)),
     perProperty: tree.map((p) => `${p.name} ${p.units}`).join(" · ") || t("no properties yet"),
@@ -121,19 +119,21 @@ export default async function AdminUnitsPage({ searchParams }: PageProps<"/admin
   };
 
   if (unitId) {
-    if (!d) customer.unitMissing = true;
-    else customer.unit = await unitLive(d, { now, has, contracts, restrictions, policies, models, memberName, customerName: cust.name, i });
+    if (d) {customer.unit = await unitLive(d, { now, has, contracts, restrictions, policies, models, memberName, customerName: cust.name, i });}
+    else {customer.unitMissing = true;}
   }
   live.customer = customer;
   return <UnitsView live={live} />;
 }
 
-type Ctx = {
+interface Ctx {
   now: Date; has: (...p: string[]) => boolean; contracts: ApiContractLite[] | null; restrictions: ApiRestrictionLite[] | null; policies: ApiCustomerPolicy[] | null;
   models: Map<string, string>; memberName: Map<string, string>; customerName: string; i: I18n;
-};
+}
 /** The unit edit card: the bound device, the attached policies (default first) and what blocks taking the unit out of use (D05). */
 async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
+  interface Device { id: string; serial: string; unitId: string | null; connection: Connection }
+  interface Job { projection: "summary"; id: string; type: string; status: string }
   const [jobs, devices, archived] = await Promise.all([
     x.has("job.read") && !d.archived ? coreAll<Job>("jobs.list", { filters: { unitId: d.id } }) : Promise.resolve(null),
     x.has("device.read") ? coreAll<Device>("devices.list", { filters: { unitId: d.id } }) : Promise.resolve(null),
@@ -146,10 +146,10 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
   const nowMs = x.now.getTime();
   const blockers = d.archived ? [] : [
     ...(x.contracts ?? []).filter((k) => k.unitIds.includes(d.id) && nowMs < Date.parse(k.endAt)).map((k) => ({ label: t("Unexpired contract ({plan}, until {date})", { plan: k.planType.toUpperCase(), date: businessDay(k.endAt, display.locale) }), href: `/admin/billing/contracts?contractId=${k.id}` })),
-    ...(jobs ?? []).filter((j) => !done.includes(j.status)).map((j) => ({ label: t("Active job ({type}, {status})", { type: typeLabel(j.type, t), status: statusWord(j.status, t) }), href: `/admin/jobs?jobId=${j.id}` })),
+    ...(jobs ?? []).filter((j) => !done.has(j.status)).map((j) => ({ label: t("Active job ({type}, {status})", { type: typeLabel(j.type, t), status: statusWord(j.status, t) }), href: `/admin/jobs?jobId=${j.id}` })),
     ...(device ? [{ label: t("Active device binding ({serial})", { serial: device.serial }), href: `/admin/devices?tab=devices&deviceId=${device.id}` }] : []),
     ...(x.restrictions ?? []).filter((r) => r.unitIds.includes(d.id) && r.state in restrictionState).map((r) => ({ label: t("Active restriction ({state})", { state: t(restrictionState[r.state]) }), href: `/admin/restrictions?restrictionId=${r.id}` })),
-    ...(d.pendingCommandIds.length ? [{ label: t(d.pendingCommandIds.length === 1 ? "1 pending command" : "{n} pending commands", { n: d.pendingCommandIds.length }), href: null }] : []),
+    ...(d.pendingCommandIds.length > 0 ? [{ label: t(d.pendingCommandIds.length === 1 ? "1 pending command" : "{n} pending commands", { n: d.pendingCommandIds.length }), href: null }] : []),
   ];
   const byId = new Map((x.policies ?? []).map((p) => [p.id, p]));
   const def = x.policies?.find((p) => p.kind === "default_alert");
@@ -170,7 +170,7 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
 }
 
 /** Warranty & coverage (FR-A19): one row per unit with its warranty end and covering contracts, and the jobs whose
- * replaced parts can still be claimed from the manufacturer (job.read for the parts, job.write to file the claim). */
+replaced parts can still be claimed from the manufacturer (job.read for the parts, job.write to file the claim). */
 async function warrantyLive(coverage: ApiCoverage[], x: { has: (...p: string[]) => boolean; units: ApiUnitRow[]; properties: ApiPropertyRow[]; rows: { id: string; name: string }[]; contracts: ApiContractLite[] | null; i: I18n }) {
   const { t, display } = x.i;
   const caps = x.has("dashboard.read", "device.read") ? await coreAll<ApiCapability>("capabilities.list") : [];

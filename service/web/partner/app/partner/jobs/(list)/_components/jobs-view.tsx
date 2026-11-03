@@ -12,8 +12,8 @@ import { Icon } from "@ac/web/components/Icon";
 const toneText = { warn: "text-warn", crit: "text-crit", ok: "text-ok", primary: "text-primary", muted: "text-muted-foreground" } as const;
 
 /** The contractor job list (FR-P01, Figma Contractor 02-1…02-6) from the Core API: status tabs with counts, sort and
- * period in the URL (the overview's period, so the KPI counts match), one row per job and cursor paging. Texts in the
- * user's display language (IR271). */
+period in the URL (the overview's period, so the KPI counts match), one row per job and cursor paging. Texts in the
+user's display language (IR271). */
 export function JobsView({ live }: { live: JobsLive }) {
   const t = useT();
   const patch = useUrlPatch();
@@ -22,12 +22,12 @@ export function JobsView({ live }: { live: JobsLive }) {
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Tabs<TabId> value={live.tab} onChange={(x) => patch({ tab: x === "all" ? null : x, ...reset })} tabs={live.tabs.map((x) => ({ id: x.id, label: x.label, count: x.count }))} />
+        <Tabs<TabId> value={live.tab} onChange={(x) => { patch({ tab: x === "all" ? null : x, ...reset }); }} tabs={live.tabs.map((x) => ({ id: x.id, label: x.label, count: x.count }))} />
         <div className="flex flex-wrap gap-2">
-          <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => patch({ sort: e.target.value === "status:asc" ? null : e.target.value, ...reset })}>
+          <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => { patch({ sort: e.target.value === "status:asc" ? null : e.target.value, ...reset }); }}>
             {live.sorts.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </Select>
-          <Select aria-label={t("Period")} className="w-auto" value={live.period.value} onChange={(e) => { const [from, to] = e.target.value.split("|"); patch({ from, to, ...reset }); }}>
+          <Select aria-label={t("Period")} className="w-auto" value={live.period.value} onChange={(e) => { const [from, to] = e.target.value.split("|", 2); patch({ from, to, ...reset }); }}>
             {live.period.custom && <option value={live.period.value}>{t("Period: {period}", { period: live.period.label })}</option>}
             {live.periods.map((p) => <option key={p.value} value={p.value}>{t("Period: {period}", { period: p.label })}</option>)}
           </Select>
@@ -55,9 +55,9 @@ export function JobsView({ live }: { live: JobsLive }) {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
           <span>{t("Showing {shown} of {total} · Sorted by {sort} · KPI counts on Overview use the same period (your company only)", { shown: live.rows.length, total: live.total, sort: live.sortText })}</span>
           <span className="flex items-center gap-3">
-            {live.paging.page > 1 && <Plain className="font-semibold text-primary" onClick={() => patch(reset)}><Icon name="chevronLeft" /> {t("First page")}</Plain>}
+            {live.paging.page > 1 && <Plain className="font-semibold text-primary" onClick={() => { patch(reset); }}><Icon name="chevronLeft" /> {t("First page")}</Plain>}
             <span>{t("Page {page} of {of}", { page: live.paging.page, of: live.paging.of })}</span>
-            {live.nextCursor && <Plain className="font-semibold text-primary" onClick={() => patch({ cursor: live.nextCursor, page: String(live.paging.page + 1) })}>{t("Next")} <Icon name="chevronRight" /></Plain>}
+            {live.nextCursor && <Plain className="font-semibold text-primary" onClick={() => { patch({ cursor: live.nextCursor, page: String(live.paging.page + 1) }); }}>{t("Next")} <Icon name="chevronRight" /></Plain>}
           </span>
         </div>
       </section>

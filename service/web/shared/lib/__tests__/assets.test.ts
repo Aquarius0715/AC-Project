@@ -7,15 +7,19 @@ import { i18nOf } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-14T01:00:00Z"); // 09:00 in Kuala Lumpur
-const unit = (over: Partial<ApiUnitRow>): ApiUnitRow => ({
-  id: "u1", version: 3, customerOrgId: "org-a", propertyId: "p1", spaceId: "s1", displayName: "Bedroom AC", modelId: "m1", type: "split", installedAt: "2026-01-09T16:00:00Z",
-  serviceScope: ["indoor", "outdoor"], alertPolicyIds: [], archived: false, capabilityVersion: 2, connection: "online", lastSeenAt: null, warrantyEndsAt: "2027-01-09T16:00:00Z",
-  effectivePowerState: "on", activeAlertCount: 0, ...over,
-});
+const unit = (over: Partial<ApiUnitRow>): ApiUnitRow => {
+  return {
+    id: "u1", version: 3, customerOrgId: "org-a", propertyId: "p1", spaceId: "s1", displayName: "Bedroom AC", modelId: "m1", type: "split", installedAt: "2026-01-09T16:00:00Z",
+    serviceScope: ["indoor", "outdoor"], alertPolicyIds: [], archived: false, capabilityVersion: 2, connection: "online", lastSeenAt: null, warrantyEndsAt: "2027-01-09T16:00:00Z",
+    effectivePowerState: "on", activeAlertCount: 0, ...over,
+  };
+};
 const standing = (over: Partial<Standing>): Standing => ({ plans: ["rto"], contracts: 1, contractUnits: 2, overdue: 0, overdueAmount: null, restriction: null, ...over });
-const policy = (over: Partial<ApiCustomerPolicy>): ApiCustomerPolicy => ({
-  id: "pol-1", version: 1, kind: "alert", name: "Bedroom too hot", unitIds: ["u1"], enabled: true, ownerMembershipId: "m-own", metric: "temperature", operator: "gte", threshold: 30, durationSeconds: 60, severity: "warning", ...over,
-});
+const policy = (over: Partial<ApiCustomerPolicy>): ApiCustomerPolicy => {
+  return {
+    id: "pol-1", version: 1, kind: "alert", name: "Bedroom too hot", unitIds: ["u1"], enabled: true, ownerMembershipId: "m-own", metric: "temperature", operator: "gte", threshold: 30, durationSeconds: 60, severity: "warning", ...over,
+  };
+};
 
 describe("HQ customers & units", () => {
   it("marks each customer's standing and counts the register", () => {
@@ -63,7 +67,7 @@ describe("HQ customers & units", () => {
     const x = { unit: () => ({ name: "Bedroom AC", place: "Home A" }), customer: () => "Demo Customer A", model: () => "Daikin X", contract: (id: string) => `RTO until ${id}` };
     const rows = coverageRows([cov({}), cov({ unitId: "u2", status: "no_coverage", warrantyEndsAt: null })], x, NOW);
     expect(rows.map((r) => [r.ends, r.endsDate, r.statusText])).toEqual([["10 Oct 2026", "2026-10-10", "Ends in 26 d · no contract"], ["—", "", "No warranty · no contract"]]);
-    expect(coverageCsv(rows).split("\n")[1]).toBe("Bedroom AC,u1,Demo Customer A,Daikin X,2026-10-10,,Ends in 26 d · no contract");
+    expect(coverageCsv(rows).split("\n", 2)[1]).toBe("Bedroom AC,u1,Demo Customer A,Daikin X,2026-10-10,,Ends in 26 d · no contract");
     expect(coverageKpis(rows)).toMatchObject({ underWarranty: 1, within30: 1, noCoverage: 1, contractNames: "none" });
     const row = (over: Partial<ApiImportRow>): ApiImportRow => ({ rowNumber: 2, propertyName: "Office A", floorName: "2F", roomName: null, unitName: "AC #2", modelCode: "SPL-100", serial: "SN-1", installedOn: null, warrantyEnd: null, result: "error", messageKey: "error.serialBound", ...over });
     expect([importMessage(row({})), importMessage(row({ messageKey: "warning.importCreatesSpace", result: "warning" })), importMessage(row({ messageKey: null, result: "ready" }))])
@@ -81,7 +85,7 @@ describe("HQ customers & units in Malay with the display time zone (IR293)", () 
     expect(conditionText(policy({ activeWindow: { weekdays: [6, 7], startLocal: "08:00", endLocal: "12:00" } }), MS)).toBe("Suhu ≥ 30 °C selama 60 s, hujung minggu 08:00–12:00 → Peringatan");
     expect(conditionText(policy({ severity: undefined, durationSeconds: 900, activeWindow: { weekdays: [1, 3], startLocal: "22:00", endLocal: "06:00" } }), MS)).toMatch(/^Suhu ≥ 30 °C selama 15 min, Isn, Rab 22:00–06:00$/);
     const rows = coverageRows([{ unitId: "u1", customerId: "c1", modelId: "m1", warrantyEndsAt: "2026-10-09T16:00:00Z", contractIds: [], status: "expiring", claimableJobIds: [] }],
-      { unit: () => undefined, customer: () => "A", model: () => "M", contract: () => "" }, NOW, MS);
+      { unit: () => {}, customer: () => "A", model: () => "M", contract: () => "" }, NOW, MS);
     expect([rows[0].ends, rows[0].statusText]).toEqual(["10 Okt 2026", "Tamat dalam 26 h · tiada kontrak"]); // the Kuala Lumpur day, in Malay
     expect(unitErrors({ ...unitDraft(unit({})), modelId: "" }, "2026-09-14", MS.t)).toEqual({ modelId: "Pilih model" });
     expect(changedFields(unit({}), { ...unitDraft(unit({})), warrantyEnd: "" }, MS.t)).toEqual(["Tamat waranti"]);

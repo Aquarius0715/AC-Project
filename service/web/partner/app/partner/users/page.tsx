@@ -16,7 +16,7 @@ export default async function PartnerUsersPage({ searchParams }: PageProps<"/par
   const sp = await searchParams;
   const status = statusFilter(Array.isArray(sp.status) ? sp.status[0] : sp.status);
   const [all, me, display, identity, now] = await Promise.all([
-    coreAll<ApiPartnerUser>("partnerUsers.list").catch((e) => { if (e instanceof CoreError && e.error.code === "FORBIDDEN") return null; throw e; }),
+    coreAll<ApiPartnerUser>("partnerUsers.list").catch((error) => { if (error instanceof CoreError && error.error.code === "FORBIDDEN") return null; throw error; }),
     corePrincipal(), coreDisplay(), coreIdentity(), coreNow(),
   ]);
   if (!all) return <UsersLive live={null} />;

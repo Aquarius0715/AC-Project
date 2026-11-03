@@ -15,12 +15,14 @@ test("HQ signs a client user out everywhere, and the password signs them in agai
   const adminContext = await browser.newContext({ baseURL: hq.url, viewport: { width: 1920, height: 1080 }, storageState: hq.state });
   try {
     const user = await userContext.newPage();
+
     await test.step("customer-b signs in to the customer app", async () => {
       await signIn(user, customer, "customer-b");
       await expect(user).toHaveURL(/\/customer$/);
     });
 
     let revokedAt = 0;
+
     await test.step("HQ signs customer-b out everywhere from the customer's Users tab", async () => {
       const admin = await adminContext.newPage();
       await admin.goto("/admin/units");
@@ -51,7 +53,7 @@ test("HQ signs a client user out everywhere, and the password signs them in agai
     await test.step("the identity provider asks for the password at once; with it customer-b is back", async () => {
       // auth_time has whole seconds, so a sign-in within the revocation's own second is refused too (IR385); a person
       // cannot sign in again that fast, the test can. The second also gives identity time to end the provider's sessions.
-      await user.waitForTimeout(Math.max(0, revokedAt + 1_100 - Date.now()));
+      await user.waitForTimeout(Math.max(0, revokedAt + 1100 - Date.now()));
       const refusedSso: string[] = []; // the BFF's prompt=login hop after a refused single sign-on answer (IR385)
       user.on("request", (r) => { if (/\/bff\/auth\/login\?(.*&)?reauth=1/.test(r.url())) refusedSso.push(r.url()); });
       await user.getByRole("link", { name: /^Continue as / }).click();

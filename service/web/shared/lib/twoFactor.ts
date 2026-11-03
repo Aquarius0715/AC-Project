@@ -7,19 +7,19 @@ export const ISSUER = "AC Project";
 /** otpauth://totp/AC%20Project:<account>?secret=<key>&issuer=AC%20Project&algorithm=SHA1&digits=6&period=30 */
 export function otpauthUri(setupKey: string, account: string): string {
   const label = encodeURIComponent(`${ISSUER}:${account}`).replace("%3A", ":");
-  return `otpauth://totp/${label}?secret=${setupKey.replace(/\s/g, "").toUpperCase()}&issuer=${encodeURIComponent(ISSUER)}&algorithm=SHA1&digits=6&period=30`;
+  return `otpauth://totp/${label}?secret=${setupKey.replaceAll(/\s/g, "").toUpperCase()}&issuer=${encodeURIComponent(ISSUER)}&algorithm=SHA1&digits=6&period=30`;
 }
 
 /** "JBSW Y3DP EHPK 3PXP": the key as people type it into an authenticator app. */
-export const groupKey = (key: string) => key.replace(/\s/g, "").match(/.{1,4}/g)?.join(" ") ?? "";
+export const groupKey = (key: string) => key.replaceAll(/\s/g, "").match(/.{1,4}/g)?.join(" ") ?? "";
 
-export type QrPath = { size: number; path: string };
+export interface QrPath { size: number; path: string }
 /** The QR code of `text` (error correction M, a 2-module border; the white frame around it adds the rest of the quiet
- * zone) as one SVG path in module units: one rectangle per run of dark modules in a row. */
+zone) as one SVG path in module units: one rectangle per run of dark modules in a row. */
 export function qrPath(text: string): QrPath {
   const { size, data } = encode(text, { ecc: "M", border: 2 });
   let path = "";
-  data.forEach((row, y) => {
+  for (const [y, row] of data.entries()) {
     for (let x = 0; x < size; x++) {
       if (!row[x]) continue;
       let w = 1;
@@ -27,7 +27,7 @@ export function qrPath(text: string): QrPath {
       path += `M${x} ${y}h${w}v1h-${w}z`;
       x += w - 1;
     }
-  });
+  }
   return { size, path };
 }
 

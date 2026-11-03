@@ -30,7 +30,7 @@ describe("touch-sized controls", () => {
     render(<Plain>Open card</Plain>);
     const b = screen.getByRole("button", { name: "Open card" });
     expect(coarse(b)).toEqual(["pointer-coarse:min-h-0"]);
-    expect(b.hasAttribute("data-plain")).toBe(true);
+    expect(Object.hasOwn(b.dataset, "plain")).toBe(true);
   });
   it("sizes a Plain action marked touch to 44×44 (IR618)", () => {
     render(<Plain touch aria-label="Rename Home A">✎</Plain>);

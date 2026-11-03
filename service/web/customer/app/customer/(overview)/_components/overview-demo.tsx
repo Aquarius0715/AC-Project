@@ -27,7 +27,7 @@ export function OverviewDemo() {
         </div>
       </div>
 
-      {stale && <Banner tone="warn" action={<Btn size="sm" onClick={() => setStale(false)}><Icon name="refresh" />Retry</Btn>}>Offline — showing values last loaded at 09:12. Remote actions are disabled until the connection returns.</Banner>}
+      {stale && <Banner tone="warn" action={<Btn size="sm" onClick={() => { setStale(false); }}><Icon name="refresh" />Retry</Btn>}>Offline — showing values last loaded at 09:12. Remote actions are disabled until the connection returns.</Banner>}
 
       <div className="grid-fluid" style={{ ["--min" as string]: "210px" }}>
         <Kpi label="Running" badge={<PowerBadge s="running" />} value={counts.powerOn} sub={`of ${counts.total} units · latest observation per unit`} href="/customer/properties?powerState=on" link="View running units" />
@@ -46,9 +46,11 @@ export function OverviewDemo() {
               <Link key={u.id} href={`/customer/units/${u.id}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 py-3 hover:bg-surface2/50 @lg:grid-cols-[minmax(0,1fr)_64px_64px_72px_120px_14px]">
                 <div className="flex min-w-0 items-center gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><Icon name="units" /></span><div className="min-w-0"><div className="truncate font-bold">{u.name}</div><div className="truncate text-[11px] text-muted-foreground">{u.loc} · {u.obs}</div></div></div>
                 <div className="col-span-2 row-start-2 flex gap-4 text-xs @lg:contents">
-                  {([[u.temp, "°C"], [u.hum, "%"], [u.power, "W"]] as const).map(([v, unit], i) => (
-                    <div key={i}><span className="text-[13px] font-bold">{v ?? "—"}</span> <span className="text-[11px] text-muted-foreground">{v === null ? "no data" : unit}</span></div>
-                  ))}
+                  {([[u.temp, "°C"], [u.hum, "%"], [u.power, "W"]] as const).map(([v, unit], i) => {
+                    return (
+                      <div key={i}><span className="text-[13px] font-bold">{v ?? "—"}</span> <span className="text-[11px] text-muted-foreground">{v === null ? "no data" : unit}</span></div>
+                    );
+                  })}
                 </div>
                 <div className="col-start-2 row-start-1 flex flex-col items-end gap-1 @lg:col-auto @lg:row-auto @lg:items-start"><PowerBadge s={u.state} /><ConnBadge s={u.conn} /></div>
                 <span className="hidden text-muted-foreground @lg:block"><Icon name="chevronRight" /></span>
@@ -60,17 +62,21 @@ export function OverviewDemo() {
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Needs attention" action={<span className="font-bold text-warn">2</span>}>
             <ul className="flex flex-col divide-y divide-line">
-              {[["Possible open window", "Bedroom AC · 09:12 today"], ["Compressor short-cycling", "Kitchen AC · Yesterday 22:40"]].map(([t, d]) => (
-                <li key={t}><Link href="/customer/alerts" className="flex items-center justify-between gap-2 py-2.5"><div><div className="font-bold">{t}</div><div className="my-1"><SeverityBadge s="warning" /></div><div className="text-[11px] text-muted-foreground">{d}</div></div><span className="text-muted-foreground"><Icon name="chevronRight" /></span></Link></li>
-              ))}
+              {[["Possible open window", "Bedroom AC · 09:12 today"], ["Compressor short-cycling", "Kitchen AC · Yesterday 22:40"]].map(([t, d]) => {
+                return (
+                  <li key={t}><Link href="/customer/alerts" className="flex items-center justify-between gap-2 py-2.5"><div><div className="font-bold">{t}</div><div className="my-1"><SeverityBadge s="warning" /></div><div className="text-[11px] text-muted-foreground">{d}</div></div><span className="text-muted-foreground"><Icon name="chevronRight" /></span></Link></li>
+                );
+              })}
             </ul>
             <p className="mt-2 border-t border-line pt-2 text-[11px] text-muted-foreground">Reminders & info (2) — filter cleaning, insulation inspection record</p>
             <TextLink href="/customer/alerts" className="mt-1 inline-block">Open alerts <Icon name="arrowRight" /></TextLink>
           </Card>
           <Card title="Automations" action={<span className="text-xs text-muted-foreground">3 on · 1 off</span>}>
-            {[["Weekday pre-cool", "Next run: today 18:00 · Bedroom AC"], ["Away power-save", "When everyone leaves · location consent: granted"]].map(([t, d]) => (
-              <div key={t} className="flex items-center justify-between gap-2 py-2"><div className="min-w-0"><div className="font-bold">{t}</div><div className="text-[11px] text-muted-foreground">{d}</div></div><OnOffBadge on /></div>
-            ))}
+            {[["Weekday pre-cool", "Next run: today 18:00 · Bedroom AC"], ["Away power-save", "When everyone leaves · location consent: granted"]].map(([t, d]) => {
+              return (
+                <div key={t} className="flex items-center justify-between gap-2 py-2"><div className="min-w-0"><div className="font-bold">{t}</div><div className="text-[11px] text-muted-foreground">{d}</div></div><OnOffBadge on /></div>
+              );
+            })}
             <TextLink href="/customer/automations" className="mt-1 inline-block">Manage automations <Icon name="arrowRight" /></TextLink>
           </Card>
         </div>
@@ -99,7 +105,7 @@ export function OverviewDemo() {
           <TextLink href="/customer/air-quality" className="mt-1 inline-block">Air quality details <Icon name="arrowRight" /></TextLink>
         </Card>
       </div>
-      <div className="flex justify-end"><Plain className="text-[11px] text-muted-foreground underline" onClick={() => setStale((s) => !s)}>{stale ? "Hide" : "Show"} offline/stale state</Plain></div>
+      <div className="flex justify-end"><Plain className="text-[11px] text-muted-foreground underline" onClick={() => { setStale((s) => !s); }}>{stale ? "Hide" : "Show"} offline/stale state</Plain></div>
     </Page>
   );
 }

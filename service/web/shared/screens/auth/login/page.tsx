@@ -10,8 +10,8 @@ type Params = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 /** Sign-in of one role's app (FR-X01, DDC-07, SCR-X-login, Figma Login frames), rendered on the server (IR251): the data
- * source and the kept returnTo decide where Continue goes, and a sign-in that came back says why. `others` are the
- * base URLs of the other apps (plain links: separate apps). */
+source and the kept returnTo decide where Continue goes, and a sign-in that came back says why. `others` are the
+base URLs of the other apps (plain links: separate apps). */
 export function LoginScreen({ role, others = {}, params = {}, api }: { role: Role; others?: AppLinks; params?: Params; api: boolean }) {
   const cfg = ROLES[role];
   const href = continueHref(api, role, safeReturnTo(role, one(params.returnTo)));
@@ -32,9 +32,11 @@ export function LoginScreen({ role, others = {}, params = {}, api }: { role: Rol
         </div>
         <ContinueLink role={role} href={href}>Continue as {cfg.loginUser} <Icon name="arrowRight" /></ContinueLink>
         <p className="mt-4 text-[11px] text-muted-foreground">Looking for a different AC Project service?{" "}
-          {names.map((r, i) => (
-            <span key={r}>{i > 0 && (i === names.length - 1 ? ", and " : ", ")}{others[r] ? <a className="font-semibold text-primary hover:underline" href={`${others[r]}/login`}>{ROLES[r].loginTitle}</a> : ROLES[r].loginTitle}</span>
-          ))}{" "}each have their own sign-in.
+          {names.map((r, i) => {
+            return (
+              <span key={r}>{i > 0 && (i === names.length - 1 ? ", and " : ", ")}{others[r] ? <a className="font-semibold text-primary hover:underline" href={`${others[r]}/login`}>{ROLES[r].loginTitle}</a> : ROLES[r].loginTitle}</span>
+            );
+          })}{" "}each have their own sign-in.
         </p>
         <Link href="/forgot-password" className="mt-3 inline-block text-xs font-semibold text-primary hover:underline">Forgot password?</Link>
         <p className="mt-3 text-[11px] text-muted-foreground">Demo authentication only — no real accounts, emails, or passwords are used.</p>

@@ -5,25 +5,27 @@ import { i18nOf, translator } from "@ac/web/lib/i18n";
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const ms = translator("ms");
 
-const line = (over: Partial<ApiPayoutLine> = {}): ApiPayoutLine => ({ id: "l1", jobId: "job-aaaaaaaa", workType: "repair_base", acceptedAt: "2026-08-05T03:00:00Z", amountMinor: 45000, kind: "charge", note: null, ...over });
-const statement = (over: Partial<ApiPayoutStatement> = {}): ApiPayoutStatement => ({
-  id: "stmt-2026-08-aaaa", version: 2, contractorOrgId: "org-contractor-a", period: "2026-08", status: "approved", currency: "MYR", grossMinor: 128000, deductionsMinor: 12000, netMinor: 116000,
-  payDate: "2026-09-15T00:00:00Z", approvedByMembershipId: "hq", paidAt: null, queries: [],
-  lines: [line(), line({ id: "l2", jobId: "job-bbbbbbbb", workType: "periodic_inspection", amountMinor: 38000, acceptedAt: "2026-08-12T03:00:00Z" }),
-    line({ id: "l3", jobId: "job-bbbbbbbb", workType: "rework_deduction", amountMinor: 12000, kind: "deduction", acceptedAt: "2026-08-12T03:00:00Z" }),
-    line({ id: "l4", jobId: "job-cccccccc", amountMinor: 45000, acceptedAt: "2026-08-20T03:00:00Z" })],
-  ...over,
-});
+const line = (over: Partial<ApiPayoutLine> = {}): ApiPayoutLine => ({ id: "l1", jobId: "job-aaaaaaaa", workType: "repair_base", acceptedAt: "2026-08-05T03:00:00Z", amountMinor: 45_000, kind: "charge", note: null, ...over });
+const statement = (over: Partial<ApiPayoutStatement> = {}): ApiPayoutStatement => {
+  return {
+    id: "stmt-2026-08-aaaa", version: 2, contractorOrgId: "org-contractor-a", period: "2026-08", status: "approved", currency: "MYR", grossMinor: 128_000, deductionsMinor: 12_000, netMinor: 116_000,
+    payDate: "2026-09-15T00:00:00Z", approvedByMembershipId: "hq", paidAt: null, queries: [],
+    lines: [line(), line({ id: "l2", jobId: "job-bbbbbbbb", workType: "periodic_inspection", amountMinor: 38_000, acceptedAt: "2026-08-12T03:00:00Z" }),
+      line({ id: "l3", jobId: "job-bbbbbbbb", workType: "rework_deduction", amountMinor: 12_000, kind: "deduction", acceptedAt: "2026-08-12T03:00:00Z" }),
+      line({ id: "l4", jobId: "job-cccccccc", amountMinor: 45_000, acceptedAt: "2026-08-20T03:00:00Z" })],
+    ...over,
+  };
+};
 
 describe("labels and money", () => {
   it("prints periods and signed amounts", () => {
     expect([periodLabel("2026-09"), periodLabel("2026-09", "ms"), periodLabel("Q3")]).toEqual(["Sept 2026", "Sep 2026", "Q3"]);
-    expect(money(199000, "MYR")).toBe("MYR 1,990.00");
-    expect(money(-12000, "MYR")).toBe("− MYR 120.00");
+    expect(money(199_000, "MYR")).toBe("MYR 1,990.00");
+    expect(money(-12_000, "MYR")).toBe("− MYR 120.00");
     expect(money(0, "USD")).toBe("USD 0.00");
   });
   it("lists statements newest first with their badge", () => {
-    const rows = statementRows([statement(), statement({ id: "stmt-2026-07-bbbb", period: "2026-07", status: "paid", netMinor: 204000, paidAt: "2026-08-15T02:00:00Z" })]);
+    const rows = statementRows([statement(), statement({ id: "stmt-2026-07-bbbb", period: "2026-07", status: "paid", netMinor: 204_000, paidAt: "2026-08-15T02:00:00Z" })]);
     expect(rows[0]).toEqual({ id: "stmt-2026-08-aaaa", period: "2026-08", label: "Aug 2026 · stmt-202", sub: "MYR 1,160.00 · pays 15 Sept 2026", badge: { label: "Approved", tone: "primary" } });
     expect(rows[1]).toMatchObject({ label: "Jul 2026 · stmt-202", sub: "MYR 2,040.00 · paid 15 Aug", badge: { label: "Paid 15 Aug", tone: "ok" } });
   });
@@ -63,7 +65,7 @@ describe("lines table", () => {
     const rows = lineRows(statement({ status: "paid", queries: [q] }), new Map(), []);
     expect(rows.find((r) => r.lineId === "l3")?.question).toEqual(q);
     expect(rows.every((r) => !r.askable)).toBe(true);
-    const qs = questionRows(statement({ queries: [q, { ...q, id: "q2", lineId: "l1", state: "adjusted", reply: "Agreed", adjustmentMinor: 12000 }, { ...q, id: "q3", lineId: null, state: "answered", reply: "No" }] }), rows);
+    const qs = questionRows(statement({ queries: [q, { ...q, id: "q2", lineId: "l1", state: "adjusted", reply: "Agreed", adjustmentMinor: 12_000 }, { ...q, id: "q3", lineId: null, state: "answered", reply: "No" }] }), rows);
     expect(qs.map((x) => [x.title, x.state, x.tone])).toEqual([
       ["Deduction · job-bbbb · Rework deduction", "Waiting for HQ", "warn"], ["Deduction · job-aaaa · Repair", "Adjusted MYR 120.00 on the next statement", "ok"], ["Deduction · statement", "Answered", "ok"],
     ]);
@@ -79,12 +81,12 @@ describe("payoutPdf", () => {
     expect(pdf).toContain("/BaseFont /Courier");
     expect(pdf).toContain("Contractor \\(A\\) - demo"); // parentheses escaped, non-ASCII replaced
     expect(pdf).toContain("(Net payable");
-    expect(pdf).not.toMatch(/[^\x00-\x7f]/);
+    expect(pdf).not.toMatch(/[^\x00-\x7F]/);
     expect((pdf.match(/\) Tj/g) ?? []).length).toBe(16); // 2 header + blank + column head + rule + 4 statement lines (Not included rows are left out) + rule + 3 totals + blank + 2 notes
     const xref = Number(/startxref\n(\d+)/.exec(pdf)![1]);
     expect(pdf.slice(xref, xref + 4)).toBe("xref");
     const offsets = [...pdf.matchAll(/(\d{10}) 00000 n/g)].map((m) => Number(m[1]));
-    offsets.forEach((o, i) => expect(pdf.slice(o, o + `${i + 1} 0 obj`.length)).toBe(`${i + 1} 0 obj`));
+    for (const [i, o] of offsets.entries()) expect(pdf.slice(o, o + `${i + 1} 0 obj`.length)).toBe(`${i + 1} 0 obj`);
     const length = Number(/\/Length (\d+) >>\nstream\n/.exec(pdf)![1]);
     const stream = /stream\n([\s\S]*?)\nendstream/.exec(pdf)![1];
     expect(stream.length).toBe(length);
@@ -106,6 +108,6 @@ describe("payouts in Malay (IR279)", () => {
     const pdf = payoutPdf(statement(), rows, "Demo Contractor A", ms, "ms");
     expect(pdf).toContain("(PENYATA BAYARAN stmt-202  Ogo 2026)");
     expect(pdf).toContain("(Bersih perlu dibayar");
-    expect(pdf).not.toMatch(/[^\x00-\x7f]/);
+    expect(pdf).not.toMatch(/[^\x00-\x7F]/);
   });
 });

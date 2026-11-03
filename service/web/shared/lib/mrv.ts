@@ -1,4 +1,4 @@
-// Digital MRV demo (FR-A14, DATA_SOURCE=api): Scope 2 reports, their versions and emission factors projected for
+// Digital MRV demo (FR-A14, DATA_SOURCE=API): Scope 2 reports, their versions and emission factors projected for
 // /admin/mrv. Pure code shared by the Server Component and the client view; texts in the display language (`t` / `i`).
 // Report periods are Kuala Lumpur business time and say so; review times are in the display time zone (IR297).
 import { klInstant, klLocal, klStamp, one, saving, summaryView, type ApiBaseline, type ApiEnergySummary, type BoundaryId, type SummaryView } from "@ac/web/lib/energy";
@@ -7,41 +7,43 @@ import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 const en = translator("en");
 
 /** MRVConditions of service-contracts.ts. */
-export type MRVConditions = {
+export interface MRVConditions {
   from: string; to: string; unitIds: string[]; baselineId: string; baselineVersion: number; factorId: string; factorVersion: number; boundaryId: BoundaryId; boundary: string; organizationId: string;
-};
+}
 /** MRVPreview / MRVReport of service-contracts.ts. */
-export type ApiMRVPreview = { conditions: MRVConditions; summary: ApiEnergySummary; incomplete: boolean; scope: "scope_2"; isDemo: true };
+export interface ApiMRVPreview { conditions: MRVConditions; summary: ApiEnergySummary; incomplete: boolean; scope: "scope_2"; isDemo: true }
 export type ApiMRVReport = ApiMRVPreview & {
   id: string; version: number; createdAt: string; status: "draft" | "demo_reviewed"; evidenceIds: string[];
   reviewHistory: { userId: string; reportVersion: number; comment: string; at: string }[];
 };
 /** EmissionFactor of service-contracts.ts. */
-export type ApiFactor = { id: string; version: number; createdAt: string; region: string; year: number; kgCO2ePerKWh: number; source: string; isDemo: true };
+export interface ApiFactor { id: string; version: number; createdAt: string; region: string; year: number; kgCO2ePerKWh: number; source: string; isDemo: true }
 
-export type ReportRow = { id: string; version: number; status: ApiMRVReport["status"]; org: string; units: string; period: string; result: string; incomplete: boolean };
+export interface ReportRow { id: string; version: number; status: ApiMRVReport["status"]; org: string; units: string; period: string; result: string; incomplete: boolean }
 
 export function reportRows(rs: ApiMRVReport[], orgs: { id: string; name: string }[], t: T = en): ReportRow[] {
   const org = new Map(orgs.map((o) => [o.id, o.name]));
-  return rs.map((r) => ({
-    id: r.id, version: r.version, status: r.status, org: org.get(r.conditions.organizationId) ?? t("customer"),
-    units: t(r.conditions.unitIds.length === 1 ? "1 unit" : "{n} units", { n: r.conditions.unitIds.length }),
-    period: `${klStamp(r.conditions.from)} → ${klStamp(r.conditions.to)}`, incomplete: r.incomplete,
-    result: r.incomplete || r.summary.totals.emissionsKg === null ? t("Calculation incomplete") : `${one(r.summary.totals.emissionsKg)} kgCO₂e`,
-  }));
+  return rs.map((r) => {
+    return {
+      id: r.id, version: r.version, status: r.status, org: org.get(r.conditions.organizationId) ?? t("customer"),
+      units: t(r.conditions.unitIds.length === 1 ? "1 unit" : "{n} units", { n: r.conditions.unitIds.length }),
+      period: `${klStamp(r.conditions.from)} → ${klStamp(r.conditions.to)}`, incomplete: r.incomplete,
+      result: r.incomplete || r.summary.totals.emissionsKg === null ? t("Calculation incomplete") : `${one(r.summary.totals.emissionsKg)} kgCO₂e`,
+    };
+  });
 }
 
 /** A report version's status as the screen words it. */
-export const statusWord = (s: ApiMRVReport["status"] | string, t: T = en) => (s === "demo_reviewed" ? t("demo reviewed") : s === "draft" ? t("draft") : s);
+export const statusWord = (s: ApiMRVReport["status"] | string, t: T = en) => (s === "demo_reviewed" ? t("demo reviewed") : (s === "draft" ? t("draft") : s));
 
 /** The demo review history (DD-A14 step 5): each review at its time in the display time zone. */
 export const reviewItems = (r: ApiMRVReport, i: I18n = EN) =>
   r.reviewHistory.map((h) => ({ time: showTime(h.at, i.display), title: `“${h.comment}”`, detail: i.t("version {n} · {user}", { n: h.reportVersion, user: h.userId.slice(0, 8) }) }));
 
 /** The figures of a preview or a stored version: energy and emissions vs the baseline stay separate (DD-A14 step 5). */
-export type MRVView = {
+export interface MRVView {
   incomplete: boolean; electricity: string; emissions: string; energyVsBaseline: string; energyPercent: string; emissionsVsBaseline: string; summary: SummaryView; conditions: [string, string][];
-};
+}
 
 export function mrvView(p: ApiMRVPreview, orgs: { id: string; name: string }[], units: { id: string; label: string }[], i: I18n = EN): MRVView {
   const { t: tr } = i;
@@ -50,11 +52,11 @@ export function mrvView(p: ApiMRVPreview, orgs: { id: string; name: string }[], 
   const unit = new Map(units.map((u) => [u.id, u.label]));
   const b = p.summary.baselineSnapshot;
   const f = p.summary.factorSnapshot;
-  const incomplete = p.incomplete || t.kWh === null || t.emissionsKg === null;
+  const isIncomplete = p.incomplete || t.kWh === null || t.emissionsKg === null;
   return {
-    incomplete, summary: s,
+    incomplete: isIncomplete, summary: s,
     electricity: t.kWh === null ? tr("Calculation incomplete") : `${one(t.kWh)} kWh`,
-    emissions: t.emissionsKg === null || incomplete ? tr("Calculation incomplete") : `${one(t.emissionsKg)} kgCO₂e`,
+    emissions: t.emissionsKg === null || isIncomplete ? tr("Calculation incomplete") : `${one(t.emissionsKg)} kgCO₂e`,
     energyVsBaseline: saving(t.savedKWh, " kWh", one, tr), energyPercent: saving(t.savingPercentage, "%", one, tr), emissionsVsBaseline: saving(t.savedEmissionsKg, " kgCO₂e", one, tr),
     conditions: [
       [tr("Organization"), orgs.find((o) => o.id === p.conditions.organizationId)?.name ?? p.conditions.organizationId],
@@ -69,9 +71,9 @@ export function mrvView(p: ApiMRVPreview, orgs: { id: string; name: string }[], 
 }
 
 /** The new-report form (DD-A14 fields): baseline and factor are chosen with their versions. */
-export type MRVDraft = { organizationId: string; unitIds: string[]; from: string; to: string; baseline: string; factor: string; boundaryId: BoundaryId; boundary: string };
+export interface MRVDraft { organizationId: string; unitIds: string[]; from: string; to: string; baseline: string; factor: string; boundaryId: BoundaryId; boundary: string }
 const ref = (s: string) => {
-  const [id, v] = s.split("@");
+  const [id, v] = s.split("@", 2);
   return { id, version: Number(v) };
 };
 export const versionKey = (id: string, version: number) => `${id}@${version}`;
@@ -79,12 +81,12 @@ export const versionKey = (id: string, version: number) => `${id}@${version}`;
 export function mrvDraftErrors(d: MRVDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!d.organizationId) e.organizationId = t("Choose a customer organization");
-  if (d.unitIds.length < 1 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
+  if (d.unitIds.length === 0 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
   if (!d.from || !d.to) e.period = t("Enter the start and the end"); // an empty period is not an end before its start (IR586)
   else if (d.from >= d.to) e.period = t("The end must be after the start");
   if (!d.baseline) e.baseline = t("Choose a baseline version");
   if (!d.factor) e.factor = t("Choose an emission factor version");
-  if ([...d.boundary.trim()].length < 1 || d.boundary.length > 500) e.boundary = t("1–500 characters");
+  if ([...d.boundary.trim()].length === 0 || d.boundary.length > 500) e.boundary = t("1–500 characters");
   return e;
 }
 
@@ -107,25 +109,27 @@ export function mrvDraftOf(c?: MRVConditions, baseline?: ApiBaseline): MRVDraft 
 }
 
 /** factors.save rules (IR factors.save item 1) checked before the call. */
-export type FactorDraft = { region: string; year: string; kgCO2ePerKWh: string; source: string };
+export interface FactorDraft { region: string; year: string; kgCO2ePerKWh: string; source: string }
 export function factorErrors(d: FactorDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if ([...d.region.trim()].length < 1 || [...d.region.trim()].length > 120) e.region = t("1–120 characters");
+  if ([...d.region.trim()].length === 0 || [...d.region.trim()].length > 120) e.region = t("1–120 characters");
   const y = Number(d.year);
   if (!(Number.isInteger(y) && y >= 2000 && y <= 2100)) e.year = t("A year 2000–2100");
   const k = Number(d.kgCO2ePerKWh);
   if (!(d.kgCO2ePerKWh.trim() !== "" && k > 0 && k <= 10)) e.kgCO2ePerKWh = t("Above 0 and at most 10 kgCO₂e/kWh");
-  if ([...d.source.trim()].length < 1 || [...d.source.trim()].length > 500) e.source = t("1–500 characters, stating the demo source");
+  if ([...d.source.trim()].length === 0 || [...d.source.trim()].length > 500) e.source = t("1–500 characters, stating the demo source");
   return e;
 }
-export const factorInput = (d: FactorDraft, id?: string) => ({
-  ...(id ? { id } : {}), region: d.region.trim(), year: Number(d.year), kgCO2ePerKWh: Number(d.kgCO2ePerKWh), source: d.source.trim(), isDemo: true as const,
-});
+export const factorInput = (d: FactorDraft, id?: string) => {
+  return {
+    ...(id && { id }), region: d.region.trim(), year: Number(d.year), kgCO2ePerKWh: Number(d.kgCO2ePerKWh), source: d.source.trim(), isDemo: true as const,
+  };
+};
 
 /** EvidenceAttachment of service-contracts.ts: a ready attachment of an accepted work report an MRV report may cite
- * (attachments.list, IR349). */
-export type ApiEvidenceAttachment = { id: string; jobId: string; reportId: string; name: string; mime: string; size: number; status: string; createdAt: string; unitId: string; acceptedAt: string };
-export type EvidenceRow = { id: string; name: string; sub: string };
+(attachments.list, IR349). */
+export interface ApiEvidenceAttachment { id: string; jobId: string; reportId: string; name: string; mime: string; size: number; status: string; createdAt: string; unitId: string; acceptedAt: string }
+export interface EvidenceRow { id: string; name: string; sub: string }
 /** mrv.saveDraft keeps 0–20 evidence attachments (IR149 item 3). */
 export const MAX_EVIDENCE = 20;
 /** The candidates as the picker lists them: the file, its unit and when it was uploaded, in the display time zone. */

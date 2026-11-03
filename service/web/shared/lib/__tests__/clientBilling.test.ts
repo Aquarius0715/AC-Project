@@ -15,7 +15,7 @@ const contract: ClientContract = {
   id: "k1aaaaaaaa", version: 1, customerId: "c", customerOrgId: "o", unitIds: ["u1"], planType: "rto", startAt: "2026-08-31T16:00:00Z", endAt: "2027-08-31T16:00:00Z", priceMinor: 1, currency: "MYR", restrictionEligible: true,
 };
 const invoice: ApiInvoice = {
-  id: "i1", version: 1, number: "INV-2026-09", amountMinor: 12000, currency: "MYR", contractId: "k1", contractVersion: 1, period: { from: "2026-08-31T16:00:00Z", to: "2026-09-30T16:00:00Z" },
+  id: "i1", version: 1, number: "INV-2026-09", amountMinor: 12_000, currency: "MYR", contractId: "k1", contractVersion: 1, period: { from: "2026-08-31T16:00:00Z", to: "2026-09-30T16:00:00Z" },
   dueAt: "2026-09-10T15:59:59Z", status: "unpaid", paymentMethod: null, paymentStatus: null, paidAt: null, // due 23:59:59 KL on 10 Sept — already 11 Sept in Tokyo
 };
 const restriction = {
@@ -45,7 +45,7 @@ describe("customer contracts & payments in the display language (FR-C10–C12, I
 
   it("times payments, restriction events and inquiries in the display time zone", () => {
     const p: ClientPayment = {
-      id: "p1aaaaaaaa", version: 2, amountMinor: 12000, currency: "MYR", invoiceId: "i1", method: "demo_credit_card", status: "confirmed", paymentReference: "DEMO-PAY-1",
+      id: "p1aaaaaaaa", version: 2, amountMinor: 12_000, currency: "MYR", invoiceId: "i1", method: "demo_credit_card", status: "confirmed", paymentReference: "DEMO-PAY-1",
       confirmedAt: "2026-09-13T02:05:00Z", confirmationReason: null, createdAt: "2026-09-13T02:00:00Z", updatedAt: "2026-09-13T02:05:00Z",
     };
     expect(paymentLines([p]).map((l) => [l.label, l.at])).toEqual([["p1aaaaaa · Credit card (demo)", "13 Sept 2026, 10:05 am MYT"]]);
@@ -100,18 +100,18 @@ describe("the overview's notice (DEC-90, IR610)", () => {
   const inv = (id: string, number: string, amountMinor: number) => ({ id, number, amountMinor, currency: "MYR" as const });
   const limit = { id: "r1", state: "applied" as const, policy: { kind: "temperature_limit" as const, minimumCoolingSetpoint: 24 }, unitIds: ["u1"], executeAfter: "2026-09-15T00:00:00Z" };
   it("names the overdue invoice and the restriction it caused, with where to act", () => {
-    expect(dueNotice([inv("i1", "INV-202608-0001", 12000)], { r: limit, invoiceId: "i1" })).toEqual([
+    expect(dueNotice([inv("i1", "INV-202608-0001", 12_000)], { r: limit, invoiceId: "i1" })).toEqual([
       { text: "Invoice INV-202608-0001 is overdue — 120.00 MYR", href: "/customer/payments/i1", link: "Pay now" },
       { text: "Cooling is limited to 24 °C or warmer on 1 unit until it is paid", href: "/customer/payments/i1?tab=restriction&restrictionId=r1", link: "View restriction details" },
     ]);
   });
   it("counts several invoices, words a power-off and a scheduled restriction, and says nothing when all is paid", () => {
-    const two = [inv("i1", "INV-1", 12000), inv("i2", "INV-2", 3050)];
+    const two = [inv("i1", "INV-1", 12_000), inv("i2", "INV-2", 3050)];
     expect(dueNotice(two, null)).toEqual([{ text: "2 invoices are overdue — 150.50 MYR in total", href: "/customer/payments?status=overdue", link: "View invoices" }]);
     expect(dueNotice(two, { r: { ...limit, policy: { kind: "power_off" }, unitIds: ["u1", "u2"] }, invoiceId: "i1" })![1].text).toBe("2 units are switched off until it is paid");
     expect(dueNotice(two, { r: { ...limit, state: "scheduled" }, invoiceId: "i1" })![1].text).toBe("A restriction starts 15 Sept 2026, 8:00 am MYT unless it is paid — Temperature limit — cooling setpoint ≥ 24 °C");
     expect(dueNotice(two, { r: { ...limit, state: "released" }, invoiceId: "i1" })).toHaveLength(1); // a released restriction is not said
     expect(dueNotice([], { r: limit, invoiceId: "i1" })).toBeNull();
-    expect(dueNotice([inv("i1", "INV-1", 12000)], { r: limit, invoiceId: "i1" }, MS_TOKYO)!.map((l) => l.link)).toEqual(["Bayar sekarang", "Lihat butiran sekatan"]);
+    expect(dueNotice([inv("i1", "INV-1", 12_000)], { r: limit, invoiceId: "i1" }, MS_TOKYO)!.map((l) => l.link)).toEqual(["Bayar sekarang", "Lihat butiran sekatan"]);
   });
 });

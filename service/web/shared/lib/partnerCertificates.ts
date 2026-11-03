@@ -19,10 +19,10 @@ export type CertStatus = (typeof CERT_STATUSES)[number];
 /** A certificate as certificates.list returns it (Certificate of service-contracts.ts). */
 export type ApiCert = ApiCertificate;
 /** A booked job of a technician with the qualifications its unit's maintenance scope needs (IR123 item 3). */
-export type CertJob = { jobId: string; short: string; technicianId: string; slot: Slot; text: string; unit: string; required: string[] };
+export interface CertJob { jobId: string; short: string; technicianId: string; slot: Slot; text: string; unit: string; required: string[] }
 
 /** The tab's conditions in the URL (DD-P09): a technician, a status and the expiring window (30 / 60 / 90 days,
- * default 60). */
+default 60). */
 export function certQuery(sp: { membershipId?: string; status?: string; expiringWithinDays?: string }, technicianIds: string[]) {
   const within = WINDOWS.find((w) => String(w) === sp.expiringWithinDays) ?? 60;
   return {
@@ -31,35 +31,37 @@ export function certQuery(sp: { membershipId?: string; status?: string; expiring
   };
 }
 
-export type CertRow = {
+export interface CertRow {
   key: string; technicianId: string; technician: string; code: string; name: string; detail: string; expires: string; expiresAt: string | null;
   status: CertStatus; badge: { text: string; tone: "ok" | "warn" | "crit" | "primary" | "muted" }; days: number | null;
   blocks: { jobId: string; text: string; day: string }[]; cert: { id: string; version: number; number: string; fileName: string | null } | null; renewalPending: boolean;
   training: string | null; actions: ("view" | "renew" | "training" | "add")[];
-};
+}
 
 /** The rows (Figma 04-6): per technician and qualification the certificate on file — its latest one, with a pending
- * renewal noted — else the HQ grant without a certificate on file, else “not held” when a booked job needs it. A
- * valid certificate ending within the window is “Expiring”; the jobs that end after it are the ones it blocks. A
- * certificate keeps the name it was uploaded with; only an active technician can get a new one (IR133 item 1). */
+renewal noted — else the HQ grant without a certificate on file, else “not held” when a booked job needs it. A
+valid certificate ending within the window is “Expiring”; the jobs that end after it are the ones it blocks. A
+certificate keeps the name it was uploaded with; only an active technician can get a new one (IR133 item 1). */
 export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJob[], within: number, nowMs: number, i: I18n = EN): CertRow[] {
   const { t, display: { locale } } = i;
   const rows: CertRow[] = [];
   const blocks = (m: string, code: string, endsAt: number) => jobs.filter((j) => j.technicianId === m && j.required.includes(code) && Date.parse(j.slot.endAt) > endsAt)
     .sort((a, b) => Date.parse(a.slot.startAt) - Date.parse(b.slot.startAt)).map((j) => {
-      const day = klDay(new Date(Date.parse(j.slot.startAt) + 8 * 3600_000).toISOString().slice(0, 10), locale); // the visit's Kuala Lumpur day
+      const day = klDay(new Date(Date.parse(j.slot.startAt) + 8 * 3_600_000).toISOString().slice(0, 10), locale); // the visit's Kuala Lumpur day
       return { jobId: j.jobId, text: `${j.short} (${day})`, day };
     });
   const state = (endsAt: number): { status: CertStatus; days: number } => {
     const days = Math.ceil((endsAt - nowMs) / DAY);
-    return { status: endsAt <= nowMs ? "expired" : days <= within ? "expiring" : "valid", days };
+    return { status: endsAt <= nowMs ? "expired" : (days <= within ? "expiring" : "valid"), days };
   };
-  const badgeOf = (s: CertStatus, days: number | null): CertRow["badge"] => ({
-    valid: { text: t("Valid"), tone: "ok" as const }, expiring: { text: t("Expiring · {n} d", { n: days ?? 0 }), tone: "warn" as const }, expired: { text: t("Expired"), tone: "crit" as const },
-    pending: { text: t("Pending HQ verification"), tone: "primary" as const }, rejected: { text: t("Rejected"), tone: "crit" as const }, not_held: { text: t("Not held"), tone: "muted" as const },
-  })[s];
+  const badgeOf = (s: CertStatus, days: number | null): CertRow["badge"] => {
+    return ({
+      valid: { text: t("Valid"), tone: "ok" as const }, expiring: { text: t("Expiring · {n} d", { n: days ?? 0 }), tone: "warn" as const }, expired: { text: t("Expired"), tone: "crit" as const },
+      pending: { text: t("Pending HQ verification"), tone: "primary" as const }, rejected: { text: t("Rejected"), tone: "crit" as const }, not_held: { text: t("Not held"), tone: "muted" as const },
+    })[s];
+  };
   for (const m of members) {
-    const active = activeNow(m, nowMs);
+    const isActive = activeNow(m, nowMs);
     const mine = certs.filter((c) => c.membershipId === m.id);
     const groups = new Map<string, ApiCert[]>();
     for (const c of mine) {
@@ -69,7 +71,11 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
     // a renewal of an "other" certificate joins its original
     for (const [k, list] of [...groups]) {
       const of = list[0].renewalOf;
-      if (k.startsWith("other:") && of && groups.has(`other:${of}`)) { groups.get(`other:${of}`)!.push(...list); groups.delete(k); }
+      if (!(k.startsWith("other:") && of && groups.has(`other:${of}`))) {
+        continue;
+      }
+
+      groups.get(`other:${of}`)!.push(...list); groups.delete(k);
     }
     const viaGrant = new Map<string, "pending" | "rejected">(); // no certificate on file yet: the HQ grant still decides (BR-P09)
     for (const [k, list] of groups) {
@@ -82,8 +88,8 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
       const ends = Date.parse(shown.expiresAt);
       const training = onFile?.trainingRequestedAt ? t("Training requested {date}", { date: businessDay(onFile.trainingRequestedAt, locale) }) : null;
       const actions: CertRow["actions"] = ["view"];
-      if (active && !pending && (s.status === "expiring" || s.status === "expired" || s.status === "rejected")) actions.push("renew");
-      if (active && onFile && !training && (s.status === "expiring" || s.status === "expired")) actions.push("training");
+      if (isActive && !pending && (s.status === "expiring" || s.status === "expired" || s.status === "rejected")) actions.push("renew");
+      if (isActive && onFile && !training && (s.status === "expiring" || s.status === "expired")) actions.push("training");
       rows.push({
         key: `${m.id}:${k}`, technicianId: m.id, technician: m.displayName, code: shown.code, name: shown.name || qualificationLabel(shown.code, t),
         detail: t("{number} · issued {date}", { number: shown.number, date: businessDay(shown.issuedAt, locale) }), expires: businessDay(shown.expiresAt, locale), expiresAt: shown.expiresAt,
@@ -99,17 +105,17 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
         const s = state(Date.parse(grant.validUntil!));
         rows.push({
           key: `${m.id}:${code}`, technicianId: m.id, technician: m.displayName, code, name: qualificationLabel(code, t),
-          detail: t(upload === "pending" ? "granted by HQ · the upload waits for HQ" : upload === "rejected" ? "granted by HQ · the upload was rejected" : "granted by HQ · no certificate on file"),
+          detail: t(upload === "pending" ? "granted by HQ · the upload waits for HQ" : (upload === "rejected" ? "granted by HQ · the upload was rejected" : "granted by HQ · no certificate on file")),
           expires: businessDay(grant.validUntil!, locale), expiresAt: grant.validUntil!, status: s.status, badge: badgeOf(s.status, s.days), days: s.days,
-          blocks: blocks(m.id, code, Date.parse(grant.validUntil!)), cert: null, renewalPending: upload === "pending", training: null, actions: active && upload !== "pending" ? ["add"] : [],
+          blocks: blocks(m.id, code, Date.parse(grant.validUntil!)), cert: null, renewalPending: upload === "pending", training: null, actions: isActive && upload !== "pending" ? ["add"] : [],
         });
         continue;
       }
       const needed = blocks(m.id, code, -Infinity);
-      if (needed.length) {
+      if (needed.length > 0) {
         rows.push({
           key: `${m.id}:${code}`, technicianId: m.id, technician: m.displayName, code, name: qualificationLabel(code, t), detail: t("not held"), expires: "—", expiresAt: null,
-          status: "not_held", badge: badgeOf("not_held", null), days: null, blocks: needed, cert: null, renewalPending: false, training: null, actions: active ? ["add"] : [],
+          status: "not_held", badge: badgeOf("not_held", null), days: null, blocks: needed, cert: null, renewalPending: false, training: null, actions: isActive ? ["add"] : [],
         });
       }
     }
@@ -119,7 +125,7 @@ export function certRows(members: ApiTeamMember[], certs: ApiCert[], jobs: CertJ
 }
 
 /** The four KPIs (Figma 04-6): in date, expiring within the window (the soonest named), expired, pending HQ
- * verification (renewals included). */
+verification (renewals included). */
 export function certKpis(rows: CertRow[], certs: ApiCert[], within: number, t: T = en) {
   const expiring = rows.filter((r) => r.status === "expiring").sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
   const expired = rows.filter((r) => r.status === "expired");
@@ -145,11 +151,11 @@ export function impact(rows: CertRow[], jobs: CertJob[], t: T = en) {
   return { text, jobId: job.jobId, rows: [[t("Job"), `${job.short} · ${job.unit}`], [t("Slot"), job.text], [t("Assigned"), r.technician], [t("Requires"), qualificationLabel(r.code, t)]] as [string, string][] };
 }
 
-export type CertForm = { membershipId: string; code: string; name: string; number: string; issued: string; expires: string; file: { name: string; type: string; size: number } | null };
+export interface CertForm { membershipId: string; code: string; name: string; number: string; issued: string; expires: string; file: { name: string; type: string; size: number } | null }
 const isDate = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
 export const FILE_TYPES = ["application/pdf", "image/jpeg", "image/png"];
 /** The renewal / certificate form's own checks (IR133 item 1): a name of 1–120 and a number of 1–64 characters, the
- * issue day before the expiry day, and a PDF, JPEG or PNG of at most 10 MB. */
+issue day before the expiry day, and a PDF, JPEG or PNG of at most 10 MB. */
 export function certificateErrors(f: CertForm, t: T = en): Partial<Record<"membershipId" | "name" | "number" | "issued" | "expires" | "file", string>> {
   const e: Partial<Record<"membershipId" | "name" | "number" | "issued" | "expires" | "file", string>> = {};
   if (!f.membershipId) e.membershipId = t("Choose a technician");
@@ -178,7 +184,7 @@ export function certificateRefusal(f: { code: string; messageKey: string; fieldE
   if (f.code === "CONFLICT") return { fields: {}, text: t("The certificate changed in the meantime — the page shows the latest state.") };
   if (f.code !== "VALIDATION") return { fields: {}, text: null };
   const fields = Object.fromEntries(Object.entries(f.fieldErrors).map(([k, v]) => [FIELDS[k] ?? k, TEXT[v] ? t(TEXT[v]) : v]));
-  return { fields, text: Object.keys(fields).length ? null : t("Check the input.") };
+  return { fields, text: Object.keys(fields).length > 0 ? null : t("Check the input.") };
 }
 /** “412 KB”, “2.4 MB”: a file's size as the form shows it. */
 export const fileSize = (bytes: number) => (bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1000))} KB` : `${Math.round(bytes / 100_000) / 10} MB`);

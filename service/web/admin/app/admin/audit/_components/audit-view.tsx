@@ -31,23 +31,23 @@ const seedEvents: AuditDeviceEvent[] = [
 const demoFilters: AuditFilters = { from: "2026-09-01", to: "2026-09-30", actorId: "", targetKind: "", targetId: "", correlationId: "", result: "All", limit: 25 };
 
 /** What the Server Component read for the URL (SCR-A16): the log page with its filters and options, the selected entry
- * with its correlation trace and related records, and on the device tab the devices and the chosen device's events. */
-export type AuditLive = {
+with its correlation trace and related records, and on the device tab the devices and the chosen device's events. */
+export interface AuditLive {
   tab: "log" | "devices"; rows: AuditRow[]; total: number; filters: AuditFilters; searched: boolean; actors: { id: string; name: string }[]; kinds: string[];
   selected: string | null; entryMissing: boolean; trace: { id: string; time: string; title: string; detail: string }[]; related: Related | null;
   device?: { options: { id: string; label: string }[]; deviceId: string | null; missing: boolean; label: string | null; total: number; events: AuditDeviceEvent[]; selected: string | null };
-};
+}
 
 /** The audit explorer (FR-A16, Figma Admin 337:2 / 338:x / 340:2). `live` comes from the Server Component in API mode,
- * where every filter and selection is in the URL and the server reads again; the demo filters its seed rows locally.
- * Read only: nothing here creates, edits, deletes or exports an entry. Texts in the display language; the period's days
- * are the display time zone's (IR304, IR320). */
+where every filter and selection is in the URL and the server reads again; the demo filters its seed rows locally.
+Read only: nothing here creates, edits, deletes or exports an entry. Texts in the display language; the period's days
+are the display time zone's (IR304, IR320). */
 export function AuditView({ live }: { live?: AuditLive }) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const patch = useUrlPatch();
   const [urlTab, setUrlTab] = useUrlTab<"log" | "devices">({ log: "log", devices: "devices" }, "log");
   const tab = live ? live.tab : urlTab; // API mode: the server read the tab from the URL (and loaded its data)
-  const setTab = (id: "log" | "devices") => (live ? patch({ tab: id === "devices" ? "devices" : null }) : setUrlTab(id));
+  const setTab = (id: "log" | "devices") => { if (live) patch({ tab: id === "devices" ? "devices" : null }); else setUrlTab(id); };
   const initial = live?.filters ?? demoFilters;
   const [f, setF] = useState(initial);
   // the filters restart from each new server result: adjust state during render, not in an effect
@@ -61,24 +61,26 @@ export function AuditView({ live }: { live?: AuditLive }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const periodErr = periodError(f, t);
   const all = live ? live.rows : seed;
-  const rows = live ? all : all.filter((l) => (f.result === "All" || l.res === f.result) && (!f.correlationId || l.corr.includes(f.correlationId)) && (!f.actorId || l.actorId === f.actorId)
-    && (!f.targetKind || l.targetKind === f.targetKind) && (!f.targetId || l.targetId === f.targetId)).slice(0, shown);
+  const rows = live ? all : all.filter((l) => {
+    return (f.result === "All" || l.res === f.result) && (!f.correlationId || l.corr.includes(f.correlationId)) && (!f.actorId || l.actorId === f.actorId)
+      && (!f.targetKind || l.targetKind === f.targetKind) && (!f.targetId || l.targetId === f.targetId);
+  }).slice(0, shown);
   const sel = live ? rows.find((r) => r.id === live.selected) ?? null : rows.find((r) => r.id === selId) ?? rows[0] ?? null;
   const total = live ? live.total : rows.length;
-  const more = live ? rows.length < live.total && live.filters.limit < 100 : rows.length < seed.length && shown < seed.length;
+  const isMore = live ? rows.length < live.total && live.filters.limit < 100 : rows.length < seed.length && shown < seed.length;
 
   // a new search starts from its newest entry; "Filter by …" of the open entry keeps it open (it matches)
   const search = (next: Partial<AuditFilters>, keepEntry = false) => {
     const merged = { ...f, ...next };
     setF(merged);
     if (!live) return;
-    patch({ ...Object.fromEntries(Object.entries(next).map(([k, v]) => [k, k === "result" && v === "All" ? null : String(v ?? "")])), limit: null, ...(keepEntry ? {} : { entryId: null, eventId: null }) });
+    patch({ ...Object.fromEntries(Object.entries(next).map(([k, v]) => [k, k === "result" && v === "All" ? null : String(v ?? "")])), limit: null, ...(!keepEntry && { entryId: null, eventId: null }) });
   };
   const typeCorr = (v: string) => {
     setF((x) => ({ ...x, correlationId: v }));
     if (!live) return;
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => patch({ correlationId: v, limit: null, entryId: null }), 300);
+    timer.current = setTimeout(() => { patch({ correlationId: v, limit: null, entryId: null }); }, 300);
   };
   const changeDate = (which: "from" | "to", v: string) => {
     const next = { ...f, [which]: v };
@@ -92,10 +94,10 @@ export function AuditView({ live }: { live?: AuditLive }) {
     }
     setF(demoFilters);
   };
-  const open = (id: string) => (live ? patch({ entryId: id }) : setSelId(id));
+  const open = (id: string) => { if (live) patch({ entryId: id }); else setSelId(id); };
   const actors = live ? live.actors : [...new Map(seed.map((r) => [r.actorId, r.actor]))].map(([id, name]) => ({ id, name }));
   const kinds = live ? live.kinds : [...new Set(seed.map((r) => r.targetKind))].sort();
-  const related = live ? live.related : sel?.id === "1" ? seedRelated : { restriction: null, command: null, job: null, unit: null };
+  const related = live ? live.related : (sel?.id === "1" ? seedRelated : { restriction: null, command: null, job: null, unit: null });
   const trace = live ? live.trace : [];
   const corr = live ? live.filters.correlationId : f.correlationId; // the searched correlation ID (typing waits 300 ms)
   const device = live ? live.device : { options: [{ id: "device-online-rto", label: "device-online-rto · unit-online-rto" }], deviceId: "device-online-rto", missing: false, label: "device-online-rto · unit-online-rto", total: seedEvents.length, events: seedEvents, selected: null };
@@ -107,22 +109,22 @@ export function AuditView({ live }: { live?: AuditLive }) {
         <div className="text-xs">{t(live ? "No create, edit, or delete here — the log is append-only. Secrets and contacts in before/after are masked. Filters are kept in the URL; reasons and values never are."
           : "No create, edit, or delete here. Secrets and contacts in before/after are masked. This browser demo does not guarantee tamper-proof storage.")}</div>
       </Banner>
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "log", label: t("Audit log"), count: total }, { id: "devices", label: t("Device events"), ...(device?.deviceId ? { count: device.total } : {}) }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "log", label: t("Audit log"), count: total }, { id: "devices", label: t("Device events"), ...(device?.deviceId && { count: device.total }) }]} />
       {tab === "log" ? (
         <>
           <Card title={t("Filter")}>
             <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
-              <Field label={t("From")} error={periodErr} hint={periodErr ? undefined : t("Days in {zone}", { zone })}><Input type="date" value={f.from} onChange={(e) => changeDate("from", e.target.value)} /></Field>
-              <Field label={t("To")}><Input type="date" value={f.to} onChange={(e) => changeDate("to", e.target.value)} /></Field>
-              <Field label={t("Actor")}><Select value={f.actorId} onChange={(e) => search({ actorId: e.target.value })}><option value="">{t("Actor: All")}</option>{actors.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
-              <Field label={t("Target")}><Select value={f.targetKind} onChange={(e) => search({ targetKind: e.target.value, targetId: "" })}><option value="">{t("Target: All")}</option>{kinds.map((k) => <option key={k} value={k}>{k}</option>)}</Select></Field>
-              <Field label={t("Correlation ID")}><Input value={f.correlationId} onChange={(e) => typeCorr(e.target.value)} placeholder="corr-…" /></Field>
+              <Field label={t("From")} error={periodErr} hint={periodErr ? undefined : t("Days in {zone}", { zone })}><Input type="date" value={f.from} onChange={(e) => { changeDate("from", e.target.value); }} /></Field>
+              <Field label={t("To")}><Input type="date" value={f.to} onChange={(e) => { changeDate("to", e.target.value); }} /></Field>
+              <Field label={t("Actor")}><Select value={f.actorId} onChange={(e) => { search({ actorId: e.target.value }); }}><option value="">{t("Actor: All")}</option>{actors.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
+              <Field label={t("Target")}><Select value={f.targetKind} onChange={(e) => { search({ targetKind: e.target.value, targetId: "" }); }}><option value="">{t("Target: All")}</option>{kinds.map((k) => <option key={k} value={k}>{k}</option>)}</Select></Field>
+              <Field label={t("Correlation ID")}><Input value={f.correlationId} onChange={(e) => { typeCorr(e.target.value); }} placeholder="corr-…" /></Field>
             </div>
-            {f.targetId && <div className="mt-2"><span className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-xs">{t("Target ID")} · <span className="font-mono">{f.targetKind ? `${f.targetKind} · ` : ""}{f.targetId}</span><Plain aria-label={t("Clear the target ID")} onClick={() => search({ targetId: "" })}><Icon name="close" /></Plain></span></div>}
+            {f.targetId && <div className="mt-2"><span className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-xs">{t("Target ID")} · <span className="font-mono">{f.targetKind ? `${f.targetKind} · ` : ""}{f.targetId}</span><Plain aria-label={t("Clear the target ID")} onClick={() => { search({ targetId: "" }); }}><Icon name="close" /></Plain></span></div>}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <Choice value={f.result} onChange={(v) => search({ result: v })} options={(["All", "Success", "Denied", "Failed", "Pending"] as const).map((k) => ({ id: k, label: k === "All" ? t("All") : resultWord(k, t) }))} />
+              <Choice value={f.result} onChange={(v) => { search({ result: v }); }} options={(["All", "Success", "Denied", "Failed", "Pending"] as const).map((k) => ({ id: k, label: k === "All" ? t("All") : resultWord(k, t) }))} />
               <span className="flex flex-wrap items-center gap-3">
-                {(!live || live.searched) && <span className="text-xs text-muted-foreground">{corr ? t("{n} entries with this correlation ID", { n: total }) : t("{n} entries", { n: total })}</span>}
+                {(!live || live.searched) && <span className="text-xs text-muted-foreground">{t(corr ? "{n} entries with this correlation ID" : "{n} entries", { n: total })}</span>}
                 <Btn size="sm" onClick={reset}>{t("Reset")}</Btn>
               </span>
             </div>
@@ -131,22 +133,22 @@ export function AuditView({ live }: { live?: AuditLive }) {
             <Card title={corr ? t("Correlation {id}", { id: corr }) : t("Audit log · newest first")} className="self-start">
               {rows.length === 0 ? <NoEntries live={live} periodErr={periodErr} corr={corr} result={f.result} /> : (
                 <div className="flex flex-col gap-2">{rows.map((l) => (
-                  <ListRow key={l.id} selected={sel?.id === l.id} onClick={() => open(l.id)}>
+                  <ListRow key={l.id} selected={sel?.id === l.id} onClick={() => { open(l.id); }}>
                     <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{l.op}</b><Badge tone={resultTone(l.res)}>{resultWord(l.res, t)}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{l.target}</div><div className="truncate text-[11px] text-muted-foreground">{l.actor} ({l.role}) · {l.at} · {l.corr}</div></div>
                   </ListRow>
                 ))}</div>
               )}
-              <div className="mt-3 flex items-center justify-between gap-2"><p className="text-[11px] text-muted-foreground">{t("{n} of {total} · 25 per page", { n: rows.length, total })}</p>{more && <Btn size="sm" onClick={() => (live ? patch({ limit: String(Math.min(100, live.filters.limit + 25)) }) : setShown((s) => s + 25))}>{t("Load more")}</Btn>}</div>
+              <div className="mt-3 flex items-center justify-between gap-2"><p className="text-[11px] text-muted-foreground">{t("{n} of {total} · 25 per page", { n: rows.length, total })}</p>{isMore && <Btn size="sm" onClick={() => { if (live) patch({ limit: String(Math.min(100, live.filters.limit + 25)) }); else setShown((s) => s + 25); }}>{t("Load more")}</Btn>}</div>
             </Card>
             {live?.entryMissing ? <EmptyState title={t("That entry is not in these results")}>{t("Change the filters or load more to open it.")}</EmptyState>
               : sel && (
                 <Card title={<span className="flex flex-wrap items-center gap-2">{sel.op}<Badge tone={resultTone(sel.res)}>{resultWord(sel.res, t)}</Badge></span>} sub={`${sel.target}${sel.versions ? ` · ${sel.versions}` : ""}`} className="self-start">
                   <SummaryList items={[
-                    [t("Actor"), <span key="a" className="flex flex-wrap items-center justify-between gap-2"><span>{sel.actor}{sel.actorId !== sel.actor && <span className="ml-2 font-mono text-xs text-muted-foreground">{sel.actorId}</span>}</span><FilterLink onClick={() => search({ actorId: sel.actorId }, true)}>{t("Filter by actor")} <Icon name="arrowRight" /></FilterLink></span>],
+                    [t("Actor"), <span key="a" className="flex flex-wrap items-center justify-between gap-2"><span>{sel.actor}{sel.actorId !== sel.actor && <span className="ml-2 font-mono text-xs text-muted-foreground">{sel.actorId}</span>}</span><FilterLink onClick={() => { search({ actorId: sel.actorId }, true); }}>{t("Filter by actor")} <Icon name="arrowRight" /></FilterLink></span>],
                     [t("Role at the time"), t("{role} — kept as recorded, not rewritten by the current membership", { role: sel.role })],
                     [t("Occurred"), sel.occurred],
-                    [t("Correlation ID"), <span key="c" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">{sel.corr}</span><FilterLink onClick={() => search({ correlationId: sel.corr }, true)}>{t("Filter by ID")} <Icon name="arrowRight" /></FilterLink></span>],
-                    [t("Target"), <span key="t" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">{sel.target}</span><FilterLink onClick={() => search({ targetKind: sel.targetKind, targetId: sel.targetId }, true)}>{t("Filter by target")} <Icon name="arrowRight" /></FilterLink></span>],
+                    [t("Correlation ID"), <span key="c" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">{sel.corr}</span><FilterLink onClick={() => { search({ correlationId: sel.corr }, true); }}>{t("Filter by ID")} <Icon name="arrowRight" /></FilterLink></span>],
+                    [t("Target"), <span key="t" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">{sel.target}</span><FilterLink onClick={() => { search({ targetKind: sel.targetKind, targetId: sel.targetId }, true); }}>{t("Filter by target")} <Icon name="arrowRight" /></FilterLink></span>],
                     [t("Reason"), sel.reason ?? "—"],
                   ]} />
                   {trace.length > 0 && (
@@ -165,7 +167,7 @@ export function AuditView({ live }: { live?: AuditLive }) {
           </div>
         </>
       ) : device && (
-        <DeviceEvents device={device} f={f} periodErr={periodErr} zone={zone} live={!!live} onDate={changeDate} onDevice={(id) => (live ? patch({ deviceId: id || null, eventId: null }) : undefined)} onEvent={(id) => live && patch({ eventId: id })} onReset={reset} />
+        <DeviceEvents device={device} f={f} periodErr={periodErr} zone={zone} live={!!live} onDate={changeDate} onDevice={(id) => { if (live) patch({ deviceId: id || null, eventId: null });; }} onEvent={(id) => live && patch({ eventId: id })} onReset={reset} />
       )}
     </Page>
   );
@@ -176,8 +178,8 @@ function FilterLink({ onClick, children }: { onClick: () => void; children: Reac
 }
 
 /** Why the list is empty: nothing was searched (an invalid period, Figma Admin 338:602), an unknown or out-of-scope
- * correlation ID — they look the same (338:332) — no pending or failed entry, which only device commands have (IR604),
- * or no match. */
+correlation ID — they look the same (338:332) — no pending or failed entry, which only device commands have (IR604),
+or no match. */
 function NoEntries({ live, periodErr, corr, result }: { live?: AuditLive; periodErr?: string; corr: string; result: string }) {
   const { t } = useI18n();
   if (periodErr || (live && !live.searched)) return <EmptyState title={t("Nothing was searched")}>{t("The period must start before it ends and cover at most 366 days. Earlier results are cleared so they are not mistaken for this search.")}</EmptyState>;
@@ -187,7 +189,7 @@ function NoEntries({ live, periodErr, corr, result }: { live?: AuditLive; period
 }
 
 /** The restriction, command, job and unit of the entry and of its correlation (DD-A16 step 1). Each link opens the
- * record's own screen, which checks its own permission; the command is read (commands.get) only when asked (SCR-A16). */
+record's own screen, which checks its own permission; the command is read (commands.get) only when asked (SCR-A16). */
 function RelatedRecords({ related, demo }: { related: Related; demo: boolean }) {
   const { t } = useI18n();
   const line = (r: RelatedRef) => <span><span className="font-mono text-xs">{r.id.slice(0, 8)}</span> · {r.note}</span>;
@@ -207,21 +209,21 @@ function RelatedRecords({ related, demo }: { related: Related; demo: boolean }) 
   );
 }
 
-type Loaded = { state: "idle" | "loading" } | { state: "done"; text: string; when: string; unitId: string | null } | { state: "error"; text: string };
 function CommandLine({ r, demo, line }: { r: RelatedRef; demo: boolean; line: ReactNode }) {
+  type Loaded = { state: "idle" | "loading" } | { state: "done"; text: string; when: string; unitId: string | null } | { state: "error"; text: string };
   const { t, display } = useI18n();
   const [c, setC] = useState<Loaded>({ state: "idle" });
   const load = async () => {
-    if (demo) return setC({ state: "done", text: t("Set temperature {celsius}°C", { celsius: 24 }), when: "09-20 10:14", unitId: null });
+    if (demo) { setC({ state: "done", text: t("Set temperature {celsius}°C", { celsius: 24 }), when: "09-20 10:14", unitId: null }); return; }
     setC({ state: "loading" });
     try {
       const cmd = await callOp<ApiCommand & { unitId: string }>("commands.get", { id: r.id });
       const h = historyRow(cmd, t, display);
       setC({ state: "done", text: h.text, when: h.when, unitId: cmd.unitId });
-    } catch (e) {
-      const code = e instanceof OpError ? e.error.code : "";
+    } catch (error) {
+      const code = error instanceof OpError ? error.error.code : "";
       setC({ state: "error", text: t(code === "FORBIDDEN" ? "You may not read this command — it needs control.execute, restriction.read, restriction.override or automation.policy.read."
-        : code === "NOT_FOUND" ? "This command is outside your scope or no longer exists." : "The command could not be loaded — try again.") });
+        : (code === "NOT_FOUND" ? "This command is outside your scope or no longer exists." : "The command could not be loaded — try again.")) });
     }
   };
   return (
@@ -234,7 +236,7 @@ function CommandLine({ r, demo, line }: { r: RelatedRef; demo: boolean; line: Re
 }
 
 /** The device events tab (Figma Admin 340:2): the devices the session may see, and only after one is picked its
- * events in the period, newest first — no fallback to a first or every device (IR33). */
+events in the period, newest first — no fallback to a first or every device (IR33). */
 function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEvent, onReset }: {
   device: NonNullable<AuditLive["device"]>; f: AuditFilters; periodErr?: string; zone: string; live: boolean;
   onDate: (which: "from" | "to", v: string) => void; onDevice: (id: string) => void; onEvent: (id: string) => void; onReset: () => void;
@@ -246,21 +248,21 @@ function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEv
     <>
       <Card title={t("Filter")}>
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-          <Field label={t("Device")}><Select value={device.deviceId ?? ""} onChange={(e) => onDevice(e.target.value)}><option value="">{t("Select a device…")}</option>{device.options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</Select></Field>
-          <Field label={t("From")} error={periodErr} hint={periodErr ? undefined : t("Days in {zone}", { zone })}><Input type="date" value={f.from} onChange={(e) => onDate("from", e.target.value)} /></Field>
-          <Field label={t("To")}><Input type="date" value={f.to} onChange={(e) => onDate("to", e.target.value)} /></Field>
+          <Field label={t("Device")}><Select value={device.deviceId ?? ""} onChange={(e) => { onDevice(e.target.value); }}><option value="">{t("Select a device…")}</option>{device.options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</Select></Field>
+          <Field label={t("From")} error={periodErr} hint={periodErr ? undefined : t("Days in {zone}", { zone })}><Input type="date" value={f.from} onChange={(e) => { onDate("from", e.target.value); }} /></Field>
+          <Field label={t("To")}><Input type="date" value={f.to} onChange={(e) => { onDate("to", e.target.value); }} /></Field>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-[11px] text-muted-foreground">{t("The devices you may see. Events load only after you pick a device — there is no “all devices” view.")}</p>
           <span className="flex items-center gap-3">{device.deviceId && <span className="text-xs text-muted-foreground">{t("{n} events", { n: device.total })}</span>}<Btn size="sm" onClick={onReset}>{t("Reset")}</Btn></span>
         </div>
       </Card>
-      {!device.deviceId ? <EmptyState title={device.missing ? t("That device is not in your list") : t("Pick a device")}>{t(device.missing ? "It does not exist or is outside your scope. Pick one of your devices." : "Choose a device above to see its connection, power and tamper events.")}</EmptyState> : (
+      {device.deviceId ? (
         <div className="split-rev">
           <Card title={t("Device events · newest first")} className="self-start">
-            {device.events.length === 0 ? <EmptyState title={t("No device events in this period")}>{periodErr ? t("The period must start before it ends and cover at most 366 days.") : t("This device recorded no events in the period.")}</EmptyState> : (
+            {device.events.length === 0 ? <EmptyState title={t("No device events in this period")}>{t(periodErr ? "The period must start before it ends and cover at most 366 days." : "This device recorded no events in the period.")}</EmptyState> : (
               <div className="flex flex-col gap-2">{device.events.map((e) => (
-                <ListRow key={e.id} selected={ev?.id === e.id} onClick={() => (live ? onEvent(e.id) : setPick(e.id))}>
+                <ListRow key={e.id} selected={ev?.id === e.id} onClick={() => { if (live) onEvent(e.id); else setPick(e.id); }}>
                   <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{e.title}</b><Badge tone={e.tone}>{e.type}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{e.meta}</div><div className="truncate text-[11px] text-muted-foreground">{e.state}</div></div>
                 </ListRow>
               ))}</div>
@@ -280,7 +282,7 @@ function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEv
             </Card>
           )}
         </div>
-      )}
+      ) : <EmptyState title={t(device.missing ? "That device is not in your list" : "Pick a device")}>{t(device.missing ? "It does not exist or is outside your scope. Pick one of your devices." : "Choose a device above to see its connection, power and tamper events.")}</EmptyState>}
     </>
   );
 }

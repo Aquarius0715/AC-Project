@@ -13,10 +13,10 @@ import type { ApiCommand, ApiUnitDetail } from "@ac/web/lib/units";
 import type { ApiRestriction } from "@ac/web/lib/restrictions";
 import { UnitView, type PolicyOption } from "./_components/unit-view";
 
-type ApiPolicy = { id: string; name: string; kind: string; metric?: string; operator?: string; threshold?: number; durationSeconds?: number; severity?: string };
+interface ApiPolicy { id: string; name: string; kind: string; metric?: string; operator?: string; threshold?: number; durationSeconds?: number; severity?: string }
 
 /** The detail of the unit's active restriction, found as Contracts & payments finds it — the contract with an active
- * restriction, one of its invoices, restrictions.forInvoice (the customer has no restriction list) — or null (IR583). */
+restriction, one of its invoices, restrictions.forInvoice (the customer has no restriction list) — or null (IR583). */
 async function restrictionHref(unitId: string): Promise<string | null> {
   const contracts = await coreAll<{ id: string; activeRestrictionIds?: string[] }>("contracts.list", { filters: { unitId } });
   for (const k of contracts.filter((c) => c.activeRestrictionIds?.length)) {
@@ -37,10 +37,10 @@ export default async function CustomerUnitPage({ params }: PageProps<"/customer/
   let detail: ApiUnitDetail;
   try {
     detail = await coreOp<ApiUnitDetail>("units.get", { id });
-  } catch (e) {
+  } catch (error) {
     // outside the customer's scope (D01) or not a unit id at all → the not-found page
-    if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.fieldErrors.id)) notFound();
-    throw e;
+    if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.fieldErrors.id)) notFound();
+    throw error;
   }
   const [room, policies, history, display, restriction, now, me] = await Promise.all([
     coreOp<{ items: ApiUnit[] }>("units.list", { limit: 100, filters: detail.spaceId ? { spaceId: detail.spaceId } : { unitIds: [id] } }),

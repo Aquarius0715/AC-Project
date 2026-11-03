@@ -17,8 +17,8 @@ export async function askHq(statementId: string, version: number, lineId: string
   try {
     await coreOp("payouts.query", { statementId, lineId, topic, message }, { write: true, expectedVersion: version });
     return { ok: true, value: null };
-  } catch (e) {
-    return failed(e);
+  } catch (error) {
+    return failed(error);
   } finally {
     refresh();
   }

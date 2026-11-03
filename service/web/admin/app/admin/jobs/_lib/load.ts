@@ -18,19 +18,21 @@ import { nextOccurrence, planDate, planRows, type ApiPlan } from "@ac/web/lib/ad
 import { breachRows, PERIODS, periodOf, slaRows, slaTiles, targetsByPlan, type ApiScorecard } from "@ac/web/lib/adminSla";
 import { contractorRows, kpiTiles, pendingCertificates, profileFacts, rateCardView, technicianRows, type ApiCertificate, type ApiProfile, type ApiRateCard, type ApiTechnician } from "@ac/web/lib/adminContractors";
 
-type Page<T> = { items: T[]; total: number };
-type Org = { id: string; name: string; kind: string; status: string };
-type Member = { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; qualifications: ApiTechnician["qualifications"] };
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
-  if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
-  throw e;
-});
+interface Page<T> { items: T[]; total: number }
+interface Org { id: string; name: string; kind: string; status: string }
+interface Member { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; qualifications: ApiTechnician["qualifications"] }
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
+  return p.catch((error) => {
+    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+    throw error;
+  });
+};
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 type SP = Record<string, string | string[] | undefined>;
 
 /** The reads both tabs share: the clock, organizations, customers, properties, units and members with their names, the
- * customer → property → unit scope from the URL, and the tab counts (jobs that are not cancelled, plans, contractors). */
+customer → property → unit scope from the URL, and the tab counts (jobs that are not cancelled, plans, contractors). */
 async function shared(sp: SP) {
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const i = i18nOf(display);
@@ -76,7 +78,7 @@ export async function loadJobs(sp: SP) {
   const sort = sortOf(one(sp.sort));
   const spec = SORTS.find((s) => s.id === sort)!;
   const [counts, list, profiles] = await Promise.all([
-    Promise.all(STAGES.map((s) => coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, ...(period ?? {}), ...s.filter }, limit: 1 }).then((r) => r.total))),
+    Promise.all(STAGES.map((s) => coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, ...period, ...s.filter }, limit: 1 }).then((r) => r.total))),
     coreOp<Page<ApiHqRow>>("jobs.list", { filters: filtersOf(q, hq?.id ?? null), sort: { field: spec.field, direction: spec.direction }, limit: 100 }),
     optional(coreAll<{ organizationId: string; status: string }>("contractors.list"), []), // offers suspended per profile (DD-A21)
   ]);
@@ -99,9 +101,9 @@ export async function loadJobs(sp: SP) {
   };
   const pick = one(sp.jobId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
-  const job = await coreOp<ApiHqJob>("jobs.get", { jobId: pick }).catch((e) => {
-    if (e instanceof CoreError && e.error.code === "NOT_FOUND") return null;
-    throw e;
+  const job = await coreOp<ApiHqJob>("jobs.get", { jobId: pick }).catch((error) => {
+    if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null;
+    throw error;
   });
   if (!job) return { ...base, detail: null, missing: pick };
   const ref = job.reportRefs?.[job.reportRefs.length - 1];
@@ -109,8 +111,10 @@ export async function loadJobs(sp: SP) {
     optional(coreOp<Page<ApiJobEvent>>("jobs.events", { jobId: job.id, query: { limit: 100 } }).then((r) => r.items), [] as ApiJobEvent[]),
     optional(coreOp<{ displayName: string; location: { pathLabels: string[] } }>("units.get", { id: job.unitId }), null),
     job.status === "requested" && job.slotProposal?.status !== "pending"
-      ? Promise.all(agreedSlots(job).map((s) => Date.parse(s.startAt) <= nowMs ? Promise.resolve([] as { id: string; displayName: string }[])
-        : optional(coreOp<Page<{ id: string; displayName: string }>>("members.eligible", { jobId: job.id, startAt: s.startAt, endAt: s.endAt, query: { limit: 20 } }).then((r) => r.items), [] as { id: string; displayName: string }[])))
+      ? Promise.all(agreedSlots(job).map((s) => {
+        return Date.parse(s.startAt) <= nowMs ? Promise.resolve([] as { id: string; displayName: string }[])
+          : optional(coreOp<Page<{ id: string; displayName: string }>>("members.eligible", { jobId: job.id, startAt: s.startAt, endAt: s.endAt, query: { limit: 20 } }).then((r) => r.items), [] as { id: string; displayName: string }[]);
+      }))
       : Promise.resolve([] as { id: string; displayName: string }[][]),
     ref ? optional(coreOp<ApiWorkReport>("reports.get", { jobId: job.id, reportId: ref.reportId, reportVersion: ref.reportVersion }), null) : Promise.resolve(null),
   ]);
@@ -127,9 +131,11 @@ export async function loadJobs(sp: SP) {
       job, title: names.units.get(job.unitId) ?? unit?.displayName ?? t("Unit"), customer: names.customers.get(unitOrg.get(job.unitId) ?? "") ?? t("customer"), location: unit?.location.pathLabels.join(" › ") ?? "",
       steps: stepper(job.status, !job.contractorOrgId, t), facts: facts(job, names, i), delivery: delivery(job, names, nowMs, i), controls: controls(job.status, t),
       preferred: preferredRows(job, eligible, nowMs, i),
-      history: [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 12).map((e) => ({
-        id: e.id, at: showTime(e.occurredAt, i.display), text: `${jobEventTitle[e.action] ? t(jobEventTitle[e.action]) : e.action.replace(/[._]/g, " ")}${e.actorUserId ? ` · ${byUser.get(e.actorUserId) ?? t("client")}` : ""}`,
-      })),
+      history: [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 12).map((e) => {
+        return {
+          id: e.id, at: showTime(e.occurredAt, i.display), text: `${jobEventTitle[e.action] ? t(jobEventTitle[e.action]) : e.action.replaceAll(/[._]/g, " ")}${e.actorUserId ? ` · ${byUser.get(e.actorUserId) ?? t("client")}` : ""}`,
+        };
+      }),
       partnerTech: pp ? names.people.get(pp.technicianMembershipId) ?? t("technician") : null,
       holdWho: sp2 ? (sp2.hold.kind === "internal" ? names.people.get(sp2.hold.membershipId) ?? t("HQ technician") : names.orgs.get(sp2.hold.contractorOrgId) ?? t("contractor")) : null,
       // the times the detail shows on its first render, formatted here in the display time zone (IR290)
@@ -150,8 +156,8 @@ export async function loadJobs(sp: SP) {
 export type JobsLive = Awaited<ReturnType<typeof loadJobs>>;
 
 /** The Plans tab: plans.list in the scope (next due first), plans.get for planId (default the first), the unit's place
- * (units.get) and the status of each generated occurrence (the unit's periodic jobs, jobs.list). The dates of the first
- * render are formatted here in the display time zone (IR291). */
+(units.get) and the status of each generated occurrence (the unit's periodic jobs, jobs.list). The dates of the first
+render are formatted here in the display time zone (IR291). */
 export async function loadPlans(sp: SP) {
   const { i, names, unitOrg, scope, head } = await shared(sp);
   const { t } = i;
@@ -162,9 +168,9 @@ export async function loadPlans(sp: SP) {
   const base = { ...head, q, rows, plansTotal: plans.length };
   const pick = one(sp.planId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
-  const plan = await coreOp<ApiPlan>("plans.get", { id: pick }).catch((e) => {
-    if (e instanceof CoreError && e.error.code === "NOT_FOUND") return null;
-    throw e;
+  const plan = await coreOp<ApiPlan>("plans.get", { id: pick }).catch((error) => {
+    if (error instanceof CoreError && error.error.code === "NOT_FOUND") return null;
+    throw error;
   });
   if (!plan) return { ...base, detail: null, missing: pick };
   const [unit, jobs] = await Promise.all([
@@ -185,8 +191,8 @@ export async function loadPlans(sp: SP) {
 export type PlansLive = Awaited<ReturnType<typeof loadPlans>>;
 
 /** The Contractors tab (DD-A21, IR131): every contractor organization with its profile (contractors.list with the
- * 90-day KPIs, the delegation and the rate card in effect) and for contractorId its rate cards (rateCards.list, newest
- * first), technicians (members.list) and uploaded certificates (certificates.list). */
+90-day KPIs, the delegation and the rate card in effect) and for contractorId its rate cards (rateCards.list, newest
+first), technicians (members.list) and uploaded certificates (certificates.list). */
 export async function loadContractors(sp: SP) {
   const { now, i, members, contractors: orgs, names, head } = await shared(sp);
   const { t } = i;
@@ -195,7 +201,7 @@ export async function loadContractors(sp: SP) {
   const technicians: ApiTechnician[] = members.filter((m) => m.role === "technician" && orgs.some((o) => o.id === m.organizationId))
     .map((m) => ({ id: m.id, displayName: m.displayName, organizationId: m.organizationId, role: m.role, validUntil: m.validUntil ?? null, qualifications: m.qualifications ?? [] }));
   const rows = contractorRows(orgs.map((o) => ({ id: o.id, name: o.name })), profiles, technicians, t);
-  const base = { ...head, q: {}, rows, withoutProfile: orgs.filter((o) => !profiles.some((p) => p.organizationId === o.id)).map((o) => ({ id: o.id, name: o.name })) };
+  const base = { ...head, q: {}, rows, withoutProfile: orgs.filter((o) => profiles.every((p) => p.organizationId !== o.id)).map((o) => ({ id: o.id, name: o.name })) };
   const pick = one(sp.contractorId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
   const org = orgs.find((o) => o.id === pick);
@@ -221,14 +227,14 @@ export async function loadContractors(sp: SP) {
 export type ContractorsLive = Awaited<ReturnType<typeof loadContractors>>;
 
 /** The SLA tab (DD-A22, IR236): sla.scorecard for the period (URL key period, default 90 days) and contractor
- * (contractorId) — totals with the targets of the customers' plans, one row per customer, the recent breaches and the
- * targets per plan type for the edit dialog. */
+(contractorId) — totals with the targets of the customers' plans, one row per customer, the recent breaches and the
+targets per plan type for the edit dialog. */
 export async function loadSla(sp: SP) {
   const { now, i, customers, properties, units, contractors: orgs, head } = await shared(sp);
   const { t } = i;
   const period = periodOf(one(sp.period), now.getTime());
   const contractorId = orgs.find((o) => o.id === one(sp.contractorId))?.id ?? "";
-  const sc = await coreOp<ApiScorecard>("sla.scorecard", { period: { from: period.from, to: period.to }, ...(contractorId ? { contractorOrgId: contractorId } : {}) });
+  const sc = await coreOp<ApiScorecard>("sla.scorecard", { period: { from: period.from, to: period.to }, ...(contractorId && { contractorOrgId: contractorId }) });
   return {
     ...head, q: {}, period, periods: PERIODS.map((p) => ({ id: p.id, label: t(p.label) })), contractorId, contractors: orgs.map((o) => ({ id: o.id, name: o.name })),
     tiles: slaTiles(sc, t), rows: slaRows(sc, customers, properties, units, t), breaches: breachRows(sc, new Map(customers.map((c) => [c.id, c.name])), t),

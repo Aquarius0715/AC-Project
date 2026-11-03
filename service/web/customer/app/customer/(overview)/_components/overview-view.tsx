@@ -12,7 +12,7 @@ import type { OverviewLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
 /** Customer overview (FR-C01, DD-C01, Figma Client 01a) from the Core API: the scope and period live in the URL; the
- * texts and times follow the user's display language and time zone (IR260). */
+texts and times follow the user's display language and time zone (IR260). */
 export function OverviewView({ live }: { live: OverviewLive }) {
   const t = useT();
   const router = useRouter();
@@ -23,34 +23,36 @@ export function OverviewView({ live }: { live: OverviewLive }) {
   // the values were read when the page rendered: two minutes later they read as stale until a refresh (DD-C01)
   const [staleFor, setStaleFor] = useState<string | null>(null);
   useEffect(() => {
-    const t = setTimeout(() => setStaleFor(live.asOf), 120_000);
-    return () => clearTimeout(t);
+    const t = setTimeout(() => { setStaleFor(live.asOf); }, 120_000);
+    return () => { clearTimeout(t); };
   }, [live.asOf]);
-  const stale = staleFor === live.asOf;
+  const isStale = staleFor === live.asOf;
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">{t("Viewing")}</span>
-          <Select aria-label={t("Property")} className="w-auto text-xs font-semibold" value={live.propertyId ?? ""} onChange={(e) => patch({ propertyId: e.target.value || null, unitId: null })}>
+          <Select aria-label={t("Property")} className="w-auto text-xs font-semibold" value={live.propertyId ?? ""} onChange={(e) => { patch({ propertyId: e.target.value || null, unitId: null }); }}>
             <option value="">{t("Property: All properties")}</option>{live.properties.map((p) => <option key={p.id} value={p.id}>{t("Property: {name}", { name: p.name })}</option>)}
           </Select>
-          <Select aria-label={t("Unit")} className="w-auto text-xs font-semibold" value={live.unitId ?? ""} onChange={(e) => patch({ unitId: e.target.value || null })}>
+          <Select aria-label={t("Unit")} className="w-auto text-xs font-semibold" value={live.unitId ?? ""} onChange={(e) => { patch({ unitId: e.target.value || null }); }}>
             <option value="">{t("Unit: All units ({n})", { n: live.units.length })}</option>{live.units.map((u) => <option key={u.id} value={u.id}>{t("Unit: {name}", { name: u.name })}</option>)}
           </Select>
-          <Tabs value={live.period} onChange={(v: OverviewPeriod) => patch({ period: v === "today" ? null : v })} tabs={OVERVIEW_PERIODS.map((p) => ({ ...p, label: t(p.label) }))} />
+          <Tabs value={live.period} onChange={(v: OverviewPeriod) => { patch({ period: v === "today" ? null : v }); }} tabs={OVERVIEW_PERIODS.map((p) => ({ ...p, label: t(p.label) }))} />
         </div>
         <div className="text-right text-xs">
-          <div className="flex items-center justify-end gap-2 font-semibold">{t("Updated {time}", { time: showClock(live.asOf, live.display) })} <Badge tone={stale ? "unknown" : "ok"} icon="live">{t(stale ? "Stale" : "Live")}</Badge><Btn size="sm" onClick={() => router.refresh()}><Icon name="refresh" />{t("Refresh")}</Btn></div>
+          <div className="flex items-center justify-end gap-2 font-semibold">{t("Updated {time}", { time: showClock(live.asOf, live.display) })} <Badge tone={isStale ? "unknown" : "ok"} icon="live">{t(isStale ? "Stale" : "Live")}</Badge><Btn size="sm" onClick={() => { router.refresh(); }}><Icon name="refresh" />{t("Refresh")}</Btn></div>
           <div className="text-muted-foreground">{live.note}</div>
         </div>
       </div>
 
       {live.due && ( // something is overdue or restricted: said where the customer first looks (DEC-90, IR610)
         <Banner tone="warn">
-          <div className="flex flex-col gap-1">{live.due.map((l) => (
-            <div key={l.href} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"><span>{l.text}</span><TextLink href={l.href}>{l.link} <Icon name="arrowRight" /></TextLink></div>
-          ))}</div>
+          <div className="flex flex-col gap-1">{live.due.map((l) => {
+            return (
+              <div key={l.href} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"><span>{l.text}</span><TextLink href={l.href}>{l.link} <Icon name="arrowRight" /></TextLink></div>
+            );
+          })}</div>
         </Banner>
       )}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
@@ -102,9 +104,11 @@ export function OverviewView({ live }: { live: OverviewLive }) {
               <Link key={u.id} href={`/customer/units/${u.id}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 py-3 hover:bg-surface2/50 lg:grid-cols-[minmax(0,1fr)_72px_72px_72px_120px_14px]">
                 <div className="flex min-w-0 items-center gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><Icon name="units" /></span><div className="min-w-0"><div className="truncate font-bold">{u.name}</div><div className="truncate text-[11px] text-muted-foreground">{u.place ? `${u.place} · ` : ""}{u.observed}</div></div></div>
                 <div className="col-span-2 row-start-2 flex gap-4 text-xs lg:contents">
-                  {([[u.temp, "°C"], [u.hum, "%"], [u.power, "W"]] as const).map(([v, unit], i) => (
-                    <div key={i}><span className="text-[13px] font-bold">{v ?? "—"}</span> <span className="text-[11px] text-muted-foreground">{v === null ? t("no data") : unit}</span></div>
-                  ))}
+                  {([[u.temp, "°C"], [u.hum, "%"], [u.power, "W"]] as const).map(([v, unit], i) => {
+                    return (
+                      <div key={i}><span className="text-[13px] font-bold">{v ?? "—"}</span> <span className="text-[11px] text-muted-foreground">{v === null ? t("no data") : unit}</span></div>
+                    );
+                  })}
                 </div>
                 <div className="col-start-2 row-start-1 flex flex-col items-end gap-1 lg:col-auto lg:row-auto lg:items-start"><PowerBadge s={u.state} /><ConnBadge s={u.conn} /></div>
                 <span className="hidden text-muted-foreground lg:block"><Icon name="chevronRight" /></span>
@@ -115,11 +119,13 @@ export function OverviewView({ live }: { live: OverviewLive }) {
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Needs attention")} action={<span className={c.alertCount ? "font-bold text-warn" : "font-bold text-muted-foreground"}>{c.alertCount}</span>}>
-            {a.items.length ? (
+            {a.items.length > 0 ? (
               <ul className="flex flex-col divide-y divide-line">
-                {a.items.map((x) => (
-                  <li key={x.id}><Link href="/customer/alerts" className="flex items-center justify-between gap-2 py-2.5"><div><div className="font-bold">{x.title}</div><div className="my-1"><SeverityBadge s={x.severity} /></div><div className="text-[11px] text-muted-foreground">{x.where}</div></div><span className="text-muted-foreground"><Icon name="chevronRight" /></span></Link></li>
-                ))}
+                {a.items.map((x) => {
+                  return (
+                    <li key={x.id}><Link href="/customer/alerts" className="flex items-center justify-between gap-2 py-2.5"><div><div className="font-bold">{x.title}</div><div className="my-1"><SeverityBadge s={x.severity} /></div><div className="text-[11px] text-muted-foreground">{x.where}</div></div><span className="text-muted-foreground"><Icon name="chevronRight" /></span></Link></li>
+                  );
+                })}
               </ul>
             ) : <p className="text-xs text-muted-foreground">{t("Nothing needs your attention.")}</p>}
             {a.more > 0 && <p className="text-[11px] text-muted-foreground">{t("+{n} more", { n: a.more })}</p>}
@@ -127,9 +133,11 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             <TextLink href="/customer/alerts" className="mt-1 inline-block">{t("link::Open alerts")} <Icon name="arrowRight" /></TextLink>
           </Card>
           <Card title={t("Automations")} action={<span className="text-xs text-muted-foreground">{t("{on} on · {off} off", { on: live.automations.on, off: live.automations.off })}</span>}>
-            {live.automations.items.map((x) => (
-              <div key={x.id} className="flex items-center justify-between gap-2 py-2"><div className="min-w-0"><div className="font-bold">{x.name}</div><div className="text-[11px] text-muted-foreground">{x.line}</div></div><Badge tone={x.status.tone} icon={x.status.tone === "ok" ? "live" : undefined}>{x.status.text}</Badge></div>
-            ))}
+            {live.automations.items.map((x) => {
+              return (
+                <div key={x.id} className="flex items-center justify-between gap-2 py-2"><div className="min-w-0"><div className="font-bold">{x.name}</div><div className="text-[11px] text-muted-foreground">{x.line}</div></div><Badge tone={x.status.tone} icon={x.status.tone === "ok" ? "live" : undefined}>{x.status.text}</Badge></div>
+              );
+            })}
             {live.automations.items.length === 0 && <p className="text-xs text-muted-foreground">{t("No automations for these units.")}</p>}
             <TextLink href="/customer/automations" className="mt-1 inline-block">{t("Manage automations")} <Icon name="arrowRight" /></TextLink>
           </Card>

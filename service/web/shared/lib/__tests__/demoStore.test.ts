@@ -25,6 +25,6 @@ describe("Phase 1A demo stores (FR-X05, IR257)", () => {
     sessionStorage.setItem("k", "{not json");
     expect(readDemo("k")).toBeNull();
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
-    expect(() => writeDemo("k", 1)).not.toThrow();
+    expect(() => { writeDemo("k", 1); }).not.toThrow();
   });
 });

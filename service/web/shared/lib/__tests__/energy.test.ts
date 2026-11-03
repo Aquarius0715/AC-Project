@@ -24,7 +24,7 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
   it("rounds half away from zero and formats energy and money in en-MY (IR44)", () => {
     expect([roundAway(2.25, 1), roundAway(-2.25, 1), roundAway(1.005, 2), roundAway(0.285, 2), roundAway(0.1 + 0.2, 6), roundAway(1e-7, 1)]).toEqual([2.3, -2.3, 1.01, 0.29, 0.3, 0]);
     expect([Object.is(roundAway(-0.04, 1), 0), roundAway(Infinity, 1)]).toEqual([true, Infinity]);
-    expect([one(120.25), one(1234.56), one(-0.04), amount(6012, "MYR"), amount(123456789, "MYR")]).toEqual(["120.3", "1,234.6", "0.0", "60.12 MYR", "1,234,567.89 MYR"]);
+    expect([one(120.25), one(1234.56), one(-0.04), amount(6012, "MYR"), amount(123_456_789, "MYR")]).toEqual(["120.3", "1,234.6", "0.0", "60.12 MYR", "1,234,567.89 MYR"]);
   });
 
   it("words a saving as a reduction or an increase, never a negative saving (IR68)", () => {

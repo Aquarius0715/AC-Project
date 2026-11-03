@@ -9,8 +9,7 @@ import type { ApiCommand, ApiUnitDetail, UnitAction } from "@ac/web/lib/units";
 export type ActionResult<T> = { ok: true; value: T } | { ok: false; messageKey: string; code: string };
 
 function failed(e: unknown): { ok: false; messageKey: string; code: string } {
-  if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code };
-  return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE" };
+  return e instanceof CoreError ? { ok: false, messageKey: e.error.messageKey, code: e.error.code } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE" };
 }
 
 /** commands.create with the current unit version; the client then polls commands.get until the device answers. */
@@ -19,8 +18,8 @@ export async function createCommand(unitId: string, action: UnitAction): Promise
     const unit = await coreOp<ApiUnitDetail>("units.get", { id: unitId });
     const command = await coreOp<ApiCommand>("commands.create", { unitId, action, expectedUnitVersion: unit.version }, { write: true });
     return { ok: true, value: command };
-  } catch (e) {
-    return failed(e);
+  } catch (error) {
+    return failed(error);
   }
 }
 
@@ -30,8 +29,8 @@ export async function setUnitAlertPolicies(unitId: string, alertPolicyIds: strin
     const unit = await coreOp<ApiUnitDetail>("units.get", { id: unitId });
     await coreOp("units.setAlertPolicies", { unitId, alertPolicyIds }, { write: true, expectedVersion: unit.version });
     return { ok: true, value: null };
-  } catch (e) {
-    return failed(e);
+  } catch (error) {
+    return failed(error);
   } finally {
     refresh();
   }

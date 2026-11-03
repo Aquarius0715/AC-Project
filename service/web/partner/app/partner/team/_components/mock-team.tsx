@@ -6,7 +6,7 @@ import { Badge, Banner, Btn, Card, Check, DataTable, EmptyState, Field, Input, M
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { Icon } from "@ac/web/components/Icon";
 
-// DATA_SOURCE=api: technicians of the company (members.list, IR172 displayName), a week of members.capacity and
+// DATA_SOURCE=API: technicians of the company (members.list, IR172 displayName), a week of members.capacity and
 // members.setUnavailability. Qualification grants come from the memberships (contractors get no permissions/scopes, IR42).
 const techs = [
   { id: "tech-external-a", quals: ["Split-unit refrigerant handling", "Electrical basics"], sub: "Refrigerant handling · Electrical basics · active since 2025-04", asg: "09:00–13:00 assigned", free: "13:00–17:00 free", used: 10, tot: 40, week: ["2 / 8 h", "4 / 8 h", "0 / 8 h", "4 / 8 h", "0 / 8 h", "—", "—"], active: true },
@@ -25,8 +25,8 @@ export function MockTeam() {
   const list = techs.filter((t) => (!activeOnly || t.active) && (!q || t.quals.some((x) => x.toLowerCase().includes(q.toLowerCase())) || t.id.includes(q)));
   return (
     <Page>
-      <div className="flex flex-wrap items-center justify-between gap-2"><Tabs value={tab} onChange={setTab} tabs={[{ id: "members", label: "Members" }, { id: "certs", label: "Certifications", count: 1 }]} /><div className="flex gap-2"><Btn size="sm" onClick={() => setModal("unavail")}><Icon name="add" /> Unavailable days</Btn></div></div>
-      {tab === "certs" ? <Certs onUpload={() => setModal("upload")} /> : <>
+      <div className="flex flex-wrap items-center justify-between gap-2"><Tabs value={tab} onChange={setTab} tabs={[{ id: "members", label: "Members" }, { id: "certs", label: "Certifications", count: 1 }]} /><div className="flex gap-2"><Btn size="sm" onClick={() => { setModal("unavail"); }}><Icon name="add" /> Unavailable days</Btn></div></div>
+      {tab === "certs" ? <Certs onUpload={() => { setModal("upload"); }} /> : <>
       <div className="flex flex-wrap items-center gap-4"><Check label="Active only" checked={activeOnly} onChange={setActiveOnly} /><div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder="Filter by qualification or technician" value={q} onChange={setQ} /></div></div>
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
@@ -52,13 +52,13 @@ export function MockTeam() {
         </div>
       </div>
       </>}
-      <Modal open={modal === "unavail"} onClose={() => setModal(null)} title="Add unavailable days" footer={<><Btn onClick={() => setModal(null)}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(null); toast("Unavailable days saved — available hours set to 0"); }}>Save</Btn></>}>
+      <Modal open={modal === "unavail"} onClose={() => { setModal(null); }} title="Add unavailable days" footer={<><Btn onClick={() => { setModal(null); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(null); toast("Unavailable days saved — available hours set to 0"); }}>Save</Btn></>}>
         <Field label="Technician"><Select><option>tech-external-a</option><option>tech-external-a2</option></Select></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Field label="From"><Input type="date" defaultValue="2026-10-01" /></Field><Field label="To"><Input type="date" defaultValue="2026-10-01" /></Field></div>
         <Field label="Type"><Select><option>Training</option><option>Annual leave</option><option>Public holiday</option><option>Sick</option><option>Other</option></Select></Field>
         <Banner tone="warn">Conflicts with 1 confirmed assignment (job-c07 · 10-01 10:00–12:00). Reassign it or ask HQ to propose a new time to the client — the client must approve any time change.</Banner>
       </Modal>
-      <Modal open={modal === "upload"} onClose={() => setModal(null)} title="Upload renewal — Electrical basics" footer={<><Btn onClick={() => setModal(null)}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(null); toast("Renewal uploaded — pending HQ verification"); }}>Upload</Btn></>}>
+      <Modal open={modal === "upload"} onClose={() => { setModal(null); }} title="Upload renewal — Electrical basics" footer={<><Btn onClick={() => { setModal(null); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(null); toast("Renewal uploaded — pending HQ verification"); }}>Upload</Btn></>}>
         <Field label="Technician"><Input disabled value="tech-external-a" /></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Field label="Certificate no."><Input defaultValue="EB-2026-0442" /></Field><Field label="Valid until"><Input type="date" defaultValue="2028-10-15" /></Field></div>
         <div className="rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted-foreground"><Icon name="upload" /> Drop a PDF / image (≤ 5 MiB)</div>
@@ -81,7 +81,7 @@ function Certs({ onUpload }: { onUpload: () => void }) {
       <Card title="Certificates — contractor-a">
         <DataTable rowKey={(r) => r.t + r.c} rows={rows} cols={[
           { key: "t", label: "Technician", render: (r) => <b>{r.t}</b> }, { key: "c", label: "Certificate", render: (r) => r.c }, { key: "u", label: "Valid until", render: (r) => r.until },
-          { key: "s", label: "Status", render: (r) => <Badge tone={r.st === "Valid" ? "ok" : r.st === "Expired" ? "muted" : "warn"}>{r.st}</Badge> },
+          { key: "s", label: "Status", render: (r) => <Badge tone={r.st === "Valid" ? "ok" : (r.st === "Expired" ? "muted" : "warn")}>{r.st}</Badge> },
           { key: "a", label: "", render: (r) => (r.st.startsWith("Expiring") ? <Btn size="sm" variant="primary" onClick={onUpload}>Upload renewal</Btn> : null) },
         ]} />
         <p className="mt-2 text-[11px] text-muted-foreground">Only valid, HQ-verified certificates make a technician eligible for offers that require them.</p>

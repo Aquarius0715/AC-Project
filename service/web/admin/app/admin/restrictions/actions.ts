@@ -12,16 +12,15 @@ export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messa
 async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
-  } catch (e) {
-    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds };
-    return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+  } catch (error) {
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     refresh();
   }
 }
 const write = (version: number) => ({ write: true, expectedVersion: version });
 
-export type ScheduleInput = { contractId: string; expectedContractVersion: number; causeInvoiceIds: string[]; unitIds: string[]; policy: Policy; executeAfter: string; reason: string; rulesVersion: string };
+export interface ScheduleInput { contractId: string; expectedContractVersion: number; causeInvoiceIds: string[]; unitIds: string[]; policy: Policy; executeAfter: string; reason: string; rulesVersion: string }
 /** restrictions.schedule (noticeAt is the acceptance time; the notice goes to the customer's clients, IR05). */
 export async function scheduleRestriction(input: ScheduleInput) {
   return run(() => coreOp<{ id: string }>("restrictions.schedule", input, { write: true }).then((r) => r.id));

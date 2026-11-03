@@ -14,10 +14,10 @@ const failed = (e: unknown): Result<never> => {
 
 export async function reviewReport(jobId: string, jobVersion: number, reportVersion: number, decision: "accept" | "return", reason: string | null): Promise<Result<{ status: string }>> {
   try {
-    const job = await coreOp<{ status: string }>("jobs.review", { jobId, reportVersion, decision, reviewMode: "normal", ...(reason !== null ? { reason } : {}) }, { write: true, expectedVersion: jobVersion });
+    const job = await coreOp<{ status: string }>("jobs.review", { jobId, reportVersion, decision, reviewMode: "normal", ...((reason !== null) && { reason }) }, { write: true, expectedVersion: jobVersion });
     return { ok: true, value: { status: job.status } };
-  } catch (e) {
-    return failed(e);
+  } catch (error) {
+    return failed(error);
   } finally {
     refresh();
   }

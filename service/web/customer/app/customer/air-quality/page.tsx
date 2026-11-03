@@ -20,7 +20,7 @@ import { AirQualityView, type AirLive } from "./_components/air-quality-view";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 /** telemetry.series of one unit over the window, whole: the chart's slots — 5-minute averages for an hour or a day, hourly
- * for 7 days — of the valid readings, with how many readings the window holds (IR605, IR607). */
+for 7 days — of the valid readings, with how many readings the window holds (IR605, IR607). */
 async function readSeries(unitId: string, metric: OpInput<"telemetry.series">["metric"], w: AirWindow) {
   const page: ApiAirSeries = await coreOp("telemetry.series", { from: w.from, to: w.to, unitIds: [unitId], metric, bucketMinutes: w.slotMs === 300_000 ? 5 : 60, query: {} });
   const slots: AirSlot[] = (page.buckets ?? []).map((b) => ({ start: b.start, avg: b.value, n: b.count }));
@@ -49,8 +49,8 @@ export default async function CustomerAirQualityPage({ searchParams }: PageProps
   ]);
   const latest = (m: string) => d.latestMeasurements.find((x) => x.metric === m);
   const sensors = new Set(d.capabilities.sensors.map((s) => s.metric));
-  const freshAir = d.capabilities.ventilation && d.capabilities.ventilationLevels.includes("low");
-  const guidance = airGuidance(latest("co2"), latest("pm25"), freshAir);
+  const isFreshAir = d.capabilities.ventilation && d.capabilities.ventilationLevels.includes("low");
+  const guidance = airGuidance(latest("co2"), latest("pm25"), isFreshAir);
   const roomName = sel.room.spaceId ? spaces.find((s) => s.id === sel.room.spaceId)?.name ?? i.t("this room") : sel.room.path; // outside rooms: the property
   const slots = series.slots; // the whole window: never cut off, so no slot is "not loaded" (IR592 → IR607)
   const points = slots.map((s) => s.avg);
@@ -59,9 +59,9 @@ export default async function CustomerAirQualityPage({ searchParams }: PageProps
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const live: AirLive = {
     rooms: rooms.map((r) => ({ key: r.key, spaceId: r.spaceId, label: r.label, units: r.units })), roomKey: sel.room.key, unitId: d.id, unitName: d.displayName,
-    path: sel.room.path, spaceId: sel.room.spaceId, connection: d.connection, updated: showClock(now.toISOString(), display), freshAir,
+    path: sel.room.path, spaceId: sel.room.spaceId, connection: d.connection, updated: showClock(now.toISOString(), display), freshAir: isFreshAir,
     cards: (["co2", "pm25", "temperature", "humidity"] as const).map((m) => metricCard(m, latest(m), sensors.has(m), i, setsTemperature(d.capabilities))),
-    strip: ventStrip(guidance, latest("co2"), roomName, d.displayName, freshAir, i.t),
+    strip: ventStrip(guidance, latest("co2"), roomName, d.displayName, isFreshAir, i.t),
     clean: cleanNote(guidance, latest("pm25"), roomName, i.t),
     allergen: allergenView(series.allergen, i), metric, period,
     chart: {

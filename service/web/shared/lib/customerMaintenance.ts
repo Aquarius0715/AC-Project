@@ -8,13 +8,13 @@ import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import type { IconName } from "@ac/web/components/Icon";
 
-export type ApiClientRow = {
+export interface ApiClientRow {
   projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; displayStatus: string; origin: string; dueAt: string;
   requestedSlot: Slot; scheduledSlot: Slot | null; preferredSlots: Slot[]; assignmentAcknowledgement: "pending" | "accepted" | "cant_make" | null;
-};
-export type ApiClientProposal = { id: string; source: "hq" | "contractor"; slot: Slot; hold: { kind: "internal" | "contractor" }; message: string; replyBy: string; status: string; decidedAt: string | null; declineReason: string | null; declineComment: string | null };
-export type ApiRating = { stars: number; tags: string[]; comment: string | null; ratedAt: string; editableUntil: string };
-export type ApiClientJob = {
+}
+export interface ApiClientProposal { id: string; source: "hq" | "contractor"; slot: Slot; hold: { kind: "internal" | "contractor" }; message: string; replyBy: string; status: string; decidedAt: string | null; declineReason: string | null; declineComment: string | null }
+export interface ApiRating { stars: number; tags: string[]; comment: string | null; ratedAt: string; editableUntil: string }
+export interface ApiClientJob {
   projection: "detail"; id: string; version: number; unitId: string; type: string; status: string; symptom: string; contactWindow: string | null; origin: string;
   planId: string | null; occurrenceAt: string | null; requestedSlot: Slot; preferredSlots: Slot[]; preferenceRound: number; slotProposal: ApiClientProposal | null;
   scheduledSlot: Slot | null; dueAt: string; completedAt: string | null; contractorOrgId: string | null; followUpOfJobId: string | null; followUpClass: "pending" | "rework" | "new_request" | null;
@@ -22,7 +22,7 @@ export type ApiClientJob = {
   /** the photos sent with the problem report this follow-up answers (IR437); absent in the demo data */
   problemPhotos?: { id: string; name: string; status: string }[];
   assignment: { acknowledgement: "pending" | "accepted" | "cant_make"; technicianName: string | null; scheduledStart: string; scheduledEnd: string; status: string } | null;
-};
+}
 
 const en = translator("en");
 /** “22 Sept, 10:00 am – 12:00 pm MYT” (both ends with their day when they fall on two days), in the display time zone. */
@@ -38,18 +38,19 @@ const CLIENT_TITLE: Record<string, string> = {
   "job.rated": "You rated the job", "job.problem_reported": "You reported a problem", "proposal.sent": "New time proposed", "partner_proposal.sent_to_client": "New time proposed", "job.follow_up_classified": "HQ reviewed your problem report", "proposal.accepted": "You accepted the proposed time",
   "proposal.declined": "You declined the proposed time", "job.reschedule_requested": "You asked for another time",
 };
-export const clientEventTitle = (action: string, shared: Record<string, string>, t: T = en) => (CLIENT_TITLE[action] ? t(CLIENT_TITLE[action]) : shared[action] ? t(shared[action]) : action.replace(/[._]/g, " "));
+export const clientEventTitle = (action: string, shared: Record<string, string>, t: T = en) => (CLIENT_TITLE[action] ? t(CLIENT_TITLE[action]) : (shared[action] ? t(shared[action]) : action.replaceAll(/[._]/g, " ")));
 export const sameSlot = (a: Slot | null, b: Slot | null) => !!a && !!b && Date.parse(a.startAt) === Date.parse(b.startAt) && Date.parse(a.endAt) === Date.parse(b.endAt);
 
 export type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
 export const STATUS_TABS: [StatusTab, string][] = [["all", "All"], ["reply", "Needs your reply"], ["requested", "Requested"], ["scheduled", "Scheduled"], ["progress", "In progress"], ["completed", "Completed"], ["cancelled", "Cancelled"]];
 /** The tab of a request: Needs your reply = a pending proposal; Scheduled = a time is agreed (offered … assigned). */
-export const tabOf = (displayStatus: string): StatusTab =>
-  displayStatus === "time_proposed" ? "reply" : displayStatus === "requested" ? "requested" : ["offered", "accepted", "assigned"].includes(displayStatus) ? "scheduled"
+export const tabOf = (displayStatus: string): StatusTab => {
+  return displayStatus === "time_proposed" ? "reply" : displayStatus === "requested" ? "requested" : ["offered", "accepted", "assigned"].includes(displayStatus) ? "scheduled"
     : displayStatus === "completed" ? "completed" : displayStatus === "cancelled" ? "cancelled" : "progress";
+};
 const ORDER = ["time_proposed", "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
 
-export type ClientRow = { id: string; short: string; unit: string; place: string; origin: "plan" | "request"; type: string; status: string; tab: StatusTab; line: string; icon: IconName; warn: boolean };
+export interface ClientRow { id: string; short: string; unit: string; place: string; origin: "plan" | "request"; type: string; status: string; tab: StatusTab; line: string; icon: IconName; warn: boolean }
 const TYPE: Record<string, string> = { reactive: "Repair", preventive: "Preventive maintenance", periodic: "Periodic inspection" };
 /** One request of the list (Figma 07a): unit and place, origin, type and what is next — business status order. */
 export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: string; place: string }, i: I18n = EN): ClientRow[] {
@@ -57,44 +58,49 @@ export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: s
   const slot = (s: Slot) => slotShort(s, i);
   return [...rows].sort((a, b) => ORDER.indexOf(a.displayStatus) - ORDER.indexOf(b.displayStatus) || Date.parse(a.dueAt) - Date.parse(b.dueAt)).map((j) => {
     const u = unit(j.unitId);
-    const plan = j.origin === "periodic_plan";
-    let line = "", warn = false, icon: IconName = "time";
+    const isPlan = j.origin === "periodic_plan";
+    let line = "", isWarn = false, icon: IconName = "time";
     switch (j.displayStatus) {
-      case "time_proposed": [line, warn, icon] = [t("A new visit time needs your reply — nothing is booked until you accept"), true, "swap"]; break;
-      case "requested": line = j.preferredSlots.length > 1 ? t("Preferred {slot} · +{n} more (not confirmed yet)", { slot: slot(j.preferredSlots[0]), n: j.preferredSlots.length - 1 })
-        : j.preferredSlots.length ? t("Preferred {slot} (not confirmed yet)", { slot: slot(j.preferredSlots[0]) }) : plan ? t("Plan visit {slot} · HQ is booking it", { slot: slot(j.requestedSlot) }) : t("Waiting for HQ"); break;
-      case "completed": icon = "success"; line = j.scheduledSlot ? t("Completed · visit {slot} · report available", { slot: slot(j.scheduledSlot) }) : t("Completed · report available"); break;
-      case "cancelled": [line, icon] = [t("Cancelled"), "cancelled"]; break;
-      case "offered": case "accepted": line = t(plan ? "Scheduled {slot} · booking the technician" : "Confirmed {slot} · booking the technician", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" }); break;
-      default: line = `${t(plan ? "Scheduled {slot}" : "Confirmed {slot}", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" })}${j.assignmentAcknowledgement === "accepted" ? t(" · technician confirmed") : ""}`;
+      case "time_proposed": { [line, isWarn, icon] = [t("A new visit time needs your reply — nothing is booked until you accept"), true, "swap"]; break;
+      }
+      case "requested": { line = j.preferredSlots.length > 1 ? t("Preferred {slot} · +{n} more (not confirmed yet)", { slot: slot(j.preferredSlots[0]), n: j.preferredSlots.length - 1 })
+        : j.preferredSlots.length > 0 ? t("Preferred {slot} (not confirmed yet)", { slot: slot(j.preferredSlots[0]) }) : isPlan ? t("Plan visit {slot} · HQ is booking it", { slot: slot(j.requestedSlot) }) : t("Waiting for HQ"); break;
+      }
+      case "completed": { icon = "success"; line = j.scheduledSlot ? t("Completed · visit {slot} · report available", { slot: slot(j.scheduledSlot) }) : t("Completed · report available"); break;
+      }
+      case "cancelled": { [line, icon] = [t("Cancelled"), "cancelled"]; break;
+      }
+      case "offered": case "accepted": { line = t(isPlan ? "Scheduled {slot} · booking the technician" : "Confirmed {slot} · booking the technician", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" }); break;
+ }
+      default: { line = `${t(isPlan ? "Scheduled {slot}" : "Confirmed {slot}", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" })}${j.assignmentAcknowledgement === "accepted" ? t(" · technician confirmed") : ""}`;
+      }
     }
-    return { id: j.id, short: j.id.slice(0, 8), unit: u.name, place: u.place, origin: plan ? "plan" : "request", type: t(plan ? "Periodic inspection" : TYPE[j.type] ?? j.type), status: j.displayStatus, tab: tabOf(j.displayStatus), line, icon, warn };
+    return { id: j.id, short: j.id.slice(0, 8), unit: u.name, place: u.place, origin: isPlan ? "plan" : "request", type: t(isPlan ? "Periodic inspection" : TYPE[j.type] ?? j.type), status: j.displayStatus, tab: tabOf(j.displayStatus), line, icon, warn: isWarn };
   });
 }
 
 /** The detail facts (Figma 07b): unit, origin and type, follow-up, request, the agreed time, the technician once accepted. */
 export function detailFacts(j: ApiClientJob, unit: { name: string; place: string }, i: I18n = EN): [string, string][] {
   const { t } = i;
-  const plan = j.origin === "periodic_plan";
-  const out: [string, string][] = [[t("Unit"), `${unit.name}${unit.place ? ` · ${unit.place}` : ""}`], [t("Origin · type"), plan ? t("Periodic plan · visit {date}", { date: j.occurrenceAt ? showDate(j.occurrenceAt, i.display) : "" }) : t("Client request · {type}", { type: t(TYPE[j.type] ?? j.type) })]];
+  const isPlan = j.origin === "periodic_plan";
+  const out: [string, string][] = [[t("Unit"), `${unit.name}${unit.place ? ` · ${unit.place}` : ""}`], [t("Origin · type"), isPlan ? t("Periodic plan · visit {date}", { date: j.occurrenceAt ? showDate(j.occurrenceAt, i.display) : "" }) : t("Client request · {type}", { type: t(TYPE[j.type] ?? j.type) })]];
   if (j.followUpOfJobId) out.push([t("Follow-up of"), `${j.followUpOfJobId.slice(0, 8)} · ${followUpText(j.followUpClass, t)}`]);
-  if (!plan && j.symptom) out.push([t("Request"), `“${j.symptom}”`]);
+  if (!isPlan && j.symptom) out.push([t("Request"), `“${j.symptom}”`]);
   const photos = (j.problemPhotos ?? []).filter((p) => p.status === "ready").length; // HQ and the technician see them too (IR437)
   if (photos) out.push([t("Your photos"), t(photos === 1 ? "1 photo sent with your report" : "{n} photos sent with your report", { n: photos })]);
   if (j.contactWindow) out.push([t("Contact window"), j.contactWindow]);
-  if (j.scheduledSlot && j.slotProposal?.status !== "pending") out.push([t(plan ? "Scheduled" : "Confirmed time"), plan ? t("{slot} · set by HQ from your plan", { slot: slotLong(j.scheduledSlot, i) }) : slotLong(j.scheduledSlot, i)]);
+  if (j.scheduledSlot && j.slotProposal?.status !== "pending") out.push([t(isPlan ? "Scheduled" : "Confirmed time"), isPlan ? t("{slot} · set by HQ from your plan", { slot: slotLong(j.scheduledSlot, i) }) : slotLong(j.scheduledSlot, i)]);
   const a = j.assignment;
   if (a?.acknowledgement === "accepted") out.push([t("Technician"), `${a.technicianName ?? t("your technician")} · ${t(j.contractorOrgId ? "service partner" : "HQ")}`]);
   else if (j.scheduledSlot && ["offered", "accepted", "assigned"].includes(j.status)) out.push([t("Technician"), t("being confirmed — the name shows once the technician accepts")]);
   return out;
 }
-export const followUpText = (c: ApiClientJob["followUpClass"], t: T = en) => t(c === "rework" ? "Rework (free)" : c === "new_request" ? "New request" : "Under HQ review");
+export const followUpText = (c: ApiClientJob["followUpClass"], t: T = en) => t(c === "rework" ? "Rework (free)" : (c === "new_request" ? "New request" : "Under HQ review"));
 
 const RANK = ["1st", "2nd", "3rd"];
 /** The preferred times with the booked one marked (request origin, open jobs). */
 export function preferredLines(j: ApiClientJob, i: I18n = EN): { text: string; note: string | null }[] {
-  if (j.origin === "periodic_plan" || ["completed", "cancelled"].includes(j.status)) return [];
-  return j.preferredSlots.map((s, k) => ({ text: `${RANK[k] ? i.t(RANK[k]) : `${k + 1}`} · ${slotLong(s, i)}`, note: sameSlot(s, j.scheduledSlot) ? i.t("booked") : null }));
+  return j.origin === "periodic_plan" || ["completed", "cancelled"].includes(j.status) ? [] : j.preferredSlots.map((s, k) => ({ text: `${RANK[k] ? i.t(RANK[k]) : `${k + 1}`} · ${slotLong(s, i)}`, note: sameSlot(s, j.scheduledSlot) ? i.t("booked") : null }));
 }
 
 /** The proposal to answer (Figma 07k): who proposes, the time, who comes, the message and the reply deadline. */
@@ -110,15 +116,16 @@ export function proposalCard(j: ApiClientJob, now: number, i: I18n = EN) {
 }
 const DECLINE_REASON: Record<string, string> = { not_home: "not at home", too_late: "too late", other: "other" };
 /** The declined-proposal notice shown while HQ looks again (Figma 07m). */
-export const declinedNotice = (j: ApiClientJob, t: T = en) => (j.status === "requested" && j.slotProposal?.status === "declined"
-  ? t("You declined the proposed time ({reason}). HQ is looking at your new times.", { reason: t(DECLINE_REASON[j.slotProposal.declineReason ?? "other"] ?? (j.slotProposal.declineReason ?? "other").replace(/_/g, " ")) }) : null);
+export const declinedNotice = (j: ApiClientJob, t: T = en) => {
+  return (j.status === "requested" && j.slotProposal?.status === "declined"
+    ? t("You declined the proposed time ({reason}). HQ is looking at your new times.", { reason: t(DECLINE_REASON[j.slotProposal.declineReason ?? "other"] ?? (j.slotProposal.declineReason ?? "other").replaceAll('_', " ")) }) : null);
+};
 
 /** A plan visit the client may move (Figma 07n): an agreed plan visit at least 48 h ahead (IR113). */
 export function planVisit(j: ApiClientJob, now: number, t: T = en): { can: boolean; why: string | null } | null {
   if (j.origin !== "periodic_plan" || !["offered", "accepted", "assigned"].includes(j.status)) return null;
   const start = j.scheduledSlot ? Date.parse(j.scheduledSlot.startAt) : null;
-  if (start !== null && start - now < 48 * 3600_000) return { can: false, why: t("Less than 48 h before the visit — contact HQ to change it.") };
-  return { can: true, why: null };
+  return start !== null && start - now < 48 * 3_600_000 ? { can: false, why: t("Less than 48 h before the visit — contact HQ to change it.") } : { can: true, why: null };
 }
 
 /** What a completed job offers (IR110, DD-C17): Confirm & rate for 7 days, editing the rating until editableUntil. */
@@ -127,13 +134,13 @@ export function feedback(j: ApiClientJob, now: number, i: I18n = EN): { kind: "r
   const { t } = i;
   if (j.status !== "completed") return { kind: "none", text: "", report: false };
   // jobs.reportProblem: within 7 days of completion (IR127 item 2), rated or not
-  const open = j.completedAt ? now < Date.parse(j.completedAt) + 7 * 86_400_000 : true;
+  const isOpen = j.completedAt ? now < Date.parse(j.completedAt) + 7 * 86_400_000 : true;
   const r = j.rating;
   if (!r) {
-    return open ? { kind: "rate", text: t("Is everything working? Your confirmation closes the job."), report: true } : { kind: "none", text: t("Confirmed automatically after 7 days."), report: false };
+    return isOpen ? { kind: "rate", text: t("Is everything working? Your confirmation closes the job."), report: true } : { kind: "none", text: t("Confirmed automatically after 7 days."), report: false };
   }
-  const editable = now < Date.parse(r.editableUntil);
-  return { kind: editable ? "edit" : "rated", stars: r.stars, report: open, text: `${r.tags.length ? ` · ${r.tags.map((x) => t(x)).join(", ")}` : ""}${editable ? t(" · editable until {when}", { when: showTime(r.editableUntil, i.display) }) : ""}` };
+  const isEditable = now < Date.parse(r.editableUntil);
+  return { kind: isEditable ? "edit" : "rated", stars: r.stars, report: isOpen, text: `${r.tags.length > 0 ? ` · ${r.tags.map((x) => t(x)).join(", ")}` : ""}${isEditable ? t(" · editable until {when}", { when: showTime(r.editableUntil, i.display) }) : ""}` };
 }
 export const RATING_TAGS = ["On time", "Clean work", "Explained clearly", "Polite", "Fixed the problem"];
 export const PROBLEMS: { id: "same_problem" | "new_damage" | "not_completed" | "other"; label: string }[] = [
@@ -141,16 +148,16 @@ export const PROBLEMS: { id: "same_problem" | "new_damage" | "not_completed" | "
 ];
 
 /** The 3 preferred times (IR113 item 2): exactly 3, each 1–4 h, starting on a later day than today in Kuala Lumpur (the
- * backend's rule, whatever the display time zone), all different; an incomplete date or time is not a time yet. */
+backend's rule, whatever the display time zone), all different; an incomplete date or time is not a time yet. */
 export function preferredError(slots: Slot[], now: number, count = 3, t: T = en): string | null {
   if (slots.length !== count) return t("Give {n} preferred times.", { n: count });
   if (slots.some((s) => !s.startAt || !s.endAt)) return t("Enter the date and both times of each preferred time.");
-  const today = new Date(now + 8 * 3600_000).toISOString().slice(0, 10);
+  const today = new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
   const keys = new Set<string>();
   for (const s of slots) {
-    const h = (Date.parse(s.endAt) - Date.parse(s.startAt)) / 3600_000;
+    const h = (Date.parse(s.endAt) - Date.parse(s.startAt)) / 3_600_000;
     if (!(h >= 1 && h <= 4)) return t("Each time is 1–4 hours long.");
-    if (new Date(Date.parse(s.startAt) + 8 * 3600_000).toISOString().slice(0, 10) <= today) return t("Times start on a later day than today (Kuala Lumpur).");
+    if (new Date(Date.parse(s.startAt) + 8 * 3_600_000).toISOString().slice(0, 10) <= today) return t("Times start on a later day than today (Kuala Lumpur).");
     const k = `${Date.parse(s.startAt)}-${Date.parse(s.endAt)}`;
     if (keys.has(k)) return t(count === 3 ? "The 3 times must be different." : "The times must be different.");
     keys.add(k);
@@ -166,12 +173,12 @@ export function symptomLength(v: string): number {
 export function contactError(v: string, tr: T = en): string | null {
   const t = v.trim();
   if (t.length > 200) return tr("Up to 200 characters.");
-  if (t.includes("@") || /\d{7,}/.test(t.replace(/[\s\-()+]/g, ""))) return tr("No e-mail addresses or phone numbers — use HH:mm for times (example: Weekdays 09:00-18:00).");
+  if (t.includes("@") || /\d{7,}/.test(t.replaceAll(/[\s\-()+]/g, ""))) return tr("No e-mail addresses or phone numbers — use HH:mm for times (example: Weekdays 09:00-18:00).");
   return null;
 }
 
 /** The client's notes and the job history from jobs.events (internal notes never reach the client, IR42). */
-export type ApiClientEvent = { id: string; action: string; occurredAt: string; actorUserId: string | null; note: { visibility: string; message: string } | null };
+export interface ApiClientEvent { id: string; action: string; occurredAt: string; actorUserId: string | null; note: { visibility: string; message: string } | null }
 export function notesOf(events: ApiClientEvent[], me: string, i: I18n = EN): { id: string; who: string; at: string; text: string }[] {
   return events.filter((e) => e.note && e.note.visibility === "customer").sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt))
     .map((e) => ({ id: e.id, who: i.t(e.actorUserId === me ? "You" : "Coordinator"), at: showTime(e.occurredAt, i.display), text: e.note!.message }));
@@ -187,7 +194,7 @@ export function clientJobRefusal(f: { code: string; messageKey: string; fieldErr
     "error.invalidFile": "photos must be JPEG or PNG up to 5 MiB", "error.unitArchived": "the unit is archived", "error.required": "required", "error.invalid": "not a valid value",
   };
   const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${keys[v] ? t(keys[v]) : v}`);
-  if (fields.length) return fields.join(" · ");
+  if (fields.length > 0) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: t(keys[f.messageKey]) }) : `${t(keys[f.messageKey])}.`;
   if (f.code === "NOT_FOUND") return t("The request no longer exists.");
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)

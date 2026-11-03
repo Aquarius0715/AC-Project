@@ -9,17 +9,17 @@ import { metricLabel } from "@ac/web/lib/adminAlerts";
 import { airNumber } from "@ac/web/lib/air";
 
 /** EvidenceCandidate of service-contracts.ts. */
-export type ApiEvidenceCandidate = {
+export interface ApiEvidenceCandidate {
   id: string; kind: "detection" | "remeasurement" | "device_event"; observedAt: string; metric: string | null; value: number | null; unit: string | null;
   origin: "measured" | "estimated" | "inspection" | null; quality: string | null; eventType: string | null;
-};
+}
 /** One row of the picker: what the record is and when, then where it comes from. */
-export type EvidenceRow = { id: string; kind: ApiEvidenceCandidate["kind"]; title: string; sub: string };
+export interface EvidenceRow { id: string; kind: ApiEvidenceCandidate["kind"]; title: string; sub: string }
 
 const ORIGIN: Record<string, string> = { measured: "measured", inspection: "recorded on site", estimated: "estimated" };
 const EVENT: Record<string, string> = { restored: "The device's signal is back" };
 /** The metric's name without the unit some labels carry (“CO₂ (ppm)” → “CO₂”): the value names its unit. */
-const metricName = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]).replace(/\s*\([^)]*\)$/, "") : metric.replace(/_/g, " "));
+const metricName = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]).replace(/\s*\([^)]*\)$/, "") : metric.replaceAll('_', " "));
 
 /** The candidates as the picker lists them: the newest first, as alerts.evidence returns them. */
 export function evidenceRows(items: ApiEvidenceCandidate[], nowMs: number, i: I18n = EN): EvidenceRow[] {

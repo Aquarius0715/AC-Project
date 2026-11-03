@@ -4,11 +4,13 @@ import { attemptText, conceptText, eventItem, kg3, quoteErrors, quoteInput, reco
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const attempt = { id: "a1", stage: "purchase" as const, status: "pending" as const, startedAt: "2026-09-14T01:30:00Z", completedAt: null };
-const record = (over: Partial<ApiOffsetRecord>): ApiOffsetRecord => ({
-  id: "rec-0001-aaaa", version: 2, createdAt: "2026-09-14T01:00:00Z", quoteId: "quo-0001-bbbb", customerId: "c1", amountKg: 1.5, attempts: [attempt], currentAttemptId: "a1",
-  state: "demo_requested", previousState: null, purchaseRef: null, retirementRef: null, demoCertificateRef: null,
-  eventHistory: [{ action: "offsets.request", occurredAt: "2026-09-14T01:00:00Z", actorId: "user-hq-0001", result: "success", reason: null }], ...over,
-});
+const record = (over: Partial<ApiOffsetRecord>): ApiOffsetRecord => {
+  return {
+    id: "rec-0001-aaaa", version: 2, createdAt: "2026-09-14T01:00:00Z", quoteId: "quo-0001-bbbb", customerId: "c1", amountKg: 1.5, attempts: [attempt], currentAttemptId: "a1",
+    state: "demo_requested", previousState: null, purchaseRef: null, retirementRef: null, demoCertificateRef: null,
+    eventHistory: [{ action: "offsets.request", occurredAt: "2026-09-14T01:00:00Z", actorId: "user-hq-0001", result: "success", reason: null }], ...over,
+  };
+};
 const draft = (over: Partial<QuoteDraft>): QuoteDraft => ({ customerId: "c1", unitIds: ["u1"], from: "2026-08-01T00:00", to: "2026-09-01T00:00", purpose: " Offset August ", amountKg: "1.250", ...over });
 
 describe("HQ offset demo (FR-A15, DD-A15)", () => {

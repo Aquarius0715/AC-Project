@@ -98,6 +98,6 @@ describe("automation name length", () => {
     const d = draftOf(schedule);
     expect(draftErrors({ ...d, name: "😀".repeat(120) })).not.toHaveProperty("name");
     expect(draftErrors({ ...d, name: "😀".repeat(121) })).toHaveProperty("name");
-    expect(draftErrors({ ...d, name: "   " })).toHaveProperty("name");
+    expect(draftErrors({ ...d, name: ' '.repeat(3) })).toHaveProperty("name");
   });
 });

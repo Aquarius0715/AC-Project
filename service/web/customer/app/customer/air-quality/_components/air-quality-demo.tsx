@@ -9,7 +9,7 @@ const series = {
   hum: { label: "Humidity", unit: "%", pts: [55, 56, 58, 60, 62, 60, 59, 60, 61, 60, 60, 60], min: 30, max: 80, th: 70 },
 } as const;
 
-/** The Phase 1A demo of the air-quality screen (fixtures; DATA_SOURCE=api uses AirQualityView). */
+/** The Phase 1A demo of the air-quality screen (fixtures; DATA_SOURCE=API uses AirQualityView). */
 export function AirQualityDemo() {
   const toast = useToast();
   const [metric, setMetric] = useState<keyof typeof series>("co2");
@@ -24,7 +24,7 @@ export function AirQualityDemo() {
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-4 py-3 text-xs">
         <div className="flex items-center gap-2"><span className="text-muted-foreground">Viewing</span><Select className="rounded-control border border-line px-2.5 py-1.5 font-semibold" aria-label="Unit"><option>Bedroom (Bedroom AC)</option><option>Living room AC</option></Select></div>
-        <span className="text-muted-foreground">Updated 09:12:30 · <Plain className="underline" onClick={() => setMissing((m) => !m)}>{missing ? "show normal" : "show missing-data state"}</Plain></span>
+        <span className="text-muted-foreground">Updated 09:12:30 · <Plain className="underline" onClick={() => { setMissing((m) => !m); }}>{missing ? "show normal" : "show missing-data state"}</Plain></span>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "210px" }}>
         {[
@@ -32,18 +32,20 @@ export function AirQualityDemo() {
           { l: "PM2.5", v: "12", u: "µg/m³", b: <Badge tone="ok" icon="check">Within guide</Badge>, s: "Observed 09:12", n: "No current advice" },
           { l: "Temperature", v: "28.0", u: "°C", b: <Badge tone="muted" icon="live">Measured</Badge>, s: "Observed 09:12:30", n: "Setpoint is on Unit Control" },
           { l: "Humidity", v: "60", u: "%", b: <Badge tone="muted" icon="live">Measured</Badge>, s: "Observed 09:12:30", n: "No current advice" },
-        ].map((m) => (
-          <div key={m.l} className="rounded-2xl border border-line bg-surface p-4"><div className="flex justify-between text-xs text-muted-foreground"><span>{m.l}</span>{m.b}</div><div className="text-[28px] font-bold">{m.v} <span className="text-sm font-medium text-muted-foreground">{m.u}</span></div><div className="text-[11px] text-muted-foreground">{m.s}</div><div className="mt-1 text-xs font-semibold">{m.n}</div></div>
-        ))}
+        ].map((m) => {
+          return (
+            <div key={m.l} className="rounded-2xl border border-line bg-surface p-4"><div className="flex justify-between text-xs text-muted-foreground"><span>{m.l}</span>{m.b}</div><div className="text-[28px] font-bold">{m.v} <span className="text-sm font-medium text-muted-foreground">{m.u}</span></div><div className="text-[11px] text-muted-foreground">{m.s}</div><div className="mt-1 text-xs font-semibold">{m.n}</div></div>
+          );
+        })}
       </div>
       <Card><div className="flex flex-wrap items-center justify-between gap-2 text-[13px]"><span><b>Allergen (dust mite)</b> <Badge tone="warn" icon="warning">Detected</Badge></span><span className="text-xs text-muted-foreground">Source: demo_observation · 09:00 · cleaning recommended</span></div></Card>
-      {!missing && <Banner tone="warn" action={<Btn size="sm" variant="primary" onClick={() => setLog(true)}>Log ventilation</Btn>}><b>Ventilation recommended</b><div className="text-xs text-muted-foreground">CO2 1000 ppm in Bedroom (≥ 1000 ppm guide). Open a window or run your ventilation fan, then log it — the record is kept in this room’s ventilation history.</div></Banner>}
-      <Card title={`${s.label} — last ${win === "24h" ? "24 hours" : win === "1h" ? "hour" : "7 days"}`} sub={`${s.unit} · Bedroom · rolling window ending 09:12 · 5-min averages`} action={<div className="flex flex-wrap gap-2"><Tabs value={metric} onChange={setMetric} tabs={(Object.keys(series) as (keyof typeof series)[]).map((k) => ({ id: k, label: series[k].label }))} /><Tabs value={win} onChange={setWin} tabs={[{ id: "1h", label: "1h" }, { id: "24h", label: "24h" }, { id: "7d", label: "7d" }]} /><Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: "Chart" }, { id: "table", label: "Table" }]} /></div>}>
+      {!missing && <Banner tone="warn" action={<Btn size="sm" variant="primary" onClick={() => { setLog(true); }}>Log ventilation</Btn>}><b>Ventilation recommended</b><div className="text-xs text-muted-foreground">CO2 1000 ppm in Bedroom (≥ 1000 ppm guide). Open a window or run your ventilation fan, then log it — the record is kept in this room’s ventilation history.</div></Banner>}
+      <Card title={`${s.label} — last ${win === "24h" ? "24 hours" : (win === "1h" ? "hour" : "7 days")}`} sub={`${s.unit} · Bedroom · rolling window ending 09:12 · 5-min averages`} action={<div className="flex flex-wrap gap-2"><Tabs value={metric} onChange={setMetric} tabs={(Object.keys(series) as (keyof typeof series)[]).map((k) => ({ id: k, label: series[k].label }))} /><Tabs value={win} onChange={setWin} tabs={[{ id: "1h", label: "1h" }, { id: "24h", label: "24h" }, { id: "7d", label: "7d" }]} /><Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: "Chart" }, { id: "table", label: "Table" }]} /></div>}>
         {view === "chart" ? <><LineChart points={missing ? s.pts.map((p, i) => (i > 4 && i < 8 ? null : p)) : [...s.pts]} min={s.min} max={s.max} threshold={s.th} height={200} labels={["09:12 yesterday", "15:00", "21:00", "03:00", "09:12 now"]} /><div className="mt-1 flex gap-4 text-[11px] text-muted-foreground"><span className="text-primary">— {s.label} ({s.unit})</span><span className="text-crit">- - {s.th} {s.unit} guide</span></div></> : <DataTable rows={s.pts.map((p, i) => ({ t: `${(9 + i * 2) % 24}:12`, p }))} rowKey={(r) => r.t + r.p} cols={[{ key: "t", label: "Time", render: (r) => r.t }, { key: "p", label: `${s.label} (${s.unit})`, render: (r) => r.p }]} />}
       </Card>
       <Card title="Ventilation history">{log2.map((l, i) => <div key={i} className="flex flex-wrap justify-between gap-2 border-b border-line py-2 text-[13px] last:border-0"><span>{l.m}</span><span className="text-xs text-muted-foreground">{l.t}</span></div>)}</Card>
-      <Modal open={log} onClose={() => setLog(false)} title="Log ventilation" footer={<><Btn onClick={() => setLog(false)}>Cancel</Btn><Btn variant="primary" onClick={() => { setLog2((l) => [{ t: "Today 09:15", m: method }, ...l]); setLog(false); toast("Ventilation logged"); }}>Save record</Btn></>}>
-        <Field label="What did you do?"><Select value={method} onChange={(e) => setMethod(e.target.value)}><option>Opened window</option><option>Ran ventilation fan</option><option>Manual ventilation</option></Select></Field>
+      <Modal open={log} onClose={() => { setLog(false); }} title="Log ventilation" footer={<><Btn onClick={() => { setLog(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setLog2((l) => [{ t: "Today 09:15", m: method }, ...l]); setLog(false); toast("Ventilation logged"); }}>Save record</Btn></>}>
+        <Field label="What did you do?"><Select value={method} onChange={(e) => { setMethod(e.target.value); }}><option>Opened window</option><option>Ran ventilation fan</option><option>Manual ventilation</option></Select></Field>
         <Field label="Note (optional)"><Textarea placeholder="e.g. 15 minutes" /></Field>
       </Modal>
     </Page>

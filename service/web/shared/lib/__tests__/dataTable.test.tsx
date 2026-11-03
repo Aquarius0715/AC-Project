@@ -6,7 +6,7 @@ import { DataTable, type Col } from "@ac/web/components/ui";
 
 afterEach(cleanup);
 
-type Unit = { id: string; name: string; status: string };
+interface Unit { id: string; name: string; status: string }
 const units: Unit[] = [{ id: "u-1", name: "Bedroom AC", status: "Online" }, { id: "u-2", name: "Office AC", status: "Offline" }];
 const cols: Col<Unit>[] = [
   { key: "name", label: "Unit", render: (u) => <strong>{u.name}</strong> },
@@ -59,7 +59,7 @@ describe("DataTable", () => {
       return (
         <>
           <p>Opened {n}</p>
-          <DataTable rows={units} rowKey={(u) => u.id} cols={[{ key: "a", label: "Actions", render: (u) => <button onClick={() => setN(n + 1)}>Edit {u.name}</button> }]} />
+          <DataTable rows={units} rowKey={(u) => u.id} cols={[{ key: "a", label: "Actions", render: (u) => <button onClick={() => { setN(n + 1); }}>Edit {u.name}</button> }]} />
         </>
       );
     }

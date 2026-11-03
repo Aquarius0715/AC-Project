@@ -76,5 +76,6 @@ test("HQ adds a contractor company and its first contractor, who signs in to the
     await expect(me.getByRole("row").filter({ hasText: "E2E Boss (you)" })).toContainText("Your account");
     await me.context().close();
   });
+
   await admin.context().close();
 });

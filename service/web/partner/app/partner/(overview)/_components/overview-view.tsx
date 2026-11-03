@@ -12,21 +12,21 @@ const badgeTone: Record<ActionRow["kind"], "primary" | "crit" | "warn"> = { offe
 const hours = Array.from({ length: (DAY_END - DAY_START) / 2 + 1 }, (_, i) => DAY_START + i * 2);
 
 /** The contractor overview (FR-P01, Figma Contractor 01-1…01-4) from the Core API: KPI tiles that open the job list,
- * the period's progress by status, what needs the company's action, today's timeline, the team's capacity and the
- * recent job activity. The period (URL from/to) applies to every section, as on the job list. Texts in the user's
- * display language (IR270); the period and today's timeline are Kuala Lumpur days and hours. */
+the period's progress by status, what needs the company's action, today's timeline, the team's capacity and the
+recent job activity. The period (URL from/to) applies to every section, as on the job list. Texts in the user's
+display language (IR270); the period and today's timeline are Kuala Lumpur days and hours. */
 export function OverviewView({ live }: { live: OverviewLive }) {
   const t = useT();
   const patch = useUrlPatch();
   const { progress: pr } = live;
   const period = live.period.text;
   const unassigned = live.actions.filter((a) => a.kind === "unassigned").length;
-  const anyBlock = live.timeline.some((r) => r.blocks.length);
+  const isAnyBlock = live.timeline.some((r) => r.blocks.length);
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-muted-foreground">
         <span>{t("Updated {time} · your company’s jobs only", { time: live.updated })}</span>
-        <Select aria-label={t("Period")} className="w-auto" value={live.period.value} onChange={(e) => { const [from, to] = e.target.value.split("|"); patch({ from, to }); }}>
+        <Select aria-label={t("Period")} className="w-auto" value={live.period.value} onChange={(e) => { const [from, to] = e.target.value.split("|", 2); patch({ from, to }); }}>
           {live.period.custom && <option value={live.period.value}>{live.period.label}</option>}
           {live.periods.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
         </Select>
@@ -61,9 +61,11 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             )}
           </Card>
           <Card title={t("Team capacity — {period}", { period })} action={<TextLink href="/partner/team">{t("Team & capacity")} <Icon name="arrowRight" /></TextLink>}>
-            {live.capacity.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : live.capacity.slice(0, OVERVIEW_ROWS).map((c) => (
-              <div key={c.id} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{c.name}</b><span className="text-muted-foreground">{c.text}</span></div><UtilBar pct={c.pct} tone={c.pct !== null && c.pct >= 90 ? "warn" : "primary"} label={`${c.name}: ${c.text}`} /></div>
-            ))}
+            {live.capacity.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : live.capacity.slice(0, OVERVIEW_ROWS).map((c) => {
+              return (
+                <div key={c.id} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{c.name}</b><span className="text-muted-foreground">{c.text}</span></div><UtilBar pct={c.pct} tone={c.pct !== null && c.pct >= 90 ? "warn" : "primary"} label={`${c.name}: ${c.text}`} /></div>
+              );
+            })}
             {live.capacity.length > OVERVIEW_ROWS && <p className="mb-2"><TextLink href="/partner/team">{t("{n} more technicians", { n: live.capacity.length - OVERVIEW_ROWS })} <Icon name="arrowRight" /></TextLink></p>}
             <p className="text-[11px] text-muted-foreground">{t("Utilization = assigned hours ÷ available hours. Undefined hours show “—”.")}</p>
           </Card>
@@ -78,7 +80,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
                   <span><b>{r.name}</b><span className="block text-[11px] text-muted-foreground">{r.sub}</span></span>
                   <div className="relative h-8 rounded-lg bg-surface2">
                     {r.blocks.map((b) => <div key={b.text} className="absolute top-1 h-6 truncate rounded bg-primary px-2 text-[11px] leading-6 text-white" style={{ left: `${b.left}%`, width: `${b.width}%` }}>{b.text}</div>)}
-                    {!r.blocks.length && <span className="absolute inset-0 grid place-items-center text-[11px] text-muted-foreground">{r.off ? t("Unavailable · {reason}", { reason: r.off }) : t("Free all day")}</span>}
+                    {r.blocks.length === 0 && <span className="absolute inset-0 grid place-items-center text-[11px] text-muted-foreground">{r.off ? t("Unavailable · {reason}", { reason: r.off }) : t("Free all day")}</span>}
                     {live.today.nowPct > 0 && live.today.nowPct < 100 && <span className="absolute inset-y-0 w-px bg-crit" style={{ left: `${live.today.nowPct}%` }} aria-hidden />}
                   </div>
                 </div>
@@ -86,7 +88,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             </div></ScrollX>
             {live.timeline.length > OVERVIEW_ROWS && <p className="mt-2"><TextLink href="/partner/schedule">{t("{n} more technicians", { n: live.timeline.length - OVERVIEW_ROWS })} <Icon name="arrowRight" /></TextLink></p>}
             <p className="mt-2 text-[11px] text-muted-foreground">
-              {t("Red line = now ({time}).", { time: live.today.now })} {t(anyBlock ? "Blue = assigned work windows." : "No assignments today.")}
+              {t("Red line = now ({time}).", { time: live.today.now })} {t(isAnyBlock ? "Blue = assigned work windows." : "No assignments today.")}
               {live.otherZone && ` ${t("The timeline is in Kuala Lumpur time (Asia/Kuala_Lumpur).")}`}
             </p>
             {unassigned > 0 && <div className="mt-2"><Banner tone="warn">{t(unassigned === 1 ? "1 accepted job still has no technician — assign it before the delegation period ends." : "{n} accepted jobs still have no technician — assign them before the delegation period ends.", { n: unassigned })}</Banner></div>}

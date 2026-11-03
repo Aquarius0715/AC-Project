@@ -6,7 +6,7 @@ import { expect, type Page } from "@playwright/test";
 
 const AXE = readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
-type Violation = { id: string; impact: string | null; help: string; nodes: { target: string[] }[] };
+interface Violation { id: string; impact: string | null; help: string; nodes: { target: string[] }[] }
 
 /** The critical and serious violations of the page, or of the elements `scope` selects, as readable lines. */
 export async function axeViolations(page: Page, scope?: string): Promise<string[]> {
@@ -15,7 +15,7 @@ export async function axeViolations(page: Page, scope?: string): Promise<string[
   await page.waitForFunction(() => document.getAnimations().every((a) => a.effect?.getComputedTiming().endTime === Infinity || a.playState !== "running"));
   await page.evaluate(AXE);
   const found = await page.evaluate(async ([s, tags]) => {
-    const axe = (window as unknown as { axe: { run: (c: unknown, o: object) => Promise<{ violations: Violation[] }> } }).axe;
+    const axe = (globalThis as unknown as { axe: { run: (c: unknown, o: object) => Promise<{ violations: Violation[] }> } }).axe;
     return (await axe.run(s ? { include: [s] } : document, { runOnly: { type: "tag", values: tags } })).violations;
   }, [scope ?? null, TAGS] as const);
   return found.filter((v) => v.impact === "critical" || v.impact === "serious")

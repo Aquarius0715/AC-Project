@@ -13,19 +13,19 @@ import type { IconName } from "@ac/web/components/Icon";
 
 const en = translator("en");
 
-export type ApiKpis = { period: { from: string; to: string }; offerAcceptance: number | null; arrivalInWindow: number | null; firstTimeAccepted: number | null; averageRating: number | null; ratingCount: number; reworkRate: number | null };
-export type ApiProfile = {
+export interface ApiKpis { period: { from: string; to: string }; offerAcceptance: number | null; arrivalInWindow: number | null; firstTimeAccepted: number | null; averageRating: number | null; ratingCount: number; reworkRate: number | null }
+export interface ApiProfile {
   id: string; version: number; organizationId: string; name: string; status: "active" | "suspended"; registrationNo: string; serviceAreas: string[]; contactEmail: string;
   insuranceValidUntil: string | null; delegation: { from: string; to: string }; rateCardId: string | null; suspendedReason: string | null; kpis: ApiKpis; createdAt: string; updatedAt: string;
-};
+}
 export type WorkType = "periodic_inspection" | "repair_base" | "emergency" | "rework_deduction";
-export type ApiRateCard = { id: string; version: number; contractorOrgId: string; effectiveFrom: string; currency: "MYR" | "USD"; lines: { workType: WorkType; amountMinor: number; note: string | null }[] };
-export type ApiCertificate = {
+export interface ApiRateCard { id: string; version: number; contractorOrgId: string; effectiveFrom: string; currency: "MYR" | "USD"; lines: { workType: WorkType; amountMinor: number; note: string | null }[] }
+export interface ApiCertificate {
   id: string; version: number; membershipId: string; organizationId: string; code: string; name: string; number: string; issuedAt: string; expiresAt: string; fileName: string | null;
   status: "valid" | "expiring" | "expired" | "pending_verification" | "rejected"; renewalOf: string | null; createdAt: string;
   verifiedAt?: string | null; trainingRequestedAt?: string | null;
-};
-export type ApiTechnician = { id: string; displayName: string; organizationId: string; role: string; validUntil: string | null; qualifications: { code: string; validFrom: string; validUntil: string; revokedAt: string | null }[] };
+}
+export interface ApiTechnician { id: string; displayName: string; organizationId: string; role: string; validUntil: string | null; qualifications: { code: string; validFrom: string; validUntil: string; revokedAt: string | null }[] }
 type Tone = "ok" | "warn" | "crit" | "primary" | "muted";
 
 const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v)} %`);
@@ -33,7 +33,7 @@ const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v)} %`);
 const dayMonth = (iso: string, i: I18n) => showDayMonth(iso, { locale: i.display.locale, timeZone: KL });
 
 /** One contractor organization of the list (Figma “contractor-a · KL, Selangor · 2 technicians · Active”). */
-export type ContractorRow = { id: string; name: string; sub: string; badge: { label: string; tone: Tone } };
+export interface ContractorRow { id: string; name: string; sub: string; badge: { label: string; tone: Tone } }
 export function contractorRows(orgs: { id: string; name: string }[], profiles: ApiProfile[], technicians: ApiTechnician[], t: T = en): ContractorRow[] {
   return [...orgs].sort((a, b) => a.name.localeCompare(b.name)).map((o) => {
     const p = profiles.find((x) => x.organizationId === o.id);
@@ -65,7 +65,7 @@ export function profileFacts(p: ApiProfile, now: number, i: I18n = EN): [string,
   const ins = p.insuranceValidUntil;
   return [
     [t("Registration"), p.registrationNo], [t("Service areas"), p.serviceAreas.join(", ")], [t("Delegation period"), `${day(p.delegation.from)} – ${day(p.delegation.to)}`],
-    [t("Contact"), p.contactEmail], [t("Insurance"), !ins ? t("not recorded — the delegation runs a year") : Date.parse(ins) <= now ? t("expired {date}", { date: day(ins) }) : t("valid to {date}", { date: day(ins) })],
+    [t("Contact"), p.contactEmail], [t("Insurance"), ins ? (Date.parse(ins) <= now ? t("expired {date}", { date: day(ins) }) : t("valid to {date}", { date: day(ins) })) : t("not recorded — the delegation runs a year")],
   ];
 }
 
@@ -77,7 +77,7 @@ export const WORK_TYPES: { id: WorkType; label: string }[] = [
 export const rateAmount = (l: { workType: WorkType; amountMinor: number }) => `${l.workType === "rework_deduction" && l.amountMinor > 0 ? "− " : ""}${amount(l.amountMinor)}`;
 
 /** The rate card in effect (rateCardId) and the versions scheduled after it. Lines keep their work type (`workType`)
- * beside the label, so the rate card form finds them in any language. */
+beside the label, so the rate card form finds them in any language. */
 export function rateCardView(cards: ApiRateCard[], rateCardId: string | null, now: number, i: I18n = EN) {
   const { t } = i;
   const day = (iso: string) => businessDay(iso, i.display.locale);
@@ -91,7 +91,7 @@ export function rateCardView(cards: ApiRateCard[], rateCardId: string | null, no
 }
 
 /** One technician of the contractor with the qualifications and the certificate state (Figma “1 expiring · 10-15”). */
-export type TechRow = { id: string; name: string; sub: string; badge: { label: string; tone: Tone } };
+export interface TechRow { id: string; name: string; sub: string; badge: { label: string; tone: Tone } }
 export function technicianRows(technicians: ApiTechnician[], certs: ApiCertificate[], now: number, i: I18n = EN): TechRow[] {
   const { t } = i;
   return technicians.map((x) => {
@@ -105,8 +105,8 @@ export function technicianRows(technicians: ApiTechnician[], certs: ApiCertifica
     let badge: TechRow["badge"];
     if (ended) badge = { label: t("Expired"), tone: "muted" };
     else if (pending) badge = { label: t("{n} awaiting verification", { n: pending }), tone: "primary" };
-    else if (expiring.length) badge = { label: t("{n} expiring · {date}", { n: expiring.length, date: dayMonth(expiring.map((c) => c.expiresAt).sort()[0], i) }), tone: "warn" };
-    else if (!quals.length || !soonest) badge = { label: t(quals.length ? "Expired" : "None"), tone: quals.length ? "crit" : "muted" };
+    else if (expiring.length > 0) badge = { label: t("{n} expiring · {date}", { n: expiring.length, date: dayMonth(expiring.map((c) => c.expiresAt).sort()[0], i) }), tone: "warn" };
+    else if (quals.length === 0 || !soonest) badge = { label: t(quals.length > 0 ? "Expired" : "None"), tone: quals.length > 0 ? "crit" : "muted" };
     else if (Date.parse(soonest.validUntil) - now <= 30 * 86_400_000) badge = { label: t("expiring · {date}", { date: dayMonth(soonest.validUntil, i) }), tone: "warn" };
     else badge = { label: t("Valid"), tone: "ok" };
     return { id: x.id, name: x.displayName, sub, badge };
@@ -122,7 +122,7 @@ export function profileErrors(f: { registrationNo: string; serviceAreas: string;
   const r = [...f.registrationNo.trim()].length;
   if (r < 1 || r > 64) e.registrationNo = t("1–64 characters.");
   const areas = areasOf(f.serviceAreas);
-  if (areas.length < 1 || areas.length > 20 || areas.some((a) => a.length > 80) || new Set(areas.map((a) => a.toLowerCase())).size !== areas.length) e.serviceAreas = t("1–20 different areas, comma-separated.");
+  if (areas.length === 0 || areas.length > 20 || areas.some((a) => a.length > 80) || new Set(areas.map((a) => a.toLowerCase())).size !== areas.length) e.serviceAreas = t("1–20 different areas, comma-separated.");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.contactEmail.trim()) || [...f.contactEmail.trim()].length > 254) e.contactEmail = t("A valid e-mail address.");
   return e;
 }
@@ -132,7 +132,7 @@ export const areasOf = (v: string) => v.split(",").map((a) => a.trim()).filter(B
 export function rateCardErrors(f: { effectiveFrom: string | null; lines: { workType: string; amount: string; note: string }[] }, now: number, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!f.effectiveFrom || Date.parse(f.effectiveFrom) <= now) e.effectiveFrom = t("Effective from a future date.");
-  if (f.lines.length < 1 || f.lines.length > 4) e.lines = t("1–4 lines.");
+  if (f.lines.length === 0 || f.lines.length > 4) e.lines = t("1–4 lines.");
   else if (new Set(f.lines.map((l) => l.workType)).size !== f.lines.length) e.lines = t("Each work type once.");
   else if (f.lines.some((l) => !/^\d+(\.\d{1,2})?$/.test(l.amount.trim()))) e.lines = t("Amounts are non-negative with at most two decimals.");
   else if (f.lines.some((l) => [...l.note.trim()].length > 200)) e.lines = t("Notes up to 200 characters.");
@@ -140,8 +140,8 @@ export function rateCardErrors(f: { effectiveFrom: string | null; lines: { workT
 }
 /** The first day of next month in Kuala Lumpur (00:00), the default start of a new rate card. */
 export function nextMonthStart(now: number): string {
-  const kl = new Date(now + 8 * 3600_000);
-  return new Date(Date.UTC(kl.getUTCFullYear(), kl.getUTCMonth() + 1, 1) - 8 * 3600_000).toISOString();
+  const kl = new Date(now + 8 * 3_600_000);
+  return new Date(Date.UTC(kl.getUTCFullYear(), kl.getUTCMonth() + 1, 1) - 8 * 3_600_000).toISOString();
 }
 
 /** Readable refusals of the contractor register writes. */
@@ -155,7 +155,7 @@ export function contractorRefusal(f: { code: string; messageKey: string; fieldEr
   };
   const word = (k: string) => (keys[k] ? t(keys[k]) : k);
   const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${word(v)}`);
-  if (fields.length) return fields.join(" · ");
+  if (fields.length > 0) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;
   if (f.code === "NOT_FOUND") return t("The contractor or the certificate no longer exists.");
   return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)

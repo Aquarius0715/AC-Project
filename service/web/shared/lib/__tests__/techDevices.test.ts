@@ -10,22 +10,28 @@ const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
 // 2026-09-14T01:05:00Z is 09:05 in Kuala Lumpur (the display time zone of every mapper)
 const NOW = Date.parse("2026-09-14T01:05:00Z");
-const device = (over: Partial<ApiDevice> = {}): ApiDevice => ({
-  id: "dev-1", version: 1, unitId: "unit-1", serial: "AC-DEMO-0001", connection: "online", lastSeenAt: "2026-09-14T01:04:30Z", firmwareVersion: "v1", powerSignal: "on", tamper: "clear", sensors: [], ...over,
-});
+const device = (over: Partial<ApiDevice> = {}): ApiDevice => {
+  return {
+    id: "dev-1", version: 1, unitId: "unit-1", serial: "AC-DEMO-0001", connection: "online", lastSeenAt: "2026-09-14T01:04:30Z", firmwareVersion: "v1", powerSignal: "on", tamper: "clear", sensors: [], ...over,
+  };
+};
 const detail = (over: Partial<ApiDeviceDetail> = {}): ApiDeviceDetail => ({ ...device(), calibrationRefs: [], activeOperation: null, ...over });
-const op = (over: Partial<ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string }> = {}): ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string } => ({
-  id: "op-1", kind: "check", status: "succeeded", targetVersion: null, failureCode: null, createdAt: "2026-09-14T01:00:00Z", finishedAt: "2026-09-14T01:00:05Z", ...over,
-});
-const event = (over: Partial<ApiDeviceEventFull> = {}): ApiDeviceEventFull => ({
-  id: "ev-1", version: 1, deviceId: "dev-1", eventType: "communication_lost", evidenceSource: "heartbeat", occurredAt: "2026-09-14T01:00:00Z", restoredAt: null, alertIds: [], recovery: null, responseNotes: [], ...over,
-});
+const op = (over: Partial<ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string }> = {}): ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string } => {
+  return {
+    id: "op-1", kind: "check", status: "succeeded", targetVersion: null, failureCode: null, createdAt: "2026-09-14T01:00:00Z", finishedAt: "2026-09-14T01:00:05Z", ...over,
+  };
+};
+const event = (over: Partial<ApiDeviceEventFull> = {}): ApiDeviceEventFull => {
+  return {
+    id: "ev-1", version: 1, deviceId: "dev-1", eventType: "communication_lost", evidenceSource: "heartbeat", occurredAt: "2026-09-14T01:00:00Z", restoredAt: null, alertIds: [], recovery: null, responseNotes: [], ...over,
+  };
+};
 const alert = (over: Partial<ApiAlertLite> = {}): ApiAlertLite => ({ id: "al-1", version: 1, status: "open", type: "tamper", severity: "critical", ...over });
 
 describe("jobFor (IR94: the job a device write runs under)", () => {
   const jobs: TechJob[] = [{ id: "j-assigned", unitId: "unit-1", status: "assigned" }, { id: "j-progress", unitId: "unit-1", status: "in_progress" }, { id: "j-rework", unitId: "unit-2", status: "rework_requested" }, { id: "j-done", unitId: "unit-3", status: "completed" }];
-  it("prefers the job in progress over an assigned one", () => expect(jobFor("unit-1", jobs)).toBe("j-progress"));
-  it("takes a rework job when nothing else is open", () => expect(jobFor("unit-2", jobs)).toBe("j-rework"));
+  it("prefers the job in progress over an assigned one", () => { expect(jobFor("unit-1", jobs)).toBe("j-progress"); });
+  it("takes a rework job when nothing else is open", () => { expect(jobFor("unit-2", jobs)).toBe("j-rework"); });
   it("gives null for completed jobs, unknown units and unbound devices", () => {
     expect(jobFor("unit-3", jobs)).toBeNull();
     expect(jobFor("unit-9", jobs)).toBeNull();
@@ -109,7 +115,7 @@ describe("firmware candidates", () => {
 });
 
 describe("firmwareCard", () => {
-  it("is absent without a firmware operation", () => expect(firmwareCard(detail(), [op()])).toBeNull());
+  it("is absent without a firmware operation", () => { expect(firmwareCard(detail(), [op()])).toBeNull(); });
   it("shows the active update with the D05 lock and its deadline", () => {
     const active = op({ id: "fw", kind: "firmware", status: "running", targetVersion: "v2", startedAt: "2026-09-14T01:00:01Z", expiresAt: "2026-09-14T01:01:00Z", finishedAt: null });
     expect(firmwareCard(detail({ activeOperation: active }), [])).toEqual({ tone: "primary", title: "Firmware update v1 → v2", status: "Running", text: "Started 9:00 am MYT · control commands locked · fails if the device does not confirm by 9:01 am MYT" });

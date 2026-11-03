@@ -12,7 +12,7 @@ import { NeedsAccess } from "@ac/web/components/NeedsAccess";
 import { AdminOverviewDemo } from "./_components/overview-demo";
 import { AdminOverviewView } from "./_components/overview-view";
 
-const quiet = <T,>(p: Promise<T>) => p.catch((e) => { if (e instanceof CoreError && (e.error.code === "FORBIDDEN" || e.error.code === "NOT_FOUND")) return null; throw e; });
+const quiet = <T,>(p: Promise<T>) => p.catch((error) => { if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null; throw error; });
 
 export default async function AdminOverviewPage({ searchParams }: PageProps<"/admin">) {
   await connection();
@@ -29,16 +29,16 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
   const propertyId = properties?.some((p) => p.id === one("propertyId")) ? one("propertyId")! : null;
   // what waits for HQ whatever its requested time — requests to book, offers declined or expired, follow-ups to classify
   // (DEC-90, IR611); a role without job.read sees no such tile
-  const scope = { ...(customerId ? { customerId } : {}), ...(propertyId ? { propertyId } : {}) };
+  const scope = { ...(customerId && { customerId }), ...(propertyId && { propertyId }) };
   const waitingPage = quiet(coreOp<{ total: number }>("jobs.list", { limit: 1, filters: { status: "requested", proposalPending: false, ...scope } }));
   let summary: AdminSummary | null = null;
   if (!period.error) {
     try {
-      summary = await coreOp<AdminSummary>("admin.summary", { from: period.from, to: period.to, ...(customerId ? { customerId } : {}), ...(propertyId ? { propertyId } : {}) });
-    } catch (e) {
+      summary = await coreOp<AdminSummary>("admin.summary", { from: period.from, to: period.to, ...(customerId && { customerId }), ...(propertyId && { propertyId }) });
+    } catch (error) {
       // a role without dashboard.read: what it needs, not a failure with Try again (IR581)
-      if (e instanceof CoreError && e.error.code === "FORBIDDEN") return <NeedsAccess what="Overview" permission="dashboard.read" />;
-      throw e;
+      if (error instanceof CoreError && error.error.code === "FORBIDDEN") return <NeedsAccess what="Overview" permission="dashboard.read" />;
+      throw error;
     }
   }
   const waiting = (await waitingPage)?.total ?? null;

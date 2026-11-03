@@ -1,4 +1,4 @@
-export type PJob = { id: string; unit: string; cust: string; line: string; tech: string | null; techSub: string; slot: string; deadline: string; status: "Offered" | "Active" | "Review" | "Completed" | "Overdue"; label: string; tone: "primary" | "warn" | "ok" | "crit" | "unknown" };
+export interface PJob { id: string; unit: string; cust: string; line: string; tech: string | null; techSub: string; slot: string; deadline: string; status: "Offered" | "Active" | "Review" | "Completed" | "Overdue"; label: string; tone: "primary" | "warn" | "ok" | "crit" | "unknown" }
 export const pjobs: PJob[] = [
   { id: "job-p09", unit: "Lobby AC", cust: "customer-b", line: "Offered by HQ · expires 2026-09-15 01:00", tech: null, techSub: "not assignable before acceptance", slot: "Answer by 09-15 01:00", deadline: "15 h left", status: "Offered", label: "Offered", tone: "primary" },
   { id: "job-contractor-a", unit: "Bedroom AC", cust: "customer-a", line: "Assigned tech-external-a · 2026-09-21 10:00–12:00", tech: "tech-external-a", techSub: "Refrigerant handling", slot: "09-21 10:00–12:00", deadline: "Delegation to 09-22 00:00", status: "Active", label: "Assigned", tone: "warn" },

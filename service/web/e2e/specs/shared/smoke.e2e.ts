@@ -12,21 +12,21 @@ import { axeViolations } from "../../fixtures/a11y";
 import type { App } from "../../fixtures/apps";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
-type Crawl = { seen: number; failed: string[]; inaccessible: string[]; wide: string[]; otherLang: string[]; untitled: string[]; small: string[] };
+interface Crawl { seen: number; failed: string[]; inaccessible: string[]; wide: string[]; otherLang: string[]; untitled: string[]; small: string[] }
 
 /** The controls a touch screen sizes to 44 px (IR615, IR617, IR618): every button — a Plain one too, whose chips, tabs and
- * marked actions are touch-sized and whose cards are larger anyway —, inputs, selects, the input groups of the
- * comboboxes, tabs and toggles. */
+marked actions are touch-sized and whose cards are larger anyway —, inputs, selects, the input groups of the
+comboboxes, tabs and toggles. */
 const TOUCH_CONTROLS = ['[data-slot="button"]', '[data-slot="input"]', '[data-slot="native-select"]', '[data-slot="input-group"]', '[data-slot="tabs-trigger"]', '[data-slot="toggle"]', '[data-slot="toggle-group-item"]'].join(", ");
 
 /** Visits up to 40 pages the app links to, from its home, and records what fails on each; `lang` is the page language
- * every page must declare (WCAG 3.1.1, IR489). `wideFont` sets a wide font on every page before it is measured, so a
- * Mac finds what the wider fonts of the Linux runners push sideways (IR501). */
+every page must declare (WCAG 3.1.1, IR489). `wideFont` sets a wide font on every page before it is measured, so a
+Mac finds what the wider fonts of the Linux runners push sideways (IR501). */
 async function crawl(page: Page, app: App, lang = "en", wideFont = false, touch = false): Promise<Crawl> {
   const seen = new Set<string>();
   const queue = [app.home];
   const out: Crawl = { seen: 0, failed: [], inaccessible: [], wide: [], otherLang: [], untitled: [], small: [] };
-  while (queue.length && seen.size < 40) {
+  while (queue.length > 0 && seen.size < 40) {
     const path = queue.shift()!;
     if (seen.has(path)) continue;
     seen.add(path);
@@ -38,11 +38,13 @@ async function crawl(page: Page, app: App, lang = "en", wideFont = false, touch 
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (sideways > 1) out.wide.push(`${path}: ${sideways}px`);
     if (touch) { // a shared control under the 44 px touch target (IR615)
-      const small = await page.locator(TOUCH_CONTROLS).evaluateAll((els) => els.flatMap((el) => {
-        const r = el.getBoundingClientRect();
-        const name = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 30);
-        return r.width > 0 && r.height > 0 && r.height < 43.5 ? [`${el.getAttribute("data-slot")} "${name}" ${Math.round(r.height)}px`] : [];
-      }));
+      const small = await page.locator(TOUCH_CONTROLS).evaluateAll((els) => {
+        return els.flatMap((el) => {
+          const r = el.getBoundingClientRect();
+          const name = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 30);
+          return r.width > 0 && r.height > 0 && r.height < 43.5 ? [`${el.getAttribute("data-slot")} "${name}" ${Math.round(r.height)}px`] : [];
+        });
+      });
       for (const x of small) out.small.push(`${path}: ${x}`);
     }
     const declared = await page.locator("html").getAttribute("lang");
@@ -51,7 +53,7 @@ async function crawl(page: Page, app: App, lang = "en", wideFont = false, touch 
     if (!/^.+ — AC Project$/.test(title)) out.untitled.push(`${path}: ${title}`);
     const links = await page.locator("a[href^='/']").evaluateAll((as) => as.map((a) => a.getAttribute("href") ?? ""));
     for (const href of links) {
-      const p = href.split("#")[0];
+      const p = href.split("#", 1)[0];
       if (!p || p.startsWith("/bff/") || p.startsWith("/login") || seen.has(p)) continue;
       if (p === app.home || p.startsWith(app.home + "/") || p.startsWith(app.home + "?") || ["/notifications", "/settings/preferences", "/demo"].includes(p)) queue.push(p);
     }
@@ -83,6 +85,7 @@ test("every linked page of the app renders", async ({ page, app }) => {
 });
 
 let zoneBefore: string | null = null;
+
 test.afterEach(async ({ page }) => {
   if (zoneBefore) await setDisplay(page, ENGLISH, zoneBefore);
   zoneBefore = null;

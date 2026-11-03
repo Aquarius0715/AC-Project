@@ -11,11 +11,11 @@ function Harness({ fields = true, inner = false }: { fields?: boolean; inner?: b
   const [second, setSecond] = useState(false);
   return (
     <>
-      <button onClick={() => setOpen(true)}>Open</button>
-      <Modal open={open} title="Edit" onClose={() => setOpen(false)} footer={<><button>Cancel</button><button onClick={() => setSecond(true)}>Save</button></>}>
+      <button onClick={() => { setOpen(true); }}>Open</button>
+      <Modal open={open} title="Edit" onClose={() => { setOpen(false); }} footer={<><button>Cancel</button><button onClick={() => { setSecond(true); }}>Save</button></>}>
         {fields ? <input aria-label="Name" /> : <p>Delete this?</p>}
       </Modal>
-      {inner && <Modal open={second} title="Inner" onClose={() => setSecond(false)} footer={<button>OK</button>}><p>Sure?</p></Modal>}
+      {inner && <Modal open={second} title="Inner" onClose={() => { setSecond(false); }} footer={<button>OK</button>}><p>Sure?</p></Modal>}
     </>
   );
 }
@@ -26,8 +26,8 @@ function Removal({ start = ["a"] }: { start?: string[] }) {
   const gone = useRef(false);
   return (
     <>
-      <div id="rows" tabIndex={-1} role="region" aria-label="Rows">{rows.map((r) => <button key={r} onClick={() => setOpen(true)}>Remove {r}</button>)}</div>
-      <Modal open={open} title="Remove" onClose={() => setOpen(false)} finalFocus={() => (gone.current ? document.getElementById("rows") : true)}
+      <div id="rows" tabIndex={-1} role="region" aria-label="Rows">{rows.map((r) => <button key={r} onClick={() => { setOpen(true); }}>Remove {r}</button>)}</div>
+      <Modal open={open} title="Remove" onClose={() => { setOpen(false); }} finalFocus={() => (gone.current ? document.querySelector("#rows") : true)}
         footer={<button onClick={() => { gone.current = true; setRows((rs) => rs.slice(1)); setOpen(false); }}>Remove</button>}><p>Sure?</p></Modal>
     </>
   );
@@ -42,16 +42,16 @@ describe("the modal dialog's keyboard behaviour", () => {
   it("moves focus to the first field and returns it to the trigger on Escape", async () => {
     render(<Harness />);
     const trigger = open();
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Name" })));
+    await waitFor(() => { expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Name" })); });
     expect(screen.getByRole("dialog", { name: "Edit" })).toBeTruthy();
     escape();
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    await waitFor(() => expect(document.activeElement).toBe(trigger));
+    await waitFor(() => { expect(screen.queryByRole("dialog")).toBeNull(); });
+    await waitFor(() => { expect(document.activeElement).toBe(trigger); });
   });
   it("focuses the first footer button (Cancel) when the body has no control", async () => {
     render(<Harness fields={false} />);
     open();
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" })));
+    await waitFor(() => { expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" })); });
   });
   it("moves focus to the list when its action took the trigger away", async () => {
     render(<Removal />);
@@ -60,8 +60,8 @@ describe("the modal dialog's keyboard behaviour", () => {
     fireEvent.click(trigger);
     const remove = await screen.findByRole("button", { name: "Remove" });
     fireEvent.click(remove);
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("region", { name: "Rows" })));
+    await waitFor(() => { expect(screen.queryByRole("dialog")).toBeNull(); });
+    await waitFor(() => { expect(document.activeElement).toBe(screen.getByRole("region", { name: "Rows" })); });
   });
   it("moves focus to the list itself, not to another row's button, when rows remain (IR620)", async () => {
     render(<Removal start={["a", "b"]} />);
@@ -69,8 +69,8 @@ describe("the modal dialog's keyboard behaviour", () => {
     trigger.focus();
     fireEvent.click(trigger);
     fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("region", { name: "Rows" })));
+    await waitFor(() => { expect(screen.queryByRole("dialog")).toBeNull(); });
+    await waitFor(() => { expect(document.activeElement).toBe(screen.getByRole("region", { name: "Rows" })); });
     expect(screen.getByRole("button", { name: "Remove b" })).not.toBe(document.activeElement);
   });
   it("lets only the innermost of stacked dialogs answer Escape", async () => {
@@ -80,13 +80,13 @@ describe("the modal dialog's keyboard behaviour", () => {
     save.focus(); // a keyboard user reaches Save, then presses it
     fireEvent.click(save);
     // both are open; behind the inner one the outer is hidden from assistive technology, as a modal dialog asks
-    await waitFor(() => expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(2));
+    await waitFor(() => { expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(2); });
     expect(screen.getByRole("dialog").getAttribute("aria-labelledby")).toBeTruthy();
     expect(screen.getByRole("dialog", { name: "Inner" })).toBeTruthy();
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "OK" })));
+    await waitFor(() => { expect(document.activeElement).toBe(screen.getByRole("button", { name: "OK" })); });
     escape();
-    await waitFor(() => expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1)); // the outer one stays
+    await waitFor(() => { expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1); }); // the outer one stays
     expect(screen.getByRole("dialog", { name: "Edit" })).toBeTruthy();
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Save" }))); // back to its trigger
+    await waitFor(() => { expect(document.activeElement).toBe(screen.getByRole("button", { name: "Save" })); }); // back to its trigger
   });
 });

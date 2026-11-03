@@ -29,7 +29,7 @@ async function AdminContractsPageContent({ searchParams }: PageProps<"/admin/bil
   const [display, all, inScope, scoped, customers, properties, units] = await Promise.all([
     coreDisplay(),
     coreAll<ApiContractFull>("contracts.list"),
-    Object.keys(where).length ? coreAll<ApiContractFull>("contracts.list", { filters: where }) : null, // the plan counts of the scope
+    Object.keys(where).length > 0 ? coreAll<ApiContractFull>("contracts.list", { filters: where }) : null, // the plan counts of the scope
     kind ? coreAll<ApiContractFull>("contracts.list", { filters: { ...where, kind } }) : null,
     coreAll<ApiCustomer>("customers.list").then((items) => ({ items, total: items.length })),
     coreAll<ApiProperty>("properties.list").then((items) => ({ items, total: items.length })),

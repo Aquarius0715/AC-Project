@@ -18,7 +18,7 @@ const gen = fileURLToPath(new URL("../contracts.gen.ts", import.meta.url));
 const snapshot = fileURLToPath(new URL("../contractInputs.gen.json", import.meta.url));
 const resultsSnapshot = fileURLToPath(new URL("../contractResults.gen.json", import.meta.url));
 
-type ResultFields = { fields: string[]; items: string[] | null };
+interface ResultFields { fields: string[]; items: string[] | null }
 
 function contract(): { inputs: Record<string, string[]>; results: Record<string, ResultFields> } {
   const program = ts.createProgram([gen], { strict: true, noEmit: true, skipLibCheck: true });
@@ -27,8 +27,8 @@ function contract(): { inputs: Record<string, string[]>; results: Record<string,
   let ops: ts.Type | undefined;
   ts.forEachChild(sf, (n) => { if (ts.isTypeAliasDeclaration(n) && n.name.text === "OperationContracts") ops = c.getTypeAtLocation(n.name); });
   const fields = (t: ts.Type, out: Set<string>) => {
-    if (t.isUnion() || t.isIntersection()) t.types.forEach((x) => fields(x, out));
-    else if (t.flags & ts.TypeFlags.Object) c.getPropertiesOfType(t).forEach((p) => out.add(p.getName()));
+    if (t.isUnion() || t.isIntersection()) for (const x of t.types) fields(x, out);
+    else if (t.flags & ts.TypeFlags.Object) for (const p of c.getPropertiesOfType(t)) out.add(p.getName());
   };
   const sorted = (t: ts.Type) => { const set = new Set<string>(); fields(t, set); return [...set].sort(); };
   const variants = (t: ts.Type): ts.Type[] => (t.isUnion() ? t.types.flatMap(variants) : [t]);
@@ -45,7 +45,7 @@ function contract(): { inputs: Record<string, string[]>; results: Record<string,
       continue;
     }
     const items = variants(result).map((v) => v.getProperty("items")).filter((p): p is ts.Symbol => !!p).map((p) => element(c.getTypeOfSymbol(p))).filter((e): e is ts.Type => !!e);
-    results[op.getName()] = { fields: sorted(result), items: items.length ? [...new Set(items.flatMap(sorted))].sort() : null };
+    results[op.getName()] = { fields: sorted(result), items: items.length > 0 ? [...new Set(items.flatMap(sorted))].sort() : null };
   }
   return { inputs, results };
 }
@@ -57,6 +57,6 @@ describe("the contract's field lists", () => {
     if (process.env.UPDATE_CONTRACT_INPUTS === "1") writeFileSync(file, text);
     expect(existsSync(file) ? readFileSync(file, "utf8") : "", "regenerate with UPDATE_CONTRACT_INPUTS=1 (see the header)").toBe(text);
   };
-  it("contractInputs.gen.json lists the input fields of every operation", () => check(snapshot, now.inputs));
-  it("contractResults.gen.json lists the result fields of every operation", () => check(resultsSnapshot, now.results));
+  it("contractInputs.gen.json lists the input fields of every operation", () => { check(snapshot, now.inputs); });
+  it("contractResults.gen.json lists the result fields of every operation", () => { check(resultsSnapshot, now.results); });
 });

@@ -14,11 +14,13 @@ const defaults: ApiDefaultPolicy = {
   ruleSettings: [{ id: "s1", version: 2, ruleKey: "heartbeat", customerId: "cust-a", enabled: false, changedByMembershipId: "me", reason: null, updatedAt: "2026-09-28T02:00:00Z" },
     { id: "s2", version: 1, ruleKey: "ventilation_co2", customerId: "cust-b", enabled: false, changedByMembershipId: "x", reason: null, updatedAt: "2026-09-28T02:00:00Z" }],
 };
-const policy = (over: Partial<ApiAlertPolicy> = {}): ApiAlertPolicy => ({
-  id: "p1", version: 3, kind: "alert", name: "Stuffy office", unitIds: ["u1", "u2"], timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 40, disabledReason: null, customerId: "cust-a",
-  recipientMembershipIds: ["owner"], channels: ["inApp"], escalateAfterMinutes: 30, cooldownMinutes: 10, metric: "co2", operator: "gte", threshold: 1200, recoveryThreshold: 1000,
-  durationSeconds: 900, activeWindow: { weekdays: [1, 2, 3, 4, 5], startLocal: "08:00", endLocal: "19:00" }, severity: "warning", ...over,
-});
+const policy = (over: Partial<ApiAlertPolicy> = {}): ApiAlertPolicy => {
+  return {
+    id: "p1", version: 3, kind: "alert", name: "Stuffy office", unitIds: ["u1", "u2"], timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 40, disabledReason: null, customerId: "cust-a",
+    recipientMembershipIds: ["owner"], channels: ["inApp"], escalateAfterMinutes: 30, cooldownMinutes: 10, metric: "co2", operator: "gte", threshold: 1200, recoveryThreshold: 1000,
+    durationSeconds: 900, activeWindow: { weekdays: [1, 2, 3, 4, 5], startLocal: "08:00", endLocal: "19:00" }, severity: "warning", ...over,
+  };
+};
 
 describe("customer alert policies", () => {
   it("lists the default rules with this customer's switches (Figma 06e)", () => {
@@ -33,7 +35,7 @@ describe("customer alert policies", () => {
     const ms = defaultRuleRows(defaults, "cust-a", "someone-else", i18nOf({ locale: "ms", timeZone: "Asia/Kuala_Lumpur" }));
     expect([ms.rows[0].name, ms.rows[0].condition, ms.rows[0].type, ms.rows[2].condition, ms.notes[0]]).toEqual(["Ventilation", "CO₂ ≥ 1000 ppm selama 10 min", "Kualiti udara", "Tiada denyutan selama 15 min",
       "Dimatikan: “AC offline” — tiada amaran daripada peraturan ini pada mana-mana AC anda (dimatikan oleh pemilik akaun, 28 Sep 2026). HQ masih melihat status peranti."]);
-    expect([durationText(60), durationText(90), durationText(10800), windowText({ weekdays: [6, 7], startLocal: "09:00", endLocal: "12:00" }), windowText({ weekdays: [1, 2, 3, 4, 5, 6, 7], startLocal: "22:00", endLocal: "06:00" })])
+    expect([durationText(60), durationText(90), durationText(10_800), windowText({ weekdays: [6, 7], startLocal: "09:00", endLocal: "12:00" }), windowText({ weekdays: [1, 2, 3, 4, 5, 6, 7], startLocal: "22:00", endLocal: "06:00" })])
       .toEqual(["1 min", "90 s", "3 h", "only 09:00–12:00 on weekends", "only 22:00–06:00"]);
     expect(conditionText({ metric: "airflow_drop", operator: "gte", threshold: 30, durationSeconds: 3600 })).toBe("Airflow drop ≥ 30 % for 1 h");
   });
@@ -41,7 +43,7 @@ describe("customer alert policies", () => {
   it("writes each own policy's When and Then and its attached ACs", () => {
     const [c] = policyCards([policy({ channels: ["inApp", "email"] })], (id) => ({ u1: "Workstations AC 1", u2: "Workstations AC 2" })[id]);
     expect([c.badge, c.when, c.then, c.attachedText]).toEqual(["Air quality", "CO₂ ≥ 1200 ppm for 15 min · recover below 1000 ppm · only 08:00–19:00 on weekdays", "Warning · notify in-app + email", "Attached to 2 ACs: Workstations AC 1, Workstations AC 2"]);
-    expect(policyCards([policy({ unitIds: [], metric: "humidity", operator: "lte", threshold: 30, recoveryThreshold: 35, activeWindow: null, severity: "normal" })], () => undefined)[0])
+    expect(policyCards([policy({ unitIds: [], metric: "humidity", operator: "lte", threshold: 30, recoveryThreshold: 35, activeWindow: null, severity: "normal" })], () => {})[0])
       .toMatchObject({ when: "Humidity ≤ 30 % for 15 min · recover above 35 %", then: "Info · notify in-app", attachedText: "Not attached to any AC yet — attach it from an AC’s page" });
   });
 

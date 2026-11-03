@@ -6,13 +6,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const coreOp = vi.fn();
 const api = { on: true };
 vi.mock("server-only", () => ({}));
-vi.mock("next/server", () => ({ connection: async () => undefined }));
-vi.mock("@ac/web/lib/dal", () => ({
-  apiMode: () => api.on,
-  coreOp: (...a: unknown[]) => coreOp(...a),
-  coreIdentity: async () => ({ displayName: "Tan Wei", organizationName: "Demo Customer A" }),
-  coreDisplay: async () => ({ language: "en", timeZone: "Asia/Kuala_Lumpur" }),
-}));
+vi.mock("next/server", () => ({ connection: async () => {} }));
+vi.mock("@ac/web/lib/dal", () => {
+  return {
+    apiMode: () => api.on,
+    coreOp: (...a: unknown[]) => coreOp(...a),
+    coreIdentity: async () => ({ displayName: "Tan Wei", organizationName: "Demo Customer A" }),
+    coreDisplay: async () => ({ language: "en", timeZone: "Asia/Kuala_Lumpur" }),
+  };
+});
 
 import { loadShell } from "@ac/web/lib/shell";
 

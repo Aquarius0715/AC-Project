@@ -11,8 +11,8 @@ import { DEFAULT_DISPLAY, isLocale, type Display } from "@ac/web/lib/i18n";
 import type { ListArgs, OpArgs } from "@ac/web/lib/opTypes";
 
 /** The session of the cookie (sealed, or stored under the sealed ID it holds, IR382), or null. proxy.ts refreshes tokens
- * before pages render (Server Components cannot write cookies), so an expired token here means the refresh failed.
- * Memoized per render pass. */
+before pages render (Server Components cannot write cookies), so an expired token here means the refresh failed.
+Memoized per render pass. */
 export const getSession = cache(async (): Promise<Session | null> => {
   const s = await loadSession((await cookies()).get(SESSION_COOKIE)?.value);
   return s && !needsRefresh(s) ? s : null;
@@ -31,10 +31,10 @@ export class CoreError extends Error {
   }
 }
 
-export type CoreOptions = { write?: boolean; expectedVersion?: number; idempotencyKey?: string };
+export interface CoreOptions { write?: boolean; expectedVersion?: number; idempotencyKey?: string }
 
 /** Calls one Core API operation as the signed-in membership at its REST route (IR222) and returns `data`
- * (DomainError → CoreError). The input is typed by the contract (IR313). */
+(DomainError → CoreError). The input is typed by the contract (IR313). */
 export async function coreOp<T>(...[operation, input, opts = {}]: OpArgs<CoreOptions>): Promise<T> {
   return (await coreCall<T>(operation, input, opts)).data;
 }
@@ -44,7 +44,7 @@ export async function coreAll<T>(...[operation, query = {}, max = 1000]: ListArg
   const out: T[] = [];
   let cursor: string | null = null;
   do {
-    const page: { items: T[]; nextCursor: string | null } = (await coreCall<{ items: T[]; nextCursor: string | null }>(operation, { ...query, limit: 100, ...(cursor ? { cursor } : {}) }, {})).data;
+    const page: { items: T[]; nextCursor: string | null } = (await coreCall<{ items: T[]; nextCursor: string | null }>(operation, { ...query, limit: 100, ...(cursor && { cursor }) }, {})).data;
     out.push(...page.items);
     cursor = page.nextCursor;
   } while (cursor && out.length < max);
@@ -55,7 +55,7 @@ export async function coreAll<T>(...[operation, query = {}, max = 1000]: ListArg
 const coreSession = cache(() => coreCall<{ permissions?: string[]; userId?: string; membershipId?: string; tenantId?: string; clientRole?: "owner" | "member" | null; displayName?: string; organizationName?: string; organizationId?: string; customerId?: string | null }>("session.get", {}, {}));
 
 /** The signed-in principal (session.get): user, membership, its organization and tenant, e.g. to block self-grants
- * before the API does or to tell the own company from another one in a URL (IR276). */
+before the API does or to tell the own company from another one in a URL (IR276). */
 export const corePrincipal = cache(async () => {
   const { data } = await coreSession();
   return { userId: data.userId ?? "", membershipId: data.membershipId ?? "", organizationId: data.organizationId ?? "", tenantId: data.tenantId ?? "", clientRole: data.clientRole ?? null, customerId: data.customerId ?? null };
@@ -74,14 +74,14 @@ export const coreNow = cache(async (): Promise<Date> => {
 });
 
 /** The Core API clock read afresh (session.get, not memoized for the render pass): for a Server Action that has just
- * moved the demo clock and waits until the other services show it (IR168, IR249). */
+moved the demo clock and waits until the other services show it (IR168, IR249). */
 export async function coreClockFresh(): Promise<Date> {
   const { meta } = await coreCall<unknown>("session.get", {}, {});
   return meta?.snapshotAt ? new Date(meta.snapshotAt) : new Date();
 }
 
 /** The signed-in user's display language and time zone (preferences.get, FR-X01, IR258), once per render pass: the
- * shell and the screens that show times read the same answer. Unreadable preferences show the defaults. */
+shell and the screens that show times read the same answer. Unreadable preferences show the defaults. */
 export const coreDisplay = cache(async (): Promise<Display> => {
   try {
     const p = await coreOp<{ locale?: string; timezone?: string }>("preferences.get", {});
@@ -92,7 +92,7 @@ export const coreDisplay = cache(async (): Promise<Display> => {
 });
 
 /** The signed-in membership's permissions (session.get), for permission-scoped sections; the API still authorizes. */
-export const corePermissions = cache(async (): Promise<Set<string>> => new Set((await coreSession()).data.permissions ?? []));
+export const corePermissions = cache(async (): Promise<Set<string>> => new Set((await coreSession()).data.permissions));
 
 async function coreCall<T>(operation: string, input: unknown, opts: CoreOptions): Promise<{ data: T; meta?: { snapshotAt?: string } }> {
   const s = await verifySession();

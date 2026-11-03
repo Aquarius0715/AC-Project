@@ -16,8 +16,8 @@ export type T = (text: string, params?: Params) => string;
 const warned = new Set<string>();
 
 /** The text in `locale`, with `{name}` placeholders filled from params; English when Malay has no entry. When one English
- * text means two things, its key names the context before "::" ("tamper::Clear" is a state, "Clear" a button); English
- * shows the text after it. */
+text means two things, its key names the context before "::" ("tamper::Clear" is a state, "Clear" a button); English
+shows the text after it. */
 export function translate(locale: Locale, text: string, params?: Params): string {
   const english = text.includes("::") ? text.slice(text.indexOf("::") + 2) : text;
   let base = english;
@@ -28,7 +28,7 @@ export function translate(locale: Locale, text: string, params?: Params): string
       console.warn(`[i18n] no Malay text for "${text}"`);
     }
   }
-  return params ? base.replace(/\{(\w+)\}/g, (all, k: string) => (k in params ? String(params[k]) : all)) : base;
+  return params ? base.replaceAll(/\{(\w+)\}/g, (all, k: string) => (k in params ? String(params[k]) : all)) : base;
 }
 
 export const translator = (locale: Locale): T => (text, params) => translate(locale, text, params);
@@ -37,15 +37,14 @@ export const translator = (locale: Locale): T => (text, params) => translate(loc
 export const intlTag = (locale: Locale) => (locale === "ms" ? "ms-MY" : "en-MY");
 
 /** How a user's screens show text and times: the display language and time zone of Preferences. */
-export type Display = { locale: Locale; timeZone: string };
+export interface Display { locale: Locale; timeZone: string }
 export const DEFAULT_DISPLAY: Display = { locale: "en", timeZone: "Asia/Kuala_Lumpur" };
 
-/** Intl output with plain spaces: ICU puts narrow and thin spaces around times and ranges, and versions differ, so a
- * time rendered on the server reads the same after hydration in any browser. */
-const plain = (s: string) => s.replace(/[\u00a0\u2009\u202f]/g, " ");
+/** Intl output with plain spaces: ICU puts narrow and thin spaces around times and ranges, and versions differ, so a time rendered on the server reads the same after hydration in any browser. */
+const plain = (s: string) => s.replaceAll(/[\u00A0\u2009\u202F]/g, " ");
 
 /** `opts` in the user's language and display time zone with the zone's abbreviation (unless `withZone` is false); a
- * zone this runtime does not know falls back to the default one. */
+zone this runtime does not know falls back to the default one. */
 function zoned(iso: string | null, d: Display, opts: Intl.DateTimeFormatOptions, withZone = true): string {
   if (!iso) return "—";
   const at = new Date(iso);
@@ -63,11 +62,11 @@ function zoned(iso: string | null, d: Display, opts: Intl.DateTimeFormatOptions,
 }
 
 /** A date and time as the user reads it (IR44): medium date and short time in their language, in their display time
- * zone, with the zone's abbreviation — “14 Sept 2026, 9:00 am MYT”; “—” without a time. Stored times stay UTC. */
+zone, with the zone's abbreviation — “14 Sept 2026, 9:00 am MYT”; “—” without a time. Stored times stay UTC. */
 export const showTime = (iso: string | null, d: Display = DEFAULT_DISPLAY) => zoned(iso, d, { dateStyle: "medium", timeStyle: "short" });
 
 /** The IR44 time without the date, where a screen shows only the time of a recent reading: “9:12 am MYT”; without the
- * abbreviation (`zone` false) on a chart axis whose zone the chart names once. */
+abbreviation (`zone` false) on a chart axis whose zone the chart names once. */
 export const showClock = (iso: string | null, d: Display = DEFAULT_DISPLAY, zone = true) => zoned(iso, d, { timeStyle: "short" }, zone);
 
 /** The short weekday and the day of the month, “Mon 14” (Figma Client 04a, 05a), in the user's language and a time zone. */
@@ -97,7 +96,7 @@ export function showDate(iso: string | null, d: Display = DEFAULT_DISPLAY): stri
 }
 
 /** The day and month without the year (“15 Sept”), where a table of one statement or period shows its dates, in the
- * user's language and display time zone. */
+user's language and display time zone. */
 export function showDayMonth(iso: string | null, d: Display = DEFAULT_DISPLAY): string {
   if (!iso) return "—";
   for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
@@ -111,15 +110,15 @@ export function showDayMonth(iso: string | null, d: Display = DEFAULT_DISPLAY): 
 }
 
 /** A time span — a booked visit or a preferred time: “Tue, 22 Sept, 10:00 am – 12:00 pm MYT” in the user's language
- * and display time zone, the weekday only when asked for. The span is the stored instants, so it keeps its meaning when
- * the user changes the time zone (NFR-08). */
+and display time zone, the weekday only when asked for. The span is the stored instants, so it keeps its meaning when
+the user changes the time zone (NFR-08). */
 export function showSpan(startIso: string, endIso: string, d: Display = DEFAULT_DISPLAY, weekday = false): string {
   const a = new Date(startIso), b = new Date(endIso);
   const tag = intlTag(d.locale);
   for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
     try {
       const zone = new Intl.DateTimeFormat(tag, { timeZone, timeZoneName: "short" }).formatToParts(a).find((p) => p.type === "timeZoneName")?.value;
-      const range = plain(new Intl.DateTimeFormat(tag, { timeZone, ...(weekday ? { weekday: "short" } : {}), month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).formatRange(a, b));
+      const range = plain(new Intl.DateTimeFormat(tag, { timeZone, ...(weekday && { weekday: "short" }), month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).formatRange(a, b));
       return zone ? `${range} ${zone}` : range;
     } catch {
       // RangeError: unknown time zone or invalid dates
@@ -144,7 +143,7 @@ const knownZone = (tz: string) => {
 };
 
 /** The instant of a date (YYYY-MM-DD) and time (HH:mm) typed in a time zone — a form in the user's display time zone
- * (NFR-08); "" while the date or time is not complete. */
+(NFR-08); "" while the date or time is not complete. */
 export function zonedInstant(date: string, time: string, timeZone: string): string {
   const wall = Date.parse(`${date}T${time}:00Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time) || Number.isNaN(wall)) return "";
@@ -160,7 +159,7 @@ export function zonedParts(iso: string, timeZone: string): { date: string; time:
 }
 
 /** The translator with the display, for the pure helpers that word and time a screen's text (IR259, IR260). */
-export type I18n = { t: T; display: Display };
+export interface I18n { t: T; display: Display }
 export const i18nOf = (display: Display): I18n => ({ t: translator(display.locale), display });
 export const EN: I18n = i18nOf(DEFAULT_DISPLAY);
 
@@ -174,15 +173,15 @@ function dayKey(ms: number, timeZone: string): string {
 }
 
 /** A reading's or report's time: the time alone on the display's today, else the date and time, so a last seen of days
- * ago never reads as today's (“8:30 am MYT” on 14 Sept is “14 Sept 2026, 8:30 am MYT” on the 23rd, IR613). `nowMs` is
- * the scenario's now; “—” without a time. */
+ago never reads as today's (“8:30 am MYT” on 14 Sept is “14 Sept 2026, 8:30 am MYT” on the 23rd, IR613). `nowMs` is
+the scenario's now; “—” without a time. */
 export function showRecent(iso: string | null, nowMs: number, d: Display = DEFAULT_DISPLAY): string {
   if (!iso) return "—";
   return dayKey(Date.parse(iso), d.timeZone) === dayKey(nowMs, d.timeZone) ? showClock(iso, d) : showTime(iso, d);
 }
 
 /** “today 9:12 am MYT”, “yesterday …”, “tomorrow …” on the days next to now in the user's display time zone, else the
- * IR44 date and time: the relative day stands in for the date (IR260). */
+IR44 date and time: the relative day stands in for the date (IR260). */
 export function relativeTime(iso: string, nowMs: number, i: I18n = EN): string {
   const tz = i.display.timeZone;
   const day = dayKey(Date.parse(iso), tz);

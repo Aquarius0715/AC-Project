@@ -1,6 +1,6 @@
 "use client";
 
-// The Phase 1A demo view (fixture rows) of this screen; the page renders it outside DATA_SOURCE=api.
+// The Phase 1A demo view (fixture rows) of this screen; the page renders it outside DATA_SOURCE=API.
 
 import Link from "next/link";
 import { useState } from "react";
@@ -33,13 +33,13 @@ export function ReviewDemo({ id }: { id: string }) {
             <p className="mb-2 text-xs text-muted-foreground">A contributor to this report version cannot approve it (IR31). Completion does not automatically resolve the linked alert.</p>
             <SummaryList items={[["Required inspection items", "4 / 4 recorded"], ["Not-applicable reasons", "1 / 1 given"], ["Photos", "3 attached"], ["Readings", "4 recorded"], ["Contributors to v1", "tech-external-a only"]]} />
             <p className="my-2 flex items-center gap-1 text-xs font-semibold text-ok"><Icon name="check" />All required evidence present — acceptable.</p>
-            {state === "pending" && <div className="flex flex-wrap gap-2"><Btn variant="primary" onClick={() => { setState("accepted"); toast("Report accepted"); }}>Accept report</Btn><Btn onClick={() => setRet(true)}>Return for rework…</Btn></div>}
+            {state === "pending" && <div className="flex flex-wrap gap-2"><Btn variant="primary" onClick={() => { setState("accepted"); toast("Report accepted"); }}>Accept report</Btn><Btn onClick={() => { setRet(true); }}>Return for rework…</Btn></div>}
           </Card>
           <Card title="Versions & linked alert"><SummaryList items={[["v1", "submitted 2026-09-20 16:40 by tech-external-a · reviewing now"], ["Vibration anomaly (alert)", "09-13 22:40 · stays open after completion"], ["Job due", "work window 09-18 → 09-23 00:00"]]} /></Card>
         </div>
       </div>
-      <Modal open={ret} onClose={() => setRet(false)} title="Return for rework" footer={<><Btn onClick={() => setRet(false)}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!why.trim()) return; setRet(false); setState("returned"); toast("Returned for rework", "warn"); }}>Return report</Btn></>}>
-        <Field label="Reason (required)" error={tried && !why.trim() ? "A reason is required" : undefined}><Textarea value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Missing evidence photo for indoor unit filter" /></Field>
+      <Modal open={ret} onClose={() => { setRet(false); }} title="Return for rework" footer={<><Btn onClick={() => { setRet(false); }}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!why.trim()) return; setRet(false); setState("returned"); toast("Returned for rework", "warn"); }}>Return report</Btn></>}>
+        <Field label="Reason (required)" error={tried && !why.trim() ? "A reason is required" : undefined}><Textarea value={why} onChange={(e) => { setWhy(e.target.value); }} placeholder="Missing evidence photo for indoor unit filter" /></Field>
       </Modal>
     </Page>
   );

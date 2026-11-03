@@ -5,17 +5,21 @@ import { i18nOf } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
-const summary = (over: Partial<AdminSummary> = {}): AdminSummary => ({
-  customerCount: 2, total: 5, online: 5, offline: 0, unknown: 0, powerOn: 2, powerOff: 2, powerUnknown: 1, operatingRate: 50, alertCount: 1,
-  jobCounts: { requested: 1, assigned: 1 }, overdueInvoiceCount: 1, amountsByCurrency: [{ amountMinor: 12000, currency: "MYR" }], billingVisibility: "allowed",
-  energySummary: { totals: { kWh: 9, amountMinor: 329 }, coverage: 0.4 }, energyForecast: null, asOf: "2026-09-14T01:00:00Z", ...over,
-});
-const forecast = (over: Partial<ApiForecast> = {}): ApiForecast => ({
-  period: { from: "2026-09-13T16:00:00Z", to: "2026-09-14T01:00:00Z" }, unitIds: ["u1"], baselineRef: { id: "baseline-demo-tenant-a", version: 1 },
-  baselineSnapshot: { id: "baseline-demo-tenant-a", version: 1, method: "demo_fixed", baselineKWh: 2592, period: { from: "", to: "" } },
-  expectedUnitMinutes: 2700, validUnitMinutes: 1080, actualKWhOnValidSlots: 9, predictedBaselineKWh: 32.4, predictedActualKWh: 22.5,
-  forecastSavedKWh: 9.9, forecastSavingPercentage: 30.6, qualityWarnings: ["modeled_baseline", "partial_coverage", "prorated_forecast"], ...over,
-});
+const summary = (over: Partial<AdminSummary> = {}): AdminSummary => {
+  return {
+    customerCount: 2, total: 5, online: 5, offline: 0, unknown: 0, powerOn: 2, powerOff: 2, powerUnknown: 1, operatingRate: 50, alertCount: 1,
+    jobCounts: { requested: 1, assigned: 1 }, overdueInvoiceCount: 1, amountsByCurrency: [{ amountMinor: 12_000, currency: "MYR" }], billingVisibility: "allowed",
+    energySummary: { totals: { kWh: 9, amountMinor: 329 }, coverage: 0.4 }, energyForecast: null, asOf: "2026-09-14T01:00:00Z", ...over,
+  };
+};
+const forecast = (over: Partial<ApiForecast> = {}): ApiForecast => {
+  return {
+    period: { from: "2026-09-13T16:00:00Z", to: "2026-09-14T01:00:00Z" }, unitIds: ["u1"], baselineRef: { id: "baseline-demo-tenant-a", version: 1 },
+    baselineSnapshot: { id: "baseline-demo-tenant-a", version: 1, method: "demo_fixed", baselineKWh: 2592, period: { from: "", to: "" } },
+    expectedUnitMinutes: 2700, validUnitMinutes: 1080, actualKWhOnValidSlots: 9, predictedBaselineKWh: 32.4, predictedActualKWh: 22.5,
+    forecastSavedKWh: 9.9, forecastSavingPercentage: 30.6, qualityWarnings: ["modeled_baseline", "partial_coverage", "prorated_forecast"], ...over,
+  };
+};
 
 describe("HQ overview sections (DD-A01, IR244)", () => {
   it("states the time and period, and links lists with the scope but not the period", () => {
@@ -49,12 +53,12 @@ describe("HQ overview sections (DD-A01, IR244)", () => {
   it("splits the power and connection axes, lists all job statuses and keeps currencies apart", () => {
     const s = summary();
     const a = axisRows(s, overviewLinks({ customerId: null, propertyId: null }));
-    expect(a.power.map((r) => [r.label.split(" ")[0], r.count, r.pct])).toEqual([["Running", 2, 40], ["Stopped", 2, 40], ["Unknown", 1, 20]]);
+    expect(a.power.map((r) => [r.label.split(" ", 1)[0], r.count, r.pct])).toEqual([["Running", 2, 40], ["Stopped", 2, 40], ["Unknown", 1, 20]]);
     expect(a.connection.map((r) => r.count)).toEqual([5, 0, 0]);
     expect(a.rateNote).toMatch(/= 2 ÷ 4 = 50\.0%/);
     const jobs = jobRows(s.jobCounts, overviewLinks({ customerId: null, propertyId: null }));
     expect([jobs.length, jobs[0], jobs.at(-1)]).toEqual([10, { status: "requested", label: "requested", count: 1, href: "/admin/jobs?stage=requested" }, { status: "cancelled", label: "cancelled", count: 0, href: "/admin/jobs" }]);
-    expect(billingView(summary({ amountsByCurrency: [{ amountMinor: 12000, currency: "MYR" }, { amountMinor: 5000, currency: "USD" }] }))).toEqual({ forbidden: false, overdue: 1, rows: [{ currency: "MYR", text: "120.00 MYR" }, { currency: "USD", text: "50.00 USD" }] });
+    expect(billingView(summary({ amountsByCurrency: [{ amountMinor: 12_000, currency: "MYR" }, { amountMinor: 5000, currency: "USD" }] }))).toEqual({ forbidden: false, overdue: 1, rows: [{ currency: "MYR", text: "120.00 MYR" }, { currency: "USD", text: "50.00 USD" }] });
     expect(billingView(summary({ billingVisibility: "forbidden", amountsByCurrency: null, overdueInvoiceCount: null }))).toEqual({ forbidden: true });
     expect(kpisFrom(s)).toMatchObject({ rate: "50.0%", kwh: "9.0 kWh", billing: "120.00 MYR", jobs: 2, kwhSub: "measured · coverage 40% · cost 3.29 MYR", billingSub: "1 overdue invoice · unpaid, per currency" });
   });

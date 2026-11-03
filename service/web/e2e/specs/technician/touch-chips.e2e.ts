@@ -27,7 +27,7 @@ test("the job tabs and the device filters are touch-sized and filter", async ({ 
   await expect(filters.filter({ hasText: /^Offline/ })).toHaveAttribute("aria-pressed", "true");
   const listed = main.getByRole("button").filter({ hasText: /^AC-/ }).first(); // the filter's first device
   if (await listed.count()) { // the detail follows the filter: its heading is that device's serial
-    const serial = (await listed.innerText()).split("\n")[0].trim();
+    const serial = (await listed.innerText()).split("\n", 1)[0].trim();
     await expect(main.getByRole("heading", { name: serial, exact: true })).toBeVisible();
   }
   await expectAccessible(page);

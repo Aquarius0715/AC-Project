@@ -149,20 +149,22 @@ test("the Policies tab's scope, Show disabled and a scoped new policy with activ
 // a customer's switch of one rule with a reason, switched back on; a rule copied as a customer's policy (the owner is
 // asked, the draft carries the rule's name and condition, nothing is saved); a rule whose metric no policy may watch
 // cannot be copied. afterEach puts the limits and the switch back through the operation relay if a run stopped halfway.
-type DefaultPolicy = { id: string; version: number; rules: { ruleKey: string; threshold: number }[]; ruleSettings: { ruleKey: string; customerId: string; enabled: boolean; version: number }[] };
-const relay = async (page: import("@playwright/test").Page, op: string, input: unknown, version?: number) => page.evaluate(async ({ op, input, version }) => {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (version !== undefined) Object.assign(headers, { "Idempotency-Key": crypto.randomUUID(), "X-Expected-Version": String(version) });
-  const r = await fetch(`/bff/ops/${op}`, { method: "POST", headers, body: JSON.stringify(input) });
-  return { status: r.status, body: await r.json() };
-}, { op, input, version });
+interface DefaultPolicy { id: string; version: number; rules: { ruleKey: string; threshold: number }[]; ruleSettings: { ruleKey: string; customerId: string; enabled: boolean; version: number }[] }
+const relay = async (page: import("@playwright/test").Page, op: string, input: unknown, version?: number) => {
+  return page.evaluate(async ({ op, input, version }) => {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (version !== undefined) Object.assign(headers, { "Idempotency-Key": crypto.randomUUID(), "X-Expected-Version": String(version) });
+    const r = await fetch(`/bff/ops/${op}`, { method: "POST", headers, body: JSON.stringify(input) });
+    return { status: r.status, body: await r.json() };
+  }, { op, input, version });
+};
 let before: DefaultPolicy | null = null;
 
 test.afterEach(async ({ page }) => {
   if (!before) return;
   const now = (await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } })).body.data.items[0] as DefaultPolicy;
   if (JSON.stringify(now.rules) !== JSON.stringify(before.rules)) expect((await relay(page, "policies.save", { id: now.id, kind: "default_alert", rules: before.rules }, now.version)).status).toBe(200);
-  for (const s of now.ruleSettings.filter((x) => !x.enabled && !before!.ruleSettings.some((b) => b.ruleKey === x.ruleKey && b.customerId === x.customerId && !b.enabled))) {
+  for (const s of now.ruleSettings.filter((x) => !x.enabled && before!.ruleSettings.every((b) => !(b.ruleKey === x.ruleKey && b.customerId === x.customerId) || b.enabled))) {
     expect((await relay(page, "policies.setDefaultRule", { policyId: now.id, ruleKey: s.ruleKey, customerId: s.customerId, enabled: true }, s.version)).status).toBe(200);
   }
   before = null;
@@ -306,7 +308,7 @@ test("the default policy's demo test on a unit of the scoped customer", async ({
   // clicked again until the page has hydrated: a click before that does nothing (a busy CI runner hydrates late; 1b4cc87)
   await expect(async () => {
     await check.getByRole("button", { name: "Evaluate (demo)" }).click();
-    await expect(check.getByRole("status")).toHaveText(/^35 µg\/m³ on .+ raises an alert and notifies the recipients — simulated, nothing is stored\.$/, { timeout: 2_000 });
+    await expect(check.getByRole("status")).toHaveText(/^35 µg\/m³ on .+ raises an alert and notifies the recipients — simulated, nothing is stored\.$/, { timeout: 2000 });
   }).toPass({ timeout: 20_000 });
   await check.getByRole("spinbutton", { name: "Reading" }).fill("34.9");
   await check.getByRole("button", { name: "Evaluate (demo)" }).click();

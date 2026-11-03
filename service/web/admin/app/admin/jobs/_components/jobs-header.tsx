@@ -5,14 +5,14 @@ import { Select, cx } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 
-type Scope = { customerId?: string; propertyId?: string; unitId?: string };
+interface Scope { customerId?: string; propertyId?: string; unitId?: string }
 const keep = (q: Scope, extra: Record<string, string> = {}) => {
   const sp = new URLSearchParams({ ...Object.fromEntries(Object.entries(q).filter(([, v]) => v) as [string, string][]), ...extra });
-  return sp.size ? `/admin/jobs?${sp}` : "/admin/jobs";
+  return sp.size > 0 ? `/admin/jobs?${sp}` : "/admin/jobs";
 };
 
 /** The tabs of /admin/jobs with their counts and the tab's create button (Figma 06-1, 283:2); the customer → property →
- * unit scope is shared, so the tab links keep it (DD-A06 item 5). Texts in the display language (IR290). */
+unit scope is shared, so the tab links keep it (DD-A06 item 5). Texts in the display language (IR290). */
 export function JobsTabs({ tab, counts, q, action }: { tab: string; counts: { jobs: number; plans: number; contractors: number }; q: Scope; action?: React.ReactNode }) {
   const t = useT();
   const tabs = [{ id: "jobs", label: "Jobs", count: counts.jobs }, { id: "plans", label: "Plans", count: counts.plans }, { id: "contractors", label: "Contractors", count: counts.contractors }, { id: "sla", label: "SLA by customer" }];
@@ -29,7 +29,7 @@ export function JobsTabs({ tab, counts, q, action }: { tab: string; counts: { jo
 type Clear = "jobId" | "planId" | "alertId" | "policyId" | "new" | "from";
 
 /** The scope selects; changing one clears the narrower ones and the selection (`clear`: the selected job, plan, alert
- * or policy, or a new policy's draft). `children` follow the count on the right (the Policies tab's Show disabled). */
+or policy, or a new policy's draft). `children` follow the count on the right (the Policies tab's Show disabled). */
 export function ScopeBar({ scope, q, text, clear, children }: { scope: { customers: { id: string; name: string }[]; properties: { id: string; name: string }[]; units: { id: string; name: string }[] }; q: Scope; text: string; clear: Clear | Clear[]; children?: React.ReactNode }) {
   const t = useT();
   const patch = useUrlPatch();
@@ -37,9 +37,9 @@ export function ScopeBar({ scope, q, text, clear, children }: { scope: { custome
   return (
     <div className="flex flex-wrap items-center gap-2 text-[13px]">
       <span className="text-muted-foreground">{t("Scope")}</span>
-      <Select aria-label={t("Customer")} className="w-auto" value={q.customerId ?? ""} onChange={(e) => patch({ customerId: e.target.value || null, propertyId: null, unitId: null, ...cleared })}><option value="">{t("Customer: All")}</option>{scope.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
-      <Select aria-label={t("Property")} className="w-auto" value={q.propertyId ?? ""} onChange={(e) => patch({ propertyId: e.target.value || null, unitId: null, ...cleared })}><option value="">{t("Property: All")}</option>{scope.properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select>
-      <Select aria-label={t("Unit")} className="w-auto" value={q.unitId ?? ""} onChange={(e) => patch({ unitId: e.target.value || null, ...cleared })}><option value="">{t("Unit: All")}</option>{scope.units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select>
+      <Select aria-label={t("Customer")} className="w-auto" value={q.customerId ?? ""} onChange={(e) => { patch({ customerId: e.target.value || null, propertyId: null, unitId: null, ...cleared }); }}><option value="">{t("Customer: All")}</option>{scope.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
+      <Select aria-label={t("Property")} className="w-auto" value={q.propertyId ?? ""} onChange={(e) => { patch({ propertyId: e.target.value || null, unitId: null, ...cleared }); }}><option value="">{t("Property: All")}</option>{scope.properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select>
+      <Select aria-label={t("Unit")} className="w-auto" value={q.unitId ?? ""} onChange={(e) => { patch({ unitId: e.target.value || null, ...cleared }); }}><option value="">{t("Unit: All")}</option>{scope.units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select>
       <span className="ml-auto text-xs text-muted-foreground">{text}</span>
       {children}
     </div>

@@ -21,11 +21,11 @@ function sonnerStylesheet(): { css: string; emptyFirst: boolean } {
   expect(call, "sonner still adds its stylesheet through __insertCSS").toBeGreaterThan(0);
   const start = call + "__insertCSS(".length;
   let end = start + 1;
-  while (end < code.length && !(code[end] === '"' && code[end - 1] !== "\\")) end++;
+  while (end < code.length && (code[end] !== '"' || code[end - 1] === "\\")) end++;
   const insert = code.slice(code.indexOf("function __insertCSS"), code.indexOf("}", code.indexOf("function __insertCSS")));
   return {
     css: runInNewContext(code.slice(start, end + 1)) as string, // the string literal's value, as the browser gets it
-    emptyFirst: insert.indexOf("head.appendChild(style)") >= 0 && insert.indexOf("head.appendChild(style)") < insert.indexOf("createTextNode"),
+    emptyFirst: insert.includes("head.appendChild(style)") && insert.indexOf("head.appendChild(style)") < insert.indexOf("createTextNode"),
   };
 }
 

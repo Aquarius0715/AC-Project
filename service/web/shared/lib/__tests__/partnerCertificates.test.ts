@@ -11,10 +11,12 @@ const member = (id: string, name: string, quals: { code: string; validUntil: str
   ({ id, userId: `u-${id}`, organizationId: "org-a", displayName: name, role: "technician", employment: "external", validFrom: KL("2025-04-01"), validUntil, qualifications: quals.map((q) => ({ ...q, validFrom: KL("2025-04-01"), revokedAt: null })) });
 const a = member("m-a", "tech-external-a", [{ code: "demo_outdoor", validUntil: KL("2027-03-31") }, { code: "demo_electrical", validUntil: KL("2026-10-15") }]);
 const b = member("m-b", "tech-external-b", [], KL("2026-08-01"));
-const cert = (id: string, over: Partial<ApiCert>): ApiCert => ({
-  id, version: 1, membershipId: "m-a", organizationId: "org-a", code: "demo_electrical", name: "Electrical basics", number: "EB-2023-1120", issuedAt: KL("2023-10-15"), expiresAt: KL("2026-10-15"),
-  fileName: "eb.pdf", status: "valid", renewalOf: null, createdAt: "2023-10-15T00:00:00Z", verifiedAt: "2023-10-16T00:00:00Z", trainingRequestedAt: null, ...over,
-});
+const cert = (id: string, over: Partial<ApiCert>): ApiCert => {
+  return {
+    id, version: 1, membershipId: "m-a", organizationId: "org-a", code: "demo_electrical", name: "Electrical basics", number: "EB-2023-1120", issuedAt: KL("2023-10-15"), expiresAt: KL("2026-10-15"),
+    fileName: "eb.pdf", status: "valid", renewalOf: null, createdAt: "2023-10-15T00:00:00Z", verifiedAt: "2023-10-16T00:00:00Z", trainingRequestedAt: null, ...over,
+  };
+};
 const certs = [
   cert("c1", { status: "expiring" }),
   cert("c2", { code: "demo_indoor", name: "Split-unit refrigerant handling", number: "RH-2024-0811", issuedAt: KL("2024-03-31"), expiresAt: KL("2027-03-31") }),

@@ -29,19 +29,19 @@ async function AdminAccessPageContent({ searchParams }: PageProps<"/admin/settin
   const status = one("status") === "active" || one("status") === "inactive" ? one("status") : undefined;
   const organizationId = one("organizationId");
   const filters = { ...(role && { role: role as Role }), ...(status === "active" && { activeOnly: true }), ...(organizationId && { organizationId }) };
-  const filtered = Object.keys(filters).length > 0;
+  const isFiltered = Object.keys(filters).length > 0;
   const [now, perms, me, display, members, everyone, orgs, properties, units] = await Promise.all([
     coreNow(), corePermissions(), corePrincipal(), coreDisplay(),
     coreAll<ApiMember>("members.list", { filters }),
-    filtered ? coreAll<ApiMember>("members.list") : Promise.resolve(null), // a new membership may be for any user, whatever the filters
+    isFiltered ? coreAll<ApiMember>("members.list") : Promise.resolve(null), // a new membership may be for any user, whatever the filters
     coreAll<ApiOrganization>("organizations.list"),
     coreAll<{ id: string; name: string }>("properties.list"),
     coreAll<{ id: string; displayName: string }>("units.list"),
   ]);
   const rows = memberRows(members, orgs, now, i18nOf(display)).filter((r) => status !== "inactive" || !r.active);
-  const users = [...new Map((everyone ?? members).filter((m) => m.role !== "client").map((m) => [m.userId, m.displayName])).entries()].map(([id, name]) => ({ id, name }));
+  const users = [...new Map((everyone ?? members).filter((m) => m.role !== "client").map((m) => [m.userId, m.displayName]))].map(([id, name]) => ({ id, name }));
   const wanted = one("membershipId");
-  const selected = wanted === "new" ? "new" : wanted ? rows.find((r) => r.id === wanted)?.id ?? "missing" : rows[0]?.id ?? "new";
+  const selected = wanted === "new" ? "new" : (wanted ? rows.find((r) => r.id === wanted)?.id ?? "missing" : rows[0]?.id ?? "new");
   return (
     <AccessView live={{
       now: now.toISOString(), canWrite: perms.has("identity.write"), selfUserId: me.userId, tenantId: me.tenantId, scope: { role, status, organizationId }, rows, selected, users,

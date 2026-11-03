@@ -8,6 +8,7 @@ import { signIn } from "../../fixtures/auth";
 import { expectAccessible } from "../../fixtures/a11y";
 
 let context: BrowserContext | null = null;
+
 test.afterEach(async () => {
   await context?.close();
   context = null;

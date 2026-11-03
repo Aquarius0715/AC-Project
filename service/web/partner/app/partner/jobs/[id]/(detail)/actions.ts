@@ -13,12 +13,12 @@ const run = async <T,>(fn: () => Promise<T>, reload: boolean): Promise<Result<T>
     const value = await fn();
     if (reload) refresh();
     return { ok: true, value };
-  } catch (e) {
-    if (e instanceof CoreError) {
-      if (e.error.code === "CONFLICT") refresh(); // expired, cancelled or changed elsewhere: show the latest state
-      return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
+  } catch (error) {
+    if (error instanceof CoreError) {
+      if (error.error.code === "CONFLICT") refresh(); // expired, cancelled or changed elsewhere: show the latest state
+      return { ok: false, code: error.error.code, messageKey: error.error.messageKey, fieldErrors: error.error.fieldErrors, retryAfterSeconds: error.error.retryAfterSeconds };
     }
-    throw e;
+    throw error;
   }
 };
 

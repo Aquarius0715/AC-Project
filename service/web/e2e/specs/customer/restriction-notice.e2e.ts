@@ -31,10 +31,12 @@ test("the overview names what is overdue and the restriction it caused", async (
   test.skip((await due.count()) === 0, "nothing is overdue on this stack");
   await expect(main.getByRole("link", { name: /^(Pay now|View invoices)/ })).toHaveAttribute("href", /^\/customer\/payments(\/[0-9a-f-]{36}|\?status=overdue)$/);
   const details = main.getByRole("link", { name: "View restriction details" });
-  if (await details.count()) {
-    await expect(main.getByText(/(until|unless) it is paid/).first()).toBeVisible();
-    await details.click();
-    await page.waitForURL(/tab=restriction/);
-    await expect(page.getByRole("main")).toContainText("Release condition");
+  if (!await details.count()) {
+    return;
   }
+
+  await expect(main.getByText(/(until|unless) it is paid/).first()).toBeVisible();
+  await details.click();
+  await page.waitForURL(/tab=restriction/);
+  await expect(page.getByRole("main")).toContainText("Release condition");
 });

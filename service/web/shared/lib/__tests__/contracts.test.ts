@@ -3,10 +3,12 @@ import { contractRows, dayInstant, draftErrors, klDay, planWord, priceMinor, uni
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
-const contract = (over: Partial<ApiContractFull>): ApiContractFull => ({
-  id: "k1234567-aaaa", version: 2, activeRestrictionIds: [], hasUnresolvedRecovery: false, customerId: "c1", customerOrgId: "org-a", unitIds: ["u1", "u2"],
-  planType: "rto", startAt: "2025-12-31T16:00:00Z", endAt: "2026-12-31T16:00:00Z", priceMinor: 12050, currency: "MYR", restrictionEligible: true, rulesVersion: "demo-v1", ...over,
-});
+const contract = (over: Partial<ApiContractFull>): ApiContractFull => {
+  return {
+    id: "k1234567-aaaa", version: 2, activeRestrictionIds: [], hasUnresolvedRecovery: false, customerId: "c1", customerOrgId: "org-a", unitIds: ["u1", "u2"],
+    planType: "rto", startAt: "2025-12-31T16:00:00Z", endAt: "2026-12-31T16:00:00Z", priceMinor: 12_050, currency: "MYR", restrictionEligible: true, rulesVersion: "demo-v1", ...over,
+  };
+};
 const customers = [{ id: "c1", name: "Demo Customer A", organizationId: "org-a", status: "active" }];
 const draft = (over: Partial<ContractDraft>): ContractDraft => ({ customerId: "c1", unitIds: ["u1"], planType: "rto", start: "2026-01-01", end: "2027-01-01", price: "120.50", currency: "MYR", restrictionEligible: true, rulesVersion: "demo-v1", ...over });
 
@@ -29,7 +31,7 @@ describe("HQ contracts (FR-A07, DD-A07)", () => {
     });
     expect([klDay("2025-12-31T16:00:00Z"), dayInstant("2026-01-01", "2025-12-31T16:00:00Z"), dayInstant("2026-01-02", "2025-12-31T16:00:00Z"), dayInstant("2026-01-02")])
       .toEqual(["2026-01-01", "2025-12-31T16:00:00Z", "2026-01-02T00:00:00+08:00", "2026-01-02T00:00:00+08:00"]);
-    expect([priceMinor("120.5"), priceMinor(" 0 "), priceMinor("19.99")]).toEqual([12050, 0, 1999]);
+    expect([priceMinor("120.5"), priceMinor(" 0 "), priceMinor("19.99")]).toEqual([12_050, 0, 1999]);
   });
 });
 

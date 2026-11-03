@@ -3,13 +3,13 @@ import { translate, type Display, type Locale } from "@ac/web/lib/i18n";
 
 export type Role = "client" | "admin" | "contractor" | "technician";
 
-export type NavItem = { href: string; label: string; icon: IconName; badge?: string; match?: string[] };
+export interface NavItem { href: string; label: string; icon: IconName; badge?: string; match?: string[] }
 /** The shell in API mode (lib/shell.ts, IR241): the signed-in user, the membership's organization, the sidebar badge
- * counts by href and the user's display language and time zone (IR258, IR259). The demo keeps the fixed scope, chip
- * and badges below. */
-export type ShellLive = { user: string; organization: string; badges: Record<string, number>; display: Display };
+counts by href and the user's display language and time zone (IR258, IR259). The demo keeps the fixed scope, chip
+and badges below. */
+export interface ShellLive { user: string; organization: string; badges: Record<string, number>; display: Display }
 
-export type RoleConfig = {
+export interface RoleConfig {
   role: Role;
   base: string;
   app: string;
@@ -21,7 +21,7 @@ export type RoleConfig = {
   loginDesc: string;
   loginTitle: string; // the service name on its sign-in page (Figma Login frames)
   loginSub: string;
-};
+}
 
 export const ROLES: Record<Role, RoleConfig> = {
   client: {
@@ -124,8 +124,8 @@ export const SHARED_PAGES = [
 ] as const;
 
 /** The English name of the page at `pathname` in a role's app, for the shell header and the document title (WCAG 2.4.2,
- * IR490): a shared page, Users, Demo controls, or the menu item whose href (or match) is the longest prefix of the path;
- * null off the menu (sign-in). */
+IR490): a shared page, Users, Demo controls, or the menu item whose href (or match) is the longest prefix of the path;
+null off the menu (sign-in). */
 export function pageLabel(role: Role, pathname: string): string | null {
   const shared = SHARED_PAGES.find((s) => pathname === s.href);
   if (shared) return shared.label;
@@ -134,7 +134,7 @@ export function pageLabel(role: Role, pathname: string): string | null {
   const { base, nav } = ROLES[role];
   const score = (href: string, match?: string[]) => {
     const hits = [href, ...(match ?? [])].filter((h) => (h === base ? pathname === h : pathname === h || pathname.startsWith(h + "/")));
-    return hits.length ? Math.max(...hits.map((h) => h.length)) : 0;
+    return hits.length > 0 ? Math.max(...hits.map((h) => h.length)) : 0;
   };
   const best = Math.max(0, ...nav.map((i) => score(i.href, i.match)));
   return best ? (nav.find((i) => score(i.href, i.match) === best)?.label ?? null) : null;

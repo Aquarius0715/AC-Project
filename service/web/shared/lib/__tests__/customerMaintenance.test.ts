@@ -8,16 +8,20 @@ import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const NOW = Date.parse("2026-09-14T01:00:00Z"); // Mon 09:00 KL
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
-const row = (over: Partial<ApiClientRow>): ApiClientRow => ({
-  projection: "summary", id: "job-1-aaaa", version: 1, unitId: "u1", type: "reactive", status: "requested", displayStatus: "requested", origin: "client_request", dueAt: "2026-09-16T04:00:00Z",
-  requestedSlot: slot("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z"), scheduledSlot: null, preferredSlots: [slot("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z"), slot("2026-09-17T02:00:00Z", "2026-09-17T04:00:00Z"), slot("2026-09-18T02:00:00Z", "2026-09-18T04:00:00Z")],
-  assignmentAcknowledgement: null, ...over,
-});
-const job = (over: Partial<ApiClientJob>): ApiClientJob => ({
-  projection: "detail", id: "job-1-aaaa", version: 3, unitId: "u1", type: "reactive", status: "requested", symptom: "Water dripping from the indoor unit", contactWindow: null, origin: "client_request",
-  planId: null, occurrenceAt: null, requestedSlot: slot("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z"), preferredSlots: row({}).preferredSlots, preferenceRound: 1, slotProposal: null, scheduledSlot: null,
-  dueAt: "2026-09-16T04:00:00Z", completedAt: null, contractorOrgId: null, followUpOfJobId: null, followUpClass: null, rating: null, customerConfirmedAt: null, reportRefs: [], assignment: null, ...over,
-});
+const row = (over: Partial<ApiClientRow>): ApiClientRow => {
+  return {
+    projection: "summary", id: "job-1-aaaa", version: 1, unitId: "u1", type: "reactive", status: "requested", displayStatus: "requested", origin: "client_request", dueAt: "2026-09-16T04:00:00Z",
+    requestedSlot: slot("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z"), scheduledSlot: null, preferredSlots: [slot("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z"), slot("2026-09-17T02:00:00Z", "2026-09-17T04:00:00Z"), slot("2026-09-18T02:00:00Z", "2026-09-18T04:00:00Z")],
+    assignmentAcknowledgement: null, ...over,
+  };
+};
+const job = (over: Partial<ApiClientJob>): ApiClientJob => {
+  return {
+    projection: "detail", id: "job-1-aaaa", version: 3, unitId: "u1", type: "reactive", status: "requested", symptom: "Water dripping from the indoor unit", contactWindow: null, origin: "client_request",
+    planId: null, occurrenceAt: null, requestedSlot: slot("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z"), preferredSlots: row({}).preferredSlots, preferenceRound: 1, slotProposal: null, scheduledSlot: null,
+    dueAt: "2026-09-16T04:00:00Z", completedAt: null, contractorOrgId: null, followUpOfJobId: null, followUpClass: null, rating: null, customerConfirmedAt: null, reportRefs: [], assignment: null, ...over,
+  };
+};
 const unit = { name: "Bedroom AC", place: "Home A › 1F › Bedroom" };
 
 describe("customer maintenance", () => {

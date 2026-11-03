@@ -12,12 +12,12 @@ import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { kpis, lineRows, money, periodLabel, questionRows, statementRows, topicLabel, type ApiPayoutStatement, type JobLabel, type ReviewingJob } from "@ac/web/lib/partnerPayouts";
 import type { PayoutsLive } from "../_components/payouts-view";
 
-type RateCard = { id: string; version: number; effectiveFrom: string };
-type JobRow = { projection: string; id?: string; jobId?: string; type: string; status: string; unitId?: string; completedAt?: string | null };
-const quiet = <T,>(p: Promise<T>) => p.catch((e) => {
-  if (e instanceof CoreError && (e.error.code === "FORBIDDEN" || e.error.code === "NOT_FOUND")) return null;
-  throw e;
-});
+const quiet = <T,>(p: Promise<T>) => {
+  return p.catch((error) => {
+    if (error instanceof CoreError && (error.error.code === "FORBIDDEN" || error.error.code === "NOT_FOUND")) return null;
+    throw error;
+  });
+};
 const unitName = async (id: string | undefined, cache: Map<string, Promise<string | null>>) => {
   if (!id) return null;
   if (!cache.has(id)) cache.set(id, quiet(coreOp<ApiUnitDetail>("units.get", { id })).then((u) => (u ? `${u.displayName} · ${u.location.pathLabels[0] ?? ""}`.replace(/ · $/, "") : null)));
@@ -25,6 +25,8 @@ const unitName = async (id: string | undefined, cache: Map<string, Promise<strin
 };
 
 export async function loadPayouts(opts: { statementId?: string; period?: string; status?: string }): Promise<PayoutsLive> {
+  interface JobRow { projection: string; id?: string; jobId?: string; type: string; status: string; unitId?: string; completedAt?: string | null }
+  interface RateCard { id: string; version: number; effectiveFrom: string }
   const [all, reviewing, display, who] = await Promise.all([
     coreAll<ApiPayoutStatement>("payouts.list"),
     quiet(coreOp<{ items: JobRow[] }>("jobs.list", { limit: 50, filters: { statuses: ["submitted"] } })),
@@ -48,11 +50,13 @@ export async function loadPayouts(opts: { statementId?: string; period?: string;
       const j = await quiet(coreOp<JobRow>("jobs.get", { jobId }));
       if (!j) return null;
       const unit = j.projection === "detail" ? await unitName(j.unitId, units) : null;
-      return [jobId, { title: `${typeLabel(j.type, t)}${unit ? ` · ${unit.split(" · ")[0]}` : ""}`, sub: unit ? unit.split(" · ").slice(1).join(" · ") || null : j.projection === "history" ? t("customer details closed with the delegation") : null }];
+      return [jobId, { title: `${typeLabel(j.type, t)}${unit ? ` · ${unit.split(" · ", 1)[0]}` : ""}`, sub: unit ? unit.split(" · ").slice(1).join(" · ") || null : (j.projection === "history" ? t("customer details closed with the delegation") : null) }];
     })),
-    Promise.all((reviewing?.items ?? []).filter((j) => j.projection === "detail" || j.projection === "summary").slice(0, 10).map(async (j): Promise<ReviewingJob> => ({
-      id: j.id ?? j.jobId ?? "", type: j.type, unitName: (await unitName(j.unitId, units))?.split(" · ")[0] ?? null,
-    }))),
+    Promise.all((reviewing?.items ?? []).filter((j) => j.projection === "detail" || j.projection === "summary").slice(0, 10).map(async (j): Promise<ReviewingJob> => {
+      return {
+        id: j.id ?? j.jobId ?? "", type: j.type, unitName: (await unitName(j.unitId, units))?.split(" · ", 1)[0] ?? null,
+      };
+    })),
   ]);
   const card = cards?.items.find((c) => Date.parse(c.effectiveFrom) <= Date.parse(selected.payDate)) ?? cards?.items[0] ?? null;
   const rows = lineRows(selected, new Map(labels.filter((l): l is [string, JobLabel] => !!l)), inReview, i);

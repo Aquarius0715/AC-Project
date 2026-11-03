@@ -11,7 +11,7 @@ import { Checkbox } from "@ac/web/components/ui/checkbox";
 function Row({ title, sub, checked, disabled, onChange }: { title: string; sub: string; checked: boolean; disabled?: boolean; onChange?: (on: boolean) => void }) {
   return (
     <label className="flex items-start gap-2.5 border-t border-line py-2 text-[13px] first:border-0">
-      <Checkbox className="mt-0.5 shrink-0" checked={checked} disabled={disabled} onCheckedChange={(v) => onChange?.(v === true)} />
+      <Checkbox className="mt-0.5 shrink-0" checked={checked} disabled={disabled} onCheckedChange={(v) => onChange?.(v)} />
       <span className="min-w-0"><b className="block font-semibold">{title}</b><span className="block text-[11px] text-muted-foreground">{sub}</span></span>
     </label>
   );
@@ -22,15 +22,15 @@ export function EvidencePicker({ rows, policyless, picked, onChange, loading, er
   const h = evidenceHeading(policyless, t);
   const attached = rows.filter((r) => r.kind === "detection");
   const later = rows.filter((r) => r.kind !== "detection");
-  const row = (r: EvidenceRow) => <Row key={r.id} title={r.title} sub={r.sub} checked={picked.includes(r.id)} onChange={(on) => onChange(togglePick(picked, r.id, on))} />;
+  const row = (r: EvidenceRow) => <Row key={r.id} title={r.title} sub={r.sub} checked={picked.includes(r.id)} onChange={(on) => { onChange(togglePick(picked, r.id, on)); }} />;
   return (
     <fieldset className="flex min-w-0 flex-col rounded-xl border border-line px-3 pb-1 pt-2">
       <legend className="px-1 text-xs font-semibold">{h.title}</legend>
       <p className="mb-1 text-[11px] text-muted-foreground">{h.sub}</p>
       {loading ? <p className="py-2 text-xs text-muted-foreground">{t("Loading the evidence…")}</p> : (
         <div className="flex flex-col">
-          {later.length ? later.map(row) : <p className="py-2 text-xs text-muted-foreground">{t("No remeasurement since detection yet — remeasure the unit or record an inspection.")}</p>}
-          {attached.length ? attached.map(row) : <Row title={t("Evidence attached to this alert")} sub={t("none attached")} checked={false} disabled />}
+          {later.length > 0 ? later.map(row) : <p className="py-2 text-xs text-muted-foreground">{t("No remeasurement since detection yet — remeasure the unit or record an inspection.")}</p>}
+          {attached.length > 0 ? attached.map(row) : <Row title={t("Evidence attached to this alert")} sub={t("none attached")} checked={false} disabled />}
         </div>
       )}
       {error && <p className="flex items-center gap-1 pb-2 text-xs font-medium text-crit"><Icon name="error" />{error}</p>}

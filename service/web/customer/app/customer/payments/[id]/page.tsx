@@ -19,10 +19,10 @@ import {
 import { InvoiceDemo } from "./_components/invoice-demo";
 import { InvoiceView, type InvoiceLive } from "./_components/invoice-view";
 
-type Unit = { id: string; displayName: string; propertyId: string; spaceId: string | null };
-type Reminder = { id: string; channel: string; occurredAt: string; target: { kind: string; id: string } };
 
 export default async function CustomerInvoicePage({ params, searchParams }: PageProps<"/customer/payments/[id]">) {
+  interface Reminder { id: string; channel: string; occurredAt: string; target: { kind: string; id: string } }
+  interface Unit { id: string; displayName: string; propertyId: string; spaceId: string | null }
   const { id } = await params;
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
@@ -31,9 +31,9 @@ export default async function CustomerInvoicePage({ params, searchParams }: Page
   let inv: ApiInvoiceDetail & { createdAt: string; paymentRefs: ClientPayment[] };
   try {
     inv = await coreOp("invoices.get", { id });
-  } catch (e) {
-    if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.fieldErrors.id)) notFound(); // another customer's invoice reads as absent (D01)
-    throw e;
+  } catch (error) {
+    if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.fieldErrors.id)) notFound(); // another customer's invoice reads as absent (D01)
+    throw error;
   }
   // WhatsApp reaches only an account with a phone number: without one the preview is offered disabled, with its reason
   // (IR578); if the check fails the button stays, and a refusal still reads in words
@@ -54,7 +54,7 @@ export default async function CustomerInvoicePage({ params, searchParams }: Page
   const contract = contractCards(contracts.filter((k) => k.id === inv.contractId), (u) => place.get(u), now, i18n)[0] ?? null;
   const { open, last } = paymentPhase(inv.paymentRefs);
   const r = restrictions.find((x) => x.id === one("restrictionId")) ?? restrictions.find((x) => ["scheduled", "requested", "applied", "release_requested"].includes(x.state)) ?? restrictions[0] ?? null;
-  const tab = one("tab") === "restriction" && r ? "restriction" : one("tab") === "inquiry" ? "inquiry" : "payment";
+  const tab = one("tab") === "restriction" && r ? "restriction" : (one("tab") === "inquiry" ? "inquiry" : "payment");
   let restriction: InvoiceLive["restriction"] = null;
   if (r) {
     const ids = r.perUnit.flatMap((u) => [u.applyCommandIds.at(-1), u.releaseCommandIds.at(-1)]).filter((x): x is string => !!x);
@@ -82,7 +82,7 @@ export default async function CustomerInvoicePage({ params, searchParams }: Page
     },
     contract: contract && {
       name: contract.name, id: contract.id,
-      scope: `${t(contract.units.length === 1 ? "{n} unit" : "{n} units", { n: contract.units.length })}${contract.units.length ? ` (${contract.units.map((u) => u.name).join(", ")})` : ""}`,
+      scope: `${t(contract.units.length === 1 ? "{n} unit" : "{n} units", { n: contract.units.length })}${contract.units.length > 0 ? ` (${contract.units.map((u) => u.name).join(", ")})` : ""}`,
     },
     payments: paymentLines(inv.paymentRefs, i18n), open: open && { id: open.id, version: open.version, status: open.status, method: open.method },
     last: last && { status: last.status, reference: last.paymentReference, method: last.method, id: last.id },

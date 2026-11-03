@@ -7,14 +7,14 @@ import { Icon } from "@ac/web/components/Icon";
 
 type Phase = "choose" | "processing" | "confirmed" | "failed";
 
-/** The Phase 1A demo of /customer/payments/[id] (fixtures; DATA_SOURCE≠api). */
+/** The Phase 1A demo of /customer/payments/[id] (fixtures; DATA_SOURCE≠API). */
 export function InvoiceDemo({ id, tab }: { id: string; tab?: string }) { // SCR-C11 tabs: payment (default) · restriction · inquiry
   const toast = useToast();
   const [phase, setPhase] = useState<Phase>("choose");
   const [method, setMethod] = useState<"credit" | "debit" | "bank">("credit");
   const [preview, setPreview] = useState<string | null>(null);
   const [reminders, setReminders] = useState(false);
-  const paid = id !== "invoice-overdue-a" && id !== "invoice-sep-a";
+  const isPaid = id !== "invoice-overdue-a" && id !== "invoice-sep-a";
 
   if (tab === "restriction") {
     return (
@@ -38,26 +38,28 @@ export function InvoiceDemo({ id, tab }: { id: string; tab?: string }) { // SCR-
 
   const pay = () => {
     setPhase("processing");
-    setTimeout(() => setPhase(method === "debit" ? "failed" : "confirmed"), 1800);
+    setTimeout(() => { setPhase(method === "debit" ? "failed" : "confirmed"); }, 1800);
   };
   return (
     <Page>
       <div className="text-[13px] text-muted-foreground"><Link href="/customer/payments" className="font-semibold text-primary"><Icon name="arrowLeft" /> Contracts & payments</Link> › Invoice {id}</div>
       <Banner tone="warn" action={<DemoBadge />}>Demo payment — no real money moves. No card number, CVV or expiry is collected.</Banner>
       <div className="split">
-        <Card title="Amount due" action={paid ? <Badge tone="ok" icon="check">Paid</Badge> : phase === "confirmed" ? <Badge tone="ok" icon="check">Confirmed</Badge> : phase === "processing" ? <Badge tone="primary">Processing</Badge> : <Badge tone="crit">Unpaid</Badge>}>
+        <Card title="Amount due" action={isPaid ? <Badge tone="ok" icon="check">Paid</Badge> : phase === "confirmed" ? <Badge tone="ok" icon="check">Confirmed</Badge> : phase === "processing" ? <Badge tone="primary">Processing</Badge> : <Badge tone="crit">Unpaid</Badge>}>
           <div className="text-[32px] font-bold">120.00 <span className="text-base text-muted-foreground">MYR</span></div>
           <p className="text-xs text-muted-foreground">Due Sep 10, 2026 · issued Aug 27</p>
           <SummaryList items={[["Contract", "RTO Plan · contract-rto-a"], ["Contract scope", "3 units (Bedroom AC, Meeting room AC, Lobby AC)"]]} />
-          {!paid && phase === "choose" && (
+          {!isPaid && phase === "choose" && (
             <>
               <h3 className="mt-4 mb-2 text-[13px] font-bold">Payment method</h3>
               <div className="flex flex-col gap-2">
-                {([["credit", "Credit card (demo)", "Simulated card payment — no card details"], ["debit", "Debit card (demo)", "Simulated card payment — no card details (this one fails in the demo)"], ["bank", "Payment instructions", "Bank transfer details — viewing them does not pay the invoice"]] as const).map(([k, t, d]) => (
-                  <Plain key={k} onClick={() => setMethod(k)} aria-pressed={method === k} className={`rounded-xl border p-3 text-left ${method === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}><b className="text-[13px]">{t}</b><div className="text-xs text-muted-foreground">{d}</div></Plain>
-                ))}
+                {([["credit", "Credit card (demo)", "Simulated card payment — no card details"], ["debit", "Debit card (demo)", "Simulated card payment — no card details (this one fails in the demo)"], ["bank", "Payment instructions", "Bank transfer details — viewing them does not pay the invoice"]] as const).map(([k, t, d]) => {
+                  return (
+                    <Plain key={k} onClick={() => { setMethod(k); }} aria-pressed={method === k} className={`rounded-xl border p-3 text-left ${method === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}><b className="text-[13px]">{t}</b><div className="text-xs text-muted-foreground">{d}</div></Plain>
+                  );
+                })}
               </div>
-              <div className="mt-3 flex justify-end">{method === "bank" ? <Btn onClick={() => toast("Bank instructions shown — invoice stays unpaid", "warn")}>View instructions</Btn> : <Btn variant="primary" onClick={pay}>Pay now</Btn>}</div>
+              <div className="mt-3 flex justify-end">{method === "bank" ? <Btn onClick={() => { toast("Bank instructions shown — invoice stays unpaid", "warn"); }}>View instructions</Btn> : <Btn variant="primary" onClick={pay}>Pay now</Btn>}</div>
             </>
           )}
           {phase === "processing" && <div className="mt-4"><Banner>Processing… “Processing” is not paid. HQ confirms the payment.</Banner></div>}
@@ -65,14 +67,14 @@ export function InvoiceDemo({ id, tab }: { id: string; tab?: string }) { // SCR-
           {phase === "failed" && <div className="mt-4"><Banner tone="crit" action={<Btn size="sm" onClick={() => { setMethod("credit"); setPhase("choose"); }}>Retry</Btn>}>Payment failed — invoice stays unpaid. Retry or choose another method.</Banner></div>}
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Payment history">{phase === "confirmed" || paid ? <p className="text-[13px]">Demo card payment · {paid ? "Aug 8" : "just now"} · 120.00 MYR</p> : <p className="text-xs text-muted-foreground">No payments yet</p>}</Card>
-          <Card title="Payment reminders" action={<Btn size="sm" variant="ghost" aria-label={reminders ? "Hide reminders" : "Show reminders"} aria-expanded={reminders} onClick={() => setReminders((r) => !r)}><Icon name={reminders ? "chevronUp" : "chevronDown"} /></Btn>} sub="Notifications only — not payment methods">
-            {reminders && [["Email", "Demo record Sep 10"], ["WhatsApp", "Demo record Sep 12"]].map(([c, d]) => <div key={c} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px]"><span>{c} · {d}<span className="block text-xs text-muted-foreground">Sent {d.replace("Demo record ", "")} (demo record)</span></span><Btn size="sm" variant="ghost" onClick={() => setPreview(c)}>View preview</Btn></div>)}
+          <Card title="Payment history">{phase === "confirmed" || isPaid ? <p className="text-[13px]">Demo card payment · {isPaid ? "Aug 8" : "just now"} · 120.00 MYR</p> : <p className="text-xs text-muted-foreground">No payments yet</p>}</Card>
+          <Card title="Payment reminders" action={<Btn size="sm" variant="ghost" aria-label={reminders ? "Hide reminders" : "Show reminders"} aria-expanded={reminders} onClick={() => { setReminders((r) => !r); }}><Icon name={reminders ? "chevronUp" : "chevronDown"} /></Btn>} sub="Notifications only — not payment methods">
+            {reminders && [["Email", "Demo record Sep 10"], ["WhatsApp", "Demo record Sep 12"]].map(([c, d]) => <div key={c} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px]"><span>{c} · {d}<span className="block text-xs text-muted-foreground">Sent {d.replace("Demo record ", "")} (demo record)</span></span><Btn size="sm" variant="ghost" onClick={() => { setPreview(c); }}>View preview</Btn></div>)}
           </Card>
         </div>
       </div>
       <Banner tone="warn" action={<Link className="text-xs font-semibold text-primary" href={`/customer/payments/${id}?tab=restriction`}>View restriction <Icon name="arrowRight" /></Link>}><b>Cooling restriction active</b> — 1 unit in scope · Lobby AC (Office A) — minimum cooling setpoint 24 °C. Paying does not restore cooling immediately.</Banner>
-      <Modal open={!!preview} onClose={() => setPreview(null)} title={`${preview} preview`} footer={<Btn onClick={() => setPreview(null)}>Close</Btn>}><p className="rounded-xl bg-surface2 p-3 text-[13px]">Your invoice invoice-overdue-a (120.00 MYR) was due on 10 Sep. Pay by card or view payment instructions in the app.</p><p className="text-xs text-muted-foreground">Preview only — nothing was sent.</p></Modal>
+      <Modal open={!!preview} onClose={() => { setPreview(null); }} title={`${preview} preview`} footer={<Btn onClick={() => { setPreview(null); }}>Close</Btn>}><p className="rounded-xl bg-surface2 p-3 text-[13px]">Your invoice invoice-overdue-a (120.00 MYR) was due on 10 Sep. Pay by card or view payment instructions in the app.</p><p className="text-xs text-muted-foreground">Preview only — nothing was sent.</p></Modal>
     </Page>
   );
 }

@@ -8,9 +8,11 @@ import { i18nOf, showClock, showDay } from "@ac/web/lib/i18n";
 import { setsTemperature, type ApiUnitDetail } from "@ac/web/lib/units";
 
 const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
-const m = (metric: string, value: number | null, over: Partial<ApiMeasurement> = {}): ApiMeasurement => ({
-  id: "m", unitId: "u", sensorId: "s", metric, value, unit: metric === "co2" ? "ppm" : metric === "pm25" ? "µg/m³" : metric === "temperature" ? "°C" : "%", observedAt: "2026-09-14T01:12:30Z", origin: "measured", quality: "valid", qualityReason: null, ...over,
-});
+const m = (metric: string, value: number | null, over: Partial<ApiMeasurement> = {}): ApiMeasurement => {
+  return {
+    id: "m", unitId: "u", sensorId: "s", metric, value, unit: metric === "co2" ? "ppm" : metric === "pm25" ? "µg/m³" : metric === "temperature" ? "°C" : "%", observedAt: "2026-09-14T01:12:30Z", origin: "measured", quality: "valid", qualityReason: null, ...over,
+  };
+};
 
 describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
   it("rounds per IR44 and states a live reading, its guide and advice", () => {
@@ -23,10 +25,12 @@ describe("air-quality metric cards (FR-C07, IR44, IR99, IR213, IR260)", () => {
   });
 
   it("points the temperature to Unit Control only when the model sets it there (IR544)", () => {
-    const model = (over: Partial<ApiUnitDetail["capabilities"]>): ApiUnitDetail["capabilities"] => ({
-      manufacturer: "Daikin", model: "IR via node_1", control: true, modeControl: false, fanControl: false, temperature: { min: 16, max: 30, step: 1 },
-      modes: [], fanLevels: [], ventilation: false, ventilationLevels: [], sensors: [], ...over,
-    });
+    const model = (over: Partial<ApiUnitDetail["capabilities"]>): ApiUnitDetail["capabilities"] => {
+      return {
+        manufacturer: "Daikin", model: "IR via node_1", control: true, modeControl: false, fanControl: false, temperature: { min: 16, max: 30, step: 1 },
+        modes: [], fanLevels: [], ventilation: false, ventilationLevels: [], sensors: [], ...over,
+      };
+    };
     // as the air-quality page passes it: whether the unit page has a temperature row
     const advice = (cap: ApiUnitDetail["capabilities"]) => metricCard("temperature", m("temperature", 27.2), true, undefined, setsTemperature(cap)).advice;
     expect(advice(model({}))).toBe("Setpoint is on Unit Control");

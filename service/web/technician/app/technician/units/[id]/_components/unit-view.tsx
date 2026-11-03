@@ -9,20 +9,20 @@ import type { UnitLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
 /** The technician's unit (FR-T02, FR-T03, Figma Technician 02-10…02-13): the register with its components, the
- * maintenance history and open alerts, the latest values and one metric over a period — the metric and the period in
- * the URL (`metric` opens Monitoring, `period`). Texts in the user's display language; the times come formatted from
- * the loader (IR283). */
+maintenance history and open alerts, the latest values and one metric over a period — the metric and the period in
+the URL (`metric` opens Monitoring, `period`). Texts in the user's display language; the times come formatted from
+the loader (IR283). */
 export function TechUnitView({ live }: { live: UnitLive }) {
   const t = useT();
   const patch = useUrlPatch();
-  const setPeriod = (p: Period) => patch({ period: p === "24h" ? null : p });
+  const setPeriod = (p: Period) => { patch({ period: p === "24h" ? null : p }); };
   const periods = <Tabs value={live.period} onChange={setPeriod} tabs={live.periods} />;
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
         <Link href={live.back} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{live.name}</h1><span className="text-muted-foreground">· {live.short}</span><ConnBadge s={live.connection} />
       </div>
-      <div><Tabs value={live.tab} onChange={(v) => patch({ metric: v === "monitoring" ? live.metric : null })} tabs={live.tabs} /></div>
+      <div><Tabs value={live.tab} onChange={(v) => { patch({ metric: v === "monitoring" ? live.metric : null }); }} tabs={live.tabs} /></div>
       {live.tab === "register" ? (
         <div className="split-rev">
           <div className="flex min-w-0 flex-col gap-4">
@@ -36,9 +36,11 @@ export function TechUnitView({ live }: { live: UnitLive }) {
               {live.register.missing && <p className="mt-2 text-[11px] text-muted-foreground">{t("Missing values are never filled from similar models or today’s date.")}</p>}
             </Card>
             <Card title={t("Components ({n})", { n: live.componentCount })}>
-              {live.components.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No components in this unit’s service scope.")}</p> : live.components.map((c) => (
-                <div key={c.group} className="border-t border-line py-2 first:border-0"><b className="text-[13px]">{c.title}</b><div className="text-xs text-muted-foreground">{c.names}</div></div>
-              ))}
+              {live.components.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No components in this unit’s service scope.")}</p> : live.components.map((c) => {
+                return (
+                  <div key={c.group} className="border-t border-line py-2 first:border-0"><b className="text-[13px]">{c.title}</b><div className="text-xs text-muted-foreground">{c.names}</div></div>
+                );
+              })}
               <p className="mt-1 text-[11px] text-muted-foreground">{t("Each component gets its result in the job workspace — normal is never preselected.")}</p>
             </Card>
           </div>
@@ -79,7 +81,7 @@ export function TechUnitView({ live }: { live: UnitLive }) {
                 <Card key={m.metric} title={m.label} action={<b className={cx("text-[13px]", m.tone === "warn" && "text-warn")}>{m.value}</b>}>
                   {m.points.every((v) => v === null) ? <p className="text-xs text-muted-foreground">{t("No valid readings in this period.")}</p> : <LineChart points={m.points} height={56} />}
                   {m.cut && <p className="mt-1 text-[11px] font-semibold text-warn">{t("Earlier readings are not loaded")}</p>}
-                  <div className="mt-1 flex justify-between gap-2 text-[11px] text-muted-foreground"><span>{m.sub}</span><Plain type="button" className="font-semibold text-primary" onClick={() => patch({ metric: m.metric })}>{t("Chart")} <Icon name="arrowRight" /></Plain></div>
+                  <div className="mt-1 flex justify-between gap-2 text-[11px] text-muted-foreground"><span>{m.sub}</span><Plain type="button" className="font-semibold text-primary" onClick={() => { patch({ metric: m.metric }); }}>{t("Chart")} <Icon name="arrowRight" /></Plain></div>
                 </Card>
               ))}
             </div>

@@ -5,14 +5,14 @@ import { Btn, Card, Choice, Field, Page, Select, Tabs, Textarea, Timeline, useTo
 import { useOp } from "@ac/web/lib/useOp";
 import { jobEventTitle } from "@ac/web/lib/partnerOverview";
 
-// DATA_SOURCE=api: the company's jobs (offer / summary / history projections, IR23) and their events (jobs.events)
-type ApiJobRow = { projection: string; id?: string; jobId?: string; type: string; status: string; completedAt?: string | null };
-type ApiEvent = { id: string; action: string; occurredAt: string; note: { visibility: "internal" | "customer"; message: string } | null };
-type Ev = { t: string; title: string; d: string; c: boolean };
+// DATA_SOURCE=API: the company's jobs (offer / summary / history projections, IR23) and their events (jobs.events)
+interface ApiJobRow { projection: string; id?: string; jobId?: string; type: string; status: string; completedAt?: string | null }
+interface ApiEvent { id: string; action: string; occurredAt: string; note: { visibility: "internal" | "customer"; message: string } | null }
+interface Ev { t: string; title: string; d: string; c: boolean }
 const actionTitle = jobEventTitle; // shared with the overview (partnerOverview.ts)
 const kl = (iso: string) => new Date(iso).toLocaleString("en-MY", { dateStyle: "short", timeStyle: "short", hour12: false, timeZone: "Asia/Kuala_Lumpur" });
 function eventRow(e: ApiEvent): Ev {
-  return { t: kl(e.occurredAt), title: actionTitle[e.action] ?? e.action.replace(/[._]/g, " "), d: e.note ? `“${e.note.message}” · ${e.note.visibility}` : e.action, c: e.note?.visibility === "customer" };
+  return { t: kl(e.occurredAt), title: actionTitle[e.action] ?? e.action.replaceAll(/[._]/g, " "), d: e.note ? `“${e.note.message}” · ${e.note.visibility}` : e.action, c: e.note?.visibility === "customer" };
 }
 function jobOptions(items: ApiJobRow[]) {
   const byId = new Map<string, ApiJobRow>();
@@ -21,7 +21,7 @@ function jobOptions(items: ApiJobRow[]) {
     const prev = byId.get(id);
     if (!prev || (prev.projection === "history" && j.projection !== "history")) byId.set(id, j); // summary beats history
   }
-  return [...byId.entries()].map(([id, j]) => ({ id, label: `${j.type} · ${j.status} · ${id.slice(0, 8)}`, status: j.status, completedAt: j.completedAt ?? null, projection: j.projection }));
+  return [...byId].map(([id, j]) => ({ id, label: `${j.type} · ${j.status} · ${id.slice(0, 8)}`, status: j.status, completedAt: j.completedAt ?? null, projection: j.projection }));
 }
 
 const events = [
@@ -48,30 +48,30 @@ export function HistoryDemo() {
   const [vis, setVis] = useState<"internal" | "customer">("internal");
   const [previews, setPreviews] = useState([{ k: "quality_rework → technician", d: "in-app · preview · internal · 09-21 14:05" }, { k: "schedule_change → customer", d: "email · preview · customer · 09-20 10:02" }]);
   const jobs = useOp<{ items: ApiJobRow[] }, ReturnType<typeof jobOptions> | null>("jobs.list", { limit: 100 }, null, (p) => jobOptions(p.items));
-  const api = jobs.source === "api";
-  const sel = api ? (jobs.data?.find((j) => j.id === job) ?? null) : null;
-  const evs = useOp<{ items: ApiEvent[] }, Ev[] | null>("jobs.events", { jobId: api ? job : "", query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } }, null, (p) => p.items.map(eventRow), !!sel);
-  const all: Ev[] = api ? (sel ? (evs.data ?? []) : []) : events;
+  const isApi = jobs.source === "api";
+  const sel = isApi ? (jobs.data?.find((j) => j.id === job) ?? null) : null;
+  const evs = useOp<{ items: ApiEvent[] }, Ev[] | null>("jobs.events", { jobId: isApi ? job : "", query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } }, null, (p) => p.items.map(eventRow), !!sel);
+  const all: Ev[] = isApi ? (sel ? (evs.data ?? []) : []) : events;
   const shown = all.filter((e) => f === "all" || (f === "customer" ? e.c : !e.c));
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2"><Select aria-label="Job" className="max-w-xs" value={job} onChange={(e) => setJob(e.target.value)}><option value="">Select a job…</option>{api ? jobs.data?.map((j) => <option key={j.id} value={j.id}>{j.label}</option>) : <><option value="job-p03">job-p03 · Office AC</option><option value="job-p04">job-p04 · Meeting room AC</option></>}</Select></div>
-      {!job || (api && !sel) ? <Card title="Select a job" sub="Choose a job above to see its history." /> : (
+      <div className="flex flex-wrap items-center gap-2"><Select aria-label="Job" className="max-w-xs" value={job} onChange={(e) => { setJob(e.target.value); }}><option value="">Select a job…</option>{isApi ? jobs.data?.map((j) => <option key={j.id} value={j.id}>{j.label}</option>) : <><option value="job-p03">job-p03 · Office AC</option><option value="job-p04">job-p04 · Meeting room AC</option></>}</Select></div>
+      {!job || (isApi && !sel) ? <Card title="Select a job" sub="Choose a job above to see its history." /> : (
         <>
           <Card><div className="grid-fluid text-[13px]" style={{ ["--min"as string]: "150px" }}>{(sel ? [["JOB", sel.id.slice(0, 8)], ["STATUS", sel.status], ["COMPLETED", sel.completedAt ? kl(sel.completedAt) : "—"], ["ACCESS", sel.projection === "history" ? "ended — history only" : "current"]] : [["UNIT", "Office AC · customer-a"], ["TECHNICIAN", "tech-external-a"], ["STATUS", "Completed"], ["DELEGATION", "ended 09-22 00:00"]]).map(([a, b]) => <div key={a}><div className="text-[10px] font-bold tracking-wide text-muted-foreground">{a}</div><b>{b}</b></div>)}</div></Card>
           <div className="split">
             <Card title={`Job history — ${job}`} action={<Tabs value={f} onChange={setF} tabs={[{ id: "all", label: "All events", count: all.length }, { id: "customer", label: "Customer-visible", count: all.filter((e) => e.c).length }, { id: "internal", label: "Internal", count: all.filter((e) => !e.c).length }]} />}>
               {shown.length === 0 && <p className="text-[13px] text-muted-foreground">{evs.loading ? "Loading…" : "No events in this view."}</p>}
-              <Timeline items={shown.map((e) => ({ time: e.t.slice(5), title: e.title, detail: e.d, tone: e.title.startsWith("Rework") ? "warn" : e.title.includes("accepted") && e.title.startsWith("Report") ? "ok" : undefined }))} />
+              <Timeline items={shown.map((e) => ({ time: e.t.slice(5), title: e.title, detail: e.d, tone: e.title.startsWith("Rework") ? "warn" : (e.title.includes("accepted") && e.title.startsWith("Report") ? "ok" : undefined) }))} />
             </Card>
             <div className="flex min-w-0 flex-col gap-4">
               <Card title="New communication preview">
                 <div className="flex flex-col gap-3">
                   <Field label="Template"><Select><option>schedule_change</option><option>quality_rework</option></Select></Field>
                   <Field label="Visibility"><Choice value={vis} onChange={setVis} options={[{ id: "internal", label: "Internal (default)" }, { id: "customer", label: "Customer-visible" }]} /></Field>
-                  <Field label="Recipient role"><Select value={role} onChange={(e) => setRole(e.target.value)}><option value="hq">hq</option><option value="technician">technician</option><option value="customer">customer</option></Select></Field>
-                  <Field label="Message (1–2000 chars)" error={tried && !msg.trim() ? "Message is required" : undefined}><Textarea value={msg} onChange={(e) => setMsg(e.target.value)} /></Field>
-                  <Btn variant="primary" disabled={api && sel?.projection === "history"} onClick={() => { setTried(true); if (!msg.trim()) return; setPreviews((p) => [{ k: `schedule_change → ${role}`, d: `in-app · preview · ${vis} · just now` }, ...p]); toast("Note saved + preview created"); }}>Save note & create preview</Btn>
+                  <Field label="Recipient role"><Select value={role} onChange={(e) => { setRole(e.target.value); }}><option value="hq">hq</option><option value="technician">technician</option><option value="customer">customer</option></Select></Field>
+                  <Field label="Message (1–2000 chars)" error={tried && !msg.trim() ? "Message is required" : undefined}><Textarea value={msg} onChange={(e) => { setMsg(e.target.value); }} /></Field>
+                  <Btn variant="primary" disabled={isApi && sel?.projection === "history"} onClick={() => { setTried(true); if (!msg.trim()) return; setPreviews((p) => [{ k: `schedule_change → ${role}`, d: `in-app · preview · ${vis} · just now` }, ...p]); toast("Note saved + preview created"); }}>Save note & create preview</Btn>
                   <p className="text-[11px] text-muted-foreground">No real sending. Free-form external recipients and other-job recipients are rejected. Internal notes stay hidden from customers.</p>
                 </div>
               </Card>

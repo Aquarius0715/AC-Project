@@ -20,6 +20,7 @@ import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display"
 import { expectAccessible } from "../../fixtures/a11y";
 
 let zoneBefore: string | null = null;
+
 test.afterEach(async ({ page }) => {
   if (zoneBefore) await setDisplay(page, ENGLISH, zoneBefore);
   zoneBefore = null;
@@ -222,7 +223,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main.getByRole("heading", { name: "Penyata", exact: true })).toBeVisible();
   // contracts (IR300): the plan tabs, the Kuala Lumpur days, and the new-contract checks, which stop before any call
   await page.goto("/admin/billing/contracts");
-  for (const name of ["RTO", "Umum", "Tenaga", "Alam sekitar"]) await expect(main.getByRole("tab", { name: new RegExp(`^${name}\\s*\\d+$`) })).toBeVisible(); // each with its count (IR322)
+  for (const name of ["RTO", "Umum", "Tenaga", "Alam sekitar"]) await expect(main.getByRole("tab", { name: new RegExp(String.raw`^${name}\s*\d+$`) })).toBeVisible(); // each with its count (IR322)
   await expect(main).toContainText(/\d+ kontrak dalam skop/);
   await expect(main.getByRole("tab", { name: /^Semua/ })).toHaveAttribute("aria-selected", "true");
   await main.getByRole("button", { name: "Kontrak baharu" }).click();

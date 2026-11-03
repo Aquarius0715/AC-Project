@@ -37,9 +37,11 @@ export function OverviewDemo() {
           <Card title="Today · Mon 2026-09-21" action={<TextLink href="/partner/schedule">Schedule <Icon name="arrowRight" /></TextLink>}>
             <div className="scroll-x"><div className="min-w-[520px]">
               <div className="grid grid-cols-[120px_repeat(6,1fr)] text-[11px] text-muted-foreground"><span />{hours.map((h) => <span key={h}>{String(h).padStart(2, "0")}:00</span>)}</div>
-              {[["tech-external-a", "Refrigerant handling", { s: 2, w: 1, t: "10–12" }], ["tech-external-a2", "General maintenance", null]].map(([n, q, b]) => (
-                <div key={n as string} className="relative grid grid-cols-[120px_repeat(6,1fr)] items-center border-t border-line py-2 text-xs"><span><b>{n as string}</b><span className="block text-[11px] text-muted-foreground">{q as string}</span></span><div className="col-span-6 relative h-8 rounded-lg bg-surface2">{b ? <div className="absolute top-1 h-6 rounded bg-primary px-2 text-[11px] leading-6 text-white" style={{ left: "16.6%", width: "16.6%" }}>10–12</div> : <span className="absolute inset-0 grid place-items-center text-[11px] text-muted-foreground">Free all day</span>}<span className="absolute inset-y-0 w-px bg-crit" style={{ left: "29%" }} /></div></div>
-              ))}
+              {[["tech-external-a", "Refrigerant handling", { s: 2, w: 1, t: "10–12" }], ["tech-external-a2", "General maintenance", null]].map(([n, q, b]) => {
+                return (
+                  <div key={n as string} className="relative grid grid-cols-[120px_repeat(6,1fr)] items-center border-t border-line py-2 text-xs"><span><b>{n as string}</b><span className="block text-[11px] text-muted-foreground">{q as string}</span></span><div className="col-span-6 relative h-8 rounded-lg bg-surface2">{b ? <div className="absolute top-1 h-6 rounded bg-primary px-2 text-[11px] leading-6 text-white" style={{ left: "16.6%", width: "16.6%" }}>10–12</div> : <span className="absolute inset-0 grid place-items-center text-[11px] text-muted-foreground">Free all day</span>}<span className="absolute inset-y-0 w-px bg-crit" style={{ left: "29%" }} /></div></div>
+                );
+              })}
             </div></div>
             <p className="mt-2 text-[11px] text-muted-foreground">Red line = now (09:30). 10–12 = job-contractor-a · Bedroom AC (assigned, starts 10:00).</p>
             <div className="mt-2"><Banner tone="warn">2 accepted jobs still have no technician — assign them before their delegation period ends.</Banner></div>

@@ -9,7 +9,7 @@ test("the contract scope, plan counts, eligibility and the restricted contract's
   await page.goto("/admin/billing/contracts");
   const main = page.getByRole("main");
   await expect(main).toContainText("2 contracts in scope");
-  for (const [name, n] of [["All", 2], ["RTO", 1], ["General", 1], ["Energy", 0], ["Environment", 0]] as const) await expect(main.getByRole("tab", { name: new RegExp(`^${name}\\s*${n}$`) })).toBeVisible();
+  for (const [name, n] of [["All", 2], ["RTO", 1], ["General", 1], ["Energy", 0], ["Environment", 0]] as const) await expect(main.getByRole("tab", { name: new RegExp(String.raw`^${name}\s*${n}$`) })).toBeVisible();
   const list = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Contracts", exact: true }) });
   const rto = list.locator("button[aria-pressed]").filter({ hasText: "RTO" });
   await expect(rto).toContainText("Eligible · demo-v1 · restriction active");

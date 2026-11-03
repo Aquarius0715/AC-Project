@@ -14,9 +14,9 @@ import { activePeriod, intentText, unitRows, type ApiRestriction } from "@ac/web
 import { ExceptionDemo } from "./_components/exception-demo";
 import { ExceptionView } from "./_components/exception-view";
 
-type Page<T> = { items: T[] };
 
 export default async function AdminRestrictionPage({ params }: PageProps<"/admin/restrictions/[id]">) {
+  interface Page<T> { items: T[] }
   await connection();
   const { id } = await params;
   if (!apiMode()) return <ExceptionDemo id={id} />;
@@ -27,9 +27,9 @@ export default async function AdminRestrictionPage({ params }: PageProps<"/admin
     return <Screen><EmptyState title={t("No access")}>{t("Restrictions need restriction.read, restriction.write or restriction.override.")}</EmptyState></Screen>;
   }
   const [r, units] = await Promise.all([
-    coreOp<ApiRestriction>("restrictions.get", { id }).catch((e) => {
-      if (e instanceof CoreError && e.error.code === "NOT_FOUND") notFound();
-      throw e;
+    coreOp<ApiRestriction>("restrictions.get", { id }).catch((error) => {
+      if (error instanceof CoreError && error.error.code === "NOT_FOUND") notFound();
+      throw error;
     }),
     perms.has("asset.read") ? coreAll<{ id: string; displayName: string }>("units.list").then((items) => ({ items, total: items.length })) : Promise.resolve({ items: [] as { id: string; displayName: string }[] }),
   ]);

@@ -33,7 +33,7 @@ test("billing months filter the invoices and the related restriction opens on th
   await expect(async () => {
     await main.getByLabel("Billing months to").fill("");
     await main.getByLabel("Billing months to").fill("2026-07");
-    await expect(main).toContainText("The first month must not be after the last", { timeout: 2_000 });
+    await expect(main).toContainText("The first month must not be after the last", { timeout: 2000 });
   }).toPass({ timeout: 20_000 });
   expect(new URL(page.url()).searchParams.has("to")).toBe(false);
 });

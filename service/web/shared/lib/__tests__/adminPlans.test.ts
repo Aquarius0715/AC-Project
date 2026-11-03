@@ -5,10 +5,12 @@ import { i18nOf } from "@ac/web/lib/i18n";
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
 const NOW = Date.parse("2026-09-15T00:30:00Z"); // Tue 08:30 KL
-const plan = (over: Partial<ApiPlan>): ApiPlan => ({
-  id: "plan-living-a-0001", version: 3, unitId: "u-living", recurrence: { kind: "monthly", intervalMonths: 3 }, timezone: "UTC", anchorDay: 8, nextDueAt: "2026-12-08T02:00:00Z",
-  generatedOccurrences: [{ occurrenceAt: "2026-06-08T02:00:00Z", jobId: "job-a06-0000" }, { occurrenceAt: "2026-09-08T02:00:00Z", jobId: "job-c02-0000" }], createdAt: "2026-05-01T00:00:00Z", updatedAt: "2026-09-08T00:00:00Z", ...over,
-});
+const plan = (over: Partial<ApiPlan>): ApiPlan => {
+  return {
+    id: "plan-living-a-0001", version: 3, unitId: "u-living", recurrence: { kind: "monthly", intervalMonths: 3 }, timezone: "UTC", anchorDay: 8, nextDueAt: "2026-12-08T02:00:00Z",
+    generatedOccurrences: [{ occurrenceAt: "2026-06-08T02:00:00Z", jobId: "job-a06-0000" }, { occurrenceAt: "2026-09-08T02:00:00Z", jobId: "job-c02-0000" }], createdAt: "2026-05-01T00:00:00Z", updatedAt: "2026-09-08T00:00:00Z", ...over,
+  };
+};
 
 describe("HQ maintenance plans", () => {
   it("lists the plans next due first", () => {

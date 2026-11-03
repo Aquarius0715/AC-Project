@@ -1,10 +1,10 @@
-// Readable text for a failed Server Action (DATA_SOURCE=api): the ServiceError code, message key and field errors of
+// Readable text for a failed Server Action (DATA_SOURCE=API): the ServiceError code, message key and field errors of
 // the Core API turned into one toast line. Pure code shared by every client view that calls Server Actions. The line
 // is in the display language (`t`, IR269); a field name and a domain message key are humanized English, because the
 // API sends keys, not texts.
 import { translator, type T } from "@ac/web/lib/i18n";
 
-export type ActionFailure = { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
+export interface ActionFailure { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }
 
 const fieldText: Record<string, string> = {
   "error.required": "{field} is required",
@@ -56,7 +56,7 @@ const codeText: Record<string, string> = {
 
 /** "invoice_has_payment" → "Invoice has payment"; "paymentReference" → "Payment reference". */
 const humanize = (s: string) => {
-  const t = s.replace(/^errors?\./, "").replace(/[._]/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().trim();
+  const t = s.replace(/^errors?\./, "").replaceAll(/[._]/g, " ").replaceAll(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().trim();
   return t.charAt(0).toUpperCase() + t.slice(1);
 };
 
@@ -64,7 +64,7 @@ const humanize = (s: string) => {
 export const fieldName = (field: string) => humanize(field.split(".").pop() ?? field);
 
 /** The field errors of a refusal under the form's own names (`fields` maps an API field to one, the rest are left out),
- * each worded as the toast words it: the text under the field to fix (IR586). */
+each worded as the toast words it: the text under the field to fix (IR586). */
 export function fieldErrorTexts<K extends string>(r: ActionFailure, fields: Record<string, K>, t: T = translator("en")): Partial<Record<K, string>> {
   const out: Partial<Record<K, string>> = {};
   for (const [field, key] of Object.entries(r.fieldErrors)) if (fields[field]) out[fields[field]] = actionMessage({ ...r, fieldErrors: { [field]: key } }, t);
@@ -83,7 +83,7 @@ export function actionMessage(r: ActionFailure, t: T = translator("en")): string
     // the set-up e-mail goes at most every 5 minutes per user (IR423, IR461)
     // a contractor or a customer owner adds at most 30 accounts a day (IR464)
     if (r.messageKey === "errors.too_many_accounts") {
-      return t("Many users were added in the last 24 hours — you can add more in {h} h", { h: Math.max(1, Math.ceil((r.retryAfterSeconds ?? 86400) / 3600)) });
+      return t("Many users were added in the last 24 hours — you can add more in {h} h", { h: Math.max(1, Math.ceil((r.retryAfterSeconds ?? 86_400) / 3600)) });
     }
     if (r.messageKey === "errors.invite_recently_sent") {
       return t("The set-up e-mail was sent a moment ago — send it again in {m} min", { m: Math.max(1, Math.ceil((r.retryAfterSeconds ?? 300) / 60)) });

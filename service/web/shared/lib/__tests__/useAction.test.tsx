@@ -11,7 +11,7 @@ const assign = vi.fn();
 beforeEach(() => {
   assign.mockClear();
   // the page the action runs on; jsdom cannot navigate, so the sign-in redirect is caught here
-  vi.stubGlobal("location", { ...window.location, pathname: "/admin/units", search: "?customerId=c-1&tab=users", assign });
+  vi.stubGlobal("location", { ...location, pathname: "/admin/units", search: "?customerId=c-1&tab=users", assign });
 });
 afterEach(() => {
   cleanup();
@@ -21,7 +21,7 @@ afterEach(() => {
 
 function Runner({ result, after, failed }: { result: Result; after: (v: string) => void; failed: () => void }) {
   const [pending, run] = useAction();
-  return <button disabled={pending} onClick={() => run(async () => result, (v: string) => `Saved ${v}`, after, failed)}>go</button>;
+  return <button disabled={pending} onClick={() => { run(async () => result, (v: string) => `Saved ${v}`, after, failed); }}>go</button>;
 }
 
 const press = async (result: Result) => {

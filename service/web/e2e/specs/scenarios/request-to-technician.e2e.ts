@@ -12,7 +12,7 @@ import { signIn } from "../../fixtures/auth";
 
 const app = (id: App["id"]) => APPS.find((a) => a.id === id)!;
 const open = async (browser: Browser, a: App, signedIn = true): Promise<Page> =>
-  (await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, ...(signedIn ? { storageState: a.state } : {}) })).newPage();
+  (await browser.newContext({ baseURL: a.url, viewport: { width: 1920, height: 1080 }, ...(signedIn && { storageState: a.state }) })).newPage();
 
 test("a customer request reaches the partner's technician", async ({ browser }) => {
   test.setTimeout(240_000);
@@ -27,7 +27,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       const dialog = customer.getByRole("dialog");
       await dialog.getByLabel(/Symptoms/).fill("E2E scenario: water drips from the indoor unit.");
       await dialog.getByLabel(/Contact window/).fill("Weekdays 09:00-18:00");
-      unitName = (await dialog.getByRole("combobox", { name: "Unit", exact: true }).evaluate((s: HTMLSelectElement) => s.selectedOptions[0]?.text ?? "")).split(" · ")[0];
+      unitName = (await dialog.getByRole("combobox", { name: "Unit", exact: true }).evaluate((s: HTMLSelectElement) => s.selectedOptions[0]?.text ?? "")).split(" · ", 1)[0];
       expect(unitName).not.toBe("");
       if ((await dialog.getByLabel("Date 1", { exact: true }).inputValue()) <= "2026-09-20") {
         for (const [n, date] of [[1, "2026-09-21"], [2, "2026-09-22"], [3, "2026-09-23"]] as const) await dialog.getByLabel(`Date ${n}`, { exact: true }).fill(date);
@@ -50,6 +50,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
     });
 
     const partner = await open(browser, app("partner"));
+
     await test.step("the partner accepts the offer", async () => {
       await partner.goto(`/partner/jobs/${jobId}`);
       await expect(partner.getByRole("main")).toContainText("Offer from HQ");

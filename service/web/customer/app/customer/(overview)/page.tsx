@@ -10,6 +10,5 @@ import { loadOverview } from "./_lib/load";
 
 export default async function CustomerOverviewPage({ searchParams }: PageProps<"/customer">) {
   await connection(); // DATA_SOURCE is a runtime setting of the image
-  if (!apiMode()) return <OverviewDemo />;
-  return <OverviewView live={await loadOverview(await searchParams)} />;
+  return apiMode() ? <OverviewView live={await loadOverview(await searchParams)} /> : <OverviewDemo />;
 }

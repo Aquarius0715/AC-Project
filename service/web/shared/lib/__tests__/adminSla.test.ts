@@ -8,14 +8,16 @@ const NOW = Date.parse("2026-09-14T01:00:00Z");
 const target = (planType: ApiTargetView["planType"], over: Partial<ApiTargetView> = {}): ApiTargetView =>
   ({ planType, responseHours: 4, arrivalInWindowPercent: 90, firstTimeFixPercent: 85, version: 0, effectiveFrom: null, state: "default", ...over });
 const metrics = { responseWithinTarget: 94, arrivalInWindow: 96, firstTimeFix: 86, averageRating: 4.5, ratingCount: 27, openOverdue: 1 };
-const sc = (over: Partial<ApiScorecard> = {}): ApiScorecard => ({
-  period: { from: "2026-06-16T01:00:00Z", to: "2026-09-14T01:00:00Z" }, contractorOrgId: null, totals: metrics,
-  customers: [{ ...metrics, customerId: "c-a", planType: "rto", jobCount: 18, status: "on_track" }, { ...metrics, firstTimeFix: 70, customerId: "c-b", planType: "general", jobCount: 9, status: "breached" }],
-  breaches: [{ jobId: "job-a11-0000", customerId: "c-b", kind: "response", detail: "response 6 h 10 min vs 4 h" }, { jobId: "job-x-000000", customerId: "c-a", kind: "overdue", detail: "open past its due time" }],
-  targets: [target("rto", { arrivalInWindowPercent: 95, version: 2, effectiveFrom: "2026-08-01T00:00:00Z", state: "in_effect" }), target("general"), target("energy"), target("environment"),
-    target("general", { responseHours: 2, version: 1, effectiveFrom: "2026-10-01T00:00:00Z", state: "scheduled" })],
-  ...over,
-});
+const sc = (over: Partial<ApiScorecard> = {}): ApiScorecard => {
+  return {
+    period: { from: "2026-06-16T01:00:00Z", to: "2026-09-14T01:00:00Z" }, contractorOrgId: null, totals: metrics,
+    customers: [{ ...metrics, customerId: "c-a", planType: "rto", jobCount: 18, status: "on_track" }, { ...metrics, firstTimeFix: 70, customerId: "c-b", planType: "general", jobCount: 9, status: "breached" }],
+    breaches: [{ jobId: "job-a11-0000", customerId: "c-b", kind: "response", detail: "response 6 h 10 min vs 4 h" }, { jobId: "job-x-000000", customerId: "c-a", kind: "overdue", detail: "open past its due time" }],
+    targets: [target("rto", { arrivalInWindowPercent: 95, version: 2, effectiveFrom: "2026-08-01T00:00:00Z", state: "in_effect" }), target("general"), target("energy"), target("environment"),
+      target("general", { responseHours: 2, version: 1, effectiveFrom: "2026-10-01T00:00:00Z", state: "scheduled" })],
+    ...over,
+  };
+};
 
 describe("HQ SLA by customer", () => {
   it("reads the period from the URL key", () => {
@@ -63,6 +65,6 @@ describe("HQ SLA by customer in Malay with the display time zone (IR291)", () =>
     const rows = slaRows(sc(), [{ id: "c-a", name: "A", organizationId: "o-a" }], [], [], MS.t);
     expect([rows[0].sub, rows[0].status.label, rows[1].name]).toEqual(["tiada premis · 0 unit", "Mengikut sasaran", "pelanggan"]);
     expect(targetsByPlan(sc().targets, MS)[1].scheduled[0]).toMatch(/^v1 dari 1 Okt 2026, 9:00 PG GMT\+9: ≤ 2 j/); // the start in the display zone
-    expect(slaCsv(rows.slice(0, 1), sc().period, MS).split("\n")[0]).toBe('"Pelanggan","Pelan","Kerja","Respons","Ketibaan","Pembaikan kali pertama","Penilaian","Tertunggak","Status","Tempoh dari","Tempoh hingga"');
+    expect(slaCsv(rows.slice(0, 1), sc().period, MS).split("\n", 1)[0]).toBe('"Pelanggan","Pelan","Kerja","Respons","Ketibaan","Pembaikan kali pertama","Penilaian","Tertunggak","Status","Tempoh dari","Tempoh hingga"');
   });
 });

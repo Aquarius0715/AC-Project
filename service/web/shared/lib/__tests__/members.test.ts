@@ -7,14 +7,18 @@ import {
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-15T01:00:00Z");
-const member = (over: Partial<ApiMember>): ApiMember => ({
-  id: "m1", version: 2, updatedAt: "2026-09-01T00:00:00Z", userId: "u1", displayName: "Aina", organizationId: "org-p", role: "technician", employment: "external",
-  permissions: ["alert.read"], scopes: [{ kind: "unit", id: "unit-1" }], scopeVersion: 3, validFrom: "2026-09-01T00:00:00Z", validUntil: "2026-12-31T16:00:00Z", ...over,
-});
-const draft = (over: Partial<MemberDraft>): MemberDraft => ({
-  userId: "u1", organizationId: "org-p", role: "technician", employment: "external", permissions: ["alert.read"], scopes: [{ kind: "unit", id: "unit-1" }], validFrom: "2026-09-01T08:00", validUntil: "2027-01-01T00:00", reason: "Rotation",
-  newUser: false, newEmail: "", newName: "", ...over,
-});
+const member = (over: Partial<ApiMember>): ApiMember => {
+  return {
+    id: "m1", version: 2, updatedAt: "2026-09-01T00:00:00Z", userId: "u1", displayName: "Aina", organizationId: "org-p", role: "technician", employment: "external",
+    permissions: ["alert.read"], scopes: [{ kind: "unit", id: "unit-1" }], scopeVersion: 3, validFrom: "2026-09-01T00:00:00Z", validUntil: "2026-12-31T16:00:00Z", ...over,
+  };
+};
+const draft = (over: Partial<MemberDraft>): MemberDraft => {
+  return {
+    userId: "u1", organizationId: "org-p", role: "technician", employment: "external", permissions: ["alert.read"], scopes: [{ kind: "unit", id: "unit-1" }], validFrom: "2026-09-01T08:00", validUntil: "2027-01-01T00:00", reason: "Rotation",
+    newUser: false, newEmail: "", newName: "", ...over,
+  };
+};
 
 describe("HQ access & roles (FR-A03, BR-A03, IR107)", () => {
   it("has the 38 permissions and the role limits of members.save", () => {

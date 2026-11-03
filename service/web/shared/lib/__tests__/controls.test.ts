@@ -37,7 +37,7 @@ function sources(): string[] {
       if (["node_modules", ".next", "__tests__"].includes(name)) continue;
       const path = join(dir, name);
       if (statSync(path).isDirectory()) walk(path);
-      else if (/\.tsx$/.test(name) && !path.startsWith(FACADE) && path !== FACADE + ".tsx") out.push(path);
+      else if (name.endsWith(".tsx") && !path.startsWith(FACADE) && path !== FACADE + ".tsx") out.push(path);
     }
   };
   for (const d of DIRS) walk(join(root, d));
@@ -52,7 +52,7 @@ describe("the screens' controls are shadcn/ui components (DEC-75)", () => {
     const got: Record<string, Record<string, number>> = {};
     for (const f of sources()) {
       const c = rawElements(f);
-      if (Object.keys(c).length) got[relative(root, f)] = c;
+      if (Object.keys(c).length > 0) got[relative(root, f)] = c;
     }
     expect(got).toEqual(BASELINE);
   });

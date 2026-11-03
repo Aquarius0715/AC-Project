@@ -9,6 +9,5 @@ import { loadAlerts } from "./_lib/load";
 
 export default async function CustomerAlertsPage({ searchParams }: PageProps<"/customer/alerts">) {
   await connection();
-  if (!apiMode()) return <AlertsView />;
-  return <AlertsLiveView live={await loadAlerts(await searchParams)} />;
+  return apiMode() ? <AlertsLiveView live={await loadAlerts(await searchParams)} /> : <AlertsView />;
 }

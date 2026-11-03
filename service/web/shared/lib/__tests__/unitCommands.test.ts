@@ -47,8 +47,10 @@ describe("following a command until the device answers (D04, Unit Control and th
 
   it("passes a failed read to the caller", async () => {
     callOp.mockRejectedValueOnce(new Error("UNAVAILABLE"));
-    const failed = expect(waitForCommand(cmd("sent"), () => {})).rejects.toThrow("UNAVAILABLE");
-    await vi.advanceTimersByTimeAsync(2000);
-    await failed;
+    // the read fails on the first poll, 2 s in: the expectation waits while the fake clock moves
+    await Promise.all([
+      expect(waitForCommand(cmd("sent"), () => {})).rejects.toThrow("UNAVAILABLE"),
+      vi.advanceTimersByTimeAsync(2000),
+    ]);
   });
 });

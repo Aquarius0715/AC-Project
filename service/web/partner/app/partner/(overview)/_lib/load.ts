@@ -9,14 +9,14 @@ import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/da
 import { i18nOf, showClock } from "@ac/web/lib/i18n";
 import { actions, activity, capacity, hhmm, klDay, kpis, onTeam, partnerJob, period, periodChoice, progress, timeline, timelinePct, type ApiCapacity, type ApiCounts, type ApiJobEvent, type ApiMember, type ApiPartnerJob } from "@ac/web/lib/partnerOverview";
 
-type Page<T> = { items: T[] };
 const KL = "Asia/Kuala_Lumpur";
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
-  if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback; // not readable now: empty section
-  throw e;
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((error) => {
+  if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback; // not readable now: empty section
+  throw error;
 });
 
 export async function loadOverview(sp: { from?: string; to?: string }) {
+  interface Page<T> { items: T[] }
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const i = i18nOf(display);
   const { t } = i;
@@ -31,7 +31,7 @@ export async function loadOverview(sp: { from?: string; to?: string }) {
     optional(coreAll<{ id: string; displayName: string }>("units.list"), []),
   ]);
   const jobs = rows.map((r) => partnerJob(r, new Map(units.map((u) => [u.id, u.displayName]))));
-  const today = new Date(now.getTime() + 8 * 3600_000).toISOString().slice(0, 10);
+  const today = new Date(now.getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
   const capacityOf = (date: string) => optional(coreOp<Page<ApiCapacity>>("members.capacity", { date, query: { limit: 100 } }).then((r) => r.items), []);
   const [days, todayCapacity] = await Promise.all([
     Promise.all(p.days.map(capacityOf)),

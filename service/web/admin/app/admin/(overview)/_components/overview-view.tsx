@@ -8,17 +8,17 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { axisRows, billingView, forecastView, jobRows, kpisFrom, overviewLinks, type AdminSummary, type AxisRow } from "@ac/web/lib/adminSummary";
 import { Icon } from "@ac/web/components/Icon";
 
-type Live = {
+interface Live {
   period: { kind: string; from: string; to: string; error: string | null; label: string }; custom: { from: string; to: string };
   customers: { id: string; name: string }[] | null; customerId: string | null; properties: { id: string; name: string }[] | null; propertyId: string | null;
   summary: AdminSummary | null; asOf: string | null;
   waiting: number | null; // requests waiting for HQ, any requested time (IR611); null without job.read
-};
+}
 const PERIODS = [{ id: "today", label: "Today" }, { id: "7d", label: "Last 7 days" }, { id: "30d", label: "Last 30 days" }, { id: "custom", label: "Custom" }];
 const barTone: Record<AxisRow["tone"], string> = { primary: "bg-primary", muted: "bg-muted-foreground/50", warn: "bg-warn", ok: "bg-ok", crit: "bg-crit" };
 
 /** The HQ dashboard (FR-A01, DD-A01, Figma Admin 01) from one admin.summary: scope and period in the URL. Texts in the
- * user's display language; the as-of time and the period come formatted from the page (IR289). */
+user's display language; the as-of time and the period come formatted from the page (IR289). */
 export function AdminOverviewView({ live }: { live: Live }) {
   const t = useT();
   const router = useRouter();
@@ -30,26 +30,26 @@ export function AdminOverviewView({ live }: { live: Live }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           {live.customers && (
-            <Select aria-label={t("Customer")} className="w-auto text-xs font-semibold" value={live.customerId ?? ""} onChange={(e) => patch({ customerId: e.target.value || null, propertyId: null })}>
+            <Select aria-label={t("Customer")} className="w-auto text-xs font-semibold" value={live.customerId ?? ""} onChange={(e) => { patch({ customerId: e.target.value || null, propertyId: null }); }}>
               <option value="">{t("Customer: All")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{t("Customer: {name}", { name: c.name })}</option>)}
             </Select>
           )}
           {live.customers && (
-            <Select aria-label={t("Property")} className="w-auto text-xs font-semibold" disabled={!live.properties} value={live.propertyId ?? ""} onChange={(e) => patch({ propertyId: e.target.value || null })}>
+            <Select aria-label={t("Property")} className="w-auto text-xs font-semibold" disabled={!live.properties} value={live.propertyId ?? ""} onChange={(e) => { patch({ propertyId: e.target.value || null }); }}>
               <option value="">{t("Property: All")}</option>{(live.properties ?? []).map((p) => <option key={p.id} value={p.id}>{t("Property: {name}", { name: p.name })}</option>)}
             </Select>
           )}
-          <Select aria-label={t("Period")} className="w-auto text-xs font-semibold" value={live.period.kind} onChange={(e) => patch({ period: e.target.value === "today" ? null : e.target.value, ...(e.target.value === "custom" ? {} : { from: null, to: null }) })}>
+          <Select aria-label={t("Period")} className="w-auto text-xs font-semibold" value={live.period.kind} onChange={(e) => { patch({ period: e.target.value === "today" ? null : e.target.value, ...(e.target.value !== "custom" && { from: null, to: null }) }); }}>
             {PERIODS.map((p) => <option key={p.id} value={p.id}>{t("Period: {period}", { period: t(p.label) })}</option>)}
           </Select>
           {live.period.kind === "custom" && (
             <span className="flex items-center gap-1 text-xs">
-              <Input aria-label={t("From")} type="datetime-local" className="w-auto text-xs" defaultValue={live.custom.from} onBlur={(e) => patch({ from: e.target.value || null })} />–
-              <Input aria-label={t("To")} type="datetime-local" className="w-auto text-xs" defaultValue={live.custom.to} onBlur={(e) => patch({ to: e.target.value || null })} />
+              <Input aria-label={t("From")} type="datetime-local" className="w-auto text-xs" defaultValue={live.custom.from} onBlur={(e) => { patch({ from: e.target.value || null }); }} />–
+              <Input aria-label={t("To")} type="datetime-local" className="w-auto text-xs" defaultValue={live.custom.to} onBlur={(e) => { patch({ to: e.target.value || null }); }} />
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">{live.asOf && <span>{live.asOf}</span>}<Btn size="sm" onClick={() => router.refresh()}><Icon name="refresh" />{t("Refresh")}</Btn></div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">{live.asOf && <span>{live.asOf}</span>}<Btn size="sm" onClick={() => { router.refresh(); }}><Icon name="refresh" />{t("Refresh")}</Btn></div>
       </div>
       {live.period.error && <Banner tone="warn">{t("{error} — choose another period.", { error: live.period.error })}</Banner>}
       {s && <Sections s={s} links={links} waiting={live.waiting} />}
@@ -76,7 +76,7 @@ function Sections({ s, links, waiting }: { s: AdminSummary; links: ReturnType<ty
         <Kpi label={t("Operation rate")} value={k.rate} sub={t("Running {on} / known {known} · unknown {unknown} not in denominator", { on: k.on, known: k.on + k.off, unknown: k.unknown })} href={links.power("on")} link={t("Units running")} />
         <Kpi label={t("Unresolved alerts")} value={k.alerts} tone={k.alerts ? "warn" : undefined} sub={t("open or acknowledged · critical and warning")} href={links.alerts} link={t("View alerts")} />
         <Kpi label={t("Energy used (actual)")} value={k.kwh} sub={k.kwhSub} href={links.energy} link={t("Energy analysis")} />
-        <Kpi label={t("Overdue billing")} value={k.billing} tone={bill.forbidden ? undefined : bill.overdue ? "crit" : undefined} sub={k.billingSub} href={bill.forbidden ? undefined : links.billing} link={bill.forbidden ? undefined : t("Open overdue")} />
+        <Kpi label={t("Overdue billing")} value={k.billing} tone={bill.forbidden ? undefined : (bill.overdue ? "crit" : undefined)} sub={k.billingSub} href={bill.forbidden ? undefined : links.billing} link={bill.forbidden ? undefined : t("Open overdue")} />
         <Kpi label={t("Maintenance jobs (period)")} value={k.jobs} sub={jobs.filter((j) => j.count).map((j) => `${j.label} ${j.count}`).join(" · ") || t("no jobs in the period")} href={links.jobs()} link={t("Open jobs")} />
         <Kpi label={t("Connection")} value={t("{n} online", { n: k.online })} sub={t("offline {offline} · unknown/connecting/error {unknown}", { offline: k.offline, unknown: k.connUnknown })} href={links.connection("online")} link={t("Open units")} />
       </div>
@@ -101,9 +101,11 @@ function Sections({ s, links, waiting }: { s: AdminSummary; links: ReturnType<ty
       <div className="grid-fluid" style={{ ["--min" as string]: "420px" }}>
         <Card title={t("Maintenance jobs by status — this period")} action={<TextLink href={links.jobs()}>{t("Open jobs")} <Icon name="arrowRight" /></TextLink>}>
           <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-            {[jobs.slice(0, half), jobs.slice(half)].map((col, i) => (
-              <div key={i} className="rounded-xl border border-line">{col.map((j) => <Link key={j.status} href={j.href} className="flex justify-between border-t border-line px-3 py-1.5 text-[13px] first:border-0 hover:bg-surface2"><span className="text-muted-foreground">{j.label}</span><b>{j.count}</b></Link>)}</div>
-            ))}
+            {[jobs.slice(0, half), jobs.slice(half)].map((col, i) => {
+              return (
+                <div key={i} className="rounded-xl border border-line">{col.map((j) => <Link key={j.status} href={j.href} className="flex justify-between border-t border-line px-3 py-1.5 text-[13px] first:border-0 hover:bg-surface2"><span className="text-muted-foreground">{j.label}</span><b>{j.count}</b></Link>)}</div>
+              );
+            })}
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">{t("Jobs whose requested time starts in the period. The status rows open the Jobs tab with that stage, the scope and the period.")}</p>
         </Card>

@@ -14,8 +14,7 @@ import { withAccess } from "@ac/web/lib/withAccess";
 import { EnergyDemo } from "./_components/energy-demo";
 import { EnergyView, type EnergyLive } from "./_components/energy-view";
 
-type Unit = { id: string; displayName: string; customerOrgId: string; propertyId: string; archived: boolean };
-const minute = (d: Date) => new Date(Math.floor(d.getTime() / 60000) * 60000);
+const minute = (d: Date) => new Date(Math.floor(d.getTime() / 60_000) * 60_000);
 
 // a role without the page's read permission sees which one it needs, not a failure (IR582)
 export default async function AdminEnergyPage(props: PageProps<"/admin/energy">) {
@@ -23,6 +22,7 @@ export default async function AdminEnergyPage(props: PageProps<"/admin/energy">)
 }
 
 async function AdminEnergyPageContent({ searchParams }: PageProps<"/admin/energy">) {
+  interface Unit { id: string; displayName: string; customerOrgId: string; propertyId: string; archived: boolean }
   await connection();
   if (!apiMode()) return <EnergyDemo />;
   const sp = await searchParams;
@@ -55,10 +55,10 @@ async function AdminEnergyPageContent({ searchParams }: PageProps<"/admin/energy
     let error: string | undefined;
     if (unitIds.length > 0) {
       try {
-        summary = await coreOp<ApiEnergySummary>("energy.summary", { from, to, unitIds, ...(baseline ? { baselineId: baseline.id } : {}) });
-      } catch (e) {
-        if (!(e instanceof CoreError) || e.error.code !== "VALIDATION") throw e; // an unusable period or unit set shows next to the form
-        error = actionMessage({ code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds }, i.t);
+        summary = await coreOp<ApiEnergySummary>("energy.summary", { from, to, unitIds, ...(baseline && { baselineId: baseline.id }) });
+      } catch (error_) {
+        if (!(error_ instanceof CoreError) || error_.error.code !== "VALIDATION") throw error_; // an unusable period or unit set shows next to the form
+        error = actionMessage({ code: error_.error.code, messageKey: error_.error.messageKey, fieldErrors: error_.error.fieldErrors ?? {}, retryAfterSeconds: error_.error.retryAfterSeconds }, i.t);
       }
     }
     live.analysis = { unitIds, from: klLocal(from), to: klLocal(to), baselineId: baseline?.id ?? null, summary: summary ? summaryView(summary, i) : null, error };
@@ -67,7 +67,7 @@ async function AdminEnergyPageContent({ searchParams }: PageProps<"/admin/energy
       ...(scope.customerId && { customerId: scope.customerId }), ...(scope.propertyId && { propertyId: scope.propertyId }), ...(scope.unitId && { unitId: scope.unitId }),
       ...(one("from") && { from: klInstant(one("from")!) }), ...(one("to") && { to: klInstant(one("to")!) }),
     };
-    const scoped = Object.keys(filters).length ? (await coreAll<ApiBaseline>("baselines.list", { filters }).then((items) => ({ items, total: items.length }))).items : all.items;
+    const scoped = Object.keys(filters).length > 0 ? (await coreAll<ApiBaseline>("baselines.list", { filters }).then((items) => ({ items, total: items.length }))).items : all.items;
     const rows = baselineRows(scoped, i.t);
     live.list = { rows, from: one("from") ?? "", to: one("to") ?? "", selectedId: rows.find((r) => r.id === one("baselineId"))?.id ?? rows[0]?.id ?? null };
   }

@@ -10,10 +10,12 @@ const grammar = {
   en: [/^temperature (.+)$/i, /^set (.+) to (\d{1,3}) degrees$/i, /^help$/i],
   ms: [/^suhu (.+)$/i, /^tetapkan (.+) kepada (\d{1,3}) darjah$/i, /^bantuan$/i],
 };
-const unit = (over: Partial<ApiUnitDetail> = {}) => ({
-  displayName: "Bedroom AC", location: { pathLabels: ["Home A", "1F", "Bedroom"], address: null, accessInstructions: null }, capabilities: { control: true, modeControl: true, fanControl: true, modes: ["cool"], fanLevels: ["mid"], temperature: { min: 16, max: 30, step: 1 } },
-  ...over,
-}) as unknown as ApiUnitDetail;
+const unit = (over: Partial<ApiUnitDetail> = {}) => {
+  return ({
+    displayName: "Bedroom AC", location: { pathLabels: ["Home A", "1F", "Bedroom"], address: null, accessInstructions: null }, capabilities: { control: true, modeControl: true, fanControl: true, modes: ["cool"], fanLevels: ["mid"], temperature: { min: 16, max: 30, step: 1 } },
+    ...over,
+  }) as unknown as ApiUnitDetail;
+};
 const change = (celsius: number, before: number | null = 26): Extract<ResolvedIntent, { kind: "change" }> => ({ kind: "change", unitId: "u-0001-aaaa", celsius, before: { power: true, celsius: before, observedAt: null }, expectedVersion: 7 });
 const command = (status: ApiCommand["status"], failureCode: string | null = null, acknowledgedAt: string | null = null): ApiCommand =>
   ({ id: "cmd-0240-aaaa", action: { kind: "set_temperature", celsius: 24 }, status, requestedAt: "2026-09-15T01:45:01Z", acknowledgedAt, expiresAt: "2026-09-15T01:45:31Z", failureCode });

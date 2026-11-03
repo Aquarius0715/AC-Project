@@ -26,11 +26,11 @@ test.afterEach(async ({ page }) => deleteE2EPolicies(page));
 test("an owner switches a default rule and back", async ({ page }) => {
   await page.goto("/customer/alerts?tab=policies");
   const rule = page.getByRole("switch", { name: "AC offline" });
-  const before = (await rule.getAttribute("aria-checked")) === "true";
-  for (const want of [!before, before]) {
+  const isBefore = (await rule.getAttribute("aria-checked")) === "true";
+  for (const isWant of [!isBefore, isBefore]) {
     await rule.click();
-    await expect(page.getByText(`Default rule “AC offline” switched ${want ? "on" : "off"}`)).toBeVisible();
-    await expect(rule).toHaveAttribute("aria-checked", String(want));
+    await expect(page.getByText(`Default rule “AC offline” switched ${isWant ? "on" : "off"}`)).toBeVisible();
+    await expect(rule).toHaveAttribute("aria-checked", String(isWant));
   }
   await expect(page.getByRole("main")).toContainText(/\d of 6 rules on/);
 });

@@ -1,23 +1,23 @@
 "use client";
 
 /**
- * Shared maintenance-job mock store (IR113). All four roles read and write the same jobs, so a
- * request made on /customer/maintenance shows up in /admin/jobs, then /partner/jobs and
- * /technician. State lives in the tab (lib/demoStore: kept across role switches, a reload or /demo reset restores the
- * seed, FR-X05). Phase 1A only: with DATA_SOURCE=api the job screens write through Server Actions, so the actions here
- * stay local and return their refusals at once.
- */
+Shared maintenance-job mock store (IR113). All four roles read and write the same jobs, so a
+request made on /customer/maintenance shows up in /admin/jobs, then /partner/jobs and
+/technician. State lives in the tab (lib/demoStore: kept across role switches, a reload or /demo reset restores the
+seed, FR-X05). Phase 1A only: with DATA_SOURCE=API the job screens write through Server Actions, so the actions here
+stay local and return their refusals at once.
+*/
 import { useSyncExternalStore } from "react";
 import { readDemo, writeDemo } from "@ac/web/lib/demoStore";
 import { useOp } from "@ac/web/lib/useOp";
 
-export type Slot = { date: string; win: string };
+export interface Slot { date: string; win: string }
 export type Origin = "request" | "plan";
 export type JobStatus = "requested" | "time_proposed" | "offered" | "accepted" | "assigned" | "in_progress" | "submitted" | "rework_requested" | "completed" | "cancelled" | "on_hold";
-export type Proposal = { by: "hq" | "contractor"; slot: Slot; who: string; message: string; replyBy: string; status: "pending" | "accepted" | "declined" | "withdrawn" };
-export type PartnerProposal = { slot: Slot; tech: string; reason: string; sentAt: string; status: "pending" | "sent_to_client" | "rejected" | "approved" | "withdrawn" };
-export type TechAck = { status: "pending" | "accepted" | "cant_make"; reason?: string; alt?: string; at?: string };
-export type Job = {
+export interface Proposal { by: "hq" | "contractor"; slot: Slot; who: string; message: string; replyBy: string; status: "pending" | "accepted" | "declined" | "withdrawn" }
+export interface PartnerProposal { slot: Slot; tech: string; reason: string; sentAt: string; status: "pending" | "sent_to_client" | "rejected" | "approved" | "withdrawn" }
+export interface TechAck { status: "pending" | "accepted" | "cant_make"; reason?: string; alt?: string; at?: string }
+export interface Job {
   id: string;
   unitId: string;
   unit: string;
@@ -48,16 +48,18 @@ export type Job = {
   followUpClass?: "pending" | "rework" | "new_request";
   followUpReason?: string;
   rating?: number;
-};
-export type Note = { id: string; role: "client" | "admin" | "contractor" | "technician"; title: string; detail: string; href: string; at: string; read: boolean };
+}
+export interface Note { id: string; role: "client" | "admin" | "contractor" | "technician"; title: string; detail: string; href: string; at: string; read: boolean }
 
 const KEY = "ac-jobs-v2";
 const NKEY = "ac-job-notes-v2";
 export const NOW = "09-22 11:05";
 
-const req = (id: string, p: Partial<Job> & Pick<Job, "unitId" | "unit" | "loc" | "type" | "symptom" | "status">): Job => ({
-  id, customer: "customer-a", origin: "request", preferred: [], round: 1, scheduled: null, delivery: null, contractor: null, technician: null, techAck: null, proposal: null, partnerProposal: null, declined: null, history: [], ...p,
-});
+const req = (id: string, p: Partial<Job> & Pick<Job, "unitId" | "unit" | "loc" | "type" | "symptom" | "status">): Job => {
+  return {
+    id, customer: "customer-a", origin: "request", preferred: [], round: 1, scheduled: null, delivery: null, contractor: null, technician: null, techAck: null, proposal: null, partnerProposal: null, declined: null, history: [], ...p,
+  };
+};
 
 export const SEED: Job[] = [
   req("job-c07", { unitId: "unit-bedroom-2", unit: "Bedroom AC #2", loc: "Home A › 1F › Bedroom", type: "Reactive", symptom: "Cold air is weak and there is water dripping from the indoor unit.", status: "requested",
@@ -87,17 +89,17 @@ export const SEED: Job[] = [
 ];
 
 /* ---------- availability (demo rule set) ---------- */
-export type Fit = { hq: string; partner: string; fits: "none" | "internal" | "contractor" | "both" };
+export interface Fit { hq: string; partner: string; fits: "none" | "internal" | "contractor" | "both" }
 export function fitFor(s: Slot): Fit {
   const d = s.date;
   if (d < "2026-10-01") return { hq: "tech-internal-a: booked · tech-internal-b: not qualified (refrigerant)", partner: "contractor-a: no free hours · contractor-b: outside service area", fits: "none" };
   if (d === "2026-10-02") return { hq: "tech-internal-a: overlaps job-c04 follow-up", partner: "contractor-a: tech-external-a fully booked", fits: "none" };
-  const internal = s.win.startsWith("14") && d >= "2026-10-01";
-  return { hq: internal ? "tech-internal-a: free (refrigerant qualified)" : "tech-internal-b: not qualified", partner: "contractor-a: tech-external-a free", fits: internal ? "both" : "contractor" };
+  const isInternal = s.win.startsWith("14") && d >= "2026-10-01";
+  return { hq: isInternal ? "tech-internal-a: free (refrigerant qualified)" : "tech-internal-b: not qualified", partner: "contractor-a: tech-external-a free", fits: isInternal ? "both" : "contractor" };
 }
 
 /* ---------- store ---------- */
-type State = { jobs: Job[]; notes: Note[] };
+interface State { jobs: Job[]; notes: Note[] }
 let state: State | null = null;
 const listeners = new Set<() => void>();
 const load = (): State => {
@@ -108,7 +110,7 @@ const load = (): State => {
 const save = () => {
   writeDemo(KEY, state!.jobs);
   writeDemo(NKEY, state!.notes);
-  listeners.forEach((l) => l());
+  listeners.forEach((l) => { l(); });
 };
 const SERVER: State = { jobs: SEED, notes: [] };
 const subscribe = (l: () => void) => { listeners.add(l); return () => listeners.delete(l); };
@@ -116,11 +118,11 @@ export function useJobStore() {
   return useSyncExternalStore(subscribe, load, () => SERVER);
 }
 /** JobSummary / Offer / History projections of jobs.list (IR23, IR124), the fields the job screens read. */
-type ApiSlot = { startAt: string; endAt: string };
-type ApiJob = { projection: "summary" | "offer" | "history"; id?: string; jobId?: string; unitId?: string; type: string; status: string; displayStatus?: string; origin?: string;
-  requestedSlot?: ApiSlot; scheduledSlot?: ApiSlot | null; preferredSlots?: ApiSlot[] };
+interface ApiSlot { startAt: string; endAt: string }
+interface ApiJob { projection: "summary" | "offer" | "history"; id?: string; jobId?: string; unitId?: string; type: string; status: string; displayStatus?: string; origin?: string;
+  requestedSlot?: ApiSlot; scheduledSlot?: ApiSlot | null; preferredSlots?: ApiSlot[] }
 
-const klDate = (iso: string) => new Date(new Date(iso).getTime() + 8 * 3600000).toISOString();
+const klDate = (iso: string) => new Date(new Date(iso).getTime() + 8 * 3_600_000).toISOString();
 const slotOf = (s: ApiSlot | null | undefined): Slot | null => (s ? { date: klDate(s.startAt).slice(0, 10), win: `${klDate(s.startAt).slice(11, 16)}–${klDate(s.endAt).slice(11, 16)}` } : null);
 const typeLabel: Record<string, Job["type"]> = { reactive: "Reactive", preventive: "Preventive", periodic: "Periodic" };
 
@@ -135,7 +137,7 @@ function jobFromApi(j: ApiJob): Job {
   };
 }
 
-/** Jobs for the screens: the shared demo store in mock mode, jobs.list (caller projection) with DATA_SOURCE=api. */
+/** Jobs for the screens: the shared demo store in mock mode, jobs.list (caller projection) with DATA_SOURCE=API. */
 export const useJobs = () => {
   const local = useJobStore().jobs;
   return useOp<{ items: ApiJob[] }, Job[]>("jobs.list", { limit: 100 }, local, (p) => p.items.map(jobFromApi)).data;
@@ -200,7 +202,7 @@ export const jobActions = {
       update(id, () => ({ status: "offered", scheduled: p.slot, proposal: { ...p, status: "accepted" }, partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "approved" } : null }), `Client approved ${fmt(p.slot)} proposed by ${j.contractor}`);
       notify("contractor", `Client approved your time for ${id}`, `${fmt(p.slot)} — accept the offer`, `/partner/jobs/${id}`);
     } else if (p.who.startsWith("contractor")) {
-      update(id, () => ({ status: "offered", scheduled: p.slot, delivery: "contractor", contractor: p.who.split(" ")[0], proposal: { ...p, status: "accepted" } }), `Client accepted ${fmt(p.slot)} → offered to ${p.who.split(" ")[0]}`);
+      update(id, () => ({ status: "offered", scheduled: p.slot, delivery: "contractor", contractor: p.who.split(" ", 1)[0], proposal: { ...p, status: "accepted" } }), `Client accepted ${fmt(p.slot)} → offered to ${p.who.split(" ", 1)[0]}`);
       notify("contractor", `New offer ${id}`, `Visit time agreed with the client: ${fmt(p.slot)}`, `/partner/jobs/${id}`);
     } else {
       update(id, () => ({ status: "assigned", scheduled: p.slot, delivery: "internal", technician: p.who, techAck: { status: "pending" }, proposal: { ...p, status: "accepted" } }), `Client accepted ${fmt(p.slot)} → assigned ${p.who}`);
@@ -210,14 +212,16 @@ export const jobActions = {
   },
   /** Client declines → back to requested with reason and (optionally) 3 new preferred times. */
   decline(id: string, reason: string, comment: string, preferred: Slot[]) {
-    update(id, (j) => ({
-      status: j.proposal?.by === "contractor" ? "offered" : "requested",
-      round: preferred.length ? j.round + 1 : j.round,
-      preferred: preferred.length ? preferred : j.preferred,
-      declined: { reason, comment, at: NOW },
-      proposal: j.proposal ? { ...j.proposal, status: "declined" } : null,
-      partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "rejected" } : null,
-    }), `Client declined the proposed time · ${reason}${preferred.length ? " · sent 3 new times" : ""}`);
+    update(id, (j) => {
+      return {
+        status: j.proposal?.by === "contractor" ? "offered" : "requested",
+        round: preferred.length > 0 ? j.round + 1 : j.round,
+        preferred: preferred.length > 0 ? preferred : j.preferred,
+        declined: { reason, comment, at: NOW },
+        proposal: j.proposal ? { ...j.proposal, status: "declined" } : null,
+        partnerProposal: j.partnerProposal ? { ...j.partnerProposal, status: "rejected" } : null,
+      };
+    }, `Client declined the proposed time · ${reason}${preferred.length > 0 ? " · sent 3 new times" : ""}`);
     notify("admin", `Client declined the proposal — ${id}`, `${reason}${comment ? ` — “${comment}”` : ""}`, `/admin/jobs?jobId=${id}`);
   },
   /** Client asks for another time for a periodic plan visit. */
@@ -233,7 +237,7 @@ export const jobActions = {
     update(id, (x) => ({ notes: [...(x.notes ?? []), { by: "customer-a", text: text.trim(), at: NOW }] }), `Client note: “${text.trim()}”`);
     notify("admin", `Client note on ${id}`, text.trim().slice(0, 80), `/admin/jobs?jobId=${id}`);
     if (j.delivery === "contractor") notify("contractor", `Client note on ${id}`, text.trim().slice(0, 80), `/partner/jobs/${id}`);
-    return undefined;
+    return;
   },
   /** Client: “Report a problem” on a completed job → requested follow-up job, pending HQ classification (FR-C17). */
   reportProblem(fromId: string, reason: string, details: string, visit: string) {
@@ -256,7 +260,7 @@ export const jobActions = {
     if (!reason.trim() || reason.length > 1000) return "A reason is required (1–1000 characters)";
     update(id, () => ({ followUpClass: cls, followUpReason: reason.trim() }), `HQ classified the follow-up as ${cls === "rework" ? "rework (free)" : "a new request"} · ${reason.trim()}`);
     notify("client", `${id}: ${cls === "rework" ? "Rework (free)" : "New request"}`, `HQ reviewed your problem report on ${j.followUpOf}`, `/customer/maintenance?jobId=${id}`);
-    return undefined;
+    return;
   },
   /* ---- contractor ---- */
   partnerAccept(id: string) { update(id, () => ({ status: "accepted", partnerProposal: null }), "contractor-a accepted the offer"); notify("admin", `contractor-a accepted ${id}`, "assign a technician next", `/admin/jobs?jobId=${id}`); },

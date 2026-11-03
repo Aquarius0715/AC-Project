@@ -9,7 +9,7 @@ test("the device list filters by state and the detail shows the device as Figma 
   await page.goto("/admin/devices?tab=devices");
   const main = page.getByRole("main");
   const list = main.getByRole("heading", { name: "Devices", exact: true }).locator('xpath=ancestor::*[self::section or @data-slot="card"][1]');
-  const serials = async () => (await list.getByRole("button").allInnerTexts()).map((x) => x.split("\n")[0].trim());
+  const serials = async () => (await list.getByRole("button").allInnerTexts()).map((x) => x.split("\n", 1)[0].trim());
   await expect(list.getByRole("button").first()).toBeVisible();
   const seed = async () => (await serials()).filter((x) => x.startsWith("AC-DEMO-"));
   const all = await serials();

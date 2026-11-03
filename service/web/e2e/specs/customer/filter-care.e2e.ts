@@ -22,7 +22,7 @@ test("reminder settings refuse too few hours, then are saved and put back", asyn
   // the reminder values once the settings card has rendered (a read right after navigation can come before it)
   const reminders = async () => {
     await expect(page.getByRole("button", { name: "Edit reminders" })).toBeVisible();
-    return (await page.getByRole("main").innerText()).match(/Remind at[\s\S]*?Edit reminders/)?.[0] ?? "";
+    return (/Remind at[\s\S]*?Edit reminders/.exec((await page.getByRole("main").innerText())))?.[0] ?? "";
   };
   // a save is finished when its Server Action has answered: a toast of the previous save may still be on screen
   const save = async () => {
@@ -60,7 +60,7 @@ test("Request cleaning opens New request for that AC, prefilled", async ({ page 
   const request = page.locator("main tr").getByRole("button", { name: "Request cleaning" });
   test.skip((await request.count()) === 0, "no AC is overdue for cleaning (the seed's Meeting room AC is, until someone marks it cleaned)");
   const row = page.locator("main tr", { has: page.getByRole("button", { name: "Request cleaning" }) }).first(); // the inner locator is relative to the row
-  const unit = ((await row.locator("td").first().innerText()).split("\n")[0] ?? "").trim();
+  const unit = ((await row.locator("td").first().innerText()).split("\n", 1)[0] ?? "").trim();
   await request.first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();

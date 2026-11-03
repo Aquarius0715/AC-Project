@@ -12,7 +12,7 @@ const DEMO_KEY = "JBSWY3DPEHPK3PXP"; // the fixed demo setup key (Figma 10g)
 const DEMO_QR = qrPath(otpauthUri(DEMO_KEY, "demo"));
 
 /** Preferences of the Phase 1A demo (browser state only; the language is kept in this browser and read by the shell);
- * API mode renders PreferencesView from the Core API. */
+API mode renders PreferencesView from the Core API. */
 export function PreferencesDemo() {
   const toast = useToast();
   const t = useT();
@@ -31,7 +31,7 @@ export function PreferencesDemo() {
         <Choice value={lang} onChange={(v) => { setStoredValue(LOCALE_KEY, v); toast(translate(v, "Language saved")); }} options={[{ id: "en", label: t("English (default)") }, { id: "ms", label: "Bahasa Melayu" }]} />
       </Card>
       <Card title={t("Display timezone")} sub={t("Booked times keep their meaning across timezone changes.")}>
-        <Select defaultValue="kl" onChange={() => toast(t("Timezone saved"))}><option value="kl">Asia/Kuala_Lumpur (UTC+8)</option><option value="sg">Asia/Singapore (UTC+8)</option><option value="tk">Asia/Tokyo (UTC+9)</option></Select>
+        <Select defaultValue="kl" onChange={() => { toast(t("Timezone saved")); }}><option value="kl">Asia/Kuala_Lumpur (UTC+8)</option><option value="sg">Asia/Singapore (UTC+8)</option><option value="tk">Asia/Tokyo (UTC+9)</option></Select>
       </Card>
       <Card title={t("Currency")} sub={`${t("MYR — Malaysian Ringgit")} · ${t("read-only demo")}`}><Select disabled><option>{t("MYR — Malaysian Ringgit")}</option></Select></Card>
       <Card title={t("Security · Two-step verification")} sub={t("Ask for a 6-digit code from an authenticator app when signing in on a new device")} action={twoFa ? <span className="flex items-center gap-2"><Badge tone="ok">{t("On")}</Badge><Btn size="sm" onClick={() => { setTwoFa(false); toast(t("Two-step verification turned off"), "warn"); }}>{t("Turn off")}</Btn></span> : <span className="flex items-center gap-2"><Badge>{t("Off")}</Badge><Btn size="sm" variant="primary" onClick={() => { setModal(true); setCodes(null); setCode(""); }}>{t("Turn on")}</Btn></span>}>
@@ -47,7 +47,7 @@ export function PreferencesDemo() {
           </div>
         </Card>
       )}
-      <Modal open={modal} onClose={() => setModal(false)} title={t("Turn on two-step verification")} footer={codes ? <Btn variant="primary" onClick={() => { setModal(false); setTwoFa(true); toast(t("Two-step verification is on")); }}>{t("I saved my codes")}</Btn> : <><Btn onClick={() => setModal(false)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!codeComplete(code)} onClick={() => setCodes(["7HQ2-K9PD", "3MZX-41RT", "Q8W2-6TNB", "L5CE-2PXK", "9VAD-7MJF", "R2KN-8QWE", "XT4P-1GHS", "B6UY-3ZLM"])}>{t("Verify & turn on")}</Btn></>}>
+      <Modal open={modal} onClose={() => { setModal(false); }} title={t("Turn on two-step verification")} footer={codes ? <Btn variant="primary" onClick={() => { setModal(false); setTwoFa(true); toast(t("Two-step verification is on")); }}>{t("I saved my codes")}</Btn> : <><Btn onClick={() => { setModal(false); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!codeComplete(code)} onClick={() => { setCodes(["7HQ2-K9PD", "3MZX-41RT", "Q8W2-6TNB", "L5CE-2PXK", "9VAD-7MJF", "R2KN-8QWE", "XT4P-1GHS", "B6UY-3ZLM"]); }}>{t("Verify & turn on")}</Btn></>}>
         {codes ? <><Banner tone="ok">{t("Two-step verification is ready. Save these {n} recovery codes — they are shown only once.", { n: codes.length })}</Banner><div className="grid grid-cols-2 gap-2 font-mono text-sm">{codes.map((c) => <span key={c} className="rounded-lg bg-surface2 px-3 py-1.5">{c}</span>)}</div></> : <div className="flex flex-col gap-3.5">
           <div className="flex flex-col gap-5 sm:flex-row">
             <div className="grid h-[150px] w-[150px] shrink-0 place-items-center rounded-lg border border-line bg-white p-2"><QrCode qr={DEMO_QR} label={t("QR code with the setup key for an authenticator app")} className="h-full w-full" /></div>

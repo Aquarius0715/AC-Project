@@ -6,22 +6,24 @@ const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
 const NOW = Date.parse("2026-09-14T03:00:00Z"); // 11:00 in Kuala Lumpur
 const all = componentsFor(["indoor", "outdoor", "electrical"]);
-const report = (over: Partial<ApiTechReport> = {}): ApiTechReport => ({
-  id: "rep", version: 3, jobId: "job", authorId: "tech", items: [
-    { id: "i1", componentGroup: "indoor", componentKey: "filter", result: "attention", reason: "dusty", evidenceIds: [], authorId: "tech", observedAt: "2026-09-14T02:00:00Z" },
-    { id: "i2", componentGroup: "electrical", componentKey: "wiring", result: "not_applicable", reason: "no wiring", evidenceIds: [], authorId: "tech", observedAt: "2026-09-14T02:00:00Z" },
-  ],
-  measurements: [{ id: "m1", componentKey: "outlet", metric: "temperature", value: 13.9, unit: "°C", observedAt: "2026-09-14T02:10:00Z", quality: "valid" }],
-  parts: [], refrigerant: [], signOff: null, workText: "Cleaned the filter.", nextAction: { kind: "none" },
-  attachmentRefs: [{ id: "a1", name: "p1.png", mime: "image/png", size: 10, status: "ready" }, { id: "a2", name: "p2.heic", mime: "image/png", size: 10, status: "failed" }],
-  submittedAt: null, acceptedAt: null, reviewHistory: [], ...over,
-});
+const report = (over: Partial<ApiTechReport> = {}): ApiTechReport => {
+  return {
+    id: "rep", version: 3, jobId: "job", authorId: "tech", items: [
+      { id: "i1", componentGroup: "indoor", componentKey: "filter", result: "attention", reason: "dusty", evidenceIds: [], authorId: "tech", observedAt: "2026-09-14T02:00:00Z" },
+      { id: "i2", componentGroup: "electrical", componentKey: "wiring", result: "not_applicable", reason: "no wiring", evidenceIds: [], authorId: "tech", observedAt: "2026-09-14T02:00:00Z" },
+    ],
+    measurements: [{ id: "m1", componentKey: "outlet", metric: "temperature", value: 13.9, unit: "°C", observedAt: "2026-09-14T02:10:00Z", quality: "valid" }],
+    parts: [], refrigerant: [], signOff: null, workText: "Cleaned the filter.", nextAction: { kind: "none" },
+    attachmentRefs: [{ id: "a1", name: "p1.png", mime: "image/png", size: 10, status: "ready" }, { id: "a2", name: "p2.heic", mime: "image/png", size: 10, status: "failed" }],
+    submittedAt: null, acceptedAt: null, reviewHistory: [], ...over,
+  };
+};
 
 describe("components", () => {
   it("follows the unit's service scope in canonical order", () => {
     expect(all).toHaveLength(18);
     expect(componentsFor(["indoor"]).map((c) => c.key)).toEqual(["filter", "evaporator_coil", "blower_motor", "blower_fan", "drain_pipe", "drain_pan", "outlet", "louver"]);
-    expect(componentsFor(["electrical", "outdoor"]).map((c) => c.group)).toEqual([...Array(5).fill("outdoor"), ...Array(5).fill("electrical")]);
+    expect(componentsFor(["electrical", "outdoor"]).map((c) => c.group)).toEqual([...new Array(5).fill("outdoor"), ...new Array(5).fill("electrical")]);
     expect(componentsFor([])).toEqual([]);
     expect(groupOf("compressor")).toBe("outdoor");
     expect(groupOf("nope")).toBeNull();
@@ -40,7 +42,7 @@ describe("draft", () => {
   });
   it("builds the saveDraft body with trimmed reasons and numeric readings", () => {
     const d = draftFrom(report(), all);
-    d.items[1] = { ...d.items[1], result: "normal", reason: "   " };
+    d.items[1] = { ...d.items[1], result: "normal", reason: ' '.repeat(3) };
     d.readings.push({ componentKey: "compressor", metric: "vibration", value: "", observedAt: "2026-09-14T02:20:00Z" });
     d.nextAction = { kind: "follow_up", date: "2026-10-01T00:00:00.000Z", note: "  replace filter  " };
     const body = draftInput("job", "rep", d);
@@ -82,7 +84,7 @@ describe("submit checks", () => {
     d.workText = "Cleaned the filter and checked the coil.";
     return d;
   };
-  it("passes a complete draft", () => expect(submitIssues(complete(), report().attachmentRefs, NOW)).toEqual([]));
+  it("passes a complete draft", () => { expect(submitIssues(complete(), report().attachmentRefs, NOW)).toEqual([]); });
   it("lists every blocking issue with its group", () => {
     const d = complete();
     d.items[7] = { ...d.items[7], result: null };

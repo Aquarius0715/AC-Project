@@ -16,8 +16,8 @@ const levelLabel: Record<Fan, string> = { low: "Low", mid: "Mid", high: "High" }
 const toggle = <T,>(xs: T[], x: T, on: boolean) => (on ? [...new Set([...xs, x])] : xs.filter((y) => y !== x));
 
 /** Models: the capability register and editor (DD-A04). Saving an existing model writes the next capability version
- * and moves its units to it; the version history is audit.list of the capability, read on explicit open. Texts in the
- * display language; metric codes stay codes (IR295). */
+and moves its units to it; the version history is audit.list of the capability, read on explicit open. Texts in the
+display language; metric codes stay codes (IR295). */
 export function ModelsTab({ live }: { live: DevicesLive }) {
   const i = useI18n(), { t } = i;
   const [pending, run] = useAction();
@@ -33,14 +33,14 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
     setTried(false);
   }
   const errors = capabilityErrors(d, !!sel, t);
-  const set = (patch: Partial<CapabilityDraft>) => setD((x) => ({ ...x, ...patch }));
+  const set = (patch: Partial<CapabilityDraft>) => { setD((x) => ({ ...x, ...patch })); };
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [newSensor, setNewSensor] = useState<Metric>("temperature");
   const [adding, setAdding] = useState<string | null>(null); // the firmware version being typed after “+ Add version”
   const units = sel ? live.units.filter((u) => u.modelId === sel.id) : [];
   // what the draft changes against the saved capability (Figma Admin 106:3: “Editing → v4”, “1 change · …”)
   const changes = sel ? capabilityChanges(d, capabilityDraft(sel.cap), t) : [];
-  const dirty = changes.length > 0;
+  const isDirty = changes.length > 0;
   const onModel = new Set(units.map((u) => u.id));
   const runningOn = (v: string) => live.devices.filter((x) => x.unitId && onModel.has(x.unitId) && x.fw === v).length;
   const addProblem = adding === null ? null : firmwareProblem(adding, d.firmware, t);
@@ -49,49 +49,49 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
     set({ firmware: [...d.firmware, adding.trim()] });
     setAdding(null);
   };
-  const available = metrics.filter((m) => !d.sensors.some((s) => s.metric === m));
+  const available = metrics.filter((m) => d.sensors.every((s) => s.metric !== m));
   const pick = available.includes(newSensor) ? newSensor : available[0];
   const save = () => {
     setTried(true);
     if (Object.keys(errors).length > 0) return;
-    run(() => saveCapability(capabilityInput(d, sel?.id), sel?.version), (k) => (sel ? t("Saved — capability version {v}", { v: k.version }) : t("Model created")), (k) => setSelId(k.id));
+    run(() => saveCapability(capabilityInput(d, sel?.id), sel?.version), (k) => (sel ? t("Saved — capability version {v}", { v: k.version }) : t("Model created")), (k) => { setSelId(k.id); });
   };
   const openHistory = () => sel && run(() => capabilityHistory(sel.id), (xs) => t(xs.length === 1 ? "1 version entry" : "{n} version entries", { n: xs.length }), setHistory);
   const err = (k: string) => (tried ? errors[k] : undefined);
 
   return (
     <div className="split-rev">
-      <Card title={t("Models")} action={live.canWrite && <Btn size="sm" onClick={() => setSelId("new")}><Icon name="add" /> {t("New model")}</Btn>} className="self-start">
-        {live.models.length === 0 ? <EmptyState title={t("No models")}>{t("Register the first model.")}</EmptyState> : <div className="flex flex-col gap-2">{live.models.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => setSelId(x.id)}><div className="min-w-0"><b className="text-[13px]">{x.name}</b> {x.ventilation && <Badge tone="primary">{t("Ventilation")}</Badge>}<div className="text-[11px] text-muted-foreground">{t("capability v{v} · updated {time}", { v: x.version, time: x.updated })}</div><div className="text-[11px] text-muted-foreground">{x.used}</div></div></ListRow>)}</div>}
+      <Card title={t("Models")} action={live.canWrite && <Btn size="sm" onClick={() => { setSelId("new"); }}><Icon name="add" /> {t("New model")}</Btn>} className="self-start">
+        {live.models.length === 0 ? <EmptyState title={t("No models")}>{t("Register the first model.")}</EmptyState> : <div className="flex flex-col gap-2">{live.models.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setSelId(x.id); }}><div className="min-w-0"><b className="text-[13px]">{x.name}</b> {x.ventilation && <Badge tone="primary">{t("Ventilation")}</Badge>}<div className="text-[11px] text-muted-foreground">{t("capability v{v} · updated {time}", { v: x.version, time: x.updated })}</div><div className="text-[11px] text-muted-foreground">{x.used}</div></div></ListRow>)}</div>}
         <p className="mt-3 text-[11px] text-muted-foreground">{t("Saving a change creates a new capability version. Unverified capabilities stay false/unknown.")}</p>
       </Card>
-      <Card title={sel ? <span className="inline-flex flex-wrap items-center gap-2">{sel.name}<Badge>{t("Capability v{v}", { v: sel.version })}</Badge>{dirty && <Badge tone="warn">{t("Editing → v{v}", { v: sel.version + 1 })}</Badge>}</span> : t("New model")}
+      <Card title={sel ? <span className="inline-flex flex-wrap items-center gap-2">{sel.name}<Badge>{t("Capability v{v}", { v: sel.version })}</Badge>{isDirty && <Badge tone="warn">{t("Editing → v{v}", { v: sel.version + 1 })}</Badge>}</span> : t("New model")}
         sub={sel ? `${t("updated {time}", { time: sel.updated })} · ${sel.used}` : t("Saving creates capability version 1")} action={sel && live.canAudit && <Btn size="sm" disabled={pending} onClick={openHistory}>{t("Version history")}</Btn>}>
         <div className="flex flex-col gap-5">
-          <section><h3 className="mb-2 text-[13px] font-bold">{t("Identity")}</h3><div className="grid-fluid" style={{ ["--min" as string]: "200px" }}><Field label={t("Manufacturer")} error={err("manufacturer")}><Input value={d.manufacturer} maxLength={120} onChange={(e) => set({ manufacturer: e.target.value })} /></Field><Field label={t("Model")} hint={t("Manufacturer + model must be unique")} error={err("model")}><Input value={d.model} maxLength={120} onChange={(e) => set({ model: e.target.value })} /></Field></div></section>
+          <section><h3 className="mb-2 text-[13px] font-bold">{t("Identity")}</h3><div className="grid-fluid" style={{ ["--min" as string]: "200px" }}><Field label={t("Manufacturer")} error={err("manufacturer")}><Input value={d.manufacturer} maxLength={120} onChange={(e) => { set({ manufacturer: e.target.value }); }} /></Field><Field label={t("Model")} hint={t("Manufacturer + model must be unique")} error={err("model")}><Input value={d.model} maxLength={120} onChange={(e) => { set({ model: e.target.value }); }} /></Field></div></section>
           <section>
             <h3 className="mb-1 text-[13px] font-bold">{t("Controls")}</h3>
             <p className="mb-2 text-xs text-muted-foreground">{t("Only enable what has been verified on the real model — never infer from product category.")}</p>
-            <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Check label={t("Power control")} checked={d.control} onChange={(v) => set({ control: v })} /><Check label={t("Mode control")} checked={d.modeControl} onChange={(v) => set({ modeControl: v })} /><Check label={t("Fan control")} checked={d.fanControl} onChange={(v) => set({ fanControl: v })} /><Check label={t("Temperature setpoint")} checked={d.temperatureOn} onChange={(v) => set({ temperatureOn: v })} /></div>
+            <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Check label={t("Power control")} checked={d.control} onChange={(v) => { set({ control: v }); }} /><Check label={t("Mode control")} checked={d.modeControl} onChange={(v) => { set({ modeControl: v }); }} /><Check label={t("Fan control")} checked={d.fanControl} onChange={(v) => { set({ fanControl: v }); }} /><Check label={t("Temperature setpoint")} checked={d.temperatureOn} onChange={(v) => { set({ temperatureOn: v }); }} /></div>
             {err("control") && <p className="mt-1 text-xs text-crit">{err("control")}</p>}
           </section>
-          {d.temperatureOn && <section><h3 className="mb-1 text-[13px] font-bold">{t("Temperature")}</h3><div className="grid-fluid" style={{ ["--min" as string]: "110px" }}><Field label={t("Min °C")} error={err("temperature")}><Input type="number" value={d.min} onChange={(e) => set({ min: e.target.value })} /></Field><Field label={t("Max °C")}><Input type="number" value={d.max} onChange={(e) => set({ max: e.target.value })} /></Field><Field label={t("Step °C")}><Input type="number" step="0.5" value={d.step} onChange={(e) => set({ step: e.target.value })} /></Field></div></section>}
+          {d.temperatureOn && <section><h3 className="mb-1 text-[13px] font-bold">{t("Temperature")}</h3><div className="grid-fluid" style={{ ["--min" as string]: "110px" }}><Field label={t("Min °C")} error={err("temperature")}><Input type="number" value={d.min} onChange={(e) => { set({ min: e.target.value }); }} /></Field><Field label={t("Max °C")}><Input type="number" value={d.max} onChange={(e) => { set({ max: e.target.value }); }} /></Field><Field label={t("Step °C")}><Input type="number" step="0.5" value={d.step} onChange={(e) => { set({ step: e.target.value }); }} /></Field></div></section>}
           <section>
             <h3 className="mb-1 text-[13px] font-bold">{t("Modes & fan")}</h3>
-            <div className="flex flex-wrap gap-x-6 gap-y-2 text-[13px]">{modes.map((m: Mode) => <Check key={m} label={t(modeLabel[m])} checked={d.modes.includes(m)} disabled={!d.modeControl} onChange={(v) => set({ modes: toggle(d.modes, m, v) })} />)}{fans.map((f: Fan) => <Check key={f} label={t("Fan {level}", { level: t(levelLabel[f]) })} checked={d.fanLevels.includes(f)} disabled={!d.fanControl} onChange={(v) => set({ fanLevels: toggle(d.fanLevels, f, v) })} />)}</div>
+            <div className="flex flex-wrap gap-x-6 gap-y-2 text-[13px]">{modes.map((m: Mode) => <Check key={m} label={t(modeLabel[m])} checked={d.modes.includes(m)} disabled={!d.modeControl} onChange={(v) => { set({ modes: toggle(d.modes, m, v) }); }} />)}{fans.map((f: Fan) => <Check key={f} label={t("Fan {level}", { level: t(levelLabel[f]) })} checked={d.fanLevels.includes(f)} disabled={!d.fanControl} onChange={(v) => { set({ fanLevels: toggle(d.fanLevels, f, v) }); }} />)}</div>
             {(err("modes") || err("fanLevels")) && <p className="mt-1 text-xs text-crit">{err("modes") ?? err("fanLevels")}</p>}
           </section>
           <section>
             <h3 className="mb-1 text-[13px] font-bold">{t("Ventilation")}</h3>
-            <Check label={t("Ventilation supported")} checked={d.ventilation} onChange={(v) => set({ ventilation: v, ventilationLevels: v ? d.ventilationLevels : [] })} />
+            <Check label={t("Ventilation supported")} checked={d.ventilation} onChange={(v) => { set({ ventilation: v, ventilationLevels: v ? d.ventilationLevels : [] }); }} />
             <p className="mb-1 mt-2 text-xs text-muted-foreground">{t("When enabled, levels must be non-empty and include Low.")}</p>
-            <div className="flex flex-wrap gap-x-6 gap-y-2">{fans.map((k) => <Check key={k} label={t(levelLabel[k])} checked={d.ventilationLevels.includes(k)} disabled={!d.ventilation} onChange={(v) => set({ ventilationLevels: toggle(d.ventilationLevels, k, v) })} />)}</div>
+            <div className="flex flex-wrap gap-x-6 gap-y-2">{fans.map((k) => <Check key={k} label={t(levelLabel[k])} checked={d.ventilationLevels.includes(k)} disabled={!d.ventilation} onChange={(v) => { set({ ventilationLevels: toggle(d.ventilationLevels, k, v) }); }} />)}</div>
             {err("ventilationLevels") && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{err("ventilationLevels")}</p>}
           </section>
           <section>
             <h3 className="mb-2 text-[13px] font-bold">{t("Sensors")}</h3>
-            <ScrollX><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after (s)")}</th><th>{t("Boundary")}</th><th /></tr></thead><tbody>{d.sensors.map((s, n) => <tr key={s.metric} className="border-t border-line"><td className="py-1.5">{metricText(s.metric, t)}</td><td>{metricUnit[s.metric]}</td><td><Input type="number" className="w-28" aria-label={t("Stale after (s)")} value={s.staleAfterSeconds} onChange={(e) => set({ sensors: d.sensors.map((x, j) => (j === n ? { ...x, staleAfterSeconds: e.target.value } : x)) })} /></td><td className="text-xs text-muted-foreground">{s.metric === "power" ? "ac_input_electricity" : "—"}</td><td><Plain touch type="button" className="text-xs text-crit" onClick={() => set({ sensors: d.sensors.filter((_, j) => j !== n) })}>{t("Remove")}</Plain></td></tr>)}</tbody></table></ScrollX>
-            {available.length > 0 && <div className="mt-2 flex items-end gap-2"><Field label={t("Add sensor")}><Select value={pick} onChange={(e) => setNewSensor(e.target.value as Metric)}>{available.map((m) => <option key={m} value={m}>{metricText(m, t)} ({metricUnit[m]})</option>)}</Select></Field><Btn size="sm" onClick={() => set({ sensors: [...d.sensors, { metric: pick, staleAfterSeconds: "120" }] })}>{t("Add")}</Btn></div>}
+            <ScrollX><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after (s)")}</th><th>{t("Boundary")}</th><th /></tr></thead><tbody>{d.sensors.map((s, n) => <tr key={s.metric} className="border-t border-line"><td className="py-1.5">{metricText(s.metric, t)}</td><td>{metricUnit[s.metric]}</td><td><Input type="number" className="w-28" aria-label={t("Stale after (s)")} value={s.staleAfterSeconds} onChange={(e) => { set({ sensors: d.sensors.map((x, j) => (j === n ? { ...x, staleAfterSeconds: e.target.value } : x)) }); }} /></td><td className="text-xs text-muted-foreground">{s.metric === "power" ? "ac_input_electricity" : "—"}</td><td><Plain touch type="button" className="text-xs text-crit" onClick={() => { set({ sensors: d.sensors.filter((_, j) => j !== n) }); }}>{t("Remove")}</Plain></td></tr>)}</tbody></table></ScrollX>
+            {available.length > 0 && <div className="mt-2 flex items-end gap-2"><Field label={t("Add sensor")}><Select value={pick} onChange={(e) => { setNewSensor(e.target.value as Metric); }}>{available.map((m) => <option key={m} value={m}>{metricText(m, t)} ({metricUnit[m]})</option>)}</Select></Field><Btn size="sm" onClick={() => { set({ sensors: [...d.sensors, { metric: pick, staleAfterSeconds: "120" }] }); }}>{t("Add")}</Btn></div>}
             {err("sensors") && <p className="mt-1 text-xs text-crit">{err("sensors")}</p>}
           </section>
           <section aria-label={t("Firmware candidates")}>
@@ -102,35 +102,35 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
                 const on = runningOn(v);
                 return (
                   <span key={v} className="inline-flex items-center gap-1.5 rounded-control border border-primary/40 bg-primary-soft px-2.5 py-1 text-xs">
-                    <b>{v}</b><span className="text-muted-foreground">{on ? t(on === 1 ? "current on 1 device" : "current on {n} devices", { n: on }) : n === d.firmware.length - 1 ? t("latest") : ""}</span>
-                    <Plain touch type="button" aria-label={t("Remove {name}", { name: v })} className="text-muted-foreground hover:text-ink" onClick={() => set({ firmware: d.firmware.filter((x) => x !== v) })}><Icon name="close" /></Plain>
+                    <b>{v}</b><span className="text-muted-foreground">{on ? t(on === 1 ? "current on 1 device" : "current on {n} devices", { n: on }) : (n === d.firmware.length - 1 ? t("latest") : "")}</span>
+                    <Plain touch type="button" aria-label={t("Remove {name}", { name: v })} className="text-muted-foreground hover:text-ink" onClick={() => { set({ firmware: d.firmware.filter((x) => x !== v) }); }}><Icon name="close" /></Plain>
                   </span>
                 );
               })}
-              {adding === null ? <Btn size="sm" variant="ghost" onClick={() => setAdding("")}><Icon name="add" /> {t("Add version")}</Btn> : (
+              {adding === null ? <Btn size="sm" variant="ghost" onClick={() => { setAdding(""); }}><Icon name="add" /> {t("Add version")}</Btn> : (
                 <span className="inline-flex items-center gap-1.5">
-                  <Input aria-label={t("Firmware version")} className="w-28" autoFocus value={adding} maxLength={32} placeholder="v3" onChange={(e) => setAdding(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addVersion(); if (e.key === "Escape") setAdding(null); }} />
-                  <Btn size="sm" disabled={!!addProblem} onClick={addVersion}>{t("Add")}</Btn><Btn size="sm" variant="ghost" onClick={() => setAdding(null)}>{t("Cancel")}</Btn>
+                  <Input aria-label={t("Firmware version")} className="w-28" autoFocus value={adding} maxLength={32} placeholder="v3" onChange={(e) => { setAdding(e.target.value); }} onKeyDown={(e) => { if (e.key === "Enter") addVersion(); if (e.key === "Escape") setAdding(null); }} />
+                  <Btn size="sm" disabled={!!addProblem} onClick={addVersion}>{t("Add")}</Btn><Btn size="sm" variant="ghost" onClick={() => { setAdding(null); }}>{t("Cancel")}</Btn>
                 </span>
               )}
             </div>
             {adding !== null && adding.trim() !== "" && addProblem && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{addProblem}</p>}
             {err("firmware") && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{err("firmware")}</p>}
           </section>
-          {sel && <section className="rounded-xl bg-surface2 p-3"><h3 className="mb-1 text-[13px] font-bold">{t("Impact of this change")}</h3><ul className="list-disc pl-5 text-xs"><li>{t(units.length === 1 ? "1 unit{list} moves to capability version {v}" : "{n} units{list} move to capability version {v}", { n: units.length, list: units.length ? ` — ${units.map((u) => u.label).join(", ")}` : "", v: sel.version + 1 })}</li><li>{t("Automation rules that no longer fit are disabled, with the reason that the capabilities changed")}</li><li>{t("Unfinished commands keep their original content")}</li></ul></section>}
-          {sel && <Field label={t("Change reason · required for updates")} error={err("changeReason")} hint={`${d.changeReason.length} / 1000`}><Textarea value={d.changeReason} maxLength={1000} onChange={(e) => set({ changeReason: e.target.value })} placeholder={t("Vendor bulletin: ventilation High not verified on the current batch.")} /></Field>}
+          {sel && <section className="rounded-xl bg-surface2 p-3"><h3 className="mb-1 text-[13px] font-bold">{t("Impact of this change")}</h3><ul className="list-disc pl-5 text-xs"><li>{t(units.length === 1 ? "1 unit{list} moves to capability version {v}" : "{n} units{list} move to capability version {v}", { n: units.length, list: units.length > 0 ? ` — ${units.map((u) => u.label).join(", ")}` : "", v: sel.version + 1 })}</li><li>{t("Automation rules that no longer fit are disabled, with the reason that the capabilities changed")}</li><li>{t("Unfinished commands keep their original content")}</li></ul></section>}
+          {sel && <Field label={t("Change reason · required for updates")} error={err("changeReason")} hint={`${d.changeReason.length} / 1000`}><Textarea value={d.changeReason} maxLength={1000} onChange={(e) => { set({ changeReason: e.target.value }); }} placeholder={t("Vendor bulletin: ventilation High not verified on the current batch.")} /></Field>}
           {live.canWrite && (
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
-              {sel && <span className="mr-auto text-[12px] text-muted-foreground">{dirty ? `${t(changes.length === 1 ? "1 change" : "{n} changes", { n: changes.length })} · ${changes.join(", ")}` : t("No unsaved changes")}</span>}
-              {!sel && live.models[0] && <Btn onClick={() => setSelId(live.models[0].id)}>{t("Cancel")}</Btn>}
-              {sel && <Btn disabled={pending || !dirty} onClick={() => { setD(capabilityDraft(sel.cap)); setTried(false); setAdding(null); }}>{t("Discard")}</Btn>}
-              <Btn variant="primary" disabled={pending || (!!sel && !dirty)} onClick={save}>{sel ? t("Save as capability v{v}", { v: sel.version + 1 }) : t("Create model")}</Btn>
+              {sel && <span className="mr-auto text-[12px] text-muted-foreground">{isDirty ? `${t(changes.length === 1 ? "1 change" : "{n} changes", { n: changes.length })} · ${changes.join(", ")}` : t("No unsaved changes")}</span>}
+              {!sel && live.models[0] && <Btn onClick={() => { setSelId(live.models[0].id); }}>{t("Cancel")}</Btn>}
+              {sel && <Btn disabled={pending || !isDirty} onClick={() => { setD(capabilityDraft(sel.cap)); setTried(false); setAdding(null); }}>{t("Discard")}</Btn>}
+              <Btn variant="primary" disabled={pending || (!!sel && !isDirty)} onClick={save}>{sel ? t("Save as capability v{v}", { v: sel.version + 1 }) : t("Create model")}</Btn>
             </div>
           )}
         </div>
       </Card>
-      <Modal open={history !== null} onClose={() => setHistory(null)} title={t("Version history · {name}", { name: sel?.name ?? "" })} footer={<Btn onClick={() => setHistory(null)}>{t("Close")}</Btn>}>
-        {history && history.length === 0 ? <p className="text-xs text-muted-foreground">{t("No saved versions in the last 12 months.")}</p> : <Timeline items={(history ?? []).map((h) => ({ time: showTime(h.at, i.display), title: `v${h.from ?? "—"} → v${h.to ?? "—"}${h.reason ? ` — ${h.reason}` : ""}`, detail: `${h.actor}${h.changes.length ? ` · ${t("changed {fields}", { fields: h.changes.join(", ") })}` : ""}` }))} />}
+      <Modal open={history !== null} onClose={() => { setHistory(null); }} title={t("Version history · {name}", { name: sel?.name ?? "" })} footer={<Btn onClick={() => { setHistory(null); }}>{t("Close")}</Btn>}>
+        {history && history.length === 0 ? <p className="text-xs text-muted-foreground">{t("No saved versions in the last 12 months.")}</p> : <Timeline items={(history ?? []).map((h) => ({ time: showTime(h.at, i.display), title: `v${h.from ?? "—"} → v${h.to ?? "—"}${h.reason ? ` — ${h.reason}` : ""}`, detail: `${h.actor}${h.changes.length > 0 ? ` · ${t("changed {fields}", { fields: h.changes.join(", ") })}` : ""}` }))} />}
         <p className="text-[11px] text-muted-foreground">{t("From the audit log (audit.read); values are masked as recorded.")}</p>
       </Modal>
     </div>

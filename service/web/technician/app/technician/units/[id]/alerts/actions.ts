@@ -5,8 +5,7 @@
 // resolve with alert.resolve, inside the work window (IR94, IR284), citing candidates of alerts.evidence (IR327).
 import { refresh } from "next/cache";
 import { coreOp, type CoreOptions, CoreError } from "@ac/web/lib/dal";
-import type { OpCall } from "@ac/web/lib/opTypes";
-import type { OpArgs } from "@ac/web/lib/opTypes";
+import type { OpCall , OpArgs } from "@ac/web/lib/opTypes";
 
 export type ActionResult = { ok: true } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
@@ -14,9 +13,8 @@ async function run(call: OpCall, version: number): Promise<ActionResult> {
   try {
     await coreOp(...([...call, { write: true, expectedVersion: version }] as OpArgs<CoreOptions>));
     return { ok: true };
-  } catch (e) {
-    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds };
-    return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+  } catch (error) {
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     refresh();
   }

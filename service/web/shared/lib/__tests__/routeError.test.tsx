@@ -6,7 +6,7 @@ import { RouteError } from "@ac/web/components/RouteStates";
 const assign = vi.fn();
 beforeEach(() => {
   assign.mockClear();
-  vi.stubGlobal("location", { ...window.location, pathname: "/customer/units/u-1", search: "?tab=readings", assign });
+  vi.stubGlobal("location", { ...location, pathname: "/customer/units/u-1", search: "?tab=readings", assign });
 });
 afterEach(() => {
   cleanup();
@@ -18,7 +18,7 @@ const show = async (session: () => Promise<Response>) => {
   await act(async () => { render(<RouteError what="unit" error={new Error("refused")} retry={() => {}} />); });
   await act(async () => { await new Promise((r) => setTimeout(r, 0)); }); // the session check settles
 };
-const json = (body: unknown) => () => Promise.resolve(new Response(JSON.stringify(body)));
+const json = (body: unknown) => () => Promise.resolve(Response.json(body));
 
 // a page that failed because its session was refused (IR385): the DAL dropped the session, so the route error state
 // sends the browser to sign-in and back; any other failure stays on the page with "Try again"

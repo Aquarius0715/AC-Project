@@ -1,18 +1,20 @@
-// The customer unit row from the Core API's UnitSummary (DATA_SOURCE=api): online units show the reading's time in
+// The customer unit row from the Core API's UnitSummary (DATA_SOURCE=API): online units show the reading's time in
 // Malaysia time, offline ones when they were last seen; the room temperature, humidity and power are the latest valid
 // readings (IR213), never the AC's setting; the power state and connection map onto the row's words.
 import { describe, expect, it } from "vitest";
 import { unitRowFromApi, type ApiUnit } from "@ac/web/lib/client";
 
-const unit = (over: Partial<ApiUnit>): ApiUnit => ({
-  id: "u-1",
-  displayName: "Bedroom AC",
-  connection: "online",
-  effectivePowerState: "on",
-  observedState: { power: true, celsius: 24.5, observedAt: "2026-09-20T01:12:00Z" },
-  lastSeenAt: "2026-09-20T01:12:00Z",
-  ...over,
-});
+const unit = (over: Partial<ApiUnit>): ApiUnit => {
+  return {
+    id: "u-1",
+    displayName: "Bedroom AC",
+    connection: "online",
+    effectivePowerState: "on",
+    observedState: { power: true, celsius: 24.5, observedAt: "2026-09-20T01:12:00Z" },
+    lastSeenAt: "2026-09-20T01:12:00Z",
+    ...over,
+  };
+};
 
 describe("unitRowFromApi", () => {
   it("shows an online unit's reading time in MYT and its latest readings, not its setting", () => {

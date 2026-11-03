@@ -15,7 +15,7 @@ const web = fileURLToPath(new URL("../../../", import.meta.url));
 const contractFile = join(web, "../../docs/02-design/service-contracts.ts");
 const catalogFile = join(web, "../api/internal/ops/catalog_gen.go");
 
-type Field = { literals: (string | number | boolean)[] | null }; // the literal values the contract allows, null: any
+interface Field { literals: (string | number | boolean)[] | null } // the literal values the contract allows, null: any
 function contractInputs(): Map<string, Map<string, Field>> {
   const program = ts.createProgram([contractFile], { strict: true, noEmit: true });
   const checker = program.getTypeChecker();
@@ -29,7 +29,7 @@ function contractInputs(): Map<string, Map<string, Field>> {
       else if (p.flags & (ts.TypeFlags.Undefined | ts.TypeFlags.Null)) continue;
       else return null;
     }
-    return values.length ? values : null;
+    return values.length > 0 ? values : null;
   };
   const out = new Map<string, Map<string, Field>>();
   ts.forEachChild(src, (n) => {
@@ -44,7 +44,7 @@ function contractInputs(): Map<string, Map<string, Field>> {
           const lit = literalsOf(checker.getTypeOfSymbolAtLocation(p, n));
           // a field of several union members allows the literals of all of them; any non-literal type allows anything
           const before = fields.get(p.getName());
-          const literals = !lit ? null : !before ? lit : before.literals === null ? null : [...new Set([...before.literals, ...lit])];
+          const literals = lit ? before ? before.literals === null ? null : [...new Set([...before.literals, ...lit])] : lit : null;
           fields.set(p.getName(), { literals });
         }
       }
@@ -81,7 +81,7 @@ describe("the web's calls against the Core API contract (IR312)", () => {
     const inputs = contractInputs(), filters = catalogFilters();
     const problems: string[] = [];
     let calls = 0;
-    const name = (p: ts.ObjectLiteralElementLike) => (p.name ? p.name.getText().replace(/^["']|["']$/g, "") : null);
+    const name = (p: ts.ObjectLiteralElementLike) => (p.name ? p.name.getText().replaceAll(/^["']|["']$/g, "") : null);
     for (const f of sources()) {
       const sf = ts.createSourceFile(f, readFileSync(f, "utf8"), ts.ScriptTarget.Latest, true, f.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
       const visit = (n: ts.Node) => {

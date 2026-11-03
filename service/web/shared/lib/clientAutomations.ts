@@ -1,4 +1,4 @@
-// Customer automations & schedules (FR-C04, FR-C05, DATA_SOURCE=api): the rule cards of the list (Figma Client 03a,
+// Customer automations & schedules (FR-C04, FR-C05, DATA_SOURCE=API): the rule cards of the list (Figma Client 03a,
 // 03d, 03f, 03i), the editor draft with its automations.save input and checks (03b, 03e), the schedule preview and the
 // event test (03c), and the location consent card. Pure code shared by the Server Component and the client view.
 import { EN, intlTag, showDate, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
@@ -15,21 +15,21 @@ export type ClientCondition =
 /** ExtraCondition of service-contracts.ts (IR215, Figma 03b “Only if …”). */
 export type ExtraCondition = { type: "weekday"; weekdays: number[] } | { type: "occupancy"; occupied: boolean } | { type: "weather"; metric: "temperature"; operator: Compare; value: number };
 /** AutomationRun of service-contracts.ts: the latest Command or skip of the rule (IR215). */
-export type ApiRun = { at: string; outcome: "command_created" | "skipped"; reason: string | null; commandId: string | null };
-type RuleBase = {
+export interface ApiRun { at: string; outcome: "command_created" | "skipped"; reason: string | null; commandId: string | null }
+interface RuleBase {
   id: string; version: number; createdAt: string; updatedAt: string; name: string; unitIds: string[]; ownerMembershipId: string; timezone: string;
   enabled: boolean; priority: number; disabledReason: "capability_changed" | "unit_archived" | "consent_revoked" | null; onlyIf: ExtraCondition[]; lastRun: ApiRun | null;
-};
+}
 /** Automation of service-contracts.ts. */
 export type ApiAutomation = RuleBase & (
   | { kind: "schedule"; weekdays: number[]; startLocal: string; endLocal: string; endsNextDay: boolean; startAction: UnitAction; endAction: UnitAction }
   | { kind: "event"; condition: ClientCondition; action: UnitAction });
 /** Consent of service-contracts.ts. */
-export type ApiConsent = { id: string; version: number; granted: boolean; grantedAt: string | null; revokedAt: string | null };
+export interface ApiConsent { id: string; version: number; granted: boolean; grantedAt: string | null; revokedAt: string | null }
 /** ScheduledOccurrence of service-contracts.ts (automationId null for a draft preview, IR214). */
-export type ApiOccurrence = { automationId: string | null; phase: "schedule_start" | "schedule_end"; at: string; action: UnitAction };
+export interface ApiOccurrence { automationId: string | null; phase: "schedule_start" | "schedule_end"; at: string; action: UnitAction }
 /** Decision of automations.simulate (SimulationResult.results). */
-export type ApiDecision = { unitId: string; decision: "selected" | "suppressed"; ruleId: string | null; reason: string | null };
+export interface ApiDecision { unitId: string; decision: "selected" | "suppressed"; ruleId: string | null; reason: string | null }
 
 export type Trigger = "schedule" | "presence" | "location" | "routine" | "weather";
 export const triggers: Trigger[] = ["schedule", "presence", "location", "routine", "weather"];
@@ -49,8 +49,8 @@ export const dayLong = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 export function weekdaysText(ds: number[], sentence = false, t: T = en): string {
   const s = [...ds].sort((a, b) => a - b);
   if (s.length === 7) return t("Every day");
-  if (s.join() === "1,2,3,4,5") return t("Weekdays");
-  if (s.join() === "6,7") return t("Weekends");
+  if (s.join(',') === "1,2,3,4,5") return t("Weekdays");
+  if (s.join(',') === "6,7") return t("Weekends");
   const names = s.map((d) => t(dayShort[d - 1]));
   return sentence && names.length > 1 ? t("{list} & {last}", { list: names.slice(0, -1).join(", "), last: names[names.length - 1] }) : names.join(", ");
 }
@@ -59,11 +59,16 @@ const modeWord: Record<string, string> = { cool: "Cool", dry: "Dry", fan: "Fan" 
 const fanWord: Record<string, string> = { low: "Low", mid: "Mid", high: "High" };
 export function actionLabel(a: UnitAction, t: T = en): string {
   switch (a.kind) {
-    case "set_power": return t(a.power ? "Power ON" : "Power OFF");
-    case "set_temperature": return t("Set temperature {celsius}°C", { celsius: a.celsius });
-    case "set_mode": return t("Mode {mode}", { mode: modeWord[a.mode] ? t(modeWord[a.mode]) : cap(a.mode) });
-    case "set_fan": return t("Fan {level}", { level: fanWord[a.fanLevel] ? t(fanWord[a.fanLevel]) : cap(a.fanLevel) });
-    case "ventilate": return t("Ventilate {level}", { level: fanWord[a.level] ? t(fanWord[a.level]).toLowerCase() : a.level });
+    case "set_power": { return t(a.power ? "Power ON" : "Power OFF");
+    }
+    case "set_temperature": { return t("Set temperature {celsius}°C", { celsius: a.celsius });
+    }
+    case "set_mode": { return t("Mode {mode}", { mode: modeWord[a.mode] ? t(modeWord[a.mode]) : cap(a.mode) });
+    }
+    case "set_fan": { return t("Fan {level}", { level: fanWord[a.fanLevel] ? t(fanWord[a.fanLevel]) : cap(a.fanLevel) });
+    }
+    case "ventilate": { return t("Ventilate {level}", { level: fanWord[a.level] ? t(fanWord[a.level]).toLowerCase() : a.level });
+    }
   }
 }
 const cmp: Record<Compare, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
@@ -76,7 +81,7 @@ export function whenText(a: ApiAutomation, place: string, t: T = en): string {
       : t("{days} at {start} ({zone})", { days: weekdaysText(a.weekdays, false, t), start: a.startLocal, zone: a.timezone })) + onlyIfText(a.onlyIf, t);
   }
   const c = a.condition;
-  const when = c.type === "location" ? (c.event === "arrival" ? t("Arrival at {place}", { place }) : t("Everyone leaves {place} (departure event)", { place }))
+  const when = c.type === "location" ? (t(c.event === "arrival" ? "Arrival at {place}" : "Everyone leaves {place} (departure event)", { place }))
     : c.type === "occupancy" ? t(c.occupied ? "Someone is in the room (demo occupancy)" : "No one detected (demo occupancy)")
     : c.type === "pattern" ? t("Your usual time {time} (demo routine)", { time: c.localTime }) : t("Outdoor temperature {op} {value}°C (demo weather)", { op: cmp[c.operator], value: c.value });
   return when + onlyIfText(a.onlyIf, t);
@@ -84,21 +89,21 @@ export function whenText(a: ApiAutomation, place: string, t: T = en): string {
 /** “someone is home”, “outdoor ≥ 30°C”, “weekdays” — the “Only if” clause of a sentence. */
 export function extraText(x: ExtraCondition, t: T = en): string {
   if (x.type === "weekday") {
-    const s = [...x.weekdays].sort((a, b) => a - b).join();
+    const s = [...x.weekdays].sort((a, b) => a - b).join(',');
     const days = weekdaysText(x.weekdays, false, t);
     return s === "1,2,3,4,5" || s === "6,7" || x.weekdays.length === 7 ? days.toLowerCase() : days;
   }
   if (x.type === "occupancy") return t(x.occupied ? "someone is home" : "no one is home");
   return t("outdoor {op} {value}°C", { op: cmp[x.operator], value: x.value });
 }
-export const onlyIfText = (xs: ExtraCondition[], t: T = en) => (xs.length ? t(" · Only if: {conditions}", { conditions: xs.map((x) => extraText(x, t)).join(t(" and ")) }) : "");
+export const onlyIfText = (xs: ExtraCondition[], t: T = en) => (xs.length > 0 ? t(" · Only if: {conditions}", { conditions: xs.map((x) => extraText(x, t)).join(t(" and ")) }) : "");
 export function thenText(a: ApiAutomation, t: T = en): string {
   return a.kind === "schedule" ? t("{start} · at {end} → {endAction} (end action)", { start: actionLabel(a.startAction, t), end: a.endLocal, endAction: actionLabel(a.endAction, t) }) : actionLabel(a.action, t);
 }
 
 const KL = "Asia/Kuala_Lumpur";
 /** "Mon, 28 Sept, 18:00 MYT": a rule's time in the rule's own time zone (a schedule keeps its local time, IR44 adds the
- * zone's abbreviation), in the display language. */
+zone's abbreviation), in the display language. */
 export function runText(iso: string, tz = KL, i: I18n = EN): string {
   const d = new Date(iso);
   const tag = intlTag(i.display.locale);
@@ -123,7 +128,7 @@ export function runClock(iso: string, tz = KL, i: I18n = EN): string {
 const reasonText: Record<string, string> = { consent_revoked: "consent revoked", capability_changed: "capability changed", unit_archived: "unit archived" };
 
 /** One “Then” row of a card: a schedule has its start and its end, each at its own time; an event rule has one action. */
-export type RuleStep = { key: "start" | "end" | "action"; label: string; time: string | null; action: string };
+export interface RuleStep { key: "start" | "end" | "action"; label: string; time: string | null; action: string }
 /** The “Then” rows of a rule, in the display language. */
 export function ruleSteps(a: ApiAutomation, t: T = en): RuleStep[] {
   if (a.kind !== "schedule") return [{ key: "action", label: t("Then"), time: null, action: actionLabel(a.action, t) }];
@@ -134,10 +139,10 @@ export function ruleSteps(a: ApiAutomation, t: T = en): RuleStep[] {
 }
 
 /** One rule card of the list. */
-export type RuleCard = {
+export interface RuleCard {
   id: string; version: number; name: string; trigger: Trigger; when: string; then: string; steps: RuleStep[]; place: string; enabled: boolean;
   status: { text: string; tone: "ok" | "warn" | "muted" }; note: string | null; skipped: string | null; toggle: { allowed: boolean; hint: string | null };
-};
+}
 /** One rule card in the display language (IR260); a rule's own times stay in its time zone. */
 export function ruleCard(a: ApiAutomation, unit: { name: string; path: string; property: string } | null, nextStart: string | null, consentGranted: boolean, i: I18n = EN): RuleCard {
   const { t } = i;
@@ -146,48 +151,49 @@ export function ruleCard(a: ApiAutomation, unit: { name: string; path: string; p
   const extra = a.unitIds.length - 1;
   const more = extra > 0 ? t(extra === 1 ? " (+{n} more AC)" : " (+{n} more ACs)", { n: extra }) : "";
   const where = unit ? `${unit.name}${more} · ${unit.path}` : t("AC no longer available");
-  const status = a.enabled ? { text: t("On"), tone: "ok" as const } : a.disabledReason ? { text: t("Disabled · {reason}", { reason: t(reasonText[a.disabledReason]) }), tone: "warn" as const } : { text: t("Off"), tone: "muted" as const };
+  const status = a.enabled ? { text: t("On"), tone: "ok" as const } : (a.disabledReason ? { text: t("Disabled · {reason}", { reason: t(reasonText[a.disabledReason]) }), tone: "warn" as const } : { text: t("Off"), tone: "muted" as const });
   const note = a.disabledReason === "consent_revoked" ? t("Will not run: location consent withdrawn {date}. Existing commands are not cancelled.", { date: showDate(a.updatedAt, i.display) })
     : a.disabledReason === "capability_changed" ? t("Will not run: the AC's capabilities changed — edit the actions, then switch it on again.")
     : a.disabledReason === "unit_archived" ? t("Will not run: the AC was archived.") : null;
   const skipped = !note && a.lastRun?.outcome === "skipped" ? t("Last evaluation skipped {when} — {reason}", { when: runText(a.lastRun.at, a.timezone, i), reason: decisionText[a.lastRun.reason ?? ""] ? t(decisionText[a.lastRun.reason ?? ""]) : a.lastRun.reason ?? t("no reason recorded") }) : null;
-  const needsConsent = trigger === "location" && !consentGranted;
+  const isNeedsConsent = trigger === "location" && !consentGranted;
   return {
     id: a.id, version: a.version, name: a.name, trigger, when: whenText(a, place, t), then: thenText(a, t), steps: ruleSteps(a, t), enabled: a.enabled, status, note, skipped,
     place: `${where}${a.enabled && nextStart ? t(" · next run {when}", { when: runText(nextStart, a.timezone, i) }) : ""}`,
-    toggle: { allowed: !(needsConsent && !a.enabled) && !!unit, hint: needsConsent && !a.enabled ? t("Grant location consent first") : unit ? null : t("The AC is no longer available") },
+    toggle: { allowed: (!isNeedsConsent || a.enabled) && !!unit, hint: isNeedsConsent && !a.enabled ? t("Grant location consent first") : (unit ? null : t("The AC is no longer available")) },
   };
 }
 
 /** The editor draft (DD-C04 / DD-C05 fields); actions are option keys of actionOptions. */
-export type Draft = {
+export interface Draft {
   id: string | null; version: number | null; name: string; trigger: Trigger; unitId: string; others: string[]; timezone: string; enabled: boolean; priority: number;
   weekdays: number[]; startLocal: string; endLocal: string; endsNextDay: boolean; startAction: string; endAction: string;
   occupied: boolean; event: "arrival" | "departure"; localTime: string; operator: Compare; value: string; action: string; extras: ExtraDraft[];
-};
+}
 /** One “Only if” row of the editor (weather value kept as typed). */
 export type ExtraDraft = { type: "weekday"; weekdays: number[] } | { type: "occupancy"; occupied: boolean } | { type: "weather"; operator: Compare; value: string };
 export const extraLabel: Record<ExtraDraft["type"], string> = { weekday: "Weekdays", occupancy: "Occupancy", weather: "Outdoor temperature" };
 /** The “Only if” types a draft may still add (IR215): no weekday on a schedule, not the trigger's own type, each once, at most 3. */
 export function extraChoices(d: Draft): ExtraDraft["type"][] {
   if (d.extras.length >= 3) return [];
-  const own = d.trigger === "presence" ? "occupancy" : d.trigger === "weather" ? "weather" : null;
-  return (["weekday", "occupancy", "weather"] as const).filter((t) => !(t === "weekday" && d.trigger === "schedule") && t !== own && !d.extras.some((x) => x.type === t));
+  const own = d.trigger === "presence" ? "occupancy" : (d.trigger === "weather" ? "weather" : null);
+  return (["weekday", "occupancy", "weather"] as const).filter((t) => !(t === "weekday" && d.trigger === "schedule") && t !== own && d.extras.every((x) => x.type !== t));
 }
-export const newExtra = (t: ExtraDraft["type"]): ExtraDraft => (t === "weekday" ? { type: t, weekdays: [1, 2, 3, 4, 5] } : t === "occupancy" ? { type: t, occupied: true } : { type: t, operator: "gte", value: "30" });
+export const newExtra = (t: ExtraDraft["type"]): ExtraDraft => (t === "weekday" ? { type: t, weekdays: [1, 2, 3, 4, 5] } : (t === "occupancy" ? { type: t, occupied: true } : { type: t, operator: "gte", value: "30" }));
 /** Extras that no longer fit the trigger (switching the trigger) are dropped. */
 export function fitExtras(d: Draft): ExtraDraft[] {
-  const own = d.trigger === "presence" ? "occupancy" : d.trigger === "weather" ? "weather" : null;
+  const own = d.trigger === "presence" ? "occupancy" : (d.trigger === "weather" ? "weather" : null);
   return d.extras.filter((x) => !(x.type === "weekday" && d.trigger === "schedule") && x.type !== own);
 }
 const extraOf = (x: ExtraDraft): ExtraCondition => (x.type === "weather" ? { type: "weather", metric: "temperature", operator: x.operator, value: Number(x.value) } : x);
 const extraDraftOf = (x: ExtraCondition): ExtraDraft => (x.type === "weather" ? { type: "weather", operator: x.operator, value: String(x.value) } : x);
 /** The option key of an action; every UnitAction of the contract has one, so a saved rule edits back unchanged (IR314). */
-export const actionKey = (a: UnitAction): string =>
-  a.kind === "set_power" ? `power:${a.power ? "on" : "off"}` : a.kind === "set_temperature" ? `temp:${a.celsius}` : a.kind === "set_mode" ? `mode:${a.mode}`
+export const actionKey = (a: UnitAction): string => {
+  return a.kind === "set_power" ? `power:${a.power ? "on" : "off"}` : a.kind === "set_temperature" ? `temp:${a.celsius}` : a.kind === "set_mode" ? `mode:${a.mode}`
     : a.kind === "set_fan" ? `fan:${a.fanLevel}` : `vent:${a.level}`;
+};
 export function actionOf(key: string): UnitAction {
-  const [k, v] = key.split(":");
+  const [k, v] = key.split(":", 2);
   if (k === "power") return { kind: "set_power", power: v === "on" };
   if (k === "temp") return { kind: "set_temperature", celsius: Number(v) };
   if (k === "mode") return { kind: "set_mode", mode: v as "cool" | "dry" | "fan" };
@@ -216,25 +222,31 @@ export function draftOf(a: ApiAutomation): Draft {
 }
 export function conditionOf(d: Draft): ClientCondition {
   switch (d.trigger) {
-    case "presence": return { type: "occupancy", occupied: d.occupied };
-    case "location": return { type: "location", event: d.event };
-    case "routine": return { type: "pattern", localTime: d.localTime };
-    default: return { type: "weather", metric: "temperature", operator: d.operator, value: Number(d.value) };
+    case "presence": { return { type: "occupancy", occupied: d.occupied };
+    }
+    case "location": { return { type: "location", event: d.event };
+    }
+    case "routine": { return { type: "pattern", localTime: d.localTime };
+    }
+    default: { return { type: "weather", metric: "temperature", operator: d.operator, value: Number(d.value) };
+    }
   }
 }
 /** automations.save input (one AC per rule on this screen, Figma 03b “Action for one AC”). */
 export function saveInput(d: Draft): OpInput<"automations.save"> {
-  const base = { ...(d.id ? { id: d.id } : {}), name: d.name.trim(), unitIds: [d.unitId, ...d.others.filter((u) => u !== d.unitId)], timezone: d.timezone, enabled: d.enabled, priority: d.priority,
+  const base = { ...(d.id && { id: d.id }), name: d.name.trim(), unitIds: [d.unitId, ...d.others.filter((u) => u !== d.unitId)], timezone: d.timezone, enabled: d.enabled, priority: d.priority,
     onlyIf: fitExtras(d).map(extraOf) };
   return d.trigger === "schedule"
     ? { ...base, kind: "schedule", weekdays: [...d.weekdays].sort((a, b) => a - b), startLocal: d.startLocal, endLocal: d.endLocal, endsNextDay: d.endsNextDay, startAction: actionOf(d.startAction), endAction: actionOf(d.endAction) }
     : { ...base, kind: "event", condition: conditionOf(d), action: actionOf(d.action) };
 }
 /** The schedule part of a draft for the automations.nextRuns draft preview. */
-export const scheduleDraft = (d: Draft) => ({
-  timezone: d.timezone, weekdays: [...d.weekdays].sort((a, b) => a - b), startLocal: d.startLocal, endLocal: d.endLocal, endsNextDay: d.endsNextDay,
-  startAction: actionOf(d.startAction), endAction: actionOf(d.endAction),
-});
+export const scheduleDraft = (d: Draft) => {
+  return {
+    timezone: d.timezone, weekdays: [...d.weekdays].sort((a, b) => a - b), startLocal: d.startLocal, endLocal: d.endLocal, endsNextDay: d.endsNextDay,
+    startAction: actionOf(d.startAction), endAction: actionOf(d.endAction),
+  };
+};
 const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
 const minutes = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
 /** The checks automations.save makes, shown before saving (the API checks again). */
@@ -257,10 +269,10 @@ export function draftErrors(d: Draft, tr: T = en): Record<string, string> {
   }
   if (d.trigger === "routine" && !hhmm.test(d.localTime)) e.localTime = "HH:mm";
   if (d.trigger === "weather" && !(d.value.trim() !== "" && Number(d.value) >= -50 && Number(d.value) <= 100)) e.value = tr("−50 to 100 °C");
-  fitExtras(d).forEach((x, i) => {
+  for (const [i, x] of fitExtras(d).entries()) {
     if (x.type === "weekday" && x.weekdays.length === 0) e[`extra${i}`] = tr("Choose at least one weekday");
     if (x.type === "weather" && !(x.value.trim() !== "" && Number(x.value) >= -50 && Number(x.value) <= 100)) e[`extra${i}`] = tr("−50 to 100 °C");
-  });
+  }
   return e;
 }
 const fieldName: Record<string, string> = {
@@ -276,40 +288,40 @@ const keyText: Record<string, string> = {
 /** API field errors of automations.save / nextRuns draft mapped to the editor fields. */
 export function apiErrors(fe: Record<string, string>, t: T = en): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(fe)) out[fieldName[k] ?? k] = keyText[v] ? t(keyText[v]) : v.replace(/^errors?\./, "").replace(/_/g, " ");
+  for (const [k, v] of Object.entries(fe)) out[fieldName[k] ?? k] = keyText[v] ? t(keyText[v]) : v.replace(/^errors?\./, "").replaceAll('_', " ");
   return out;
 }
 
 /** Action options for an AC (Figma 03b one select): power, the capability temperatures, modes and fan levels. */
-export type Caps = {
+export interface Caps {
   control: boolean; modeControl: boolean; fanControl: boolean; temperature: { min: number; max: number; step: number } | null; modes: ("cool" | "dry" | "fan")[]; fanLevels: ("low" | "mid" | "high")[];
   ventilation?: boolean; ventilationLevels?: ("low" | "mid" | "high")[];
-};
+}
 /** One kind of setting an action changes (power, temperature, mode, fan, ventilation) and its values. */
-export type ActionGroup = { id: "power" | "temp" | "mode" | "fan" | "vent"; group: string; options: { key: string; label: string; short: string }[] };
+export interface ActionGroup { id: "power" | "temp" | "mode" | "fan" | "vent"; group: string; options: { key: string; label: string; short: string }[] }
 /** The actions a unit takes (DD-C05 “within unit capabilities”, the API's rule): the AC settings with control, and
- * ventilation on a model with a fresh-air function (IR314). Grouped by the setting they change: the editor picks the
- * setting first, then its value (`short` is the value alone, `label` the whole action). */
+ventilation on a model with a fresh-air function (IR314). Grouped by the setting they change: the editor picks the
+setting first, then its value (`short` is the value alone, `label` the whole action). */
 export function actionOptions(c: Caps | null, t: T = en): ActionGroup[] {
   if (!c) return [];
   const temps: ActionGroup["options"] = [];
   if (c.control && c.temperature) for (let x = c.temperature.min; x <= c.temperature.max; x += c.temperature.step || 1) temps.push({ key: `temp:${x}`, label: t("Set temperature {celsius}°C", { celsius: x }), short: `${x}°C` });
   const out: ActionGroup[] = [];
   if (c.control) out.push({ id: "power", group: t("Power"), options: [{ key: "power:on", label: t("Power ON"), short: t("ON") }, { key: "power:off", label: t("Power OFF"), short: t("OFF") }] });
-  if (temps.length) out.push({ id: "temp", group: t("Temperature"), options: temps });
-  if (c.control && c.modeControl && c.modes.length) out.push({ id: "mode", group: t("Mode"), options: c.modes.map((m) => ({ key: `mode:${m}`, label: actionLabel({ kind: "set_mode", mode: m }, t), short: t(modeWord[m] ?? m) })) });
-  if (c.control && c.fanControl && c.fanLevels.length) out.push({ id: "fan", group: t("Fan"), options: c.fanLevels.map((f) => ({ key: `fan:${f}`, label: actionLabel({ kind: "set_fan", fanLevel: f }, t), short: t(fanWord[f] ?? f) })) });
+  if (temps.length > 0) out.push({ id: "temp", group: t("Temperature"), options: temps });
+  if (c.control && c.modeControl && c.modes.length > 0) out.push({ id: "mode", group: t("Mode"), options: c.modes.map((m) => ({ key: `mode:${m}`, label: actionLabel({ kind: "set_mode", mode: m }, t), short: t(modeWord[m] ?? m) })) });
+  if (c.control && c.fanControl && c.fanLevels.length > 0) out.push({ id: "fan", group: t("Fan"), options: c.fanLevels.map((f) => ({ key: `fan:${f}`, label: actionLabel({ kind: "set_fan", fanLevel: f }, t), short: t(fanWord[f] ?? f) })) });
   if (c.ventilation && c.ventilationLevels?.length) out.push({ id: "vent", group: t("Ventilation"), options: c.ventilationLevels.map((l) => ({ key: `vent:${l}`, label: actionLabel({ kind: "ventilate", level: l }, t), short: t(fanWord[l] ?? l) })) });
   return out;
 }
 
 /** The setting an action key changes (`temp:24` → temp). */
 export function actionGroupOf(key: string): string {
-  return key.split(":")[0];
+  return key.split(":", 1)[0];
 }
 
 /** The action to start from when the setting is switched to `id`: 24 °C for temperature when the AC offers it (else the
- * middle of its range), otherwise the first value. Empty when the AC has no such setting. */
+middle of its range), otherwise the first value. Empty when the AC has no such setting. */
 export function firstAction(groups: ActionGroup[], id: string): string {
   const g = groups.find((x) => x.id === id);
   if (!g || g.options.length === 0) return "";
@@ -322,15 +334,20 @@ export function summaryText(d: Draft, unit: string, place: string, t: T = en): s
   const set = (k: string) => {
     const a = actionOf(k);
     switch (a.kind) {
-      case "set_power": return t(a.power ? "{unit} power ON" : "{unit} power OFF", { unit });
-      case "set_temperature": return t("set {unit} to {value}", { unit, value: `${a.celsius}°C` });
-      case "set_mode": return t("set {unit} to {value}", { unit, value: t("mode {mode}", { mode: (modeWord[a.mode] ? t(modeWord[a.mode]) : a.mode).toLowerCase() }) });
-      case "set_fan": return t("set {unit} to {value}", { unit, value: t("fan {level}", { level: (fanWord[a.fanLevel] ? t(fanWord[a.fanLevel]) : a.fanLevel).toLowerCase() }) });
-      case "ventilate": return t("set {unit} to {value}", { unit, value: t("ventilation {level}", { level: (fanWord[a.level] ? t(fanWord[a.level]) : a.level).toLowerCase() }) });
+      case "set_power": { return t(a.power ? "{unit} power ON" : "{unit} power OFF", { unit });
+      }
+      case "set_temperature": { return t("set {unit} to {value}", { unit, value: `${a.celsius}°C` });
+      }
+      case "set_mode": { return t("set {unit} to {value}", { unit, value: t("mode {mode}", { mode: (modeWord[a.mode] ? t(modeWord[a.mode]) : a.mode).toLowerCase() }) });
+      }
+      case "set_fan": { return t("set {unit} to {value}", { unit, value: t("fan {level}", { level: (fanWord[a.fanLevel] ? t(fanWord[a.fanLevel]) : a.fanLevel).toLowerCase() }) });
+      }
+      case "ventilate": { return t("set {unit} to {value}", { unit, value: t("ventilation {level}", { level: (fanWord[a.level] ? t(fanWord[a.level]) : a.level).toLowerCase() }) });
+      }
     }
   };
   if (d.trigger === "schedule") {
-    const days = d.weekdays.length ? weekdaysText(d.weekdays, true, t) : t("no weekday");
+    const days = d.weekdays.length > 0 ? weekdaysText(d.weekdays, true, t) : t("no weekday");
     return t(d.endsNextDay ? "When {days} at {start} → {startAction}. At {end} (next day) → {endAction}.{onlyIf}" : "When {days} at {start} → {startAction}. At {end} → {endAction}.{onlyIf}",
       { days, start: d.startLocal, startAction: set(d.startAction), end: d.endLocal, endAction: set(d.endAction), onlyIf: onlyIfSummary(d, t) });
   }
@@ -340,7 +357,7 @@ export function summaryText(d: Draft, unit: string, place: string, t: T = en): s
 }
 function onlyIfSummary(d: Draft, t: T): string {
   const xs = fitExtras(d).filter((x) => x.type !== "weather" || x.value.trim() !== "").map((x) => extraText(extraOf(x), t));
-  return xs.length ? t(" Only if {conditions}.", { conditions: xs.join(t(" and ")) }) : "";
+  return xs.length > 0 ? t(" Only if {conditions}.", { conditions: xs.join(t(" and ")) }) : "";
 }
 export const summaryNote: Record<Trigger, string> = {
   schedule: "Weekdays are the start day. At run time the automation is re-checked (permissions, capabilities, restrictions).",
@@ -351,7 +368,7 @@ export const summaryNote: Record<Trigger, string> = {
 };
 
 /** One row of the test result (Figma 03c). */
-export type TestRow = { at: string; title: string; detail: string; tone: "ok" | "muted" };
+export interface TestRow { at: string; title: string; detail: string; tone: "ok" | "muted" }
 /** The schedule test: the next start and end from the preview and the first following day that is not selected. */
 export function scheduleTest(runs: ApiOccurrence[], d: Draft, unit: string, i: I18n = EN): TestRow[] {
   const { t } = i;
@@ -393,15 +410,19 @@ export function eventTest(dec: ApiDecision | undefined, ruleId: string | null, n
 /** The synthetic fact a test sends for an event rule (Phase 1A demo events; the action adds the AC and the tick). */
 export function testFact(d: Draft): Omit<OpInput<"automations.simulate">["facts"][number], "unitId" | "observedAt">[] {
   switch (d.trigger) {
-    case "location": return [{ metric: "location", value: d.event as "arrival" | "departure", unit: "event", quality: "valid" }];
-    case "presence": return [{ metric: "occupied", value: d.occupied, unit: "boolean", quality: "valid" }];
-    case "weather": return [{ metric: "weather_temperature", value: Number(d.value), unit: "°C", quality: "valid" }];
-    default: return []; // a routine matches only at its local time (IR52)
+    case "location": { return [{ metric: "location", value: d.event as "arrival" | "departure", unit: "event", quality: "valid" }];
+    }
+    case "presence": { return [{ metric: "occupied", value: d.occupied, unit: "boolean", quality: "valid" }];
+    }
+    case "weather": { return [{ metric: "weather_temperature", value: Number(d.value), unit: "°C", quality: "valid" }];
+    }
+    default: { return []; // a routine matches only at its local time (IR52)
+    }
   }
 }
 
 /** The location consent card (Figma 03a/03f); its times in the user's display time zone (IR44). A withdrawal warns only
- * when it turned location automations off; otherwise the card is plain (IR619). */
+when it turned location automations off; otherwise the card is plain (IR619). */
 export function consentCard(c: ApiConsent | null, locationRules: number, disabledByConsent: number, i: I18n = EN): { granted: boolean; title: string; text: string; tone: "ok" | "warn" | "muted" } {
   const { t } = i;
   if (!c) return { granted: false, title: t("Not recorded"), text: t("No location consent record exists for your account — location automations cannot be used."), tone: "muted" };

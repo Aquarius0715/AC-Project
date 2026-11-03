@@ -12,6 +12,7 @@ import { signIn } from "../../fixtures/auth";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
 let context: BrowserContext | null = null, tech: Page | null = null, zoneBefore: string | null = null;
+
 test.afterEach(async () => {
   if (tech && zoneBefore) await setDisplay(tech, ENGLISH, zoneBefore);
   await context?.close();

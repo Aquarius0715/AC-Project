@@ -12,7 +12,7 @@ import { useT } from "@ac/web/components/I18n";
 import { disableTwoFactor, enableTwoFactor, savePreferences } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 
-export type PreferencesLive = {
+export interface PreferencesLive {
   prefs: { locale: "en" | "ms"; timezone: string; currency: "MYR"; monthlyReportEmail: boolean; twoFactorEnabled: boolean };
   twoFactor: { enabled: boolean; enabledAt: string | null; recoveryCodesLeft: number | null; setupKey: string | null };
   consent: Consent | null;
@@ -20,11 +20,11 @@ export type PreferencesLive = {
   hq: boolean; // HQ's sign-in always asks for the one-time code (DEC-85, IR510): nothing to turn on or off here
   zones: { id: string; label: string }[];
   qr: QrPath | null; // the setup key as an authenticator QR code while two-step verification is off
-};
+}
 
 /** Preferences (FR-X01, FR-X08, DDC-07, Figma Client 10d/10g) from the Core API: language and time zone of the user,
- * for a client the location consent and the monthly energy report e-mail (BR-C16), two-step verification; the
- * microphone switch stays on this device. */
+for a client the location consent and the monthly energy report e-mail (BR-C16), two-step verification; the
+microphone switch stays on this device. */
 export function PreferencesView({ live }: { live: PreferencesLive }) {
   const t = useT();
   const [pending, run] = useAction();
@@ -32,14 +32,16 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
   const [zone, setZone] = useState(live.prefs.timezone);
   const [location, setLocation] = useState(live.consent?.granted ?? false);
   const [monthly, setMonthly] = useState(live.prefs.monthlyReportEmail);
-  const mic = useStoredValue(MICROPHONE) !== "off";
+  const isMic = useStoredValue(MICROPHONE) !== "off";
   const [modal, setModal] = useState<null | "on" | "off">(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const consentChanged = live.client && location !== (live.consent?.granted ?? false);
-  const dirty = locale !== live.prefs.locale || zone !== live.prefs.timezone || consentChanged || (live.client && monthly !== live.prefs.monthlyReportEmail);
+  const isConsentChanged = live.client && location !== (live.consent?.granted ?? false);
+  const isDirty = locale !== live.prefs.locale || zone !== live.prefs.timezone || isConsentChanged || (live.client && monthly !== live.prefs.monthlyReportEmail);
   // monthlyReportEmail only from a client session (preferences.update refuses it otherwise, IR142 item 5)
-  const save = () => run(() => savePreferences({ locale, timezone: zone, ...(live.client ? { monthlyReportEmail: monthly } : {}) }, consentChanged ? { granted: location, version: live.consent?.version ?? 0 } : null), t("Preferences saved"),
-    () => setFailed(null), (f) => setFailed(actionMessage(f, t)));
+  const save = () => {
+    run(() => savePreferences({ locale, timezone: zone, ...(live.client && { monthlyReportEmail: monthly }) }, isConsentChanged ? { granted: location, version: live.consent?.version ?? 0 } : null), t("Preferences saved"),
+      () => { setFailed(null); }, (f) => { setFailed(actionMessage(f, t)); });
+  };
   const reset = () => { setLocale(live.prefs.locale); setZone(live.prefs.timezone); setLocation(live.consent?.granted ?? false); setMonthly(live.prefs.monthlyReportEmail); setFailed(null); };
   const tf = live.twoFactor;
   return (
@@ -51,7 +53,7 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
         </Field>
         <div className="my-4 border-t border-line" />
         <Field label={t("Display timezone")} hint={t("Booked times keep their meaning across timezone changes.")}>
-          <Select value={zone} onChange={(e) => setZone(e.target.value)}>{live.zones.map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}</Select>
+          <Select value={zone} onChange={(e) => { setZone(e.target.value); }}>{live.zones.map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}</Select>
         </Field>
         <div className="mt-4"><Field label={t("Currency")} hint={t("Invoices keep their own currency — nothing is converted.")}><div className="flex items-center justify-between rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] text-muted-foreground">{t("MYR — Malaysian Ringgit")} <span className="text-[11px]">{t("read-only demo")}</span></div></Field></div>
         <div className="my-4 border-t border-line" />
@@ -59,7 +61,7 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
           <div className="flex flex-col gap-3">
             <div className="text-[13px] font-semibold">{t("Consent")}</div>
             <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Location, for voice room disambiguation and location automations")}</div><div className="text-xs text-muted-foreground">{t("{when} · withdrawal turns off location automations and discards pending voice requests", { when: consentNote(live.consent, t) })}</div></div><Toggle on={location} onChange={setLocation} label={t("Location consent")} /></div>
-            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Microphone, for voice actions (this device)")}</div><div className="text-xs text-muted-foreground">{t("Text input always available as a fallback")}</div></div><Toggle on={mic} onChange={(v) => setStoredValue(MICROPHONE, v ? "on" : "off")} label={t("Microphone consent")} /></div>
+            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Microphone, for voice actions (this device)")}</div><div className="text-xs text-muted-foreground">{t("Text input always available as a fallback")}</div></div><Toggle on={isMic} onChange={(v) => { setStoredValue(MICROPHONE, v ? "on" : "off"); }} label={t("Microphone consent")} /></div>
             <div className="mt-1 text-[13px] font-semibold">{t("Reports")}</div>
             <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Email me the monthly energy report (1st of each month)")}</div><div className="text-xs text-muted-foreground">{t("Last month's report, to your account e-mail · also set from Energy & cost › Export report")}</div></div><Toggle on={monthly} onChange={setMonthly} label={t("Monthly energy report e-mail")} /></div>
           </div>
@@ -73,15 +75,15 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
           <>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <div><div className="text-[13px] font-semibold">{t("Security · Two-step verification")}</div><div className="text-xs text-muted-foreground">{t("Ask for a 6-digit code from an authenticator app when signing in on a new device")}{tf.enabled && tf.recoveryCodesLeft !== null ? t(" · {n} recovery codes left", { n: tf.recoveryCodesLeft }) : ""}.</div></div>
-              <span className="flex items-center gap-2">{tf.enabled ? <><Badge tone="ok">{t("On")}</Badge><Btn size="sm" onClick={() => setModal("off")}>{t("Turn off")}</Btn></> : <><Badge>{t("Off")}</Badge><Btn size="sm" variant="primary" onClick={() => setModal("on")}>{t("Turn on")}</Btn></>}</span>
+              <span className="flex items-center gap-2">{tf.enabled ? <><Badge tone="ok">{t("On")}</Badge><Btn size="sm" onClick={() => { setModal("off"); }}>{t("Turn off")}</Btn></> : <><Badge>{t("Off")}</Badge><Btn size="sm" variant="primary" onClick={() => { setModal("on"); }}>{t("Turn on")}</Btn></>}</span>
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">{t("Demo only — any 6 digits are accepted and the demo sign-in is unchanged.")}</p>
           </>
         )}
-        <div className="mt-5 flex justify-end gap-2"><Btn disabled={!dirty || pending} onClick={reset}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!dirty || pending} onClick={save}><Icon name="check" />{t("Save preferences")}</Btn></div>
+        <div className="mt-5 flex justify-end gap-2"><Btn disabled={!isDirty || pending} onClick={reset}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!isDirty || pending} onClick={save}><Icon name="check" />{t("Save preferences")}</Btn></div>
       </Card>
-      {modal === "on" && <TurnOn setupKey={tf.setupKey} qr={live.qr} onClose={() => setModal(null)} />}
-      {modal === "off" && <TurnOff onClose={() => setModal(null)} />}
+      {modal === "on" && <TurnOn setupKey={tf.setupKey} qr={live.qr} onClose={() => { setModal(null); }} />}
+      {modal === "off" && <TurnOff onClose={() => { setModal(null); }} />}
     </Page>
   );
 }
@@ -93,7 +95,7 @@ function TurnOn({ setupKey, qr, onClose }: { setupKey: string | null; qr: QrPath
   const [codes, setCodes] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   return (
-    <Modal open onClose={onClose} title={t("Turn on two-step verification")} footer={codes ? <Btn variant="primary" onClick={onClose}>{t("I saved my codes")}</Btn> : <><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!codeComplete(code) || pending} onClick={() => run(() => enableTwoFactor(code), t("Two-step verification is on"), (c) => setCodes(c), (f) => setError(actionMessage(f, t)))}>{t("Verify & turn on")}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Turn on two-step verification")} footer={codes ? <Btn variant="primary" onClick={onClose}>{t("I saved my codes")}</Btn> : <><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!codeComplete(code) || pending} onClick={() => { run(() => enableTwoFactor(code), t("Two-step verification is on"), (c) => { setCodes(c); }, (f) => { setError(actionMessage(f, t)); }); }}>{t("Verify & turn on")}</Btn></>}>
       {codes ? <><Banner tone="ok">{t("Two-step verification is on. Save these {n} recovery codes — they are shown only once.", { n: codes.length })}</Banner><div className="grid grid-cols-2 gap-2 font-mono text-sm">{codes.map((c) => <span key={c} className="rounded-lg bg-surface2 px-3 py-1.5">{c}</span>)}</div></> : <div className="flex flex-col gap-3.5">
         <div className="flex flex-col gap-5 sm:flex-row">
           <div className="grid h-[150px] w-[150px] shrink-0 place-items-center rounded-lg border border-line bg-white p-2">{qr ? <QrCode qr={qr} label={t("QR code with the setup key for an authenticator app")} className="h-full w-full" /> : <span className="text-xs text-muted-foreground">{t("No setup key")}</span>}</div>
@@ -118,7 +120,7 @@ function TurnOff({ onClose }: { onClose: () => void }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   return (
-    <Modal open onClose={onClose} title={t("Turn off two-step verification")} footer={<><Btn onClick={onClose}>{t("Keep it on")}</Btn><Btn variant="danger" disabled={!codeComplete(code) || pending} onClick={() => run(() => disableTwoFactor(code), t("Two-step verification turned off"), onClose, (f) => setError(actionMessage(f, t)))}>{t("Turn off")}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Turn off two-step verification")} footer={<><Btn onClick={onClose}>{t("Keep it on")}</Btn><Btn variant="danger" disabled={!codeComplete(code) || pending} onClick={() => { run(() => disableTwoFactor(code), t("Two-step verification turned off"), onClose, (f) => { setError(actionMessage(f, t)); }); }}>{t("Turn off")}</Btn></>}>
       <Field label={t("Enter a 6-digit code from your authenticator app")}><CodeInput label={t("6-digit code")} value={code} onChange={setCode} autoFocus /></Field>
       {error && <p className="mt-2 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{error}</p>}
     </Modal>

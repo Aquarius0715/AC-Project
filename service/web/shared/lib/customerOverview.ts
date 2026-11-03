@@ -50,10 +50,10 @@ export function previousRange(p: { from: string; to: string }): { from: string; 
 const latestOf = (u: OverviewUnit, metric: string) => u.latestMeasurements.find((m) => m.metric === metric);
 const current = (m?: ApiMeasurement) => (m && m.quality === "valid" && m.value !== null ? m.value : null);
 
-export type OverviewRow = {
+export interface OverviewRow {
   id: string; name: string; place: string; observed: string; temp: string | null; hum: string | null; power: string | null;
   state: "running" | "stopped" | "unknown"; conn: "online" | "offline" | "connecting" | "unknown" | "error";
-};
+}
 /** One row per unit: the latest valid room temperature, humidity and power (W); missing readings stay empty. */
 export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => string, i: I18n = EN): OverviewRow[] {
   return units.map((u) => {
@@ -65,46 +65,46 @@ export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => 
       observed: u.connection === "online" ? (last ? showClock(last, i.display) : i.t("no reading yet")) : i.t("last seen {when}", { when: u.lastSeenAt ? showTime(u.lastSeenAt, i.display) : i.t("never") }),
       temp: current(t) === null ? null : airNumber("temperature", current(t)!), hum: current(h) === null ? null : airNumber("humidity", current(h)!),
       power: watts === null ? null : String(watts),
-      state: u.effectivePowerState === "on" ? "running" : u.effectivePowerState === "off" ? "stopped" : "unknown", conn: u.connection,
+      state: u.effectivePowerState === "on" ? "running" : (u.effectivePowerState === "off" ? "stopped" : "unknown"), conn: u.connection,
     };
   });
 }
 
-export type EnergyCard = { sub: string; total: string | null; delta: { text: string; icon: IconName; tone: "ok" | "warn" } | null; labels: string[]; series: number[][]; gaps: boolean };
+export interface EnergyCard { sub: string; total: string | null; delta: { text: string; icon: IconName; tone: "ok" | "warn" } | null; labels: string[]; series: number[][]; gaps: boolean }
 const previousName: Record<OverviewPeriod, string> = { today: "yesterday at this time", "7d": "the 7 days before", "30d": "the 30 days before" };
 /** The energy card: the period's kWh and its change against the previous period; bars for the last 7 days (dark)
- * against the 7 days before (light). A missing value is never a 0 kWh total. */
+against the 7 days before (light). A missing value is never a 0 kWh total. */
 export function energyCard(kind: OverviewPeriod, cur: ApiEnergySummary | null, prev: ApiEnergySummary | null, week: { label: string; kWh: number | null }[], before: (number | null)[], scope: string, i: I18n = EN): EnergyCard {
   const total = cur?.totals.kWh ?? null;
   const was = prev?.totals.kWh ?? null;
   const delta = total !== null && was !== null && was > 0 ? Math.round(((total - was) / was) * 100) : null;
   return {
     sub: `${i.t(periodLabel[kind])} · ${scope}`, total: total === null ? null : one(total),
-    delta: delta === null ? null : { text: i.t("{pct}% vs {previous} ({kWh} kWh)", { pct: Math.abs(delta), previous: i.t(previousName[kind]), kWh: one(was!) }), icon: delta < 0 ? "arrowDown" : delta > 0 ? "arrowUp" : "remove", tone: delta <= 0 ? "ok" : "warn" },
-    labels: week.map((d) => d.label), series: [before.map((v) => v ?? 0), week.map((d) => d.kWh ?? 0)], gaps: week.some((d) => d.kWh === null) || before.some((v) => v === null),
+    delta: delta === null ? null : { text: i.t("{pct}% vs {previous} ({kWh} kWh)", { pct: Math.abs(delta), previous: i.t(previousName[kind]), kWh: one(was!) }), icon: delta < 0 ? "arrowDown" : (delta > 0 ? "arrowUp" : "remove"), tone: delta <= 0 ? "ok" : "warn" },
+    labels: week.map((d) => d.label), series: [before.map((v) => v ?? 0), week.map((d) => d.kWh ?? 0)], gaps: week.some((d) => d.kWh === null) || before.includes(null),
   };
 }
 
-export type EmissionsCard = { total: string | null; factor: string | null; baseline: string | null; saved: string | null };
+export interface EmissionsCard { total: string | null; factor: string | null; baseline: string | null; saved: string | null }
 /** Estimated emissions of the period (the factor of energy.summary) and, with a comparable baseline, its emissions and
- * the estimated saving — an estimate, never a tradable balance. */
+the estimated saving — an estimate, never a tradable balance. */
 export function emissionsCard(cur: ApiEnergySummary | null, baselineLabel: string | null, i: I18n = EN): EmissionsCard {
   const e = cur?.totals.emissionsKg ?? null;
   const saved = cur?.totals.savedEmissionsKg ?? null;
   const f = cur?.factorSnapshot ?? null;
   return {
     total: e === null ? null : one(e), factor: f ? i.t("{region} {year} · {factor} kgCO₂e/kWh (demo factor)", { region: f.region, year: f.year, factor: f.kgCO2ePerKWh }) : null,
-    baseline: e !== null && saved !== null ? `${one(e + saved)} kgCO₂e${baselineLabel ? ` (${baselineLabel})` : ""}` : null, saved: saved === null ? null : `${one(saved)} kgCO₂e`,
+    baseline: e === null || saved === null ? null : `${one(e + saved)} kgCO₂e${baselineLabel ? ` (${baselineLabel})` : ""}`, saved: saved === null ? null : `${one(saved)} kgCO₂e`,
   };
 }
 
 /** “today 9:12 am MYT”, “yesterday 10:40 pm MYT”, else the date and time — in the user's display time zone (IR260). */
 export const whenText = (iso: string, nowMs: number, i: I18n = EN) => relativeTime(iso, nowMs, i);
 
-export type AttentionCard = { items: { id: string; title: string; severity: "critical" | "warning"; where: string }[]; more: number; info: { count: number; text: string } };
+export interface AttentionCard { items: { id: string; title: string; severity: "critical" | "warning"; where: string }[]; more: number; info: { count: number; text: string } }
 const rank = { critical: 0, warning: 1, normal: 2 };
 /** Needs attention: the unresolved critical and warning alerts of the units shown, most severe and newest first (IR51);
- * unresolved information (normal severity) is counted separately and never in the attention count. */
+unresolved information (normal severity) is counted separately and never in the attention count. */
 export function attentionCard(alerts: ApiAlert[], units: OverviewUnit[], nowMs: number, max = 3, i: I18n = EN): AttentionCard {
   const names = new Map(units.map((u) => [u.id, u.displayName]));
   const open = alerts.filter((a) => names.has(a.unitId) && a.status !== "resolved");
@@ -118,7 +118,7 @@ export function attentionCard(alerts: ApiAlert[], units: OverviewUnit[], nowMs: 
 }
 
 /** The air card's 24 points: the hourly averages of the valid CO2 readings of the last 24 hours, whole (bucketMinutes 60,
- * IR607), rounded; an hour without a valid reading stays empty. */
+IR607), rounded; an hour without a valid reading stays empty. */
 export const bucketPoints = (buckets: { value: number | null }[]): (number | null)[] => buckets.map((b) => (b.value === null ? null : Math.round(b.value)));
 
 /** “today 6:00 pm MYT”, “tomorrow 7:30 am MYT”, else the date and time — the next run of a schedule rule (IR260). */

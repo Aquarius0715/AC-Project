@@ -12,18 +12,22 @@ const names: Names = {
   people: new Map([["m-int", "tech-internal-a"], ["m-ext", "tech-external-a"]]), orgs: new Map([["org-c", "Demo Contractor A"]]),
 };
 const unitOrg = new Map([["u1", "org-a"]]);
-const row = (over: Record<string, unknown>) => ({
-  projection: "summary", id: "job-1-aaaa", version: 3, unitId: "u1", type: "reactive", status: "requested", dueAt: "2026-09-22T04:00:00Z", requestedSlot: slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"),
-  scheduledSlot: null, assignmentId: null, origin: "client_request", preferredSlots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z")],
-  severity: "normal", displayStatus: "requested", assignmentAcknowledgement: null, technicianMembershipId: null, accessValidFrom: null, accessValidUntil: null,
-  createdAt: "2026-09-18T01:00:00Z", followUpOfJobId: null, followUpClass: null, ...over,
-}) as unknown as ApiHqRow;
-const job = (over: Record<string, unknown>) => ({
-  projection: "detail", id: "job-1-aaaa", version: 4, unitId: "u1", type: "reactive", status: "requested", symptom: "Water dripping", contactWindow: "9:00–18:00", origin: "client_request", planId: null, occurrenceAt: null,
-  requestedSlot: slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), preferredSlots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z")], preferenceRound: 1,
-  slotProposal: null, partnerSlotProposal: null, scheduledSlot: null, dueAt: "2026-09-22T04:00:00Z", startedAt: null, completedAt: null, contractorOrgId: null, createdAt: "2026-09-18T01:00:00Z",
-  followUpOfJobId: null, followUpClass: null, assignment: null, offer: null, reportRefs: [], draftReportRef: null, costs: [], ...over,
-}) as unknown as ApiHqJob;
+const row = (over: Record<string, unknown>) => {
+  return ({
+    projection: "summary", id: "job-1-aaaa", version: 3, unitId: "u1", type: "reactive", status: "requested", dueAt: "2026-09-22T04:00:00Z", requestedSlot: slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"),
+    scheduledSlot: null, assignmentId: null, origin: "client_request", preferredSlots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z")],
+    severity: "normal", displayStatus: "requested", assignmentAcknowledgement: null, technicianMembershipId: null, accessValidFrom: null, accessValidUntil: null,
+    createdAt: "2026-09-18T01:00:00Z", followUpOfJobId: null, followUpClass: null, ...over,
+  }) as unknown as ApiHqRow;
+};
+const job = (over: Record<string, unknown>) => {
+  return ({
+    projection: "detail", id: "job-1-aaaa", version: 4, unitId: "u1", type: "reactive", status: "requested", symptom: "Water dripping", contactWindow: "9:00–18:00", origin: "client_request", planId: null, occurrenceAt: null,
+    requestedSlot: slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), preferredSlots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z")], preferenceRound: 1,
+    slotProposal: null, partnerSlotProposal: null, scheduledSlot: null, dueAt: "2026-09-22T04:00:00Z", startedAt: null, completedAt: null, contractorOrgId: null, createdAt: "2026-09-18T01:00:00Z",
+    followUpOfJobId: null, followUpClass: null, assignment: null, offer: null, reportRefs: [], draftReportRef: null, costs: [], ...over,
+  }) as unknown as ApiHqJob;
+};
 
 describe("HQ maintenance jobs", () => {
   it("builds the filters of the scope and the filter bar", () => {
@@ -80,7 +84,7 @@ describe("HQ maintenance jobs", () => {
     expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { startAt: "errors.slot_not_agreed" } })).toBe("Start at: only one of the client’s preferred times (or an accepted proposal) can be booked");
     // in Malay, with the field named in words; every refusal text has a Malay entry (IR493)
     expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { contactWindow: "error.length" } }, translator("ms"))).toBe("Contact window: sehingga 200 aksara");
-    expect(hqRefusal({ code: "CONFLICT", messageKey: "errors.proposal_pending", fieldErrors: {} }, translator("ms"))).toBe(`${ms["Not saved: {reason}."].replace("{reason}", ms["a proposal is already waiting for the client — withdraw it first"])}`);
+    expect(hqRefusal({ code: "CONFLICT", messageKey: "errors.proposal_pending", fieldErrors: {} }, translator("ms"))).toBe(ms["Not saved: {reason}."].replace("{reason}", ms["a proposal is already waiting for the client — withdraw it first"]));
     expect(HQ_REFUSAL_KEYS.filter((k) => !(k in ms))).toEqual([]);
     expect(hqRefusal({ code: "CONFLICT", messageKey: "errors.proposal_pending", fieldErrors: {} })).toBe("Not saved: a proposal is already waiting for the client — withdraw it first.");
     expect(hqRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} })).toBe("The job no longer exists in your scope.");

@@ -29,18 +29,18 @@ export default async function CustomerPropertiesPage({ searchParams }: PageProps
   const tree = locationTree(properties, spaces, units, properties[0]?.customerOrgId ?? "");
   const powerState = powerStates.find((p) => p === one("powerState"));
   const conns = (one("connections") ?? "").split(",").filter((c): c is Connection => (connections as string[]).includes(c));
-  const filtered = !one("spaceId") && !one("propertyId") && (!!powerState || conns.length > 0);
+  const isFiltered = !one("spaceId") && !one("propertyId") && (!!powerState || conns.length > 0);
   const sel = one("spaceId") ? selection(tree, one("spaceId"), spaces)
-    : one("unassignedOnly") === "true" && one("propertyId") ? selection(tree, `unassigned:${one("propertyId")}`, spaces)
-    : selection(tree, one("propertyId"), spaces);
+    : (one("unassignedOnly") === "true" && one("propertyId") ? selection(tree, `unassigned:${one("propertyId")}`, spaces)
+    : selection(tree, one("propertyId"), spaces));
   // the units whose detail the panel needs: the KPI filter, a room / area (descendants included) or the property's unassigned units
-  const shown = filtered ? filterUnits(units, { powerState, connections: conns, search: "" })
-    : !sel ? [] : sel.kind === "property" ? units.filter((u) => u.propertyId === sel.property.id && u.spaceId === null) : unitsAt(sel, units);
+  const shown = isFiltered ? filterUnits(units, { powerState, connections: conns, search: "" })
+    : sel ? sel.kind === "property" ? units.filter((u) => u.propertyId === sel.property.id && u.spaceId === null) : unitsAt(sel, units) : [];
   const details = await Promise.all(shown.map((u) => coreOp<ApiUnitDetail>("units.get", { id: u.id })));
   const place = (u: ApiUnitRow) => [tree.find((p) => p.id === u.propertyId)?.name ?? "", spacePath(u.spaceId, spaces)].filter(Boolean).join(" › ");
   const p = sel?.property;
   const live: PropertiesLive = {
-    tree, selection: sel, owner: me.clientRole === "owner", filter: filtered ? { powerState: powerState ?? null, connections: conns, total: units.length } : null,
+    tree, selection: sel, owner: me.clientRole === "owner", filter: isFiltered ? { powerState: powerState ?? null, connections: conns, total: units.length } : null,
     units: roomUnits(details, i).map((r) => ({ ...r, place: place(units.find((u) => u.id === r.id)!) })), details,
     summary: p ? {
       kind: p.kind, floors: flatten(p.spaces).filter((s) => s.kind === "floor").map((s) => s.name), rooms: p.rooms, inRooms: p.units - p.unassigned, unassigned: p.unassigned,

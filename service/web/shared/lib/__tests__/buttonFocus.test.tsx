@@ -26,7 +26,7 @@ describe("a button disabled while it has the focus", () => {
   it("keeps the focus, marked aria-disabled, and ignores further presses", () => {
     render(<Pending />);
     const save = screen.getByRole("button", { name: "Save" });
-    act(() => save.focus());
+    act(() => { save.focus(); });
     fireEvent.click(save);
     expect(document.activeElement).toBe(save);
     expect([save.getAttribute("aria-disabled"), save.hasAttribute("disabled")]).toEqual(["true", false]);
@@ -37,9 +37,9 @@ describe("a button disabled while it has the focus", () => {
   it("is natively disabled again once the focus moves on, and so is a button disabled without it", () => {
     render(<Pending />);
     const save = screen.getByRole("button", { name: "Save" });
-    act(() => save.focus());
+    act(() => { save.focus(); });
     fireEvent.click(save);
-    act(() => screen.getByRole("button", { name: "Next" }).focus());
+    act(() => { screen.getByRole("button", { name: "Next" }).focus(); });
     expect(save.hasAttribute("disabled")).toBe(true);
     expect(screen.getByRole("button", { name: "Idle" }).hasAttribute("disabled")).toBe(true);
   });

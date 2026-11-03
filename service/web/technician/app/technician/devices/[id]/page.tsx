@@ -13,9 +13,9 @@ export default async function TechnicianDeviceEventsPage({ params }: PageProps<"
   const { id } = await params;
   await connection();
   if (!apiMode()) return <DevicesView initial={id} />;
-  const live = await loadDevices({ selected: id, events: true }).catch((e) => {
-    if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN")) notFound();
-    throw e;
+  const live = await loadDevices({ selected: id, events: true }).catch((error) => {
+    if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) notFound();
+    throw error;
   });
   if (live.device?.detail.id !== id) notFound(); // not one of the technician's devices
   return <TechDevicesView live={live} />;

@@ -22,11 +22,10 @@ const statusTone: Record<JobStatus, Parameters<typeof Badge>[0]["tone"]> = {
 const statusIcon: Record<JobStatus, IconName> = { requested: "requested", time_proposed: "proposed", offered: "offered", accepted: "accepted", assigned: "assigned", in_progress: "inProgress", submitted: "submitted", rework_requested: "rework", completed: "completed", cancelled: "cancelled", on_hold: "paused" };
 // A client sees one word for a booked visit: offered, accepted and assigned all read "Scheduled", like the tab they
 // are listed under and the request dialog's "you will see “Scheduled” once a time is confirmed" (IR574).
-const SCHEDULED: JobStatus[] = ["offered", "accepted", "assigned"];
+const SCHEDULED = new Set<JobStatus>(["offered", "accepted", "assigned"]);
 export function JobStatusBadge({ s, client }: { s: JobStatus; client?: boolean }) {
   const t = useT();
-  if (client && SCHEDULED.includes(s)) return <Badge tone="primary" icon="assigned">{t("Scheduled")}</Badge>;
-  return <Badge tone={statusTone[s]} icon={statusIcon[s]}>{t(statusLabel[s])}</Badge>;
+  return client && SCHEDULED.has(s) ? <Badge tone="primary" icon="assigned">{t("Scheduled")}</Badge> : <Badge tone={statusTone[s]} icon={statusIcon[s]}>{t(statusLabel[s])}</Badge>;
 }
 
 export const RANKS = ["1st", "2nd", "3rd"];
@@ -39,15 +38,15 @@ export const WINDOWS = ["09:00–11:00", "10:00–12:00", "13:00–15:00", "14:0
 
 /** Three preferred times (1st = most preferred). Used by the request, decline and reschedule dialogs. */
 export function PreferredSlotsInput({ value, onChange, error, label = "Preferred times — give 3 options (1st = most preferred)", hint }: { value: Slot[]; onChange: (v: Slot[]) => void; error?: string; label?: string; hint?: string }) {
-  const set = (i: number, p: Partial<Slot>) => onChange(value.map((s, k) => (k === i ? { ...s, ...p } : s)));
+  const set = (i: number, p: Partial<Slot>) => { onChange(value.map((s, k) => (k === i ? { ...s, ...p } : s))); };
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="mb-1 text-xs font-semibold text-ink">{label}</legend>
       {value.map((s, i) => (
         <div key={i} className="flex items-center gap-2">
           <Rank i={i} />
-          <Input type="date" aria-label={`${RANKS[i]} preferred date`} value={s.date} onChange={(e) => set(i, { date: e.target.value })} className="min-w-0 flex-1" />
-          <Select aria-label={`${RANKS[i]} preferred window`} value={s.win} onChange={(e) => set(i, { win: e.target.value })} className="min-w-0 flex-1">{WINDOWS.map((w) => <option key={w}>{w}</option>)}</Select>
+          <Input type="date" aria-label={`${RANKS[i]} preferred date`} value={s.date} onChange={(e) => { set(i, { date: e.target.value }); }} className="min-w-0 flex-1" />
+          <Select aria-label={`${RANKS[i]} preferred window`} value={s.win} onChange={(e) => { set(i, { win: e.target.value }); }} className="min-w-0 flex-1">{WINDOWS.map((w) => <option key={w}>{w}</option>)}</Select>
         </div>
       ))}
       {error ? <span className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{error}</span> : <span className="text-[11px] text-muted-foreground">{hint ?? "3 different times, at least 1 day ahead. HQ books one of them. If none can be met, HQ proposes another time — you accept or decline it."}</span>}

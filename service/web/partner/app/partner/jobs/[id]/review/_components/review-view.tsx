@@ -14,7 +14,7 @@ import { focusField } from "@ac/web/lib/focusField";
 import { reviewReport } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 
-export type ReviewLive = {
+export interface ReviewLive {
   job: { id: string; version: number; status: string; type: string; unit: string | null };
   reviewer: string;
   report: null | {
@@ -23,17 +23,18 @@ export type ReviewLive = {
     photos: { id: string; name: string; url: string }[]; timeOnSite: string; evidence: EvidenceRow[]; acceptable: boolean; missing: string[]; allowed: boolean; blocked: string | null;
     versions: VersionRow[]; last: { decision: "accept" | "return"; version: number; reason: string | null } | null; rework: ReworkItem[];
   };
-};
+}
 
-const refusal = (f: ActionFailure, t: T): string | null =>
-  f.code === "CONFLICT" ? t("This report version was already accepted or returned, or the job changed in the meantime; the page shows the latest state.")
+const refusal = (f: ActionFailure, t: T): string | null => {
+  return f.code === "CONFLICT" ? t("This report version was already accepted or returned, or the job changed in the meantime; the page shows the latest state.")
     : f.code === "FORBIDDEN" ? t("A contributor to this report version cannot approve it, or your company does not hold this delegation.")
     : f.code === "NOT_FOUND" ? t("This job is outside your company’s delegation.") : null;
+};
 const dot: Record<EvidenceRow["tone"], string> = { ok: "bg-ok", warn: "bg-warn", muted: "bg-line" };
 
 /** Quality review of a submitted report (FR-P05): the technician's evidence, the DD-P05 evidence check, accept or
- * return with a reason; the reviewer never edits the original records and cannot approve their own contribution.
- * Texts in the user's display language; the times come formatted from the loader (IR274). */
+return with a reason; the reviewer never edits the original records and cannot approve their own contribution.
+Texts in the user's display language; the times come formatted from the loader (IR274). */
 export function ReviewView({ live }: { live: ReviewLive }) {
   const t = useT();
   const [pending, run] = useAction();
@@ -51,17 +52,17 @@ export function ReviewView({ live }: { live: ReviewLive }) {
   const items = ticked ?? r.rework.filter((x) => x.checked).map((x) => x.label);
   // the ticked items lead the reason the technician reads, as on HQ's dialog (IR609)
   const reason = returnReason(items, why, t);
-  const reasonError = !why.trim() ? t("A reason is required (1–1000 characters)") : reason.length > 1000 ? t("{n} / 1000 characters with the ticked items", { n: reason.length }) : null;
+  const reasonError = why.trim() ? (reason.length > 1000 ? t("{n} / 1000 characters with the ticked items", { n: reason.length }) : null) : t("A reason is required (1–1000 characters)");
   // a refused return takes focus to the reason, the one field to fix (IR597, as IR586)
   const badReason = (message = reasonError ?? t("A reason is required (1–1000 characters)")) => { setError(message); focusField("return-reason"); };
   const failed = (f: ActionFailure) => { setRefused(refusal(f, t)); if (f.fieldErrors.reason) badReason(); };
   const decide = (decision: "accept" | "return") => {
-    if (decision === "return" && reasonError) return badReason(reasonError);
+    if (decision === "return" && reasonError) { badReason(reasonError); return; }
     setError(null);
     run(() => reviewReport(live.job.id, live.job.version, r.version, decision, decision === "return" ? reason : null),
       (v) => t(v.status === "completed" ? "Report accepted — job completed" : "Returned for rework"), () => { setRefused(null); setRet(false); setWhy(""); setTicked(null); }, failed);
   };
-  const open = live.job.status === "submitted" && r.allowed;
+  const isOpen = live.job.status === "submitted" && r.allowed;
   return (
     <Page>
       {head}
@@ -94,32 +95,36 @@ export function ReviewView({ live }: { live: ReviewLive }) {
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Quality review")} sub={t("Author: {name} · Reviewer: you (must differ)", { name: r.author })}>
             <p className="mb-2 flex items-start gap-1.5 rounded-xl bg-primary-soft/40 px-3 py-2 text-xs text-muted-foreground"><Icon name="info" className="mt-px" />{t("A contributor to this report version cannot approve it. The reviewer never edits the technician’s original records.")}</p>
-            {open ? (
+            {isOpen ? (
               <div className="flex flex-col gap-2">
                 <Btn disabled={pending} onClick={() => { setError(null); setRet(true); }}>{t("Return for rework…")}</Btn>
-                <Btn variant="primary" disabled={pending || !r.acceptable} title={r.acceptable ? undefined : r.missing.join("; ")} onClick={() => decide("accept")}>{t("Accept report")}</Btn>
+                <Btn variant="primary" disabled={pending || !r.acceptable} title={r.acceptable ? undefined : r.missing.join("; ")} onClick={() => { decide("accept"); }}>{t("Accept report")}</Btn>
               </div>
             ) : <p className="text-[13px] text-muted-foreground">{live.job.status === "submitted" ? t("You cannot decide on this version.") : t("Decided — the job is {status}.", { status })}</p>}
             <p className="mt-2 text-[11px] text-muted-foreground">{t("Completion does not automatically resolve the linked alert.")}</p>
           </Card>
           <Card title={t("Evidence check")}>
-            <ul className="flex flex-col gap-1.5 text-[13px]">{r.evidence.map((e) => (
-              <li key={e.label} className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-muted-foreground"><span className={cx("h-2 w-2 rounded-full", dot[e.tone])} />{e.label}</span><b>{e.value}</b></li>
-            ))}</ul>
+            <ul className="flex flex-col gap-1.5 text-[13px]">{r.evidence.map((e) => {
+              return (
+                <li key={e.label} className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-muted-foreground"><span className={cx("h-2 w-2 rounded-full", dot[e.tone])} />{e.label}</span><b>{e.value}</b></li>
+              );
+            })}</ul>
             <p className={cx("mt-2 rounded-xl px-3 py-1.5 text-xs font-semibold", r.acceptable ? "bg-ok-soft text-ok" : "bg-warn-soft text-warn")}>{r.acceptable ? t("All required evidence present — acceptable.") : t("Not acceptable yet: {missing}.", { missing: r.missing.join("; ") })}</p>
           </Card>
           <Card title={t("Versions & linked alert")}>
-            <ul className="divide-y divide-line">{r.versions.map((v, i) => (
-              <li key={i} className="flex items-start justify-between gap-2 py-2 text-[13px]"><div><b className="text-[13px]">{v.title}</b><div className="text-[11px] text-muted-foreground">{v.sub}</div></div>{v.badge && <Badge tone={v.badge.tone}>{v.badge.label}</Badge>}</li>
-            ))}</ul>
+            <ul className="divide-y divide-line">{r.versions.map((v, i) => {
+              return (
+                <li key={i} className="flex items-start justify-between gap-2 py-2 text-[13px]"><div><b className="text-[13px]">{v.title}</b><div className="text-[11px] text-muted-foreground">{v.sub}</div></div>{v.badge && <Badge tone={v.badge.tone}>{v.badge.label}</Badge>}</li>
+              );
+            })}</ul>
           </Card>
         </div>
       </div>
-      <Modal open={ret} onClose={() => setRet(false)} title={t("Return for rework")} footer={<><Btn onClick={() => setRet(false)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => decide("return")}>{t("Return report")}</Btn></>}>
+      <Modal open={ret} onClose={() => { setRet(false); }} title={t("Return for rework")} footer={<><Btn onClick={() => { setRet(false); }}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { decide("return"); }}>{t("Return report")}</Btn></>}>
         <fieldset className="flex flex-col gap-1.5"><legend className="mb-1 text-[13px] font-semibold">{t("Items that need rework")}</legend>
-          {r.rework.map((x) => <label key={x.label} className="flex items-start gap-2 text-[13px]"><Checkbox className="mt-0.5" checked={items.includes(x.label)} onCheckedChange={(v) => setTicked(v === true ? [...items, x.label] : items.filter((y) => y !== x.label))} />{x.label}</label>)}
+          {r.rework.map((x) => <label key={x.label} className="flex items-start gap-2 text-[13px]"><Checkbox className="mt-0.5" checked={items.includes(x.label)} onCheckedChange={(v) => { setTicked(v ? [...items, x.label] : items.filter((y) => y !== x.label)); }} />{x.label}</label>)}
         </fieldset>
-        <Field label={t("Reason (required, 1–1000 characters)")} error={error ?? undefined}><Textarea id="return-reason" value={why} maxLength={1000} onChange={(e) => setWhy(e.target.value)} placeholder={t("Missing evidence photo for the indoor unit filter")} /></Field>
+        <Field label={t("Reason (required, 1–1000 characters)")} error={error ?? undefined}><Textarea id="return-reason" value={why} maxLength={1000} onChange={(e) => { setWhy(e.target.value); }} placeholder={t("Missing evidence photo for the indoor unit filter")} /></Field>
         <p className="text-[11px] text-muted-foreground">{t("The technician sees the reason and resumes the report as a new version; the returned version is kept.")}</p>
       </Modal>
     </Page>

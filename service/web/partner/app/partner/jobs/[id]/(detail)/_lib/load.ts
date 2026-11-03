@@ -13,18 +13,20 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { delegationLeft, detailBanner, eventRows, fits, ordinal, qualified, requiredFor, timeline, type ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDetail";
 import { until, type ApiCapacity, type ApiJobEvent, type ApiMember } from "@ac/web/lib/partnerOverview";
 
-type Page<T> = { items: T[] };
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
-  if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
-  throw e;
-});
-const klDate = (iso: string) => new Date(Date.parse(iso) + 8 * 3600_000).toISOString().slice(0, 10);
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
+  return p.catch((error) => {
+    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+    throw error;
+  });
+};
+const klDate = (iso: string) => new Date(Date.parse(iso) + 8 * 3_600_000).toISOString().slice(0, 10);
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 export async function loadJobDetail(jobId: string) {
-  const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((e) => {
-    if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN")) return null; // another company's job reads as absent (D01)
-    throw e;
+  interface Page<T> { items: T[] }
+  const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId }).catch((error) => {
+    if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) return null; // another company's job reads as absent (D01)
+    throw error;
   });
   if (!job) return null;
   const [nowAt, display] = await Promise.all([coreNow(), coreDisplay()]);

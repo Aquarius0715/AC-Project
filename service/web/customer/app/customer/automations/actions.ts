@@ -12,9 +12,8 @@ export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messa
 async function run<T>(fn: () => Promise<T>, write = true): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
-  } catch (e) {
-    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds };
-    return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+  } catch (error) {
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     if (write) refresh();
   }
@@ -22,7 +21,7 @@ async function run<T>(fn: () => Promise<T>, write = true): Promise<ActionResult<
 
 /** automations.save (create without a version, update with the rule's version); saving sends no Command (AT-C04-N item 2). */
 export async function saveAutomation(input: OpInput<"automations.save">, version: number | null) {
-  return run(() => coreOp<ApiAutomation>("automations.save", input, { write: true, ...(version !== null ? { expectedVersion: version } : {}) }));
+  return run(() => coreOp<ApiAutomation>("automations.save", input, { write: true, ...((version !== null) && { expectedVersion: version }) }));
 }
 /** automations.delete: the rule stops; its Commands and run log stay (IR214). */
 export async function deleteAutomation(id: string, version: number) {
@@ -33,7 +32,7 @@ export async function updateConsent(granted: boolean, version: number) {
   return run(() => coreOp<ApiConsent>("consents.update", { purpose: "location_automation", granted }, { write: true, expectedVersion: version }));
 }
 /** automations.simulate of the AC for a synthetic event at the current tick of the business clock (IR21): the saved
- * rules decide, nothing is stored or sent. */
+rules decide, nothing is stored or sent. */
 export async function testEvent(unitId: string, facts: Omit<OpInput<"automations.simulate">["facts"][number], "unitId" | "observedAt">[]) {
   return run(async () => {
     const at = new Date(Math.floor((await coreNow()).getTime() / 60_000) * 60_000).toISOString();

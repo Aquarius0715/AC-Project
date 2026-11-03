@@ -20,12 +20,12 @@ const cellTone: Record<WeekCell["kind"], string> = {
 };
 
 /** The contractor's schedule & assignments (FR-P03, Figma Contractor 03-1…03-10) from the Core API. Texts in the user's
- * display language; the job's times come formatted from the loader, the team's week is in Kuala Lumpur time (IR275). */
+display language; the job's times come formatted from the loader, the team's week is in Kuala Lumpur time (IR275). */
 export function ScheduleView({ live }: { live: ScheduleLive }) {
   const t = useT();
   const patch = useUrlPatch();
   const sel = live.selected;
-  if (!live.rows.length) {
+  if (live.rows.length === 0) {
     return (
       <Page>
         <EmptyState title={t("No accepted jobs")} action={<Link className="text-sm font-semibold text-primary" href="/partner/jobs?tab=offered">{t("link::Open offers")} <Icon name="arrowRight" /></Link>}>
@@ -40,7 +40,7 @@ export function ScheduleView({ live }: { live: ScheduleLive }) {
         <div className="flex min-w-0 flex-col gap-4 self-start">
           <Card title={t("Accepted jobs")} action={
             <label className="flex items-center gap-1 text-[11px] text-muted-foreground">{t("Sort")}
-              <Select aria-label={t("Sort")} className="w-auto py-1 text-[11px]" value={live.sort} onChange={(e) => patch({ sort: e.target.value === "status" ? null : e.target.value })}>
+              <Select aria-label={t("Sort")} className="w-auto py-1 text-[11px]" value={live.sort} onChange={(e) => { patch({ sort: e.target.value === "status" ? null : e.target.value }); }}>
                 {live.sorts.map((s) => <option key={s.id} value={s.id}>{s.text}</option>)}
               </Select>
             </label>
@@ -75,7 +75,7 @@ export function ScheduleView({ live }: { live: ScheduleLive }) {
 }
 
 type Selected = NonNullable<ScheduleLive["selected"]>;
-type Choice = { tech: string; setTech: (v: string) => void; end: string; setEnd: (v: string) => void };
+interface Choice { tech: string; setTech: (v: string) => void; end: string; setEnd: (v: string) => void }
 
 /** The form and the week of the selected job share the chosen technician and end (the week's “This proposal”). */
 function Workspace({ sel, week, members, zone, otherZone }: { sel: Selected; week: ScheduleLive["week"]; members: ScheduleLive["members"]; zone: string; otherZone: boolean }) {
@@ -92,7 +92,7 @@ function Workspace({ sel, week, members, zone, otherZone }: { sel: Selected; wee
 }
 
 /** The slot the form proposes: the agreed or current one, or the same start with the chosen end — typed in the user's
- * display time zone (NFR-08) — while extending. */
+display time zone (NFR-08) — while extending. */
 function proposed(sel: Selected, end: string, zone: string) {
   const endAt = sel.mode.kind === "extend" && end ? zonedInstant(end.slice(0, 10), end.slice(11, 16), zone) : "";
   return sel.mode.kind === "extend" && endAt ? { startAt: sel.mode.slot.startAt, endAt } : sel.mode.slot;
@@ -122,26 +122,26 @@ function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: C
   }
   const slot = proposed(sel, end, zone)!;
   const endOk = !m.endEditable || (end && Date.parse(slot.endAt) >= Date.parse(m.slot.endAt));
-  const reasonMissing = m.reasonRequired && !reason.trim();
-  const same = tech === sel.currentId && (!m.endEditable || slot.endAt === m.slot.endAt);
+  const isReasonMissing = m.reasonRequired && !reason.trim();
+  const isSame = tech === sel.currentId && (!m.endEditable || slot.endAt === m.slot.endAt);
   const save = () => {
     setTried(true);
-    if (!tech || reasonMissing || !endOk || same) return;
+    if (!tech || isReasonMissing || !endOk || isSame) return;
     const name = chosen?.name ?? t("technician");
     run(() => assignTechnician(sel.id, sel.version, tech, slot, reason), t(m.kind === "assign" ? "Technician assigned — waiting for acceptance" : "Assignment changed"),
-      (v) => setResult({ tone: "ok", text: m.kind === "assign" ? t("Assigned {name} for {slot}. The technician must accept the assignment; HQ and the technician are notified.", { name, slot: v.slot }) : t("Changed to {name} for {slot}. The technician must accept the assignment; HQ and the technician are notified.", { name, slot: v.slot }) }),
-      (f: ActionFailure) => setResult({ tone: f.code === "CONFLICT" ? "warn" : "crit", text: assignRefusal(f, name, t) }));
+      (v) => { setResult({ tone: "ok", text: t(m.kind === "assign" ? "Assigned {name} for {slot}. The technician must accept the assignment; HQ and the technician are notified." : "Changed to {name} for {slot}. The technician must accept the assignment; HQ and the technician are notified.", { name, slot: v.slot }) }); },
+      (f: ActionFailure) => { setResult({ tone: f.code === "CONFLICT" ? "warn" : "crit", text: assignRefusal(f, name, t) }); });
   };
   return (
     <Card title={m.title}>
       <div className="flex flex-col gap-3">
         {m.banner && <Banner tone={m.banner.tone === "muted" ? undefined : m.banner.tone}>{m.banner.text}</Banner>}
         {window && <Banner>{window}</Banner>}
-        <Field label={sel.currentId ? t("New technician (current: {name})", { name: currentName ?? "—" }) : t("Technician (own company, active, qualified)")} error={tried && !tech ? t("Choose a technician") : tried && same ? t("Choose another technician or a later end") : undefined}>
+        <Field label={sel.currentId ? t("New technician (current: {name})", { name: currentName ?? "—" }) : t("Technician (own company, active, qualified)")} error={tried && !tech ? t("Choose a technician") : (tried && isSame ? t("Choose another technician or a later end") : undefined)}>
           <div role="radiogroup" aria-label={t("Technician")} className="flex flex-col gap-1.5">
             {sel.candidates.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet — add them in Team & capacity.")}</p>}
             {sel.candidates.map((c) => (
-              <Plain key={c.id} type="button" role="radio" aria-checked={tech === c.id} disabled={!c.eligible} onClick={() => setTech(c.id)}
+              <Plain key={c.id} type="button" role="radio" aria-checked={tech === c.id} disabled={!c.eligible} onClick={() => { setTech(c.id); }}
                 className={cx("flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left", tech === c.id ? "border-primary bg-primary-soft/60" : "border-line bg-surface", !c.eligible && "cursor-not-allowed opacity-70")}>
                 {/* the name keeps at least 10rem; a long reason (the missing qualifications) goes below it and wraps */}
                 <span className="min-w-0 flex-[1_1_10rem]"><b className={cx("block text-[13px]", tech === c.id && "text-primary")}>{c.name}</b><span className="block text-[11px] text-muted-foreground">{c.sub}</span></span>
@@ -157,7 +157,7 @@ function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: C
         {m.endEditable ? (
           <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
             <Field label={t("Work start (kept)")}><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {sel.text.start}</div></Field>
-            <Field label={t("Work end (same or later)")} hint={t("Times in {zone}.", { zone })} error={tried && !endOk ? t("The end must be at or after the current end") : undefined}><Input type="datetime-local" value={end} min={sel.text.end} onChange={(e) => setEnd(e.target.value)} /></Field>
+            <Field label={t("Work end (same or later)")} hint={t("Times in {zone}.", { zone })} error={tried && !endOk ? t("The end must be at or after the current end") : undefined}><Input type="datetime-local" value={end} min={sel.text.end} onChange={(e) => { setEnd(e.target.value); }} /></Field>
           </div>
         ) : (
           <Field label={t("Visit time (agreed with the client)")} hint={t("Fixed. A different time needs the client’s approval via HQ.")}>
@@ -165,19 +165,19 @@ function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: C
           </Field>
         )}
         {m.kind !== "assign" && (
-          <Field label={t(m.reasonRequired ? "Reason for reassignment (required, 1–1000)" : "Reason (optional, kept with the change)")} error={tried && reasonMissing ? t("A reason is required while the work is under way") : undefined}>
-            <Textarea value={reason} maxLength={1000} onChange={(e) => setReason(e.target.value)} placeholder={m.reasonRequired ? t("tech-external-a is on sick leave from today.") : ""} />
+          <Field label={t(m.reasonRequired ? "Reason for reassignment (required, 1–1000)" : "Reason (optional, kept with the change)")} error={tried && isReasonMissing ? t("A reason is required while the work is under way") : undefined}>
+            <Textarea value={reason} maxLength={1000} onChange={(e) => { setReason(e.target.value); }} placeholder={m.reasonRequired ? t("tech-external-a is on sick leave from today.") : ""} />
           </Field>
         )}
         {m.kind === "extend" && chosen && chosen.id !== sel.currentId && <Banner tone="warn">{t("On save, {current} loses action access immediately. The job keeps its state; {name} continues in a new draft version and the original report authorship is kept.", { current: currentName ?? t("the current technician"), name: chosen.name })}</Banner>}
         {sel.ack && m.kind === "reassign" && sel.ack.status !== "cant_make" && <Banner tone={sel.ack.status === "accepted" ? "ok" : "primary"}>{t(sel.ack.status === "accepted" ? "The current technician accepted the assignment" : "Waiting for the current technician to accept the assignment.")}</Banner>}
         {sel.text.alternative && <p className="text-[11px] text-muted-foreground">{t("The technician could do {slot} instead — a different time needs the client’s approval via HQ.", { slot: sel.text.alternative })}</p>}
-        {sel.candidates.length > 0 && !sel.candidates.some((c) => c.eligible) && <Banner tone="warn">{t("No technician of your company can take this time (busy, unavailable or not qualified). Free a technician in Team & capacity, or ask HQ to agree another time with the client.")}</Banner>}
+        {sel.candidates.length > 0 && sel.candidates.every((c) => !c.eligible) && <Banner tone="warn">{t("No technician of your company can take this time (busy, unavailable or not qualified). Free a technician in Team & capacity, or ask HQ to agree another time with the client.")}</Banner>}
         {chosen && (chosen.eligible
           ? <Banner tone="ok">{t("No overlapping confirmed schedule for {name} in this window.", { name: chosen.name })}</Banner>
           : <Banner tone="warn">{t("{name}: {reason} — saving is refused.", { name: chosen.name, reason: chosen.badge.text })}</Banner>)}
         {result && <Banner tone={result.tone}>{result.text}</Banner>}
-        <Btn variant="primary" className="w-full justify-center" disabled={pending || !sel.candidates.some((c) => c.eligible)} onClick={save}>{m.kind === "extend" && tech === sel.currentId ? t("Save new slot") : m.button}</Btn>
+        <Btn variant="primary" className="w-full justify-center" disabled={pending || sel.candidates.every((c) => !c.eligible)} onClick={save}>{m.kind === "extend" && tech === sel.currentId ? t("Save new slot") : m.button}</Btn>
         <p className="text-[11px] text-muted-foreground">{t("Reassigning a job already in progress requires a reason and immediately revokes the previous technician’s access.")}</p>
       </div>
     </Card>
@@ -187,8 +187,8 @@ function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: C
 function WeekCard({ week, members, sel, choice, zone }: { week: NonNullable<ScheduleLive["week"]>; members: ScheduleLive["members"]; sel: Selected; choice: Choice; zone: string }) {
   const t = useT();
   const slot = proposed(sel, choice.end, zone);
-  const unchanged = choice.tech === sel.currentId && slot?.endAt === sel.mode.slot?.endAt; // the current booking, not a proposal
-  const proposal = slot && sel.mode.kind !== "blocked" && choice.tech && !unchanged ? { technicianId: choice.tech, slot, short: sel.short } : null;
+  const isUnchanged = choice.tech === sel.currentId && slot?.endAt === sel.mode.slot?.endAt; // the current booking, not a proposal
+  const proposal = slot && sel.mode.kind !== "blocked" && choice.tech && !isUnchanged ? { technicianId: choice.tech, slot, short: sel.short } : null;
   const rows = weekGrid(week.dates, members, week.capacity, new Map(Object.entries(week.jobsOf)), proposal, t);
   return (
     <Card title={week.title} action={<Link href="/partner/team" className="text-xs font-semibold text-primary">{t("Team & capacity")} <Icon name="arrowRight" /></Link>}>

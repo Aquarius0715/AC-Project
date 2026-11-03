@@ -17,18 +17,20 @@ import {
   windowEvents, type ApiTechUnit, type Period, type Point,
 } from "@ac/web/lib/techUnit";
 
-type Page<T> = { items: T[]; nextCursor?: string | null; total?: number };
+interface Page<T> { items: T[]; nextCursor?: string | null; total?: number }
 /** telemetry.series: a page of readings, or with bucketMinutes the period's averages (AirSeries.buckets, IR605). */
 type SeriesPage = Page<Point> & { buckets: { start: string; value: number | null; count: number }[] | null };
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
-  if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
-  throw e;
-});
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
+  return p.catch((error) => {
+    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+    throw error;
+  });
+};
 const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || !!e.error.fieldErrors.id);
 
 /** The readings of a metric in the period. A day and a week come whole, as 5- and 60-minute averages of their valid
- * readings (bucketMinutes, IR605, IR606); an hour comes as its readings, newest first, up to `pages` pages of 100
- * (telemetry.series pages its query), with how many the period holds, so a cut hour says what is not loaded (IR598). */
+readings (bucketMinutes, IR605, IR606); an hour comes as its readings, newest first, up to `pages` pages of 100
+(telemetry.series pages its query), with how many the period holds, so a cut hour says what is not loaded (IR598). */
 async function series(unitId: string, metric: OpInput<"telemetry.series">["metric"], from: number, to: number, period: Period, pages: number): Promise<{ items: Point[]; total: number; complete: boolean }> {
   const range = { from: new Date(from).toISOString(), to: new Date(to + 1000).toISOString(), unitIds: [unitId], metric };
   if (period !== "1h") {
@@ -41,7 +43,7 @@ async function series(unitId: string, metric: OpInput<"telemetry.series">["metri
   let cursor: string | null | undefined;
   for (let page = 0; page < pages; page++) {
     const r: SeriesPage = await coreOp<SeriesPage>("telemetry.series", {
-      ...range, query: { limit: 100, sort: { field: "observedAt", direction: "desc" }, ...(cursor ? { cursor } : {}) },
+      ...range, query: { limit: 100, sort: { field: "observedAt", direction: "desc" }, ...(cursor && { cursor }) },
     });
     out.push(...r.items);
     if (page === 0) total = r.total ?? 0;
@@ -57,10 +59,10 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const i = i18nOf(display);
   const { t } = i;
   const nowMs = now.getTime();
-  const d = await coreOp<ApiTechUnit>("units.get", { id }).catch(async (e) => {
-    if (e instanceof CoreError && e.error.messageKey === "errors.assignment_not_started") return "not_started" as const;
-    if (gone(e)) return null;
-    throw e;
+  const d = await coreOp<ApiTechUnit>("units.get", { id }).catch(async (error) => {
+    if (error instanceof CoreError && error.error.messageKey === "errors.assignment_not_started") return "not_started" as const;
+    if (gone(error)) return null;
+    throw error;
   });
   if (d === null) return null; // not in the technician's assignments: not found (IR169)
   if (d === "not_started") { // IR76: the start time comes from the URL's job; without it only the general sentence
@@ -84,9 +86,11 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
     Promise.all(others.map((m) => optional(series(id, m, from, to, period, 1), NONE))),
     tab === "monitoring" ? optional(coreOp<Page<{ id: string }>>("devices.list", { limit: 5, filters: { unitId: id } }).then((r) => r.items), []) : Promise.resolve([]),
   ]);
-  const events = (await Promise.all(devices.map((x) => optional(coreOp<Page<ApiDeviceEventFull>>("devices.events", {
-    id: x.id, query: { limit: 50, filters: { from: new Date(from).toISOString(), to: new Date(to + 1000).toISOString() } },
-  }).then((r) => r.items), [] as ApiDeviceEventFull[])))).flat();
+  const events = (await Promise.all(devices.map((x) => {
+    return optional(coreOp<Page<ApiDeviceEventFull>>("devices.events", {
+      id: x.id, query: { limit: 50, filters: { from: new Date(from).toISOString(), to: new Date(to + 1000).toISOString() } },
+    }).then((r) => r.items), [] as ApiDeviceEventFull[]);
+  }))).flat();
   const control = controlJob(jobs, sp.jobId);
   const job = control ?? sp.jobId ?? null; // the job the alert evidence opens with
   const back = sp.jobId ? `/technician/jobs/${sp.jobId}` : "/technician";

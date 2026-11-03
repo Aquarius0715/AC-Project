@@ -17,18 +17,22 @@ import type { AlertsLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
 type Live = AlertsLive["policies"];
-type Props = { p: Live; onDone: (text: string) => void; onFail: (f: ActionFailure) => void };
+interface Props { p: Live; onDone: (text: string) => void; onFail: (f: ActionFailure) => void }
 const base = "/customer/alerts?tab=policies";
 /** Where the focus goes once the list shows: the policy just saved, or the list after a delete. The editor and the list
- * are different views, so the target waits for the list to mount (IR623). */
+are different views, so the target waits for the list to mount (IR623). */
 let listFocus: string | null = null;
 const takeListFocus = () => {
   const el = listFocus ? document.getElementById(listFocus) : null;
-  if (el) { el.focus(); listFocus = null; }
+  if (!el) {
+    return;
+  }
+
+  el.focus(); listFocus = null;
 };
 
 /** The Alert policies tab (FR-C15, DD-C15, Figma Client 06e/06f) from the Core API: the default policy's rules switched
- * for the customer by the owner, the customer's own policies, and the editor (policyId in the URL). */
+for the customer by the owner, the customer's own policies, and the editor (policyId in the URL). */
 export function PoliciesLive({ p, onDone, onFail }: Props) {
   return p.editor ? <PolicyEditor p={p} editor={p.editor} onDone={onDone} onFail={onFail} /> : <PolicyList p={p} onDone={onDone} onFail={onFail} />;
 }
@@ -38,10 +42,10 @@ function PolicyList({ p, onDone, onFail }: Props) {
   const [pending, run] = useAction();
   const [remove, setRemove] = useState<PolicyCard | null>(null);
   const d = p.defaults;
-  const fail = (f: ActionFailure) => onFail(f);
-  useEffect(() => takeListFocus(), []);
+  const fail = (f: ActionFailure) => { onFail(f); };
+  useEffect(() => { takeListFocus(); }, []);
   const toggleRule = (ruleKey: string, name: string, on: boolean, version: number) =>
-    d && p.customerId && run(() => setDefaultRule(d.id, ruleKey, p.customerId!, on, version), t(on ? "“{name}” on" : "“{name}” off", { name }), () => onDone(t(on ? "Default rule “{name}” switched on for all your ACs." : "Default rule “{name}” switched off for all your ACs.", { name })), fail);
+    d && p.customerId && run(() => setDefaultRule(d.id, ruleKey, p.customerId!, on, version), t(on ? "“{name}” on" : "“{name}” off", { name }), () => { onDone(t(on ? "Default rule “{name}” switched on for all your ACs." : "Default rule “{name}” switched off for all your ACs.", { name })); }, fail);
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -70,15 +74,15 @@ function PolicyList({ p, onDone, onFail }: Props) {
         <Card key={c.id} title={<span id={`policy-title-${c.id}`} tabIndex={-1} className="flex flex-wrap items-center gap-2 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring/50">{c.name}<Badge tone="muted">{c.badge}</Badge><Badge tone={c.enabled ? "ok" : "muted"}>{t(c.enabled ? "On" : "Off")}</Badge></span>}
           action={<span className="flex items-center gap-2 text-xs text-muted-foreground">{t(c.enabled ? "On" : "Off")}<Toggle on={c.enabled} disabled={pending} label={c.name} onChange={(v) => {
             const pol = p.list.find((x) => x.id === c.id)!;
-            run(() => savePolicy(toggledInput(pol, v), pol.version), t(v ? "Policy on" : "Policy off"), () => onDone(t(v ? "“{name}” switched on." : "“{name}” switched off.", { name: c.name })), fail);
+            run(() => savePolicy(toggledInput(pol, v), pol.version), t(v ? "Policy on" : "Policy off"), () => { onDone(t(v ? "“{name}” switched on." : "“{name}” switched off.", { name: c.name })); }, fail);
           }} /></span>}>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="text-[13px]">
               <p><span className="text-muted-foreground">{t("When")}</span> {c.when}</p><p><span className="text-muted-foreground">{t("Then")}</span> {c.then}</p>
-              <p className={cx("mt-1 text-xs", c.attached.length ? "text-muted-foreground" : "text-warn")}>{c.attachedText}</p>
+              <p className={cx("mt-1 text-xs", c.attached.length > 0 ? "text-muted-foreground" : "text-warn")}>{c.attachedText}</p>
               {c.note && <p className="text-xs text-warn">{c.note}</p>}
             </div>
-            <div className="flex gap-2"><Link href={`${base}&policyId=${c.id}`} className="inline-flex items-center rounded-control border border-line bg-surface px-3 py-1.5 text-xs font-semibold hover:bg-surface2">{t("Edit")}</Link><Btn size="sm" variant="danger" onClick={() => setRemove(c)}>{t("Delete")}</Btn></div>
+            <div className="flex gap-2"><Link href={`${base}&policyId=${c.id}`} className="inline-flex items-center rounded-control border border-line bg-surface px-3 py-1.5 text-xs font-semibold hover:bg-surface2">{t("Edit")}</Link><Btn size="sm" variant="danger" onClick={() => { setRemove(c); }}>{t("Delete")}</Btn></div>
           </div>
         </Card>
       ))}
@@ -95,13 +99,13 @@ function DeleteModal({ c, version, onClose, onFail }: { c: PolicyCard; version: 
   const router = useRouter();
   const n = c.attached.length;
   return (
-    <Modal open onClose={() => onClose()} title={t("Delete “{name}”?", { name: c.name })} footer={<><Btn onClick={() => onClose()}>{t("Keep policy")}</Btn><Btn variant="danger" disabled={pending} onClick={() => run(() => deletePolicy(c.id, version), t("Policy deleted"), () => {
+    <Modal open onClose={() => { onClose(); }} title={t("Delete “{name}”?", { name: c.name })} footer={<><Btn onClick={() => { onClose(); }}>{t("Keep policy")}</Btn><Btn variant="danger" disabled={pending} onClick={() => { run(() => deletePolicy(c.id, version), t("Policy deleted"), () => {
       // the card went with its Delete button: the focus goes to the list (IR623)
       listFocus = "your-policies";
       onClose(n ? t("“{name}” deleted and detached from {units}.", { name: c.name, units: c.attached.join(", ") }) : t("“{name}” deleted.", { name: c.name }));
       router.replace(base, { scroll: false });
       requestAnimationFrame(takeListFocus);
-    }, onFail)}>{t("Delete policy")}</Btn></>}>
+    }, onFail); }}>{t("Delete policy")}</Btn></>}>
       <p className="text-[13px]">{n ? t(n === 1 ? "It is detached from {n} AC first: {units}." : "It is detached from {n} ACs first: {units}.", { n, units: c.attached.join(", ") }) : t("It is not attached to any AC.")} {t("The default policy can’t be deleted.")}</p>
     </Modal>
   );
@@ -118,18 +122,18 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
   const [tried, setTried] = useState(false);
   const [remove, setRemove] = useState(false);
   const err = policyErrors(f, t);
-  const set = (x: Partial<PolicyForm>) => setF((s) => ({ ...s, ...x }));
+  const set = (x: Partial<PolicyForm>) => { setF((s) => ({ ...s, ...x })); };
   const unit = metricUnit[f.metric] ?? "";
-  const up = f.operator === "gt" || f.operator === "gte";
+  const isUp = f.operator === "gt" || f.operator === "gte";
   // the condition sentence shows one problem at a time; its field is marked and named by that line
   const conditionErr = err.threshold ? "threshold" : err.recovery ? "recovery" : err.duration ? "duration" : null;
-  const showCondition = !!conditionErr && (tried || f.recovery !== editor.form.recovery || f.threshold !== editor.form.threshold);
-  const invalid = (k: "threshold" | "recovery" | "duration") => (showCondition && conditionErr === k ? { "aria-invalid": true, "aria-describedby": "policy-condition-error" } : {});
+  const isShowCondition = !!conditionErr && (tried || f.recovery !== editor.form.recovery || f.threshold !== editor.form.threshold);
+  const invalid = (k: "threshold" | "recovery" | "duration") => (isShowCondition && conditionErr === k ? { "aria-invalid": true, "aria-describedby": "policy-condition-error" } : {});
   const save = () => {
     setTried(true);
     // a refused save takes the focus to the first field to fix, top to bottom (IR586, IR623)
     const bad = POLICY_FIELDS.find((k) => err[k]);
-    if (bad) return focusField(policyFieldId(bad));
+    if (bad) { focusField(policyFieldId(bad)); return; }
     if (!p.customerId) return;
     run(() => savePolicy(policyInput(f, editor.policy, { customerId: p.customerId!, membershipId: p.membershipId, timezone: p.timezone }), editor.policy?.version ?? null), t("Policy saved"),
       (id) => { listFocus = `policy-title-${id}`; onDone(t(editor.policy ? "“{name}” saved." : "“{name}” saved — attach it on an AC’s page.", { name: f.name.trim() })); router.replace(base, { scroll: false }); }, onFail);
@@ -138,36 +142,36 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
       <Card>
         <div className="mb-3 text-[13px]"><Link href={base} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Alert policies")}</Link> › {t(editor.policy ? "Edit alert policy" : "Create alert policy")}</div>
-        <Field label={t("Name")} error={tried ? err.name : undefined}><Input id={policyFieldId("name")} value={f.name} maxLength={120} onChange={(e) => set({ name: e.target.value })} /></Field>
+        <Field label={t("Name")} error={tried ? err.name : undefined}><Input id={policyFieldId("name")} value={f.name} maxLength={120} onChange={(e) => { set({ name: e.target.value }); }} /></Field>
         <h3 className="mt-4 text-[13px] font-bold">{t("1 · When …")} <span className="font-normal text-muted-foreground">{t("What to watch")}</span></h3>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {metricGroups.map((g) => (
-            <Plain key={g.id} type="button" aria-pressed={f.group === g.id} onClick={() => set({ group: g.id, metric: metricOfGroup(g.id) })} className={cx("rounded-xl border p-3 text-left", f.group === g.id ? "border-primary bg-primary-soft text-primary" : "border-line hover:bg-surface2")}>
+            <Plain key={g.id} type="button" aria-pressed={f.group === g.id} onClick={() => { set({ group: g.id, metric: metricOfGroup(g.id) }); }} className={cx("rounded-xl border p-3 text-left", f.group === g.id ? "border-primary bg-primary-soft text-primary" : "border-line hover:bg-surface2")}>
               <b className="block text-[13px]">{t(g.label)}</b><span className="text-[11px] text-muted-foreground">{g.sub}</span>
             </Plain>
           ))}
         </div>
-        {f.group === "air" && <div className="mt-2"><Choice value={f.metric as "co2"} onChange={(v) => set({ metric: v })} options={[{ id: "co2", label: "CO₂ (ppm)" }, { id: "pm25" as "co2", label: "PM2.5 (µg/m³)" }]} /></div>}
+        {f.group === "air" && <div className="mt-2"><Choice value={f.metric as "co2"} onChange={(v) => { set({ metric: v }); }} options={[{ id: "co2", label: "CO₂ (ppm)" }, { id: "pm25" as "co2", label: "PM2.5 (µg/m³)" }]} /></div>}
         <div className="mt-3 flex flex-col gap-2 rounded-xl bg-surface2 p-3 text-[13px]">
           <div className="flex flex-wrap items-center gap-2">
-            {t("Alert when {what} is", { what: f.metric === "co2" ? "CO₂" : f.metric === "pm25" ? "PM2.5" : t(f.group === "temperature" ? "room temperature" : f.group === "humidity" ? "humidity" : "power") })}
-            <Select aria-label={t("Operator")} className="w-20" value={f.operator} onChange={(e) => set({ operator: e.target.value as Operator })}>{ops.map((o) => <option key={o} value={o}>{opSymbol[o]}</option>)}</Select>
-            <Input id={policyFieldId("threshold")} aria-label={t("Threshold")} {...invalid("threshold")} inputMode="decimal" className="w-24" value={f.threshold} onChange={(e) => set({ threshold: e.target.value })} />{t("{unit} continuously for", { unit })}
-            <Input id={policyFieldId("duration")} aria-label={t("Duration")} {...invalid("duration")} inputMode="numeric" className="w-20" value={f.duration} onChange={(e) => set({ duration: e.target.value })} />
-            <Select aria-label={t("Duration unit")} className="w-24" value={f.unit} onChange={(e) => set({ unit: e.target.value as "s" | "min" })}><option value="min">min</option><option value="s">s</option></Select>
+            {t("Alert when {what} is", { what: f.metric === "co2" ? "CO₂" : (f.metric === "pm25" ? "PM2.5" : t(f.group === "temperature" ? "room temperature" : (f.group === "humidity" ? "humidity" : "power"))) })}
+            <Select aria-label={t("Operator")} className="w-20" value={f.operator} onChange={(e) => { set({ operator: e.target.value as Operator }); }}>{ops.map((o) => <option key={o} value={o}>{opSymbol[o]}</option>)}</Select>
+            <Input id={policyFieldId("threshold")} aria-label={t("Threshold")} {...invalid("threshold")} inputMode="decimal" className="w-24" value={f.threshold} onChange={(e) => { set({ threshold: e.target.value }); }} />{t("{unit} continuously for", { unit })}
+            <Input id={policyFieldId("duration")} aria-label={t("Duration")} {...invalid("duration")} inputMode="numeric" className="w-20" value={f.duration} onChange={(e) => { set({ duration: e.target.value }); }} />
+            <Select aria-label={t("Duration unit")} className="w-24" value={f.unit} onChange={(e) => { set({ unit: e.target.value as "s" | "min" }); }}><option value="min">min</option><option value="s">s</option></Select>
           </div>
-          <div className="flex flex-wrap items-center gap-2">{t(up ? "Recover when it drops below" : "Recover when it rises above")} <Input id={policyFieldId("recovery")} aria-label={t("Recovery")} {...invalid("recovery")} inputMode="decimal" className="w-24" value={f.recovery} onChange={(e) => set({ recovery: e.target.value })} />{unit}</div>
-          {conditionErr ? showCondition && <p id="policy-condition-error" className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{err[conditionErr]}</p>
-            : <p className="flex items-center gap-1 text-xs text-ok"><Icon name="check" />{t(up ? "Recovery {recovery} {unit} is below the {threshold} {unit} limit · unit fixed to {unit} for this metric" : "Recovery {recovery} {unit} is above the {threshold} {unit} limit · unit fixed to {unit} for this metric", { recovery: f.recovery, threshold: f.threshold, unit })}</p>}
+          <div className="flex flex-wrap items-center gap-2">{t(isUp ? "Recover when it drops below" : "Recover when it rises above")} <Input id={policyFieldId("recovery")} aria-label={t("Recovery")} {...invalid("recovery")} inputMode="decimal" className="w-24" value={f.recovery} onChange={(e) => { set({ recovery: e.target.value }); }} />{unit}</div>
+          {conditionErr ? isShowCondition && <p id="policy-condition-error" className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{err[conditionErr]}</p>
+            : <p className="flex items-center gap-1 text-xs text-ok"><Icon name="check" />{t(isUp ? "Recovery {recovery} {unit} is below the {threshold} {unit} limit · unit fixed to {unit} for this metric" : "Recovery {recovery} {unit} is above the {threshold} {unit} limit · unit fixed to {unit} for this metric", { recovery: f.recovery, threshold: f.threshold, unit })}</p>}
         </div>
         <h3 className="mt-4 text-[13px] font-bold">{t("2 · Only if …")} <span className="font-normal text-muted-foreground">{t("(optional) Limit when the policy is checked")}</span></h3>
         <div className="mt-2 flex flex-col gap-2">
-          <Check label={t("Only on some days and times")} checked={f.windowOn} onChange={(v) => set({ windowOn: v })} />
+          <Check label={t("Only on some days and times")} checked={f.windowOn} onChange={(v) => { set({ windowOn: v }); }} />
           {f.windowOn && (
             <div id={policyFieldId("window")} className="flex flex-wrap items-center gap-2">
-              <Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5] })}>{t("Mon–Fri")}</Btn><Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5, 6, 7] })}>{t("Every day")}</Btn>
-              {days.map((d, i) => <Plain key={d} type="button" aria-pressed={f.weekdays.includes(i + 1)} onClick={() => set({ weekdays: f.weekdays.includes(i + 1) ? f.weekdays.filter((x) => x !== i + 1) : [...f.weekdays, i + 1] })} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", f.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</Plain>)}
-              <Input aria-label={t("From")} type="time" className="w-32" value={f.start} onChange={(e) => set({ start: e.target.value })} /> – <Input aria-label={t("To")} type="time" className="w-32" value={f.end} onChange={(e) => set({ end: e.target.value })} />
+              <Btn size="sm" onClick={() => { set({ weekdays: [1, 2, 3, 4, 5] }); }}>{t("Mon–Fri")}</Btn><Btn size="sm" onClick={() => { set({ weekdays: [1, 2, 3, 4, 5, 6, 7] }); }}>{t("Every day")}</Btn>
+              {days.map((d, i) => <Plain key={d} type="button" aria-pressed={f.weekdays.includes(i + 1)} onClick={() => { set({ weekdays: f.weekdays.includes(i + 1) ? f.weekdays.filter((x) => x !== i + 1) : [...f.weekdays, i + 1] }); }} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", f.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</Plain>)}
+              <Input aria-label={t("From")} type="time" className="w-32" value={f.start} onChange={(e) => { set({ start: e.target.value }); }} /> – <Input aria-label={t("To")} type="time" className="w-32" value={f.end} onChange={(e) => { set({ end: e.target.value }); }} />
               <span className="text-xs text-muted-foreground">{editor.policy?.timezone ?? p.timezone}</span>
             </div>
           )}
@@ -175,21 +179,21 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
         </div>
         <h3 className="mt-4 text-[13px] font-bold">{t("3 · Then …")} <span className="font-normal text-muted-foreground">{t("How loud the alert is and who hears about it")}</span></h3>
         <div className="mt-2 flex flex-col gap-2 text-[13px]">
-          <div className="flex flex-wrap items-center gap-3">{t("Severity")} <Choice value={f.severity} onChange={(v: Severity) => set({ severity: v })} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /></div>
-          <div className="flex flex-wrap items-center gap-3">{t("Notify me by")} <Check label={t("In-app (always)")} checked disabled /><Check label={t("Email")} checked={f.email} onChange={(v) => set({ email: v })} /><Check label="WhatsApp" checked={false} disabled /></div>
+          <div className="flex flex-wrap items-center gap-3">{t("Severity")} <Choice value={f.severity} onChange={(v: Severity) => { set({ severity: v }); }} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /></div>
+          <div className="flex flex-wrap items-center gap-3">{t("Notify me by")} <Check label={t("In-app (always)")} checked disabled /><Check label={t("Email")} checked={f.email} onChange={(v) => { set({ email: v }); }} /><Check label="WhatsApp" checked={false} disabled /></div>
           <p className="text-[11px] text-muted-foreground">{t("WhatsApp is only available after you allow it in Preferences. Missing or stale readings never trigger — they show “not measured”.")}</p>
         </div>
       </Card>
       <div className="flex flex-col gap-4">
         <Card title={t("Summary")}><p className="text-[13px] font-semibold">{summaryText(f, t)}</p></Card>
         <Card title={t("Attached to")}>
-          {editor.attached.length ? <div className="flex flex-wrap gap-1.5">{editor.attached.map((a) => <Badge key={a} tone="primary">{a}</Badge>)}</div> : <p className="text-xs text-warn">{t("Not attached to any AC yet.")}</p>}
+          {editor.attached.length > 0 ? <div className="flex flex-wrap gap-1.5">{editor.attached.map((a) => <Badge key={a} tone="primary">{a}</Badge>)}</div> : <p className="text-xs text-warn">{t("Not attached to any AC yet.")}</p>}
           <p className="mt-2 text-[11px] text-muted-foreground">{t("Attach or detach from each AC’s page (Units & locations › AC › Alert policies). Editing here changes it on every attached AC.")}</p>
         </Card>
         <Card>
           <Btn variant="primary" className="w-full" disabled={pending} onClick={save}>{t("Save policy")}</Btn>
           <Link href={base} className="mt-2 block text-center text-[13px] font-semibold text-primary">{t("Cancel")}</Link>
-          {editor.policy && <><Btn variant="danger" className="mt-3 w-full" onClick={() => setRemove(true)}>{t("Delete policy")}</Btn><p className="mt-2 text-[11px] text-muted-foreground">{editor.attached.length === 0 ? t("Deleting detaches it from every AC first (you confirm). The default policy can’t be deleted.") : editor.attached.length === 1 ? t("Deleting detaches it from its AC first (you confirm). The default policy can’t be deleted.") : t("Deleting detaches it from all {n} ACs first (you confirm). The default policy can’t be deleted.", { n: editor.attached.length })}</p></>}
+          {editor.policy && <><Btn variant="danger" className="mt-3 w-full" onClick={() => { setRemove(true); }}>{t("Delete policy")}</Btn><p className="mt-2 text-[11px] text-muted-foreground">{editor.attached.length === 0 ? t("Deleting detaches it from every AC first (you confirm). The default policy can’t be deleted.") : (editor.attached.length === 1 ? t("Deleting detaches it from its AC first (you confirm). The default policy can’t be deleted.") : t("Deleting detaches it from all {n} ACs first (you confirm). The default policy can’t be deleted.", { n: editor.attached.length }))}</p></>}
           {!p.customerId && <Banner tone="warn">{t("Your customer account could not be read — saving is not possible.")}</Banner>}
         </Card>
       </div>

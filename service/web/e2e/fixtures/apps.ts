@@ -2,14 +2,14 @@
 // signed-in browser state. E2E_<APP>_URL points a project at another host (default: the local ports).
 import path from "node:path";
 
-export type App = {
+export interface App {
   id: "customer" | "partner" | "technician" | "admin";
   url: string;
   home: string;
   user: string; // the demo identity of the app's sign-in page (Figma Login frames)
   otp: boolean; // HQ accounts also enter a one-time code
   state: string;
-};
+}
 
 const url = (name: string, port: number) => (process.env[name] ?? `http://localhost:${port}`).replace(/\/$/, "");
 const state = (id: string) => path.resolve(__dirname, "../.auth", `${id}.json`);

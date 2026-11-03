@@ -13,16 +13,18 @@ import { requiredFor, type ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDet
 import { klDay, weekOf, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
 import { candidates, formMode, SCHEDULE_STATUSES, scheduleRow, scheduleTeam, sortOf, SORTS, type ScheduleRow } from "@ac/web/lib/partnerSchedule";
 
-type Page<T> = { items: T[]; total: number };
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
-  if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
-  throw e;
-});
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
+  return p.catch((error) => {
+    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+    throw error;
+  });
+};
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
-const klDate = (iso: string) => new Date(Date.parse(iso) + 8 * 3600_000).toISOString().slice(0, 10);
+const klDate = (iso: string) => new Date(Date.parse(iso) + 8 * 3_600_000).toISOString().slice(0, 10);
 const KL = "Asia/Kuala_Lumpur";
 
 export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
+  interface Page<T> { items: T[]; total: number }
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const nowMs = now.getTime();
   const i = i18nOf(display);
@@ -41,9 +43,9 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   const base = { now: now.toISOString(), sort, sorts: SORTS.map((s) => ({ id: s.id, text: t(s.text) })), rows, members, zone: display.timeZone, otherZone: display.timeZone !== KL };
   const picked = rows.find((r) => r.id === sp.jobId) ?? rows[0];
   if (!picked) return { ...base, selected: null, week: null };
-  const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId: picked.id }).catch((e) => {
-    if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN")) return null; // delegation ended meanwhile
-    throw e;
+  const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId: picked.id }).catch((error) => {
+    if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.code === "FORBIDDEN")) return null; // delegation ended meanwhile
+    throw error;
   });
   if (!job || job.projection === "history") return { ...base, selected: null, week: null };
   const label = `${picked.short} · ${picked.title}`;

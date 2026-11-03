@@ -10,7 +10,7 @@ import { useAction } from "@ac/web/lib/useAction";
 import { nameError } from "@ac/web/lib/assets";
 import { renameLocation } from "../properties/actions";
 
-export type Renaming = { kind: "property" | "space" | "unit"; id: string; version: number; name: string; where: string };
+export interface Renaming { kind: "property" | "space" | "unit"; id: string; version: number; name: string; where: string }
 
 export function RenameModal({ r, onClose, demo = false }: { r: Renaming; onClose: () => void; demo?: boolean }) {
   const t = useT();
@@ -20,10 +20,10 @@ export function RenameModal({ r, onClose, demo = false }: { r: Renaming; onClose
   const [err, setErr] = useState<string | undefined>();
   const save = () => {
     const e = nameError(name, t);
-    if (e) return setErr(e);
+    if (e) { setErr(e); return; }
     if (demo) {
       toast(t("Renamed to “{name}”", { name: name.trim() }));
-      return onClose();
+      onClose(); return;
     }
     run(() => renameLocation(r.kind, r.id, r.version, name), t("Renamed to “{name}”", { name: name.trim() }), onClose, (f) => {
       if (f.messageKey === "error.duplicateSiblingName") setErr(t("“{name}” already exists there — choose another name. Your input is kept.", { name: name.trim() }));

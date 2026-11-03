@@ -8,14 +8,14 @@ import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } f
 import { cookies } from "next/headers";
 import { createClient } from "@redis/client";
 
-export type Session = {
+export interface Session {
   accessToken: string;
   refreshToken: string | null;
   tenantId: string;
   membershipId: string;
   role: "client" | "contractor" | "technician" | "admin";
   expiresAt: number; // epoch seconds of the access token
-};
+}
 
 // One web app per role (IR178). AC_APP_ROLE is set at build time by each app's next.config; the cookie names carry
 // it because local apps share the host "localhost" (cookies are not separated by port).
@@ -24,22 +24,22 @@ export const APP_ROLE = (process.env.AC_APP_ROLE ?? "client") as Session["role"]
 /** True when the app is served over HTTPS (APP_URL): its cookies are Secure and carry the cookie prefixes. */
 const httpsApp = () => oidcConfig().appUrl.startsWith("https");
 
-// On https the names carry the cookie prefixes: __Host- for the session (Secure, Path=/, no Domain) and __Secure- for
+// On HTTPS the names carry the cookie prefixes: __Host- for the session (Secure, Path=/, no Domain) and __Secure- for
 // the sign-in state (Secure, Path=/bff/auth). The browser then keeps them to this host and HTTPS, so a sibling
 // subdomain cannot set or shadow them (cookie tossing, IR374). Plain-http local runs keep the plain names.
 export const SESSION_COOKIE = `${httpsApp() ? "__Host-" : ""}ac_session_${APP_ROLE}`;
 export const OIDC_COOKIE = `${httpsApp() ? "__Secure-" : ""}ac_oidc_${APP_ROLE}`;
 
-/** Shortest SESSION_SECRET a deployment on https accepts. */
+/** Shortest SESSION_SECRET a deployment on HTTPS accepts. */
 export const MIN_SECRET_LENGTH = 32;
 
 /** The local default secret of plain-http runs (compose.yaml uses the same value). */
 const LOCAL_SECRET = "local-dev-session-secret-change-me";
 
-/** The cookie key: 32 bytes derived from SESSION_SECRET with HKDF-SHA256 (the secret itself is never the key). On https
- * a missing, empty or short secret is refused rather than replaced by the local one, and so is the public local value
- * (IR430: it is long enough, but it is in the repository), so a deployment without its own secret cannot seal or open
- * a session and fails closed (IR367). Plain-http local runs keep the local default. */
+/** The cookie key: 32 bytes derived from SESSION_SECRET with HKDF-SHA256 (the secret itself is never the key). On HTTPS
+a missing, empty or short secret is refused rather than replaced by the local one, and so is the public local value
+(IR430: it is long enough, but it is in the repository), so a deployment without its own secret cannot seal or open
+a session and fails closed (IR367). Plain-http local runs keep the local default. */
 export function cookieKey(): Buffer {
   const secret = process.env.SESSION_SECRET || undefined;
   if (oidcConfig().appUrl.startsWith("https") && (secret === undefined || secret.length < MIN_SECRET_LENGTH || secret.includes("change-me"))) {
@@ -60,7 +60,7 @@ export function seal(value: object): string {
 
 /** Opens a sealed cookie value; null when it is missing, altered, sealed with another key, or not JSON. */
 export function unseal<T>(token: string | undefined): T | null {
-  const [iv64, body64, extra] = (token ?? "").split(".");
+  const [iv64, body64, extra] = (token ?? "").split(".", 3);
   if (!iv64 || !body64 || extra !== undefined) return null;
   const iv = Buffer.from(iv64, "base64url"), body = Buffer.from(body64, "base64url");
   if (iv.length !== IV_BYTES || body.length <= TAG_BYTES) return null;
@@ -83,7 +83,7 @@ export function cookieOptions() {
 }
 
 /** The attributes that remove the session cookie: the Secure flag and path it was set with. A browser ignores a
- * deletion of a __Host- cookie that lacks them, which is what cookies.delete(name) sends (IR374). */
+deletion of a __Host- cookie that lacks them, which is what cookies.delete(name) sends (IR374). */
 export function clearedCookieOptions() {
   return { ...cookieOptions(), maxAge: 0 };
 }
@@ -125,8 +125,8 @@ export async function refresh(s: Session): Promise<Session | null> {
 }
 
 /** Ends the identity provider's session of a sign-in (backend architecture §6: sign-out revokes the IdP session and
- * its refresh token, IR357): Keycloak's back-channel logout, the refresh token posted with the client's credentials
- * to the internal logout endpoint. False when the provider refused or did not answer within 3 seconds. */
+its refresh token, IR357): Keycloak's back-channel logout, the refresh token posted with the client's credentials
+to the internal logout endpoint. False when the provider refused or did not answer within 3 seconds. */
 export async function endIdpSession(refreshToken: string): Promise<boolean> {
   const cfg = oidcConfig();
   try {
@@ -157,26 +157,26 @@ export function needsRefresh(s: Session): boolean {
 export const ABSOLUTE_SECONDS = 12 * 60 * 60;
 const STORE_TIMEOUT_MS = 2000;
 
-type Stored = { session: Session; startedAt: number }; // epoch seconds of the sign-in
-type StoreClient = {
+interface Stored { session: Session; startedAt: number } // epoch seconds of the sign-in
+interface StoreClient {
   getEx(key: string, options: { type: "EX"; value: number }): Promise<string | null>;
   set(key: string, value: string, options: { expiration: { type: "EX"; value: number }; condition?: "XX" }): Promise<string | null>;
   del(key: string): Promise<number>;
-};
+}
 
 let client: Promise<StoreClient> | null = null;
 
 /** The store's client, connected once per process; null without SESSION_STORE_URL (the cookie carries the session). A
- * failed connection is tried again by the next request; commands fail at once while it is down (no offline queue). */
+failed connection is tried again by the next request; commands fail at once while it is down (no offline queue). */
 function store(): Promise<StoreClient> | null {
   const url = process.env.SESSION_STORE_URL;
   if (!url) return null;
   if (!client) {
     const c = createClient({ url, disableOfflineQueue: true, socket: { connectTimeout: STORE_TIMEOUT_MS, reconnectStrategy: (n: number) => Math.min(100 * 2 ** n, 2000) } });
-    c.on("error", (e: Error) => console.warn(`session store: ${e.message}`));
-    client = c.connect().then(() => c as unknown as StoreClient, (e: unknown) => {
+    c.on("error", (e: Error) => { console.warn(`session store: ${e.message}`); });
+    client = c.connect().then(() => c as unknown as StoreClient, (error: unknown) => {
       client = null;
-      throw e;
+      throw error;
     });
   }
   return client;
@@ -185,8 +185,8 @@ function store(): Promise<StoreClient> | null {
 /** A store call that gives up after 2 seconds: the session then counts as absent (fail closed). */
 const timed = <T,>(p: Promise<T>): Promise<T> => {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<never>((_, fail) => { timer = setTimeout(() => fail(new Error("session store timeout")), STORE_TIMEOUT_MS); });
-  return Promise.race([p, late]).finally(() => clearTimeout(timer));
+  const late = new Promise<never>((_, fail) => { timer = setTimeout(() => { fail(new Error("session store timeout")); }, STORE_TIMEOUT_MS); });
+  return Promise.race([p, late]).finally(() => { clearTimeout(timer); });
 };
 const keyOf = (id: string) => `ac:session:${createHash("sha256").update(id).digest("hex")}`;
 const idOf = (cookie: string | undefined) => {
@@ -195,8 +195,8 @@ const idOf = (cookie: string | undefined) => {
 };
 
 /** The session a cookie value names: in store mode the live record of its sealed ID (the read extends the idle
- * lifetime), else the sealed session itself. Null when the cookie is missing, altered or of the other mode, when the
- * record was deleted or has expired, or when the store does not answer. */
+lifetime), else the sealed session itself. Null when the cookie is missing, altered or of the other mode, when the
+record was deleted or has expired, or when the store does not answer. */
 export async function loadSession(cookie: string | undefined): Promise<Session | null> {
   const c = store();
   if (!c) {
@@ -213,14 +213,13 @@ export async function loadSession(cookie: string | undefined): Promise<Session |
       return null;
     }
     return rec.session;
-  } catch (e) {
-    console.warn(`session store: ${(e as Error).message}`);
+  } catch (error) {
+    console.warn(`session store: ${(error as Error).message}`);
     return null;
   }
 }
 
-/** The cookie value of a new sign-in: store mode stores the session under a new random ID and deletes the record the
- * browser's previous cookie named; cookie mode seals the session. Throws when the store does not answer. */
+/** The cookie value of a new sign-in: store mode stores the session under a new random ID and deletes the record the browser's previous cookie named; cookie mode seals the session. Throws when the store does not answer. */
 export async function createSessionCookie(s: Session, previous?: string): Promise<string> {
   const c = store();
   if (!c) return seal(s);
@@ -231,9 +230,7 @@ export async function createSessionCookie(s: Session, previous?: string): Promis
   return seal({ sid: id });
 }
 
-/** The cookie value after a token refresh: store mode rewrites the record only while it still exists, so a sign-out
- * in another tab stays a sign-out, and keeps the cookie; cookie mode seals the new session. Null when the record is
- * gone or the store does not answer. */
+/** The cookie value after a token refresh: store mode rewrites the record only while it still exists, so a sign-out in another tab stays a sign-out, and keeps the cookie; cookie mode seals the new session. Null when the record is gone or the store does not answer. */
 export async function renewSessionCookie(cookie: string | undefined, s: Session): Promise<string | null> {
   const c = store();
   if (!c) return seal(s);
@@ -245,22 +242,22 @@ export async function renewSessionCookie(cookie: string | undefined, s: Session)
     if (!rec) return null;
     const ok = await timed(sc.set(keyOf(id), seal({ session: s, startedAt: rec.startedAt } satisfies Stored), { expiration: { type: "EX", value: SESSION_MAX_AGE }, condition: "XX" }));
     return ok === null ? null : cookie;
-  } catch (e) {
-    console.warn(`session store: ${(e as Error).message}`);
+  } catch (error) {
+    console.warn(`session store: ${(error as Error).message}`);
     return null;
   }
 }
 
 /** Deletes the stored session a cookie names (sign-out, a failed refresh, a new sign-in); cookie mode has nothing to
- * delete. Best effort: when the store does not answer, the record ends with its idle lifetime. */
+delete. Best effort: when the store does not answer, the record ends with its idle lifetime. */
 export async function dropSession(cookie: string | undefined): Promise<void> {
   const c = store();
   const id = c ? idOf(cookie) : null;
   if (!c || !id) return;
   try {
     await timed((await timed(c)).del(keyOf(id)));
-  } catch (e) {
-    console.warn(`session store: ${(e as Error).message}`);
+  } catch (error) {
+    console.warn(`session store: ${(error as Error).message}`);
   }
 }
 
@@ -284,15 +281,14 @@ export async function readSession(): Promise<Session | null> {
 
 /** A same-origin path to return to after sign-in; rejects absolute, protocol-relative ("//host") and backslash forms. */
 export function safeReturnTo(v: string | null | undefined): string | null {
-  if (!v || !v.startsWith("/") || v.startsWith("//") || v.includes("\\") || /[\u0000-\u001f]/.test(v)) return null;
-  return v;
+  return !v || !v.startsWith("/") || v.startsWith("//") || v.includes("\\") || /[\u0000-\u001F]/.test(v) ? null : v;
 }
 
 export const roleHome: Record<Session["role"], string> = { client: "/customer", contractor: "/partner", technician: "/technician", admin: "/admin" };
 
 /** Decodes a JWT payload without verifying it (the Core API verifies every token against the JWKS). */
 export function jwtClaims(token: string): Record<string, unknown> {
-  const part = token.split(".")[1] ?? "";
+  const part = token.split(".", 2)[1] ?? "";
   try {
     return JSON.parse(Buffer.from(part, "base64url").toString()) as Record<string, unknown>;
   } catch {

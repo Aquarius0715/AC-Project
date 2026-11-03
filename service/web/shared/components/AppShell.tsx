@@ -40,18 +40,18 @@ function NavLink({ href, label, icon, badge, active }: { href: string; label: st
   );
 }
 
-type NavItem = { href: string; label: string; icon: IconName; badge?: string; match?: string[] };
+interface NavItem { href: string; label: string; icon: IconName; badge?: string; match?: string[] }
 /** The role's sidebar items with the active one: the longest matching path, where an item whose href carries a query
- * (Sidebar › Assigned jobs = /technician?tab=all) wins on its path only when the query matches too. */
+(Sidebar › Assigned jobs = /technician?tab=all) wins on its path only when the query matches too. */
 function RoleNav({ items, base, pathname, search }: { items: NavItem[]; base: string; pathname: string; search: string }) {
   const query = new URLSearchParams(search);
   const score = (href: string, match?: string[]) => {
     const hits = [href, ...(match ?? [])].filter((h) => {
-      const [path, q] = h.split("?");
+      const [path, q] = h.split("?", 2);
       if (q) return pathname === path && [...new URLSearchParams(q)].every(([k, v]) => query.get(k) === v);
       return path === base ? pathname === path : pathname === path || pathname.startsWith(path + "/");
     });
-    return hits.length ? Math.max(...hits.map((h) => h.length)) : 0;
+    return hits.length > 0 ? Math.max(...hits.map((h) => h.length)) : 0;
   };
   const best = Math.max(0, ...items.map((i) => score(i.href, i.match)));
   const activeHref = best ? items.find((i) => score(i.href, i.match) === best)?.href : undefined;
@@ -62,8 +62,8 @@ function RoleNavWithQuery(props: { items: NavItem[]; base: string; pathname: str
 }
 
 /** The app frame. In API mode the layout passes `live` (IR241): the organization as the scope label, the signed-in user
- * in the chip, the sidebar badges counted by the Core API (no badge for 0) and the user's display language and time
- * zone (IR258, IR259); the demo keeps the fixed ones, the language chosen in this browser and Asia/Kuala_Lumpur. */
+in the chip, the sidebar badges counted by the Core API (no badge for 0) and the user's display language and time
+zone (IR258, IR259); the demo keeps the fixed ones, the language chosen in this browser and Asia/Kuala_Lumpur. */
 export function AppShell({ role: forced, live, children }: { role?: Role; live?: ShellLive; children: React.ReactNode }) {
   const detected = useStoredRole();
   const role = forced ?? detected;
@@ -72,13 +72,13 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
   const display: Display = live ? live.display : { ...DEFAULT_DISPLAY, locale: isLocale(stored) ? stored : "en" };
   const t = (text: string) => translate(display.locale, text);
   const scope = live ? (live.organization || cfg.scope).toUpperCase() : cfg.scope;
-  const [roleWord, persona] = cfg.chip.split(" — ");
+  const [roleWord, persona] = cfg.chip.split(" — ", 2);
   const chip = `${t(roleWord)} — ${live ? live.user || t("signed in") : persona}`;
   const count = (href: string) => (live?.badges[href] ? String(live.badges[href]) : undefined);
   const pathname = usePathname();
   const session = useBffSession();
   // Users is owner-only (FR-C19): the session's client role in API mode, the demo persona otherwise
-  const owner = session?.dataSource === "api" ? session.clientRole === "owner" : CURRENT_CLIENT.role === "owner";
+  const isOwner = session?.dataSource === "api" ? session.clientRole === "owner" : CURRENT_CLIENT.role === "owner";
   const [open, setOpen] = useState(false);
   // close the mobile menu when the route changes: adjust state during render (React: "You might not need an effect")
   const [menuPath, setMenuPath] = useState(pathname);
@@ -96,7 +96,7 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
   const title = label ? t(label) : "AC Project";
   // the tab's title names the page in the display language after a client-side navigation too (WCAG 2.4.2, IR490)
   useEffect(() => { document.title = documentTitle(role, pathname, display.locale); }, [role, pathname, display.locale]);
-  const demo = pathname === "/demo";
+  const isDemo = pathname === "/demo";
 
 
   const sidebar = (
@@ -109,9 +109,9 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
           <Suspense fallback={<RoleNav items={items} base={cfg.base} pathname={pathname} search="" />}><RoleNavWithQuery items={items} base={cfg.base} pathname={pathname} /></Suspense>
           <div className="my-2 border-t border-line" />
           <nav className="flex flex-col gap-0.5">
-            {role === "client" && owner && <NavLink href="/customer/users" label={t("Users")} icon="users" active={pathname === "/customer/users"} />}
+            {role === "client" && isOwner && <NavLink href="/customer/users" label={t("Users")} icon="users" active={pathname === "/customer/users"} />}
             {role === "contractor" && <NavLink href="/partner/users" label={t("Users")} icon="users" active={pathname === "/partner/users"} />}
-            {SHARED.map((s) => <NavLink key={s.href} {...s} label={t(s.label)} active={pathname === s.href} badge={s.href !== "/notifications" ? undefined : live ? count(s.href) : String(3 + unread)} />)}
+            {SHARED.map((s) => <NavLink key={s.href} {...s} label={t(s.label)} active={pathname === s.href} badge={s.href === "/notifications" ? (live ? count(s.href) : String(3 + unread)) : undefined} />)}
             <Link href="/demo" className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-warn hover:bg-warn-soft/50", pathname === "/demo" && "bg-warn-soft/60")}>
               <Icon name="demo" className="text-[15px]" />
               <span className="flex-1">{t("Demo controls")}</span>
@@ -133,7 +133,7 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
       {/* keyboard users jump past the sidebar and the header to the page (UIUX accessibility, IR568) */}
       {/* focus moves in code, not by the #main fragment: a fragment would enter the URL, which holds the screens' state,
           and the router's own fragment handling moved focus again after it */}
-      <a href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}
+      <a href="#main" onClick={(e) => { e.preventDefault(); document.querySelector<HTMLElement>("#main")?.focus(); }}
         className="fixed top-3 left-3 z-[70] -translate-y-24 rounded-control bg-primary px-3.5 py-2 text-[13px] font-semibold text-white shadow-md transition-transform focus:translate-y-0">{t("Skip to main content")}</a>
       <div className="min-h-dvh lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
         {/* the sidebar: in the page from lg up, in a sheet opened by the menu button below (shadcn/ui Sheet, DEC-75) */}
@@ -143,30 +143,30 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
         </Sheet>
 
         <div className="flex min-w-0 flex-col">
-          <header className={cx("sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b px-4 backdrop-blur sm:px-6 lg:px-8", demo ? "border-[#fdba74] bg-warn-soft" : "border-line bg-surface/95")}>
+          <header className={cx("sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b px-4 backdrop-blur sm:px-6 lg:px-8", isDemo ? "border-[#fdba74] bg-warn-soft" : "border-line bg-surface/95")}>
             <div className="flex min-w-0 items-center gap-3">
-              <Button variant="outline" size="icon" aria-label={t("Open menu")} onClick={() => setOpen(true)} className="size-9 rounded-control lg:hidden"><Icon name="menu" /></Button>
+              <Button variant="outline" size="icon" aria-label={t("Open menu")} onClick={() => { setOpen(true); }} className="size-9 rounded-control lg:hidden"><Icon name="menu" /></Button>
               {/* Demo controls are always labelled demo (FR-X05, Figma 10e) */}
-              <h1 className={cx("flex min-w-0 items-center gap-2 text-[15px] font-bold", demo && "text-warn")}>{demo && <Icon name="demo" />}<span className="truncate">{title}</span>{demo && <Badge tone="warn" className="uppercase tracking-wide max-sm:hidden">{t("Always labelled demo")}</Badge>}</h1>
+              <h1 className={cx("flex min-w-0 items-center gap-2 text-[15px] font-bold", isDemo && "text-warn")}>{isDemo && <Icon name="demo" />}<span className="truncate">{title}</span>{isDemo && <Badge tone="warn" className="uppercase tracking-wide max-sm:hidden">{t("Always labelled demo")}</Badge>}</h1>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {role === "technician" && <Btn size="sm" onClick={() => setQr(true)} aria-label={t("Scan QR")} className="gap-1.5 font-bold"><Icon name="qr" /> <span className="max-sm:hidden">{t("Scan QR")}</span></Btn>}
+              {role === "technician" && <Btn size="sm" onClick={() => { setQr(true); }} aria-label={t("Scan QR")} className="gap-1.5 font-bold"><Icon name="qr" /> <span className="max-sm:hidden">{t("Scan QR")}</span></Btn>}
               {role === "client" && (
-                <Button variant="outline" size="sm" onClick={() => setAssistant(true)} aria-label={t("Assistant")} className="gap-1.5 rounded-full border-primary bg-primary-soft/50 font-bold text-primary hover:bg-primary-soft"><Icon name="mic" /> <span className="max-sm:hidden">{t("Assistant")}</span></Button>
+                <Button variant="outline" size="sm" onClick={() => { setAssistant(true); }} aria-label={t("Assistant")} className="gap-1.5 rounded-full border-primary bg-primary-soft/50 font-bold text-primary hover:bg-primary-soft"><Icon name="mic" /> <span className="max-sm:hidden">{t("Assistant")}</span></Button>
               )}
-              <span className="inline-flex items-center gap-1.5 rounded-control bg-surface2 px-3 py-1.5 text-xs font-semibold"><Icon name="account" /> <span className="max-sm:hidden">{chip}</span><span className="sm:hidden">{chip.split(" — ")[0]}</span></span>
+              <span className="inline-flex items-center gap-1.5 rounded-control bg-surface2 px-3 py-1.5 text-xs font-semibold"><Icon name="account" /> <span className="max-sm:hidden">{chip}</span><span className="sm:hidden">{chip.split(" — ", 1)[0]}</span></span>
             </div>
           </header>
           <main id="main" tabIndex={-1} className="min-w-0 flex-1 px-4 py-5 outline-none sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
-      {role === "technician" && session?.dataSource === "api" && <QrScan open={qr} onClose={() => setQr(false)} />}
-      <Modal open={qr && session?.dataSource !== "api"} onClose={() => setQr(false)} title="Scan unit QR" footer={<><Btn onClick={() => setQr(false)}>Close</Btn><Link href="/technician/jobs/job-contractor-a" onClick={() => setQr(false)} className="inline-flex items-center rounded-control border border-primary bg-primary px-3.5 py-2 text-[13px] font-semibold text-white">Open job <Icon name="arrowRight" /></Link></>}>
+      {role === "technician" && session?.dataSource === "api" && <QrScan open={qr} onClose={() => { setQr(false); }} />}
+      <Modal open={qr && session?.dataSource !== "api"} onClose={() => { setQr(false); }} title="Scan unit QR" footer={<><Btn onClick={() => { setQr(false); }}>Close</Btn><Link href="/technician/jobs/job-contractor-a" onClick={() => { setQr(false); }} className="inline-flex items-center rounded-control border border-primary bg-primary px-3.5 py-2 text-[13px] font-semibold text-white">Open job <Icon name="arrowRight" /></Link></>}>
         <div className="grid h-40 place-items-center rounded-xl bg-ink/90 text-xs text-white">[ camera preview ]</div>
         <SummaryList items={[["Result", <Badge key="m" tone="ok" icon="check">Matched</Badge>], ["Label", "AC-QR-online-rto · scanned 10:04"], ["Unit", "Bedroom AC · unit-online-rto · customer-a · Home A › 1F › Bedroom"], ["Your job today", "job-contractor-a"]]} />
         <Banner>Units outside your assignments show “Not in your assignments” (NOT_FOUND).</Banner>
       </Modal>
-      {role === "client" && <AssistantPanel open={assistant} onClose={() => setAssistant(false)} context={title} live={!!live} />}
+      {role === "client" && <AssistantPanel open={assistant} onClose={() => { setAssistant(false); }} context={title} live={!!live} />}
     </ToastProvider>
     </I18nProvider>
   );

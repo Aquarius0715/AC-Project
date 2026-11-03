@@ -9,6 +9,7 @@ import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display"
 import { expectAccessible } from "../../fixtures/a11y";
 
 let zoneBefore: string | null = null;
+
 test.afterEach(async ({ page }) => {
   if (zoneBefore) await setDisplay(page, ENGLISH, zoneBefore);
   zoneBefore = null;
@@ -17,8 +18,9 @@ test.afterEach(async ({ page }) => {
 test("the customer screens in Malay keep IDs and units and use the display time zone", async ({ page }) => {
   const zone = await displayZone(page);
   await page.goto("/customer"); // the overview lists every AC with a link to its screen
-  const href = await page.locator('main a[href^="/customer/units/"]').first().getAttribute("href");
-  expect(href).toBeTruthy();
+  const unitLink = page.locator('main a[href^="/customer/units/"]').first();
+  await expect(unitLink).toHaveAttribute("href", /^\/customer\/units\//);
+  const href = await unitLink.getAttribute("href");
   zoneBefore = zone;
   await setDisplay(page, MALAY, "Asia/Tokyo");
   await page.goto("/customer");

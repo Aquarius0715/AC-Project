@@ -11,9 +11,8 @@ export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messa
 async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
-  } catch (e) {
-    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds };
-    return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+  } catch (error) {
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     refresh();
   }
@@ -21,7 +20,7 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
 const write = (version?: number) => (version === undefined ? { write: true } : { write: true, expectedVersion: version });
 
 /** payments.simulate initiate with the chosen demo card; the demo PSP takes the card at once (processing), and the
- * invoice is paid only after a confirmation event (DD-C11). */
+invoice is paid only after a confirmation event (DD-C11). */
 export async function startPayment(invoiceId: string, version: number, method: "demo_credit_card" | "demo_debit_card") {
   return run(async () => {
     const p = await coreOp<ClientPayment>("payments.simulate", { event: "initiate", invoiceId, method, demoConfirmed: true }, write(version));

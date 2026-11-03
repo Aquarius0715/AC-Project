@@ -14,9 +14,8 @@ export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messa
 async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResult<T>> {
   try {
     return { ok: true, value: await fn() };
-  } catch (e) {
-    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds };
-    return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
+  } catch (error) {
+    return error instanceof CoreError ? { ok: false, messageKey: error.error.messageKey, code: error.error.code, fieldErrors: error.error.fieldErrors ?? {}, retryAfterSeconds: error.error.retryAfterSeconds } : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     if (rerender) refresh();
   }
@@ -27,7 +26,7 @@ export async function saveCapability(input: OpInput<"capabilities.save">, versio
   return run(() => coreOp<{ id: string; version: number }>("capabilities.save", input, { write: true, expectedVersion: input.id ? version : undefined }).then((k) => ({ id: k.id, version: k.version })));
 }
 
-export type HistoryEntry = { at: string; actor: string; from: number | null; to: number | null; reason: string | null; changes: string[] };
+export interface HistoryEntry { at: string; actor: string; from: number | null; to: number | null; reason: string | null; changes: string[] }
 
 /** The saved versions of a capability: audit.list for its id over the last 12 months (DD-A04 step 6; a read). */
 export async function capabilityHistory(capabilityId: string) {
@@ -37,10 +36,12 @@ export async function capabilityHistory(capabilityId: string) {
     const to = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
     const page = await coreOp<{ items: { occurredAt: string; actorId: string; previousVersion: number | null; nextVersion: number | null; reason: string | null; maskedBefore: Record<string, string | null> | null; maskedAfter: Record<string, string | null> | null }[] }>(
       "audit.list", { limit: 100, filters: { targetId: capabilityId, from, to } });
-    return page.items.map((a): HistoryEntry => ({
-      at: a.occurredAt, actor: a.actorId, from: a.previousVersion, to: a.nextVersion, reason: a.reason,
-      changes: Object.keys({ ...a.maskedBefore, ...a.maskedAfter }).filter((k) => (a.maskedBefore ?? {})[k] !== (a.maskedAfter ?? {})[k]),
-    }));
+    return page.items.map((a): HistoryEntry => {
+      return {
+        at: a.occurredAt, actor: a.actorId, from: a.previousVersion, to: a.nextVersion, reason: a.reason,
+        changes: Object.keys({ ...a.maskedBefore, ...a.maskedAfter }).filter((k) => (a.maskedBefore ?? {})[k] !== (a.maskedAfter ?? {})[k]),
+      };
+    });
   }, false);
 }
 
@@ -70,12 +71,14 @@ export async function updateFirmware(deviceId: string, version: number, firmware
 
 /** firmwareCampaigns.schedule; `startAt` is the instant the form read in the user's display time zone (NFR-08). */
 export async function scheduleCampaign(d: CampaignDraft, startAt: string) {
-  return run(() => coreOp<{ id: string }>("firmwareCampaigns.schedule", {
-    modelId: d.modelId, targetVersion: d.targetVersion, deviceIds: d.deviceIds, waves: parseWaves(d.waves) ?? [], window: { startLocal: d.startLocal, endLocal: d.endLocal },
-    autoPauseFailurePercent: Number(d.autoPause), startAt,
-  }, { write: true }).then((c) => c.id));
+  return run(() => {
+    return coreOp<{ id: string }>("firmwareCampaigns.schedule", {
+      modelId: d.modelId, targetVersion: d.targetVersion, deviceIds: d.deviceIds, waves: parseWaves(d.waves) ?? [], window: { startLocal: d.startLocal, endLocal: d.endLocal },
+      autoPauseFailurePercent: Number(d.autoPause), startAt,
+    }, { write: true }).then((c) => c.id);
+  });
 }
 
 export async function controlCampaign(campaignId: string, version: number, action: "pause" | "resume" | "abort" | "retry_device", deviceId?: string, reason?: string) {
-  return run(() => coreOp("firmwareCampaigns.control", { campaignId, action, ...(deviceId ? { deviceId } : {}), ...(reason ? { reason } : {}) }, { write: true, expectedVersion: version }).then(() => null));
+  return run(() => coreOp("firmwareCampaigns.control", { campaignId, action, ...(deviceId && { deviceId }), ...(reason && { reason }) }, { write: true, expectedVersion: version }).then(() => null));
 }

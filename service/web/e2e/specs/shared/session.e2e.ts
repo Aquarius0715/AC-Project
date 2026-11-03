@@ -41,9 +41,9 @@ test("Sign out ends the session, at the identity provider too", async ({ browser
     await page.getByRole("button", { name: "Sign out" }).click();
     await page.waitForURL(/\/login$/);
     await page.goto(app.home);
-    await expect(page).toHaveURL(new RegExp(`/login\\?returnTo=${encodeURIComponent(app.home)}`));
+    await expect(page).toHaveURL(new RegExp(String.raw`/login\?returnTo=${encodeURIComponent(app.home)}`));
     const again = page.getByRole("link", { name: `Continue as ${app.user}` });
-    await expect(again).toHaveAttribute("href", new RegExp(`^/bff/auth/login\\?login_hint=${app.user}&returnTo=`));
+    await expect(again).toHaveAttribute("href", new RegExp(String.raw`^/bff/auth/login\?login_hint=${app.user}&returnTo=`));
     // the provider's session ended with the sign-out: signing in again asks for the password instead of coming back
     await again.click();
     await expect(page.locator("#password")).toBeVisible();
@@ -70,7 +70,7 @@ test("a copy of the session cookie stops working at sign-out", async ({ browser,
     await page.getByRole("button", { name: "Sign out" }).click();
     await page.waitForURL(/\/login$/);
     await elsewhere.goto(app.home);
-    await expect(elsewhere).toHaveURL(new RegExp(`/login\\?returnTo=${encodeURIComponent(app.home)}`));
+    await expect(elsewhere).toHaveURL(new RegExp(String.raw`/login\?returnTo=${encodeURIComponent(app.home)}`));
   } finally {
     await context.close();
     await other.close();
@@ -91,7 +91,7 @@ test.describe("signed out", () => {
 
   test("a protected page keeps where it was going", async ({ page, app }) => {
     await page.goto(`${app.home}/x-not-a-page`);
-    await expect(page).toHaveURL(new RegExp(`/login\\?returnTo=${encodeURIComponent(`${app.home}/x-not-a-page`)}`));
+    await expect(page).toHaveURL(new RegExp(String.raw`/login\?returnTo=${encodeURIComponent(`${app.home}/x-not-a-page`)}`));
     const href = await page.getByRole("link", { name: /^Continue as / }).getAttribute("href");
     expect(decodeURIComponent(href ?? "")).toContain(`returnTo=${app.home}/x-not-a-page`);
   });

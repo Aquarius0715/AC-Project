@@ -10,36 +10,36 @@ import { showTime } from "@ac/web/lib/i18n";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
-export type Communication = {
+export interface Communication {
   jobId: string; version: number | null; saveNote: boolean; message: string; visibility: "internal" | "customer";
   templateKey: OpInput<"notifications.preview">["templateKey"]; channel: OpInput<"notifications.preview">["channel"]; recipientMembershipId: string;
-};
-type Preview = { id: string; templateKey: string; channel: string; recipientMembershipId: string; deliveryState: string; occurredAt: string; at: string };
+}
+interface Preview { id: string; templateKey: string; channel: string; recipientMembershipId: string; deliveryState: string; occurredAt: string; at: string }
 export type CommunicationFailure = { ok: false; stage: "note" | "preview"; noteSaved: boolean } & ActionFailure;
 type Failure = CommunicationFailure;
 const failure = (e: CoreError, stage: Failure["stage"], noteSaved: boolean): Failure => ({ ok: false, stage, noteSaved, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds });
 
-export async function communicate(c: Communication): Promise<{ ok: true; value: { noteSaved: boolean; preview: Preview } } | Failure> {
+export async function communicate(c: Communication): Promise<Failure | { ok: true; value: { noteSaved: boolean; preview: Preview } }> {
   const message = c.message.trim();
-  let noteSaved = false;
+  let isNoteSaved = false;
   if (c.saveNote) {
     try {
       await coreOp("jobs.addNote", { jobId: c.jobId, message, visibility: c.visibility }, { write: true, expectedVersion: c.version ?? undefined });
-      noteSaved = true;
-    } catch (e) {
-      if (!(e instanceof CoreError)) throw e;
-      if (e.error.code === "CONFLICT") refresh(); // another version or a closed job: show the latest
-      return failure(e, "note", false);
+      isNoteSaved = true;
+    } catch (error) {
+      if (!(error instanceof CoreError)) throw error;
+      if (error.error.code === "CONFLICT") refresh(); // another version or a closed job: show the latest
+      return failure(error, "note", false);
     }
   }
   try {
     const p = await coreOp<Omit<Preview, "at">>("notifications.preview", { target: { kind: "job", id: c.jobId }, templateKey: c.templateKey, channel: c.channel, recipientMembershipId: c.recipientMembershipId, message });
-    if (noteSaved) refresh();
+    if (isNoteSaved) refresh();
     const at = showTime(p.occurredAt, await coreDisplay()); // in the user's display time zone (IR278)
-    return { ok: true, value: { noteSaved, preview: { id: p.id, templateKey: p.templateKey, channel: p.channel, recipientMembershipId: p.recipientMembershipId, deliveryState: p.deliveryState, occurredAt: p.occurredAt, at } } };
-  } catch (e) {
-    if (!(e instanceof CoreError)) throw e;
-    if (noteSaved) refresh();
-    return failure(e, "preview", noteSaved);
+    return { ok: true, value: { noteSaved: isNoteSaved, preview: { id: p.id, templateKey: p.templateKey, channel: p.channel, recipientMembershipId: p.recipientMembershipId, deliveryState: p.deliveryState, occurredAt: p.occurredAt, at } } };
+  } catch (error) {
+    if (!(error instanceof CoreError)) throw error;
+    if (isNoteSaved) refresh();
+    return failure(error, "preview", isNoteSaved);
   }
 }

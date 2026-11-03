@@ -11,13 +11,15 @@ import type { ApiAlert } from "@ac/web/lib/alerts";
 import { klDay } from "@ac/web/lib/partnerOverview";
 import { alertRows, dayTimeline, kpis, reportRows, SORTS, sortOf, TABS, tabOf, techRow, type ApiTechCounts, type ApiTechJobRow, type TechJobRow } from "@ac/web/lib/techOverview";
 
-type Page<T> = { items: T[]; total: number };
-const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
-  if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
-  throw e;
-});
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => {
+  return p.catch((error) => {
+    if (error instanceof CoreError && error.error.code !== "UNAVAILABLE" && error.error.code !== "TIMEOUT") return fallback;
+    throw error;
+  });
+};
 
 export async function loadOverview(sp: { tab?: string; sort?: string }) {
+  interface Page<T> { items: T[]; total: number }
   const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const nowMs = now.getTime();
   const i = i18nOf(display);
@@ -35,7 +37,7 @@ export async function loadOverview(sp: { tab?: string; sort?: string }) {
   const jobOfUnit = new Map<string, string>();
   for (const j of list.items) if (j.projection === "summary" && !jobOfUnit.has(j.unitId)) jobOfUnit.set(j.unitId, j.id);
   const today = rows.filter((r) => r.today);
-  const klToday = new Date(nowMs + 8 * 3600_000).toISOString().slice(0, 10);
+  const klToday = new Date(nowMs + 8 * 3_600_000).toISOString().slice(0, 10);
   return {
     now: now.toISOString(), tab, sort, sorts: SORTS.map((s) => ({ id: s.id, text: t("Sort: {sort}", { sort: t(s.text) }) })),
     title: tab === "today" ? t("Today — sorted by severity, deadline, progress") : t("All assigned — sorted by {sort}", { sort: t(spec.word) }),

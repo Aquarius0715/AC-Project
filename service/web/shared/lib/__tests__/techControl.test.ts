@@ -9,10 +9,12 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
 const cmd = (over: Partial<ApiCommandRow> = {}): ApiCommandRow => ({ id: "cmd-00000001", action: { kind: "set_mode", mode: "cool" }, status: "acknowledged", requestedAt: "2026-09-14T01:00:00Z", acknowledgedAt: "2026-09-14T01:00:05Z", failureCode: null, reason: "test", diagnosticRunId: null, source: "diagnostic", ...over });
-const run = (over: Partial<ApiRun> = {}): ApiRun => ({
-  id: "run-1", version: 1, jobId: "job", unitId: "unit", startAction: { kind: "set_power", power: true }, endAction: { kind: "set_power", power: false }, durationMinutes: 5, reason: "test",
-  state: "running", startCommandId: "cmd-start", endCommandId: null, startedAt: "2026-09-14T01:05:00Z", endAt: "2026-09-14T01:10:00Z", failureCode: null, createdAt: "2026-09-14T01:04:00Z", ...over,
-});
+const run = (over: Partial<ApiRun> = {}): ApiRun => {
+  return {
+    id: "run-1", version: 1, jobId: "job", unitId: "unit", startAction: { kind: "set_power", power: true }, endAction: { kind: "set_power", power: false }, durationMinutes: 5, reason: "test",
+    state: "running", startCommandId: "cmd-start", endCommandId: null, startedAt: "2026-09-14T01:05:00Z", endAt: "2026-09-14T01:10:00Z", failureCode: null, createdAt: "2026-09-14T01:04:00Z", ...over,
+  };
+};
 
 describe("action text", () => {
   it("codes every unit action", () => {
