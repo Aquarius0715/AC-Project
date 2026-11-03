@@ -19,7 +19,7 @@ import (
 func (m Restrictions) RequestRelease(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	restrictionID uuid.UUID,
 	source string,
 ) error {
 	intent, _ := json.Marshal(
@@ -34,7 +34,7 @@ func (m Restrictions) RequestRelease(
 		ctx,
 		`UPDATE restrictions.restrictions SET state = 'release_requested', release_intent = $2, version = version + 1,
 			updated_at = $3 WHERE id = $1`,
-		id,
+		restrictionID,
 		intent,
 		call.Now,
 	)
@@ -45,13 +45,13 @@ func (m Restrictions) RequestRelease(
 	call.Emit(
 		ops.Event{
 			AggregateType: "restriction",
-			AggregateID:   id,
+			AggregateID:   restrictionID,
 			Type:          "RestrictionReleaseRequested",
 			Payload:       map[string]any{"source": source},
 		},
 	)
 
-	return m.evaluateRelease(ctx, call, id)
+	return m.evaluateRelease(ctx, call, restrictionID)
 }
 
 // evaluateRelease applies the D03 release table to every unit still at releaseState=none.
@@ -82,16 +82,16 @@ func (m Restrictions) evaluateRelease(ctx context.Context, call *ops.Call, id uu
 	var units []pending
 
 	for rows.Next() {
-		var p pending
+		var pendingUnit pending
 
-		err := rows.Scan(&p.unit, &p.apply)
+		err := rows.Scan(&pendingUnit.unit, &pendingUnit.apply)
 		if err != nil {
 			rows.Close()
 
 			return apperr.Wrap(err, "select restrictions.restriction_units")
 		}
 
-		units = append(units, p)
+		units = append(units, pendingUnit)
 	}
 
 	rows.Close()
@@ -105,19 +105,19 @@ func (m Restrictions) evaluateRelease(ctx context.Context, call *ops.Call, id uu
 		map[string]any{"kind": "remove_restriction", "restrictionId": id, "rulesVersion": rules},
 	)
 
-	for _, u := range units {
+	for _, pendingUnit := range units {
 		set := func(sql string, args ...any) error {
 			_, err := call.Tx.Exec(
 				ctx,
 				`UPDATE restrictions.restriction_units SET `+sql+` WHERE restriction_id = $1 AND unit_id = $2`,
-				append([]any{id, u.unit}, args...)...)
+				append([]any{id, pendingUnit.unit}, args...)...)
 
 			return apperr.Wrap(err, "update restrictions.restriction_units")
 		}
 
-		switch u.apply {
+		switch pendingUnit.apply {
 		case "not_sent": // undelivered apply is finalized as cancelled: zero-delivery evidence
-			unit := u.unit
+			unit := pendingUnit.unit
 
 			publishErr := events.Publish(
 				ctx,
@@ -158,7 +158,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, call *ops.Call, id uu
 				reason    *string
 			)
 
-			cmd, delivered, reason, err = m.send(ctx, call, id, u.unit, remove)
+			cmd, delivered, reason, err = m.send(ctx, call, id, pendingUnit.unit, remove)
 			if err != nil {
 				return err
 			}
@@ -210,14 +210,14 @@ func (m Restrictions) evaluateRelease(ctx context.Context, call *ops.Call, id uu
 }
 
 // finishRelease sets a release_requested restriction released once every unit is released / not_required (D03).
-func finishRelease(ctx context.Context, tx pgx.Tx, id uuid.UUID, now time.Time) error {
+func finishRelease(ctx context.Context, tx pgx.Tx, restrictionID uuid.UUID, now time.Time) error {
 	_, err := tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions r SET state = 'released', version = version + 1, updated_at = $2
 		WHERE r.id = $1 AND r.state = 'release_requested'
 		  AND NOT EXISTS (SELECT 1 FROM restrictions.restriction_units ru WHERE ru.restriction_id = r.id AND ru.release_state
 		  NOT IN ('released','not_required'))`,
-		id,
+		restrictionID,
 		now,
 	)
 

@@ -121,13 +121,13 @@ func sessionGet(ctx context.Context, call *ops.Call, _ *struct{}) (Session, erro
 	if err == nil &&
 		principal.Role == "client" { // identity's reference copy of the customers (IR188)
 		var id uuid.UUID
-		switch e := call.Tx.QueryRow(ctx, `SELECT c.id FROM notify.ref_customers c JOIN identity.memberships m ON
+		switch scanErr := call.Tx.QueryRow(ctx, `SELECT c.id FROM notify.ref_customers c JOIN identity.memberships m ON
 			m.organization_id = c.organization_id WHERE m.id = $1`,
 			principal.MembershipID).Scan(&id); {
-		case e == nil:
+		case scanErr == nil:
 			out.CustomerID = &id
-		case !errors.Is(e, pgx.ErrNoRows):
-			err = e
+		case !errors.Is(scanErr, pgx.ErrNoRows):
+			err = scanErr
 		}
 	}
 

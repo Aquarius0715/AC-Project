@@ -65,7 +65,7 @@ func EventHandlers() map[string]events.Handler {
 
 			return apperr.Wrap(err, "update assets.units")
 		},
-		events.OfferAccessChanged: func(ctx context.Context, tx pgx.Tx, event events.Event) error {
+		events.OfferAccessChanged: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
 			var offerAccess events.OfferAccess
 
 			decodeErr := event.Decode(&offerAccess)
@@ -74,7 +74,7 @@ func EventHandlers() map[string]events.Handler {
 			}
 
 			if !offerAccess.Accepted || offerAccess.UnitID == nil {
-				_, err := tx.Exec(
+				_, err := txn.Exec(
 					ctx,
 					`DELETE FROM assets.unit_offer_access WHERE tenant_id = $1 AND offer_id = $2`,
 					event.TenantID,
@@ -84,7 +84,7 @@ func EventHandlers() map[string]events.Handler {
 				return apperr.Wrap(err, "delete assets.unit_offer_access")
 			}
 
-			_, err := tx.Exec(
+			_, err := txn.Exec(
 				ctx,
 				`INSERT INTO assets.unit_offer_access (tenant_id, offer_id, job_id, unit_id, contractor_org_id, access_valid_from,
 					access_valid_until)
@@ -103,10 +103,10 @@ func EventHandlers() map[string]events.Handler {
 
 			return apperr.Wrap(err, "insert assets.unit_offer_access")
 		},
-		events.AssignmentAccessChanged: func(ctx context.Context, txn pgx.Tx, e events.Event) error {
+		events.AssignmentAccessChanged: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
 			var assignmentAccess events.AssignmentAccess
 
-			decodeErr := e.Decode(&assignmentAccess)
+			decodeErr := event.Decode(&assignmentAccess)
 			if decodeErr != nil {
 				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
@@ -115,7 +115,7 @@ func EventHandlers() map[string]events.Handler {
 				_, err := txn.Exec(
 					ctx,
 					`DELETE FROM assets.unit_assignment_access WHERE tenant_id = $1 AND assignment_id = $2`,
-					e.TenantID,
+					event.TenantID,
 					assignmentAccess.AssignmentID,
 				)
 
@@ -130,7 +130,7 @@ func EventHandlers() map[string]events.Handler {
 				ON CONFLICT (tenant_id, assignment_id) DO UPDATE SET job_id = EXCLUDED.job_id, unit_id = EXCLUDED.unit_id,
 				  technician_membership_id = EXCLUDED.technician_membership_id, created_at = EXCLUDED.created_at, scheduled =
 				  EXCLUDED.scheduled, active = EXCLUDED.active`,
-				e.TenantID,
+				event.TenantID,
 				assignmentAccess.AssignmentID,
 				assignmentAccess.JobID,
 				*assignmentAccess.UnitID,

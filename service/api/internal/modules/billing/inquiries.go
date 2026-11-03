@@ -117,13 +117,13 @@ func (m Billing) notifyMembers(
 		return err
 	}
 
-	for _, id := range ids {
-		if id == call.Principal.MembershipID {
+	for _, membershipID := range ids {
+		if membershipID == call.Principal.MembershipID {
 			continue
 		}
 
 		_, err := m.Notify.Create(ctx, call, notify.New{
-			RecipientMembershipID: id,
+			RecipientMembershipID: membershipID,
 			Type:                  "inquiry",
 			TemplateKey:           "inquiry",
 			TargetKind:            "inquiry",
@@ -172,13 +172,13 @@ func (m Billing) createInquiry(
 	call *ops.Call,
 	input *InquiryInput,
 ) (Inquiry, error) {
-	customer, ok, err := m.Customers.CustomerOfOrg(ctx, call, call.Principal.OrgID)
+	customer, found, err := m.Customers.CustomerOfOrg(ctx, call, call.Principal.OrgID)
 	if err != nil {
 		return Inquiry{}, apperr.Wrap(err, "billing.Customers.CustomerOfOrg")
 	}
 
 	notFound := apperr.E(apperr.NotFound, apperr.KeyNotFound)
-	if !ok {
+	if !found {
 		return Inquiry{}, notFound
 	}
 
@@ -220,14 +220,14 @@ func (m Billing) createInquiry(
 		}
 	}
 
-	id := uuid.New()
+	inquiryID := uuid.New()
 
 	_, execErr := call.Tx.Exec(
 		ctx,
 		`INSERT INTO billing.inquiries (id, tenant_id, customer_id, invoice_id, restriction_id, subject_type, message, state,
 			created_by, created_at, updated_at)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'received', $7, $8, $8)`,
-		id,
+		inquiryID,
 		customer,
 		input.InvoiceID,
 		input.RestrictionID,
@@ -250,7 +250,7 @@ func (m Billing) createInquiry(
 			OrganizationID: nil,
 			ClientRole:     "",
 		},
-		id,
+		inquiryID,
 		"received",
 	)
 	if notifyMembersErr != nil {
@@ -260,38 +260,43 @@ func (m Billing) createInquiry(
 	call.Emit(
 		ops.Event{
 			AggregateType: "inquiry",
-			AggregateID:   id,
+			AggregateID:   inquiryID,
 			Type:          "InquiryReceived",
 			Payload:       map[string]any{"subjectType": input.SubjectType},
 		},
 	)
 
-	v := 1
+	version := 1
 	call.Audit(
 		ops.AuditEntry{
-			Action:      "inquiries.create",
-			TargetKind:  "inquiry",
-			TargetID:    id.String(),
-			NextVersion: &v, PreviousVersion: nil, Reason: "", Result: "", Before: nil, After: nil,
+			Action:          "inquiries.create",
+			TargetKind:      "inquiry",
+			TargetID:        inquiryID.String(),
+			NextVersion:     &version,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
-	return m.loadInquiry(ctx, call, id, false)
+	return m.loadInquiry(ctx, call, inquiryID, false)
 }
 
 func (m Billing) loadInquiry(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	inquiryID uuid.UUID,
 	lock bool,
 ) (Inquiry, error) {
-	q := "SELECT " + inquiryCols + " FROM billing.inquiries q JOIN billing.ref_customers cu ON cu.id = q.customer_id " +
+	stmt := "SELECT " + inquiryCols + " FROM billing.inquiries q JOIN billing.ref_customers cu ON cu.id = q.customer_id " +
 		"WHERE q.id = $1"
 	if lock {
-		q += " FOR UPDATE OF q"
+		stmt += " FOR UPDATE OF q"
 	}
 
-	x, err := scanInquiry(call.Tx.QueryRow(ctx, q, id))
+	x, err := scanInquiry(call.Tx.QueryRow(ctx, stmt, inquiryID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return x, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
@@ -335,7 +340,7 @@ func (m Billing) listInquiries(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Inquiry], error) {
-	var f struct {
+	var filters struct {
 		Status        *string    `json:"status,omitempty"` // => state
 		SubjectType   *string    `json:"subjectType,omitempty"`
 		InvoiceID     *uuid.UUID `json:"invoiceId,omitempty"`
@@ -347,9 +352,9 @@ func (m Billing) listInquiries(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil ||
-			(f.Status != nil && !slices.Contains([]string{"received", "answered"}, *f.Status)) ||
-			(f.SubjectType != nil && !slices.Contains([]string{"payment", "restriction"}, *f.SubjectType)) {
+		if dec.Decode(&filters) != nil ||
+			(filters.Status != nil && !slices.Contains([]string{"received", "answered"}, *filters.Status)) ||
+			(filters.SubjectType != nil && !slices.Contains([]string{"payment", "restriction"}, *filters.SubjectType)) {
 			return paging.Page[Inquiry]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
@@ -365,7 +370,7 @@ func (m Billing) listInquiries(
 		return paging.Page[Inquiry]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Inquiry]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -380,8 +385,8 @@ func (m Billing) listInquiries(
 	conds := []string{clientScope(call, "cu.organization_id", &args)}
 
 	for col, v := range map[string]any{
-		"q.state": f.Status, "q.subject_type": f.SubjectType, "q.invoice_id": f.InvoiceID,
-		"q.restriction_id": f.RestrictionID, "q.customer_id": f.CustomerID,
+		"q.state": filters.Status, "q.subject_type": filters.SubjectType, "q.invoice_id": filters.InvoiceID,
+		"q.restriction_id": filters.RestrictionID, "q.customer_id": filters.CustomerID,
 	} {
 		switch x := v.(type) {
 		case *string:
@@ -494,9 +499,9 @@ func (in *AnswerInput) Validate() map[string]string {
 func (m Billing) answerInquiry(
 	ctx context.Context,
 	call *ops.Call,
-	in *AnswerInput,
+	input *AnswerInput,
 ) (Inquiry, error) {
-	inquiry, err := m.loadInquiry(ctx, call, in.InquiryID, true)
+	inquiry, err := m.loadInquiry(ctx, call, input.InquiryID, true)
 	if err != nil {
 		return inquiry, err
 	}
@@ -514,7 +519,7 @@ func (m Billing) answerInquiry(
 		`UPDATE billing.inquiries SET state = 'answered', reply = $2, answered_by = $3, answered_at = $4, version = version +
 			1, updated_at = $4 WHERE id = $1`,
 		inquiry.ID,
-		in.Reply,
+		input.Reply,
 		call.Principal.MembershipID,
 		call.Now,
 	)

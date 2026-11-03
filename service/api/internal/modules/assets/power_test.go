@@ -9,13 +9,13 @@ import (
 
 func TestEffectivePower(t *testing.T) {
 	now := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
-	on, off := true, false
-	at := func(d time.Duration) *time.Time {
+	powerOn, off := true, false
+	fromNow := func(d time.Duration) *time.Time {
 		x := now.Add(d)
 
 		return &x
 	}
-	mk := func(conn string, p *bool, obs *time.Time) *Unit {
+	newUnit := func(conn string, p *bool, obs *time.Time) *Unit {
 		return &Unit{
 			ACUnit: ACUnit{
 				Connection: conn,
@@ -54,21 +54,26 @@ func TestEffectivePower(t *testing.T) {
 		fresh, have bool
 		want        string
 	}{
-		{mk("online", &on, at(-30*time.Second)), true, true, "on"},
-		{mk("online", &off, at(-120*time.Second)), true, true, "off"},
-		{mk("online", &on, at(-121*time.Second)), true, true, "unknown"}, // too old
-		{mk("online", &on, at(time.Second)), true, true, "unknown"},      // future observation
-		{mk("offline", &on, at(-time.Second)), true, true, "unknown"},
-		{mk("online", nil, at(-time.Second)), true, true, "unknown"},
-		{mk("online", &on, nil), true, true, "unknown"},
+		{newUnit("online", &powerOn, fromNow(-30*time.Second)), true, true, "on"},
+		{newUnit("online", &off, fromNow(-120*time.Second)), true, true, "off"},
+		{newUnit("online", &powerOn, fromNow(-121*time.Second)), true, true, "unknown"}, // too old
 		{
-			mk("online", &on, at(-time.Second)),
+			newUnit("online", &powerOn, fromNow(time.Second)),
+			true,
+			true,
+			"unknown",
+		}, // future observation
+		{newUnit("offline", &powerOn, fromNow(-time.Second)), true, true, "unknown"},
+		{newUnit("online", nil, fromNow(-time.Second)), true, true, "unknown"},
+		{newUnit("online", &powerOn, nil), true, true, "unknown"},
+		{
+			newUnit("online", &powerOn, fromNow(-time.Second)),
 			false,
 			true,
 			"unknown",
 		}, // measured power stale / invalid
 		{
-			mk("online", &on, at(-time.Second)),
+			newUnit("online", &powerOn, fromNow(-time.Second)),
 			true,
 			false,
 			"unknown",

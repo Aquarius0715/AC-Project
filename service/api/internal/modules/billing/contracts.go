@@ -137,7 +137,7 @@ func clientScope(c *ops.Call, col string, args *[]any) string {
 func (m Billing) loadContract(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	contractID uuid.UUID,
 	lock bool,
 ) (Contract, error) {
 	q := "SELECT " + contractCols + " FROM billing.contracts k WHERE k.id = $1 AND k.is_current"
@@ -145,7 +145,7 @@ func (m Billing) loadContract(
 		q += " FOR UPDATE"
 	}
 
-	contract, err := scanContract(call.Tx.QueryRow(ctx, q, id))
+	contract, err := scanContract(call.Tx.QueryRow(ctx, q, contractID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return contract, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
@@ -191,7 +191,7 @@ func (m Billing) listContracts(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Contract], error) {
-	var f struct {
+	var filters struct {
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
 		UnitID     *uuid.UUID `json:"unitId,omitempty"`
 		Kind       *string    `json:"kind,omitempty"` // => planType
@@ -201,7 +201,8 @@ func (m Billing) listContracts(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil || (f.Kind != nil && !slices.Contains(planTypes, *f.Kind)) {
+		if dec.Decode(&filters) != nil ||
+			(filters.Kind != nil && !slices.Contains(planTypes, *filters.Kind)) {
 			return paging.Page[Contract]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
@@ -222,7 +223,7 @@ func (m Billing) listContracts(
 		return paging.Page[Contract]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Contract]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -236,22 +237,22 @@ func (m Billing) listContracts(
 	}
 
 	conds := []string{"k.is_current", clientScope(call, "k.customer_org_id", &args)}
-	if f.CustomerID != nil {
-		conds = append(conds, "k.customer_id = "+add(*f.CustomerID))
+	if filters.CustomerID != nil {
+		conds = append(conds, "k.customer_id = "+add(*filters.CustomerID))
 	}
 
-	if f.UnitID != nil {
+	if filters.UnitID != nil {
 		conds = append(
 			conds,
 			"EXISTS (SELECT 1 FROM billing.contract_units cu WHERE cu.contract_id = k.id AND cu.contract_version = k.version "+
 				"AND cu.unit_id = "+add(
-				*f.UnitID,
+				*filters.UnitID,
 			)+")",
 		)
 	}
 
-	if f.Kind != nil {
-		conds = append(conds, "k.plan_type = "+add(*f.Kind))
+	if filters.Kind != nil {
+		conds = append(conds, "k.plan_type = "+add(*filters.Kind))
 	}
 
 	where := strings.Join(conds, " AND ")
@@ -438,7 +439,7 @@ func (m Billing) saveContract(
 		}
 	}
 
-	id, version := uuid.New(), 1
+	contractID, version := uuid.New(), 1
 
 	var (
 		prev   *int
@@ -473,7 +474,7 @@ func (m Billing) saveContract(
 			return cur, apperr.Wrap(execErr, "update billing.contracts")
 		}
 
-		id, version, prev = cur.ID, cur.Version+1, call.ExpectedVersion
+		contractID, version, prev = cur.ID, cur.Version+1, call.ExpectedVersion
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -482,7 +483,7 @@ func (m Billing) saveContract(
 			currency, restriction_eligible,
 		rules_version, created_by, created_at) VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, $4, $5,
 		tstzrange($6, $7), $8, $9, $10, $11, $12, $13)`,
-		id,
+		contractID,
 		version,
 		input.CustomerID,
 		org,
@@ -500,21 +501,21 @@ func (m Billing) saveContract(
 		return Contract{}, apperr.Wrap(execErr, "insert billing.contracts")
 	}
 
-	for _, u := range input.UnitIDs {
+	for _, unitID := range input.UnitIDs {
 		_, err := call.Tx.Exec(
 			ctx,
 			`INSERT INTO billing.contract_units (tenant_id, contract_id, contract_version, unit_id) VALUES
 				(current_setting('app.tenant_id')::uuid, $1, $2, $3)`,
-			id,
+			contractID,
 			version,
-			u,
+			unitID,
 		)
 		if err != nil {
 			return Contract{}, apperr.Wrap(err, "insert billing.contract_units")
 		}
 	}
 
-	contract, err := m.loadContract(ctx, call, id, false)
+	contract, err := m.loadContract(ctx, call, contractID, false)
 	if err != nil {
 		return contract, err
 	}
@@ -522,22 +523,22 @@ func (m Billing) saveContract(
 	call.Emit(
 		ops.Event{
 			AggregateType: "contract",
-			AggregateID:   id,
+			AggregateID:   contractID,
 			Type:          "ContractSaved",
 			Payload:       map[string]any{"version": version},
 		},
 	)
 
-	b, a := ops.Changes(before, contract.fields())
+	changedBefore, changedAfter := ops.Changes(before, contract.fields())
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "contracts.save",
 			TargetKind:      "contract",
-			TargetID:        id.String(),
+			TargetID:        contractID.String(),
 			PreviousVersion: prev,
 			NextVersion:     &contract.Version,
-			Before:          b,
-			After:           a, Reason: "", Result: "",
+			Before:          changedBefore,
+			After:           changedAfter, Reason: "", Result: "",
 		},
 	)
 
@@ -735,7 +736,7 @@ func (m Billing) createInvoice(
 
 	number := InvoiceNumber(input.Period.From, seq)
 
-	var id uuid.UUID
+	var invoiceID uuid.UUID
 
 	err = call.Tx.QueryRow(ctx, `INSERT INTO billing.invoices (tenant_id, number, contract_id, contract_version,
 		customer_id,
@@ -744,7 +745,7 @@ func (m Billing) createInvoice(
 		RETURNING id`,
 		number, contract.ID, contract.Version, contract.CustomerID, input.AmountMinor, input.Currency, input.Period.From,
 		input.Period.To, input.DueAt, call.Now).
-		Scan(&id)
+		Scan(&invoiceID)
 	if err != nil {
 		if apperr.From(err).Code == apperr.Conflict {
 			return Invoice{}, apperr.E(apperr.Conflict, "errors.invoice_period_exists")
@@ -753,7 +754,7 @@ func (m Billing) createInvoice(
 		return Invoice{}, apperr.Wrap(err, "insert billing.invoices")
 	}
 
-	invoice, err := m.loadInvoice(ctx, call, id, false)
+	invoice, err := m.loadInvoice(ctx, call, invoiceID, false)
 	if err != nil {
 		return invoice, err
 	}
@@ -761,7 +762,7 @@ func (m Billing) createInvoice(
 	call.Emit(
 		ops.Event{
 			AggregateType: "invoice",
-			AggregateID:   id,
+			AggregateID:   invoiceID,
 			Type:          "InvoiceCreated",
 			Payload:       map[string]any{"contractId": contract.ID},
 		},
@@ -770,7 +771,7 @@ func (m Billing) createInvoice(
 		ops.AuditEntry{
 			Action:          "invoices.create",
 			TargetKind:      "invoice",
-			TargetID:        id.String(),
+			TargetID:        invoiceID.String(),
 			NextVersion:     &invoice.Version,
 			PreviousVersion: nil,
 			Reason:          "",
@@ -786,7 +787,7 @@ func (m Billing) createInvoice(
 func (m Billing) loadInvoice(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	invoiceID uuid.UUID,
 	lock bool,
 ) (Invoice, error) {
 	q := "SELECT " + invoiceCols + " FROM billing.invoices i WHERE i.id = $1"
@@ -794,7 +795,7 @@ func (m Billing) loadInvoice(
 		q += " FOR UPDATE"
 	}
 
-	invoice, err := scanInvoice(call.Tx.QueryRow(ctx, q, id))
+	invoice, err := scanInvoice(call.Tx.QueryRow(ctx, q, invoiceID))
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == "client" && invoice.customerOrg != call.Principal.OrgID) {
 		return invoice, apperr.E(apperr.NotFound, apperr.KeyNotFound)
@@ -960,7 +961,7 @@ func (m Billing) listInvoices(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Invoice], error) {
-	var f struct {
+	var filters struct {
 		CustomerID  *uuid.UUID `json:"customerId,omitempty"`
 		PropertyID  *uuid.UUID `json:"propertyId,omitempty"`
 		ContractID  *uuid.UUID `json:"contractId,omitempty"`
@@ -974,14 +975,14 @@ func (m Billing) listInvoices(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil ||
-			(f.Status != nil && !slices.Contains(invoiceStatuses, *f.Status)) {
+		if dec.Decode(&filters) != nil ||
+			(filters.Status != nil && !slices.Contains(invoiceStatuses, *filters.Status)) {
 			return paging.Page[Invoice]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 
-		if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
+		if filters.From != nil && filters.To != nil && !filters.From.Before(*filters.To) {
 			return paging.Page[Invoice]{}, apperr.Fields(
 				map[string]string{"filters.to": apperr.KeyRange},
 			)
@@ -1002,7 +1003,7 @@ func (m Billing) listInvoices(
 		return paging.Page[Invoice]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Invoice]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -1025,37 +1026,37 @@ func (m Billing) listInvoices(
 		conds = append(conds, "i.customer_id = "+add(cust))
 	}
 
-	if f.CustomerID != nil {
-		conds = append(conds, "i.customer_id = "+add(*f.CustomerID))
+	if filters.CustomerID != nil {
+		conds = append(conds, "i.customer_id = "+add(*filters.CustomerID))
 	}
 
-	if f.PropertyID != nil { // an invoice belongs to the properties of its contract version's units
+	if filters.PropertyID != nil { // an invoice belongs to the properties of its contract version's units
 		conds = append(
 			conds,
 			`EXISTS (SELECT 1 FROM billing.contract_units cu JOIN billing.ref_units u ON u.id = cu.unit_id
 			WHERE cu.contract_id = i.contract_id AND cu.contract_version = i.contract_version AND u.property_id = `+add(
-				*f.PropertyID,
+				*filters.PropertyID,
 			)+")",
 		)
 	}
 
-	if f.ContractID != nil {
-		conds = append(conds, "i.contract_id = "+add(*f.ContractID))
+	if filters.ContractID != nil {
+		conds = append(conds, "i.contract_id = "+add(*filters.ContractID))
 	}
 
-	if f.Status != nil {
-		conds = append(conds, "i.status = "+add(*f.Status))
+	if filters.Status != nil {
+		conds = append(conds, "i.status = "+add(*filters.Status))
 	}
 
-	if f.From != nil { // [from, to) on the period start
-		conds = append(conds, "lower(i.period) >= "+add(*f.From))
+	if filters.From != nil { // [from, to) on the period start
+		conds = append(conds, "lower(i.period) >= "+add(*filters.From))
 	}
 
-	if f.To != nil {
-		conds = append(conds, "lower(i.period) < "+add(*f.To))
+	if filters.To != nil {
+		conds = append(conds, "lower(i.period) < "+add(*filters.To))
 	}
 
-	if f.OverdueOnly != nil && *f.OverdueOnly {
+	if filters.OverdueOnly != nil && *filters.OverdueOnly {
 		conds = append(conds, "i.status <> 'paid' AND i.due_at < "+add(call.Now))
 	}
 
@@ -1208,12 +1209,12 @@ func (m Billing) remind(ctx context.Context, call *ops.Call, in *RemindInput) (R
 		return Receipt{}, apperr.Wrap(err, "notify.Store.Create")
 	}
 
-	var v int
+	var version int
 
 	scanErr := call.Tx.QueryRow(ctx, `UPDATE billing.invoices SET last_reminded_at = $2, version = version + 1, updated_at
 		=
 		$2 WHERE id = $1 RETURNING version`, invoice.ID, call.Now).
-		Scan(&v)
+		Scan(&version)
 	if scanErr != nil {
 		return Receipt{}, apperr.Wrap(scanErr, "update billing.invoices")
 	}
@@ -1232,20 +1233,20 @@ func (m Billing) remind(ctx context.Context, call *ops.Call, in *RemindInput) (R
 			TargetKind:      "invoice",
 			TargetID:        invoice.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &v,
+			NextVersion:     &version,
 			Reason:          in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return Receipt{InvoiceID: invoice.ID, InvoiceVersion: v, NotificationID: nid}, nil
+	return Receipt{InvoiceID: invoice.ID, InvoiceVersion: version, NotificationID: nid}, nil
 }
 
 // Register binds the contract and invoice operations.
-func Register(r *ops.Registry, billing Billing) {
-	ops.Register(r, "contracts.list", billing.listContracts)
-	ops.Register(r, "contracts.save", billing.saveContract)
-	ops.Register(r, "invoices.create", billing.createInvoice)
-	ops.Register(r, "invoices.get", billing.getInvoice)
-	ops.Register(r, "invoices.list", billing.listInvoices)
-	ops.Register(r, "invoices.remind", billing.remind)
+func Register(reg *ops.Registry, billing Billing) {
+	ops.Register(reg, "contracts.list", billing.listContracts)
+	ops.Register(reg, "contracts.save", billing.saveContract)
+	ops.Register(reg, "invoices.create", billing.createInvoice)
+	ops.Register(reg, "invoices.get", billing.getInvoice)
+	ops.Register(reg, "invoices.list", billing.listInvoices)
+	ops.Register(reg, "invoices.remind", billing.remind)
 }

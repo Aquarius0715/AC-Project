@@ -31,8 +31,8 @@ func RegisterQueries(r *ops.Registry) {
 }
 
 // overdue sums unpaid invoices past due on contracts covering the units, by currency.
-func overdue(ctx context.Context, c *ops.Call, input *OverdueInput) ([]Overdue, error) {
-	rows, err := c.Tx.Query(
+func overdue(ctx context.Context, call *ops.Call, input *OverdueInput) ([]Overdue, error) {
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT i.currency, count(*), sum(i.amount_minor) FROM billing.invoices i
 		WHERE i.status = 'unpaid' AND i.due_at < $2
@@ -40,7 +40,7 @@ func overdue(ctx context.Context, c *ops.Call, input *OverdueInput) ([]Overdue, 
 		  i.contract_version AND cu.unit_id = ANY($1))
 		GROUP BY i.currency ORDER BY i.currency`,
 		input.UnitIDs,
-		c.Now,
+		call.Now,
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select billing.invoices")
@@ -50,14 +50,14 @@ func overdue(ctx context.Context, c *ops.Call, input *OverdueInput) ([]Overdue, 
 	out := []Overdue{}
 
 	for rows.Next() {
-		var o Overdue
+		var perCurrency Overdue
 
-		err := rows.Scan(&o.Currency, &o.Count, &o.AmountMinor)
+		err := rows.Scan(&perCurrency.Currency, &perCurrency.Count, &perCurrency.AmountMinor)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select billing.invoices")
 		}
 
-		out = append(out, o)
+		out = append(out, perCurrency)
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select billing.invoices")

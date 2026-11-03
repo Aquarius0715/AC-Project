@@ -78,7 +78,7 @@ func nonReaders(ctx context.Context, c *ops.Call, input *NonReadersInput) ([]uui
 		return nil, apperr.Wrap(err, "select identity.memberships")
 	}
 
-	ok := map[uuid.UUID]bool{}
+	isReader := map[uuid.UUID]bool{}
 
 	readers, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
@@ -86,13 +86,13 @@ func nonReaders(ctx context.Context, c *ops.Call, input *NonReadersInput) ([]uui
 	}
 
 	for _, id := range readers {
-		ok[id] = true
+		isReader[id] = true
 	}
 
 	bad := []uuid.UUID{}
 
 	for _, id := range input.IDs {
-		if !ok[id] {
+		if !isReader[id] {
 			bad = append(bad, id)
 		}
 	}
@@ -129,7 +129,7 @@ func orgName(ctx context.Context, c *ops.Call, in *OrgInput) (string, error) {
 func technician(
 	ctx context.Context,
 	call *ops.Call,
-	in *MembershipInput,
+	input *MembershipInput,
 ) (TechnicianResult, error) {
 	var (
 		technicianResult TechnicianResult
@@ -140,7 +140,7 @@ func technician(
 
 	err := call.Tx.QueryRow(ctx, `SELECT organization_id, employment, valid_from, valid_until FROM identity.memberships
 		WHERE
-		id = $1 AND role = 'technician'`, in.MembershipID).
+		id = $1 AND role = 'technician'`, input.MembershipID).
 		Scan(&technicianResult.OrgID, &emp, &from, &until)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return TechnicianResult{
@@ -170,7 +170,7 @@ func technician(
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT kind, ref_id FROM identity.membership_scopes WHERE membership_id = $1`,
-		in.MembershipID,
+		input.MembershipID,
 	)
 	if err != nil {
 		return technicianResult, apperr.Wrap(err, "select identity.membership_scopes")
@@ -179,16 +179,16 @@ func technician(
 
 	for rows.Next() {
 		var (
-			key string
-			id  uuid.UUID
+			key     string
+			scopeID uuid.UUID
 		)
 
-		err := rows.Scan(&key, &id)
+		err := rows.Scan(&key, &scopeID)
 		if err != nil {
 			return technicianResult, apperr.Wrap(err, "select identity.membership_scopes")
 		}
 
-		technicianResult.Scopes[key] = append(technicianResult.Scopes[key], id)
+		technicianResult.Scopes[key] = append(technicianResult.Scopes[key], scopeID)
 	}
 
 	technicianResult.Found = true
@@ -197,22 +197,22 @@ func technician(
 }
 
 func qualified(ctx context.Context, c *ops.Call, input *QualifiedInput) (bool, error) {
-	var n int
+	var count int
 
 	err := c.Tx.QueryRow(ctx, `SELECT count(DISTINCT code) FROM identity.qualification_grants WHERE membership_id = $1 AND
 		code = ANY($2)
 		AND valid_from <= $3 AND valid_until >= $4 AND revoked_at IS
 		NULL`, input.MembershipID, input.Codes, input.Start, input.End).
-		Scan(&n)
+		Scan(&count)
 
-	return n == len(input.Codes), apperr.Wrap(err, "select identity.qualification_grants")
+	return count == len(input.Codes), apperr.Wrap(err, "select identity.qualification_grants")
 }
 
 // GrantHandlers apply QualificationGranted (consumer identity, IR192): the grant for the code covers
 // [validFrom, validUntil) without revocation.
 func GrantHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
-		events.QualificationGranted: func(ctx context.Context, tx pgx.Tx, event events.Event) error {
+		events.QualificationGranted: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
 			var grant events.Grant
 
 			err := event.Decode(&grant)
@@ -220,7 +220,7 @@ func GrantHandlers() map[string]events.Handler {
 				return apperr.Wrap(err, "events.Event.Decode")
 			}
 
-			tag, err := tx.Exec(
+			tag, err := txn.Exec(
 				ctx,
 				`UPDATE identity.qualification_grants SET valid_from = $3, valid_until = $4, revoked_at = NULL WHERE membership_id =
 					$1 AND code = $2`,
@@ -233,7 +233,7 @@ func GrantHandlers() map[string]events.Handler {
 				return apperr.Wrap(err, "update identity.qualification_grants")
 			}
 
-			_, err = tx.Exec(
+			_, err = txn.Exec(
 				ctx,
 				`INSERT INTO identity.qualification_grants (tenant_id, membership_id, code, valid_from, valid_until) VALUES ($1, $2,
 					$3, $4, $5)`,

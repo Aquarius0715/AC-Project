@@ -124,7 +124,7 @@ func clientUsersList(
 		return paging.Page[ClientUser]{}, err
 	}
 
-	var f struct {
+	var filters struct {
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
 		Status     *string    `json:"status,omitempty"`
 		ClientRole *string    `json:"clientRole,omitempty"`
@@ -135,9 +135,9 @@ func clientUsersList(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil ||
-			(f.Status != nil && !slices.Contains([]string{"invited", "active", "disabled"}, *f.Status)) ||
-			(f.ClientRole != nil && *f.ClientRole != "owner" && *f.ClientRole != "member") {
+		if dec.Decode(&filters) != nil ||
+			(filters.Status != nil && !slices.Contains([]string{"invited", "active", "disabled"}, *filters.Status)) ||
+			(filters.ClientRole != nil && *filters.ClientRole != "owner" && *filters.ClientRole != "member") {
 			return paging.Page[ClientUser]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
@@ -160,7 +160,7 @@ func clientUsersList(
 		return paging.Page[ClientUser]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[ClientUser]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -178,20 +178,20 @@ func clientUsersList(
 		conds = append(conds, "cu.organization_id = "+add(call.Principal.OrgID))
 	}
 
-	if f.CustomerID != nil {
-		conds = append(conds, "x.customer_id = "+add(*f.CustomerID))
+	if filters.CustomerID != nil {
+		conds = append(conds, "x.customer_id = "+add(*filters.CustomerID))
 	}
 
-	if f.Status != nil {
-		conds = append(conds, "x.status = "+add(*f.Status))
+	if filters.Status != nil {
+		conds = append(conds, "x.status = "+add(*filters.Status))
 	}
 
-	if f.ClientRole != nil {
-		conds = append(conds, "x.client_role = "+add(*f.ClientRole))
+	if filters.ClientRole != nil {
+		conds = append(conds, "x.client_role = "+add(*filters.ClientRole))
 	}
 
-	if f.Search != nil && strings.TrimSpace(*f.Search) != "" {
-		p := add(paging.Contains(*f.Search))
+	if filters.Search != nil && strings.TrimSpace(*filters.Search) != "" {
+		p := add(paging.Contains(*filters.Search))
 		conds = append(conds, "(x.email ILIKE "+p+" OR x.display_name ILIKE "+p+")")
 	}
 
@@ -249,7 +249,7 @@ func clientUsersList(
 func loadClientUser(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	clientUserID uuid.UUID,
 	lock bool,
 ) (ClientUser, error) {
 	q := "SELECT " + clientUserCols + " FROM " + clientUserFrom + " WHERE x.id = $1"
@@ -257,7 +257,7 @@ func loadClientUser(
 		q += " FOR UPDATE OF x"
 	}
 
-	clientUser, err := scanClientUser(call.Tx.QueryRow(ctx, q, id))
+	clientUser, err := scanClientUser(call.Tx.QueryRow(ctx, q, clientUserID))
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == "client" && clientUser.customerOrg != call.Principal.OrgID) {
 		return ClientUser{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
@@ -341,14 +341,14 @@ func otherActiveOwner(
 		return false, apperr.Wrap(execErr, "select pg_advisory_xact_lock")
 	}
 
-	var ok bool
+	var found bool
 
 	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.client_users WHERE customer_id = $1 AND id <> $2
 		AND
 		client_role = 'owner' AND status = 'active')`, customer, except).
-		Scan(&ok)
+		Scan(&found)
 
-	return ok, apperr.Wrap(err, "select identity.client_users")
+	return found, apperr.Wrap(err, "select identity.client_users")
 }
 
 // clientUsersSave serves clientUsers.save.
@@ -445,14 +445,14 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 			return ClientUser{}, err
 		}
 
-		id := uuid.New()
+		clientUserID := uuid.New()
 
 		_, execErr := call.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role,
 				status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'invited', $7, $8, $7, $7, $7)`,
-			id,
+			clientUserID,
 			in.CustomerID,
 			membership,
 			in.Email,
@@ -465,13 +465,13 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 			return ClientUser{}, apperr.Wrap(execErr, "insert identity.client_users")
 		}
 
-		v := 1
+		version := 1
 		call.Audit(
 			ops.AuditEntry{
 				Action:          "clientUsers.save",
 				TargetKind:      "client_user",
-				TargetID:        id.String(),
-				NextVersion:     &v,
+				TargetID:        clientUserID.String(),
+				NextVersion:     &version,
 				Reason:          "account created",
 				PreviousVersion: nil,
 				Result:          "",
@@ -480,7 +480,7 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 			},
 		)
 
-		return loadClientUser(ctx, call, id, false)
+		return loadClientUser(ctx, call, clientUserID, false)
 	}
 
 	clientUser, err := loadClientUser(ctx, call, *in.ID, true)
@@ -782,14 +782,14 @@ type InvitePreview struct {
 func clientUsersResend(
 	ctx context.Context,
 	call *ops.Call,
-	in *ResendInput,
+	input *ResendInput,
 ) (InvitePreview, error) {
 	err := ownerOnly(call)
 	if err != nil {
 		return InvitePreview{}, err
 	}
 
-	clientUser, err := loadClientUser(ctx, call, in.ID, false)
+	clientUser, err := loadClientUser(ctx, call, input.ID, false)
 	if err != nil {
 		return InvitePreview{}, err
 	}

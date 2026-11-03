@@ -79,10 +79,10 @@ func (m *Module) unitsDelete(
 	call *ops.Call,
 	input *DeleteInput,
 ) (DeletedResource, error) {
-	var v int
+	var version int
 
 	err := call.Tx.QueryRow(ctx, `SELECT version FROM assets.units WHERE id = $1 FOR UPDATE`, input.ID).
-		Scan(&v)
+		Scan(&version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return DeletedResource{}, notFound()
 	}
@@ -91,7 +91,7 @@ func (m *Module) unitsDelete(
 		return DeletedResource{}, apperr.Wrap(err, "select assets.units")
 	}
 
-	if v != *call.ExpectedVersion {
+	if version != *call.ExpectedVersion {
 		return DeletedResource{}, conflict(apperr.KeyVersionConflict)
 	}
 
@@ -238,24 +238,24 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 	}
 
 	for _, id := range input.AlertPolicyIDs {
-		o, ok := owners[id]
+		owner, found := owners[id]
 		switch { // IR108 / IR120 item 8
-		case ok && o.Kind != "alert":
+		case found && owner.Kind != "alert":
 			return Unit{}, apperr.Fields(
 				map[string]string{"alertPolicyIds": "error.defaultPolicyImplicit"},
 			)
-		case !ok || o.CustomerID == nil || customerID == nil || *o.CustomerID != *customerID:
+		case !found || owner.CustomerID == nil || customerID == nil || *owner.CustomerID != *customerID:
 			return Unit{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 	}
 
-	var v int
+	var version int
 
 	err = call.Tx.QueryRow(ctx, `UPDATE assets.units SET version = version + 1, updated_at = platform.app_now() WHERE id =
 		$1
 		AND version = $2 RETURNING version`,
 		input.UnitID, *call.ExpectedVersion).
-		Scan(&v)
+		Scan(&version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Unit{}, conflict(apperr.KeyVersionConflict)
 	}
@@ -277,14 +277,14 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 	ids := append([]uuid.UUID(nil), input.AlertPolicyIDs...)
 	sort.Slice(ids, func(i, j int) bool { return ids[i].String() < ids[j].String() })
 
-	for _, id := range ids {
+	for _, policyID := range ids {
 		_, err := call.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.unit_alert_policies (tenant_id, unit_id, policy_id) VALUES
 				(current_setting('app.tenant_id')::uuid, $1, $2)
 			ON CONFLICT DO NOTHING`,
 			input.UnitID,
-			id,
+			policyID,
 		)
 		if err != nil {
 			return Unit{}, apperr.Wrap(err, "insert assets.unit_alert_policies")
@@ -305,7 +305,7 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 			TargetKind:      "unit",
 			TargetID:        input.UnitID.String(),
 			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &v, Reason: "", Result: "", Before: nil, After: nil,
+			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 

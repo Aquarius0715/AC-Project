@@ -84,7 +84,7 @@ func organizationsList(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Organization], error) {
-	var f struct {
+	var filters struct {
 		Kind   *string `json:"kind,omitempty"`
 		Status *string `json:"status,omitempty"`
 	}
@@ -93,7 +93,7 @@ func organizationsList(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil {
+		if dec.Decode(&filters) != nil {
 			return paging.Page[Organization]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
@@ -109,24 +109,24 @@ func organizationsList(
 	}
 	conds := []string{"TRUE"}
 
-	if f.Kind != nil {
-		if !orgKinds[*f.Kind] {
+	if filters.Kind != nil {
+		if !orgKinds[*filters.Kind] {
 			return paging.Page[Organization]{}, apperr.Fields(
 				map[string]string{"filters.kind": apperr.KeyInvalid},
 			)
 		}
 
-		conds = append(conds, "kind = "+add(*f.Kind))
+		conds = append(conds, "kind = "+add(*filters.Kind))
 	}
 
-	if f.Status != nil {
-		if *f.Status != "active" && *f.Status != "inactive" {
+	if filters.Status != nil {
+		if *filters.Status != "active" && *filters.Status != "inactive" {
 			return paging.Page[Organization]{}, apperr.Fields(
 				map[string]string{"filters.status": apperr.KeyInvalid},
 			)
 		}
 
-		conds = append(conds, "status = "+add(*f.Status))
+		conds = append(conds, "status = "+add(*filters.Status))
 	}
 
 	order, err := paging.OrderBy(
@@ -138,7 +138,7 @@ func organizationsList(
 		return paging.Page[Organization]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Organization]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -267,14 +267,14 @@ func organizationsSave(
 	input *OrganizationSave,
 ) (Organization, error) {
 	if input.ID == nil {
-		id := uuid.Must(uuid.NewV7())
+		orgID := uuid.Must(uuid.NewV7())
 
 		organization, err := scanOrg(
 			call.Tx.QueryRow(
 				ctx,
 				`INSERT INTO identity.organizations (id, tenant_id, name, kind, status)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4) RETURNING `+orgCols,
-				id,
+				orgID,
 				input.Name,
 				input.Kind,
 				input.Status,
@@ -284,7 +284,7 @@ func organizationsSave(
 			return Organization{}, err
 		}
 
-		uniqueNameErr := uniqueName(ctx, call, id)
+		uniqueNameErr := uniqueName(ctx, call, orgID)
 		if uniqueNameErr != nil {
 			return Organization{}, uniqueNameErr
 		}
@@ -293,7 +293,7 @@ func organizationsSave(
 			ops.AuditEntry{
 				Action:          "organizations.save",
 				TargetKind:      "organization",
-				TargetID:        id.String(),
+				TargetID:        orgID.String(),
 				NextVersion:     &organization.Version,
 				PreviousVersion: nil,
 				Reason:          "",
@@ -305,7 +305,7 @@ func organizationsSave(
 		call.Emit(
 			ops.Event{
 				AggregateType: "organization",
-				AggregateID:   id,
+				AggregateID:   orgID,
 				Type:          "OrganizationChanged",
 				Payload:       nil,
 			},
@@ -314,7 +314,7 @@ func organizationsSave(
 		return organization, nil
 	}
 	// kind is fixed after creation
-	o, err := scanOrg(
+	org, err := scanOrg(
 		call.Tx.QueryRow(
 			ctx,
 			`UPDATE identity.organizations SET name=$3, status=$4, version = version + 1, updated_at = platform.app_now()
@@ -346,7 +346,7 @@ func organizationsSave(
 		return Organization{}, err
 	}
 
-	uniqueNameErr := uniqueName(ctx, call, o.ID)
+	uniqueNameErr := uniqueName(ctx, call, org.ID)
 	if uniqueNameErr != nil {
 		return Organization{}, uniqueNameErr
 	}
@@ -355,21 +355,21 @@ func organizationsSave(
 		ops.AuditEntry{
 			Action:          "organizations.save",
 			TargetKind:      "organization",
-			TargetID:        o.ID.String(),
+			TargetID:        org.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &o.Version, Reason: "", Result: "", Before: nil, After: nil,
+			NextVersion:     &org.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 	call.Emit(
 		ops.Event{
 			AggregateType: "organization",
-			AggregateID:   o.ID,
+			AggregateID:   org.ID,
 			Type:          "OrganizationChanged",
 			Payload:       nil,
 		},
 	)
 
-	return o, nil
+	return org, nil
 }
 
 // Directory answers membership questions for other modules. Every method is query-backed (IR192): callers in

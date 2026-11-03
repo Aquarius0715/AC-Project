@@ -237,14 +237,14 @@ func (m Restrictions) schedule(
 		)
 	}
 
-	for _, u := range input.UnitIDs {
-		if !slices.Contains(contractUnits, u) {
+	for _, unitID := range input.UnitIDs {
+		if !slices.Contains(contractUnits, unitID) {
 			return Restriction{}, apperr.Fields(
 				map[string]string{"unitIds": "errors.unit_not_in_contract"},
 			)
 		}
 
-		unitCaps, found, err := m.Units.RestrictionTarget(ctx, call, u)
+		unitCaps, found, err := m.Units.RestrictionTarget(ctx, call, unitID)
 		if err != nil {
 			return Restriction{}, apperr.Wrap(err, "restrictions.Units.RestrictionTarget")
 		}
@@ -309,7 +309,7 @@ func (m Restrictions) schedule(
 		)
 	}
 
-	id := uuid.New()
+	restrictionID := uuid.New()
 
 	policy, _ := json.Marshal(input.policy)
 
@@ -319,7 +319,7 @@ func (m Restrictions) schedule(
 			notice_at, execute_after, reason,
 		policy, state, created_at, updated_at) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8,
 		$9, 'scheduled', $6, $6)`,
-		id,
+		restrictionID,
 		input.ContractID,
 		version,
 		customer,
@@ -338,7 +338,7 @@ func (m Restrictions) schedule(
 			ctx,
 			`INSERT INTO restrictions.restriction_invoices (tenant_id, restriction_id, invoice_id) VALUES
 				(current_setting('app.tenant_id')::uuid, $1, $2)`,
-			id,
+			restrictionID,
 			inv,
 		)
 		if err != nil {
@@ -346,13 +346,13 @@ func (m Restrictions) schedule(
 		}
 	}
 
-	for _, u := range input.UnitIDs {
+	for _, unitID := range input.UnitIDs {
 		_, err := call.Tx.Exec(
 			ctx,
 			`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'not_sent', 'none')`,
-			id,
-			u,
+			restrictionID,
+			unitID,
 		)
 		if err != nil {
 			return Restriction{}, apperr.Wrap(err, "insert restrictions.restriction_units")
@@ -362,12 +362,12 @@ func (m Restrictions) schedule(
 	notices := []uuid.UUID{}
 
 	for _, r := range recipients {
-		n, err := m.Notify.Create(ctx, call, notify.New{
+		notificationID, err := m.Notify.Create(ctx, call, notify.New{
 			RecipientMembershipID: r,
 			Type:                  "restriction",
 			TemplateKey:           "restriction",
 			TargetKind:            "restriction",
-			TargetID:              id,
+			TargetID:              restrictionID,
 			Severity:              "warning",
 			Params: map[string]any{
 				"executeAfter": input.ExecuteAfter,
@@ -378,13 +378,13 @@ func (m Restrictions) schedule(
 			return Restriction{}, apperr.Wrap(err, "notify.Store.Create")
 		}
 
-		notices = append(notices, n)
+		notices = append(notices, notificationID)
 	}
 
 	_, execErr = call.Tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions SET notice_notification_ids = $2 WHERE id = $1`,
-		id,
+		restrictionID,
 		notices,
 	)
 	if execErr != nil {
@@ -394,24 +394,24 @@ func (m Restrictions) schedule(
 	call.Emit(
 		ops.Event{
 			AggregateType: "restriction",
-			AggregateID:   id,
+			AggregateID:   restrictionID,
 			Type:          "RestrictionScheduled",
 			Payload:       map[string]any{"contractId": input.ContractID, "unitIds": input.UnitIDs},
 		},
 	)
 
-	v := 1
+	nextVersion := 1
 	call.Audit(
 		ops.AuditEntry{
 			Action:      "restrictions.schedule",
 			TargetKind:  "restriction",
-			TargetID:    id.String(),
-			NextVersion: &v,
+			TargetID:    restrictionID.String(),
+			NextVersion: &nextVersion,
 			Reason:      input.Reason, PreviousVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return load(ctx, call, id, false)
+	return load(ctx, call, restrictionID, false)
 }
 
 // noticeRecipients returns the active client memberships of the customer organization (IR05 / IR19: clients read
@@ -545,7 +545,7 @@ func (m Restrictions) execute(
 	evidence := 0 // the notices identity stored for the restriction at notice time (IR191)
 
 	if len(restriction.NoticeNotificationIDs) > 0 {
-		n, err := ops.Query[int](
+		stored, err := ops.Query[int](
 			ctx,
 			call,
 			identity.QueryNotificationsStored,
@@ -559,7 +559,7 @@ func (m Restrictions) execute(
 			return restriction, err
 		}
 
-		evidence = n
+		evidence = stored
 	}
 
 	if evidence == 0 || evidence != len(restriction.NoticeNotificationIDs) ||
@@ -712,17 +712,17 @@ func (m Restrictions) send(
 		status, delivery, sentAt = "requested", "not_sent", nil
 	}
 	// the command row is equipment's (IR185): billing assigns the ID and publishes the decided command
-	id := uuid.Must(uuid.NewV7())
+	commandID := uuid.Must(uuid.NewV7())
 
 	err = events.Publish(
 		ctx,
 		call.Tx,
 		call.Principal.TenantID,
 		"command",
-		id,
+		commandID,
 		events.RestrictionCommandRequested,
 		events.RestrictionCommand{
-			CommandID:     id,
+			CommandID:     commandID,
 			UnitID:        unit,
 			DeviceID:      device,
 			ActorID:       SystemActor,
@@ -737,19 +737,19 @@ func (m Restrictions) send(
 		},
 	)
 	if err == nil { // billing's own record of the command (IR194)
-		var a struct{ Kind string }
+		var parsedAction struct{ Kind string }
 
-		_ = json.Unmarshal(action, &a)
+		_ = json.Unmarshal(action, &parsedAction)
 		_, err = call.Tx.Exec(
 			ctx,
 			`INSERT INTO restrictions.restriction_commands (tenant_id, command_id, restriction_id, unit_id, kind, delivered,
 				status, requested_at, updated_at)
 			VALUES ($1, $2, $3, $4, $5, $6, 'requested', $7, $7)`,
 			call.Principal.TenantID,
-			id,
+			commandID,
 			restriction,
 			unit,
-			a.Kind,
+			parsedAction.Kind,
 			reason == nil,
 			call.Now,
 		)
@@ -759,7 +759,7 @@ func (m Restrictions) send(
 		call.Emit(
 			ops.Event{
 				AggregateType: "command",
-				AggregateID:   id,
+				AggregateID:   commandID,
 				Type:          "CommandRequested",
 				Payload: map[string]any{
 					"unitId":   unit,
@@ -771,7 +771,10 @@ func (m Restrictions) send(
 		)
 	}
 
-	return id, reason == nil, reason, apperr.Wrap(err, "insert restrictions.restriction_commands")
+	return commandID, reason == nil, reason, apperr.Wrap(
+		err,
+		"insert restrictions.restriction_commands",
+	)
 }
 
 // CancelInput is restrictions.cancel input.

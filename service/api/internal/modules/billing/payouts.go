@@ -194,7 +194,7 @@ func (m Payouts) fill(ctx context.Context, c *ops.Call, statement *Statement) er
 func (m Payouts) load(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	statementID uuid.UUID,
 	lock bool,
 ) (Statement, error) {
 	q := "SELECT " + statementCols + " FROM billing.payout_statements WHERE id = $1"
@@ -202,7 +202,7 @@ func (m Payouts) load(
 		q += " FOR UPDATE"
 	}
 
-	statement, err := scanStatement(call.Tx.QueryRow(ctx, q, id))
+	statement, err := scanStatement(call.Tx.QueryRow(ctx, q, statementID))
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == "contractor" &&
 			(statement.ContractorOrgID != call.Principal.OrgID || statement.Status == "draft")) {
@@ -300,7 +300,7 @@ func (m Payouts) generate(
 		return per[org]
 	}
 	for _, acceptedJob := range jobs {
-		a := get(acceptedJob.ContractorOrgID)
+		draft := get(acceptedJob.ContractorOrgID)
 
 		rates, currency, found, err := m.Source.RateAt(
 			ctx,
@@ -327,17 +327,17 @@ func (m Payouts) generate(
 		}
 
 		if found {
-			a.currency = currency
+			draft.currency = currency
 			line.AmountMinor = rates[work]
 		} else {
 			note := "no rate card"
 			line.Note = &note
 		}
 
-		a.lines = append(a.lines, line)
+		draft.lines = append(draft.lines, line)
 		if acceptedJob.Returned && found {
-			a.lines = append(
-				a.lines,
+			draft.lines = append(
+				draft.lines,
 				PayoutLine{
 					ID:          uuid.New(),
 					JobID:       acceptedJob.JobID,
@@ -379,11 +379,11 @@ func (m Payouts) generate(
 
 	for rows.Next() {
 		var (
-			a   adj
-			job *uuid.UUID
+			adjustment adj
+			job        *uuid.UUID
 		)
 
-		err := rows.Scan(&a.query, &a.org, &a.amount, &job)
+		err := rows.Scan(&adjustment.query, &adjustment.org, &adjustment.amount, &job)
 		if err != nil {
 			rows.Close()
 
@@ -391,10 +391,10 @@ func (m Payouts) generate(
 		}
 
 		if job != nil {
-			a.job = *job
+			adjustment.job = *job
 		}
 
-		adjs = append(adjs, a)
+		adjs = append(adjs, adjustment)
 	}
 
 	rows.Close()
@@ -404,15 +404,15 @@ func (m Payouts) generate(
 		return nil, apperr.Wrap(rowsErr, "select billing.payout_queries")
 	}
 
-	for _, a := range adjs {
-		note := "adjustment from question " + a.query.String()
-		get(a.org).lines = append(
-			get(a.org).lines,
+	for _, adjustment := range adjs {
+		note := "adjustment from question " + adjustment.query.String()
+		get(adjustment.org).lines = append(
+			get(adjustment.org).lines,
 			PayoutLine{
 				ID:          uuid.New(),
-				JobID:       a.job,
+				JobID:       adjustment.job,
 				WorkType:    "repair_base",
-				AmountMinor: a.amount,
+				AmountMinor: adjustment.amount,
 				Kind:        "adjustment",
 				Note:        &note, AcceptedAt: nil,
 			},
@@ -446,11 +446,11 @@ func (m Payouts) generate(
 			return nil, apperr.Wrap(execErr, "delete billing.payout_statements")
 		}
 
-		a := per[org]
+		draft := per[org]
 
 		var gross, ded int64
 
-		for _, payoutLine := range a.lines {
+		for _, payoutLine := range draft.lines {
 			switch {
 			case payoutLine.Kind == "deduction":
 				ded += payoutLine.AmountMinor
@@ -466,13 +466,13 @@ func (m Payouts) generate(
 		scanErr := call.Tx.QueryRow(ctx, `INSERT INTO billing.payout_statements (tenant_id, contractor_org_id, period, status,
 			currency, gross_minor, deductions_minor, net_minor, pay_date, created_at, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'draft', $3, $4, $5, $6, $7, $8, $8) RETURNING
-			id`, org, input.Period, a.currency, gross, ded, gross-ded, payDate, call.Now).
+			id`, org, input.Period, draft.currency, gross, ded, gross-ded, payDate, call.Now).
 			Scan(&sid)
 		if scanErr != nil {
 			return nil, apperr.Wrap(scanErr, "insert billing.payout_statements")
 		}
 
-		for _, payoutLine := range a.lines {
+		for _, payoutLine := range draft.lines {
 			_, err := call.Tx.Exec(
 				ctx,
 				`INSERT INTO billing.payout_lines (id, statement_id, tenant_id, job_id, work_type, accepted_at, amount_minor, kind,
@@ -657,10 +657,10 @@ func reasonOf(s *string) string {
 func (m Payouts) finish(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	statementID uuid.UUID,
 	action, reason string,
 ) (Statement, error) {
-	statement, err := m.load(ctx, call, id, false)
+	statement, err := m.load(ctx, call, statementID, false)
 	if err != nil {
 		return statement, err
 	}
@@ -668,7 +668,7 @@ func (m Payouts) finish(
 	call.Emit(
 		ops.Event{
 			AggregateType: "payout_statement",
-			AggregateID:   id,
+			AggregateID:   statementID,
 			Type:          "PayoutStatementChanged",
 			Payload:       map[string]any{"status": statement.Status},
 		},
@@ -677,7 +677,7 @@ func (m Payouts) finish(
 		ops.AuditEntry{
 			Action:          action,
 			TargetKind:      "payout_statement",
-			TargetID:        id.String(),
+			TargetID:        statementID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &statement.Version,
 			Reason:          reason, Result: "", Before: nil, After: nil,
@@ -1014,7 +1014,7 @@ func (m Payouts) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Statement], error) {
-	var f struct {
+	var filters struct {
 		Period          *string    `json:"period,omitempty"`
 		ContractorOrgID *uuid.UUID `json:"contractorOrgId,omitempty"`
 		Status          *string    `json:"status,omitempty"`
@@ -1024,8 +1024,8 @@ func (m Payouts) list(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil ||
-			(f.Status != nil && *f.Status != "draft" && *f.Status != "approved" && *f.Status != "paid") {
+		if dec.Decode(&filters) != nil ||
+			(filters.Status != nil && *filters.Status != "draft" && *filters.Status != "approved" && *filters.Status != "paid") {
 			return paging.Page[Statement]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
@@ -1046,7 +1046,7 @@ func (m Payouts) list(
 		return paging.Page[Statement]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Statement]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -1067,16 +1067,16 @@ func (m Payouts) list(
 		)
 	}
 
-	if f.Period != nil {
-		conds = append(conds, "period = "+add(*f.Period))
+	if filters.Period != nil {
+		conds = append(conds, "period = "+add(*filters.Period))
 	}
 
-	if f.ContractorOrgID != nil {
-		conds = append(conds, "contractor_org_id = "+add(*f.ContractorOrgID))
+	if filters.ContractorOrgID != nil {
+		conds = append(conds, "contractor_org_id = "+add(*filters.ContractorOrgID))
 	}
 
-	if f.Status != nil {
-		conds = append(conds, "status = "+add(*f.Status))
+	if filters.Status != nil {
+		conds = append(conds, "status = "+add(*filters.Status))
 	}
 
 	where := strings.Join(conds, " AND ")

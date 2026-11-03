@@ -112,7 +112,7 @@ func partnerUsersList(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[PartnerUser], error) {
-	var f struct {
+	var filters struct {
 		Status      *string `json:"status,omitempty"`
 		PartnerRole *string `json:"partnerRole,omitempty"`
 		Search      *string `json:"search,omitempty"` // email or display name contains, case-insensitive
@@ -122,9 +122,9 @@ func partnerUsersList(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil ||
-			(f.Status != nil && !slices.Contains([]string{"invited", "active", "disabled"}, *f.Status)) ||
-			(f.PartnerRole != nil && *f.PartnerRole != "contractor" && *f.PartnerRole != "technician") {
+		if dec.Decode(&filters) != nil ||
+			(filters.Status != nil && !slices.Contains([]string{"invited", "active", "disabled"}, *filters.Status)) ||
+			(filters.PartnerRole != nil && *filters.PartnerRole != "contractor" && *filters.PartnerRole != "technician") {
 			return paging.Page[PartnerUser]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
@@ -147,7 +147,7 @@ func partnerUsersList(
 		return paging.Page[PartnerUser]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[PartnerUser]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -160,16 +160,16 @@ func partnerUsersList(
 	}
 
 	conds := []string{"x.organization_id = $1"}
-	if f.Status != nil {
-		conds = append(conds, "x.status = "+add(*f.Status))
+	if filters.Status != nil {
+		conds = append(conds, "x.status = "+add(*filters.Status))
 	}
 
-	if f.PartnerRole != nil {
-		conds = append(conds, "x.partner_role = "+add(*f.PartnerRole))
+	if filters.PartnerRole != nil {
+		conds = append(conds, "x.partner_role = "+add(*filters.PartnerRole))
 	}
 
-	if f.Search != nil && strings.TrimSpace(*f.Search) != "" {
-		p := add(paging.Contains(*f.Search))
+	if filters.Search != nil && strings.TrimSpace(*filters.Search) != "" {
+		p := add(paging.Contains(*filters.Search))
 		conds = append(conds, "(x.email ILIKE "+p+" OR x.display_name ILIKE "+p+")")
 	}
 
@@ -269,7 +269,7 @@ func markBooked(ctx context.Context, call *ops.Call, items []PartnerUser) error 
 func loadPartnerUser(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	partnerUserID uuid.UUID,
 	lock bool,
 ) (PartnerUser, error) {
 	q := "SELECT " + partnerUserCols + " FROM " + partnerUserFrom + " WHERE x.id = $1"
@@ -277,7 +277,7 @@ func loadPartnerUser(
 		q += " FOR UPDATE OF x"
 	}
 
-	x, err := scanPartnerUser(call.Tx.QueryRow(ctx, q, id))
+	x, err := scanPartnerUser(call.Tx.QueryRow(ctx, q, partnerUserID))
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && x.OrganizationID != call.Principal.OrgID) {
 		return PartnerUser{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
@@ -371,14 +371,14 @@ func otherActiveContractor(
 		return false, apperr.Wrap(execErr, "select pg_advisory_xact_lock")
 	}
 
-	var ok bool
+	var found bool
 
 	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE organization_id = $1 AND id <>
 		$2
 		AND partner_role = 'contractor' AND status = 'active')`, org, except).
-		Scan(&ok)
+		Scan(&found)
 
-	return ok, apperr.Wrap(err, "select identity.partner_users")
+	return found, apperr.Wrap(err, "select identity.partner_users")
 }
 
 // InviteResendGap is the least time between two invitation e-mails to one invite (IR423): the write limit per member
@@ -480,7 +480,7 @@ func notSelfOrLast(ctx context.Context, c *ops.Call, partnerUser PartnerUser) er
 //	@Router			/v1/partner-users [post]
 func partnerUsersSave(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	input *PartnerUserInput,
 ) (PartnerUser, error) {
 	var self uuid.UUID
@@ -490,8 +490,9 @@ func partnerUsersSave(
 
 	var dup bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE organization_id = $1 AND email =
-		$2::citext AND id <> $3)`, c.Principal.OrgID, input.Email, self).
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE organization_id = $1 AND email
+		=
+		$2::citext AND id <> $3)`, call.Principal.OrgID, input.Email, self).
 		Scan(&dup)
 	if err != nil {
 		return PartnerUser{}, apperr.Wrap(err, "select identity.partner_users")
@@ -514,7 +515,7 @@ func partnerUsersSave(
 			Email:       input.Email,
 			DisplayName: *input.DisplayName,
 			Role:        input.PartnerRole,
-			OrgID:       c.Principal.OrgID,
+			OrgID:       call.Principal.OrgID,
 			Permissions: defaultPermissions[input.PartnerRole],
 			Employment:  nil,
 			ClientRole:  nil,
@@ -522,7 +523,7 @@ func partnerUsersSave(
 			Scopes:      nil,
 		}
 		if input.PartnerRole == "technician" {
-			if !accessUntilOK(c.Now, *input.AccessUntil) {
+			if !accessUntilOK(call.Now, *input.AccessUntil) {
 				return PartnerUser{}, apperr.Fields(
 					map[string]string{"accessUntil": apperr.KeyRange},
 				)
@@ -531,41 +532,41 @@ func partnerUsersSave(
 			ext := "external"
 			acct.Employment, acct.ValidUntil, acct.Scopes = &ext, input.AccessUntil, []ScopeRef{}
 		} else {
-			acct.Scopes = []ScopeRef{{Kind: "organization", ID: c.Principal.OrgID}}
+			acct.Scopes = []ScopeRef{{Kind: "organization", ID: call.Principal.OrgID}}
 		}
 
-		_, membership, err := createAccount(ctx, c, acct)
+		_, membership, err := createAccount(ctx, call, acct)
 		if err != nil {
 			return PartnerUser{}, err
 		}
 
-		id := uuid.New()
+		partnerUserID := uuid.New()
 
-		_, execErr := c.Tx.Exec(
+		_, execErr := call.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, display_name,
 				partner_role, status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'invited', $7, $8, $7, $7, $7)`,
-			id,
-			c.Principal.OrgID,
+			partnerUserID,
+			call.Principal.OrgID,
 			membership,
 			input.Email,
 			*input.DisplayName,
 			input.PartnerRole,
-			c.Now,
-			c.Principal.MembershipID,
+			call.Now,
+			call.Principal.MembershipID,
 		)
 		if execErr != nil {
 			return PartnerUser{}, apperr.Wrap(execErr, "insert identity.partner_users")
 		}
 
-		v := 1
-		c.Audit(
+		version := 1
+		call.Audit(
 			ops.AuditEntry{
 				Action:          "partnerUsers.save",
 				TargetKind:      "partner_user",
-				TargetID:        id.String(),
-				NextVersion:     &v,
+				TargetID:        partnerUserID.String(),
+				NextVersion:     &version,
 				Reason:          "account created",
 				PreviousVersion: nil,
 				Result:          "",
@@ -574,15 +575,15 @@ func partnerUsersSave(
 			},
 		)
 
-		return loadPartnerUser(ctx, c, id, false)
+		return loadPartnerUser(ctx, call, partnerUserID, false)
 	}
 
-	partnerUser, err := loadPartnerUser(ctx, c, *input.ID, true)
+	partnerUser, err := loadPartnerUser(ctx, call, *input.ID, true)
 	if err != nil {
 		return partnerUser, err
 	}
 
-	if partnerUser.Version != *c.ExpectedVersion {
+	if partnerUser.Version != *call.ExpectedVersion {
 		return partnerUser, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
@@ -616,7 +617,7 @@ func partnerUsersSave(
 
 	if partnerUser.Status != "invited" && status != partnerUser.Status ||
 		partnerUser.PartnerRole != input.PartnerRole {
-		err := notSelfOrLast(ctx, c, partnerUser)
+		err := notSelfOrLast(ctx, call, partnerUser)
 		if err != nil {
 			return partnerUser, err
 		}
@@ -627,29 +628,29 @@ func partnerUsersSave(
 		if status == "disabled" { // keep the access end, and close the membership now
 			kept = partnerUser.AccessUntil
 
-			_, err := c.Tx.Exec(
+			_, err := call.Tx.Exec(
 				ctx,
 				`UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'),
 					scope_version = scope_version + 1,
 				version = version + 1, updated_at = $2 WHERE id = $1`,
 				*partnerUser.MembershipID,
-				c.Now,
+				call.Now,
 			)
 			if err != nil {
 				return partnerUser, apperr.Wrap(err, "update identity.memberships")
 			}
 		} else { // re-enabled: the kept access end comes back, if it has not passed
-			if kept != nil && !kept.After(c.Now) {
+			if kept != nil && !kept.After(call.Now) {
 				return partnerUser, apperr.E(apperr.Conflict, "errors.access_expired")
 			}
 
-			_, err := c.Tx.Exec(
+			_, err := call.Tx.Exec(
 				ctx,
 				`UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1,
 					updated_at = $3 WHERE id = $1`,
 				*partnerUser.MembershipID,
 				kept,
-				c.Now,
+				call.Now,
 			)
 			if err != nil {
 				return partnerUser, apperr.Wrap(err, "update identity.memberships")
@@ -660,7 +661,7 @@ func partnerUsersSave(
 	}
 
 	if input.AccessUntil != nil { // a technician's access end, set by the contractor (IR461)
-		if !accessUntilOK(c.Now, *input.AccessUntil) {
+		if !accessUntilOK(call.Now, *input.AccessUntil) {
 			return partnerUser, apperr.Fields(map[string]string{"accessUntil": apperr.KeyRange})
 		}
 
@@ -674,7 +675,7 @@ func partnerUsersSave(
 			) { // shortening: not while booked (IR421)
 			booked, err := ops.Query[bool](
 				ctx,
-				c,
+				call,
 				"maintenance.technicianBooked",
 				map[string]any{"membershipId": *partnerUser.MembershipID},
 			)
@@ -690,13 +691,13 @@ func partnerUsersSave(
 		if status == "disabled" {
 			kept = input.AccessUntil // comes back when re-enabled
 		} else {
-			_, err := c.Tx.Exec(
+			_, err := call.Tx.Exec(
 				ctx,
 				`UPDATE identity.memberships SET valid_until = $2, scope_version = scope_version + 1, version = version + 1,
 					updated_at = $3 WHERE id = $1`,
 				*partnerUser.MembershipID,
 				*input.AccessUntil,
-				c.Now,
+				call.Now,
 			)
 			if err != nil {
 				return partnerUser, apperr.Wrap(err, "update identity.memberships")
@@ -704,7 +705,7 @@ func partnerUsersSave(
 		}
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE identity.partner_users SET email = $2, partner_role = $3, status = $4, access_until = $5, version = version +
 			1, updated_at = $6 WHERE id = $1`,
@@ -713,7 +714,7 @@ func partnerUsersSave(
 		input.PartnerRole,
 		status,
 		kept,
-		c.Now,
+		call.Now,
 	)
 	if execErr != nil {
 		return partnerUser, apperr.Wrap(execErr, "update identity.partner_users")
@@ -721,22 +722,22 @@ func partnerUsersSave(
 
 	if partnerUser.MembershipID != nil && status != partnerUser.Status &&
 		(status == "disabled" || partnerUser.Status == "disabled") { // the sign-in follows (IR461)
-		setAccountEnabled(c, *partnerUser.MembershipID, status != "disabled")
+		setAccountEnabled(call, *partnerUser.MembershipID, status != "disabled")
 	}
 
 	next := partnerUser.Version + 1
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "partnerUsers.save",
 			TargetKind:      "partner_user",
 			TargetID:        partnerUser.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next,
 			Reason:          *input.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return loadPartnerUser(ctx, c, partnerUser.ID, false)
+	return loadPartnerUser(ctx, call, partnerUser.ID, false)
 }
 
 // PartnerRemoveInput is partnerUsers.remove input.
@@ -791,9 +792,9 @@ func (in *PartnerRemoveInput) Validate() map[string]string {
 func partnerUsersRemove(
 	ctx context.Context,
 	call *ops.Call,
-	in *PartnerRemoveInput,
+	input *PartnerRemoveInput,
 ) (Deleted, error) {
-	partnerUser, err := loadPartnerUser(ctx, call, in.ID, true)
+	partnerUser, err := loadPartnerUser(ctx, call, input.ID, true)
 	if err != nil {
 		return Deleted{}, err
 	}
@@ -838,7 +839,7 @@ func partnerUsersRemove(
 			TargetKind:      "partner_user",
 			TargetID:        partnerUser.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
-			Reason:          in.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
+			Reason:          input.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 

@@ -38,7 +38,7 @@ func list[T any](
 	ctx context.Context,
 	call *ops.Call,
 	query *paging.Query,
-	f any,
+	filters any,
 	table, cols string,
 	conds []string,
 	args []any,
@@ -49,7 +49,7 @@ func list[T any](
 		return paging.Page[T]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[T]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -188,13 +188,13 @@ func (m *Module) customersList(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Customer], error) {
-	var f struct {
+	var filters struct {
 		Kind           *string    `json:"kind,omitempty"`
 		Status         *string    `json:"status,omitempty"`
 		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
 	}
 
-	err := decodeFilters(query.Filters, &f)
+	err := decodeFilters(query.Filters, &filters)
 	if err != nil {
 		return paging.Page[Customer]{}, err
 	}
@@ -208,24 +208,24 @@ func (m *Module) customersList(
 	}
 	conds := []string{"TRUE"}
 
-	if f.Kind != nil {
-		if !profiles[*f.Kind] {
+	if filters.Kind != nil {
+		if !profiles[*filters.Kind] {
 			return paging.Page[Customer]{}, apperr.Fields(
 				map[string]string{"filters.kind": apperr.KeyInvalid},
 			)
 		}
 
-		conds = append(conds, "service_profile = "+add(*f.Kind))
+		conds = append(conds, "service_profile = "+add(*filters.Kind))
 	}
 
-	if f.Status != nil {
-		if *f.Status != "active" && *f.Status != "inactive" {
+	if filters.Status != nil {
+		if *filters.Status != "active" && *filters.Status != "inactive" {
 			return paging.Page[Customer]{}, apperr.Fields(
 				map[string]string{"filters.status": apperr.KeyInvalid},
 			)
 		}
 
-		conds = append(conds, "status = "+add(*f.Status))
+		conds = append(conds, "status = "+add(*filters.Status))
 	} else {
 		conds = append(
 			conds,
@@ -233,11 +233,21 @@ func (m *Module) customersList(
 		) // inactive customers only with Status: All / inactive (IR40)
 	}
 
-	if f.OrganizationID != nil {
-		conds = append(conds, "organization_id = "+add(*f.OrganizationID))
+	if filters.OrganizationID != nil {
+		conds = append(conds, "organization_id = "+add(*filters.OrganizationID))
 	}
 
-	return list(ctx, call, query, f, "assets.customers", customerCols, conds, args, scanCustomer)
+	return list(
+		ctx,
+		call,
+		query,
+		filters,
+		"assets.customers",
+		customerCols,
+		conds,
+		args,
+		scanCustomer,
+	)
 }
 
 // CustomerSave is customers.save input.
@@ -303,14 +313,14 @@ func (m *Module) customersSave(
 	input *CustomerSave,
 ) (Customer, error) {
 	if input.ID == nil {
-		id := uuid.Must(uuid.NewV7())
+		customerID := uuid.Must(uuid.NewV7())
 
 		customer, err := scanCustomer(
 			call.Tx.QueryRow(
 				ctx,
 				`INSERT INTO assets.customers (id, tenant_id, organization_id, name, status, service_profile)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5) RETURNING `+customerCols,
-				id,
+				customerID,
 				input.OrganizationID,
 				input.Name,
 				input.Status,
@@ -325,7 +335,7 @@ func (m *Module) customersSave(
 			ops.AuditEntry{
 				Action:          "customers.save",
 				TargetKind:      "customer",
-				TargetID:        id.String(),
+				TargetID:        customerID.String(),
 				NextVersion:     &customer.Version,
 				PreviousVersion: nil,
 				Reason:          "",
@@ -337,7 +347,7 @@ func (m *Module) customersSave(
 		call.Emit(
 			ops.Event{
 				AggregateType: "customer",
-				AggregateID:   id,
+				AggregateID:   customerID,
 				Type:          "CustomerChanged",
 				Payload:       nil,
 			},
@@ -372,7 +382,7 @@ func (m *Module) customersSave(
 		}
 	}
 
-	x, err := scanCustomer(
+	updated, err := scanCustomer(
 		call.Tx.QueryRow(
 			ctx,
 			`UPDATE assets.customers SET name=$3, status=$4, service_profile=$5, version = version + 1, updated_at =
@@ -394,21 +404,21 @@ func (m *Module) customersSave(
 		ops.AuditEntry{
 			Action:          "customers.save",
 			TargetKind:      "customer",
-			TargetID:        x.ID.String(),
+			TargetID:        updated.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &x.Version, Reason: "", Result: "", Before: nil, After: nil,
+			NextVersion:     &updated.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 	call.Emit(
 		ops.Event{
 			AggregateType: "customer",
-			AggregateID:   x.ID,
+			AggregateID:   updated.ID,
 			Type:          "CustomerChanged",
 			Payload:       nil,
 		},
 	)
 
-	return x, nil
+	return updated, nil
 }
 
 // ---- properties / spaces lists ----
@@ -446,12 +456,12 @@ func (m *Module) propertiesList(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Property], error) {
-	var f struct {
+	var filters struct {
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
 		Kind       *string    `json:"kind,omitempty"`
 	}
 
-	err := decodeFilters(query.Filters, &f)
+	err := decodeFilters(query.Filters, &filters)
 	if err != nil {
 		return paging.Page[Property]{}, err
 	}
@@ -465,26 +475,36 @@ func (m *Module) propertiesList(
 	}
 
 	conds := []string{"NOT archived", clientOrg(call, "customer_org_id", &args)}
-	if f.CustomerID != nil {
+	if filters.CustomerID != nil {
 		conds = append(
 			conds,
 			"customer_org_id = (SELECT organization_id FROM assets.customers WHERE id = "+add(
-				*f.CustomerID,
+				*filters.CustomerID,
 			)+")",
 		)
 	}
 
-	if f.Kind != nil {
-		if *f.Kind != "home" && *f.Kind != "office" {
+	if filters.Kind != nil {
+		if *filters.Kind != "home" && *filters.Kind != "office" {
 			return paging.Page[Property]{}, apperr.Fields(
 				map[string]string{"filters.kind": apperr.KeyInvalid},
 			)
 		}
 
-		conds = append(conds, "kind = "+add(*f.Kind))
+		conds = append(conds, "kind = "+add(*filters.Kind))
 	}
 
-	return list(ctx, call, query, f, "assets.properties", propertyCols, conds, args, scanProperty)
+	return list(
+		ctx,
+		call,
+		query,
+		filters,
+		"assets.properties",
+		propertyCols,
+		conds,
+		args,
+		scanProperty,
+	)
 }
 
 // spacesList serves spaces.list.
@@ -520,12 +540,12 @@ func (m *Module) spacesList(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Space], error) {
-	var f struct {
+	var filters struct {
 		PropertyID *uuid.UUID `json:"propertyId,omitempty"`
 		Kind       *string    `json:"kind,omitempty"`
 	}
 
-	err := decodeFilters(query.Filters, &f)
+	err := decodeFilters(query.Filters, &filters)
 	if err != nil {
 		return paging.Page[Space]{}, err
 	}
@@ -548,21 +568,21 @@ func (m *Module) spacesList(
 		)
 	}
 
-	if f.PropertyID != nil {
-		conds = append(conds, "property_id = "+add(*f.PropertyID))
+	if filters.PropertyID != nil {
+		conds = append(conds, "property_id = "+add(*filters.PropertyID))
 	}
 
-	if f.Kind != nil {
-		if !spaceKinds[*f.Kind] {
+	if filters.Kind != nil {
+		if !spaceKinds[*filters.Kind] {
 			return paging.Page[Space]{}, apperr.Fields(
 				map[string]string{"filters.kind": apperr.KeyInvalid},
 			)
 		}
 
-		conds = append(conds, "kind = "+add(*f.Kind))
+		conds = append(conds, "kind = "+add(*filters.Kind))
 	}
 
-	return list(ctx, call, query, f, "assets.spaces", spaceCols, conds, args, scanSpace)
+	return list(ctx, call, query, filters, "assets.spaces", spaceCols, conds, args, scanSpace)
 }
 
 // ---- locations.rename (IR109) ----
@@ -625,13 +645,13 @@ func (in *RenameInput) Validate() map[string]string {
 func (m *Module) locationsRename(
 	ctx context.Context,
 	call *ops.Call,
-	in *RenameInput,
+	input *RenameInput,
 ) (any, error) {
-	name := strings.TrimSpace(in.Name)
+	name := strings.TrimSpace(input.Name)
 
 	var table, col, org, siblings string
 
-	switch in.Target.Kind {
+	switch input.Target.Kind {
 	case "property":
 		table, col, org = "assets.properties", "name", "customer_org_id"
 		siblings = `SELECT 1 FROM assets.properties o, assets.properties t WHERE t.id = $1 AND o.customer_org_id =
@@ -648,7 +668,7 @@ func (m *Module) locationsRename(
 			o.space_id IS NOT DISTINCT FROM t.space_id AND o.id <> t.id AND NOT o.archived AND lower(o.display_name) = lower($2)`
 	}
 
-	visArgs, updArgs := []any{in.Target.ID}, []any{in.Target.ID, *call.ExpectedVersion, name}
+	visArgs, updArgs := []any{input.Target.ID}, []any{input.Target.ID, *call.ExpectedVersion, name}
 	visScope, updScope := "TRUE", "TRUE"
 
 	if call.Principal.Role == "client" { // client:self-customer
@@ -677,7 +697,7 @@ func (m *Module) locationsRename(
 
 	var dup bool
 
-	scanErr = call.Tx.QueryRow(ctx, "SELECT EXISTS ("+siblings+")", in.Target.ID, name).
+	scanErr = call.Tx.QueryRow(ctx, "SELECT EXISTS ("+siblings+")", input.Target.ID, name).
 		Scan(&dup)
 	if scanErr != nil {
 		return nil, apperr.Wrap(scanErr, "select exists")
@@ -687,11 +707,11 @@ func (m *Module) locationsRename(
 		return nil, conflict(apperr.KeyDuplicateSiblingName)
 	}
 
-	var v int
+	var version int
 
 	err := call.Tx.QueryRow(ctx, "UPDATE "+table+" SET "+col+" = $3, version = version + 1, updated_at = "+
 		"platform.app_now() WHERE id = $1 AND version = $2 AND NOT archived AND "+updScope+" RETURNING version", updArgs...).
-		Scan(&v)
+		Scan(&version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, conflict(apperr.KeyVersionConflict)
 	}
@@ -701,14 +721,14 @@ func (m *Module) locationsRename(
 	}
 
 	typ := "LocationChanged"
-	if in.Target.Kind == "unit" {
+	if input.Target.Kind == "unit" {
 		typ = "UnitChanged"
 	}
 
 	call.Emit(
 		ops.Event{
-			AggregateType: in.Target.Kind,
-			AggregateID:   in.Target.ID,
+			AggregateType: input.Target.Kind,
+			AggregateID:   input.Target.ID,
 			Type:          typ,
 			Payload:       nil,
 		},
@@ -716,20 +736,20 @@ func (m *Module) locationsRename(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "locations.rename",
-			TargetKind:      in.Target.Kind,
-			TargetID:        in.Target.ID.String(),
+			TargetKind:      input.Target.Kind,
+			TargetID:        input.Target.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &v, Reason: "", Result: "", Before: nil, After: nil,
+			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
-	switch in.Target.Kind {
+	switch input.Target.Kind {
 	case "property":
 		return scanProperty(
 			call.Tx.QueryRow(
 				ctx,
 				"SELECT "+propertyCols+" FROM assets.properties WHERE id = $1",
-				in.Target.ID,
+				input.Target.ID,
 			),
 		)
 	case "space":
@@ -737,10 +757,10 @@ func (m *Module) locationsRename(
 			call.Tx.QueryRow(
 				ctx,
 				"SELECT "+spaceCols+" FROM assets.spaces WHERE id = $1",
-				in.Target.ID,
+				input.Target.ID,
 			),
 		)
 	}
 
-	return m.load(ctx, call, in.Target.ID)
+	return m.load(ctx, call, input.Target.ID)
 }

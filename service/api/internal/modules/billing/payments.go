@@ -57,13 +57,13 @@ func forCaller(c *ops.Call, p Payment) Payment {
 func (m Billing) loadPayment(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	paymentID uuid.UUID,
 ) (Payment, Invoice, error) {
 	payment, err := scanPayment(
 		call.Tx.QueryRow(
 			ctx,
 			"SELECT "+paymentCols+" FROM billing.payments WHERE id = $1 FOR UPDATE",
-			id,
+			paymentID,
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -81,13 +81,13 @@ func (m Billing) loadPayment(
 
 var paymentMethods = []string{"demo_credit_card", "demo_debit_card"}
 
-func refOK(s *string) bool {
-	if s == nil {
+func refOK(ref *string) bool {
+	if ref == nil {
 		return false
 	}
 
-	*s = strings.TrimSpace(*s)
-	n := utf8.RuneCountInString(*s)
+	*ref = strings.TrimSpace(*ref)
+	n := utf8.RuneCountInString(*ref)
 
 	return n >= 1 && n <= 128
 }
@@ -136,12 +136,16 @@ func (m Billing) markPaid(ctx context.Context, call *ops.Call, invoice uuid.UUID
 func (m Billing) paymentResult(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	paymentID uuid.UUID,
 	action string,
 	reason string,
 ) (Payment, error) {
 	payment, err := scanPayment(
-		call.Tx.QueryRow(ctx, "SELECT "+paymentCols+" FROM billing.payments WHERE id = $1", id),
+		call.Tx.QueryRow(
+			ctx,
+			"SELECT "+paymentCols+" FROM billing.payments WHERE id = $1",
+			paymentID,
+		),
 	)
 	if err != nil {
 		return payment, err
@@ -150,7 +154,7 @@ func (m Billing) paymentResult(
 	call.Emit(
 		ops.Event{
 			AggregateType: "payment",
-			AggregateID:   id,
+			AggregateID:   paymentID,
 			Type:          "PaymentChanged",
 			Payload:       map[string]any{"status": payment.Status, "invoiceId": payment.InvoiceID},
 		},
@@ -159,7 +163,7 @@ func (m Billing) paymentResult(
 		ops.AuditEntry{
 			Action:          action,
 			TargetKind:      "payment",
-			TargetID:        id.String(),
+			TargetID:        paymentID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &payment.Version,
 			Reason:          reason, Result: "", Before: nil, After: nil,
@@ -306,13 +310,13 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, input *SimulateInput
 			}, nil
 		}
 
-		var id uuid.UUID
+		var paymentID uuid.UUID
 
 		scanErr := c.Tx.QueryRow(ctx, `INSERT INTO billing.payments (tenant_id, invoice_id, amount_minor, currency, method,
 			channel, status, created_at, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'demo', 'initiated', $5, $5) RETURNING
 			id`, inv.ID, inv.AmountMinor, inv.Currency, *input.Method, c.Now).
-			Scan(&id)
+			Scan(&paymentID)
 		if scanErr != nil {
 			return nil, apperr.Wrap(scanErr, "insert billing.payments")
 		}
@@ -327,7 +331,7 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, input *SimulateInput
 			return nil, apperr.Wrap(execErr, "update billing.invoices")
 		}
 
-		return m.paymentResult(ctx, c, id, "payments.simulate", "initiate")
+		return m.paymentResult(ctx, c, paymentID, "payments.simulate", "initiate")
 	}
 
 	payment, inv, err := m.loadPayment(ctx, c, *input.PaymentID)
@@ -512,8 +516,12 @@ func amountOK(in PaymentEntry, inv Invoice) error {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/payments/confirm [post]
-func (m Billing) confirm(ctx context.Context, call *ops.Call, in *ConfirmInput) (Payment, error) {
-	payment, inv, err := m.loadPayment(ctx, call, in.PaymentID)
+func (m Billing) confirm(
+	ctx context.Context,
+	call *ops.Call,
+	input *ConfirmInput,
+) (Payment, error) {
+	payment, inv, err := m.loadPayment(ctx, call, input.PaymentID)
 	if err != nil {
 		return payment, err
 	}
@@ -526,12 +534,12 @@ func (m Billing) confirm(ctx context.Context, call *ops.Call, in *ConfirmInput) 
 		return payment, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
-	amountOKErr := amountOK(in.PaymentEntry, inv)
+	amountOKErr := amountOK(input.PaymentEntry, inv)
 	if amountOKErr != nil {
 		return payment, amountOKErr
 	}
 
-	free, referenceFreeErr := referenceFree(ctx, call, in.PaymentReference, payment.ID)
+	free, referenceFreeErr := referenceFree(ctx, call, input.PaymentReference, payment.ID)
 	if referenceFreeErr != nil || !free {
 		if referenceFreeErr != nil {
 			return payment, referenceFreeErr
@@ -546,9 +554,9 @@ func (m Billing) confirm(ctx context.Context, call *ops.Call, in *ConfirmInput) 
 			$4, recorded_by_membership_id = $5,
 		version = version + 1, updated_at = $3 WHERE id = $1`,
 		payment.ID,
-		in.PaymentReference,
+		input.PaymentReference,
 		call.Now,
-		in.Reason,
+		input.Reason,
 		call.Principal.MembershipID,
 	)
 	if execErr != nil {
@@ -560,7 +568,7 @@ func (m Billing) confirm(ctx context.Context, call *ops.Call, in *ConfirmInput) 
 		return payment, markPaidErr
 	}
 
-	return m.paymentResult(ctx, call, payment.ID, "payments.confirm", in.Reason)
+	return m.paymentResult(ctx, call, payment.ID, "payments.confirm", input.Reason)
 }
 
 // recordManual serves payments.recordManual.
@@ -590,16 +598,16 @@ func (m Billing) confirm(ctx context.Context, call *ops.Call, in *ConfirmInput) 
 //	@Router			/v1/payments/manual [post]
 func (m Billing) recordManual(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	input *ManualInput,
 ) (Payment, error) {
-	inv, err := m.loadInvoice(ctx, c, input.InvoiceID, true)
+	inv, err := m.loadInvoice(ctx, call, input.InvoiceID, true)
 	if err != nil {
 		return Payment{}, err
 	}
 	// the same invoice / reference / amount again returns the existing success
 	existing, err := scanPayment(
-		c.Tx.QueryRow(
+		call.Tx.QueryRow(
 			ctx,
 			"SELECT "+paymentCols+" FROM billing.payments WHERE invoice_id = $1 AND status = 'confirmed' AND "+
 				"payment_reference = $2 AND amount_minor = $3",
@@ -616,14 +624,14 @@ func (m Billing) recordManual(
 		return Payment{}, err
 	}
 
-	if inv.Version != *c.ExpectedVersion {
+	if inv.Version != *call.ExpectedVersion {
 		return Payment{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	var any bool
 	// a failed or expired attempt does not stop it: the customer may have paid another way (IR447); one still in flight
 	// does
-	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.payments WHERE invoice_id = $1 AND status IN
+	scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.payments WHERE invoice_id = $1 AND status IN
 		('initiated','processing','confirmed'))`, inv.ID).
 		Scan(&any)
 	if scanErr != nil {
@@ -639,7 +647,7 @@ func (m Billing) recordManual(
 		return Payment{}, amountOKErr
 	}
 
-	free, referenceFreeErr := referenceFree(ctx, c, input.PaymentReference, uuid.Nil)
+	free, referenceFreeErr := referenceFree(ctx, call, input.PaymentReference, uuid.Nil)
 	if referenceFreeErr != nil || !free {
 		if referenceFreeErr != nil {
 			return Payment{}, referenceFreeErr
@@ -648,24 +656,24 @@ func (m Billing) recordManual(
 		return Payment{}, apperr.E(apperr.Conflict, "errors.reference_used")
 	}
 
-	var id uuid.UUID
+	var paymentID uuid.UUID
 
-	scanErr = c.Tx.QueryRow(ctx, `INSERT INTO billing.payments (tenant_id, invoice_id, amount_minor, currency, method,
+	scanErr = call.Tx.QueryRow(ctx, `INSERT INTO billing.payments (tenant_id, invoice_id, amount_minor, currency, method,
 		channel, status, payment_reference, recorded_by_membership_id,
 		confirmed_at, confirmation_reason, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3,
 		NULL, 'manual', 'confirmed', $4, $5, $6, $7, $6, $6) RETURNING id`,
-		inv.ID, inv.AmountMinor, inv.Currency, input.PaymentReference, c.Principal.MembershipID, c.Now, input.Reason).
-		Scan(&id)
+		inv.ID, inv.AmountMinor, inv.Currency, input.PaymentReference, call.Principal.MembershipID, call.Now, input.Reason).
+		Scan(&paymentID)
 	if scanErr != nil {
 		return Payment{}, apperr.Wrap(scanErr, "insert billing.payments")
 	}
 
-	markPaidErr := m.markPaid(ctx, c, inv.ID)
+	markPaidErr := m.markPaid(ctx, call, inv.ID)
 	if markPaidErr != nil {
 		return Payment{}, markPaidErr
 	}
 
-	return m.paymentResult(ctx, c, id, "payments.recordManual", input.Reason)
+	return m.paymentResult(ctx, call, paymentID, "payments.recordManual", input.Reason)
 }
 
 // RegisterPayments binds the payment operations.

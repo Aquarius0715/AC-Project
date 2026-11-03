@@ -192,23 +192,24 @@ func (in *ConsentGetInput) Validate() map[string]string {
 }
 
 func loadConsent(ctx context.Context, call *ops.Call, purpose string, lock bool) (Consent, error) {
-	q := `SELECT id::text, tenant_id::text, version, created_at, updated_at, membership_id::text, purpose, granted,
+	stmt := `SELECT id::text, tenant_id::text, version, created_at, updated_at, membership_id::text, purpose, granted,
 		granted_at, revoked_at
 		FROM identity.consents WHERE membership_id = $1 AND purpose = $2`
 	if lock {
-		q += " FOR UPDATE"
+		stmt += " FOR UPDATE"
 	}
 
-	var x Consent
+	var record Consent
 
-	err := call.Tx.QueryRow(ctx, q, call.Principal.MembershipID, purpose).
-		Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.MembershipID, &x.Purpose, &x.Granted,
-			&x.GrantedAt, &x.RevokedAt)
+	err := call.Tx.QueryRow(ctx, stmt, call.Principal.MembershipID, purpose).
+		Scan(&record.ID, &record.TenantID, &record.Version, &record.CreatedAt, &record.UpdatedAt, &record.MembershipID,
+			&record.Purpose, &record.Granted,
+			&record.GrantedAt, &record.RevokedAt)
 	if errors.Is(err, pgx.ErrNoRows) { // IR84: a missing record is a fixture defect
-		return x, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		return record, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
-	return x, apperr.Wrap(err, "update (loadConsent)")
+	return record, apperr.Wrap(err, "update (loadConsent)")
 }
 
 // getConsent serves consents.get.
@@ -281,68 +282,72 @@ func (in *ConsentUpdateInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/consents/{purpose} [put]
-func updateConsent(ctx context.Context, c *ops.Call, input *ConsentUpdateInput) (Consent, error) {
-	x, err := loadConsent(ctx, c, input.Purpose, true)
+func updateConsent(
+	ctx context.Context,
+	call *ops.Call,
+	input *ConsentUpdateInput,
+) (Consent, error) {
+	record, err := loadConsent(ctx, call, input.Purpose, true)
 	if err != nil {
-		return x, err
+		return record, err
 	}
 
-	if x.Version != *c.ExpectedVersion {
-		return x, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	if record.Version != *call.ExpectedVersion {
+		return record, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	if x.Granted == input.Granted {
-		return x, nil
+	if record.Granted == input.Granted {
+		return record, nil
 	}
 
 	if input.Granted {
-		x.GrantedAt, x.RevokedAt = &c.Now, nil
+		record.GrantedAt, record.RevokedAt = &call.Now, nil
 	} else {
-		x.RevokedAt = &c.Now
+		record.RevokedAt = &call.Now
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE identity.consents SET granted = $2, granted_at = $3, revoked_at = $4, version = version + 1, updated_at = $5
 			WHERE id = $1::uuid`,
-		x.ID,
+		record.ID,
 		input.Granted,
-		x.GrantedAt,
-		x.RevokedAt,
-		c.Now,
+		record.GrantedAt,
+		record.RevokedAt,
+		call.Now,
 	)
 	if execErr != nil {
-		return x, apperr.Wrap(execErr, "update identity.consents")
+		return record, apperr.Wrap(execErr, "update identity.consents")
 	}
 
-	prev := x.Version
+	prev := record.Version
 
-	x.Granted, x.Version, x.UpdatedAt = input.Granted, x.Version+1, c.Now
+	record.Granted, record.Version, record.UpdatedAt = input.Granted, record.Version+1, call.Now
 	if !input.Granted { // equipment disables the membership's location automations (IR53; another domain, so an event)
-		id, _ := uuid.Parse(x.ID)
-		c.Emit(ops.Event{
+		id, _ := uuid.Parse(record.ID)
+		call.Emit(ops.Event{
 			AggregateType: "consent",
 			AggregateID:   id,
 			Type:          events.ConsentRevoked,
 			Payload: events.ConsentRevocation{
-				MembershipID: c.Principal.MembershipID,
+				MembershipID: call.Principal.MembershipID,
 				Purpose:      input.Purpose,
-				At:           c.Now,
+				At:           call.Now,
 			},
 		})
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "consents.update",
 			TargetKind:      "consent",
-			TargetID:        x.ID,
+			TargetID:        record.ID,
 			PreviousVersion: &prev,
-			NextVersion:     &x.Version, Reason: "", Result: "", Before: nil, After: nil,
+			NextVersion:     &record.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return x, nil
+	return record, nil
 }
 
 // RegisterPreferences binds preferences.* and consents.*.

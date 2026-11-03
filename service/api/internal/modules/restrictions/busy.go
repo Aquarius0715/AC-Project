@@ -57,20 +57,20 @@ func (Busy) UnitRestriction(
 }
 
 func unitRestriction(ctx context.Context, c *ops.Call, input *UnitInput) (UnitRestriction, error) {
-	var r UnitRestriction
+	var restriction UnitRestriction
 
 	err := c.Tx.QueryRow(ctx, `SELECT r.state, r.policy FROM restrictions.restriction_units ru JOIN
 		restrictions.restrictions r ON r.id = ru.restriction_id
 		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested') ORDER BY r.created_at DESC LIMIT
 		1`, input.UnitID).
-		Scan(&r.Phase, &r.Policy)
+		Scan(&restriction.Phase, &restriction.Policy)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return UnitRestriction{Phase: "", Policy: nil, Found: false}, nil
 	}
 
-	r.Found = err == nil
+	restriction.Found = err == nil
 
-	return r, apperr.Wrap(err, "select restrictions.restriction_units")
+	return restriction, apperr.Wrap(err, "select restrictions.restriction_units")
 }
 
 // UnitRecovering reports an unresolved terminal-restriction recovery case of the unit, which blocks ordinary control
@@ -100,14 +100,14 @@ func (Busy) UnitBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, er
 }
 
 func unitBusy(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
-	var b bool
+	var busy bool
 
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_units ru JOIN
 		restrictions.restrictions r ON r.id = ru.restriction_id
 		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested'))`, in.UnitID).
-		Scan(&b)
+		Scan(&busy)
 
-	return b, apperr.Wrap(err, "select restrictions.restriction_units")
+	return busy, apperr.Wrap(err, "select restrictions.restriction_units")
 }
 
 // UnitActive implements assets.UnitActivity (same rule as UnitBusy).
@@ -137,17 +137,17 @@ func (Busy) ContractState(
 
 	for rows.Next() {
 		var (
-			id             uuid.UUID
+			restrictionID  uuid.UUID
 			isActive, open bool
 		)
 
-		err := rows.Scan(&id, &isActive, &open)
+		err := rows.Scan(&restrictionID, &isActive, &open)
 		if err != nil {
 			return nil, false, apperr.Wrap(err, "select restrictions.restrictions")
 		}
 
 		if isActive {
-			active = append(active, id)
+			active = append(active, restrictionID)
 		}
 
 		unresolved = unresolved || open
@@ -171,14 +171,14 @@ func (Busy) ForInvoice(ctx context.Context, c *ops.Call, invoice uuid.UUID) ([]u
 	out := []uuid.UUID{}
 
 	for rows.Next() {
-		var id uuid.UUID
+		var restrictionID uuid.UUID
 
-		err := rows.Scan(&id)
+		err := rows.Scan(&restrictionID)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select restrictions.restriction_invoices")
 		}
 
-		out = append(out, id)
+		out = append(out, restrictionID)
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select restrictions.restriction_invoices")
@@ -223,14 +223,14 @@ func (m Restrictions) OnInvoicePaid(
 	out := []uuid.UUID{}
 
 	for rows.Next() {
-		var id uuid.UUID
+		var restrictionID uuid.UUID
 
-		err := rows.Scan(&id)
+		err := rows.Scan(&restrictionID)
 		if err != nil {
 			return nil, apperr.Wrap(err, "update restrictions.restrictions")
 		}
 
-		out = append(out, id)
+		out = append(out, restrictionID)
 	}
 
 	rowsErr := rows.Err()
@@ -238,11 +238,11 @@ func (m Restrictions) OnInvoicePaid(
 		return nil, apperr.Wrap(rowsErr, "update restrictions.restrictions")
 	}
 
-	for _, id := range out {
+	for _, restrictionID := range out {
 		call.Emit(
 			ops.Event{
 				AggregateType: "restriction",
-				AggregateID:   id,
+				AggregateID:   restrictionID,
 				Type:          "RestrictionReleaseRequested",
 				Payload:       map[string]any{"source": "payment", "invoiceId": invoice},
 			},
@@ -251,7 +251,7 @@ func (m Restrictions) OnInvoicePaid(
 		err := m.evaluateRelease(
 			ctx,
 			call,
-			id,
+			restrictionID,
 		)
 		if err != nil { // D03 release evaluation in the same transition (IR35 ①)
 			return nil, err
@@ -261,7 +261,7 @@ func (m Restrictions) OnInvoicePaid(
 			ops.AuditEntry{
 				Action:          "payments.release",
 				TargetKind:      "restriction",
-				TargetID:        id.String(),
+				TargetID:        restrictionID.String(),
 				Reason:          "cause invoices paid",
 				PreviousVersion: nil,
 				NextVersion:     nil,
@@ -284,16 +284,16 @@ func (Busy) UnitPolicy(ctx context.Context, c *ops.Call, unit uuid.UUID) ([]byte
 }
 
 func unitPolicy(ctx context.Context, c *ops.Call, input *UnitInput) ([]byte, error) {
-	var p []byte
+	var policy []byte
 
 	err := c.Tx.QueryRow(ctx, `SELECT r.policy FROM restrictions.restriction_units ru JOIN restrictions.restrictions r ON
 		r.id = ru.restriction_id
 		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested') ORDER BY r.created_at DESC LIMIT
 		1`, input.UnitID).
-		Scan(&p)
+		Scan(&policy)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 
-	return p, apperr.Wrap(err, "select restrictions.restriction_units")
+	return policy, apperr.Wrap(err, "select restrictions.restriction_units")
 }
