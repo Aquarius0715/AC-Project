@@ -2,8 +2,8 @@ package integration
 
 import "testing"
 
-// asObj, asArr, asStr, asNum and asBool read a decoded JSON value as the JSON type the test expects. Anything else
-// fails the test and shows the value, where a bare type assertion would panic (forcetypeassert).
+// asObj, asArr, asStr and asNum read a decoded JSON value as the JSON type the test expects. Anything else fails the
+// test and shows the value, where a bare type assertion would panic (forcetypeassert).
 func asObj(t testing.TB, v any) map[string]any {
 	t.Helper()
 
@@ -26,12 +26,6 @@ func asNum(t testing.TB, v any) float64 {
 	t.Helper()
 
 	return as[float64](t, v)
-}
-
-func asBool(t testing.TB, v any) bool {
-	t.Helper()
-
-	return as[bool](t, v)
 }
 
 // as reads v as T and fails the test when v holds something else.
