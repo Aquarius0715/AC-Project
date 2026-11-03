@@ -32,6 +32,14 @@ type Conditions struct {
 	OrganizationID  uuid.UUID   `json:"organizationId"`
 }
 
+// Validate implements ops.Validator (mrv.preview input).
+func (in *Conditions) Validate() map[string]string {
+	fe := map[string]string{}
+	in.check(fe, "")
+
+	return fe
+}
+
 func (in *Conditions) check(fieldErrs map[string]string, prefix string) {
 	if CheckRange(in.From, in.To) != nil {
 		fieldErrs[prefix+"from"] = "errors.energy_range"
@@ -70,14 +78,6 @@ func (in *Conditions) check(fieldErrs map[string]string, prefix string) {
 	if in.OrganizationID == uuid.Nil {
 		fieldErrs[prefix+"organizationId"] = apperr.KeyRequired
 	}
-}
-
-// Validate implements ops.Validator (mrv.preview input).
-func (in *Conditions) Validate() map[string]string {
-	fe := map[string]string{}
-	in.check(fe, "")
-
-	return fe
 }
 
 // Preview is MRVPreview.

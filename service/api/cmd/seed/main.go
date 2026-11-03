@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -26,27 +27,36 @@ func main() {
 		*url = "postgres://postgres:local@localhost:5432/ac?sslmode=disable"
 	}
 
-	ctx := context.Background()
-
-	loaded, err := seed.Load(*fixture)
+	err := run(context.Background(), *fixture, *url)
 	if err != nil {
 		log.Fatal(err)
 	}
+}
 
-	conn, err := pgx.Connect(ctx, *url)
+// run loads the fixture in one transaction; main exits on its error once its deferred clean-up has run.
+func run(ctx context.Context, fixture, url string) error {
+	loaded, err := seed.Load(fixture)
 	if err != nil {
-		log.Fatal(err)
+		return apperr.Wrap(err, "seed.Load")
 	}
-	defer conn.Close(ctx)
+
+	conn, err := pgx.Connect(ctx, url)
+	if err != nil {
+		return apperr.Wrap(err, "pgx.Connect")
+	}
+
+	defer func() { _ = conn.Close(ctx) }()
 
 	beginFuncErr := pgx.BeginFunc(
 		ctx,
 		conn,
-		func(tx pgx.Tx) error { return seed.Apply(ctx, tx, loaded) },
+		func(txn pgx.Tx) error { return seed.Apply(ctx, txn, loaded) },
 	)
 	if beginFuncErr != nil {
-		log.Fatal(beginFuncErr)
+		return apperr.Wrap(beginFuncErr, "transaction")
 	}
 
 	log.Printf("seeded %d actors, %d units", len(loaded.Actors), len(loaded.DemoSeed.Units))
+
+	return nil
 }

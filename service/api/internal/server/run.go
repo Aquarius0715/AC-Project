@@ -25,6 +25,21 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/ratelimit"
 )
 
+var (
+	// errWeakInternalToken refuses a service token that is short, or the local one outside the demo.
+	errWeakInternalToken = errors.New(
+		"INTERNAL_API_TOKEN: at least 32 characters and not the local value outside the demo",
+	)
+	// errNotPositive refuses a count setting that is not a whole number above zero.
+	errNotPositive = errors.New("not a whole number above zero")
+	// errPartialIDP refuses an identity provider set up in part.
+	errPartialIDP = errors.New(
+		"IDP_TOKEN_URL, IDP_ADMIN_URL, IDP_ADMIN_CLIENT_ID and IDP_ADMIN_CLIENT_SECRET go together",
+	)
+	// errNotHTTPURL refuses a setting that should be an http(s) URL.
+	errNotHTTPURL = errors.New("not an http(s) URL")
+)
+
 // Main runs one domain service (IR180): it serves only the operations of domains, with /healthz and /readyz and the
 // container healthcheck subcommand (container design §3).
 func Main(service string, domains ...string) {
@@ -125,9 +140,7 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 	// compose.yaml (IR430), which anyone could send to the internal endpoints
 	if t := cfg.InternalToken; !cfg.DemoOps && t != "" &&
 		(len(t) < 32 || strings.Contains(t, "change-me")) {
-		return cfg, errors.New(
-			"INTERNAL_API_TOKEN: at least 32 characters and not the local value outside the demo",
-		)
+		return cfg, errWeakInternalToken
 	}
 
 	for _, d := range ops.Domains { // <DOMAIN>_API_URL of the other services (IR190), optional
@@ -147,7 +160,7 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		if v := os.Getenv("WRITE_LIMIT_PER_MINUTE"); v != "" {
 			limit, err = strconv.Atoi(v)
 			if err != nil || limit < 1 {
-				return cfg, fmt.Errorf("WRITE_LIMIT_PER_MINUTE: %q", v)
+				return cfg, fmt.Errorf("WRITE_LIMIT_PER_MINUTE: %q: %w", v, errNotPositive)
 			}
 		}
 
@@ -169,7 +182,7 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 	if v := os.Getenv("ACCOUNTS_PER_ORG_PER_DAY"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 {
-			return cfg, fmt.Errorf("ACCOUNTS_PER_ORG_PER_DAY: %q", v)
+			return cfg, fmt.Errorf("ACCOUNTS_PER_ORG_PER_DAY: %q: %w", v, errNotPositive)
 		}
 
 		cfg.AccountsPerDay = n
@@ -183,9 +196,7 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		os.Getenv("IDP_ADMIN_CLIENT_SECRET"),
 	}; idpValues[0]+idpValues[1]+idpValues[2]+idpValues[3] != "" {
 		if idpValues[0] == "" || idpValues[1] == "" || idpValues[2] == "" || idpValues[3] == "" {
-			return cfg, errors.New(
-				"IDP_TOKEN_URL, IDP_ADMIN_URL, IDP_ADMIN_CLIENT_ID and IDP_ADMIN_CLIENT_SECRET go together",
-			)
+			return cfg, errPartialIDP
 		}
 
 		for i, key := range []string{"IDP_TOKEN_URL", "IDP_ADMIN_URL"} {
@@ -194,7 +205,7 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 			)
 			if err != nil || (u.Scheme != "http" && u.Scheme != "https") ||
 				u.Host == "" {
-				return cfg, fmt.Errorf("%s: not an http(s) URL", key)
+				return cfg, fmt.Errorf("%s: %w", key, errNotHTTPURL)
 			}
 		}
 

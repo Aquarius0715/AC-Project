@@ -6,6 +6,7 @@ package seed
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -18,6 +19,9 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/monitoring"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
+
+// errUnknownParents stops the seed when spaces name parents the fixture does not have.
+var errUnknownParents = errors.New("spaces with unknown parents")
 
 // Namespace is the UUIDv5 namespace for fixture IDs.
 var Namespace = uuid.MustParse("6f1c3a52-6d0b-5c1e-9a57-0d1b7a4c2e10")
@@ -507,7 +511,7 @@ func Apply(ctx context.Context, txn pgx.Tx, f *Fixture) error {
 		}
 
 		if len(next) == len(pending) {
-			return fmt.Errorf("spaces with unknown parents: %d", len(next))
+			return fmt.Errorf("%w: %d", errUnknownParents, len(next))
 		}
 
 		pending = next

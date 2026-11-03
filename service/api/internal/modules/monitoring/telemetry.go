@@ -138,23 +138,6 @@ var metrics = map[string]bool{
 
 const maxSeriesRange = 35 * 24 * time.Hour
 
-// readableUnits checks that every unit is readable by the caller (NOT_FOUND otherwise, D01).
-func (m Telemetry) readableUnits(ctx context.Context, call *ops.Call, units []uuid.UUID) error {
-	vis, err := m.Units.VisibleUnits(ctx, call, units)
-	if err != nil {
-		return apperr.Wrap(err, "monitoring.TelemetryUnits.VisibleUnits")
-	}
-
-	if len(vis) != len(units) {
-		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
-	}
-
-	return apperr.Wrap(
-		unitscope.Gate(ctx, call, units),
-		"unitscope.Gate",
-	) // IR49(b): external technicians wait for the work window
-}
-
 // ---- telemetry.series ----
 
 // SeriesInput is telemetry.series input.
@@ -246,6 +229,509 @@ type AirSeries struct {
 	SnapshotVersion     int                  `json:"snapshotVersion"`
 	AllergenObservation *AllergenObservation `json:"allergenObservation"`
 	Buckets             []SeriesBucket       `json:"buckets"` // with bucketMinutes only; null otherwise (IR605)
+}
+
+// bucketed averages the valid readings of the series in stretches of size from from to to (IR605, DEC-90): a stretch
+// without a valid reading stays in the list with no value and a count of 0, so a gap is never joined; stale, suspect
+// and missing readings are left out, as the charts leave them out.
+func bucketed(
+	ctx context.Context,
+	call *ops.Call,
+	where string,
+	args []any,
+	from, until time.Time,
+	size time.Duration,
+) ([]SeriesBucket, error) {
+	q := fmt.Sprintf(`SELECT date_bin(make_interval(secs => $%d), m.observed_at, $3) AS b,
+		avg(m.value) FILTER (WHERE m.quality = 'valid' AND m.value IS NOT NULL), count(*) FILTER (WHERE m.quality = 'valid'
+		AND m.value IS NOT NULL)
+		FROM monitoring.measurements m WHERE %s GROUP BY b`, len(args)+1, where)
+
+	rows, err := call.Tx.Query(ctx, q, append(append([]any{}, args...), size.Seconds())...)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select monitoring.measurements")
+	}
+
+	got := map[int64]SeriesBucket{}
+
+	for rows.Next() {
+		var seriesBucket SeriesBucket
+
+		err := rows.Scan(&seriesBucket.Start, &seriesBucket.Value, &seriesBucket.Count)
+		if err != nil {
+			rows.Close()
+
+			return nil, apperr.Wrap(err, "select monitoring.measurements")
+		}
+
+		got[seriesBucket.Start.UnixMilli()] = seriesBucket
+	}
+
+	rows.Close()
+
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, apperr.Wrap(rowsErr, "select monitoring.measurements")
+	}
+
+	out := []SeriesBucket{}
+
+	for when := from; when.Before(until); when = when.Add(size) {
+		seriesBucket, ok := got[when.UnixMilli()]
+		if !ok {
+			seriesBucket = SeriesBucket{Start: when, Value: nil, Count: 0}
+		}
+
+		seriesBucket.Start = when.UTC()
+		if seriesBucket.Count == 0 {
+			seriesBucket.Value = nil
+		}
+
+		out = append(out, seriesBucket)
+	}
+
+	return out, nil
+}
+
+// allergen returns the DEC-57 observation of one unit (not_measured without a row; unsupported clears all fields).
+func allergen(ctx context.Context, c *ops.Call, unit uuid.UUID) (AllergenObservation, error) {
+	var allergenObservation AllergenObservation
+
+	err := c.Tx.QueryRow(ctx, `SELECT availability, substance, value, unit, source_label, observed_at, evidence_text FROM
+		monitoring.allergen_observations
+		WHERE unit_id = $1 ORDER BY observed_at DESC NULLS LAST, created_at DESC, id ASC LIMIT 1`, unit).
+		Scan(&allergenObservation.Availability, &allergenObservation.Substance, &allergenObservation.Value,
+			&allergenObservation.Unit, &allergenObservation.SourceLabel, &allergenObservation.ObservedAt,
+			&allergenObservation.EvidenceText)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return AllergenObservation{
+			Availability: "not_measured",
+			Substance:    nil,
+			Value:        nil,
+			Unit:         nil,
+			SourceLabel:  nil,
+			ObservedAt:   nil,
+			EvidenceText: nil,
+		}, nil
+	}
+
+	if allergenObservation.Availability == "unsupported" {
+		allergenObservation = AllergenObservation{
+			Availability: "unsupported",
+			Substance:    nil,
+			Value:        nil,
+			Unit:         nil,
+			SourceLabel:  nil,
+			ObservedAt:   nil,
+			EvidenceText: nil,
+		}
+	}
+
+	return allergenObservation, apperr.Wrap(err, "select monitoring.allergen_observations")
+}
+
+// ---- telemetry.summary ----
+
+// SummaryInput is telemetry.summary input.
+type SummaryInput struct {
+	From    time.Time   `json:"from"`
+	To      time.Time   `json:"to"`
+	UnitIDs []uuid.UUID `json:"unitIds"`
+	Metric  *string     `json:"metric,omitempty"`
+}
+
+// Validate implements ops.Validator (IR121 item 3).
+func (in *SummaryInput) Validate() map[string]string {
+	fieldErrs := map[string]string{}
+	validRange(in.From, in.To, 0, fieldErrs)
+
+	if len(in.UnitIDs) < 1 || len(in.UnitIDs) > 100 || hasDup(in.UnitIDs) {
+		fieldErrs["unitIds"] = apperr.KeyInvalid
+	}
+
+	if in.Metric != nil && !metrics[*in.Metric] {
+		fieldErrs["metric"] = apperr.KeyInvalid
+	}
+
+	return fieldErrs
+}
+
+// TelemetrySummary is TelemetrySummary of service-contracts.ts.
+type TelemetrySummary struct {
+	Measurements []Measurement `json:"measurements"`
+	AsOf         time.Time     `json:"asOf"`
+	Energy       any           `json:"energy"`
+}
+
+// ---- ventilation ----
+
+// CO2Reading is VentilationLog.co2AtLog.
+type CO2Reading struct {
+	Value      float64   `json:"value"`
+	Unit       string    `json:"unit"`
+	ObservedAt time.Time `json:"observedAt"`
+}
+
+// VentilationLog is VentilationLog of service-contracts.ts.
+type VentilationLog struct {
+	ID                   uuid.UUID   `json:"id"`
+	TenantID             uuid.UUID   `json:"tenantId"`
+	Version              int         `json:"version"`
+	CreatedAt            time.Time   `json:"createdAt"`
+	UpdatedAt            time.Time   `json:"updatedAt"`
+	SpaceID              uuid.UUID   `json:"spaceId"`
+	UnitID               *uuid.UUID  `json:"unitId"`
+	Method               string      `json:"method"`
+	DurationMinutes      int         `json:"durationMinutes"`
+	CO2AtLog             *CO2Reading `json:"co2AtLog"`
+	LoggedByMembershipID uuid.UUID   `json:"loggedByMembershipId"`
+	LoggedAt             time.Time   `json:"loggedAt"`
+}
+
+const ventCols = `v.id, v.tenant_id, v.version, v.created_at, v.updated_at, v.space_id, v.unit_id, v.method, ` +
+	`v.duration_minutes, v.co2_at_log,
+	v.logged_by_membership_id, v.logged_at`
+
+func scanVent(r pgx.Row) (VentilationLog, error) {
+	var ventilationLog VentilationLog
+
+	err := r.Scan(
+		&ventilationLog.ID,
+		&ventilationLog.TenantID,
+		&ventilationLog.Version,
+		&ventilationLog.CreatedAt,
+		&ventilationLog.UpdatedAt,
+		&ventilationLog.SpaceID,
+		&ventilationLog.UnitID,
+		&ventilationLog.Method,
+		&ventilationLog.DurationMinutes,
+		&ventilationLog.CO2AtLog,
+		&ventilationLog.LoggedByMembershipID,
+		&ventilationLog.LoggedAt,
+	)
+
+	return ventilationLog, apperr.Wrap(err, "scan (scanVent)")
+}
+
+var ventMethods = map[string]bool{
+	"window_opened":   true,
+	"door_opened":     true,
+	"ventilation_fan": true,
+	"other":           true,
+}
+
+// VentLogInput is ventilation.log input.
+type VentLogInput struct {
+	SpaceID         uuid.UUID  `json:"spaceId"`
+	UnitID          *uuid.UUID `json:"unitId,omitempty"`
+	Method          string     `json:"method"`
+	DurationMinutes int        `json:"durationMinutes"`
+}
+
+// Validate implements ops.Validator (IR110: 1–240 minutes).
+func (in *VentLogInput) Validate() map[string]string {
+	fieldErrs := map[string]string{}
+	if in.SpaceID == uuid.Nil {
+		fieldErrs["spaceId"] = apperr.KeyRequired
+	}
+
+	if !ventMethods[in.Method] {
+		fieldErrs["method"] = apperr.KeyInvalid
+	}
+
+	if in.DurationMinutes < 1 || in.DurationMinutes > 240 {
+		fieldErrs["durationMinutes"] = apperr.KeyRange
+	}
+
+	return fieldErrs
+}
+
+// RegisterTelemetry binds telemetry.* and ventilation.*.
+func RegisterTelemetry(r *ops.Registry, m Telemetry) {
+	ops.Register(r, "telemetry.series", m.series)
+	ops.Register(r, "telemetry.summary", m.summary)
+	ops.Register(r, "ventilation.log", m.log)
+	ops.Register(r, "ventilation.list", m.list)
+}
+
+// SensorLimits returns the D07 stale limit of sensors (Devices); unknown sensors are absent.
+type SensorLimits interface {
+	StaleAfter(
+		ctx context.Context,
+		c *ops.Call,
+		sensors []uuid.UUID,
+	) (map[uuid.UUID]time.Duration, error)
+}
+
+// PowerMeasured implements assets.Monitoring (SR27): per unit, whether the latest power reading at or before now —
+// chosen by observedAt desc, sequence desc, id asc, never falling back to older rows — is measured, valid, non-null and
+// within its sensor's stale limit (D07). Units without a reading are absent; a reading without its sensor is not fresh.
+func (m Telemetry) PowerMeasured(
+	ctx context.Context,
+	call *ops.Call,
+	units []uuid.UUID,
+) (map[uuid.UUID]bool, error) {
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT DISTINCT ON (m.unit_id) m.unit_id, m.sensor_id, m.origin, m.quality, m.value, m.observed_at
+		FROM monitoring.measurements m WHERE m.unit_id = ANY($1) AND m.metric = 'power' AND m.observed_at <= $2
+		ORDER BY m.unit_id, m.observed_at DESC, m.sequence DESC, m.event_id ASC`,
+		units,
+		call.Now,
+	)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select monitoring.measurements")
+	}
+
+	type reading struct {
+		unit, sensor uuid.UUID
+		ok           bool
+		at           time.Time
+	}
+
+	var (
+		readings []reading
+		sensors  []uuid.UUID
+	)
+
+	for rows.Next() {
+		var (
+			latest          reading
+			origin, quality string
+			value           *float64
+		)
+
+		err := rows.Scan(&latest.unit, &latest.sensor, &origin, &quality, &value, &latest.at)
+		if err != nil {
+			rows.Close()
+
+			return nil, apperr.Wrap(err, "select monitoring.measurements")
+		}
+
+		latest.ok = origin == "measured" && quality == "valid" && value != nil
+		readings, sensors = append(readings, latest), append(sensors, latest.sensor)
+	}
+
+	rows.Close()
+
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, apperr.Wrap(rowsErr, "select monitoring.measurements")
+	}
+
+	limits, err := m.Sensors.StaleAfter(ctx, call, sensors)
+	if err != nil {
+		return nil, apperr.Wrap(err, "monitoring.SensorLimits.StaleAfter")
+	}
+
+	out := map[uuid.UUID]bool{}
+
+	for _, r := range readings {
+		limit, known := limits[r.sensor]
+		out[r.unit] = r.ok && known && call.Now.Sub(r.at) <= limit
+	}
+
+	return out, nil
+}
+
+// metricOrder lists every Metric for the latest-reading lookup (one index probe per unit and metric).
+var metricOrder = []string{
+	"airflow_drop",
+	"co2",
+	"compressor_cycles",
+	"heartbeat_gap",
+	"humidity",
+	"pm25",
+	"power",
+	"refrigerant_pressure",
+	"temperature",
+	"vibration",
+}
+
+// LatestMeasurements implements assets.Monitoring (UnitSummary.latestMeasurements, IR213): per unit, the latest
+// Measurement of each metric at or before now — observedAt desc, sequence desc, id asc, every origin and quality, null
+// values kept — ordered by metric. A valid reading older than its sensor's stale limit, or whose sensor is unknown, is
+// returned with quality=stale (D07: missing→suspect→stale→valid); history in telemetry.series keeps the stored quality.
+func (m Telemetry) LatestMeasurements(
+	ctx context.Context,
+	call *ops.Call,
+	units []uuid.UUID,
+) (map[uuid.UUID][]Measurement, error) {
+	out := map[uuid.UUID][]Measurement{}
+	if len(units) == 0 {
+		return out, nil
+	}
+
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT x.* FROM unnest($1::uuid[]) AS u(id) CROSS JOIN unnest($3::text[]) AS k(metric)
+		CROSS JOIN LATERAL (SELECT
+		`+measurementCols+` FROM monitoring.measurements m WHERE m.unit_id = u.id AND m.metric =
+			k.metric AND m.observed_at <= $2
+		ORDER BY m.observed_at DESC, m.sequence DESC, m.event_id ASC LIMIT 1) x ORDER BY x.unit_id, x.metric`,
+		units,
+		call.Now,
+		metricOrder,
+	)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select unnest")
+	}
+
+	var (
+		all     []Measurement
+		sensors []uuid.UUID
+	)
+
+	for rows.Next() {
+		measurement, err := scanMeasurement(rows)
+		if err != nil {
+			rows.Close()
+
+			return nil, err
+		}
+
+		all, sensors = append(all, measurement), append(sensors, measurement.SensorID)
+	}
+
+	rows.Close()
+
+	rowsErr := rows.Err()
+	if rowsErr != nil {
+		return nil, apperr.Wrap(rowsErr, "select unnest")
+	}
+
+	limits, err := m.Sensors.StaleAfter(ctx, call, sensors)
+	if err != nil {
+		return nil, apperr.Wrap(err, "monitoring.SensorLimits.StaleAfter")
+	}
+
+	for _, measurement := range all {
+		if limit, known := limits[measurement.SensorID]; measurement.Quality == "valid" &&
+			(!known || call.Now.Sub(measurement.ObservedAt) > limit) {
+			measurement.Quality = "stale"
+		}
+
+		out[measurement.UnitID] = append(out[measurement.UnitID], measurement)
+	}
+
+	return out, nil
+}
+
+// RunHours implements IR134 item 1: hours with a valid measured power reading > 0 since `since` (nil = all), each
+// reading counting until the next one capped at its sensor's stale limit; the reading in force at `since` counts from
+// `since`, so a unit with power readings but none running since then has 0 h (IR238); nil without any power reading.
+func (m Telemetry) RunHours(
+	ctx context.Context,
+	call *ops.Call,
+	unit uuid.UUID,
+	since *time.Time,
+) (*float64, error) {
+	const cols = `SELECT sensor_id, observed_at, sequence, value, origin, quality FROM monitoring.measurements WHERE
+		unit_id = $1 AND metric = 'power' AND observed_at <= $2`
+
+	stmt, args := cols, []any{unit, call.Now}
+	if since != nil {
+		stmt = `(` + cols + ` AND observed_at <= $3 ORDER BY observed_at DESC, sequence DESC LIMIT 1) UNION ALL
+			(` + cols + ` AND observed_at > $3)`
+
+		args = append(args, *since)
+	}
+
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT sensor_id, observed_at, value, origin, quality FROM (`+stmt+`) r ORDER BY observed_at, sequence`,
+		args...)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select sensor_id")
+	}
+
+	type r struct {
+		sensor uuid.UUID
+		at     time.Time
+		on     bool
+	}
+
+	var (
+		readings []r
+		sensors  []uuid.UUID
+	)
+
+	for rows.Next() {
+		var (
+			reading         r
+			value           *float64
+			origin, quality string
+		)
+
+		err := rows.Scan(&reading.sensor, &reading.at, &value, &origin, &quality)
+		if err != nil {
+			rows.Close()
+
+			return nil, apperr.Wrap(err, "select sensor_id")
+		}
+
+		reading.on = origin == "measured" && quality == "valid" && value != nil && *value > 0
+		readings, sensors = append(readings, reading), append(sensors, reading.sensor)
+	}
+
+	rows.Close()
+
+	rowsErr := rows.Err()
+	if rowsErr != nil || len(readings) == 0 {
+		return nil, apperr.Wrap(rowsErr, "select sensor_id")
+	}
+
+	limits, err := m.Sensors.StaleAfter(ctx, call, sensors)
+	if err != nil {
+		return nil, apperr.Wrap(err, "monitoring.SensorLimits.StaleAfter")
+	}
+
+	var total time.Duration
+
+	for idx, reading := range readings {
+		if !reading.on {
+			continue
+		}
+
+		end := call.Now
+		if idx+1 < len(readings) {
+			end = readings[idx+1].at
+		}
+
+		if lim, ok := limits[reading.sensor]; ok && end.Sub(reading.at) > lim {
+			end = reading.at.Add(lim)
+		}
+
+		start := reading.at
+		if since != nil && start.Before(*since) {
+			start = *since
+		}
+
+		if end.After(start) {
+			total += end.Sub(start)
+		}
+	}
+
+	h := math.Round(total.Hours()*10) / 10
+
+	return &h, nil
+}
+
+// readableUnits checks that every unit is readable by the caller (NOT_FOUND otherwise, D01).
+func (m Telemetry) readableUnits(ctx context.Context, call *ops.Call, units []uuid.UUID) error {
+	vis, err := m.Units.VisibleUnits(ctx, call, units)
+	if err != nil {
+		return apperr.Wrap(err, "monitoring.TelemetryUnits.VisibleUnits")
+	}
+
+	if len(vis) != len(units) {
+		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	return apperr.Wrap(
+		unitscope.Gate(ctx, call, units),
+		"unitscope.Gate",
+	) // IR49(b): external technicians wait for the work window
 }
 
 // series serves telemetry.series.
@@ -430,138 +916,6 @@ func (m Telemetry) series(
 	return out, nil
 }
 
-// bucketed averages the valid readings of the series in stretches of size from from to to (IR605, DEC-90): a stretch
-// without a valid reading stays in the list with no value and a count of 0, so a gap is never joined; stale, suspect
-// and missing readings are left out, as the charts leave them out.
-func bucketed(
-	ctx context.Context,
-	call *ops.Call,
-	where string,
-	args []any,
-	from, until time.Time,
-	size time.Duration,
-) ([]SeriesBucket, error) {
-	q := fmt.Sprintf(`SELECT date_bin(make_interval(secs => $%d), m.observed_at, $3) AS b,
-		avg(m.value) FILTER (WHERE m.quality = 'valid' AND m.value IS NOT NULL), count(*) FILTER (WHERE m.quality = 'valid'
-		AND m.value IS NOT NULL)
-		FROM monitoring.measurements m WHERE %s GROUP BY b`, len(args)+1, where)
-
-	rows, err := call.Tx.Query(ctx, q, append(append([]any{}, args...), size.Seconds())...)
-	if err != nil {
-		return nil, apperr.Wrap(err, "select monitoring.measurements")
-	}
-
-	got := map[int64]SeriesBucket{}
-
-	for rows.Next() {
-		var seriesBucket SeriesBucket
-
-		err := rows.Scan(&seriesBucket.Start, &seriesBucket.Value, &seriesBucket.Count)
-		if err != nil {
-			rows.Close()
-
-			return nil, apperr.Wrap(err, "select monitoring.measurements")
-		}
-
-		got[seriesBucket.Start.UnixMilli()] = seriesBucket
-	}
-
-	rows.Close()
-
-	rowsErr := rows.Err()
-	if rowsErr != nil {
-		return nil, apperr.Wrap(rowsErr, "select monitoring.measurements")
-	}
-
-	out := []SeriesBucket{}
-
-	for when := from; when.Before(until); when = when.Add(size) {
-		seriesBucket, ok := got[when.UnixMilli()]
-		if !ok {
-			seriesBucket = SeriesBucket{Start: when, Value: nil, Count: 0}
-		}
-
-		seriesBucket.Start = when.UTC()
-		if seriesBucket.Count == 0 {
-			seriesBucket.Value = nil
-		}
-
-		out = append(out, seriesBucket)
-	}
-
-	return out, nil
-}
-
-// allergen returns the DEC-57 observation of one unit (not_measured without a row; unsupported clears all fields).
-func allergen(ctx context.Context, c *ops.Call, unit uuid.UUID) (AllergenObservation, error) {
-	var allergenObservation AllergenObservation
-
-	err := c.Tx.QueryRow(ctx, `SELECT availability, substance, value, unit, source_label, observed_at, evidence_text FROM
-		monitoring.allergen_observations
-		WHERE unit_id = $1 ORDER BY observed_at DESC NULLS LAST, created_at DESC, id ASC LIMIT 1`, unit).
-		Scan(&allergenObservation.Availability, &allergenObservation.Substance, &allergenObservation.Value,
-			&allergenObservation.Unit, &allergenObservation.SourceLabel, &allergenObservation.ObservedAt,
-			&allergenObservation.EvidenceText)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return AllergenObservation{
-			Availability: "not_measured",
-			Substance:    nil,
-			Value:        nil,
-			Unit:         nil,
-			SourceLabel:  nil,
-			ObservedAt:   nil,
-			EvidenceText: nil,
-		}, nil
-	}
-
-	if allergenObservation.Availability == "unsupported" {
-		allergenObservation = AllergenObservation{
-			Availability: "unsupported",
-			Substance:    nil,
-			Value:        nil,
-			Unit:         nil,
-			SourceLabel:  nil,
-			ObservedAt:   nil,
-			EvidenceText: nil,
-		}
-	}
-
-	return allergenObservation, apperr.Wrap(err, "select monitoring.allergen_observations")
-}
-
-// ---- telemetry.summary ----
-
-// SummaryInput is telemetry.summary input.
-type SummaryInput struct {
-	From    time.Time   `json:"from"`
-	To      time.Time   `json:"to"`
-	UnitIDs []uuid.UUID `json:"unitIds"`
-	Metric  *string     `json:"metric,omitempty"`
-}
-
-// Validate implements ops.Validator (IR121 item 3).
-func (in *SummaryInput) Validate() map[string]string {
-	fieldErrs := map[string]string{}
-	validRange(in.From, in.To, 0, fieldErrs)
-
-	if len(in.UnitIDs) < 1 || len(in.UnitIDs) > 100 || hasDup(in.UnitIDs) {
-		fieldErrs["unitIds"] = apperr.KeyInvalid
-	}
-
-	if in.Metric != nil && !metrics[*in.Metric] {
-		fieldErrs["metric"] = apperr.KeyInvalid
-	}
-
-	return fieldErrs
-}
-
-// TelemetrySummary is TelemetrySummary of service-contracts.ts.
-type TelemetrySummary struct {
-	Measurements []Measurement `json:"measurements"`
-	AsOf         time.Time     `json:"asOf"`
-	Energy       any           `json:"energy"`
-}
-
 // summary serves telemetry.summary.
 //
 //	@Summary		telemetry.summary (read)
@@ -630,89 +984,6 @@ func (m Telemetry) summary(
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select monitoring.measurements")
-}
-
-// ---- ventilation ----
-
-// CO2Reading is VentilationLog.co2AtLog.
-type CO2Reading struct {
-	Value      float64   `json:"value"`
-	Unit       string    `json:"unit"`
-	ObservedAt time.Time `json:"observedAt"`
-}
-
-// VentilationLog is VentilationLog of service-contracts.ts.
-type VentilationLog struct {
-	ID                   uuid.UUID   `json:"id"`
-	TenantID             uuid.UUID   `json:"tenantId"`
-	Version              int         `json:"version"`
-	CreatedAt            time.Time   `json:"createdAt"`
-	UpdatedAt            time.Time   `json:"updatedAt"`
-	SpaceID              uuid.UUID   `json:"spaceId"`
-	UnitID               *uuid.UUID  `json:"unitId"`
-	Method               string      `json:"method"`
-	DurationMinutes      int         `json:"durationMinutes"`
-	CO2AtLog             *CO2Reading `json:"co2AtLog"`
-	LoggedByMembershipID uuid.UUID   `json:"loggedByMembershipId"`
-	LoggedAt             time.Time   `json:"loggedAt"`
-}
-
-const ventCols = `v.id, v.tenant_id, v.version, v.created_at, v.updated_at, v.space_id, v.unit_id, v.method, ` +
-	`v.duration_minutes, v.co2_at_log,
-	v.logged_by_membership_id, v.logged_at`
-
-func scanVent(r pgx.Row) (VentilationLog, error) {
-	var ventilationLog VentilationLog
-
-	err := r.Scan(
-		&ventilationLog.ID,
-		&ventilationLog.TenantID,
-		&ventilationLog.Version,
-		&ventilationLog.CreatedAt,
-		&ventilationLog.UpdatedAt,
-		&ventilationLog.SpaceID,
-		&ventilationLog.UnitID,
-		&ventilationLog.Method,
-		&ventilationLog.DurationMinutes,
-		&ventilationLog.CO2AtLog,
-		&ventilationLog.LoggedByMembershipID,
-		&ventilationLog.LoggedAt,
-	)
-
-	return ventilationLog, apperr.Wrap(err, "scan (scanVent)")
-}
-
-var ventMethods = map[string]bool{
-	"window_opened":   true,
-	"door_opened":     true,
-	"ventilation_fan": true,
-	"other":           true,
-}
-
-// VentLogInput is ventilation.log input.
-type VentLogInput struct {
-	SpaceID         uuid.UUID  `json:"spaceId"`
-	UnitID          *uuid.UUID `json:"unitId,omitempty"`
-	Method          string     `json:"method"`
-	DurationMinutes int        `json:"durationMinutes"`
-}
-
-// Validate implements ops.Validator (IR110: 1–240 minutes).
-func (in *VentLogInput) Validate() map[string]string {
-	fieldErrs := map[string]string{}
-	if in.SpaceID == uuid.Nil {
-		fieldErrs["spaceId"] = apperr.KeyRequired
-	}
-
-	if !ventMethods[in.Method] {
-		fieldErrs["method"] = apperr.KeyInvalid
-	}
-
-	if in.DurationMinutes < 1 || in.DurationMinutes > 240 {
-		fieldErrs["durationMinutes"] = apperr.KeyRange
-	}
-
-	return fieldErrs
 }
 
 // log serves ventilation.log.
@@ -1033,277 +1304,6 @@ func (m Telemetry) list(
 		Total:           total,
 		SnapshotVersion: window.Snapshot,
 	}, apperr.Wrap(rows.Err(), "select monitoring.ventilation_logs")
-}
-
-// RegisterTelemetry binds telemetry.* and ventilation.*.
-func RegisterTelemetry(r *ops.Registry, m Telemetry) {
-	ops.Register(r, "telemetry.series", m.series)
-	ops.Register(r, "telemetry.summary", m.summary)
-	ops.Register(r, "ventilation.log", m.log)
-	ops.Register(r, "ventilation.list", m.list)
-}
-
-// SensorLimits returns the D07 stale limit of sensors (Devices); unknown sensors are absent.
-type SensorLimits interface {
-	StaleAfter(
-		ctx context.Context,
-		c *ops.Call,
-		sensors []uuid.UUID,
-	) (map[uuid.UUID]time.Duration, error)
-}
-
-// PowerMeasured implements assets.Monitoring (SR27): per unit, whether the latest power reading at or before now —
-// chosen by observedAt desc, sequence desc, id asc, never falling back to older rows — is measured, valid, non-null and
-// within its sensor's stale limit (D07). Units without a reading are absent; a reading without its sensor is not fresh.
-func (m Telemetry) PowerMeasured(
-	ctx context.Context,
-	call *ops.Call,
-	units []uuid.UUID,
-) (map[uuid.UUID]bool, error) {
-	rows, err := call.Tx.Query(
-		ctx,
-		`SELECT DISTINCT ON (m.unit_id) m.unit_id, m.sensor_id, m.origin, m.quality, m.value, m.observed_at
-		FROM monitoring.measurements m WHERE m.unit_id = ANY($1) AND m.metric = 'power' AND m.observed_at <= $2
-		ORDER BY m.unit_id, m.observed_at DESC, m.sequence DESC, m.event_id ASC`,
-		units,
-		call.Now,
-	)
-	if err != nil {
-		return nil, apperr.Wrap(err, "select monitoring.measurements")
-	}
-
-	type reading struct {
-		unit, sensor uuid.UUID
-		ok           bool
-		at           time.Time
-	}
-
-	var (
-		readings []reading
-		sensors  []uuid.UUID
-	)
-
-	for rows.Next() {
-		var (
-			latest          reading
-			origin, quality string
-			value           *float64
-		)
-
-		err := rows.Scan(&latest.unit, &latest.sensor, &origin, &quality, &value, &latest.at)
-		if err != nil {
-			rows.Close()
-
-			return nil, apperr.Wrap(err, "select monitoring.measurements")
-		}
-
-		latest.ok = origin == "measured" && quality == "valid" && value != nil
-		readings, sensors = append(readings, latest), append(sensors, latest.sensor)
-	}
-
-	rows.Close()
-
-	rowsErr := rows.Err()
-	if rowsErr != nil {
-		return nil, apperr.Wrap(rowsErr, "select monitoring.measurements")
-	}
-
-	limits, err := m.Sensors.StaleAfter(ctx, call, sensors)
-	if err != nil {
-		return nil, apperr.Wrap(err, "monitoring.SensorLimits.StaleAfter")
-	}
-
-	out := map[uuid.UUID]bool{}
-
-	for _, r := range readings {
-		limit, known := limits[r.sensor]
-		out[r.unit] = r.ok && known && call.Now.Sub(r.at) <= limit
-	}
-
-	return out, nil
-}
-
-// metricOrder lists every Metric for the latest-reading lookup (one index probe per unit and metric).
-var metricOrder = []string{
-	"airflow_drop",
-	"co2",
-	"compressor_cycles",
-	"heartbeat_gap",
-	"humidity",
-	"pm25",
-	"power",
-	"refrigerant_pressure",
-	"temperature",
-	"vibration",
-}
-
-// LatestMeasurements implements assets.Monitoring (UnitSummary.latestMeasurements, IR213): per unit, the latest
-// Measurement of each metric at or before now — observedAt desc, sequence desc, id asc, every origin and quality, null
-// values kept — ordered by metric. A valid reading older than its sensor's stale limit, or whose sensor is unknown, is
-// returned with quality=stale (D07: missing→suspect→stale→valid); history in telemetry.series keeps the stored quality.
-func (m Telemetry) LatestMeasurements(
-	ctx context.Context,
-	call *ops.Call,
-	units []uuid.UUID,
-) (map[uuid.UUID][]Measurement, error) {
-	out := map[uuid.UUID][]Measurement{}
-	if len(units) == 0 {
-		return out, nil
-	}
-
-	rows, err := call.Tx.Query(
-		ctx,
-		`SELECT x.* FROM unnest($1::uuid[]) AS u(id) CROSS JOIN unnest($3::text[]) AS k(metric)
-		CROSS JOIN LATERAL (SELECT
-		`+measurementCols+` FROM monitoring.measurements m WHERE m.unit_id = u.id AND m.metric =
-			k.metric AND m.observed_at <= $2
-		ORDER BY m.observed_at DESC, m.sequence DESC, m.event_id ASC LIMIT 1) x ORDER BY x.unit_id, x.metric`,
-		units,
-		call.Now,
-		metricOrder,
-	)
-	if err != nil {
-		return nil, apperr.Wrap(err, "select unnest")
-	}
-
-	var (
-		all     []Measurement
-		sensors []uuid.UUID
-	)
-
-	for rows.Next() {
-		measurement, err := scanMeasurement(rows)
-		if err != nil {
-			rows.Close()
-
-			return nil, err
-		}
-
-		all, sensors = append(all, measurement), append(sensors, measurement.SensorID)
-	}
-
-	rows.Close()
-
-	rowsErr := rows.Err()
-	if rowsErr != nil {
-		return nil, apperr.Wrap(rowsErr, "select unnest")
-	}
-
-	limits, err := m.Sensors.StaleAfter(ctx, call, sensors)
-	if err != nil {
-		return nil, apperr.Wrap(err, "monitoring.SensorLimits.StaleAfter")
-	}
-
-	for _, measurement := range all {
-		if limit, known := limits[measurement.SensorID]; measurement.Quality == "valid" &&
-			(!known || call.Now.Sub(measurement.ObservedAt) > limit) {
-			measurement.Quality = "stale"
-		}
-
-		out[measurement.UnitID] = append(out[measurement.UnitID], measurement)
-	}
-
-	return out, nil
-}
-
-// RunHours implements IR134 item 1: hours with a valid measured power reading > 0 since `since` (nil = all), each
-// reading counting until the next one capped at its sensor's stale limit; the reading in force at `since` counts from
-// `since`, so a unit with power readings but none running since then has 0 h (IR238); nil without any power reading.
-func (m Telemetry) RunHours(
-	ctx context.Context,
-	call *ops.Call,
-	unit uuid.UUID,
-	since *time.Time,
-) (*float64, error) {
-	const cols = `SELECT sensor_id, observed_at, sequence, value, origin, quality FROM monitoring.measurements WHERE
-		unit_id = $1 AND metric = 'power' AND observed_at <= $2`
-
-	stmt, args := cols, []any{unit, call.Now}
-	if since != nil {
-		stmt = `(` + cols + ` AND observed_at <= $3 ORDER BY observed_at DESC, sequence DESC LIMIT 1) UNION ALL
-			(` + cols + ` AND observed_at > $3)`
-
-		args = append(args, *since)
-	}
-
-	rows, err := call.Tx.Query(
-		ctx,
-		`SELECT sensor_id, observed_at, value, origin, quality FROM (`+stmt+`) r ORDER BY observed_at, sequence`,
-		args...)
-	if err != nil {
-		return nil, apperr.Wrap(err, "select sensor_id")
-	}
-
-	type r struct {
-		sensor uuid.UUID
-		at     time.Time
-		on     bool
-	}
-
-	var (
-		readings []r
-		sensors  []uuid.UUID
-	)
-
-	for rows.Next() {
-		var (
-			reading         r
-			value           *float64
-			origin, quality string
-		)
-
-		err := rows.Scan(&reading.sensor, &reading.at, &value, &origin, &quality)
-		if err != nil {
-			rows.Close()
-
-			return nil, apperr.Wrap(err, "select sensor_id")
-		}
-
-		reading.on = origin == "measured" && quality == "valid" && value != nil && *value > 0
-		readings, sensors = append(readings, reading), append(sensors, reading.sensor)
-	}
-
-	rows.Close()
-
-	rowsErr := rows.Err()
-	if rowsErr != nil || len(readings) == 0 {
-		return nil, apperr.Wrap(rowsErr, "select sensor_id")
-	}
-
-	limits, err := m.Sensors.StaleAfter(ctx, call, sensors)
-	if err != nil {
-		return nil, apperr.Wrap(err, "monitoring.SensorLimits.StaleAfter")
-	}
-
-	var total time.Duration
-
-	for idx, reading := range readings {
-		if !reading.on {
-			continue
-		}
-
-		end := call.Now
-		if idx+1 < len(readings) {
-			end = readings[idx+1].at
-		}
-
-		if lim, ok := limits[reading.sensor]; ok && end.Sub(reading.at) > lim {
-			end = reading.at.Add(lim)
-		}
-
-		start := reading.at
-		if since != nil && start.Before(*since) {
-			start = *since
-		}
-
-		if end.After(start) {
-			total += end.Sub(start)
-		}
-	}
-
-	h := math.Round(total.Hours()*10) / 10
-
-	return &h, nil
 }
 
 // LatestMeasurement returns the most recent measurement of a unit for a metric (highest observedAt, then sequence),

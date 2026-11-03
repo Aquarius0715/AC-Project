@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log"
 	"net/http"
@@ -21,7 +22,7 @@ import (
 )
 
 func main() {
-	days := flag.Int("days", envInt("MOCK_HISTORY_DAYS", 30), "days of history (1–35)")
+	days := flag.Int("days", envInt("MOCK_HISTORY_DAYS", defaultDays), "days of history (1–35)")
 	api := flag.String(
 		"api",
 		envOr("CORE_API_URL", "http://localhost:8080"),
@@ -30,56 +31,78 @@ func main() {
 
 	flag.Parse()
 
+	err := run(context.Background(), *days, *api)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+// defaultDays is how much history a run writes unless MOCK_HISTORY_DAYS or -days says otherwise.
+const defaultDays = 30
+
+// clientTimeout bounds the scenario clock's request to the Core API.
+const clientTimeout = 10 * time.Second
+
+// liveTakeover is how long before the scenario's now the history stops: the live readings take over from there.
+const liveTakeover = 2 * time.Minute
+
+// errNoDatabaseURL refuses a run without the owner login.
+var errNoDatabaseURL = errors.New("DATABASE_URL is required (the owner login)")
+
+// run writes the history; main exits on its error once its deferred clean-up has run.
+func run(ctx context.Context, days int, api string) error {
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
-		log.Fatal("DATABASE_URL is required (the owner login)")
+		return errNoDatabaseURL
 	}
-
-	ctx := context.Background()
 
 	fleet, err := devicesim.MockFleet()
 	if err != nil {
-		log.Fatal(err)
+		return apperr.Wrap(err, "devicesim.MockFleet")
 	}
 
 	now, err := iotbridge.ScenarioNow(
-		&http.Client{Timeout: 10 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil},
-		*api,
+		ctx,
+		&http.Client{Timeout: clientTimeout, Transport: nil, CheckRedirect: nil, Jar: nil},
+		api,
 	)
 	if err != nil {
-		log.Fatalf("scenario clock: %v", err)
+		return apperr.Wrap(err, "scenario clock")
 	}
 
-	until := now.Add(-2 * time.Minute) // the live readings take over from here
+	until := now.Add(-liveTakeover)
 
 	conn, err := pgx.Connect(ctx, url)
 	if err != nil {
-		log.Fatal(err)
+		return apperr.Wrap(err, "pgx.Connect")
 	}
-	defer conn.Close(ctx)
+
+	defer func() { _ = conn.Close(ctx) }()
 
 	var rows int64
 
 	started := time.Now()
 
-	beginFuncErr := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+	beginFuncErr := pgx.BeginFunc(ctx, conn, func(txn pgx.Tx) error {
 		var err error
 
-		rows, err = seed.ApplyFleetHistory(ctx, tx, fleet, until, *days)
+		rows, err = seed.ApplyFleetHistory(ctx, txn, fleet, until, days)
 
 		return apperr.Wrap(err, "seed.ApplyFleetHistory")
 	})
 	if beginFuncErr != nil {
-		log.Fatal(beginFuncErr)
+		return apperr.Wrap(beginFuncErr, "transaction")
 	}
 
 	log.Printf(
 		"mockhistory: %d days up to %s, %d new rows in %s",
-		*days,
+		days,
 		until.Format(time.RFC3339),
 		rows,
 		time.Since(started).Round(time.Second),
 	)
+
+	return nil
 }
 
 func envOr(key, def string) string {

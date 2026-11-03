@@ -29,7 +29,7 @@ func TestScenarioNowReadsThePreviewSnapshot(t *testing.T) {
 
 	client := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
 
-	got, err := iotbridge.ScenarioNow(client, srv.URL)
+	got, err := iotbridge.ScenarioNow(t.Context(), client, srv.URL)
 	if err != nil || !got.Equal(scenario) {
 		t.Fatalf("scenario now %v, err %v", got, err)
 	}
@@ -41,7 +41,7 @@ func TestScenarioNowReadsThePreviewSnapshot(t *testing.T) {
 			),
 		)
 
-		_, err := iotbridge.ScenarioNow(client, bad.URL)
+		_, err := iotbridge.ScenarioNow(t.Context(), client, bad.URL)
 		if err == nil {
 			t.Errorf("%s: accepted", name)
 		}
@@ -49,7 +49,7 @@ func TestScenarioNowReadsThePreviewSnapshot(t *testing.T) {
 		bad.Close()
 	}
 
-	_, scenarioNowErr := iotbridge.ScenarioNow(client, "http://127.0.0.1:1")
+	_, scenarioNowErr := iotbridge.ScenarioNow(t.Context(), client, "http://127.0.0.1:1")
 	if scenarioNowErr == nil {
 		t.Error("a dead API is not an error")
 	}

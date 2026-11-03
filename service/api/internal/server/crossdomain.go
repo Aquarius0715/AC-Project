@@ -136,16 +136,6 @@ func (v equipmentView) UnitState(
 	return r.OrgID, r.Archived, r.Found, apperr.Wrap(err, "delegate assets.unitState")
 }
 
-func (v equipmentView) unitState(
-	ctx context.Context,
-	c *ops.Call,
-	in *unitIn,
-) (unitStateOut, error) {
-	org, archived, found, err := v.am.UnitState(ctx, c, in.UnitID)
-
-	return unitStateOut{org, archived, found}, apperr.Wrap(err, "assets.Module.UnitState")
-}
-
 func (v equipmentView) UnitsOfProperty(
 	ctx context.Context,
 	c *ops.Call,
@@ -154,16 +144,6 @@ func (v equipmentView) UnitsOfProperty(
 	out, err := ops.Delegate(ctx, c, qUnitsOfProperty, propertyIn{property}, v.unitsOfProperty)
 
 	return out, apperr.Wrap(err, "delegate assets.unitsOfProperty")
-}
-
-func (v equipmentView) unitsOfProperty(
-	ctx context.Context,
-	c *ops.Call,
-	in *propertyIn,
-) ([]uuid.UUID, error) {
-	out, err := v.am.UnitsOfProperty(ctx, c, in.PropertyID)
-
-	return out, apperr.Wrap(err, "assets.Module.UnitsOfProperty")
 }
 
 func (v equipmentView) OrgOfCustomer(
@@ -176,16 +156,6 @@ func (v equipmentView) OrgOfCustomer(
 	return r.ID, r.Found, apperr.Wrap(err, "delegate assets.orgOfCustomer")
 }
 
-func (v equipmentView) orgOfCustomer(
-	ctx context.Context,
-	c *ops.Call,
-	in *customerIn,
-) (idFound, error) {
-	id, found, err := v.am.OrgOfCustomer(ctx, c, in.CustomerID)
-
-	return idFound{id, found}, apperr.Wrap(err, "assets.Module.OrgOfCustomer")
-}
-
 func (v equipmentView) UnitsOfOrg(
 	ctx context.Context,
 	c *ops.Call,
@@ -194,16 +164,6 @@ func (v equipmentView) UnitsOfOrg(
 	out, err := ops.Delegate(ctx, c, qUnitsOfOrg, orgIn{org}, v.unitsOfOrg)
 
 	return out, apperr.Wrap(err, "delegate assets.unitsOfOrg")
-}
-
-func (v equipmentView) unitsOfOrg(
-	ctx context.Context,
-	c *ops.Call,
-	in *orgIn,
-) ([]uuid.UUID, error) {
-	out, err := v.am.UnitsOfOrg(ctx, c, in.OrgID)
-
-	return out, apperr.Wrap(err, "assets.Module.UnitsOfOrg")
 }
 
 func (v equipmentView) UnitService(
@@ -216,16 +176,6 @@ func (v equipmentView) UnitService(
 	return r.OrgID, r.PropertyID, r.Scope, apperr.Wrap(err, "delegate assets.unitService")
 }
 
-func (v equipmentView) unitService(
-	ctx context.Context,
-	c *ops.Call,
-	in *unitIn,
-) (unitServiceOut, error) {
-	org, prop, scope, err := v.am.UnitService(ctx, c, in.UnitID)
-
-	return unitServiceOut{org, prop, scope}, apperr.Wrap(err, "assets.Module.UnitService")
-}
-
 func (v equipmentView) CustomerProfiles(
 	ctx context.Context,
 	c *ops.Call,
@@ -234,16 +184,6 @@ func (v equipmentView) CustomerProfiles(
 	out, err := ops.Delegate(ctx, c, qCustomerProfiles, orgsIn{orgs}, v.customerProfiles)
 
 	return out, apperr.Wrap(err, "delegate assets.customerProfiles")
-}
-
-func (v equipmentView) customerProfiles(
-	ctx context.Context,
-	c *ops.Call,
-	in *orgsIn,
-) (map[uuid.UUID][2]string, error) {
-	out, err := v.am.CustomerProfiles(ctx, c, in.OrgIDs)
-
-	return out, apperr.Wrap(err, "assets.Module.CustomerProfiles")
 }
 
 func (v equipmentView) SiteAddress(
@@ -256,12 +196,6 @@ func (v equipmentView) SiteAddress(
 	return r.Address, r.Scope, apperr.Wrap(err, "delegate assets.siteAddress")
 }
 
-func (v equipmentView) siteAddress(ctx context.Context, c *ops.Call, in *unitIn) (siteOut, error) {
-	addr, scope, err := v.am.SiteAddress(ctx, c, in.UnitID)
-
-	return siteOut{addr, scope}, apperr.Wrap(err, "assets.Module.SiteAddress")
-}
-
 func (v equipmentView) WarrantyEnd(
 	ctx context.Context,
 	c *ops.Call,
@@ -270,16 +204,6 @@ func (v equipmentView) WarrantyEnd(
 	out, err := ops.Delegate(ctx, c, qWarrantyEnd, unitIn{unit}, v.warrantyEnd)
 
 	return out, apperr.Wrap(err, "delegate assets.warrantyEnd")
-}
-
-func (v equipmentView) warrantyEnd(
-	ctx context.Context,
-	c *ops.Call,
-	in *unitIn,
-) (*time.Time, error) {
-	out, err := v.am.WarrantyEnd(ctx, c, in.UnitID)
-
-	return out, apperr.Wrap(err, "assets.Module.WarrantyEnd")
 }
 
 func (v equipmentView) BriefUnits(
@@ -298,16 +222,6 @@ func (v equipmentView) BriefUnits(
 	return out, apperr.Wrap(err, "delegate assets.briefUnits")
 }
 
-func (v equipmentView) briefUnits(
-	ctx context.Context,
-	c *ops.Call,
-	in *briefIn,
-) ([]ops.UnitBrief, error) {
-	out, err := v.am.BriefUnits(ctx, c, in.CustomerID, in.PropertyID, in.SpaceID, in.UnitID)
-
-	return out, apperr.Wrap(err, "assets.Module.BriefUnits")
-}
-
 func (v equipmentView) CustomerOfOrg(
 	ctx context.Context,
 	c *ops.Call,
@@ -316,12 +230,6 @@ func (v equipmentView) CustomerOfOrg(
 	r, err := ops.Delegate(ctx, c, qCustomerOfOrg, orgIn{org}, v.customerOfOrg)
 
 	return r.ID, r.Found, apperr.Wrap(err, "delegate assets.customerOfOrg")
-}
-
-func (v equipmentView) customerOfOrg(ctx context.Context, c *ops.Call, in *orgIn) (idFound, error) {
-	id, found, err := v.am.CustomerOfOrg(ctx, c, in.OrgID)
-
-	return idFound{id, found}, apperr.Wrap(err, "assets.Module.CustomerOfOrg")
 }
 
 func (v equipmentView) CustomerState(
@@ -334,16 +242,6 @@ func (v equipmentView) CustomerState(
 	return r.OrgID, r.Active, r.Found, apperr.Wrap(err, "delegate assets.customerState")
 }
 
-func (v equipmentView) customerState(
-	ctx context.Context,
-	c *ops.Call,
-	in *customerIn,
-) (customerStateOut, error) {
-	org, active, found, err := v.am.CustomerState(ctx, c, in.CustomerID)
-
-	return customerStateOut{org, active, found}, apperr.Wrap(err, "assets.Module.CustomerState")
-}
-
 func (v equipmentView) RestrictionTarget(
 	ctx context.Context,
 	c *ops.Call,
@@ -352,16 +250,6 @@ func (v equipmentView) RestrictionTarget(
 	r, err := ops.Delegate(ctx, c, qRestrictionTarget, unitIn{unit}, v.restrictionTarget)
 
 	return r.Caps, r.Found, apperr.Wrap(err, "delegate assets.restrictionTarget")
-}
-
-func (v equipmentView) restrictionTarget(
-	ctx context.Context,
-	c *ops.Call,
-	in *unitIn,
-) (targetOut, error) {
-	caps, found, err := restrictionTargets{v.am}.RestrictionTarget(ctx, c, in.UnitID)
-
-	return targetOut{caps, found}, err
 }
 
 type observationOut struct {
@@ -379,19 +267,6 @@ func (v equipmentView) Observation(
 	return r.Observed, r.LastSeenAt, apperr.Wrap(err, "delegate assets.unitObservation")
 }
 
-func (v equipmentView) observation(
-	ctx context.Context,
-	c *ops.Call,
-	in *unitIn,
-) (observationOut, error) {
-	var r observationOut
-
-	err := c.Tx.QueryRow(ctx, `SELECT observed_restriction, last_seen_at FROM assets.units WHERE id = $1`, in.UnitID).
-		Scan(&r.Observed, &r.LastSeenAt)
-
-	return r, apperr.Wrap(err, "select assets.units")
-}
-
 func (v equipmentView) UnitSeverities(
 	ctx context.Context,
 	c *ops.Call,
@@ -400,16 +275,6 @@ func (v equipmentView) UnitSeverities(
 	out, err := ops.Delegate(ctx, c, qUnitSeverities, unitsIn{units}, v.unitSeverities)
 
 	return out, apperr.Wrap(err, "delegate monitoring.unitSeverities")
-}
-
-func (v equipmentView) unitSeverities(
-	ctx context.Context,
-	c *ops.Call,
-	in *unitsIn,
-) (map[uuid.UUID]string, error) {
-	out, err := v.alerts.UnitSeverities(ctx, c, in.UnitIDs)
-
-	return out, apperr.Wrap(err, "monitoring.Alerts.UnitSeverities")
 }
 
 func (v equipmentView) RunHours(
@@ -421,16 +286,6 @@ func (v equipmentView) RunHours(
 	out, err := ops.Delegate(ctx, c, qRunHours, runHoursIn{unit, since}, v.runHours)
 
 	return out, apperr.Wrap(err, "delegate monitoring.runHours")
-}
-
-func (v equipmentView) runHours(
-	ctx context.Context,
-	c *ops.Call,
-	in *runHoursIn,
-) (*float64, error) {
-	out, err := v.tel.RunHours(ctx, c, in.UnitID, in.Since)
-
-	return out, apperr.Wrap(err, "monitoring.Telemetry.RunHours")
 }
 
 func (v equipmentView) BoundDevice(
@@ -446,16 +301,6 @@ func (v equipmentView) BoundDevice(
 	)
 }
 
-func (v equipmentView) boundDevice(
-	ctx context.Context,
-	c *ops.Call,
-	in *unitIn,
-) (deviceOut, error) {
-	id, conn, signal, found, err := v.models.BoundDevice(ctx, c, in.UnitID)
-
-	return deviceOut{id, conn, signal, found}, apperr.Wrap(err, "devices.Models.BoundDevice")
-}
-
 func (v equipmentView) OperationBusy(
 	ctx context.Context,
 	c *ops.Call,
@@ -464,6 +309,161 @@ func (v equipmentView) OperationBusy(
 	out, err := ops.Delegate(ctx, c, qOperationBusy, unitIn{unit}, v.operationBusy)
 
 	return out, apperr.Wrap(err, "delegate devices.operationBusy")
+}
+
+func (v equipmentView) unitState(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (unitStateOut, error) {
+	org, archived, found, err := v.am.UnitState(ctx, c, in.UnitID)
+
+	return unitStateOut{org, archived, found}, apperr.Wrap(err, "assets.Module.UnitState")
+}
+
+func (v equipmentView) unitsOfProperty(
+	ctx context.Context,
+	c *ops.Call,
+	in *propertyIn,
+) ([]uuid.UUID, error) {
+	out, err := v.am.UnitsOfProperty(ctx, c, in.PropertyID)
+
+	return out, apperr.Wrap(err, "assets.Module.UnitsOfProperty")
+}
+
+func (v equipmentView) orgOfCustomer(
+	ctx context.Context,
+	c *ops.Call,
+	in *customerIn,
+) (idFound, error) {
+	id, found, err := v.am.OrgOfCustomer(ctx, c, in.CustomerID)
+
+	return idFound{id, found}, apperr.Wrap(err, "assets.Module.OrgOfCustomer")
+}
+
+func (v equipmentView) unitsOfOrg(
+	ctx context.Context,
+	c *ops.Call,
+	in *orgIn,
+) ([]uuid.UUID, error) {
+	out, err := v.am.UnitsOfOrg(ctx, c, in.OrgID)
+
+	return out, apperr.Wrap(err, "assets.Module.UnitsOfOrg")
+}
+
+func (v equipmentView) unitService(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (unitServiceOut, error) {
+	org, prop, scope, err := v.am.UnitService(ctx, c, in.UnitID)
+
+	return unitServiceOut{org, prop, scope}, apperr.Wrap(err, "assets.Module.UnitService")
+}
+
+func (v equipmentView) customerProfiles(
+	ctx context.Context,
+	c *ops.Call,
+	in *orgsIn,
+) (map[uuid.UUID][2]string, error) {
+	out, err := v.am.CustomerProfiles(ctx, c, in.OrgIDs)
+
+	return out, apperr.Wrap(err, "assets.Module.CustomerProfiles")
+}
+
+func (v equipmentView) siteAddress(ctx context.Context, c *ops.Call, in *unitIn) (siteOut, error) {
+	addr, scope, err := v.am.SiteAddress(ctx, c, in.UnitID)
+
+	return siteOut{addr, scope}, apperr.Wrap(err, "assets.Module.SiteAddress")
+}
+
+func (v equipmentView) warrantyEnd(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (*time.Time, error) {
+	out, err := v.am.WarrantyEnd(ctx, c, in.UnitID)
+
+	return out, apperr.Wrap(err, "assets.Module.WarrantyEnd")
+}
+
+func (v equipmentView) briefUnits(
+	ctx context.Context,
+	c *ops.Call,
+	in *briefIn,
+) ([]ops.UnitBrief, error) {
+	out, err := v.am.BriefUnits(ctx, c, in.CustomerID, in.PropertyID, in.SpaceID, in.UnitID)
+
+	return out, apperr.Wrap(err, "assets.Module.BriefUnits")
+}
+
+func (v equipmentView) customerOfOrg(ctx context.Context, c *ops.Call, in *orgIn) (idFound, error) {
+	id, found, err := v.am.CustomerOfOrg(ctx, c, in.OrgID)
+
+	return idFound{id, found}, apperr.Wrap(err, "assets.Module.CustomerOfOrg")
+}
+
+func (v equipmentView) customerState(
+	ctx context.Context,
+	c *ops.Call,
+	in *customerIn,
+) (customerStateOut, error) {
+	org, active, found, err := v.am.CustomerState(ctx, c, in.CustomerID)
+
+	return customerStateOut{org, active, found}, apperr.Wrap(err, "assets.Module.CustomerState")
+}
+
+func (v equipmentView) restrictionTarget(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (targetOut, error) {
+	caps, found, err := restrictionTargets{v.am}.RestrictionTarget(ctx, c, in.UnitID)
+
+	return targetOut{caps, found}, err
+}
+
+func (v equipmentView) observation(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (observationOut, error) {
+	var r observationOut
+
+	err := c.Tx.QueryRow(ctx, `SELECT observed_restriction, last_seen_at FROM assets.units WHERE id = $1`, in.UnitID).
+		Scan(&r.Observed, &r.LastSeenAt)
+
+	return r, apperr.Wrap(err, "select assets.units")
+}
+
+func (v equipmentView) unitSeverities(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitsIn,
+) (map[uuid.UUID]string, error) {
+	out, err := v.alerts.UnitSeverities(ctx, c, in.UnitIDs)
+
+	return out, apperr.Wrap(err, "monitoring.Alerts.UnitSeverities")
+}
+
+func (v equipmentView) runHours(
+	ctx context.Context,
+	c *ops.Call,
+	in *runHoursIn,
+) (*float64, error) {
+	out, err := v.tel.RunHours(ctx, c, in.UnitID, in.Since)
+
+	return out, apperr.Wrap(err, "monitoring.Telemetry.RunHours")
+}
+
+func (v equipmentView) boundDevice(
+	ctx context.Context,
+	c *ops.Call,
+	in *unitIn,
+) (deviceOut, error) {
+	id, conn, signal, found, err := v.models.BoundDevice(ctx, c, in.UnitID)
+
+	return deviceOut{id, conn, signal, found}, apperr.Wrap(err, "devices.Models.BoundDevice")
 }
 
 func (v equipmentView) operationBusy(ctx context.Context, c *ops.Call, in *unitIn) (bool, error) {
@@ -508,16 +508,6 @@ func (v maintenanceView) AcceptedJobs(
 	return out, apperr.Wrap(err, "delegate maintenance.acceptedJobs")
 }
 
-func (v maintenanceView) acceptedJobs(
-	ctx context.Context,
-	c *ops.Call,
-	in *acceptedIn,
-) ([]maintenance.AcceptedJob, error) {
-	out, err := v.src.AcceptedJobs(ctx, c, in.From, in.To)
-
-	return out, apperr.Wrap(err, "maintenance.PayoutSource.AcceptedJobs")
-}
-
 func (v maintenanceView) RateAt(
 	ctx context.Context,
 	c *ops.Call,
@@ -527,12 +517,6 @@ func (v maintenanceView) RateAt(
 	r, err := ops.Delegate(ctx, c, qRateAt, rateIn{contractor, at}, v.rateAt)
 
 	return r.Lines, r.Currency, r.Found, apperr.Wrap(err, "delegate maintenance.rateAt")
-}
-
-func (v maintenanceView) rateAt(ctx context.Context, c *ops.Call, in *rateIn) (rateOut, error) {
-	lines, currency, found, err := v.src.RateAt(ctx, c, in.ContractorOrgID, in.At)
-
-	return rateOut{lines, currency, found}, apperr.Wrap(err, "maintenance.PayoutSource.RateAt")
 }
 
 // AddJobNote is a write into maintenance: billing publishes JobNoteRequested and maintenance's consumer adds the note
@@ -565,6 +549,22 @@ func (v maintenanceView) AddJobNote(
 			At:           call.Now,
 		},
 	), "events.Publish")
+}
+
+func (v maintenanceView) acceptedJobs(
+	ctx context.Context,
+	c *ops.Call,
+	in *acceptedIn,
+) ([]maintenance.AcceptedJob, error) {
+	out, err := v.src.AcceptedJobs(ctx, c, in.From, in.To)
+
+	return out, apperr.Wrap(err, "maintenance.PayoutSource.AcceptedJobs")
+}
+
+func (v maintenanceView) rateAt(ctx context.Context, c *ops.Call, in *rateIn) (rateOut, error) {
+	lines, currency, found, err := v.src.RateAt(ctx, c, in.ContractorOrgID, in.At)
+
+	return rateOut{lines, currency, found}, apperr.Wrap(err, "maintenance.PayoutSource.RateAt")
 }
 
 // registerCrossDomain binds the owner-side handlers of the adapters above.

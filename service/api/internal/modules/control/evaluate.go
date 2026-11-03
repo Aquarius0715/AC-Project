@@ -406,6 +406,50 @@ func ownerValid(
 	return len(ids) == 1, apperr.Wrap(err, "identity.Members")
 }
 
+func checkTick(c *ops.Call, in *EvaluationInput) error {
+	if !in.OccurredAt.Truncate(time.Minute).
+		Equal(c.Now.Truncate(time.Minute)) { // IR21: the current demo clock tick
+		return apperr.Fields(map[string]string{"occurredAt": "errors.not_current_tick"})
+	}
+
+	return nil
+}
+
+// Notify evaluates only the alert policies of the units against facts a device gateway reports (DemoTrigger
+// automation, IR529): a matching policy opens or reuses its Alert and notifies, a recovered one resolves it (D08). No
+// automation rule is decided, so a sensor report never switches an air conditioner by itself, and no tick is taken
+// (the gateway reports every minute beside the UI's fire). It returns the notification outcomes.
+func (m Automations) Notify(
+	ctx context.Context,
+	call *ops.Call,
+	input *EvaluationInput,
+) ([]json.RawMessage, error) {
+	_, err := m.prepare(ctx, call, input)
+	if err != nil {
+		return nil, err
+	}
+
+	out := []json.RawMessage{}
+	if m.Notifier == nil {
+		return out, nil
+	}
+
+	units := append([]uuid.UUID{}, input.UnitIDs...)
+	sort.Slice(units, func(i, j int) bool { return units[i].String() < units[j].String() })
+
+	facts, _ := json.Marshal(input.Facts)
+	for _, u := range units {
+		ns, err := m.Notifier.Evaluate(ctx, call, u, facts, input.OccurredAt, input.EventID, true)
+		if err != nil {
+			return nil, apperr.Wrap(err, "control.Notifier.Evaluate")
+		}
+
+		out = append(out, ns...)
+	}
+
+	return out, nil
+}
+
 func (m Automations) candidates(
 	ctx context.Context,
 	call *ops.Call,
@@ -958,15 +1002,6 @@ func (m Automations) automationCommand(
 	return commandID, apperr.Wrap(err, "insert control.commands")
 }
 
-func checkTick(c *ops.Call, in *EvaluationInput) error {
-	if !in.OccurredAt.Truncate(time.Minute).
-		Equal(c.Now.Truncate(time.Minute)) { // IR21: the current demo clock tick
-		return apperr.Fields(map[string]string{"occurredAt": "errors.not_current_tick"})
-	}
-
-	return nil
-}
-
 // simulate serves automations.simulate.
 //
 //	@Summary		automations.simulate (read)
@@ -1140,41 +1175,6 @@ func (m Automations) fire(
 	)
 
 	return result, nil
-}
-
-// Notify evaluates only the alert policies of the units against facts a device gateway reports (DemoTrigger
-// automation, IR529): a matching policy opens or reuses its Alert and notifies, a recovered one resolves it (D08). No
-// automation rule is decided, so a sensor report never switches an air conditioner by itself, and no tick is taken
-// (the gateway reports every minute beside the UI's fire). It returns the notification outcomes.
-func (m Automations) Notify(
-	ctx context.Context,
-	call *ops.Call,
-	input *EvaluationInput,
-) ([]json.RawMessage, error) {
-	_, err := m.prepare(ctx, call, input)
-	if err != nil {
-		return nil, err
-	}
-
-	out := []json.RawMessage{}
-	if m.Notifier == nil {
-		return out, nil
-	}
-
-	units := append([]uuid.UUID{}, input.UnitIDs...)
-	sort.Slice(units, func(i, j int) bool { return units[i].String() < units[j].String() })
-
-	facts, _ := json.Marshal(input.Facts)
-	for _, u := range units {
-		ns, err := m.Notifier.Evaluate(ctx, call, u, facts, input.OccurredAt, input.EventID, true)
-		if err != nil {
-			return nil, apperr.Wrap(err, "control.Notifier.Evaluate")
-		}
-
-		out = append(out, ns...)
-	}
-
-	return out, nil
 }
 
 // RegisterEvaluation binds automations.simulate / fire.

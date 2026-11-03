@@ -31,6 +31,13 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+var (
+	// errForceUsage refuses force without the version to record.
+	errForceUsage = errors.New("usage: migrate force VERSION")
+	// errUnknownCommand refuses a command migrate does not have.
+	errUnknownCommand = errors.New("unknown command")
+)
+
 func main() {
 	err := run(context.Background(), os.Args[1:])
 	if err != nil {
@@ -86,7 +93,7 @@ func run(ctx context.Context, args []string) error {
 		return nil
 	case "force":
 		if len(args) < 2 {
-			return errors.New("usage: migrate force VERSION")
+			return errForceUsage
 		}
 
 		v, err := strconv.ParseInt(args[1], 10, 64)
@@ -99,7 +106,7 @@ func run(ctx context.Context, args []string) error {
 		return bootstrapAdmin(ctx, conn, args[1:])
 	}
 
-	return fmt.Errorf("unknown command %q (want up, version, force or bootstrap-admin)", cmd)
+	return fmt.Errorf("%w %q (want up, version, force or bootstrap-admin)", errUnknownCommand, cmd)
 }
 
 // bootstrapAdmin creates the first HQ administrator of a tenant (DEC-84, IR509). The identity service's consumer then

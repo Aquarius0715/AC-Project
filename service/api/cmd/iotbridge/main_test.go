@@ -47,12 +47,12 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 
 	client := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
 
-	got, err := fetchWaiting(client, srv.URL, "tok", "t1")
+	got, err := fetchWaiting(t.Context(), client, srv.URL, "tok", "t1")
 	if err != nil || len(got) != 1 || got[0].ID != commandID {
 		t.Fatalf("waiting: %v %v", got, err)
 	}
 
-	_, fetchWaitingErr := fetchWaiting(client, srv.URL, "wrong", "t1")
+	_, fetchWaitingErr := fetchWaiting(t.Context(), client, srv.URL, "wrong", "t1")
 	if fetchWaitingErr == nil {
 		t.Error("a refused token is not an error")
 	}
@@ -64,12 +64,12 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 	)
 	defer bad.Close()
 
-	_, fetchWaitingErr = fetchWaiting(client, bad.URL, "tok", "t1")
+	_, fetchWaitingErr = fetchWaiting(t.Context(), client, bad.URL, "tok", "t1")
 	if fetchWaitingErr == nil {
 		t.Error("a bad answer is not an error")
 	}
 
-	_, fetchWaitingErr = fetchWaiting(client, "http://127.0.0.1:1", "tok", "t1")
+	_, fetchWaitingErr = fetchWaiting(t.Context(), client, "http://127.0.0.1:1", "tok", "t1")
 	if fetchWaitingErr == nil {
 		t.Error("a dead API is not an error")
 	}
@@ -99,7 +99,7 @@ func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
 		off: 0,
 	}
 
-	err := clock.refresh()
+	err := clock.refresh(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
 
 	clock.api = empty.URL
 
-	err = clock.refresh()
+	err = clock.refresh(t.Context())
 	if err == nil {
 		t.Error("an answer without a snapshot time is accepted")
 	}
@@ -160,7 +160,7 @@ func TestSendReportsRefusals(t *testing.T) {
 		Recovery:    nil,
 	}
 
-	err := send(client, srv.URL, trigger)
+	err := send(t.Context(), client, srv.URL, trigger)
 	if err != nil {
 		t.Fatalf("accepted trigger: %v", err)
 	}
@@ -170,6 +170,7 @@ func TestSendReportsRefusals(t *testing.T) {
 	}
 
 	err = send(
+		t.Context(),
 		client,
 		srv.URL,
 		iotbridge.Trigger{
@@ -192,7 +193,7 @@ func TestSendReportsRefusals(t *testing.T) {
 		t.Error("a refused trigger is not an error")
 	}
 
-	err = send(client, "http://127.0.0.1:1", trigger)
+	err = send(t.Context(), client, "http://127.0.0.1:1", trigger)
 	if err == nil {
 		t.Error("a dead API is not an error")
 	}
@@ -208,6 +209,7 @@ func TestSendCommandStopsBeforePublishingABadCommand(t *testing.T) {
 	}
 
 	err := sendCommand(
+		t.Context(),
 		nil,
 		&http.Client{Transport: nil, CheckRedirect: nil, Jar: nil, Timeout: 0},
 		"http://127.0.0.1:1",

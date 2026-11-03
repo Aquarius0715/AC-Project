@@ -7,15 +7,19 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"slices"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
@@ -37,59 +41,74 @@ func main() {
 
 	flag.Parse()
 
+	err := run(*role, *domain)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+var (
+	// errNoDatabaseURL refuses to start without the role's database.
+	errNoDatabaseURL = errors.New("DATABASE_URL is required")
+	// errUnknownDomain refuses a scheduler domain that has no jobs.
+	errUnknownDomain = errors.New("no scheduler for domain")
+)
+
+// run runs the role until a signal ends it; main exits on its error once its deferred clean-up has run.
+func run(role, domain string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	if os.Getenv("DATABASE_URL") == "" {
-		log.Fatal("DATABASE_URL is required")
+		return errNoDatabaseURL
 	}
 
-	if *role == "notification" {
-		runMail(ctx)
-
-		return
+	switch role {
+	case "notification":
+		return runMail(ctx)
+	case "outbox":
+		return runHousekeeping(ctx)
+	case "scheduler":
+		return runScheduler(ctx, domain)
 	}
 
-	if *role == "outbox" {
-		runHousekeeping(ctx)
+	log.Printf("worker role %q has no jobs yet; idling", role)
+	<-ctx.Done()
 
-		return
-	}
+	return nil
+}
 
-	if *role != "scheduler" {
-		log.Printf("worker role %q has no jobs yet; idling", *role)
-		<-ctx.Done()
-
-		return
-	}
-
+// runScheduler ticks the clock-driven transitions every second: one domain's, or with no domain every domain's on an
+// all-domain role (single-process development).
+func runScheduler(ctx context.Context, domain string) error {
 	var domains []string // nil: every domain on an all-domain role (single-process development)
 
-	if *domain != "" {
-		if !slices.Contains(scheduler.Domains, *domain) {
-			log.Fatalf("no scheduler for domain %q (want one of %v)", *domain, scheduler.Domains)
+	if domain != "" {
+		if !slices.Contains(scheduler.Domains, domain) {
+			return fmt.Errorf("%w %q (want one of %v)", errUnknownDomain, domain, scheduler.Domains)
 		}
 
-		domains = []string{*domain}
+		domains = []string{domain}
 	}
 
 	name := "scheduler"
-	if *domain != "" {
-		name = *domain + "-scheduler"
+	if domain != "" {
+		name = domain + "-scheduler"
 	}
 
 	logger := logging.New(os.Stdout, name)
 
 	cfg, err := server.ConfigFromEnv(logger, domains)
 	if err != nil {
-		log.Fatal(err)
+		return apperr.Wrap(err, "server.ConfigFromEnv")
 	}
 	// the domains' wiring without HTTP: the role, the registry (internal queries, the modules' jobs such as the IR54
 	// schedule automations) and the shared scenario clock
 	srv, err := server.New(ctx, cfg, auth.StaticVerifier{})
 	if err != nil {
-		log.Fatal(err)
+		return apperr.Wrap(err, "server.New")
 	}
+
 	defer srv.DB.Close()
 
 	scheduler.RunDomains(
@@ -101,30 +120,33 @@ func main() {
 		domains,
 		srv.Registry,
 	)
+
+	return nil
 }
 
 // runMail sends the pending e-mails of every tenant every five seconds (IR418). Without MAIL_SMTP_ADDR it idles:
 // e-mails stay previews, as before.
-func runMail(ctx context.Context) {
+func runMail(ctx context.Context) error {
 	addr := os.Getenv("MAIL_SMTP_ADDR")
 	if addr == "" {
 		log.Print("notification worker: MAIL_SMTP_ADDR is not set; e-mails stay previews")
 		<-ctx.Done()
 
-		return
+		return nil
 	}
 
 	logger := logging.New(os.Stdout, "notification")
 
 	cfg, err := server.ConfigFromEnv(logger, nil)
 	if err != nil {
-		log.Fatal(err)
+		return apperr.Wrap(err, "server.ConfigFromEnv")
 	}
 
 	srv, err := server.New(ctx, cfg, auth.StaticVerifier{})
 	if err != nil {
-		log.Fatal(err)
+		return apperr.Wrap(err, "server.New")
 	}
+
 	defer srv.DB.Close()
 
 	sender := notify.SMTP{
@@ -144,9 +166,23 @@ func runMail(ctx context.Context) {
 		Admin: envOr("APP_URL_ADMIN", "http://localhost:3003"),
 	}
 
-	log.Printf("notification worker: sending e-mails through %s", addr)
+	log.Printf("notification worker: sending e-mails through %s", strconv.Quote(addr))
 
-	ticker := time.NewTicker(5 * time.Second)
+	deliverEvery(ctx, srv, sender, apps)
+
+	return nil
+}
+
+// mailEvery is how often the notification worker looks for pending e-mails, and mailBatch how many it sends at most
+// each time.
+const (
+	mailEvery = 5 * time.Second
+	mailBatch = 50
+)
+
+// deliverEvery sends the pending e-mails of every tenant every mailEvery until the context ends.
+func deliverEvery(ctx context.Context, srv *server.Server, sender notify.SMTP, apps notify.Apps) {
+	ticker := time.NewTicker(mailEvery)
 	defer ticker.Stop()
 
 	for {
@@ -156,7 +192,7 @@ func runMail(ctx context.Context) {
 			sender,
 			apps,
 			srv.Registry.Clock(),
-			50,
+			mailBatch,
 		)
 		if err != nil {
 			log.Printf("notification worker: %v", err)
@@ -184,18 +220,19 @@ func envOr(key, def string) string {
 // longer in the outbox and the expired idempotency keys (events.Housekeep), and the notifications and sent e-mails
 // older than two years (notify.SweepAll, IR428). It runs on the all-domain role so
 // it knows every consumer's subscriptions; the outbox relay to SNS joins this role later.
-func runHousekeeping(ctx context.Context) {
+func runHousekeeping(ctx context.Context) error {
 	logger := logging.New(os.Stdout, "outbox")
 
 	cfg, err := server.ConfigFromEnv(logger, nil)
 	if err != nil {
-		log.Fatal(err)
+		return apperr.Wrap(err, "server.ConfigFromEnv")
 	}
 
 	srv, err := server.New(ctx, cfg, auth.StaticVerifier{})
 	if err != nil {
-		log.Fatal(err)
+		return apperr.Wrap(err, "server.New")
 	}
+
 	defer srv.DB.Close()
 
 	ticker := time.NewTicker(time.Hour)
@@ -233,7 +270,7 @@ func runHousekeeping(ctx context.Context) {
 
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case <-ticker.C:
 		}
 	}

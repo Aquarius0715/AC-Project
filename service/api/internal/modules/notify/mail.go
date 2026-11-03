@@ -20,6 +20,9 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 )
 
+// errHeaderLineBreak refuses a header value with a line break in it (header injection).
+var errHeaderLineBreak = errors.New("mail: line break in a header")
+
 // Sender sends one plain-text e-mail and answers the provider's message ID (IR418). In development it is SMTP to
 // Mailpit, which keeps every message for its web inbox and delivers nothing; production sends through Amazon SES.
 type Sender interface {
@@ -36,7 +39,7 @@ type SMTP struct {
 func (s SMTP) Send(_ context.Context, to, subject, body string) (string, error) {
 	if strings.ContainsAny(to, "\r\n") ||
 		strings.ContainsAny(subject, "\r\n") { // no header injection
-		return "", errors.New("mail: line break in a header")
+		return "", errHeaderLineBreak
 	}
 
 	id := uuid.NewString() + "@ac-project.local"

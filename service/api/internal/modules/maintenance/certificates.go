@@ -117,50 +117,6 @@ func scanCert(r pgx.Row, now time.Time) (Certificate, error) {
 	return certificate, apperr.Wrap(err, "scan (scanCert)")
 }
 
-func (m Certificates) lock(
-	ctx context.Context,
-	call *ops.Call,
-	certificateID uuid.UUID,
-) (Certificate, string, error) {
-	var stored string
-
-	certificate, err := scanCert(
-		call.Tx.QueryRow(
-			ctx,
-			"SELECT "+certCols+" FROM maintenance.certificates WHERE id = $1 FOR UPDATE",
-			certificateID,
-		),
-		call.Now,
-	)
-	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && call.Principal.Role == roleContractor && certificate.OrganizationID != call.Principal.OrgID) {
-		return certificate, "", apperr.E(apperr.NotFound, apperr.KeyNotFound)
-	}
-
-	if err != nil {
-		return certificate, "", err
-	}
-
-	scanErr := call.Tx.QueryRow(ctx, `SELECT status FROM maintenance.certificates WHERE id = $1`, certificateID).
-		Scan(&stored)
-	if scanErr != nil {
-		return certificate, "", apperr.Wrap(scanErr, "select maintenance.certificates")
-	}
-
-	if certificate.Version != *call.ExpectedVersion {
-		return certificate, "", apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-	}
-
-	return certificate, stored, nil
-}
-
-func (m Certificates) reload(ctx context.Context, c *ops.Call, id uuid.UUID) (Certificate, error) {
-	return scanCert(
-		c.Tx.QueryRow(ctx, "SELECT "+certCols+" FROM maintenance.certificates WHERE id = $1", id),
-		c.Now,
-	)
-}
-
 // ---- certificates.submit ----
 
 // codeOther is the catch-all choice of the code lists: a qualification that grants no work, a problem's reason, a kind
@@ -230,6 +186,282 @@ func (in *SubmitCertInput) Validate() map[string]string {
 	}
 
 	return fieldErrs
+}
+
+// ---- certificates.verify ----
+
+// VerifyInput is certificates.verify input.
+type VerifyInput struct {
+	CertificateID uuid.UUID `json:"certificateId"`
+	Decision      string    `json:"decision"`
+	Reason        *string   `json:"reason,omitempty"`
+}
+
+// Validate implements ops.Validator.
+func (in *VerifyInput) Validate() map[string]string {
+	fieldErrs := map[string]string{}
+	if in.CertificateID == uuid.Nil {
+		fieldErrs["certificateId"] = apperr.KeyRequired
+	}
+
+	switch in.Decision {
+	case "approve":
+	case "reject":
+		if in.Reason == nil {
+			fieldErrs[fieldReason] = apperr.KeyRequired
+		} else {
+			trimmedReason(in.Reason, maxReasonLength, fieldReason, fieldErrs)
+		}
+	default:
+		fieldErrs["decision"] = apperr.KeyInvalid
+	}
+
+	return fieldErrs
+}
+
+// ---- certificates.requestTraining ----
+
+// TrainingInput is certificates.requestTraining input.
+type TrainingInput struct {
+	CertificateID uuid.UUID `json:"certificateId"`
+	Note          string    `json:"note"`
+}
+
+// Validate implements ops.Validator.
+func (in *TrainingInput) Validate() map[string]string {
+	fieldErrs := map[string]string{}
+	if in.CertificateID == uuid.Nil {
+		fieldErrs["certificateId"] = apperr.KeyRequired
+	}
+
+	trimmedReason(&in.Note, maxReasonLength, "note", fieldErrs)
+
+	return fieldErrs
+}
+
+// ---- certificates.getContent, certificates.list ----
+
+// CertificateContentInput is certificates.getContent input.
+type CertificateContentInput struct {
+	CertificateID uuid.UUID `json:"certificateId"`
+}
+
+// Validate implements ops.Validator.
+func (in *CertificateContentInput) Validate() map[string]string {
+	if in.CertificateID == uuid.Nil {
+		return map[string]string{"certificateId": apperr.KeyRequired}
+	}
+
+	return nil
+}
+
+// DocumentOut is DocumentContent of service-contracts.ts: the uploaded certificate document (IR436).
+type DocumentOut struct {
+	Name  string `json:"name"`
+	Mime  string `json:"mime"`
+	Size  int    `json:"size"`
+	Bytes []byte `json:"bytes"`
+}
+
+// documentMime names an uploaded document's type from its leading bytes (certificates.submit admitted only these).
+func documentMime(b []byte) string {
+	for _, m := range []string{mimePDF, mimePNG, mimeJPEG} {
+		if ContentMatches(m, b) {
+			return m
+		}
+	}
+
+	return "application/octet-stream"
+}
+
+// ---- parts.list ----
+
+// PartItem is PartCatalogItem.
+type PartItem struct {
+	Code             string `json:"code"`
+	Name             string `json:"name"`
+	VanStockQuantity *int   `json:"vanStockQuantity"`
+}
+
+// ---- expiry reminders (scheduler job) ----
+
+// reminderDays are the BR-P09 reminders in days before expiry, the latest first.
+var reminderDays = []int{7, 30, 60}
+
+// reminderStage is the latest reminder the certificate has reached at now (0 when it expires later than 60 days).
+func reminderStage(expires, now time.Time) int {
+	for _, d := range reminderDays {
+		if !now.Before(expires.Add(-time.Duration(d) * 24 * time.Hour)) {
+			return d
+		}
+	}
+
+	return 0
+}
+
+// Remind is the maintenance scheduler job of BR-P09 (IR336). A valid certificate that expires within 60 days gets
+// the latest reminder it has reached — 60, 30 or 7 days before expiresAt — once, and never an earlier one after a later
+// one: one certificate_expiry notification to each contractor admin of its organization (partner.assign). No reminder
+// goes for a certificate that waits for HQ, was rejected or has expired, that a valid renewal or a later valid
+// certificate of the same qualification replaced, or whose technician is no longer an active member. A pending renewal
+// does not stop the reminders: the current expiry applies until HQ verifies it.
+func (m Certificates) Remind(ctx context.Context, call *ops.Call) (int, error) {
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT c.id, c.organization_id, c.expires_at FROM maintenance.certificates c
+		JOIN maintenance.ref_memberships rm ON rm.id = c.membership_id AND rm.valid_from <= $1 AND (rm.valid_until IS NULL OR
+		rm.valid_until > $1)
+		WHERE c.status = 'valid' AND c.expires_at > $1 AND c.expires_at <= $2
+		  AND NOT EXISTS (SELECT 1 FROM maintenance.certificates n WHERE n.membership_id = c.membership_id AND n.status =
+		  'valid' AND n.expires_at > c.expires_at
+		    AND (n.renewal_of = c.id OR (n.code = c.code AND c.code <> 'other')))
+		ORDER BY c.expires_at, c.id`,
+		call.Now,
+		call.Now.Add(time.Duration(reminderDays[len(reminderDays)-1])*24*time.Hour),
+	)
+	if err != nil {
+		return 0, apperr.Wrap(err, "select maintenance.certificates")
+	}
+
+	type due struct {
+		id, org uuid.UUID
+		expires time.Time
+	}
+
+	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (due, error) {
+		var d due
+
+		return d, r.Scan(&d.id, &d.org, &d.expires)
+	})
+	if err != nil {
+		return 0, apperr.Wrap(err, "select maintenance.certificates")
+	}
+
+	count := 0
+
+	for _, cert := range list {
+		days := reminderStage(cert.expires, call.Now)
+
+		tag, err := call.Tx.Exec(
+			ctx,
+			`INSERT INTO maintenance.certificate_reminders (certificate_id, days_before, tenant_id, sent_at)
+			SELECT $1, $2, current_setting('app.tenant_id')::uuid, $3
+			WHERE NOT EXISTS (SELECT 1 FROM maintenance.certificate_reminders WHERE certificate_id = $1 AND days_before <= $2) ON
+			CONFLICT DO NOTHING`,
+			cert.id,
+			days,
+			call.Now,
+		)
+		if err != nil {
+			return count, apperr.Wrap(err, "insert maintenance.certificate_reminders")
+		}
+
+		if tag.RowsAffected() == 0 { // this reminder (or a later one) went already
+			continue
+		}
+
+		recipients, err := identity.Members(
+			ctx,
+			call,
+			identity.MembersInput{
+				Role:           roleContractor,
+				OrganizationID: &cert.org,
+				Permission:     "partner.assign", IDs: nil, ClientRole: "",
+			},
+		)
+		if err != nil {
+			return count, apperr.Wrap(err, "identity.Members")
+		}
+
+		severity := severityNormal
+		if days == reminderDays[0] {
+			severity = severityWarning
+		}
+
+		for _, r := range recipients {
+			_, err := (notify.Store{}).Create(ctx, call, notify.New{
+				RecipientMembershipID: r,
+				Type:                  "certificate_expiry",
+				TemplateKey:           "certificate_expiry",
+				TargetKind:            "certificate",
+				TargetID:              cert.id,
+				Severity:              severity,
+				Params: map[string]any{
+					"at":        cert.expires,
+					fieldStatus: certExpiring,
+				},
+				Channel:       "",
+				SourceAlertID: nil,
+			})
+			if err != nil {
+				return count, apperr.Wrap(err, "notify.Store.Create")
+			}
+		}
+
+		_, execErr := call.Tx.Exec(
+			ctx,
+			`UPDATE maintenance.certificate_reminders SET notifications = $3 WHERE certificate_id = $1 AND days_before = $2`,
+			cert.id,
+			days,
+			len(recipients),
+		)
+		if execErr != nil {
+			return count, apperr.Wrap(execErr, "update maintenance.certificate_reminders")
+		}
+
+		call.Audit(auditEntry("certificates.remind", "certificate", cert.id, nil, nil, fmt.Sprintf(
+			"%d days before expiry",
+			days,
+		)))
+
+		count++
+	}
+
+	return count, nil
+}
+
+func (m Certificates) lock(
+	ctx context.Context,
+	call *ops.Call,
+	certificateID uuid.UUID,
+) (Certificate, string, error) {
+	var stored string
+
+	certificate, err := scanCert(
+		call.Tx.QueryRow(
+			ctx,
+			"SELECT "+certCols+" FROM maintenance.certificates WHERE id = $1 FOR UPDATE",
+			certificateID,
+		),
+		call.Now,
+	)
+	if errors.Is(err, pgx.ErrNoRows) ||
+		(err == nil && call.Principal.Role == roleContractor && certificate.OrganizationID != call.Principal.OrgID) {
+		return certificate, "", apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return certificate, "", err
+	}
+
+	scanErr := call.Tx.QueryRow(ctx, `SELECT status FROM maintenance.certificates WHERE id = $1`, certificateID).
+		Scan(&stored)
+	if scanErr != nil {
+		return certificate, "", apperr.Wrap(scanErr, "select maintenance.certificates")
+	}
+
+	if certificate.Version != *call.ExpectedVersion {
+		return certificate, "", apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	return certificate, stored, nil
+}
+
+func (m Certificates) reload(ctx context.Context, c *ops.Call, id uuid.UUID) (Certificate, error) {
+	return scanCert(
+		c.Tx.QueryRow(ctx, "SELECT "+certCols+" FROM maintenance.certificates WHERE id = $1", id),
+		c.Now,
+	)
 }
 
 // submit serves certificates.submit.
@@ -346,37 +578,6 @@ func (m Certificates) submit(
 	)
 
 	return certificate, nil
-}
-
-// ---- certificates.verify ----
-
-// VerifyInput is certificates.verify input.
-type VerifyInput struct {
-	CertificateID uuid.UUID `json:"certificateId"`
-	Decision      string    `json:"decision"`
-	Reason        *string   `json:"reason,omitempty"`
-}
-
-// Validate implements ops.Validator.
-func (in *VerifyInput) Validate() map[string]string {
-	fieldErrs := map[string]string{}
-	if in.CertificateID == uuid.Nil {
-		fieldErrs["certificateId"] = apperr.KeyRequired
-	}
-
-	switch in.Decision {
-	case "approve":
-	case "reject":
-		if in.Reason == nil {
-			fieldErrs[fieldReason] = apperr.KeyRequired
-		} else {
-			trimmedReason(in.Reason, maxReasonLength, fieldReason, fieldErrs)
-		}
-	default:
-		fieldErrs["decision"] = apperr.KeyInvalid
-	}
-
-	return fieldErrs
 }
 
 // verify serves certificates.verify.
@@ -504,26 +705,6 @@ func (m Certificates) verify(
 	return certificate, nil
 }
 
-// ---- certificates.requestTraining ----
-
-// TrainingInput is certificates.requestTraining input.
-type TrainingInput struct {
-	CertificateID uuid.UUID `json:"certificateId"`
-	Note          string    `json:"note"`
-}
-
-// Validate implements ops.Validator.
-func (in *TrainingInput) Validate() map[string]string {
-	fieldErrs := map[string]string{}
-	if in.CertificateID == uuid.Nil {
-		fieldErrs["certificateId"] = apperr.KeyRequired
-	}
-
-	trimmedReason(&in.Note, maxReasonLength, "note", fieldErrs)
-
-	return fieldErrs
-}
-
 // requestTraining serves certificates.requestTraining.
 //
 //	@Summary		certificates.requestTraining (write)
@@ -591,41 +772,6 @@ func (m Certificates) requestTraining(
 	)
 
 	return certificate, nil
-}
-
-// ---- certificates.getContent, certificates.list ----
-
-// CertificateContentInput is certificates.getContent input.
-type CertificateContentInput struct {
-	CertificateID uuid.UUID `json:"certificateId"`
-}
-
-// Validate implements ops.Validator.
-func (in *CertificateContentInput) Validate() map[string]string {
-	if in.CertificateID == uuid.Nil {
-		return map[string]string{"certificateId": apperr.KeyRequired}
-	}
-
-	return nil
-}
-
-// DocumentOut is DocumentContent of service-contracts.ts: the uploaded certificate document (IR436).
-type DocumentOut struct {
-	Name  string `json:"name"`
-	Mime  string `json:"mime"`
-	Size  int    `json:"size"`
-	Bytes []byte `json:"bytes"`
-}
-
-// documentMime names an uploaded document's type from its leading bytes (certificates.submit admitted only these).
-func documentMime(b []byte) string {
-	for _, m := range []string{mimePDF, mimePNG, mimeJPEG} {
-		if ContentMatches(m, b) {
-			return m
-		}
-	}
-
-	return "application/octet-stream"
 }
 
 // content answers a certificate's uploaded document, so HQ sees what it verifies (IR436). Scoped as list: a
@@ -837,15 +983,6 @@ func (m Certificates) list(
 	return pageOf(all, *query, filters, call.Principal.ScopeVersion)
 }
 
-// ---- parts.list ----
-
-// PartItem is PartCatalogItem.
-type PartItem struct {
-	Code             string `json:"code"`
-	Name             string `json:"name"`
-	VanStockQuantity *int   `json:"vanStockQuantity"`
-}
-
 // parts serves parts.list.
 //
 //	@Summary		parts.list (read)
@@ -942,143 +1079,6 @@ func (m Certificates) parts(
 	}
 
 	return pageOf(all, *query, filters, call.Principal.ScopeVersion)
-}
-
-// ---- expiry reminders (scheduler job) ----
-
-// reminderDays are the BR-P09 reminders in days before expiry, the latest first.
-var reminderDays = []int{7, 30, 60}
-
-// reminderStage is the latest reminder the certificate has reached at now (0 when it expires later than 60 days).
-func reminderStage(expires, now time.Time) int {
-	for _, d := range reminderDays {
-		if !now.Before(expires.Add(-time.Duration(d) * 24 * time.Hour)) {
-			return d
-		}
-	}
-
-	return 0
-}
-
-// Remind is the maintenance scheduler job of BR-P09 (IR336). A valid certificate that expires within 60 days gets
-// the latest reminder it has reached — 60, 30 or 7 days before expiresAt — once, and never an earlier one after a later
-// one: one certificate_expiry notification to each contractor admin of its organization (partner.assign). No reminder
-// goes for a certificate that waits for HQ, was rejected or has expired, that a valid renewal or a later valid
-// certificate of the same qualification replaced, or whose technician is no longer an active member. A pending renewal
-// does not stop the reminders: the current expiry applies until HQ verifies it.
-func (m Certificates) Remind(ctx context.Context, call *ops.Call) (int, error) {
-	rows, err := call.Tx.Query(
-		ctx,
-		`SELECT c.id, c.organization_id, c.expires_at FROM maintenance.certificates c
-		JOIN maintenance.ref_memberships rm ON rm.id = c.membership_id AND rm.valid_from <= $1 AND (rm.valid_until IS NULL OR
-		rm.valid_until > $1)
-		WHERE c.status = 'valid' AND c.expires_at > $1 AND c.expires_at <= $2
-		  AND NOT EXISTS (SELECT 1 FROM maintenance.certificates n WHERE n.membership_id = c.membership_id AND n.status =
-		  'valid' AND n.expires_at > c.expires_at
-		    AND (n.renewal_of = c.id OR (n.code = c.code AND c.code <> 'other')))
-		ORDER BY c.expires_at, c.id`,
-		call.Now,
-		call.Now.Add(time.Duration(reminderDays[len(reminderDays)-1])*24*time.Hour),
-	)
-	if err != nil {
-		return 0, apperr.Wrap(err, "select maintenance.certificates")
-	}
-
-	type due struct {
-		id, org uuid.UUID
-		expires time.Time
-	}
-
-	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (due, error) {
-		var d due
-
-		return d, r.Scan(&d.id, &d.org, &d.expires)
-	})
-	if err != nil {
-		return 0, apperr.Wrap(err, "select maintenance.certificates")
-	}
-
-	count := 0
-
-	for _, cert := range list {
-		days := reminderStage(cert.expires, call.Now)
-
-		tag, err := call.Tx.Exec(
-			ctx,
-			`INSERT INTO maintenance.certificate_reminders (certificate_id, days_before, tenant_id, sent_at)
-			SELECT $1, $2, current_setting('app.tenant_id')::uuid, $3
-			WHERE NOT EXISTS (SELECT 1 FROM maintenance.certificate_reminders WHERE certificate_id = $1 AND days_before <= $2) ON
-			CONFLICT DO NOTHING`,
-			cert.id,
-			days,
-			call.Now,
-		)
-		if err != nil {
-			return count, apperr.Wrap(err, "insert maintenance.certificate_reminders")
-		}
-
-		if tag.RowsAffected() == 0 { // this reminder (or a later one) went already
-			continue
-		}
-
-		recipients, err := identity.Members(
-			ctx,
-			call,
-			identity.MembersInput{
-				Role:           roleContractor,
-				OrganizationID: &cert.org,
-				Permission:     "partner.assign", IDs: nil, ClientRole: "",
-			},
-		)
-		if err != nil {
-			return count, apperr.Wrap(err, "identity.Members")
-		}
-
-		severity := severityNormal
-		if days == reminderDays[0] {
-			severity = severityWarning
-		}
-
-		for _, r := range recipients {
-			_, err := (notify.Store{}).Create(ctx, call, notify.New{
-				RecipientMembershipID: r,
-				Type:                  "certificate_expiry",
-				TemplateKey:           "certificate_expiry",
-				TargetKind:            "certificate",
-				TargetID:              cert.id,
-				Severity:              severity,
-				Params: map[string]any{
-					"at":        cert.expires,
-					fieldStatus: certExpiring,
-				},
-				Channel:       "",
-				SourceAlertID: nil,
-			})
-			if err != nil {
-				return count, apperr.Wrap(err, "notify.Store.Create")
-			}
-		}
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`UPDATE maintenance.certificate_reminders SET notifications = $3 WHERE certificate_id = $1 AND days_before = $2`,
-			cert.id,
-			days,
-			len(recipients),
-		)
-		if execErr != nil {
-			return count, apperr.Wrap(execErr, "update maintenance.certificate_reminders")
-		}
-
-		call.Audit(auditEntry("certificates.remind", "certificate", cert.id, nil, nil, fmt.Sprintf(
-			"%d days before expiry",
-			days,
-		)))
-
-		count++
-	}
-
-	return count, nil
 }
 
 // RegisterCertificates binds the IR133 operations.

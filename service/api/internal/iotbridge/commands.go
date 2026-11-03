@@ -2,6 +2,7 @@ package iotbridge
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,9 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
+
+// errNoActionKind refuses a stored command whose action names no kind.
+var errNoActionKind = errors.New("has no action kind")
 
 // Waiting is one command the API lists as requested (control.requestedCommands): not yet sent to its device.
 type Waiting struct {
@@ -36,7 +40,7 @@ func CommandMessage(waiting Waiting, offset time.Duration) (devicesim.Command, e
 	}
 
 	if a.Kind == "" {
-		return devicesim.Command{}, fmt.Errorf("command %s has no action kind", waiting.ID)
+		return devicesim.Command{}, fmt.Errorf("command %s %w", waiting.ID, errNoActionKind)
 	}
 
 	return devicesim.Command{

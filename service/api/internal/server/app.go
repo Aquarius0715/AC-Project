@@ -39,6 +39,9 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/ratelimit"
 )
 
+// errRelativeURL refuses a domain service URL without a scheme and a host.
+var errRelativeURL = errors.New("is not absolute")
+
 // Config is the runtime configuration (container design §4 environment variables).
 type Config struct {
 	DatabaseURL       string
@@ -73,29 +76,6 @@ type Server struct {
 	Registry  *ops.Registry
 	DB        *db.TxManager
 	Consumers []*events.Consumer // event subscribers of the served domains (IR183)
-}
-
-// DrainEvents applies every pending event of this server's consumers (inline mode and tests).
-func (s *Server) DrainEvents(ctx context.Context) error {
-	for range 10 { // events can trigger further events: repeat until nothing is pending
-		applied := 0
-
-		var errs []error
-
-		for _, c := range s.Consumers {
-			// each on its own, as each runs its own loop: one failing does not hold the others (IR511)
-			n, err := c.Drain(ctx)
-			errs = append(errs, err)
-			applied += n
-		}
-
-		err := errors.Join(errs...)
-		if err != nil || applied == 0 {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // New wires the registry, database and modules. The verifier is injected so tests can use static tokens.
@@ -416,7 +396,7 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 		for domain, raw := range cfg.ServiceURLs {
 			u, err := url.Parse(raw)
 			if err != nil || u.Scheme == "" || u.Host == "" {
-				return nil, fmt.Errorf("server: service URL of %s is not absolute", domain)
+				return nil, fmt.Errorf("server: service URL of %s %w", domain, errRelativeURL)
 			}
 
 			httpQueries.Targets[domain] = u
@@ -439,6 +419,29 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 	}
 
 	return srv, nil
+}
+
+// DrainEvents applies every pending event of this server's consumers (inline mode and tests).
+func (s *Server) DrainEvents(ctx context.Context) error {
+	for range 10 { // events can trigger further events: repeat until nothing is pending
+		applied := 0
+
+		var errs []error
+
+		for _, c := range s.Consumers {
+			// each on its own, as each runs its own loop: one failing does not hold the others (IR511)
+			n, err := c.Drain(ctx)
+			errs = append(errs, err)
+			applied += n
+		}
+
+		err := errors.Join(errs...)
+		if err != nil || applied == 0 {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // monitorReads combines the Monitoring read interfaces Assets uses.

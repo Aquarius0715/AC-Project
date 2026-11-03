@@ -2,6 +2,7 @@ package seed
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,9 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
+
+// errHistoryDays refuses a history length outside what the API serves.
+var errHistoryDays = errors.New("days (1–35, the longest series the API serves)")
 
 // ApplyFleetHistory gives the mock fleet days of past readings ending at until, so the charts have a long series:
 // power every minute (the slots energy counts, D07) and temperature every 15 minutes, with a daily rhythm in Kuala
@@ -30,7 +34,7 @@ func ApplyFleetHistory(
 	days int,
 ) (int64, error) {
 	if days < 1 || days > 35 {
-		return 0, fmt.Errorf("history: %d days (1–35, the longest series the API serves)", days)
+		return 0, fmt.Errorf("history: %d %w", days, errHistoryDays)
 	}
 
 	var tenant string

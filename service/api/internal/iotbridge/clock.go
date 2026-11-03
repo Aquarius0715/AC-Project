@@ -17,9 +17,9 @@ var errNoSnapshot = errors.New("no snapshot time in the preview's answer")
 // ScenarioNow reads the Core API's scenario clock: the snapshot time of the demo-only password-reset preview, which
 // saves and sends nothing. The demo runs its own clock (a seed date that moves with real time), and readings and
 // history must be stamped on it.
-func ScenarioNow(client *http.Client, api string) (time.Time, error) {
+func ScenarioNow(ctx context.Context, client *http.Client, api string) (time.Time, error) {
 	req, err := http.NewRequestWithContext(
-		context.Background(),
+		ctx,
 		http.MethodPost,
 		api+"/v1/auth/password-reset-preview",
 		bytes.NewReader([]byte(`{"demoEmail":"clock.probe@iot-bridge.invalid"}`)),

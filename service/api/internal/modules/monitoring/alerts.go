@@ -140,6 +140,143 @@ var (
 
 const severityRank = `CASE a.severity WHEN 'normal' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END`
 
+// GetInput is alerts.get input.
+type GetInput struct {
+	ID uuid.UUID `json:"id"`
+}
+
+// Validate implements ops.Validator.
+func (in *GetInput) Validate() map[string]string {
+	if in.ID == uuid.Nil {
+		return map[string]string{"id": apperr.KeyRequired}
+	}
+
+	return nil
+}
+
+// AckInput is alerts.acknowledge input.
+type AckInput struct {
+	AlertID uuid.UUID `json:"alertId"`
+}
+
+// Validate implements ops.Validator.
+func (in *AckInput) Validate() map[string]string {
+	if in.AlertID == uuid.Nil {
+		return map[string]string{"alertId": apperr.KeyRequired}
+	}
+
+	return nil
+}
+
+// ResolveInput is alerts.resolve input.
+type ResolveInput struct {
+	AlertID               uuid.UUID   `json:"alertId"`
+	ResolutionReason      string      `json:"resolutionReason"`
+	ResolutionEvidenceIDs []uuid.UUID `json:"resolutionEvidenceIds"`
+}
+
+// Validate implements ops.Validator (IR87: 1–1000 after trimming).
+func (in *ResolveInput) Validate() map[string]string {
+	fieldErrs := map[string]string{}
+	if in.AlertID == uuid.Nil {
+		fieldErrs["alertId"] = apperr.KeyRequired
+	}
+
+	in.ResolutionReason = strings.TrimSpace(in.ResolutionReason)
+	if n := utf8.RuneCountInString(in.ResolutionReason); n < 1 || n > 1000 {
+		fieldErrs["resolutionReason"] = apperr.KeyLength
+	}
+
+	if in.ResolutionEvidenceIDs == nil {
+		fieldErrs["resolutionEvidenceIds"] = apperr.KeyRequired
+	} else if len(in.ResolutionEvidenceIDs) > 20 || !distinct(in.ResolutionEvidenceIDs) {
+		fieldErrs["resolutionEvidenceIds"] = apperr.KeyInvalid // at most 20, each once
+	}
+
+	return fieldErrs
+}
+
+// ActiveAlertCounts implements assets.Monitoring: open + acknowledged critical/warning alerts per unit (IR51).
+func (Alerts) ActiveAlertCounts(
+	ctx context.Context,
+	c *ops.Call,
+	units []uuid.UUID,
+) (map[uuid.UUID]int, error) {
+	out := map[uuid.UUID]int{}
+
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT unit_id, count(*) FROM monitoring.alerts WHERE unit_id = ANY($1) AND status IN ('open','acknowledged')
+		AND severity IN ('critical','warning') GROUP BY unit_id`,
+		units,
+	)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select monitoring.alerts")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			unitID uuid.UUID
+			count  int
+		)
+
+		err := rows.Scan(&unitID, &count)
+		if err != nil {
+			return nil, apperr.Wrap(err, "select monitoring.alerts")
+		}
+
+		out[unitID] = count
+	}
+
+	return out, apperr.Wrap(rows.Err(), "select monitoring.alerts")
+}
+
+// RegisterAlerts binds the alert operations.
+func RegisterAlerts(r *ops.Registry, m Alerts) {
+	ops.Register(r, "alerts.list", m.list)
+	ops.Register(r, "alerts.get", m.get)
+	ops.Register(r, "alerts.acknowledge", m.acknowledge)
+	ops.Register(r, "alerts.resolve", m.resolve)
+	ops.Register(r, "alerts.evidence", m.evidence)
+}
+
+// UnitSeverities implements maintenance.UnitSeverity (IR23): the highest open/acknowledged alert severity per unit.
+func (Alerts) UnitSeverities(
+	ctx context.Context,
+	c *ops.Call,
+	units []uuid.UUID,
+) (map[uuid.UUID]string, error) {
+	rows, err := c.Tx.Query(
+		ctx,
+		`SELECT a.unit_id, (array_agg(a.severity ORDER BY `+severityRank+` DESC))[1] FROM monitoring.alerts a
+		WHERE a.unit_id = ANY($1) AND a.status <> 'resolved' GROUP BY a.unit_id`,
+		units,
+	)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select monitoring.alerts")
+	}
+	defer rows.Close()
+
+	out := map[uuid.UUID]string{}
+
+	for rows.Next() {
+		var (
+			unitID   uuid.UUID
+			severity string
+		)
+
+		err := rows.Scan(&unitID, &severity)
+		if err != nil {
+			return nil, apperr.Wrap(err, "select monitoring.alerts")
+		}
+
+		out[unitID] = severity
+	}
+
+	return out, apperr.Wrap(rows.Err(), "select monitoring.alerts")
+}
+
 // list serves alerts.list.
 //
 //	@Summary		alerts.list (read)
@@ -349,20 +486,6 @@ func (m Alerts) list(
 	}, apperr.Wrap(rows.Err(), "select monitoring.alerts")
 }
 
-// GetInput is alerts.get input.
-type GetInput struct {
-	ID uuid.UUID `json:"id"`
-}
-
-// Validate implements ops.Validator.
-func (in *GetInput) Validate() map[string]string {
-	if in.ID == uuid.Nil {
-		return map[string]string{"id": apperr.KeyRequired}
-	}
-
-	return nil
-}
-
 // get serves alerts.get.
 //
 //	@Summary		alerts.get (read)
@@ -460,20 +583,6 @@ func (m Alerts) lockAlert(
 	return status, unit, nil
 }
 
-// AckInput is alerts.acknowledge input.
-type AckInput struct {
-	AlertID uuid.UUID `json:"alertId"`
-}
-
-// Validate implements ops.Validator.
-func (in *AckInput) Validate() map[string]string {
-	if in.AlertID == uuid.Nil {
-		return map[string]string{"alertId": apperr.KeyRequired}
-	}
-
-	return nil
-}
-
 // acknowledge serves alerts.acknowledge.
 //
 //	@Summary		alerts.acknowledge (write)
@@ -544,34 +653,6 @@ func (m Alerts) acknowledge(ctx context.Context, call *ops.Call, input *AckInput
 	)
 
 	return alert, nil
-}
-
-// ResolveInput is alerts.resolve input.
-type ResolveInput struct {
-	AlertID               uuid.UUID   `json:"alertId"`
-	ResolutionReason      string      `json:"resolutionReason"`
-	ResolutionEvidenceIDs []uuid.UUID `json:"resolutionEvidenceIds"`
-}
-
-// Validate implements ops.Validator (IR87: 1–1000 after trimming).
-func (in *ResolveInput) Validate() map[string]string {
-	fieldErrs := map[string]string{}
-	if in.AlertID == uuid.Nil {
-		fieldErrs["alertId"] = apperr.KeyRequired
-	}
-
-	in.ResolutionReason = strings.TrimSpace(in.ResolutionReason)
-	if n := utf8.RuneCountInString(in.ResolutionReason); n < 1 || n > 1000 {
-		fieldErrs["resolutionReason"] = apperr.KeyLength
-	}
-
-	if in.ResolutionEvidenceIDs == nil {
-		fieldErrs["resolutionEvidenceIds"] = apperr.KeyRequired
-	} else if len(in.ResolutionEvidenceIDs) > 20 || !distinct(in.ResolutionEvidenceIDs) {
-		fieldErrs["resolutionEvidenceIds"] = apperr.KeyInvalid // at most 20, each once
-	}
-
-	return fieldErrs
 }
 
 // resolve serves alerts.resolve.
@@ -666,85 +747,4 @@ func (m Alerts) resolve(ctx context.Context, call *ops.Call, input *ResolveInput
 	)
 
 	return alert, nil
-}
-
-// ActiveAlertCounts implements assets.Monitoring: open + acknowledged critical/warning alerts per unit (IR51).
-func (Alerts) ActiveAlertCounts(
-	ctx context.Context,
-	c *ops.Call,
-	units []uuid.UUID,
-) (map[uuid.UUID]int, error) {
-	out := map[uuid.UUID]int{}
-
-	rows, err := c.Tx.Query(
-		ctx,
-		`SELECT unit_id, count(*) FROM monitoring.alerts WHERE unit_id = ANY($1) AND status IN ('open','acknowledged')
-		AND severity IN ('critical','warning') GROUP BY unit_id`,
-		units,
-	)
-	if err != nil {
-		return nil, apperr.Wrap(err, "select monitoring.alerts")
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var (
-			unitID uuid.UUID
-			count  int
-		)
-
-		err := rows.Scan(&unitID, &count)
-		if err != nil {
-			return nil, apperr.Wrap(err, "select monitoring.alerts")
-		}
-
-		out[unitID] = count
-	}
-
-	return out, apperr.Wrap(rows.Err(), "select monitoring.alerts")
-}
-
-// RegisterAlerts binds the alert operations.
-func RegisterAlerts(r *ops.Registry, m Alerts) {
-	ops.Register(r, "alerts.list", m.list)
-	ops.Register(r, "alerts.get", m.get)
-	ops.Register(r, "alerts.acknowledge", m.acknowledge)
-	ops.Register(r, "alerts.resolve", m.resolve)
-	ops.Register(r, "alerts.evidence", m.evidence)
-}
-
-// UnitSeverities implements maintenance.UnitSeverity (IR23): the highest open/acknowledged alert severity per unit.
-func (Alerts) UnitSeverities(
-	ctx context.Context,
-	c *ops.Call,
-	units []uuid.UUID,
-) (map[uuid.UUID]string, error) {
-	rows, err := c.Tx.Query(
-		ctx,
-		`SELECT a.unit_id, (array_agg(a.severity ORDER BY `+severityRank+` DESC))[1] FROM monitoring.alerts a
-		WHERE a.unit_id = ANY($1) AND a.status <> 'resolved' GROUP BY a.unit_id`,
-		units,
-	)
-	if err != nil {
-		return nil, apperr.Wrap(err, "select monitoring.alerts")
-	}
-	defer rows.Close()
-
-	out := map[uuid.UUID]string{}
-
-	for rows.Next() {
-		var (
-			unitID   uuid.UUID
-			severity string
-		)
-
-		err := rows.Scan(&unitID, &severity)
-		if err != nil {
-			return nil, apperr.Wrap(err, "select monitoring.alerts")
-		}
-
-		out[unitID] = severity
-	}
-
-	return out, apperr.Wrap(rows.Err(), "select monitoring.alerts")
 }

@@ -3,6 +3,7 @@ package seed
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,6 +13,9 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
+
+// errAddressTaken stops the live seed when the owner's address is another person's.
+var errAddressTaken = errors.New("belongs to another person")
 
 // LiveSensor is one sensor of the live site's module, by its fixture-style name.
 type LiveSensor struct {
@@ -329,7 +333,7 @@ func liveOwner(ctx context.Context, txn pgx.Tx, tenant uuid.UUID, at time.Time) 
 	}
 
 	if holder != user {
-		return fmt.Errorf("live owner: %s belongs to another person", o.Email)
+		return fmt.Errorf("live owner: %s %w", o.Email, errAddressTaken)
 	}
 
 	added, err := txn.Exec(

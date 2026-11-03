@@ -84,6 +84,152 @@ const (
 // other choice is all_users.
 const recipientsOwners = "owners"
 
+// filterRank orders the filter statuses for the status sort, unknown first.
+func filterRank() map[string]int {
+	return map[string]int{filterUnknown: 0, filterOK: 1, filterDueSoon: 2, filterOverdue: 3}
+}
+
+// MarkInput is filterCare.markCleaned input.
+type MarkInput struct {
+	UnitID uuid.UUID `json:"unitId"`
+}
+
+// Validate implements ops.Validator.
+func (in *MarkInput) Validate() map[string]string {
+	if in.UnitID == uuid.Nil {
+		return map[string]string{fieldUnitID: apperr.KeyRequired}
+	}
+
+	return nil
+}
+
+// SettingsInput is filterCare.saveSettings input.
+type SettingsInput struct {
+	ThresholdHours *int     `json:"thresholdHours"`
+	FallbackDays   int      `json:"fallbackDays"`
+	Recipients     string   `json:"recipients"`
+	Channels       []string `json:"channels"`
+}
+
+// Validate implements ops.Validator (IR134 item 4).
+func (in *SettingsInput) Validate() map[string]string {
+	fieldErrs := map[string]string{}
+	if in.ThresholdHours != nil && (*in.ThresholdHours < 50 || *in.ThresholdHours > 2000) {
+		fieldErrs["thresholdHours"] = apperr.KeyRange
+	}
+
+	if in.FallbackDays < 7 || in.FallbackDays > 180 {
+		fieldErrs["fallbackDays"] = apperr.KeyRange
+	}
+
+	if in.Recipients != recipientsOwners && in.Recipients != "all_users" {
+		fieldErrs["recipients"] = apperr.KeyInvalid
+	}
+
+	seen := map[string]bool{}
+
+	valid := len(in.Channels) >= 1 && len(in.Channels) <= 2
+	for _, ch := range in.Channels {
+		valid = valid && (ch == "inApp" || ch == "email") && !seen[ch]
+		seen[ch] = true
+	}
+
+	if !valid || !slices.Contains(in.Channels, "inApp") {
+		fieldErrs["channels"] = apperr.KeyInvalid
+	}
+
+	return fieldErrs
+}
+
+// ---- filterCare.getSettings ----
+
+// SettingsGetInput is filterCare.getSettings input: none, the caller's customer.
+type SettingsGetInput struct{}
+
+// ---- reminders (scheduler job) ----
+
+// FilterRemindEvery is how often the maintenance scheduler evaluates the filter statuses for reminders (IR239).
+const FilterRemindEvery = 15 * time.Minute
+
+// Remind is the maintenance scheduler job of IR134 item 5 (IR239). Every FilterRemindEvery of business time it
+// evaluates the filter status of the tenant's units: a cleaning recorded since a reminder ends that cleaning cycle and
+// resolves its Alert (FilterCleaningCleared — Mark cleaned does so at once, a technician cleaning here); an overdue
+// unit without a reminder in its cycle gets one — the maintenance Alert (FilterCleaningDue, opened by equipment) and
+// one cleaning_due notification per recipient and channel of the customer's settings.
+func (m FilterCare) Remind(ctx context.Context, call *ops.Call) (int, error) {
+	var when time.Time
+
+	err := call.Tx.QueryRow(ctx, `SELECT evaluated_at FROM maintenance.filter_reminder_watermarks WHERE tenant_id = $1 FOR
+		UPDATE`, call.Principal.TenantID).
+		Scan(&when)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+	case err != nil:
+		return 0, apperr.Wrap(err, "select maintenance.filter_reminder_watermarks")
+	case call.Now.Sub(when) < FilterRemindEvery:
+		return 0, nil
+	}
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`INSERT INTO maintenance.filter_reminder_watermarks (tenant_id, evaluated_at) VALUES ($1, $2)
+		ON CONFLICT (tenant_id) DO UPDATE SET evaluated_at = EXCLUDED.evaluated_at`,
+		call.Principal.TenantID,
+		call.Now,
+	)
+	if execErr != nil {
+		return 0, apperr.Wrap(execErr, "insert maintenance.filter_reminder_watermarks")
+	}
+
+	units, err := m.Units.BriefUnits(ctx, call, nil, nil, nil, nil)
+	if err != nil {
+		return 0, apperr.Wrap(err, "maintenance.FilterUnits.BriefUnits")
+	}
+
+	cache := map[uuid.UUID]FilterSettings{}
+	count := 0
+
+	for _, unitBrief := range units {
+		set, ok := cache[unitBrief.OrgID]
+		if !ok {
+			cust, found, err := m.Units.CustomerOfOrg(ctx, call, unitBrief.OrgID)
+			if err != nil {
+				return count, apperr.Wrap(err, "maintenance.FilterUnits.CustomerOfOrg")
+			}
+
+			if !found {
+				continue
+			}
+
+			set, err = m.settings(ctx, call, cust)
+			if err != nil {
+				return count, err
+			}
+
+			cache[unitBrief.OrgID] = set
+		}
+
+		filterStatus, err := m.status(ctx, call, unitBrief, set)
+		if err != nil {
+			return count, err
+		}
+
+		k, err := clearReminders(ctx, call, unitBrief.ID, filterStatus.LastCleanedAt)
+		if count += k; err != nil {
+			return count, err
+		}
+
+		if filterStatus.Status == filterOverdue {
+			k, err := remind(ctx, call, unitBrief, set, filterStatus)
+			if count += k; err != nil {
+				return count, err
+			}
+		}
+	}
+
+	return count, nil
+}
+
 func (m FilterCare) settings(
 	ctx context.Context,
 	call *ops.Call,
@@ -203,11 +349,6 @@ func (m FilterCare) status(
 	}
 
 	return filterStatus, nil
-}
-
-// filterRank orders the filter statuses for the status sort, unknown first.
-func filterRank() map[string]int {
-	return map[string]int{filterUnknown: 0, filterOK: 1, filterDueSoon: 2, filterOverdue: 3}
 }
 
 // list serves filterCare.list.
@@ -340,20 +481,6 @@ func (m FilterCare) list(
 	return pageOf(out, *query, filters, call.Principal.ScopeVersion)
 }
 
-// MarkInput is filterCare.markCleaned input.
-type MarkInput struct {
-	UnitID uuid.UUID `json:"unitId"`
-}
-
-// Validate implements ops.Validator.
-func (in *MarkInput) Validate() map[string]string {
-	if in.UnitID == uuid.Nil {
-		return map[string]string{fieldUnitID: apperr.KeyRequired}
-	}
-
-	return nil
-}
-
 // markCleaned serves filterCare.markCleaned.
 //
 //	@Summary		filterCare.markCleaned (write)
@@ -445,44 +572,6 @@ func (m FilterCare) markCleaned(
 	return filterStatus, nil
 }
 
-// SettingsInput is filterCare.saveSettings input.
-type SettingsInput struct {
-	ThresholdHours *int     `json:"thresholdHours"`
-	FallbackDays   int      `json:"fallbackDays"`
-	Recipients     string   `json:"recipients"`
-	Channels       []string `json:"channels"`
-}
-
-// Validate implements ops.Validator (IR134 item 4).
-func (in *SettingsInput) Validate() map[string]string {
-	fieldErrs := map[string]string{}
-	if in.ThresholdHours != nil && (*in.ThresholdHours < 50 || *in.ThresholdHours > 2000) {
-		fieldErrs["thresholdHours"] = apperr.KeyRange
-	}
-
-	if in.FallbackDays < 7 || in.FallbackDays > 180 {
-		fieldErrs["fallbackDays"] = apperr.KeyRange
-	}
-
-	if in.Recipients != recipientsOwners && in.Recipients != "all_users" {
-		fieldErrs["recipients"] = apperr.KeyInvalid
-	}
-
-	seen := map[string]bool{}
-
-	valid := len(in.Channels) >= 1 && len(in.Channels) <= 2
-	for _, ch := range in.Channels {
-		valid = valid && (ch == "inApp" || ch == "email") && !seen[ch]
-		seen[ch] = true
-	}
-
-	if !valid || !slices.Contains(in.Channels, "inApp") {
-		fieldErrs["channels"] = apperr.KeyInvalid
-	}
-
-	return fieldErrs
-}
-
 // saveSettings serves filterCare.saveSettings.
 //
 //	@Summary		filterCare.saveSettings (write)
@@ -568,11 +657,6 @@ func (m FilterCare) saveSettings(
 	return filterSettings, nil
 }
 
-// ---- filterCare.getSettings ----
-
-// SettingsGetInput is filterCare.getSettings input: none, the caller's customer.
-type SettingsGetInput struct{}
-
 // getSettings serves filterCare.getSettings.
 //
 //	@Summary		filterCare.getSettings (read)
@@ -611,90 +695,6 @@ func (m FilterCare) getSettings(
 	}
 
 	return m.settings(ctx, call, cust)
-}
-
-// ---- reminders (scheduler job) ----
-
-// FilterRemindEvery is how often the maintenance scheduler evaluates the filter statuses for reminders (IR239).
-const FilterRemindEvery = 15 * time.Minute
-
-// Remind is the maintenance scheduler job of IR134 item 5 (IR239). Every FilterRemindEvery of business time it
-// evaluates the filter status of the tenant's units: a cleaning recorded since a reminder ends that cleaning cycle and
-// resolves its Alert (FilterCleaningCleared — Mark cleaned does so at once, a technician cleaning here); an overdue
-// unit without a reminder in its cycle gets one — the maintenance Alert (FilterCleaningDue, opened by equipment) and
-// one cleaning_due notification per recipient and channel of the customer's settings.
-func (m FilterCare) Remind(ctx context.Context, call *ops.Call) (int, error) {
-	var when time.Time
-
-	err := call.Tx.QueryRow(ctx, `SELECT evaluated_at FROM maintenance.filter_reminder_watermarks WHERE tenant_id = $1 FOR
-		UPDATE`, call.Principal.TenantID).
-		Scan(&when)
-	switch {
-	case errors.Is(err, pgx.ErrNoRows):
-	case err != nil:
-		return 0, apperr.Wrap(err, "select maintenance.filter_reminder_watermarks")
-	case call.Now.Sub(when) < FilterRemindEvery:
-		return 0, nil
-	}
-
-	_, execErr := call.Tx.Exec(
-		ctx,
-		`INSERT INTO maintenance.filter_reminder_watermarks (tenant_id, evaluated_at) VALUES ($1, $2)
-		ON CONFLICT (tenant_id) DO UPDATE SET evaluated_at = EXCLUDED.evaluated_at`,
-		call.Principal.TenantID,
-		call.Now,
-	)
-	if execErr != nil {
-		return 0, apperr.Wrap(execErr, "insert maintenance.filter_reminder_watermarks")
-	}
-
-	units, err := m.Units.BriefUnits(ctx, call, nil, nil, nil, nil)
-	if err != nil {
-		return 0, apperr.Wrap(err, "maintenance.FilterUnits.BriefUnits")
-	}
-
-	cache := map[uuid.UUID]FilterSettings{}
-	count := 0
-
-	for _, unitBrief := range units {
-		set, ok := cache[unitBrief.OrgID]
-		if !ok {
-			cust, found, err := m.Units.CustomerOfOrg(ctx, call, unitBrief.OrgID)
-			if err != nil {
-				return count, apperr.Wrap(err, "maintenance.FilterUnits.CustomerOfOrg")
-			}
-
-			if !found {
-				continue
-			}
-
-			set, err = m.settings(ctx, call, cust)
-			if err != nil {
-				return count, err
-			}
-
-			cache[unitBrief.OrgID] = set
-		}
-
-		filterStatus, err := m.status(ctx, call, unitBrief, set)
-		if err != nil {
-			return count, err
-		}
-
-		k, err := clearReminders(ctx, call, unitBrief.ID, filterStatus.LastCleanedAt)
-		if count += k; err != nil {
-			return count, err
-		}
-
-		if filterStatus.Status == filterOverdue {
-			k, err := remind(ctx, call, unitBrief, set, filterStatus)
-			if count += k; err != nil {
-				return count, err
-			}
-		}
-	}
-
-	return count, nil
 }
 
 // clearReminders ends the open reminders of the unit whose cycle a later cleaning ended (last = the unit's last

@@ -4,6 +4,7 @@
 package iotbridge
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,6 +12,13 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
 	"github.com/pradita/ac-project/service/api/internal/seed"
+)
+
+var (
+	// errNotDemoLink refuses a batch from a device the links do not know.
+	errNotDemoLink = errors.New("is not a demo link")
+	// errNoSensor refuses a reading of a sensor the device does not have.
+	errNoSensor = errors.New("has no sensor")
 )
 
 // Scenario labels the triggers the bridge sends, so the demo audit can tell them from the browser's own triggers.
@@ -170,7 +178,7 @@ func (r *Resolver) Triggers(batch devicesim.Batch, received time.Time) ([]Trigge
 
 	t, ok := r.byDevice[dev]
 	if !ok {
-		return nil, fmt.Errorf("device %s is not a demo link", batch.DeviceID)
+		return nil, fmt.Errorf("device %s %w", batch.DeviceID, errNotDemoLink)
 	}
 
 	var out []Trigger
@@ -182,8 +190,9 @@ func (r *Resolver) Triggers(batch devicesim.Batch, received time.Time) ([]Trigge
 		if !ok {
 			if first == nil {
 				first = fmt.Errorf(
-					"device %s has no sensor %q",
+					"device %s %w %q",
 					batch.DeviceID,
+					errNoSensor,
 					measurement.SensorID,
 				)
 			}

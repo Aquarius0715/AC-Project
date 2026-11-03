@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -35,6 +36,13 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 	"github.com/pradita/ac-project/service/api/internal/seed"
+)
+
+var (
+	// errLiveBrokerDown fails a live command while the nodes' broker is out of reach.
+	errLiveBrokerDown = errors.New("the nodes' broker is not connected")
+	// errLiveCommandTimeout fails a live command the nodes' broker did not take in time.
+	errLiveCommandTimeout = errors.New("the nodes' broker did not take the command in 5 s")
 )
 
 func main() {
@@ -73,7 +81,7 @@ func main() {
 
 	clock := &demoClock{api: *api, c: httpc, mu: sync.Mutex{}, off: 0}
 
-	refreshErr := clock.refresh()
+	refreshErr := clock.refresh(ctx)
 	if refreshErr != nil {
 		log.Fatalf("demo clock: %v", refreshErr)
 	}
@@ -84,7 +92,7 @@ func main() {
 	opts := mqtt.NewClientOptions().AddBroker(*broker).SetClientID("iot-bridge").
 		SetUsername(os.Getenv("MQTT_USER")).SetPassword(os.Getenv("MQTT_PASSWORD")).
 		SetAutoReconnect(true).SetConnectRetry(true).SetKeepAlive(60 * time.Second).
-		SetOnConnectHandler(func(c mqtt.Client) { subscribeDemo(c, resolver, clock, httpc, endpoint) }).
+		SetOnConnectHandler(func(c mqtt.Client) { subscribeDemo(ctx, c, resolver, clock, httpc, endpoint) }).
 		SetConnectionLostHandler(
 			func(_ mqtt.Client, err error) { log.Printf("broker %s: connection lost: %v", *broker, err) })
 
@@ -127,6 +135,7 @@ func main() {
 // subscribeDemo subscribes to the simulated modules' topics (QoS 1, as the design says). It runs on every connect; a
 // subscription that fails is logged, and the next reconnect tries again.
 func subscribeDemo(
+	ctx context.Context,
 	client mqtt.Client,
 	resolver *iotbridge.Resolver,
 	clock *demoClock,
@@ -158,7 +167,7 @@ func subscribeDemo(
 		}
 
 		for _, tr := range triggers {
-			err := send(httpc, endpoint, tr)
+			err := send(ctx, httpc, endpoint, tr)
 			if err != nil {
 				log.Printf("trigger %s: %v", tr.EventID, err)
 			}
@@ -186,7 +195,7 @@ func subscribeDemo(
 			return
 		}
 
-		sendErr := send(httpc, endpoint, trigger)
+		sendErr := send(ctx, httpc, endpoint, trigger)
 		if sendErr != nil {
 			log.Printf("state %s: %v", heartbeat.DeviceID, sendErr)
 		}
@@ -219,7 +228,7 @@ func subscribeDemo(
 			return
 		}
 
-		sendErr := send(httpc, endpoint, trigger)
+		sendErr := send(ctx, httpc, endpoint, trigger)
 		if sendErr != nil {
 			log.Printf("trigger %s: %v", trigger.EventID, sendErr)
 		}
@@ -288,7 +297,7 @@ func listenLive(
 		}
 
 		for _, tr := range triggers {
-			err := send(httpc, endpoint, tr)
+			err := send(ctx, httpc, endpoint, tr)
 			if err != nil && !recorded(err) {
 				gate.Release(node, slot)
 				rep.Failed(fmt.Sprintf("live %s: %v", node, err))
@@ -312,21 +321,28 @@ func listenLive(
 		// the handler sends to the API: it must not hold up the client's keepalive
 		SetOnConnectHandler(func(c mqtt.Client) {
 			if tok := c.Subscribe(topic, 0, handle); tok.Wait() && tok.Error() != nil {
-				log.Printf("live broker %s: subscribe %s: %v", host, topic, tok.Error())
+				log.Printf(
+					"live broker %s: subscribe %s: %v",
+					strconv.Quote(host),
+					strconv.Quote(topic),
+					tok.Error(),
+				)
 
 				return
 			}
 
-			log.Printf("live broker %s: listening to %s", host, topic)
+			log.Printf("live broker %s: listening to %s", strconv.Quote(host), strconv.Quote(topic))
 		}).
 		SetConnectionLostHandler(
-			func(_ mqtt.Client, err error) { log.Printf("live broker %s: connection lost: %v", host, err) })
+			func(_ mqtt.Client, err error) {
+				log.Printf("live broker %s: connection lost: %v", strconv.Quote(host), err)
+			})
 	client := mqtt.NewClient(opts)
 	client.Connect() // not waited for: the client keeps trying while the broker is out of reach
 	log.Printf(
 		"iot-bridge: live sensors from %s (%s) → %s of %s",
-		host,
-		topic,
+		strconv.Quote(host),
+		strconv.Quote(topic),
 		seed.LiveSite.UnitName,
 		seed.LiveSite.CustomerName,
 	)
@@ -335,13 +351,18 @@ func listenLive(
 }
 
 // send posts one trigger. The event ID is the idempotency key: the API answers a repeat with the original receipt.
-func send(client *http.Client, endpoint string, trigger iotbridge.Trigger) error {
+func send(
+	ctx context.Context,
+	client *http.Client,
+	endpoint string,
+	trigger iotbridge.Trigger,
+) error {
 	body, err := json.Marshal(trigger)
 	if err != nil {
 		return apperr.Wrap(err, "json.Marshal")
 	}
 
-	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return apperr.Wrap(err, "http.NewRequest")
 	}
@@ -353,7 +374,7 @@ func send(client *http.Client, endpoint string, trigger iotbridge.Trigger) error
 	if err != nil {
 		return apperr.Wrap(err, "http.Client.Do")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 300 {
 		return &statusError{code: resp.StatusCode}
@@ -400,10 +421,10 @@ func (d *demoClock) offset() time.Duration {
 	return d.off
 }
 
-func (d *demoClock) refresh() error {
+func (d *demoClock) refresh(ctx context.Context) error {
 	before := time.Now()
 
-	scenario, err := iotbridge.ScenarioNow(d.c, d.api)
+	scenario, err := iotbridge.ScenarioNow(ctx, d.c, d.api)
 	if err != nil {
 		return apperr.Wrap(err, "iotbridge.ScenarioNow")
 	}
@@ -426,7 +447,7 @@ func (d *demoClock) keepRefreshing(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			err := d.refresh()
+			err := d.refresh(ctx)
 			if err != nil {
 				log.Printf("demo clock: %v", err)
 			}
@@ -464,7 +485,7 @@ func pollCommands(
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			waiting, err := fetchWaiting(httpc, api, token, tenant)
+			waiting, err := fetchWaiting(ctx, httpc, api, token, tenant)
 			if err != nil {
 				rep.Failed(fmt.Sprintf("requested commands: %v", err))
 
@@ -476,9 +497,9 @@ func pollCommands(
 			for _, command := range waiting {
 				var err error
 				if live != nil && command.DeviceID == live.device {
-					err = live.send(httpc, endpoint, command, clock.offset())
+					err = live.send(ctx, httpc, endpoint, command, clock.offset())
 				} else {
-					err = sendCommand(client, httpc, endpoint, tenant, command, clock.offset())
+					err = sendCommand(ctx, client, httpc, endpoint, tenant, command, clock.offset())
 				}
 
 				if err != nil {
@@ -490,8 +511,13 @@ func pollCommands(
 }
 
 // fetchWaiting asks the API for the requested commands with the internal service token and the tenant.
-func fetchWaiting(client *http.Client, api, token, tenant string) ([]iotbridge.Waiting, error) {
-	req, err := http.NewRequest(
+func fetchWaiting(
+	ctx context.Context,
+	client *http.Client,
+	api, token, tenant string,
+) ([]iotbridge.Waiting, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
 		http.MethodPost,
 		api+"/internal/v1/system/queries/control.requestedCommands",
 		strings.NewReader(`{"limit":50}`),
@@ -508,10 +534,10 @@ func fetchWaiting(client *http.Client, api, token, tenant string) ([]iotbridge.W
 	if err != nil {
 		return nil, apperr.Wrap(err, "http.Client.Do")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API answered %s", http.StatusText(resp.StatusCode))
+		return nil, &statusError{code: resp.StatusCode}
 	}
 
 	var out struct {
@@ -529,6 +555,7 @@ func fetchWaiting(client *http.Client, api, token, tenant string) ([]iotbridge.W
 // sendCommand publishes one requested command to its device, then reports it sent. The report comes only after the
 // publish succeeded, so a command is never reported sent without leaving the bridge.
 func sendCommand(
+	ctx context.Context,
 	client mqtt.Client,
 	httpc *http.Client,
 	endpoint, tenant string,
@@ -557,7 +584,7 @@ func sendCommand(
 		return apperr.Wrap(tok.Error(), "mqtt.Token.Error")
 	}
 
-	return send(httpc, endpoint, iotbridge.SentTrigger(waiting, time.Now().Add(off)))
+	return send(ctx, httpc, endpoint, iotbridge.SentTrigger(waiting, time.Now().Add(off)))
 }
 
 // liveAPI is where the bridge reads the live module's connection axis: the equipment service's internal queries, with
@@ -590,11 +617,11 @@ func reportGap(
 			when := now.Add(clock.offset() - clockMargin).UTC()
 			gap := heard.Gap(now)
 
-			f, err := fetchConnectionFault(httpc, api, seed.ID(seed.LiveSite.Device))
+			f, err := fetchConnectionFault(ctx, httpc, api, seed.ID(seed.LiveSite.Device))
 			if err != nil {
 				rep.Failed(fmt.Sprintf("live connection: %v", err))
 			} else if trigger, ok := iotbridge.LiveConnectionTrigger(f, gap, when); ok {
-				err := send(httpc, endpoint, trigger)
+				err := send(ctx, httpc, endpoint, trigger)
 				if err != nil && !recorded(err) {
 					rep.Failed(fmt.Sprintf("live connection %s: %v", trigger.Kind, err))
 				} else {
@@ -608,6 +635,7 @@ func reportGap(
 			}
 
 			sendErr := send(
+				ctx,
 				httpc,
 				endpoint,
 				iotbridge.LiveGapTrigger(gap, when.Truncate(time.Minute)),
@@ -626,13 +654,15 @@ func reportGap(
 
 // fetchConnectionFault reads the live module's connection axis (devices.connectionFault, IR532).
 func fetchConnectionFault(
+	ctx context.Context,
 	client *http.Client,
 	api liveAPI,
 	device uuid.UUID,
 ) (iotbridge.ConnectionFault, error) {
 	var out iotbridge.ConnectionFault
 
-	req, err := http.NewRequest(
+	req, err := http.NewRequestWithContext(
+		ctx,
 		http.MethodPost,
 		api.equipment+"/internal/v1/system/queries/devices.connectionFault",
 		strings.NewReader(`{"deviceId":"`+device.String()+`"}`),
@@ -649,10 +679,10 @@ func fetchConnectionFault(
 	if err != nil {
 		return out, apperr.Wrap(err, "http.Client.Do")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return out, fmt.Errorf("API answered %s", http.StatusText(resp.StatusCode))
+		return out, &statusError{code: resp.StatusCode}
 	}
 
 	var body struct {
@@ -708,6 +738,7 @@ func newLiveControl(client mqtt.Client, node string, enabled bool) *liveControl 
 // acknowledged and the settings it runs with. An action the firmware does not take, or any while sending is off,
 // fails. While the broker is out of reach the command stays requested, and the API ends it at its expiry.
 func (l *liveControl) send(
+	ctx context.Context,
 	httpc *http.Client,
 	endpoint string,
 	waiting iotbridge.Waiting,
@@ -720,16 +751,16 @@ func (l *liveControl) send(
 
 	when := time.Now().Add(off)
 	if !supported || !l.enabled {
-		return send(httpc, endpoint, iotbridge.LiveRefusedTrigger(waiting, when))
+		return send(ctx, httpc, endpoint, iotbridge.LiveRefusedTrigger(waiting, when))
 	}
 
 	if !l.client.IsConnectionOpen() {
-		return errors.New("the nodes' broker is not connected")
+		return errLiveBrokerDown
 	}
 
 	tok := l.client.Publish(iotbridge.LiveCommandTopic(l.node), 1, false, payload)
 	if !tok.WaitTimeout(5 * time.Second) {
-		return errors.New("the nodes' broker did not take the command in 5 s")
+		return errLiveCommandTimeout
 	}
 
 	errorErr := tok.Error()
@@ -737,10 +768,15 @@ func (l *liveControl) send(
 		return apperr.Wrap(errorErr, "mqtt.Token.Error")
 	}
 
-	log.Printf("live command %s: %s → %s", waiting.ID, payload, iotbridge.LiveCommandTopic(l.node))
+	log.Printf(
+		"live command %s: %s → %s",
+		waiting.ID,
+		strconv.Quote(payload),
+		iotbridge.LiveCommandTopic(l.node),
+	)
 
 	for _, tr := range iotbridge.LiveSentTriggers(waiting, when, when.Add(-clockMargin), state) {
-		err := send(httpc, endpoint, tr)
+		err := send(ctx, httpc, endpoint, tr)
 		if err != nil {
 			return err
 		}

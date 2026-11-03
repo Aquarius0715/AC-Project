@@ -2,6 +2,7 @@ package iotbridge
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -12,6 +13,13 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
 	"github.com/pradita/ac-project/service/api/internal/seed"
+)
+
+var (
+	// errNotLiveNode refuses a message from a node the live site does not have.
+	errNotLiveNode = errors.New("is not a live-site node")
+	// errNoLiveSensor refuses a reading for a sensor the live module does not have.
+	errNoLiveSensor = errors.New("the live module has no sensor")
 )
 
 // LiveField is one field of a real sensor node's message and the sensor of the live module it is recorded as (DEC-86,
@@ -60,7 +68,7 @@ func LiveNode(topic string) string {
 func LiveTriggers(node string, payload []byte, when time.Time) ([]Trigger, error) {
 	fields, ok := LiveNodes[node]
 	if !ok {
-		return nil, fmt.Errorf("node %q is not a live-site node", node)
+		return nil, fmt.Errorf("node %q %w", node, errNotLiveNode)
 	}
 
 	var msg map[string]any
@@ -96,8 +104,9 @@ func LiveTriggers(node string, payload []byte, when time.Time) ([]Trigger, error
 		liveSensor, ok := units[liveField.Sensor]
 		if !ok {
 			return nil, fmt.Errorf(
-				"node %s: the live module has no sensor %s",
+				"node %s: %w %s",
 				node,
+				errNoLiveSensor,
 				liveField.Sensor,
 			)
 		}

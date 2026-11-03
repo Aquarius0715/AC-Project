@@ -138,26 +138,6 @@ func (in *PropertySave) Validate() map[string]string {
 	return fieldErrs
 }
 
-func (m *Module) customerActive(ctx context.Context, c *ops.Call, org uuid.UUID) error {
-	var status string
-
-	err := c.Tx.QueryRow(ctx, `SELECT status FROM assets.customers WHERE organization_id = $1`, org).
-		Scan(&status)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return notFound()
-	}
-
-	if err != nil {
-		return apperr.Wrap(err, "select assets.customers")
-	}
-
-	if status != "active" {
-		return conflict(apperr.KeyCustomerInactive)
-	}
-
-	return nil
-}
-
 // dupSibling maps the properties_name / spaces_name unique indexes (lower(name) per parent) to the sibling-name
 // CONFLICT of siblingName (IR208).
 func dupSibling(err error) error {
@@ -203,135 +183,6 @@ func siblingName(ctx context.Context, call *ops.Call, kind string, locationID uu
 	}
 
 	return nil
-}
-
-// propertiesSave serves properties.save.
-//
-//	@Summary		properties.save (write)
-//	@ID				properties.save
-//	@Description	Authorization: admin:asset.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-//	@Description	Design: DD-A02
-//	@Tags			properties
-//	@Accept			json
-//	@Produce		json
-//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-//	@Param			request			body		PropertySave	true	"input"
-//	@Success		200				{object}	ops.Envelope{data=Property}
-//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-//	@Security		BearerAuth
-//	@Router			/v1/properties [post]
-func (m *Module) propertiesSave(
-	ctx context.Context,
-	call *ops.Call,
-	input *PropertySave,
-) (Property, error) {
-	if input.ID == nil {
-		err := m.customerActive(ctx, call, input.CustomerOrgID)
-		if err != nil {
-			return Property{}, err
-		}
-
-		propertyID := uuid.Must(uuid.NewV7())
-
-		property, err := scanProperty(
-			call.Tx.QueryRow(
-				ctx,
-				`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, access_instructions)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6) RETURNING `+propertyCols,
-				propertyID,
-				input.CustomerOrgID,
-				input.Kind,
-				input.Name,
-				input.Address,
-				input.AccessInstructions,
-			),
-		)
-		if err != nil {
-			return Property{}, dupSibling(err)
-		}
-
-		siblingNameErr := siblingName(ctx, call, "property", propertyID)
-		if siblingNameErr != nil {
-			return Property{}, siblingNameErr
-		}
-
-		call.Emit(
-			ops.Event{
-				AggregateType: "property",
-				AggregateID:   propertyID,
-				Type:          "LocationChanged",
-				Payload:       nil,
-			},
-		)
-		call.Audit(
-			ops.AuditEntry{
-				Action:          "properties.save",
-				TargetKind:      "property",
-				TargetID:        propertyID.String(),
-				NextVersion:     &property.Version,
-				PreviousVersion: nil,
-				Reason:          "",
-				Result:          "",
-				Before:          nil,
-				After:           nil,
-			},
-		)
-
-		return property, nil
-	}
-
-	updated, err := scanProperty(
-		call.Tx.QueryRow(
-			ctx,
-			`UPDATE assets.properties SET kind=$3, name=$4, address=$5, access_instructions=$6,
-		version = version + 1, updated_at = platform.app_now()
-		WHERE id = $1 AND version = $2 AND customer_org_id = $7 AND NOT archived RETURNING `+propertyCols,
-			*input.ID,
-			*call.ExpectedVersion,
-			input.Kind,
-			input.Name,
-			input.Address,
-			input.AccessInstructions,
-			input.CustomerOrgID,
-		),
-	)
-	if err != nil {
-		return Property{}, versionedUpdate(ctx, call, "assets.properties", *input.ID, err)
-	}
-
-	siblingNameErr := siblingName(ctx, call, "property", updated.ID)
-	if siblingNameErr != nil {
-		return Property{}, siblingNameErr
-	}
-
-	call.Emit(
-		ops.Event{
-			AggregateType: "property",
-			AggregateID:   updated.ID,
-			Type:          "LocationChanged",
-			Payload:       nil,
-		},
-	)
-	call.Audit(
-		ops.AuditEntry{
-			Action:          "properties.save",
-			TargetKind:      "property",
-			TargetID:        updated.ID.String(),
-			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &updated.Version, Reason: "", Result: "", Before: nil, After: nil,
-		},
-	)
-
-	return updated, nil
 }
 
 // ---- spaces ----
@@ -404,193 +255,6 @@ func (in *SpaceSave) Validate() map[string]string {
 	}
 
 	return fieldErrs
-}
-
-// activeProperty requires an active property, read with a share lock: an archive of it waits, or is waited for and seen
-// (IR478).
-func (m *Module) activeProperty(ctx context.Context, c *ops.Call, id uuid.UUID) error {
-	err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.properties WHERE id = $1 AND NOT archived FOR SHARE`, id).
-		Scan(new(int))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return notFound()
-	}
-
-	return apperr.Wrap(err, "select assets.properties")
-}
-
-// checkParent requires the parent to be an active space of the same property and, for an existing space, not one
-// of its own descendants (no hierarchy cycles).
-func (m *Module) checkParent(
-	ctx context.Context,
-	call *ops.Call,
-	self *uuid.UUID,
-	property uuid.UUID,
-	parent *uuid.UUID,
-) error {
-	if parent == nil {
-		return nil
-	}
-
-	err := call.Tx.QueryRow(ctx, `SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived FOR
-		SHARE`, *parent, property).
-		Scan(new(int))
-
-		// IR478
-	if errors.Is(err, pgx.ErrNoRows) {
-		return apperr.Fields(map[string]string{"parentSpaceId": "error.otherProperty"})
-	}
-
-	if err != nil {
-		return apperr.Wrap(err, "select assets.spaces")
-	}
-
-	if self == nil {
-		return nil
-	}
-
-	var cycle bool
-
-	scanErr := call.Tx.QueryRow(ctx, `WITH RECURSIVE d AS (SELECT id FROM assets.spaces WHERE parent_space_id = $1
-		UNION ALL SELECT s.id FROM assets.spaces s JOIN d ON s.parent_space_id = d.id) SELECT EXISTS (SELECT 1 FROM d WHERE id
-		= $2)`, *self, *parent).
-		Scan(&cycle)
-	if scanErr != nil {
-		return apperr.Wrap(scanErr, "select d")
-	}
-
-	if cycle {
-		return apperr.Fields(map[string]string{"parentSpaceId": "error.cycle"})
-	}
-
-	return nil
-}
-
-// spacesSave serves spaces.save.
-//
-//	@Summary		spaces.save (write)
-//	@ID				spaces.save
-//	@Description	Authorization: admin:asset.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-//	@Description	Design: DD-A02
-//	@Tags			spaces
-//	@Accept			json
-//	@Produce		json
-//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-//	@Param			request			body		SpaceSave	true	"input"
-//	@Success		200				{object}	ops.Envelope{data=Space}
-//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-//	@Security		BearerAuth
-//	@Router			/v1/spaces [post]
-func (m *Module) spacesSave(ctx context.Context, c *ops.Call, input *SpaceSave) (Space, error) {
-	err := m.activeProperty(ctx, c, input.PropertyID)
-	if err != nil {
-		return Space{}, err
-	}
-
-	err = m.checkParent(ctx, c, input.ID, input.PropertyID, input.ParentSpaceID)
-	if err != nil {
-		return Space{}, err
-	}
-
-	if input.ID == nil {
-		spaceID := uuid.Must(uuid.NewV7())
-
-		space, err := scanSpace(
-			c.Tx.QueryRow(
-				ctx,
-				`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5) RETURNING `+spaceCols,
-				spaceID,
-				input.PropertyID,
-				input.ParentSpaceID,
-				input.Kind,
-				input.Name,
-			),
-		)
-		if err != nil {
-			return Space{}, dupSibling(err)
-		}
-
-		siblingNameErr := siblingName(ctx, c, "space", spaceID)
-		if siblingNameErr != nil {
-			return Space{}, siblingNameErr
-		}
-
-		c.Emit(
-			ops.Event{
-				AggregateType: "space",
-				AggregateID:   spaceID,
-				Type:          "LocationChanged",
-				Payload:       nil,
-			},
-		)
-		c.Audit(
-			ops.AuditEntry{
-				Action:          "spaces.save",
-				TargetKind:      "space",
-				TargetID:        spaceID.String(),
-				NextVersion:     &space.Version,
-				PreviousVersion: nil,
-				Reason:          "",
-				Result:          "",
-				Before:          nil,
-				After:           nil,
-			},
-		)
-
-		return space, nil
-	}
-
-	space, err := scanSpace(
-		c.Tx.QueryRow(
-			ctx,
-			`UPDATE assets.spaces SET parent_space_id=$3, kind=$4, name=$5, version = version + 1, updated_at =
-				platform.app_now()
-		WHERE id = $1 AND version = $2 AND property_id = $6 AND NOT archived RETURNING `+spaceCols,
-			*input.ID,
-			*c.ExpectedVersion,
-			input.ParentSpaceID,
-			input.Kind,
-			input.Name,
-			input.PropertyID,
-		),
-	)
-	if err != nil {
-		return Space{}, versionedUpdate(ctx, c, "assets.spaces", *input.ID, err)
-	}
-
-	siblingNameErr := siblingName(ctx, c, "space", space.ID)
-	if siblingNameErr != nil {
-		return Space{}, siblingNameErr
-	}
-
-	c.Emit(
-		ops.Event{
-			AggregateType: "space",
-			AggregateID:   space.ID,
-			Type:          "LocationChanged",
-			Payload:       nil,
-		},
-	)
-	c.Audit(
-		ops.AuditEntry{
-			Action:          "spaces.save",
-			TargetKind:      "space",
-			TargetID:        space.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &space.Version, Reason: "", Result: "", Before: nil, After: nil,
-		},
-	)
-
-	return space, nil
 }
 
 // ---- units ----
@@ -676,258 +340,6 @@ func (in *UnitSave) Validate() map[string]string {
 	return fieldErrs
 }
 
-// unitsSave serves units.save.
-//
-//	@Summary		units.save (write)
-//	@ID				units.save
-//	@Description	Authorization: admin:asset.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
-//	@Description	IR62 spaceId=null is property root; IR74 no tenantId input
-//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-//	@Description	Design: DD-A02
-//	@Tags			units
-//	@Accept			json
-//	@Produce		json
-//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-//	@Param			request			body		UnitSave	true	"input"
-//	@Success		200				{object}	ops.Envelope{data=ACUnit}
-//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
-//	@Security		BearerAuth
-//	@Router			/v1/units [post]
-func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (ACUnit, error) {
-	u, err := m.unitsSaveUnit(ctx, c, in)
-
-	return u.ACUnit, err
-}
-
-// unitsSaveUnit is unitsSave answering the unit with its summary fields.
-func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, input *UnitSave) (Unit, error) {
-	if input.InstalledAt != nil && input.InstalledAt.After(c.Now) {
-		return Unit{}, apperr.Fields(map[string]string{"installedAt": apperr.KeyFuture})
-	}
-
-	var propOrg uuid.UUID
-	// the property and the space are read with a share lock: their archive waits, or is waited for and seen (IR478)
-	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.properties WHERE id = $1 AND NOT archived FOR
-		SHARE`, input.PropertyID).
-		Scan(&propOrg)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Unit{}, notFound()
-	}
-
-	if err != nil {
-		return Unit{}, apperr.Wrap(err, "select assets.properties")
-	}
-
-	if propOrg != input.CustomerOrgID {
-		return Unit{}, apperr.Fields(map[string]string{"propertyId": "error.otherCustomer"})
-	}
-
-	if input.SpaceID != nil {
-		err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived FOR
-			SHARE`, *input.SpaceID, input.PropertyID).
-			Scan(new(int))
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Unit{}, apperr.Fields(map[string]string{"spaceId": "error.otherProperty"})
-		}
-
-		if err != nil {
-			return Unit{}, apperr.Wrap(err, "select assets.spaces")
-		}
-	}
-
-	capVer, ok, err := m.Models.CurrentVersion(ctx, c, input.ModelID)
-	if err != nil {
-		return Unit{}, apperr.Wrap(err, "assets.Models.CurrentVersion")
-	}
-
-	if !ok {
-		return Unit{}, apperr.Fields(map[string]string{"modelId": "error.unknownModel"})
-	}
-
-	if input.ID == nil {
-		err := m.customerActive(ctx, c, input.CustomerOrgID)
-		if err != nil {
-			return Unit{}, err
-		}
-
-		unitID := uuid.Must(uuid.NewV7())
-
-		_, err = c.Tx.Exec(
-			ctx,
-			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, type,
-				installed_at, service_scope, capability_version, warranty_ends_at)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-			unitID,
-			input.CustomerOrgID,
-			input.PropertyID,
-			input.SpaceID,
-			input.DisplayName,
-			input.ModelID,
-			input.Type,
-			input.InstalledAt,
-			input.ServiceScope,
-			capVer,
-			input.warranty,
-		)
-		if err != nil {
-			return Unit{}, apperr.Wrap(err, "insert assets.units")
-		}
-
-		err = siblingName(ctx, c, "unit", unitID)
-		if err != nil {
-			return Unit{}, err
-		}
-
-		c.Emit(
-			ops.Event{
-				AggregateType: "unit",
-				AggregateID:   unitID,
-				Type:          "UnitChanged",
-				Payload:       nil,
-			},
-		)
-
-		one := 1
-		c.Audit(
-			ops.AuditEntry{
-				Action:          "units.save",
-				TargetKind:      "unit",
-				TargetID:        unitID.String(),
-				NextVersion:     &one,
-				PreviousVersion: nil,
-				Reason:          "",
-				Result:          "",
-				Before:          nil,
-				After:           nil,
-			},
-		)
-
-		return m.load(ctx, c, unitID)
-	}
-	// relocation (property or space change) requires a reason (DD-A02 changeReason)
-	var (
-		curProp      uuid.UUID
-		curSpace     *uuid.UUID
-		curName      string
-		curModel     uuid.UUID
-		curInstalled *time.Time
-		curScope     []string
-		curWarranty  *time.Time
-	)
-
-	err = c.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, installed_at, service_scope,
-		warranty_ends_at FROM assets.units WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
-		*input.ID, input.CustomerOrgID).
-		Scan(&curProp, &curSpace, &curName, &curModel, &curInstalled, &curScope, &curWarranty)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Unit{}, notFound()
-	}
-
-	if err != nil {
-		return Unit{}, apperr.Wrap(err, "select assets.units")
-	}
-
-	moved := curProp != input.PropertyID || (curSpace == nil) != (input.SpaceID == nil) ||
-		(curSpace != nil && input.SpaceID != nil && *curSpace != *input.SpaceID)
-	reason := ""
-
-	if moved {
-		if input.ChangeReason == nil {
-			return Unit{}, apperr.Fields(map[string]string{"changeReason": apperr.KeyRequired})
-		}
-
-		reason = *input.ChangeReason
-	}
-
-	warranty := curWarranty
-	if input.warrantySet {
-		warranty = input.warranty
-	}
-
-	if warranty != nil && input.InstalledAt != nil && warranty.Before(*input.InstalledAt) {
-		return Unit{}, apperr.Fields(map[string]string{"warrantyEndsAt": apperr.KeyRange})
-	}
-
-	var version int
-
-	err = c.Tx.QueryRow(ctx, `UPDATE assets.units SET property_id=$3, space_id=$4, display_name=$5, model_id=$6,
-		installed_at=$7, service_scope=$8,
-		capability_version=$9, warranty_ends_at=$10, version = version + 1, updated_at = platform.app_now()
-		WHERE id = $1 AND version = $2 AND NOT archived RETURNING version`,
-		*input.ID, *c.ExpectedVersion, input.PropertyID, input.SpaceID, input.DisplayName, input.ModelID, input.InstalledAt,
-		input.ServiceScope,
-		capVer, warranty).
-		Scan(&version)
-	if err != nil {
-		return Unit{}, versionedUpdate(ctx, c, "assets.units", *input.ID, err)
-	}
-
-	siblingNameErr := siblingName(ctx, c, "unit", *input.ID)
-	if siblingNameErr != nil {
-		return Unit{}, siblingNameErr
-	}
-
-	c.Emit(
-		ops.Event{AggregateType: "unit", AggregateID: *input.ID, Type: "UnitChanged", Payload: nil},
-	)
-	// before/after keep the original location and values in the history (DD-A02 step 3)
-	before, after := ops.Changes(
-		map[string]any{
-			"propertyId":     curProp,
-			"spaceId":        curSpace,
-			"displayName":    curName,
-			"modelId":        curModel,
-			"installedAt":    curInstalled,
-			"serviceScope":   curScope,
-			"warrantyEndsAt": curWarranty,
-		},
-		map[string]any{
-			"propertyId":     input.PropertyID,
-			"spaceId":        input.SpaceID,
-			"displayName":    input.DisplayName,
-			"modelId":        input.ModelID,
-			"installedAt":    input.InstalledAt,
-			"serviceScope":   input.ServiceScope,
-			"warrantyEndsAt": warranty,
-		},
-	)
-	c.Audit(
-		ops.AuditEntry{
-			Action:          "units.save",
-			TargetKind:      "unit",
-			TargetID:        input.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &version,
-			Reason:          reason,
-			Before:          before,
-			After:           after, Result: "",
-		},
-	)
-
-	return m.load(ctx, c, *input.ID)
-}
-
-func (m *Module) load(ctx context.Context, c *ops.Call, id uuid.UUID) (Unit, error) {
-	units, _, err := m.query(ctx, c, "u.id = $1", []any{id}, "u.id", 1, 0)
-	if err != nil {
-		return Unit{}, err
-	}
-
-	if len(units) == 0 {
-		return Unit{}, notFound()
-	}
-
-	return units[0], nil
-}
-
 // ---- archive ----
 
 // ArchiveInput is the input of properties/spaces/units.archive.
@@ -955,151 +367,6 @@ type ArchivedResource struct {
 	ID       uuid.UUID `json:"id"`
 	Version  int       `json:"version"`
 	Archived bool      `json:"archived"`
-}
-
-// propertiesArchive answers properties.archive: refused while the property has units or spaces that are not archived.
-//
-//	@Summary		properties.archive (write)
-//	@ID				properties.archive
-//	@Description	Authorization: admin:asset.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-//	@Description	Design: DD-A02
-//	@Tags			properties
-//	@Accept			json
-//	@Produce		json
-//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-//	@Param			X-Expected-Version	header		integer			true	"all: required (target properties, read properties.list)"
-//	@Param			id					path		string			true	"input field id"
-//	@Param			request				body		ArchiveInput	true	"input; the path parameters come from the route"
-//	@Success		200					{object}	ops.Envelope{data=ArchivedResource}
-//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-//	@Security		BearerAuth
-//	@Router			/v1/properties/{id}/archive [post]
-func (m *Module) propertiesArchive(
-	ctx context.Context,
-	call *ops.Call,
-	input *ArchiveInput,
-) (ArchivedResource, error) {
-	return m.archive(
-		"property",
-		"assets.properties",
-		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM
-			assets.spaces WHERE property_id = $1 AND NOT archived)`,
-	)(
-		ctx,
-		call,
-		input,
-	)
-}
-
-// spacesArchive answers spaces.archive: refused while the space has units or child spaces that are not archived.
-//
-//	@Summary		spaces.archive (write)
-//	@ID				spaces.archive
-//	@Description	Authorization: admin:asset.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-//	@Description	Design: DD-A02
-//	@Tags			spaces
-//	@Accept			json
-//	@Produce		json
-//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-//	@Param			X-Expected-Version	header		integer			true	"all: required (target spaces, read spaces.list)"
-//	@Param			id					path		string			true	"input field id"
-//	@Param			request				body		ArchiveInput	true	"input; the path parameters come from the route"
-//	@Success		200					{object}	ops.Envelope{data=ArchivedResource}
-//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-//	@Security		BearerAuth
-//	@Router			/v1/spaces/{id}/archive [post]
-func (m *Module) spacesArchive(
-	ctx context.Context,
-	call *ops.Call,
-	input *ArchiveInput,
-) (ArchivedResource, error) {
-	return m.archive(
-		"space",
-		"assets.spaces",
-		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE space_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM
-			assets.spaces WHERE parent_space_id = $1 AND NOT archived)`,
-	)(
-		ctx,
-		call,
-		input,
-	)
-}
-
-func (m *Module) archive(
-	kind, table, busySQL string,
-) func(context.Context, *ops.Call, *ArchiveInput) (ArchivedResource, error) {
-	return func(ctx context.Context, call *ops.Call, input *ArchiveInput) (ArchivedResource, error) {
-		// the row is locked before the check for active children: a unit or space added at the same moment reads its
-		// parent with a share lock, so one of the two waits and then sees the other (IR478)
-		_, execErr := call.Tx.Exec(
-			ctx,
-			"SELECT 1 FROM "+table+" WHERE id = $1 FOR UPDATE",
-			input.ID,
-		)
-		if execErr != nil {
-			return ArchivedResource{}, apperr.Wrap(execErr, "select (archive)")
-		}
-
-		if busySQL != "" {
-			var busy bool
-
-			err := call.Tx.QueryRow(ctx, busySQL, input.ID).Scan(&busy)
-			if err != nil {
-				return ArchivedResource{}, apperr.Wrap(err, "queryrow (archive)")
-			}
-
-			if busy {
-				return ArchivedResource{}, conflict("error.notEmpty")
-			}
-		}
-
-		var version int
-
-		err := call.Tx.QueryRow(ctx, "UPDATE "+table+` SET archived = true, version = version + 1, updated_at =
-			platform.app_now()
-			WHERE id = $1 AND version = $2 AND NOT archived RETURNING version`, input.ID, *call.ExpectedVersion).
-			Scan(&version)
-		if err != nil {
-			return ArchivedResource{}, versionedUpdate(ctx, call, table, input.ID, err)
-		}
-
-		typ := "LocationChanged"
-		if kind == "unit" {
-			typ = "UnitChanged"
-		}
-
-		call.Emit(ops.Event{AggregateType: kind, AggregateID: input.ID, Type: typ, Payload: nil})
-		call.Audit(
-			ops.AuditEntry{
-				Action:          kind + "s.archive",
-				TargetKind:      kind,
-				TargetID:        input.ID.String(),
-				PreviousVersion: call.ExpectedVersion,
-				NextVersion:     &version,
-				Reason:          input.Reason, Result: "", Before: nil, After: nil,
-			},
-		)
-
-		return ArchivedResource{ID: input.ID, Version: version, Archived: true}, nil
-	}
 }
 
 // MoveToCapabilityVersion points every unit of the model at its new capability version (called by Devices on
@@ -1163,52 +430,6 @@ func (m *Module) UnitInfo(
 	}
 
 	return unitInfo, err == nil, apperr.Wrap(err, "select assets.units")
-}
-
-// unitsArchive applies D05: an active job, device binding or operation, restriction, command / run or unexpired
-// contract on the unit is CONFLICT; history alone is allowed.
-//
-//	@Summary		units.archive (write)
-//	@ID				units.archive
-//	@Description	Authorization: admin:asset.write
-//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
-//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-//	@Description	Design: DD-A02
-//	@Tags			units
-//	@Accept			json
-//	@Produce		json
-//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-//	@Param			X-Expected-Version	header		integer			true	"all: required (target units, read units.get)"
-//	@Param			id					path		string			true	"input field id"
-//	@Param			request				body		ArchiveInput	true	"input; the path parameters come from the route"
-//	@Success		200					{object}	ops.Envelope{data=ArchivedResource}
-//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
-//	@Security		BearerAuth
-//	@Router			/v1/units/{id}/archive [post]
-func (m *Module) unitsArchive(
-	ctx context.Context,
-	call *ops.Call,
-	input *ArchiveInput,
-) (ArchivedResource, error) {
-	for _, a := range m.Active {
-		busy, err := a.UnitActive(ctx, call, input.ID)
-		if err != nil {
-			return ArchivedResource{}, apperr.Wrap(err, "assets.UnitActivity.UnitActive")
-		}
-
-		if busy {
-			return ArchivedResource{}, conflict("error.unitActive")
-		}
-	}
-
-	return m.archive("unit", "assets.units", "")(ctx, call, input)
 }
 
 // UnitsOfProperty lists the units of a property (Monitoring propertyId filters).
@@ -1465,37 +686,6 @@ func (m *Module) UnitsInSpace(
 	args := []any{space}
 
 	return m.unitIDs(ctx, c, "u.space_id = $1 AND "+scopeSQL(c, &args), args)
-}
-
-func (m *Module) unitIDs(
-	ctx context.Context,
-	c *ops.Call,
-	where string,
-	args []any,
-) ([]uuid.UUID, error) {
-	rows, err := c.Tx.Query(
-		ctx,
-		"SELECT u.id FROM assets.units u WHERE "+where+" ORDER BY u.id",
-		args...)
-	if err != nil {
-		return nil, apperr.Wrap(err, "select assets.units")
-	}
-	defer rows.Close()
-
-	out := []uuid.UUID{}
-
-	for rows.Next() {
-		var unitID uuid.UUID
-
-		err := rows.Scan(&unitID)
-		if err != nil {
-			return nil, apperr.Wrap(err, "select assets.units")
-		}
-
-		out = append(out, unitID)
-	}
-
-	return out, apperr.Wrap(rows.Err(), "select assets.units")
 }
 
 // SpaceInfo returns the customer organization of a space and the units placed directly in it.
@@ -1761,4 +951,814 @@ func (m *Module) UnitVersion(ctx context.Context, c *ops.Call, unit uuid.UUID) (
 	err := c.Tx.QueryRow(ctx, `SELECT version FROM assets.units WHERE id = $1`, unit).Scan(&v)
 
 	return v, apperr.Wrap(err, "select assets.units")
+}
+
+func (m *Module) customerActive(ctx context.Context, c *ops.Call, org uuid.UUID) error {
+	var status string
+
+	err := c.Tx.QueryRow(ctx, `SELECT status FROM assets.customers WHERE organization_id = $1`, org).
+		Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return notFound()
+	}
+
+	if err != nil {
+		return apperr.Wrap(err, "select assets.customers")
+	}
+
+	if status != "active" {
+		return conflict(apperr.KeyCustomerInactive)
+	}
+
+	return nil
+}
+
+// propertiesSave serves properties.save.
+//
+//	@Summary		properties.save (write)
+//	@ID				properties.save
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			properties
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		PropertySave	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Property}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/properties [post]
+func (m *Module) propertiesSave(
+	ctx context.Context,
+	call *ops.Call,
+	input *PropertySave,
+) (Property, error) {
+	if input.ID == nil {
+		err := m.customerActive(ctx, call, input.CustomerOrgID)
+		if err != nil {
+			return Property{}, err
+		}
+
+		propertyID := uuid.Must(uuid.NewV7())
+
+		property, err := scanProperty(
+			call.Tx.QueryRow(
+				ctx,
+				`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, access_instructions)
+			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6) RETURNING `+propertyCols,
+				propertyID,
+				input.CustomerOrgID,
+				input.Kind,
+				input.Name,
+				input.Address,
+				input.AccessInstructions,
+			),
+		)
+		if err != nil {
+			return Property{}, dupSibling(err)
+		}
+
+		siblingNameErr := siblingName(ctx, call, "property", propertyID)
+		if siblingNameErr != nil {
+			return Property{}, siblingNameErr
+		}
+
+		call.Emit(
+			ops.Event{
+				AggregateType: "property",
+				AggregateID:   propertyID,
+				Type:          "LocationChanged",
+				Payload:       nil,
+			},
+		)
+		call.Audit(
+			ops.AuditEntry{
+				Action:          "properties.save",
+				TargetKind:      "property",
+				TargetID:        propertyID.String(),
+				NextVersion:     &property.Version,
+				PreviousVersion: nil,
+				Reason:          "",
+				Result:          "",
+				Before:          nil,
+				After:           nil,
+			},
+		)
+
+		return property, nil
+	}
+
+	updated, err := scanProperty(
+		call.Tx.QueryRow(
+			ctx,
+			`UPDATE assets.properties SET kind=$3, name=$4, address=$5, access_instructions=$6,
+		version = version + 1, updated_at = platform.app_now()
+		WHERE id = $1 AND version = $2 AND customer_org_id = $7 AND NOT archived RETURNING `+propertyCols,
+			*input.ID,
+			*call.ExpectedVersion,
+			input.Kind,
+			input.Name,
+			input.Address,
+			input.AccessInstructions,
+			input.CustomerOrgID,
+		),
+	)
+	if err != nil {
+		return Property{}, versionedUpdate(ctx, call, "assets.properties", *input.ID, err)
+	}
+
+	siblingNameErr := siblingName(ctx, call, "property", updated.ID)
+	if siblingNameErr != nil {
+		return Property{}, siblingNameErr
+	}
+
+	call.Emit(
+		ops.Event{
+			AggregateType: "property",
+			AggregateID:   updated.ID,
+			Type:          "LocationChanged",
+			Payload:       nil,
+		},
+	)
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "properties.save",
+			TargetKind:      "property",
+			TargetID:        updated.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			NextVersion:     &updated.Version, Reason: "", Result: "", Before: nil, After: nil,
+		},
+	)
+
+	return updated, nil
+}
+
+// activeProperty requires an active property, read with a share lock: an archive of it waits, or is waited for and seen
+// (IR478).
+func (m *Module) activeProperty(ctx context.Context, c *ops.Call, id uuid.UUID) error {
+	err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.properties WHERE id = $1 AND NOT archived FOR SHARE`, id).
+		Scan(new(int))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return notFound()
+	}
+
+	return apperr.Wrap(err, "select assets.properties")
+}
+
+// checkParent requires the parent to be an active space of the same property and, for an existing space, not one
+// of its own descendants (no hierarchy cycles).
+func (m *Module) checkParent(
+	ctx context.Context,
+	call *ops.Call,
+	self *uuid.UUID,
+	property uuid.UUID,
+	parent *uuid.UUID,
+) error {
+	if parent == nil {
+		return nil
+	}
+
+	err := call.Tx.QueryRow(ctx, `SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived FOR
+		SHARE`, *parent, property).
+		Scan(new(int))
+
+		// IR478
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperr.Fields(map[string]string{"parentSpaceId": "error.otherProperty"})
+	}
+
+	if err != nil {
+		return apperr.Wrap(err, "select assets.spaces")
+	}
+
+	if self == nil {
+		return nil
+	}
+
+	var cycle bool
+
+	scanErr := call.Tx.QueryRow(ctx, `WITH RECURSIVE d AS (SELECT id FROM assets.spaces WHERE parent_space_id = $1
+		UNION ALL SELECT s.id FROM assets.spaces s JOIN d ON s.parent_space_id = d.id) SELECT EXISTS (SELECT 1 FROM d WHERE id
+		= $2)`, *self, *parent).
+		Scan(&cycle)
+	if scanErr != nil {
+		return apperr.Wrap(scanErr, "select d")
+	}
+
+	if cycle {
+		return apperr.Fields(map[string]string{"parentSpaceId": "error.cycle"})
+	}
+
+	return nil
+}
+
+// spacesSave serves spaces.save.
+//
+//	@Summary		spaces.save (write)
+//	@ID				spaces.save
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			spaces
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		SpaceSave	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Space}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/spaces [post]
+func (m *Module) spacesSave(ctx context.Context, c *ops.Call, input *SpaceSave) (Space, error) {
+	err := m.activeProperty(ctx, c, input.PropertyID)
+	if err != nil {
+		return Space{}, err
+	}
+
+	err = m.checkParent(ctx, c, input.ID, input.PropertyID, input.ParentSpaceID)
+	if err != nil {
+		return Space{}, err
+	}
+
+	if input.ID == nil {
+		spaceID := uuid.Must(uuid.NewV7())
+
+		space, err := scanSpace(
+			c.Tx.QueryRow(
+				ctx,
+				`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name)
+			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5) RETURNING `+spaceCols,
+				spaceID,
+				input.PropertyID,
+				input.ParentSpaceID,
+				input.Kind,
+				input.Name,
+			),
+		)
+		if err != nil {
+			return Space{}, dupSibling(err)
+		}
+
+		siblingNameErr := siblingName(ctx, c, "space", spaceID)
+		if siblingNameErr != nil {
+			return Space{}, siblingNameErr
+		}
+
+		c.Emit(
+			ops.Event{
+				AggregateType: "space",
+				AggregateID:   spaceID,
+				Type:          "LocationChanged",
+				Payload:       nil,
+			},
+		)
+		c.Audit(
+			ops.AuditEntry{
+				Action:          "spaces.save",
+				TargetKind:      "space",
+				TargetID:        spaceID.String(),
+				NextVersion:     &space.Version,
+				PreviousVersion: nil,
+				Reason:          "",
+				Result:          "",
+				Before:          nil,
+				After:           nil,
+			},
+		)
+
+		return space, nil
+	}
+
+	space, err := scanSpace(
+		c.Tx.QueryRow(
+			ctx,
+			`UPDATE assets.spaces SET parent_space_id=$3, kind=$4, name=$5, version = version + 1, updated_at =
+				platform.app_now()
+		WHERE id = $1 AND version = $2 AND property_id = $6 AND NOT archived RETURNING `+spaceCols,
+			*input.ID,
+			*c.ExpectedVersion,
+			input.ParentSpaceID,
+			input.Kind,
+			input.Name,
+			input.PropertyID,
+		),
+	)
+	if err != nil {
+		return Space{}, versionedUpdate(ctx, c, "assets.spaces", *input.ID, err)
+	}
+
+	siblingNameErr := siblingName(ctx, c, "space", space.ID)
+	if siblingNameErr != nil {
+		return Space{}, siblingNameErr
+	}
+
+	c.Emit(
+		ops.Event{
+			AggregateType: "space",
+			AggregateID:   space.ID,
+			Type:          "LocationChanged",
+			Payload:       nil,
+		},
+	)
+	c.Audit(
+		ops.AuditEntry{
+			Action:          "spaces.save",
+			TargetKind:      "space",
+			TargetID:        space.ID.String(),
+			PreviousVersion: c.ExpectedVersion,
+			NextVersion:     &space.Version, Reason: "", Result: "", Before: nil, After: nil,
+		},
+	)
+
+	return space, nil
+}
+
+// unitsSave serves units.save.
+//
+//	@Summary		units.save (write)
+//	@ID				units.save
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
+//	@Description	IR62 spaceId=null is property root; IR74 no tenantId input
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			units
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		UnitSave	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=ACUnit}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/units [post]
+func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (ACUnit, error) {
+	u, err := m.unitsSaveUnit(ctx, c, in)
+
+	return u.ACUnit, err
+}
+
+// unitsSaveUnit is unitsSave answering the unit with its summary fields.
+func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, input *UnitSave) (Unit, error) {
+	if input.InstalledAt != nil && input.InstalledAt.After(c.Now) {
+		return Unit{}, apperr.Fields(map[string]string{"installedAt": apperr.KeyFuture})
+	}
+
+	var propOrg uuid.UUID
+	// the property and the space are read with a share lock: their archive waits, or is waited for and seen (IR478)
+	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.properties WHERE id = $1 AND NOT archived FOR
+		SHARE`, input.PropertyID).
+		Scan(&propOrg)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Unit{}, notFound()
+	}
+
+	if err != nil {
+		return Unit{}, apperr.Wrap(err, "select assets.properties")
+	}
+
+	if propOrg != input.CustomerOrgID {
+		return Unit{}, apperr.Fields(map[string]string{"propertyId": "error.otherCustomer"})
+	}
+
+	if input.SpaceID != nil {
+		err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived FOR
+			SHARE`, *input.SpaceID, input.PropertyID).
+			Scan(new(int))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Unit{}, apperr.Fields(map[string]string{"spaceId": "error.otherProperty"})
+		}
+
+		if err != nil {
+			return Unit{}, apperr.Wrap(err, "select assets.spaces")
+		}
+	}
+
+	capVer, ok, err := m.Models.CurrentVersion(ctx, c, input.ModelID)
+	if err != nil {
+		return Unit{}, apperr.Wrap(err, "assets.Models.CurrentVersion")
+	}
+
+	if !ok {
+		return Unit{}, apperr.Fields(map[string]string{"modelId": "error.unknownModel"})
+	}
+
+	if input.ID == nil {
+		err := m.customerActive(ctx, c, input.CustomerOrgID)
+		if err != nil {
+			return Unit{}, err
+		}
+
+		unitID := uuid.Must(uuid.NewV7())
+
+		_, err = c.Tx.Exec(
+			ctx,
+			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, type,
+				installed_at, service_scope, capability_version, warranty_ends_at)
+			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+			unitID,
+			input.CustomerOrgID,
+			input.PropertyID,
+			input.SpaceID,
+			input.DisplayName,
+			input.ModelID,
+			input.Type,
+			input.InstalledAt,
+			input.ServiceScope,
+			capVer,
+			input.warranty,
+		)
+		if err != nil {
+			return Unit{}, apperr.Wrap(err, "insert assets.units")
+		}
+
+		err = siblingName(ctx, c, "unit", unitID)
+		if err != nil {
+			return Unit{}, err
+		}
+
+		c.Emit(
+			ops.Event{
+				AggregateType: "unit",
+				AggregateID:   unitID,
+				Type:          "UnitChanged",
+				Payload:       nil,
+			},
+		)
+
+		one := 1
+		c.Audit(
+			ops.AuditEntry{
+				Action:          "units.save",
+				TargetKind:      "unit",
+				TargetID:        unitID.String(),
+				NextVersion:     &one,
+				PreviousVersion: nil,
+				Reason:          "",
+				Result:          "",
+				Before:          nil,
+				After:           nil,
+			},
+		)
+
+		return m.load(ctx, c, unitID)
+	}
+	// relocation (property or space change) requires a reason (DD-A02 changeReason)
+	var (
+		curProp      uuid.UUID
+		curSpace     *uuid.UUID
+		curName      string
+		curModel     uuid.UUID
+		curInstalled *time.Time
+		curScope     []string
+		curWarranty  *time.Time
+	)
+
+	err = c.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, installed_at, service_scope,
+		warranty_ends_at FROM assets.units WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
+		*input.ID, input.CustomerOrgID).
+		Scan(&curProp, &curSpace, &curName, &curModel, &curInstalled, &curScope, &curWarranty)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Unit{}, notFound()
+	}
+
+	if err != nil {
+		return Unit{}, apperr.Wrap(err, "select assets.units")
+	}
+
+	moved := curProp != input.PropertyID || (curSpace == nil) != (input.SpaceID == nil) ||
+		(curSpace != nil && input.SpaceID != nil && *curSpace != *input.SpaceID)
+	reason := ""
+
+	if moved {
+		if input.ChangeReason == nil {
+			return Unit{}, apperr.Fields(map[string]string{"changeReason": apperr.KeyRequired})
+		}
+
+		reason = *input.ChangeReason
+	}
+
+	warranty := curWarranty
+	if input.warrantySet {
+		warranty = input.warranty
+	}
+
+	if warranty != nil && input.InstalledAt != nil && warranty.Before(*input.InstalledAt) {
+		return Unit{}, apperr.Fields(map[string]string{"warrantyEndsAt": apperr.KeyRange})
+	}
+
+	var version int
+
+	err = c.Tx.QueryRow(ctx, `UPDATE assets.units SET property_id=$3, space_id=$4, display_name=$5, model_id=$6,
+		installed_at=$7, service_scope=$8,
+		capability_version=$9, warranty_ends_at=$10, version = version + 1, updated_at = platform.app_now()
+		WHERE id = $1 AND version = $2 AND NOT archived RETURNING version`,
+		*input.ID, *c.ExpectedVersion, input.PropertyID, input.SpaceID, input.DisplayName, input.ModelID, input.InstalledAt,
+		input.ServiceScope,
+		capVer, warranty).
+		Scan(&version)
+	if err != nil {
+		return Unit{}, versionedUpdate(ctx, c, "assets.units", *input.ID, err)
+	}
+
+	siblingNameErr := siblingName(ctx, c, "unit", *input.ID)
+	if siblingNameErr != nil {
+		return Unit{}, siblingNameErr
+	}
+
+	c.Emit(
+		ops.Event{AggregateType: "unit", AggregateID: *input.ID, Type: "UnitChanged", Payload: nil},
+	)
+	// before/after keep the original location and values in the history (DD-A02 step 3)
+	before, after := ops.Changes(
+		map[string]any{
+			"propertyId":     curProp,
+			"spaceId":        curSpace,
+			"displayName":    curName,
+			"modelId":        curModel,
+			"installedAt":    curInstalled,
+			"serviceScope":   curScope,
+			"warrantyEndsAt": curWarranty,
+		},
+		map[string]any{
+			"propertyId":     input.PropertyID,
+			"spaceId":        input.SpaceID,
+			"displayName":    input.DisplayName,
+			"modelId":        input.ModelID,
+			"installedAt":    input.InstalledAt,
+			"serviceScope":   input.ServiceScope,
+			"warrantyEndsAt": warranty,
+		},
+	)
+	c.Audit(
+		ops.AuditEntry{
+			Action:          "units.save",
+			TargetKind:      "unit",
+			TargetID:        input.ID.String(),
+			PreviousVersion: c.ExpectedVersion,
+			NextVersion:     &version,
+			Reason:          reason,
+			Before:          before,
+			After:           after, Result: "",
+		},
+	)
+
+	return m.load(ctx, c, *input.ID)
+}
+
+func (m *Module) load(ctx context.Context, c *ops.Call, id uuid.UUID) (Unit, error) {
+	units, _, err := m.query(ctx, c, "u.id = $1", []any{id}, "u.id", 1, 0)
+	if err != nil {
+		return Unit{}, err
+	}
+
+	if len(units) == 0 {
+		return Unit{}, notFound()
+	}
+
+	return units[0], nil
+}
+
+// propertiesArchive answers properties.archive: refused while the property has units or spaces that are not archived.
+//
+//	@Summary		properties.archive (write)
+//	@ID				properties.archive
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			properties
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target properties, read properties.list)"
+//	@Param			id					path		string			true	"input field id"
+//	@Param			request				body		ArchiveInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=ArchivedResource}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/properties/{id}/archive [post]
+func (m *Module) propertiesArchive(
+	ctx context.Context,
+	call *ops.Call,
+	input *ArchiveInput,
+) (ArchivedResource, error) {
+	return m.archive(
+		"property",
+		"assets.properties",
+		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM
+			assets.spaces WHERE property_id = $1 AND NOT archived)`,
+	)(
+		ctx,
+		call,
+		input,
+	)
+}
+
+// spacesArchive answers spaces.archive: refused while the space has units or child spaces that are not archived.
+//
+//	@Summary		spaces.archive (write)
+//	@ID				spaces.archive
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			spaces
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target spaces, read spaces.list)"
+//	@Param			id					path		string			true	"input field id"
+//	@Param			request				body		ArchiveInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=ArchivedResource}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/spaces/{id}/archive [post]
+func (m *Module) spacesArchive(
+	ctx context.Context,
+	call *ops.Call,
+	input *ArchiveInput,
+) (ArchivedResource, error) {
+	return m.archive(
+		"space",
+		"assets.spaces",
+		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE space_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM
+			assets.spaces WHERE parent_space_id = $1 AND NOT archived)`,
+	)(
+		ctx,
+		call,
+		input,
+	)
+}
+
+func (m *Module) archive(
+	kind, table, busySQL string,
+) func(context.Context, *ops.Call, *ArchiveInput) (ArchivedResource, error) {
+	return func(ctx context.Context, call *ops.Call, input *ArchiveInput) (ArchivedResource, error) {
+		// the row is locked before the check for active children: a unit or space added at the same moment reads its
+		// parent with a share lock, so one of the two waits and then sees the other (IR478)
+		_, execErr := call.Tx.Exec(
+			ctx,
+			"SELECT 1 FROM "+table+" WHERE id = $1 FOR UPDATE",
+			input.ID,
+		)
+		if execErr != nil {
+			return ArchivedResource{}, apperr.Wrap(execErr, "select (archive)")
+		}
+
+		if busySQL != "" {
+			var busy bool
+
+			err := call.Tx.QueryRow(ctx, busySQL, input.ID).Scan(&busy)
+			if err != nil {
+				return ArchivedResource{}, apperr.Wrap(err, "queryrow (archive)")
+			}
+
+			if busy {
+				return ArchivedResource{}, conflict("error.notEmpty")
+			}
+		}
+
+		var version int
+
+		err := call.Tx.QueryRow(ctx, "UPDATE "+table+` SET archived = true, version = version + 1, updated_at =
+			platform.app_now()
+			WHERE id = $1 AND version = $2 AND NOT archived RETURNING version`, input.ID, *call.ExpectedVersion).
+			Scan(&version)
+		if err != nil {
+			return ArchivedResource{}, versionedUpdate(ctx, call, table, input.ID, err)
+		}
+
+		typ := "LocationChanged"
+		if kind == "unit" {
+			typ = "UnitChanged"
+		}
+
+		call.Emit(ops.Event{AggregateType: kind, AggregateID: input.ID, Type: typ, Payload: nil})
+		call.Audit(
+			ops.AuditEntry{
+				Action:          kind + "s.archive",
+				TargetKind:      kind,
+				TargetID:        input.ID.String(),
+				PreviousVersion: call.ExpectedVersion,
+				NextVersion:     &version,
+				Reason:          input.Reason, Result: "", Before: nil, After: nil,
+			},
+		)
+
+		return ArchivedResource{ID: input.ID, Version: version, Archived: true}, nil
+	}
+}
+
+// unitsArchive applies D05: an active job, device binding or operation, restriction, command / run or unexpired
+// contract on the unit is CONFLICT; history alone is allowed.
+//
+//	@Summary		units.archive (write)
+//	@ID				units.archive
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			units
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target units, read units.get)"
+//	@Param			id					path		string			true	"input field id"
+//	@Param			request				body		ArchiveInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=ArchivedResource}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/units/{id}/archive [post]
+func (m *Module) unitsArchive(
+	ctx context.Context,
+	call *ops.Call,
+	input *ArchiveInput,
+) (ArchivedResource, error) {
+	for _, a := range m.Active {
+		busy, err := a.UnitActive(ctx, call, input.ID)
+		if err != nil {
+			return ArchivedResource{}, apperr.Wrap(err, "assets.UnitActivity.UnitActive")
+		}
+
+		if busy {
+			return ArchivedResource{}, conflict("error.unitActive")
+		}
+	}
+
+	return m.archive("unit", "assets.units", "")(ctx, call, input)
+}
+
+func (m *Module) unitIDs(
+	ctx context.Context,
+	c *ops.Call,
+	where string,
+	args []any,
+) ([]uuid.UUID, error) {
+	rows, err := c.Tx.Query(
+		ctx,
+		"SELECT u.id FROM assets.units u WHERE "+where+" ORDER BY u.id",
+		args...)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select assets.units")
+	}
+	defer rows.Close()
+
+	out := []uuid.UUID{}
+
+	for rows.Next() {
+		var unitID uuid.UUID
+
+		err := rows.Scan(&unitID)
+		if err != nil {
+			return nil, apperr.Wrap(err, "select assets.units")
+		}
+
+		out = append(out, unitID)
+	}
+
+	return out, apperr.Wrap(rows.Err(), "select assets.units")
 }
