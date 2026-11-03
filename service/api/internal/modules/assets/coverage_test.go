@@ -9,7 +9,7 @@ import (
 
 func TestCoverageStatus(t *testing.T) {
 	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
-	d := func(days int) *time.Time {
+	daysFromNow := func(days int) *time.Time {
 		x := now.Add(time.Duration(days) * 24 * time.Hour)
 
 		return &x
@@ -20,13 +20,13 @@ func TestCoverageStatus(t *testing.T) {
 		contracts int
 		want      string
 	}{
-		{d(10), 1, "contract"},
+		{daysFromNow(10), 1, "contract"},
 		{nil, 1, "contract"},
-		{d(91), 0, "under_warranty"},
-		{d(90), 0, "expiring"},
-		{d(1), 0, "expiring"},
-		{d(0), 0, "no_coverage"},
-		{d(-5), 0, "no_coverage"},
+		{daysFromNow(91), 0, "under_warranty"},
+		{daysFromNow(90), 0, "expiring"},
+		{daysFromNow(1), 0, "expiring"},
+		{daysFromNow(0), 0, "no_coverage"},
+		{daysFromNow(-5), 0, "no_coverage"},
 		{nil, 0, "no_coverage"},
 	}
 	for i, c := range cases {
@@ -67,7 +67,7 @@ func TestWarrantyStage(t *testing.T) {
 	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
 
 	day := 24 * time.Hour
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		ends time.Time
 		want int
 	}{
@@ -78,8 +78,8 @@ func TestWarrantyStage(t *testing.T) {
 		"30 days":        {now.Add(30 * day), 30},
 		"an hour":        {now.Add(time.Hour), 30},
 	} {
-		if got := warrantyStage(c.ends, now); got != c.want {
-			t.Errorf("%s: %d, want %d", name, got, c.want)
+		if got := warrantyStage(testCase.ends, now); got != testCase.want {
+			t.Errorf("%s: %d, want %d", name, got, testCase.want)
 		}
 	}
 }

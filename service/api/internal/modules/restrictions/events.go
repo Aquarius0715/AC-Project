@@ -45,15 +45,15 @@ func EventHandlers() map[string]events.Handler {
 			return nil
 		},
 		events.UnitRestrictionObserved: func(ctx context.Context, txn pgx.Tx, e events.Event) error {
-			var p events.Observation
+			var payload events.Observation
 
-			decodeErr := e.Decode(&p)
+			decodeErr := e.Decode(&payload)
 			if decodeErr != nil {
 				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
 			var observed *Observation
-			if len(p.Observed) > 0 && string(p.Observed) != "null" {
+			if len(payload.Observed) > 0 && string(payload.Observed) != "null" {
 				observed = &Observation{
 					RestrictionID: uuid.UUID{},
 					RulesVersion:  "",
@@ -61,13 +61,13 @@ func EventHandlers() map[string]events.Handler {
 					ObservedAt:    time.Time{},
 				}
 
-				err := json.Unmarshal(p.Observed, observed)
+				err := json.Unmarshal(payload.Observed, observed)
 				if err != nil {
 					return apperr.Wrap(err, "json.Unmarshal")
 				}
 			}
 
-			_, err := Observe(ctx, txn, p.At, p.UnitID, observed, p.EventID)
+			_, err := Observe(ctx, txn, payload.At, payload.UnitID, observed, payload.EventID)
 
 			return err
 		},
@@ -79,8 +79,8 @@ func EventHandlers() map[string]events.Handler {
 				return apperr.Wrap(err, "events.Event.Decode")
 			}
 
-			for _, id := range commands.CommandIDs { // billing's record takes equipment's final status (IR194)
-				status := commands.Statuses[id]
+			for _, commandID := range commands.CommandIDs { // billing's record takes equipment's final status (IR194)
+				status := commands.Statuses[commandID]
 				if status != "failed" && status != "cancelled" {
 					status = "expired"
 				}
@@ -89,7 +89,7 @@ func EventHandlers() map[string]events.Handler {
 					ctx,
 					`UPDATE restrictions.restriction_commands SET status = $2, updated_at = $3 WHERE command_id = $1 AND status =
 						'requested'`,
-					id,
+					commandID,
 					status,
 					commands.At,
 				)

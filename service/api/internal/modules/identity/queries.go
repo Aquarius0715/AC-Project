@@ -114,8 +114,8 @@ type NotificationsStoredInput struct {
 	OccurredAt time.Time   `json:"occurredAt"`
 }
 
-func members(ctx context.Context, call *ops.Call, in *MembersInput) ([]uuid.UUID, error) {
-	q := `SELECT m.id FROM identity.memberships m WHERE m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until >
+func members(ctx context.Context, call *ops.Call, input *MembersInput) ([]uuid.UUID, error) {
+	stmt := `SELECT m.id FROM identity.memberships m WHERE m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until >
 		$1)
 		AND ($2::uuid[] IS NULL OR m.id = ANY($2)) AND ($3 = '' OR m.role = $3) AND ($4::uuid IS NULL OR m.organization_id =
 		$4)
@@ -124,19 +124,19 @@ func members(ctx context.Context, call *ops.Call, in *MembersInput) ([]uuid.UUID
 		AND ($6 = '' OR m.client_role = $6) ORDER BY m.id`
 
 	var ids []uuid.UUID
-	if in.IDs != nil {
-		ids = in.IDs
+	if input.IDs != nil {
+		ids = input.IDs
 	}
 
 	rows, err := call.Tx.Query(
 		ctx,
-		q,
+		stmt,
 		call.Now,
 		ids,
-		in.Role,
-		in.OrganizationID,
-		in.Permission,
-		in.ClientRole,
+		input.Role,
+		input.OrganizationID,
+		input.Permission,
+		input.ClientRole,
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select identity.memberships")
@@ -155,12 +155,12 @@ func notificationsStored(
 	c *ops.Call,
 	input *NotificationsStoredInput,
 ) (int, error) {
-	var n int
+	var count int
 
 	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM notify.notifications n WHERE n.id = ANY($1) AND n.target->>'id' =
 		$2::text AND n.occurred_at = $3`,
 		input.IDs, input.TargetID, input.OccurredAt).
-		Scan(&n)
+		Scan(&count)
 
-	return n, apperr.Wrap(err, "select notify.notifications")
+	return count, apperr.Wrap(err, "select notify.notifications")
 }

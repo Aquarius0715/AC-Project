@@ -107,36 +107,36 @@ func activeContracts(
 	defer rows.Close()
 
 	for rows.Next() {
-		var u, k uuid.UUID
+		var unitID, contractID uuid.UUID
 
-		err := rows.Scan(&u, &k)
+		err := rows.Scan(&unitID, &contractID)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select billing.contract_units")
 		}
 
-		out[u] = append(out[u], k)
+		out[unitID] = append(out[unitID], contractID)
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select billing.contract_units")
 }
 
 func unitActive(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
-	var b bool
+	var active bool
 
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.contract_units cu JOIN billing.contracts k ON k.id =
 		cu.contract_id AND k.version = cu.contract_version
 		WHERE cu.unit_id = $1 AND k.is_current AND upper(k.term) > $2)`, in.UnitID, c.Now).
-		Scan(&b)
+		Scan(&active)
 
-	return b, apperr.Wrap(err, "select billing.contract_units")
+	return active, apperr.Wrap(err, "select billing.contract_units")
 }
 
 func orgActive(ctx context.Context, c *ops.Call, in *OrgInput) (bool, error) {
-	var b bool
+	var active bool
 
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing.contracts WHERE customer_org_id = $1 AND is_current AND
 		upper(term) > $2)`, in.OrgID, c.Now).
-		Scan(&b)
+		Scan(&active)
 
-	return b, apperr.Wrap(err, "select billing.contracts")
+	return active, apperr.Wrap(err, "select billing.contracts")
 }

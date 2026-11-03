@@ -375,17 +375,17 @@ func overrideOnlyAllowed(c *ops.Call, restriction Restriction) bool {
 		return true
 	}
 
-	var ri struct {
+	var intent struct {
 		Source string `json:"source"`
 	}
 
-	_ = json.Unmarshal(restriction.ReleaseIntent, &ri)
+	_ = json.Unmarshal(restriction.ReleaseIntent, &intent)
 	if (restriction.State == "released" || restriction.State == "cancelled") &&
 		unresolvedCase(restriction) { // IR03: terminal recovery
 		return true
 	}
 
-	return restriction.State == "release_requested" && ri.Source == "override"
+	return restriction.State == "release_requested" && intent.Source == "override"
 }
 
 func unresolvedCase(x Restriction) bool {
@@ -476,21 +476,21 @@ type observation struct {
 //	@Router			/v1/restrictions/{restrictionId}/reconcile [post]
 func (m Restrictions) reconcile(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	input *ReconcileInput,
 ) (any, error) {
-	restriction, err := lockCurrent(ctx, c, input.RestrictionID)
+	restriction, err := lockCurrent(ctx, call, input.RestrictionID)
 	if err != nil {
 		return nil, err
 	}
 
-	if !overrideOnlyAllowed(c, restriction) {
+	if !overrideOnlyAllowed(call, restriction) {
 		return nil, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
 	if restriction.State == "released" ||
 		restriction.State == "cancelled" { // SR26 recovery of a terminal restriction
-		return m.reconcileTerminal(ctx, c, restriction, input.UnitIDs)
+		return m.reconcileTerminal(ctx, call, restriction, input.UnitIDs)
 	}
 
 	if restriction.State != "requested" && restriction.State != "applied" &&
@@ -518,7 +518,7 @@ func (m Restrictions) reconcile(
 
 		var open bool
 
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1
+		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1
 			AND unit_id = $2 AND status = 'requested')`, restriction.ID, unit.UnitID).
 			Scan(&open)
 		if err != nil {
@@ -529,7 +529,7 @@ func (m Restrictions) reconcile(
 			return nil, apperr.E(apperr.Conflict, "errors.command_pending")
 		}
 
-		_, conn, power, bound, err := m.Devices.BoundDevice(ctx, c, unit.UnitID)
+		_, conn, power, bound, err := m.Devices.BoundDevice(ctx, call, unit.UnitID)
 		if err != nil {
 			return nil, apperr.Wrap(err, "restrictions.Devices.BoundDevice")
 		}
@@ -538,34 +538,38 @@ func (m Restrictions) reconcile(
 			return nil, apperr.E(apperr.Offline, "errors.device_offline")
 		}
 
-		raw, at, err := m.Units.Observation(ctx, c, unit.UnitID) // equipment's observation (IR194)
+		raw, observedAt, err := m.Units.Observation(
+			ctx,
+			call,
+			unit.UnitID,
+		) // equipment's observation (IR194)
 		if err != nil {
 			return nil, apperr.Wrap(err, "restrictions.Units.Observation")
 		}
 
-		if at == nil || c.Now.Sub(*at) > IntentTTL {
+		if observedAt == nil || call.Now.Sub(*observedAt) > IntentTTL {
 			return nil, apperr.E(apperr.Timeout, "errors.observation_stale")
 		}
 
-		var o observation
+		var observed observation
 		if len(raw) > 0 {
-			_ = json.Unmarshal(raw, &o)
+			_ = json.Unmarshal(raw, &observed)
 		}
 
 		releasing := unit.ReleaseState == "waiting_reconcile"
 		set := func(sql string, args ...any) error {
-			_, err := c.Tx.Exec(
+			_, err := call.Tx.Exec(
 				ctx,
 				`UPDATE restrictions.restriction_units SET
 					`+sql+`, observed_at = $3, pending_reason = NULL WHERE restriction_id `+
 					`= $1 AND unit_id = $2`,
-				append([]any{restriction.ID, unit.UnitID, c.Now}, args...)...)
+				append([]any{restriction.ID, unit.UnitID, call.Now}, args...)...)
 
 			return apperr.Wrap(err, "update restrictions.restriction_units")
 		}
 
 		switch {
-		case o.RestrictionID == nil:
+		case observed.RestrictionID == nil:
 			if releasing {
 				err = set(
 					`apply_state = 'not_applied', release_state = 'not_required', observed_restriction = NULL`,
@@ -573,14 +577,14 @@ func (m Restrictions) reconcile(
 			} else {
 				err = set(`apply_state = 'not_applied', observed_restriction = NULL`)
 			}
-		case *o.RestrictionID == restriction.ID && o.RulesVersion == restriction.RulesVersion:
+		case *observed.RestrictionID == restriction.ID && observed.RulesVersion == restriction.RulesVersion:
 			err = set(`apply_state = 'applied', observed_restriction = $4`, raw)
 			if err != nil {
 				return nil, err
 			}
 
 			if releasing {
-				cmd, delivered, _, err := m.send(ctx, c, restriction.ID, unit.UnitID, remove)
+				cmd, delivered, _, err := m.send(ctx, call, restriction.ID, unit.UnitID, remove)
 				if err != nil {
 					return nil, err
 				}
@@ -606,37 +610,37 @@ func (m Restrictions) reconcile(
 		}
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions r SET version = version + 1, updated_at = $2,
 		state = CASE WHEN r.state = 'requested' AND NOT EXISTS (SELECT 1 FROM restrictions.restriction_units ru WHERE
 		ru.restriction_id = r.id AND ru.apply_state <> 'applied')
 			THEN 'applied' ELSE r.state END WHERE r.id = $1`,
 		restriction.ID,
-		c.Now,
+		call.Now,
 	)
 	if execErr != nil {
 		return nil, apperr.Wrap(execErr, "update restrictions.restrictions")
 	}
 
-	finishReleaseErr := finishRelease(ctx, c.Tx, restriction.ID, c.Now)
+	finishReleaseErr := finishRelease(ctx, call.Tx, restriction.ID, call.Now)
 	if finishReleaseErr != nil {
 		return nil, finishReleaseErr
 	}
 
 	next := restriction.Version + 1
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "restrictions.reconcile",
 			TargetKind:      "restriction",
 			TargetID:        restriction.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
-	restriction, err = load(ctx, c, restriction.ID, false)
+	restriction, err = load(ctx, call, restriction.ID, false)
 
-	return project(c, restriction), err
+	return project(call, restriction), err
 }
 
 // RetryInput is restrictions.retry input.
@@ -879,11 +883,11 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput)
 }
 
 // RegisterActions binds the exception, release and recovery operations.
-func RegisterActions(reg *ops.Registry, m Restrictions) {
-	ops.Register(reg, "restrictions.defer", m.deferRestriction)
-	ops.Register(reg, "restrictions.exempt", m.exempt)
-	ops.Register(reg, "restrictions.release", m.release)
-	ops.Register(reg, "restrictions.override", m.override)
-	ops.Register(reg, "restrictions.reconcile", m.reconcile)
-	ops.Register(reg, "restrictions.retry", m.retry)
+func RegisterActions(reg *ops.Registry, module Restrictions) {
+	ops.Register(reg, "restrictions.defer", module.deferRestriction)
+	ops.Register(reg, "restrictions.exempt", module.exempt)
+	ops.Register(reg, "restrictions.release", module.release)
+	ops.Register(reg, "restrictions.override", module.override)
+	ops.Register(reg, "restrictions.reconcile", module.reconcile)
+	ops.Register(reg, "restrictions.retry", module.retry)
 }

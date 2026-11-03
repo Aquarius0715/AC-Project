@@ -102,19 +102,19 @@ func addCap(ctx context.Context, call *ops.Call, org uuid.UUID) error {
 	}
 
 	var (
-		n      int
+		count  int
 		oldest *time.Time
 	)
 
 	err = call.Tx.QueryRow(ctx, `SELECT count(*), min(created_at) FROM (SELECT created_at FROM identity.memberships
 		WHERE organization_id = $1 AND created_at > $2 AND created_at <= $3 ORDER BY created_at DESC LIMIT $4) x`,
 		org, call.Now.Add(-24*time.Hour), call.Now, AccountsPerOrgPerDay).
-		Scan(&n, &oldest)
+		Scan(&count, &oldest)
 	if err != nil {
 		return apperr.Wrap(err, "select identity.memberships")
 	}
 
-	if n < AccountsPerOrgPerDay || oldest == nil {
+	if count < AccountsPerOrgPerDay || oldest == nil {
 		return nil
 	}
 
@@ -178,14 +178,14 @@ func personFor(ctx context.Context, call *ops.Call, email, name string) (uuid.UU
 func createAccount(
 	ctx context.Context,
 	call *ops.Call,
-	a newAccount,
+	account newAccount,
 ) (user, membership uuid.UUID, err error) {
-	err = addCap(ctx, call, a.OrgID)
+	err = addCap(ctx, call, account.OrgID)
 	if err != nil {
 		return user, membership, err
 	}
 
-	user, err = personFor(ctx, call, a.Email, a.DisplayName)
+	user, err = personFor(ctx, call, account.Email, account.DisplayName)
 	if errors.Is(err, errEmailTaken) {
 		return user, membership, apperr.Fields(map[string]string{"email": "errors.email_taken"})
 	}
@@ -216,26 +216,26 @@ func createAccount(
 	err = call.Tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, employment,
 		client_role, valid_from, valid_until, created_at, updated_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $6, $6) RETURNING id`,
-		user, a.OrgID, a.Role, a.Employment, a.ClientRole, call.Now, a.ValidUntil).
+		user, account.OrgID, account.Role, account.Employment, account.ClientRole, call.Now, account.ValidUntil).
 		Scan(&membership)
 	if err != nil {
 		return user, membership, apperr.Wrap(err, "insert identity.memberships")
 	}
 
-	for _, p := range a.Permissions {
+	for _, permission := range account.Permissions {
 		_, err = call.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES
 				(current_setting('app.tenant_id')::uuid, $1, $2)`,
 			membership,
-			p,
+			permission,
 		)
 		if err != nil {
 			return user, membership, apperr.Wrap(err, "insert identity.membership_permissions")
 		}
 	}
 
-	for _, scopeRef := range a.Scopes {
+	for _, scopeRef := range account.Scopes {
 		_, err = call.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES
@@ -249,7 +249,7 @@ func createAccount(
 		}
 	}
 
-	if a.Role == "client" { // IR84 initial Consent
+	if account.Role == "client" { // IR84 initial Consent
 		_, err = call.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES
@@ -266,10 +266,10 @@ func createAccount(
 			AggregateType: "membership",
 			AggregateID:   membership,
 			Type:          "MembershipSaved",
-			Payload:       map[string]any{"role": a.Role},
+			Payload:       map[string]any{"role": account.Role},
 		},
 	)
-	requestAccount(call, user, membership, a.Role)
+	requestAccount(call, user, membership, account.Role)
 
 	return user, membership, nil
 }
@@ -309,14 +309,14 @@ func AccountHandlers(provider Provider, apps AccountApps) map[string]events.Hand
 	}
 
 	return map[string]events.Handler{
-		EventAccountRequested: func(ctx context.Context, txn pgx.Tx, e events.Event) error {
+		EventAccountRequested: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
 			var input struct {
 				UserID       uuid.UUID `json:"userId"`
 				MembershipID uuid.UUID `json:"membershipId"`
 				Role         string    `json:"role"`
 			}
 
-			decodeErr := e.Decode(&input)
+			decodeErr := event.Decode(&input)
 			if decodeErr != nil {
 				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
@@ -340,7 +340,7 @@ func AccountHandlers(provider Provider, apps AccountApps) map[string]events.Hand
 			acct := idp.Account{
 				Email:       email,
 				DisplayName: name,
-				TenantID:    e.TenantID.String(),
+				TenantID:    event.TenantID.String(),
 				Membership:  input.MembershipID.String(),
 				Role:        input.Role,
 				ClientID:    client,
@@ -414,7 +414,7 @@ func AccountHandlers(provider Provider, apps AccountApps) map[string]events.Hand
 
 			return nil
 		},
-		EventAccountEnabled: func(ctx context.Context, tx pgx.Tx, event events.Event) error {
+		EventAccountEnabled: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
 			var input struct {
 				MembershipID uuid.UUID `json:"membershipId"`
 				Enabled      bool      `json:"enabled"`
@@ -428,7 +428,8 @@ func AccountHandlers(provider Provider, apps AccountApps) map[string]events.Hand
 			// membership the account does not sign in with leaves it alone (IR462)
 			var sub string
 
-			err := tx.QueryRow(ctx, `SELECT coalesce(u.cognito_sub, u.id::text) FROM identity.memberships m JOIN identity.users u
+			err := txn.QueryRow(ctx, `SELECT coalesce(u.cognito_sub, u.id::text) FROM identity.memberships m JOIN identity.users
+				u
 				ON u.id = m.user_id
 				WHERE m.id = $1 AND (u.sign_in_membership_id IS NULL OR u.sign_in_membership_id = m.id)`, input.MembershipID).
 				Scan(&sub)

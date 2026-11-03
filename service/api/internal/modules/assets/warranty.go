@@ -73,14 +73,14 @@ func (m *Module) RemindWarranties(ctx context.Context, call *ops.Call) (int, err
 
 	var recipients []uuid.UUID
 
-	n := 0
+	reminded := 0
 
-	for _, d := range list {
-		if len(contracts[d.id]) > 0 { // a maintenance contract covers the unit (IR111)
+	for _, dueUnit := range list {
+		if len(contracts[dueUnit.id]) > 0 { // a maintenance contract covers the unit (IR111)
 			continue
 		}
 
-		days := warrantyStage(d.ends, call.Now)
+		days := warrantyStage(dueUnit.ends, call.Now)
 
 		tag, err := call.Tx.Exec(
 			ctx,
@@ -88,13 +88,13 @@ func (m *Module) RemindWarranties(ctx context.Context, call *ops.Call) (int, err
 			SELECT $1, $2, $3, current_setting('app.tenant_id')::uuid, $4
 			WHERE NOT EXISTS (SELECT 1 FROM assets.warranty_reminders WHERE unit_id = $1 AND warranty_ends_at = $2 AND
 			days_before <= $3) ON CONFLICT DO NOTHING`,
-			d.id,
-			d.ends,
+			dueUnit.id,
+			dueUnit.ends,
 			days,
 			call.Now,
 		)
 		if err != nil {
-			return n, apperr.Wrap(err, "insert assets.warranty_reminders")
+			return reminded, apperr.Wrap(err, "insert assets.warranty_reminders")
 		}
 
 		if tag.RowsAffected() == 0 { // this reminder (or a later one) went already
@@ -114,7 +114,7 @@ func (m *Module) RemindWarranties(ctx context.Context, call *ops.Call) (int, err
 				},
 			)
 			if err != nil {
-				return n, apperr.Wrap(err, "identity.Members")
+				return reminded, apperr.Wrap(err, "identity.Members")
 			}
 		}
 
@@ -129,17 +129,17 @@ func (m *Module) RemindWarranties(ctx context.Context, call *ops.Call) (int, err
 				Type:                  "warranty_expiring",
 				TemplateKey:           "warranty_expiring",
 				TargetKind:            "unit",
-				TargetID:              d.id,
+				TargetID:              dueUnit.id,
 				Severity:              severity,
 				Params: map[string]any{
-					"at":     d.ends,
+					"at":     dueUnit.ends,
 					"status": "expiring",
 				},
 				Channel:       "",
 				SourceAlertID: nil,
 			})
 			if err != nil {
-				return n, apperr.Wrap(err, "notify.Store.Create")
+				return reminded, apperr.Wrap(err, "notify.Store.Create")
 			}
 		}
 
@@ -147,20 +147,20 @@ func (m *Module) RemindWarranties(ctx context.Context, call *ops.Call) (int, err
 			ctx,
 			`UPDATE assets.warranty_reminders SET notifications = $4 WHERE unit_id = $1 AND warranty_ends_at = $2 AND days_before
 				= $3`,
-			d.id,
-			d.ends,
+			dueUnit.id,
+			dueUnit.ends,
 			days,
 			len(recipients),
 		)
 		if execErr != nil {
-			return n, apperr.Wrap(execErr, "update assets.warranty_reminders")
+			return reminded, apperr.Wrap(execErr, "update assets.warranty_reminders")
 		}
 
 		call.Audit(
 			ops.AuditEntry{
 				Action:     "units.remindWarranty",
 				TargetKind: "unit",
-				TargetID:   d.id.String(),
+				TargetID:   dueUnit.id.String(),
 				Reason: fmt.Sprintf(
 					"%d days before the warranty ends",
 					days,
@@ -173,8 +173,8 @@ func (m *Module) RemindWarranties(ctx context.Context, call *ops.Call) (int, err
 			},
 		)
 
-		n++
+		reminded++
 	}
 
-	return n, nil
+	return reminded, nil
 }

@@ -108,9 +108,9 @@ func resolveQr(
 		}
 	}
 
-	nf := apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	notFoundErr := apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	if unit == uuid.Nil {
-		return QrResolution{}, nf
+		return QrResolution{}, notFoundErr
 	}
 
 	assigned, job, err := qrAssignments.QrAssignment(ctx, call, unit)
@@ -119,7 +119,7 @@ func resolveQr(
 	}
 
 	if !assigned {
-		return QrResolution{}, nf
+		return QrResolution{}, notFoundErr
 	}
 
 	return QrResolution{UnitID: unit, JobID: job}, nil

@@ -124,25 +124,26 @@ func (m *Module) unitsCoverage(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[UnitCoverage], error) {
-	var f struct {
+	var filters struct {
 		CustomerID         *uuid.UUID `json:"customerId,omitempty"`
 		Coverage           *string    `json:"coverage,omitempty"`
 		ExpiringWithinDays *int       `json:"expiringWithinDays,omitempty"`
 		Search             *string    `json:"search,omitempty"`
 	}
 
-	err := decodeFilters(query.Filters, &f)
+	err := decodeFilters(query.Filters, &filters)
 	if err != nil {
 		return paging.Page[UnitCoverage]{}, err
 	}
 
-	if f.Coverage != nil && !coverageStatuses[*f.Coverage] {
+	if filters.Coverage != nil && !coverageStatuses[*filters.Coverage] {
 		return paging.Page[UnitCoverage]{}, apperr.Fields(
 			map[string]string{"filters.coverage": apperr.KeyInvalid},
 		)
 	}
 
-	if f.ExpiringWithinDays != nil && (*f.ExpiringWithinDays < 1 || *f.ExpiringWithinDays > 3650) {
+	if filters.ExpiringWithinDays != nil &&
+		(*filters.ExpiringWithinDays < 1 || *filters.ExpiringWithinDays > 3650) {
 		return paging.Page[UnitCoverage]{}, apperr.Fields(
 			map[string]string{"filters.expiringWithinDays": apperr.KeyRange},
 		)
@@ -155,7 +156,7 @@ func (m *Module) unitsCoverage(
 		)
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[UnitCoverage]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -169,12 +170,12 @@ func (m *Module) unitsCoverage(
 	}
 
 	conds := []string{"NOT u.archived"}
-	if f.CustomerID != nil {
-		conds = append(conds, "cu.id = "+add(*f.CustomerID))
+	if filters.CustomerID != nil {
+		conds = append(conds, "cu.id = "+add(*filters.CustomerID))
 	}
 
-	if f.Search != nil && strings.TrimSpace(*f.Search) != "" {
-		q := paging.Contains(strings.ToLower(*f.Search))
+	if filters.Search != nil && strings.TrimSpace(*filters.Search) != "" {
+		q := paging.Contains(strings.ToLower(*filters.Search))
 		conds = append(
 			conds,
 			"(lower(u.display_name) LIKE "+add(q)+" OR u.id::text LIKE "+add(q)+")",
@@ -250,13 +251,13 @@ func (m *Module) unitsCoverage(
 			unitCoverage.WarrantyEndsAt,
 			len(unitCoverage.ContractIDs),
 		)
-		if f.Coverage != nil && unitCoverage.Status != *f.Coverage {
+		if filters.Coverage != nil && unitCoverage.Status != *filters.Coverage {
 			continue
 		}
 
-		if f.ExpiringWithinDays != nil &&
+		if filters.ExpiringWithinDays != nil &&
 			(unitCoverage.WarrantyEndsAt == nil || unitCoverage.WarrantyEndsAt.Before(call.Now) ||
-				unitCoverage.WarrantyEndsAt.After(call.Now.Add(time.Duration(*f.ExpiringWithinDays)*24*time.Hour))) {
+				unitCoverage.WarrantyEndsAt.After(call.Now.Add(time.Duration(*filters.ExpiringWithinDays)*24*time.Hour))) {
 			continue
 		}
 
@@ -271,32 +272,32 @@ func (m *Module) unitsCoverage(
 	}
 
 	sort.SliceStable(keep, func(i, j int) bool {
-		unitCoverage, b := keep[i], keep[j]
-		less, eq := false, false
+		unitCoverage, otherCoverage := keep[i], keep[j]
+		less, equal := false, false
 
 		switch field {
 		case "name":
-			less, eq = unitCoverage.name < b.name, unitCoverage.name == b.name
+			less, equal = unitCoverage.name < otherCoverage.name, unitCoverage.name == otherCoverage.name
 		case "dueAt": // warrantyEndsAt, null last
 			switch {
-			case unitCoverage.WarrantyEndsAt == nil || b.WarrantyEndsAt == nil:
-				less, eq = b.WarrantyEndsAt == nil &&
+			case unitCoverage.WarrantyEndsAt == nil || otherCoverage.WarrantyEndsAt == nil:
+				less, equal = otherCoverage.WarrantyEndsAt == nil &&
 					unitCoverage.WarrantyEndsAt != nil, unitCoverage.WarrantyEndsAt == nil &&
-					b.WarrantyEndsAt == nil
-				if !eq {
+					otherCoverage.WarrantyEndsAt == nil
+				if !equal {
 					return less // nulls stay last in both directions
 				}
 			default:
-				less, eq = unitCoverage.WarrantyEndsAt.Before(
-					*b.WarrantyEndsAt,
+				less, equal = unitCoverage.WarrantyEndsAt.Before(
+					*otherCoverage.WarrantyEndsAt,
 				), unitCoverage.WarrantyEndsAt.Equal(
-					*b.WarrantyEndsAt,
+					*otherCoverage.WarrantyEndsAt,
 				)
 			}
 		}
 
-		if field == "id" || eq {
-			return unitCoverage.UnitID.String() < b.UnitID.String()
+		if field == "id" || equal {
+			return unitCoverage.UnitID.String() < otherCoverage.UnitID.String()
 		}
 
 		return less != desc

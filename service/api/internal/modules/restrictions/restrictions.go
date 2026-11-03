@@ -348,26 +348,31 @@ func fullReader(c *ops.Call) bool {
 }
 
 // project returns the RestrictionRead the caller may receive (IR03 / IR42).
-func project(call *ops.Call, x Restriction) any {
+func project(call *ops.Call, restriction Restriction) any {
 	switch {
 	case call.Principal.Role == "client":
-		maskForClient(&x)
+		maskForClient(&restriction)
 
-		return x
+		return restriction
 	case fullReader(call):
-		return x
+		return restriction
 	default:
-		return releaseView(x)
+		return releaseView(restriction)
 	}
 }
 
-func load(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Restriction, error) {
+func load(
+	ctx context.Context,
+	call *ops.Call,
+	restrictionID uuid.UUID,
+	lock bool,
+) (Restriction, error) {
 	q := "SELECT " + cols + " FROM restrictions.restrictions r WHERE r.id = $1"
 	if lock {
 		q += " FOR UPDATE OF r"
 	}
 
-	restriction, err := scan(c.Tx.QueryRow(ctx, q, id))
+	restriction, err := scan(call.Tx.QueryRow(ctx, q, restrictionID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return restriction, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
@@ -376,7 +381,7 @@ func load(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Restrictio
 		return restriction, err
 	}
 
-	return restriction, decorate(ctx, c, &restriction)
+	return restriction, decorate(ctx, call, &restriction)
 }
 
 // GetInput is restrictions.get input.
@@ -445,7 +450,7 @@ func (m Restrictions) query(
 	ctx context.Context,
 	call *ops.Call,
 	query paging.Query,
-	f listFilter,
+	filter listFilter,
 ) ([]Restriction, *string, int, int, error) {
 	order, err := paging.OrderBy(
 		query.Sort,
@@ -464,7 +469,7 @@ func (m Restrictions) query(
 	// the cursor binds the filter (SR14)
 	window, err := paging.Resolve(query, struct {
 		F listFilter `json:"f"`
-	}{f}, call.Principal.ScopeVersion, 1)
+	}{filter}, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return nil, nil, 0, 0, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -478,21 +483,21 @@ func (m Restrictions) query(
 	}
 
 	conds := []string{"TRUE"}
-	if f.ContractID != nil {
-		conds = append(conds, "r.contract_id = "+add(*f.ContractID))
+	if filter.ContractID != nil {
+		conds = append(conds, "r.contract_id = "+add(*filter.ContractID))
 	}
 
-	if f.InvoiceID != nil {
+	if filter.InvoiceID != nil {
 		conds = append(
 			conds,
 			"EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri WHERE ri.restriction_id = r.id AND ri.invoice_id = "+add(
-				*f.InvoiceID,
+				*filter.InvoiceID,
 			)+")",
 		)
 	}
 
-	if f.Status != nil {
-		conds = append(conds, "r.state = "+add(*f.Status))
+	if filter.Status != nil {
+		conds = append(conds, "r.state = "+add(*filter.Status))
 	}
 
 	where := strings.Join(conds, " AND ")
@@ -550,7 +555,7 @@ func (m Restrictions) query(
 	return out, window.Next(total), total, window.Snapshot, nil
 }
 
-func decodeFilter(raw json.RawMessage, f *listFilter) error {
+func decodeFilter(raw json.RawMessage, filter *listFilter) error {
 	if len(raw) == 0 {
 		return nil
 	}
@@ -558,7 +563,8 @@ func decodeFilter(raw json.RawMessage, f *listFilter) error {
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
 	dec.DisallowUnknownFields()
 
-	if dec.Decode(f) != nil || (f.Status != nil && !slices.Contains(states, *f.Status)) {
+	if dec.Decode(filter) != nil ||
+		(filter.Status != nil && !slices.Contains(states, *filter.Status)) {
 		return apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
 	}
 
@@ -600,24 +606,24 @@ func (m Restrictions) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[any], error) {
-	var f listFilter
+	var filter listFilter
 
-	err := decodeFilter(query.Filters, &f)
+	err := decodeFilter(query.Filters, &filter)
 	if err != nil {
 		return paging.Page[any]{}, err
 	}
 
-	if !fullReader(call) && (f.ContractID != nil || f.InvoiceID != nil) {
+	if !fullReader(call) && (filter.ContractID != nil || filter.InvoiceID != nil) {
 		return paging.Page[any]{}, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
-	xs, next, total, snap, err := m.query(ctx, call, *query, f)
+	results, next, total, snap, err := m.query(ctx, call, *query, filter)
 	if err != nil {
 		return paging.Page[any]{}, err
 	}
 
-	items := make([]any, len(xs))
-	for i, x := range xs {
+	items := make([]any, len(results))
+	for i, x := range results {
 		items[i] = project(call, x)
 	}
 
@@ -692,29 +698,29 @@ func (m Restrictions) forInvoice(
 		return paging.Page[Restriction]{}, apperr.Wrap(err, "select billing.invoices")
 	}
 
-	var f listFilter
+	var filter listFilter
 
-	decodeFilterErr := decodeFilter(input.Query.Filters, &f)
+	decodeFilterErr := decodeFilter(input.Query.Filters, &filter)
 	if decodeFilterErr != nil {
 		return paging.Page[Restriction]{}, decodeFilterErr
 	}
 	// query catalog: input.invoiceId (the REST path) => causeInvoiceIds contains; contractId => contractId; status =>
 	// state. invoiceId is no filter of this read: the REST binding refuses it as error.notAllowed
-	f.InvoiceID = &input.InvoiceID
+	filter.InvoiceID = &input.InvoiceID
 
-	xs, next, total, snap, err := m.query(ctx, call, input.Query, f)
+	results, next, total, snap, err := m.query(ctx, call, input.Query, filter)
 	if err != nil {
 		return paging.Page[Restriction]{}, err
 	}
 
 	if call.Principal.Role == "client" {
-		for i := range xs {
-			maskForClient(&xs[i])
+		for i := range results {
+			maskForClient(&results[i])
 		}
 	}
 
 	return paging.Page[Restriction]{
-		Items:           xs,
+		Items:           results,
 		NextCursor:      next,
 		Total:           total,
 		SnapshotVersion: snap,
@@ -722,12 +728,12 @@ func (m Restrictions) forInvoice(
 }
 
 // Register binds the restriction operations.
-func Register(reg *ops.Registry, m Restrictions) {
-	ops.Register(reg, "restrictions.get", m.get)
-	ops.Register(reg, "restrictions.list", m.list)
-	ops.Register(reg, "restrictions.forInvoice", m.forInvoice)
-	ops.Register(reg, "restrictions.schedule", m.schedule)
-	ops.Register(reg, "restrictions.execute", m.execute)
-	ops.Register(reg, "restrictions.cancel", m.cancel)
-	RegisterActions(reg, m)
+func Register(reg *ops.Registry, module Restrictions) {
+	ops.Register(reg, "restrictions.get", module.get)
+	ops.Register(reg, "restrictions.list", module.list)
+	ops.Register(reg, "restrictions.forInvoice", module.forInvoice)
+	ops.Register(reg, "restrictions.schedule", module.schedule)
+	ops.Register(reg, "restrictions.execute", module.execute)
+	ops.Register(reg, "restrictions.cancel", module.cancel)
+	RegisterActions(reg, module)
 }

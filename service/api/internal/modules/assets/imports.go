@@ -228,7 +228,7 @@ func (m *Module) unitsImportPreview(
 	unitNames := map[string]bool{}
 	serials := map[string]bool{}
 
-	for n := 1; ; n++ {
+	for rowNumber := 1; ; rowNumber++ {
 		rec, err := reader.Read()
 		if errors.Is(err, io.EOF) {
 			break
@@ -240,13 +240,13 @@ func (m *Module) unitsImportPreview(
 			)
 		}
 
-		if n > maxImportRows {
+		if rowNumber > maxImportRows {
 			return ImportPreview{}, apperr.Fields(map[string]string{"csvText": "error.tooManyRows"})
 		}
 
 		row := storedRow{
 			ImportRow: ImportRow{
-				RowNumber:    n,
+				RowNumber:    rowNumber,
 				Result:       "ready",
 				PropertyName: "",
 				FloorName:    nil,
@@ -326,7 +326,7 @@ func (m *Module) unitsImportPreview(
 		}
 
 		if row.Result != "error" {
-			id, v, ok, err := m.Import.ByCode(ctx, call, row.ModelCode)
+			modelID, capVersion, ok, err := m.Import.ByCode(ctx, call, row.ModelCode)
 			if err != nil {
 				return ImportPreview{}, apperr.Wrap(err, "assets.ImportModels.ByCode")
 			}
@@ -335,7 +335,7 @@ func (m *Module) unitsImportPreview(
 				fail("error.unknownModel")
 			}
 
-			row.ModelID, row.CapVersion = id, v
+			row.ModelID, row.CapVersion = modelID, capVersion
 		}
 
 		for _, d := range []*string{row.InstalledOn, row.WarrantyEnd} {
@@ -361,7 +361,7 @@ func (m *Module) unitsImportPreview(
 
 		if row.Result != "error" &&
 			row.Serial != nil { // the device must exist, be free and untampered; one row per serial
-			id, state, err := m.Import.SerialState(ctx, call, *row.Serial)
+			deviceID, state, err := m.Import.SerialState(ctx, call, *row.Serial)
 			if err != nil {
 				return ImportPreview{}, apperr.Wrap(err, "assets.ImportModels.SerialState")
 			}
@@ -376,7 +376,7 @@ func (m *Module) unitsImportPreview(
 			case state == "tamper":
 				fail(apperr.KeyTamperUnresolved)
 			default:
-				row.DeviceID = &id
+				row.DeviceID = &deviceID
 				serials[key] = true
 			}
 		}
@@ -394,18 +394,18 @@ func (m *Module) unitsImportPreview(
 				continue
 			}
 
-			var id uuid.UUID
+			var spaceID uuid.UUID
 			// an existing location of any kind with this name under the parent is reused: names are unique per parent
 			err := call.Tx.QueryRow(ctx, `SELECT id FROM assets.spaces WHERE property_id = $1 AND parent_space_id IS NOT DISTINCT
 				FROM $2
 				AND NOT archived AND lower(name) = lower($3) ORDER BY id LIMIT 1`, row.PropertyID, parentSpace, *lvl.name).
-				Scan(&id)
+				Scan(&spaceID)
 			if errors.Is(err, pgx.ErrNoRows) {
 				warn("warning.importCreatesSpace")
 
 				k := locKey{parent, lvl.kind, strings.ToLower(*lvl.name)}
 				planned[k] = true
-				id = uuid.NewSHA1(
+				spaceID = uuid.NewSHA1(
 					row.PropertyID,
 					[]byte(lvl.kind+"/"+parent.String()+"/"+strings.ToLower(*lvl.name)),
 				) // stable placeholder
@@ -413,8 +413,8 @@ func (m *Module) unitsImportPreview(
 				return ImportPreview{}, apperr.Wrap(err, "select assets.spaces")
 			}
 
-			*lvl.dst = &id
-			parent, parentSpace = id, &id
+			*lvl.dst = &spaceID
+			parent, parentSpace = spaceID, &spaceID
 		}
 
 		if row.Result != "error" {
@@ -650,13 +650,13 @@ func (m *Module) unitsImportCommit(
 			return uuid.Nil, conflict(apperr.KeyPreviewExpired)
 		}
 
-		id := uuid.Must(uuid.NewV7())
+		propertyID := uuid.Must(uuid.NewV7())
 
 		_, err = call.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name) VALUES ($1,
 				current_setting('app.tenant_id')::uuid, $2, 'office', $3)`,
-			id,
+			propertyID,
 			org,
 			row.PropertyName,
 		)
@@ -664,18 +664,18 @@ func (m *Module) unitsImportCommit(
 			return uuid.Nil, apperr.Wrap(err, "insert assets.properties")
 		}
 
-		created[row.PropertyID] = id
-		properties = append(properties, id)
+		created[row.PropertyID] = propertyID
+		properties = append(properties, propertyID)
 		call.Emit(
 			ops.Event{
 				AggregateType: "property",
-				AggregateID:   id,
+				AggregateID:   propertyID,
 				Type:          "LocationChanged",
 				Payload:       nil,
 			},
 		)
 
-		return id, nil
+		return propertyID, nil
 	}
 	resolve := func(propertyID uuid.UUID, placeholder *uuid.UUID, parent *uuid.UUID, kind, name string) (*uuid.UUID,
 		error,
@@ -688,26 +688,26 @@ func (m *Module) unitsImportCommit(
 			return &real, nil
 		}
 
-		var ok bool
+		var present bool
 
 		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.spaces WHERE id = $1 AND NOT
 			archived)`, *placeholder).
-			Scan(&ok)
+			Scan(&present)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select assets.spaces")
 		}
 
-		if ok {
+		if present {
 			return placeholder, nil
 		}
 
-		id := uuid.Must(uuid.NewV7())
+		spaceID := uuid.Must(uuid.NewV7())
 
 		_, err = call.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5)`,
-			id,
+			spaceID,
 			propertyID,
 			parent,
 			kind,
@@ -717,18 +717,18 @@ func (m *Module) unitsImportCommit(
 			return nil, dupSibling(err)
 		}
 
-		created[*placeholder] = id
-		spaces = append(spaces, id)
+		created[*placeholder] = spaceID
+		spaces = append(spaces, spaceID)
 		call.Emit(
 			ops.Event{
 				AggregateType: "space",
-				AggregateID:   id,
+				AggregateID:   spaceID,
 				Type:          "LocationChanged",
 				Payload:       nil,
 			},
 		)
 
-		return &id, nil
+		return &spaceID, nil
 	}
 
 	for _, row := range rows {
@@ -779,7 +779,7 @@ func (m *Module) unitsImportCommit(
 			warranty = &t
 		}
 
-		id := uuid.Must(uuid.NewV7())
+		unitID := uuid.Must(uuid.NewV7())
 
 		_, execErr := call.Tx.Exec(
 			ctx,
@@ -787,7 +787,7 @@ func (m *Module) unitsImportCommit(
 				installed_at,
 			warranty_ends_at, capability_version) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8,
 			$9)`,
-			id,
+			unitID,
 			org,
 			propertyID,
 			space,
@@ -801,17 +801,22 @@ func (m *Module) unitsImportCommit(
 			return UnitImport{}, apperr.Wrap(execErr, "insert assets.units")
 		}
 
-		units = append(units, id)
+		units = append(units, unitID)
 		call.Emit(
-			ops.Event{AggregateType: "unit", AggregateID: id, Type: "UnitChanged", Payload: nil},
+			ops.Event{
+				AggregateType: "unit",
+				AggregateID:   unitID,
+				Type:          "UnitChanged",
+				Payload:       nil,
+			},
 		)
 
 		if row.DeviceID != nil { // the serial column binds the device (bound or tampered since the preview: validate again)
-			ok, err := m.Import.BindImported(
+			bound, err := m.Import.BindImported(
 				ctx,
 				call,
 				*row.DeviceID,
-				id,
+				unitID,
 				org,
 				"CSV import "+fileName,
 			)
@@ -819,7 +824,7 @@ func (m *Module) unitsImportCommit(
 				return UnitImport{}, apperr.Wrap(err, "assets.ImportModels.BindImported")
 			}
 
-			if !ok {
+			if !bound {
 				return UnitImport{}, conflict(apperr.KeyPreviewExpired)
 			}
 		}
@@ -837,7 +842,7 @@ func (m *Module) unitsImportCommit(
 		units = []uuid.UUID{}
 	}
 
-	id := uuid.Must(uuid.NewV7())
+	importID := uuid.Must(uuid.NewV7())
 
 	unitImport, err := scanImport(
 		call.Tx.QueryRow(
@@ -846,7 +851,7 @@ func (m *Module) unitsImportCommit(
 		created_space_ids, created_unit_ids, skipped_row_numbers, undo_until, state) VALUES ($1,
 		current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, 'imported')
 		RETURNING `+importCols,
-			id,
+			importID,
 			customer,
 			input.PreviewID,
 			"inline:"+fileName,
@@ -865,7 +870,7 @@ func (m *Module) unitsImportCommit(
 		ops.AuditEntry{
 			Action:          "units.importCommit",
 			TargetKind:      "unit_import",
-			TargetID:        id.String(),
+			TargetID:        importID.String(),
 			NextVersion:     &unitImport.Version,
 			PreviousVersion: nil,
 			Reason:          "",
@@ -977,7 +982,7 @@ func (m *Module) unitsImportUndo(
 		return UnitImport{}, apperr.Wrap(unbindUnitsErr, "assets.ImportModels.UnbindUnits")
 	}
 
-	for _, q := range []struct {
+	for _, created := range []struct {
 		table string
 		ids   []uuid.UUID
 	}{
@@ -987,9 +992,9 @@ func (m *Module) unitsImportUndo(
 	} {
 		_, err := call.Tx.Exec(
 			ctx,
-			"UPDATE "+q.table+" SET archived = true, version = version + 1, updated_at = platform.app_now() WHERE id = "+
+			"UPDATE "+created.table+" SET archived = true, version = version + 1, updated_at = platform.app_now() WHERE id = "+
 				"ANY($1) AND NOT archived",
-			q.ids,
+			created.ids,
 		)
 		if err != nil {
 			return UnitImport{}, apperr.Wrap(err, "update (unitsImportUndo)")

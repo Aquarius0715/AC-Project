@@ -122,26 +122,26 @@ type Module struct {
 }
 
 // Register binds the Assets operations implemented so far.
-func Register(r *ops.Registry, module *Module) {
-	ops.Register(r, "units.list", module.unitsList)
-	ops.Register(r, "units.get", module.unitsGet)
-	ops.Register(r, "properties.save", module.propertiesSave)
-	ops.Register(r, "spaces.save", module.spacesSave)
-	ops.Register(r, "units.save", module.unitsSave)
-	ops.Register(r, "properties.archive", module.propertiesArchive)
-	ops.Register(r, "spaces.archive", module.spacesArchive)
-	ops.Register(r, "units.archive", module.unitsArchive)
-	ops.Register(r, "customers.list", module.customersList)
-	ops.Register(r, "customers.save", module.customersSave)
-	ops.Register(r, "properties.list", module.propertiesList)
-	ops.Register(r, "spaces.list", module.spacesList)
-	ops.Register(r, "locations.rename", module.locationsRename)
-	ops.Register(r, "units.delete", module.unitsDelete)
-	ops.Register(r, "units.setAlertPolicies", module.unitsSetAlertPolicies)
-	ops.Register(r, "units.coverage", module.unitsCoverage)
-	ops.Register(r, "units.importPreview", module.unitsImportPreview)
-	ops.Register(r, "units.importCommit", module.unitsImportCommit)
-	ops.Register(r, "units.importUndo", module.unitsImportUndo)
+func Register(reg *ops.Registry, module *Module) {
+	ops.Register(reg, "units.list", module.unitsList)
+	ops.Register(reg, "units.get", module.unitsGet)
+	ops.Register(reg, "properties.save", module.propertiesSave)
+	ops.Register(reg, "spaces.save", module.spacesSave)
+	ops.Register(reg, "units.save", module.unitsSave)
+	ops.Register(reg, "properties.archive", module.propertiesArchive)
+	ops.Register(reg, "spaces.archive", module.spacesArchive)
+	ops.Register(reg, "units.archive", module.unitsArchive)
+	ops.Register(reg, "customers.list", module.customersList)
+	ops.Register(reg, "customers.save", module.customersSave)
+	ops.Register(reg, "properties.list", module.propertiesList)
+	ops.Register(reg, "spaces.list", module.spacesList)
+	ops.Register(reg, "locations.rename", module.locationsRename)
+	ops.Register(reg, "units.delete", module.unitsDelete)
+	ops.Register(reg, "units.setAlertPolicies", module.unitsSetAlertPolicies)
+	ops.Register(reg, "units.coverage", module.unitsCoverage)
+	ops.Register(reg, "units.importPreview", module.unitsImportPreview)
+	ops.Register(reg, "units.importCommit", module.unitsImportCommit)
+	ops.Register(reg, "units.importUndo", module.unitsImportUndo)
 }
 
 // UnitFilters are the units.list filters of query-catalog.csv.
@@ -594,15 +594,15 @@ func (in *UnitGetInput) Validate() map[string]string {
 //	@Router			/v1/units/{id} [get]
 func (m *Module) unitsGet(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	input *UnitGetInput,
 ) (UnitDetail, error) {
 	var args []any
 
 	args = append(args, input.ID)
-	where := "u.id = $1 AND " + scopeSQL(c, &args)
+	where := "u.id = $1 AND " + scopeSQL(call, &args)
 
-	units, _, err := m.query(ctx, c, where, args, "u.id", 1, 0)
+	units, _, err := m.query(ctx, call, where, args, "u.id", 1, 0)
 	if err != nil {
 		return UnitDetail{}, err
 	}
@@ -613,7 +613,7 @@ func (m *Module) unitsGet(
 
 	gateErr := unitscope.Gate(
 		ctx,
-		c,
+		call,
 		[]uuid.UUID{input.ID},
 	)
 	if gateErr != nil { // IR49(b): equipment read waits for the work window
@@ -637,7 +637,7 @@ func (m *Module) unitsGet(
 		},
 	}
 	if m.Details != nil {
-		unitDetail.DetailExtras, err = m.Details.Detail(ctx, c, units[0])
+		unitDetail.DetailExtras, err = m.Details.Detail(ctx, call, units[0])
 		if err != nil {
 			return UnitDetail{}, apperr.Wrap(err, "assets.Details.Detail")
 		}
