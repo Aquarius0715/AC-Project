@@ -21,7 +21,7 @@ type QrInput struct {
 func (in *QrInput) Validate() map[string]string {
 	in.Code = strings.TrimSpace(in.Code)
 	if in.Code == "" || len(in.Code) > 200 {
-		return map[string]string{"code": "error.invalid"}
+		return map[string]string{"code": apperr.KeyInvalid}
 	}
 
 	return nil
@@ -108,7 +108,7 @@ func resolveQr(
 		}
 	}
 
-	nf := apperr.E(apperr.NotFound, "error.notFound")
+	nf := apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	if unit == uuid.Nil {
 		return QrResolution{}, nf
 	}

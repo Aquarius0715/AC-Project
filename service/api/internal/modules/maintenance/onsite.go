@@ -54,7 +54,7 @@ func (m OnSite) lockOwn(
 		UPDATE`, id).
 		Scan(&status, &unit, &v, &raw)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", TimeOnSite{}, apperr.E(apperr.NotFound, "error.notFound")
+		return "", TimeOnSite{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -67,7 +67,7 @@ func (m OnSite) lockOwn(
 	}
 
 	if v != *call.ExpectedVersion {
-		return "", TimeOnSite{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return "", TimeOnSite{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	timeOnSite := TimeOnSite{
@@ -160,11 +160,11 @@ type StartInput struct {
 func (in *StartInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if in.StartConfirmed == nil || !*in.StartConfirmed {
-		fieldErrs["startConfirmed"] = "error.required"
+		fieldErrs["startConfirmed"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -209,7 +209,7 @@ func (m OnSite) startJob(ctx context.Context, call *ops.Call, in *StartInput) (J
 	}
 
 	if status != "assigned" {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	now := call.Now
@@ -231,7 +231,7 @@ type CheckInInput struct {
 func (in *CheckInInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	switch in.Method {
@@ -241,20 +241,20 @@ func (in *CheckInInput) Validate() map[string]string {
 		}
 
 		if in.QRUnitID == nil {
-			fieldErrs["qrUnitId"] = "error.required"
+			fieldErrs["qrUnitId"] = apperr.KeyRequired
 		}
 	case "manual":
 		if in.Reason == nil {
-			fieldErrs["reason"] = "error.required"
+			fieldErrs["reason"] = apperr.KeyRequired
 		} else {
 			trimmedReason(in.Reason, 1000, "reason", fieldErrs)
 		}
 
 		if in.DistanceMeters != nil && *in.DistanceMeters < 0 {
-			fieldErrs["distanceMeters"] = "error.range"
+			fieldErrs["distanceMeters"] = apperr.KeyRange
 		}
 	default:
-		fieldErrs["method"] = "error.invalid"
+		fieldErrs["method"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -318,7 +318,7 @@ func (m OnSite) checkInJob(ctx context.Context, c *ops.Call, input *CheckInInput
 	}
 
 	if status != "assigned" && (status != "in_progress" || timeOnSite.ArrivedAt != nil) {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	now := c.Now
@@ -355,11 +355,11 @@ type PauseInput struct {
 func (in *PauseInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if in.Paused == nil {
-		fieldErrs["paused"] = "error.required"
+		fieldErrs["paused"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -403,7 +403,7 @@ func (m OnSite) pauseJob(ctx context.Context, c *ops.Call, input *PauseInput) (J
 	}
 
 	if status != "in_progress" {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	open := len(timeOnSite.Pauses) > 0 && timeOnSite.Pauses[len(timeOnSite.Pauses)-1].To == nil
@@ -411,7 +411,7 @@ func (m OnSite) pauseJob(ctx context.Context, c *ops.Call, input *PauseInput) (J
 
 	switch {
 	case *input.Paused && open, !*input.Paused && !open:
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	case *input.Paused:
 		timeOnSite.Pauses = append(timeOnSite.Pauses, Pause{From: now, To: nil})
 	default:
@@ -438,7 +438,7 @@ type AckInput struct {
 func (in *AckInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	switch in.Decision {
@@ -448,17 +448,17 @@ func (in *AckInput) Validate() map[string]string {
 		}
 	case "cant_make":
 		if in.Reason == nil {
-			fieldErrs["reason"] = "error.required"
+			fieldErrs["reason"] = apperr.KeyRequired
 		} else {
 			trimmedReason(in.Reason, 1000, "reason", fieldErrs)
 		}
 
 		if in.AlternativeSlot != nil &&
 			!in.AlternativeSlot.StartAt.Before(in.AlternativeSlot.EndAt) {
-			fieldErrs["alternativeSlot"] = "error.range"
+			fieldErrs["alternativeSlot"] = apperr.KeyRange
 		}
 	default:
-		fieldErrs["decision"] = "error.invalid"
+		fieldErrs["decision"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -504,7 +504,7 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, input *AckInput) (
 		AND status = 'active' AND created_at <= $3 FOR UPDATE`, input.JobID, c.Principal.MembershipID, c.Now).
 		Scan(&aid, &ack, &end)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Assignment{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Assignment{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -524,11 +524,11 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, input *AckInput) (
 	}
 
 	if v != *c.ExpectedVersion {
-		return Assignment{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Assignment{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if ack != "pending" {
-		return Assignment{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Assignment{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	value := "accepted"

@@ -85,7 +85,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		)+`","address":null,"accessInstructions":null}`,
 		0,
 	); code != 409 ||
-		res["messageKey"] != "error.duplicateSiblingName" {
+		res["messageKey"] != apperr.KeyDuplicateSiblingName {
 		t.Errorf("duplicate property name: %d %v", code, res)
 	}
 
@@ -256,7 +256,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 			b,
 			0,
 		); code != 409 ||
-			res["messageKey"] != "error.duplicateSiblingName" {
+			res["messageKey"] != apperr.KeyDuplicateSiblingName {
 			t.Errorf("duplicate space (%s): %d %v", name, code, res)
 		}
 	}
@@ -314,7 +314,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		strings.Replace(unitBody("", room, ""), "Server AC", "server ac", 1),
 		0,
 	); code != 409 ||
-		res["messageKey"] != "error.duplicateSiblingName" {
+		res["messageKey"] != apperr.KeyDuplicateSiblingName {
 		t.Errorf("duplicate unit name in the room: %d %v", code, res)
 	}
 
@@ -403,7 +403,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		unitBody(second, floor, ""),
 		1,
 	); code != 409 ||
-		res["messageKey"] != "error.duplicateSiblingName" {
+		res["messageKey"] != apperr.KeyDuplicateSiblingName {
 		t.Errorf("rename to a sibling's name: %d %v", code, res)
 	}
 
@@ -452,7 +452,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		early,
 		4,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["warrantyEndsAt"] != "error.range" {
+		res["fieldErrors"].(map[string]any)["warrantyEndsAt"] != apperr.KeyRange {
 		t.Errorf("warranty before installation: %d %v", code, res)
 	}
 	// the stored warranty end counts too (an installation in 2027 would be refused as future, so the end moves back)
@@ -474,7 +474,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		),
 		4,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["warrantyEndsAt"] != "error.range" {
+		res["fieldErrors"].(map[string]any)["warrantyEndsAt"] != apperr.KeyRange {
 		t.Errorf("an installation after the stored warranty end: %d %v", code, res)
 	}
 

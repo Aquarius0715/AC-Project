@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -73,7 +74,7 @@ func TestRateAndReportProblem(t *testing.T) {
 		`"stars":3,"tags":[]`,
 		1,
 	); code != 409 ||
-		res["messageKey"] != "error.versionConflict" {
+		res["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("re-rate a stale version: %d %v", code, res)
 	}
 
@@ -101,7 +102,7 @@ func TestRateAndReportProblem(t *testing.T) {
 		`{"jobId":"`+open+`","stars":5,"tags":[]}`,
 		1,
 	); code != 409 ||
-		res["messageKey"] != "error.invalidState" {
+		res["messageKey"] != apperr.KeyInvalidState {
 		t.Errorf("rate a job not completed: %d %v", code, res)
 	}
 

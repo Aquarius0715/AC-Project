@@ -198,7 +198,7 @@ func (m Alerts) list(
 
 		if dec.Decode(&f) != nil {
 			return paging.Page[Alert]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -206,14 +206,14 @@ func (m Alerts) list(
 	switch {
 	case f.Severity != nil && !severities[*f.Severity]:
 		return paging.Page[Alert]{}, apperr.Fields(
-			map[string]string{"filters.severity": "error.invalid"},
+			map[string]string{"filters.severity": apperr.KeyInvalid},
 		)
 	case f.Status != nil && !alertStatuses[*f.Status]:
 		return paging.Page[Alert]{}, apperr.Fields(
-			map[string]string{"filters.status": "error.invalid"},
+			map[string]string{"filters.status": apperr.KeyInvalid},
 		)
 	case f.From != nil && f.To != nil && !f.From.Before(*f.To):
-		return paging.Page[Alert]{}, apperr.Fields(map[string]string{"filters.to": "error.range"})
+		return paging.Page[Alert]{}, apperr.Fields(map[string]string{"filters.to": apperr.KeyRange})
 	}
 	// default sort severity desc (critical → warning → normal), id asc; severity asc = normal, warning, critical
 	order := severityRank + " DESC, a.id ASC"
@@ -357,7 +357,7 @@ type GetInput struct {
 // Validate implements ops.Validator.
 func (in *GetInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil
@@ -401,7 +401,7 @@ func (m Alerts) get(ctx context.Context, call *ops.Call, in *GetInput) (Alert, e
 			args...),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return alert, apperr.E(apperr.NotFound, "error.notFound")
+		return alert, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -433,7 +433,7 @@ func (m Alerts) lockAlert(
 		alertScope(call, &args, unitscope.List)+" FOR UPDATE", args...).
 		Scan(&status, &unit, &v)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", unit, apperr.E(apperr.NotFound, "error.notFound")
+		return "", unit, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -454,7 +454,7 @@ func (m Alerts) lockAlert(
 	}
 
 	if v != *call.ExpectedVersion {
-		return "", unit, apperr.E(apperr.Conflict, "error.versionConflict")
+		return "", unit, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	return status, unit, nil
@@ -468,7 +468,7 @@ type AckInput struct {
 // Validate implements ops.Validator.
 func (in *AckInput) Validate() map[string]string {
 	if in.AlertID == uuid.Nil {
-		return map[string]string{"alertId": "error.required"}
+		return map[string]string{"alertId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -508,7 +508,7 @@ func (m Alerts) acknowledge(ctx context.Context, call *ops.Call, in *AckInput) (
 	}
 
 	if status != "open" {
-		return Alert{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Alert{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	alert, err := scanAlert(
@@ -557,18 +557,18 @@ type ResolveInput struct {
 func (in *ResolveInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.AlertID == uuid.Nil {
-		fieldErrs["alertId"] = "error.required"
+		fieldErrs["alertId"] = apperr.KeyRequired
 	}
 
 	in.ResolutionReason = strings.TrimSpace(in.ResolutionReason)
 	if n := utf8.RuneCountInString(in.ResolutionReason); n < 1 || n > 1000 {
-		fieldErrs["resolutionReason"] = "error.length"
+		fieldErrs["resolutionReason"] = apperr.KeyLength
 	}
 
 	if in.ResolutionEvidenceIDs == nil {
-		fieldErrs["resolutionEvidenceIds"] = "error.required"
+		fieldErrs["resolutionEvidenceIds"] = apperr.KeyRequired
 	} else if len(in.ResolutionEvidenceIDs) > 20 || !distinct(in.ResolutionEvidenceIDs) {
-		fieldErrs["resolutionEvidenceIds"] = "error.invalid" // at most 20, each once
+		fieldErrs["resolutionEvidenceIds"] = apperr.KeyInvalid // at most 20, each once
 	}
 
 	return fieldErrs
@@ -610,7 +610,7 @@ func (m Alerts) resolve(ctx context.Context, call *ops.Call, in *ResolveInput) (
 	}
 
 	if status == "resolved" {
-		return Alert{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Alert{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	cur, err := scanAlert(

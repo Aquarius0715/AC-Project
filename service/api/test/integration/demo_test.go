@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -209,27 +210,27 @@ func TestDemoOperations(t *testing.T) {
 			"errors.trigger_unsupported",
 		},
 		"no event ID": {`{"scenarioId":"t",` +
-			`"occurredAt":"` + now + `","eventType":"network"}`, "eventId", "error.required"},
+			`"occurredAt":"` + now + `","eventType":"network"}`, "eventId", apperr.KeyRequired},
 		"no time": {`{"scenarioId":"t",` +
-			`"eventId":"` + uuid.NewString() + `","eventType":"network"}`, "occurredAt", "error.required"},
+			`"eventId":"` + uuid.NewString() + `","eventType":"network"}`, "occurredAt", apperr.KeyRequired},
 		"command without ID": {
 			`{"scenarioId":"t",` +
 				`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"command_ack"}`, "commandId",
-			"error.required",
+			apperr.KeyRequired,
 		},
 		"telemetry without one": {
 			`{"scenarioId":"t",` +
 				`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"telemetry"}`, "measurement",
-			"error.required",
+			apperr.KeyRequired,
 		},
 		"observation, no unit": {
 			`{"scenarioId":"t",` +
 				`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"restriction_observation"}`, "unitId",
-			"error.required",
+			apperr.KeyRequired,
 		},
 		"device without one": {`{"scenarioId":"t",` +
 			`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"device","kind":"tamper",` +
-			`"sequence":1}`, "deviceId", "error.required"},
+			`"sequence":1}`, "deviceId", apperr.KeyRequired},
 	} {
 		if code, m := trig(
 			srv,

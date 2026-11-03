@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -738,7 +739,7 @@ func TestPolicySaveRefusals(t *testing.T) {
 	owner(t, `UPDATE assets.customers SET status = 'active' WHERE id = $1`, seed.ID("cust-a"))
 
 	if code != 422 ||
-		res["fieldErrors"].(map[string]any)["customerId"] != "error.inactiveCustomer" {
+		res["fieldErrors"].(map[string]any)["customerId"] != apperr.KeyInactiveCustomer {
 		t.Errorf("inactive customer: %d %v", code, res)
 	}
 
@@ -755,7 +756,7 @@ func TestPolicySaveRefusals(t *testing.T) {
 		alertPolicyBody(map[string]string{"id": `"` + id + `"`}),
 		v,
 	); code != 422 ||
-		resp["fieldErrors"].(map[string]any)["kind"] != "error.kindFixed" {
+		resp["fieldErrors"].(map[string]any)["kind"] != apperr.KeyKindFixed {
 		t.Errorf("alert save over an automation policy: %d %v", code, resp)
 	}
 

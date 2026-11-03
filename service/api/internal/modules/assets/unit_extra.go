@@ -92,7 +92,7 @@ func (m *Module) unitsDelete(
 	}
 
 	if v != *call.ExpectedVersion {
-		return DeletedResource{}, conflict("error.versionConflict")
+		return DeletedResource{}, conflict(apperr.KeyVersionConflict)
 	}
 
 	for _, u := range m.Usage {
@@ -146,17 +146,17 @@ type SetPoliciesInput struct {
 func (in *SetPoliciesInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.UnitID == uuid.Nil {
-		fieldErrs["unitId"] = "error.required"
+		fieldErrs["unitId"] = apperr.KeyRequired
 	}
 
 	if in.AlertPolicyIDs == nil {
-		fieldErrs["alertPolicyIds"] = "error.required"
+		fieldErrs["alertPolicyIds"] = apperr.KeyRequired
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, id := range in.AlertPolicyIDs {
 		if seen[id] {
-			fieldErrs["alertPolicyIds"] = "error.duplicate"
+			fieldErrs["alertPolicyIds"] = apperr.KeyDuplicate
 		}
 
 		seen[id] = true
@@ -245,7 +245,7 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 				map[string]string{"alertPolicyIds": "error.defaultPolicyImplicit"},
 			)
 		case !ok || o.CustomerID == nil || customerID == nil || *o.CustomerID != *customerID:
-			return Unit{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Unit{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 	}
 
@@ -257,7 +257,7 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 		input.UnitID, *call.ExpectedVersion).
 		Scan(&v)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Unit{}, conflict("error.versionConflict")
+		return Unit{}, conflict(apperr.KeyVersionConflict)
 	}
 
 	if err != nil {

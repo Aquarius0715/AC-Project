@@ -112,7 +112,7 @@ func campaignDetail(ctx context.Context, call *ops.Call, id uuid.UUID) (Campaign
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return campaign, apperr.E(apperr.NotFound, "error.notFound")
+		return campaign, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -206,7 +206,7 @@ func campaignsList(
 
 		if dec.Decode(&f) != nil {
 			return paging.Page[Campaign]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -242,7 +242,7 @@ func campaignsList(
 			*f.Status,
 		) {
 			return paging.Page[Campaign]{}, apperr.Fields(
-				map[string]string{"filters.status": "error.invalid"},
+				map[string]string{"filters.status": apperr.KeyInvalid},
 			)
 		}
 
@@ -359,21 +359,21 @@ var hhmm = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)
 func (in *ScheduleInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.ModelID == uuid.Nil {
-		fieldErrs["modelId"] = "error.required"
+		fieldErrs["modelId"] = apperr.KeyRequired
 	}
 
 	if in.TargetVersion == "" {
-		fieldErrs["targetVersion"] = "error.required"
+		fieldErrs["targetVersion"] = apperr.KeyRequired
 	}
 
 	if len(in.DeviceIDs) == 0 {
-		fieldErrs["deviceIds"] = "error.required"
+		fieldErrs["deviceIds"] = apperr.KeyRequired
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, d := range in.DeviceIDs {
 		if seen[d] {
-			fieldErrs["deviceIds"] = "error.duplicate"
+			fieldErrs["deviceIds"] = apperr.KeyDuplicate
 		}
 
 		seen[d] = true
@@ -395,11 +395,11 @@ func (in *ScheduleInput) Validate() map[string]string {
 
 	if !hhmm.MatchString(in.Window.StartLocal) || !hhmm.MatchString(in.Window.EndLocal) ||
 		in.Window.StartLocal == in.Window.EndLocal {
-		fieldErrs["window"] = "error.invalid"
+		fieldErrs["window"] = apperr.KeyInvalid
 	}
 
 	if in.AutoPauseFailurePercent < 1 || in.AutoPauseFailurePercent > 50 {
-		fieldErrs["autoPauseFailurePercent"] = "error.range"
+		fieldErrs["autoPauseFailurePercent"] = apperr.KeyRange
 	}
 
 	return fieldErrs
@@ -457,7 +457,7 @@ func (m *Module) campaignsSchedule(
 		is_current`, input.ModelID).
 		Scan(&candidates)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Campaign{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Campaign{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -520,7 +520,7 @@ func (m *Module) campaignsSchedule(
 
 		if x.tamper == "detected" {
 			return Campaign{}, apperr.Fields(
-				map[string]string{"deviceIds": "error.tamperUnresolved"},
+				map[string]string{"deviceIds": apperr.KeyTamperUnresolved},
 			)
 		}
 
@@ -625,7 +625,7 @@ type ControlInput struct {
 func (in *ControlInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.CampaignID == uuid.Nil {
-		fieldErrs["campaignId"] = "error.required"
+		fieldErrs["campaignId"] = apperr.KeyRequired
 	}
 
 	switch in.Action {
@@ -633,14 +633,14 @@ func (in *ControlInput) Validate() map[string]string {
 	case "abort":
 		if in.Reason == nil || utf8.RuneCountInString(strings.TrimSpace(*in.Reason)) < 1 ||
 			utf8.RuneCountInString(strings.TrimSpace(*in.Reason)) > 1000 {
-			fieldErrs["reason"] = "error.length"
+			fieldErrs["reason"] = apperr.KeyLength
 		}
 	case "retry_device":
 		if in.DeviceID == nil {
-			fieldErrs["deviceId"] = "error.required"
+			fieldErrs["deviceId"] = apperr.KeyRequired
 		}
 	default:
-		fieldErrs["action"] = "error.invalid"
+		fieldErrs["action"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -690,7 +690,7 @@ func campaignsControl(ctx context.Context, c *ops.Call, input *ControlInput) (Ca
 		UPDATE`, input.CampaignID).
 		Scan(&state, &v, &start)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Campaign{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Campaign{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -698,7 +698,7 @@ func campaignsControl(ctx context.Context, c *ops.Call, input *ControlInput) (Ca
 	}
 
 	if v != *c.ExpectedVersion {
-		return Campaign{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Campaign{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	next := state
@@ -708,7 +708,7 @@ func campaignsControl(ctx context.Context, c *ops.Call, input *ControlInput) (Ca
 	switch input.Action {
 	case "retry_device":
 		if state != "running" && state != "paused" {
-			return Campaign{}, apperr.E(apperr.Conflict, "error.invalidState")
+			return Campaign{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 		}
 
 		tag, err := c.Tx.Exec(
@@ -729,7 +729,7 @@ func campaignsControl(ctx context.Context, c *ops.Call, input *ControlInput) (Ca
 	default:
 		to, ok := transitions[input.Action][state]
 		if !ok {
-			return Campaign{}, apperr.E(apperr.Conflict, "error.invalidState")
+			return Campaign{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 		}
 
 		if input.Action == "resume" && c.Now.Before(start) {

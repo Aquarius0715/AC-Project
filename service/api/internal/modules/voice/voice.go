@@ -42,11 +42,11 @@ func (in *Input) Validate() map[string]string {
 
 	in.Text = strings.TrimSpace(in.Text)
 	if n := utf8.RuneCountInString(in.Text); n < 1 || n > 200 {
-		fieldErrs["text"] = "error.length"
+		fieldErrs["text"] = apperr.KeyLength
 	}
 
 	if in.Locale != "en" && in.Locale != "ms" {
-		fieldErrs["locale"] = "error.invalid"
+		fieldErrs["locale"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -240,7 +240,7 @@ func (v Voice) resolve(ctx context.Context, call *ops.Call, in *Input) (Intent, 
 		}
 
 		if !found {
-			return Intent{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Intent{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		unit = *in.SelectedUnitID
@@ -299,7 +299,7 @@ func (v Voice) resolve(ctx context.Context, call *ops.Call, in *Input) (Intent, 
 	err = call.Tx.QueryRow(ctx, `SELECT observed_state, version FROM assets.units WHERE id = $1`, unit).
 		Scan(&before, &version)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Intent{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Intent{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {

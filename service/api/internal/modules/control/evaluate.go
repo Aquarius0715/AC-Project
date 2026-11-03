@@ -89,28 +89,28 @@ var factSpec = map[string]struct {
 func (in *EvaluationInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.EventID == uuid.Nil {
-		fieldErrs["eventId"] = "error.required"
+		fieldErrs["eventId"] = apperr.KeyRequired
 	}
 
 	if in.OccurredAt.IsZero() {
-		fieldErrs["occurredAt"] = "error.required"
+		fieldErrs["occurredAt"] = apperr.KeyRequired
 	}
 
 	if in.Phase != "schedule_start" && in.Phase != "schedule_end" && in.Phase != "condition" {
-		fieldErrs["phase"] = "error.invalid"
+		fieldErrs["phase"] = apperr.KeyInvalid
 	}
 
 	units := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || units[u] {
-			fieldErrs["unitIds"] = "error.invalid"
+			fieldErrs["unitIds"] = apperr.KeyInvalid
 		}
 
 		units[u] = true
 	}
 
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 100 {
-		fieldErrs["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
 	seen := map[string]bool{}
@@ -121,7 +121,7 @@ func (in *EvaluationInput) Validate() map[string]string {
 		key := fact.UnitID.String() + "/" + fact.Metric
 		if !ok || fact.Unit != spec.unit || !units[fact.UnitID] || seen[key] ||
 			(fact.Quality != "valid" && fact.Quality != "missing" && fact.Quality != "stale" && fact.Quality != "suspect") {
-			fieldErrs["facts"] = "error.invalid"
+			fieldErrs["facts"] = apperr.KeyInvalid
 
 			continue
 		}
@@ -136,17 +136,17 @@ func (in *EvaluationInput) Validate() map[string]string {
 		case "number":
 			var v float64
 			if json.Unmarshal(fact.Value, &v) != nil || math.IsNaN(v) || math.IsInf(v, 0) {
-				fieldErrs["facts"] = "error.invalid"
+				fieldErrs["facts"] = apperr.KeyInvalid
 			}
 		case "boolean":
 			var v bool
 			if json.Unmarshal(fact.Value, &v) != nil {
-				fieldErrs["facts"] = "error.invalid"
+				fieldErrs["facts"] = apperr.KeyInvalid
 			}
 		default:
 			var v string
 			if json.Unmarshal(fact.Value, &v) != nil || (v != "arrival" && v != "departure") {
-				fieldErrs["facts"] = "error.invalid"
+				fieldErrs["facts"] = apperr.KeyInvalid
 			}
 		}
 	}
@@ -776,7 +776,7 @@ func (m Automations) targets(ctx context.Context, call *ops.Call, in *Evaluation
 		}
 
 		if !found || (call.Principal.Role == "client" && t.OrgID != call.Principal.OrgID) {
-			return apperr.E(apperr.NotFound, "error.notFound")
+			return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 	}
 

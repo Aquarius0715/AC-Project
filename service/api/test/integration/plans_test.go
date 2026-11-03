@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -186,7 +187,7 @@ func TestPlans(t *testing.T) {
 
 	owner(t, `UPDATE assets.units SET archived = false WHERE id = $1`, unit)
 
-	if code != 409 || resp["messageKey"] != "error.unitArchived" {
+	if code != 409 || resp["messageKey"] != apperr.KeyUnitArchived {
 		t.Errorf("archived unit: %d %v", code, resp)
 	}
 	// a past next date must be corrected first

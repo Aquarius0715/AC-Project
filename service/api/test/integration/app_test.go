@@ -490,7 +490,7 @@ func TestUnitsGet(t *testing.T) {
 		"units.get",
 		`{}`,
 	); code != 404 ||
-		res["messageKey"] != "error.unknownOperation" { // GET /v1/units/ has no route
+		res["messageKey"] != apperr.KeyUnknownOperation { // GET /v1/units/ has no route
 		t.Fatalf("missing id: %d %v", code, res)
 	}
 }

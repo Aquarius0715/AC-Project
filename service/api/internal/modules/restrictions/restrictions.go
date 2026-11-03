@@ -369,7 +369,7 @@ func load(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Restrictio
 
 	restriction, err := scan(c.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return restriction, apperr.E(apperr.NotFound, "error.notFound")
+		return restriction, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -387,7 +387,7 @@ type GetInput struct {
 // Validate implements ops.Validator.
 func (in *GetInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil
@@ -559,7 +559,7 @@ func decodeFilter(raw json.RawMessage, f *listFilter) error {
 	dec.DisallowUnknownFields()
 
 	if dec.Decode(f) != nil || (f.Status != nil && !slices.Contains(states, *f.Status)) {
-		return apperr.Fields(map[string]string{"filters": "error.invalid"})
+		return apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
 	}
 
 	return nil
@@ -608,7 +608,7 @@ func (m Restrictions) list(
 	}
 
 	if !fullReader(call) && (f.ContractID != nil || f.InvoiceID != nil) {
-		return paging.Page[any]{}, apperr.E(apperr.Forbidden, "error.forbidden")
+		return paging.Page[any]{}, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
 	xs, next, total, snap, err := m.query(ctx, call, *query, f)
@@ -638,7 +638,7 @@ type ForInvoiceInput struct {
 // Validate implements ops.Validator.
 func (in *ForInvoiceInput) Validate() map[string]string {
 	if in.InvoiceID == uuid.Nil {
-		return map[string]string{"invoiceId": "error.required"}
+		return map[string]string{"invoiceId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -685,7 +685,7 @@ func (m Restrictions) forInvoice(
 		Scan(&org)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == "client" && org != call.Principal.OrgID) {
-		return paging.Page[Restriction]{}, apperr.E(apperr.NotFound, "error.notFound")
+		return paging.Page[Restriction]{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {

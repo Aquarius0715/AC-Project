@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 func TestWaveOf(t *testing.T) {
@@ -111,11 +113,11 @@ func TestControlInput(t *testing.T) {
 		},
 		"abort without reason": {
 			ControlInput{CampaignID: camp, Action: "abort", DeviceID: nil, Reason: nil},
-			map[string]string{"reason": "error.length"},
+			map[string]string{"reason": apperr.KeyLength},
 		},
 		"abort blank reason": {
 			ControlInput{CampaignID: camp, Action: "abort", Reason: &blank, DeviceID: nil},
-			map[string]string{"reason": "error.length"},
+			map[string]string{"reason": apperr.KeyLength},
 		},
 		"retry a device": {
 			ControlInput{CampaignID: camp, Action: "retry_device", DeviceID: &dev, Reason: nil},
@@ -123,15 +125,15 @@ func TestControlInput(t *testing.T) {
 		},
 		"retry without device": {
 			ControlInput{CampaignID: camp, Action: "retry_device", DeviceID: nil, Reason: nil},
-			map[string]string{"deviceId": "error.required"},
+			map[string]string{"deviceId": apperr.KeyRequired},
 		},
 		"unknown action": {
 			ControlInput{CampaignID: camp, Action: "restart", DeviceID: nil, Reason: nil},
-			map[string]string{"action": "error.invalid"},
+			map[string]string{"action": apperr.KeyInvalid},
 		},
 		"no campaign": {
 			ControlInput{Action: "pause", CampaignID: uuid.UUID{}, DeviceID: nil, Reason: nil},
-			map[string]string{"campaignId": "error.required"},
+			map[string]string{"campaignId": apperr.KeyRequired},
 		},
 	} {
 		in := c.in

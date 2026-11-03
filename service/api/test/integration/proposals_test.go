@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -939,7 +940,7 @@ func TestRescheduleAfterContractorAssignment(t *testing.T) {
 			version(job),
 		)
 	}
-	if code, m := propose(); code != 409 || m["messageKey"] != "error.invalidState" {
+	if code, m := propose(); code != 409 || m["messageKey"] != apperr.KeyInvalidState {
 		t.Errorf("propose while the technician has not answered: %d %v", code, m)
 	}
 
@@ -1068,7 +1069,7 @@ func TestPartnerProposalRefusals(t *testing.T) {
 	if code, m := pp(
 		slotJSON(3, 1),
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["slot"] != "error.slotRules" {
+		m["fieldErrors"].(map[string]any)["slot"] != apperr.KeySlotRules {
 		t.Errorf("a time today: %d %v", code, m)
 	}
 
@@ -1114,7 +1115,7 @@ func TestPartnerProposalRefusals(t *testing.T) {
 	if code, m := resolve(
 		stamp(24 * 8),
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["replyBy"] != "error.range" {
+		m["fieldErrors"].(map[string]any)["replyBy"] != apperr.KeyRange {
 		t.Errorf("reply by in 8 days: %d %v", code, m)
 	}
 	// HQ's own proposal is pending: the contractor's time waits

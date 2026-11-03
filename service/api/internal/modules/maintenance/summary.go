@@ -34,7 +34,7 @@ func (m Jobs) CountJobs(
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil {
-			return JobCounts{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+			return JobCounts{}, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
 		}
 	}
 

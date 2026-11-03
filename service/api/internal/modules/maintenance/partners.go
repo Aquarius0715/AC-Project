@@ -308,7 +308,7 @@ func (m Partners) loadProfile(
 
 	profile, err := scanProfile(call.Tx.QueryRow(ctx, q, append([]any{call.Now}, args...)...))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return profile, apperr.E(apperr.NotFound, "error.notFound")
+		return profile, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -364,7 +364,7 @@ func (m Partners) list(
 		if dec.Decode(&f) != nil ||
 			(f.Status != nil && *f.Status != "active" && *f.Status != "suspended") {
 			return paging.Page[Profile]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -481,7 +481,7 @@ type ProfileInput struct {
 func (in *ProfileInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.OrganizationID == uuid.Nil {
-		fieldErrs["organizationId"] = "error.required"
+		fieldErrs["organizationId"] = apperr.KeyRequired
 	}
 
 	trimmedReason(&in.RegistrationNo, 64, "registrationNo", fieldErrs)
@@ -489,7 +489,7 @@ func (in *ProfileInput) Validate() map[string]string {
 	seen := map[string]bool{}
 
 	if len(in.ServiceAreas) < 1 || len(in.ServiceAreas) > 20 {
-		fieldErrs["serviceAreas"] = "error.count"
+		fieldErrs["serviceAreas"] = apperr.KeyCount
 	}
 
 	for idx := range in.ServiceAreas {
@@ -497,7 +497,7 @@ func (in *ProfileInput) Validate() map[string]string {
 
 		n := utf8.RuneCountInString(in.ServiceAreas[idx])
 		if n < 1 || n > 80 || seen[strings.ToLower(in.ServiceAreas[idx])] {
-			fieldErrs["serviceAreas"] = "error.invalid"
+			fieldErrs["serviceAreas"] = apperr.KeyInvalid
 		}
 
 		seen[strings.ToLower(in.ServiceAreas[idx])] = true
@@ -510,7 +510,7 @@ func (in *ProfileInput) Validate() map[string]string {
 	)
 	if err != nil || a.Address != in.ContactEmail ||
 		len(in.ContactEmail) > 254 {
-		fieldErrs["contactEmail"] = "error.invalid"
+		fieldErrs["contactEmail"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -548,7 +548,7 @@ func (m Partners) save(ctx context.Context, c *ops.Call, input *ProfileInput) (P
 	}
 
 	if !found {
-		return Profile{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Profile{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if kind != "contractor" {
@@ -609,7 +609,7 @@ func (m Partners) save(ctx context.Context, c *ops.Call, input *ProfileInput) (P
 		}
 
 		if profile.Version != *c.ExpectedVersion {
-			return profile, apperr.E(apperr.Conflict, "error.versionConflict")
+			return profile, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
 		_, execErr := c.Tx.Exec(
@@ -670,11 +670,11 @@ type OfferStatusInput struct {
 func (in *OfferStatusInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.ContractorOrgID == uuid.Nil {
-		fieldErrs["contractorOrgId"] = "error.required"
+		fieldErrs["contractorOrgId"] = apperr.KeyRequired
 	}
 
 	if in.Status != "active" && in.Status != "suspended" {
-		fieldErrs["status"] = "error.invalid"
+		fieldErrs["status"] = apperr.KeyInvalid
 	}
 
 	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
@@ -726,11 +726,11 @@ func (m Partners) setOfferStatus(
 	}
 
 	if profile.Version != *call.ExpectedVersion {
-		return profile, apperr.E(apperr.Conflict, "error.versionConflict")
+		return profile, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if profile.Status == input.Status {
-		return profile, apperr.E(apperr.Conflict, "error.invalidState")
+		return profile, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	var reason *string
@@ -814,19 +814,19 @@ type RateCardInput struct {
 func (in *RateCardInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.ContractorOrgID == uuid.Nil {
-		fieldErrs["contractorOrgId"] = "error.required"
+		fieldErrs["contractorOrgId"] = apperr.KeyRequired
 	}
 
 	if in.EffectiveFrom.IsZero() {
-		fieldErrs["effectiveFrom"] = "error.required"
+		fieldErrs["effectiveFrom"] = apperr.KeyRequired
 	}
 
 	if in.Currency != "MYR" && in.Currency != "USD" {
-		fieldErrs["currency"] = "error.invalid"
+		fieldErrs["currency"] = apperr.KeyInvalid
 	}
 
 	if len(in.Lines) < 1 || len(in.Lines) > 4 {
-		fieldErrs["lines"] = "error.count"
+		fieldErrs["lines"] = apperr.KeyCount
 	}
 
 	seen := map[string]bool{}
@@ -835,14 +835,14 @@ func (in *RateCardInput) Validate() map[string]string {
 		rateLine := &in.Lines[i]
 		if !slices.Contains(workTypes, rateLine.WorkType) || seen[rateLine.WorkType] ||
 			rateLine.AmountMinor < 0 {
-			fieldErrs["lines"] = "error.invalid"
+			fieldErrs["lines"] = apperr.KeyInvalid
 		}
 
 		seen[rateLine.WorkType] = true
 		if rateLine.Note != nil {
 			*rateLine.Note = strings.TrimSpace(*rateLine.Note)
 			if utf8.RuneCountInString(*rateLine.Note) > 200 {
-				fieldErrs["lines"] = "error.length"
+				fieldErrs["lines"] = apperr.KeyLength
 			}
 
 			if *rateLine.Note == "" {
@@ -912,7 +912,7 @@ func (m Partners) saveRateCard(
 	input *RateCardInput,
 ) (RateCard, error) {
 	if !input.EffectiveFrom.After(call.Now) {
-		return RateCard{}, apperr.Fields(map[string]string{"effectiveFrom": "error.past"})
+		return RateCard{}, apperr.Fields(map[string]string{"effectiveFrom": apperr.KeyPast})
 	}
 
 	var exists bool
@@ -925,7 +925,7 @@ func (m Partners) saveRateCard(
 	}
 
 	if !exists {
-		return RateCard{}, apperr.E(apperr.NotFound, "error.notFound")
+		return RateCard{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	lines, _ := json.Marshal(input.Lines)
@@ -1016,7 +1016,7 @@ func (m Partners) listRateCards(
 
 		if dec.Decode(&f) != nil {
 			return paging.Page[RateCard]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -1132,23 +1132,23 @@ type TargetsInput struct {
 func (in *TargetsInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if !slices.Contains(planTypes, in.PlanType) {
-		fieldErrs["planType"] = "error.invalid"
+		fieldErrs["planType"] = apperr.KeyInvalid
 	}
 
 	if in.ResponseHours < 1 || in.ResponseHours > 168 {
-		fieldErrs["responseHours"] = "error.range"
+		fieldErrs["responseHours"] = apperr.KeyRange
 	}
 
 	if in.ArrivalInWindowPercent < 0 || in.ArrivalInWindowPercent > 100 {
-		fieldErrs["arrivalInWindowPercent"] = "error.range"
+		fieldErrs["arrivalInWindowPercent"] = apperr.KeyRange
 	}
 
 	if in.FirstTimeFixPercent < 0 || in.FirstTimeFixPercent > 100 {
-		fieldErrs["firstTimeFixPercent"] = "error.range"
+		fieldErrs["firstTimeFixPercent"] = apperr.KeyRange
 	}
 
 	if in.EffectiveFrom.IsZero() {
-		fieldErrs["effectiveFrom"] = "error.required"
+		fieldErrs["effectiveFrom"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -1186,7 +1186,7 @@ func (m Partners) saveTargets(
 	input *TargetsInput,
 ) (SlaTargets, error) {
 	if input.EffectiveFrom.Before(call.Now) {
-		return SlaTargets{}, apperr.Fields(map[string]string{"effectiveFrom": "error.past"})
+		return SlaTargets{}, apperr.Fields(map[string]string{"effectiveFrom": apperr.KeyPast})
 	}
 
 	var slaTargets SlaTargets
@@ -1368,7 +1368,7 @@ type ScorecardInput struct {
 func (in *ScorecardInput) Validate() map[string]string {
 	if in.Period.From.IsZero() || in.Period.To.IsZero() || !in.Period.From.Before(in.Period.To) ||
 		in.Period.To.Sub(in.Period.From) > 366*24*time.Hour {
-		return map[string]string{"period": "error.range"}
+		return map[string]string{"period": apperr.KeyRange}
 	}
 
 	return nil

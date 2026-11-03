@@ -139,7 +139,7 @@ func capabilitiesList(
 ) (paging.Page[Capability], error) {
 	if len(query.Filters) > 0 && string(query.Filters) != "{}" && string(query.Filters) != "null" {
 		return paging.Page[Capability]{}, apperr.Fields(
-			map[string]string{"filters": "error.invalid"},
+			map[string]string{"filters": apperr.KeyInvalid},
 		) // query catalog: no filters
 	}
 
@@ -252,15 +252,15 @@ func uniqueIn(vals []string, allowed map[string]bool) bool {
 func (in *CapabilitySave) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if n := utf8.RuneCountInString(in.Manufacturer); n < 1 || n > 120 {
-		fieldErrs["manufacturer"] = "error.length"
+		fieldErrs["manufacturer"] = apperr.KeyLength
 	}
 
 	if n := utf8.RuneCountInString(in.Model); n < 1 || n > 120 {
-		fieldErrs["model"] = "error.length"
+		fieldErrs["model"] = apperr.KeyLength
 	}
 
 	if t := in.Temperature; t != nil && (t.Min >= t.Max || t.Step <= 0 || t.Step > t.Max-t.Min) {
-		fieldErrs["temperature"] = "error.range"
+		fieldErrs["temperature"] = apperr.KeyRange
 	}
 
 	if !in.Control && (in.ModeControl || in.FanControl || in.Temperature != nil) {
@@ -268,15 +268,15 @@ func (in *CapabilitySave) Validate() map[string]string {
 	}
 
 	if !uniqueIn(in.Modes, modes) || (in.ModeControl && len(in.Modes) == 0) {
-		fieldErrs["modes"] = "error.invalid"
+		fieldErrs["modes"] = apperr.KeyInvalid
 	}
 
 	if !uniqueIn(in.FanLevels, fans) || (in.FanControl && len(in.FanLevels) == 0) {
-		fieldErrs["fanLevels"] = "error.invalid"
+		fieldErrs["fanLevels"] = apperr.KeyInvalid
 	}
 
 	if !uniqueIn(in.VentilationLevels, fans) || (!in.Ventilation && len(in.VentilationLevels) > 0) {
-		fieldErrs["ventilationLevels"] = "error.invalid"
+		fieldErrs["ventilationLevels"] = apperr.KeyInvalid
 	}
 
 	seen := map[string]bool{}
@@ -286,13 +286,13 @@ func (in *CapabilitySave) Validate() map[string]string {
 
 		switch {
 		case metricUnit[sensorSpec.Metric] == "" || seen[sensorSpec.Metric]:
-			fieldErrs[key+".metric"] = "error.invalid"
+			fieldErrs[key+".metric"] = apperr.KeyInvalid
 		case metricUnit[sensorSpec.Metric] != sensorSpec.Unit:
 			fieldErrs[key+".unit"] = "error.unitMismatch"
 		case sensorSpec.StaleAfterSeconds < 10 || sensorSpec.StaleAfterSeconds > 86400:
-			fieldErrs[key+".staleAfterSeconds"] = "error.range"
+			fieldErrs[key+".staleAfterSeconds"] = apperr.KeyRange
 		case sensorSpec.BoundaryID != nil && (!boundaries[*sensorSpec.BoundaryID] || sensorSpec.Metric != "power"):
-			fieldErrs[key+".boundaryId"] = "error.invalid"
+			fieldErrs[key+".boundaryId"] = apperr.KeyInvalid
 		}
 
 		seen[sensorSpec.Metric] = true
@@ -304,7 +304,7 @@ func (in *CapabilitySave) Validate() map[string]string {
 	for _, v := range in.FirmwareCandidates {
 		x := strings.TrimSpace(v)
 		if n := utf8.RuneCountInString(x); n < 1 || n > 32 || seenFirmware[x] {
-			fieldErrs["firmwareCandidates"] = "error.invalid"
+			fieldErrs["firmwareCandidates"] = apperr.KeyInvalid
 		}
 
 		seenFirmware[x] = true
@@ -312,10 +312,10 @@ func (in *CapabilitySave) Validate() map[string]string {
 
 	switch { // DD-A04: a change reason is required on update and not taken on create
 	case in.ID != nil && in.ChangeReason == nil:
-		fieldErrs["changeReason"] = "error.required"
+		fieldErrs["changeReason"] = apperr.KeyRequired
 	case in.ChangeReason != nil &&
 		(utf8.RuneCountInString(strings.TrimSpace(*in.ChangeReason)) < 1 || utf8.RuneCountInString(*in.ChangeReason) > 1000):
-		fieldErrs["changeReason"] = "error.length"
+		fieldErrs["changeReason"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -425,7 +425,7 @@ func (m Capabilities) save(
 			),
 		)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Capability{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Capability{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		if err != nil {
@@ -436,7 +436,7 @@ func (m Capabilities) save(
 		before = old.fields()
 
 		if cur != *call.ExpectedVersion {
-			return Capability{}, apperr.E(apperr.Conflict, "error.versionConflict")
+			return Capability{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
 		_, execErr := call.Tx.Exec(

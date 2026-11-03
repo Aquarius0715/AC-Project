@@ -81,7 +81,7 @@ type CodeInput struct {
 // Validate implements ops.Validator.
 func (in *CodeInput) Validate() map[string]string {
 	if !sixDigits.MatchString(in.Code) {
-		return map[string]string{"code": "error.invalid"}
+		return map[string]string{"code": apperr.KeyInvalid}
 	}
 
 	return nil

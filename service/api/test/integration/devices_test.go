@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -522,7 +523,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		`{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":"back"}`,
 		v,
 	); code != 409 ||
-		res["messageKey"] != "error.tamperUnresolved" {
+		res["messageKey"] != apperr.KeyTamperUnresolved {
 		t.Fatalf("tamper: %d %v", code, res)
 	}
 

@@ -114,7 +114,7 @@ func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 
 			token, ok := strings.CutPrefix(h, "Bearer ")
 			if !ok || token == "" {
-				return unauth(ectx, "error.unauthenticated")
+				return unauth(ectx, apperr.KeyUnauthenticated)
 			}
 
 			identity, err := a.Verifier.Verify(ectx.Request().Context(), token)
@@ -122,7 +122,7 @@ func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 				// why, never the token: an expired one, an unknown signing key or another issuer or client
 				slog.InfoContext(ectx.Request().Context(), "auth: token refused", "err", err)
 
-				return unauth(ectx, "error.unauthenticated")
+				return unauth(ectx, apperr.KeyUnauthenticated)
 			}
 
 			tenant, err1 := uuid.Parse(ectx.Request().Header.Get("X-Tenant-Id"))
@@ -140,11 +140,11 @@ func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 				identity.SignedIn,
 			)
 			if errors.Is(err, ErrUnavailable) {
-				return apperr.E(apperr.Unavailable, "error.unavailable")
+				return apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 			}
 
 			if err != nil {
-				return unauth(ectx, "error.membershipInvalid")
+				return unauth(ectx, apperr.KeyMembershipInvalid)
 			}
 
 			if Revoked(
@@ -297,7 +297,7 @@ func (a *Authenticator) Load(
 			(validUntil != nil && !now.Before(*validUntil)) {
 			return apperr.E(
 				apperr.NotFound,
-				"error.membershipInvalid",
+				apperr.KeyMembershipInvalid,
 			) // inactive user or outside the validity window
 		}
 

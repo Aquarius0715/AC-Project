@@ -377,13 +377,13 @@ func (Inbox) list(
 			(f.Severity != nil && !slices.Contains(severities, *f.Severity)) ||
 			(f.Type != nil && !slices.Contains(types, *f.Type)) {
 			return paging.Page[Notification]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 
 		if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
 			return paging.Page[Notification]{}, apperr.Fields(
-				map[string]string{"filters.to": "error.range"},
+				map[string]string{"filters.to": apperr.KeyRange},
 			)
 		}
 	}
@@ -505,7 +505,7 @@ type MarkReadInput struct {
 // Validate implements ops.Validator.
 func (in *MarkReadInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil
@@ -554,7 +554,7 @@ func (Inbox) markRead(
 
 	notification, err := scanNotification(call.Tx.QueryRow(ctx, q, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return notification, apperr.E(apperr.NotFound, "error.notFound")
+		return notification, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -562,7 +562,7 @@ func (Inbox) markRead(
 	}
 
 	if notification.Version != *call.ExpectedVersion {
-		return notification, apperr.E(apperr.Conflict, "error.versionConflict")
+		return notification, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	one := []Notification{notification}
@@ -600,17 +600,17 @@ type MarkAllReadInput struct {
 // Validate implements ops.Validator: 1–100 distinct IDs, the size of one inbox page.
 func (in *MarkAllReadInput) Validate() map[string]string {
 	if len(in.IDs) == 0 {
-		return map[string]string{"ids": "error.required"}
+		return map[string]string{"ids": apperr.KeyRequired}
 	}
 
 	if len(in.IDs) > 100 {
-		return map[string]string{"ids": "error.count"}
+		return map[string]string{"ids": apperr.KeyCount}
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, id := range in.IDs {
 		if id == uuid.Nil || seen[id] {
-			return map[string]string{"ids": "error.invalid"}
+			return map[string]string{"ids": apperr.KeyInvalid}
 		}
 
 		seen[id] = true
@@ -724,15 +724,15 @@ var (
 
 func (in *TargetInput) validate(fieldErrs map[string]string) {
 	if !slices.Contains(kinds, in.Target.Kind) || in.Target.ID == uuid.Nil {
-		fieldErrs["target"] = "error.invalid"
+		fieldErrs["target"] = apperr.KeyInvalid
 	}
 
 	if !slices.Contains(templates, in.TemplateKey) {
-		fieldErrs["templateKey"] = "error.invalid"
+		fieldErrs["templateKey"] = apperr.KeyInvalid
 	}
 
 	if !slices.Contains(channels, in.Channel) {
-		fieldErrs["channel"] = "error.invalid"
+		fieldErrs["channel"] = apperr.KeyInvalid
 	}
 }
 
@@ -752,7 +752,7 @@ func resolve(ctx context.Context, c *ops.Call, input *TargetInput) (target, erro
 		readableSQL(c.Principal, c.Now, "$1::text", "$2::uuid", &args), args...).
 		Scan(&t.org, &t.name)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return t, apperr.E(apperr.NotFound, "error.notFound")
+		return t, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -761,11 +761,11 @@ func resolve(ctx context.Context, c *ops.Call, input *TargetInput) (target, erro
 
 	if input.TemplateKey == "payment_reminder" {
 		if c.Principal.Role != "admin" || !c.Principal.Permissions["billing.write"] {
-			return t, apperr.E(apperr.Forbidden, "error.forbidden")
+			return t, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 		}
 
 		if input.Target.Kind != "invoice" {
-			return t, apperr.Fields(map[string]string{"target": "error.invalid"})
+			return t, apperr.Fields(map[string]string{"target": apperr.KeyInvalid})
 		}
 
 		var ok bool
@@ -889,7 +889,7 @@ func (in *RecipientsInput) Validate() map[string]string {
 	in.validate(fieldErrs)
 
 	if in.Role != nil && !slices.Contains(roles, *in.Role) {
-		fieldErrs["role"] = "error.invalid"
+		fieldErrs["role"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -934,7 +934,9 @@ func (Inbox) recipients(
 ) (paging.Page[Recipient], error) {
 	if len(input.Query.Filters) > 0 && string(input.Query.Filters) != "{}" ||
 		input.Query.Sort != nil {
-		return paging.Page[Recipient]{}, apperr.Fields(map[string]string{"query": "error.invalid"})
+		return paging.Page[Recipient]{}, apperr.Fields(
+			map[string]string{"query": apperr.KeyInvalid},
+		)
 	}
 
 	window, err := paging.Resolve(input.Query, struct{}{}, call.Principal.ScopeVersion, 1)
@@ -985,15 +987,15 @@ func (in *PreviewInput) Validate() map[string]string {
 	in.validate(fieldErrs)
 
 	if in.RecipientMembershipID == uuid.Nil {
-		fieldErrs["recipientMembershipId"] = "error.required"
+		fieldErrs["recipientMembershipId"] = apperr.KeyRequired
 	}
 
 	if in.Severity != nil {
 		switch {
 		case in.TemplateKey != "alert":
-			fieldErrs["severity"] = "error.notAllowed"
+			fieldErrs["severity"] = apperr.KeyNotAllowed
 		case !slices.Contains(severities, *in.Severity):
-			fieldErrs["severity"] = "error.invalid"
+			fieldErrs["severity"] = apperr.KeyInvalid
 		}
 	}
 	// the message carries a job note (1–2000, DD-P07) or a reminder text; the reason stays 1–1000 (IR228)
@@ -1004,7 +1006,7 @@ func (in *PreviewInput) Validate() map[string]string {
 		if f.s != nil {
 			*f.s = strings.TrimSpace(*f.s)
 			if n := utf8.RuneCountInString(*f.s); n < 1 || n > f.max {
-				fieldErrs[k] = "error.length"
+				fieldErrs[k] = apperr.KeyLength
 			}
 		}
 	}

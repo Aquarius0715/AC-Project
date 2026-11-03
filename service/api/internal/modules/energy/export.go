@@ -32,37 +32,37 @@ var (
 func (in *ExportInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if !monthRe.MatchString(in.Month) {
-		fieldErrs["month"] = "error.invalid"
+		fieldErrs["month"] = apperr.KeyInvalid
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, p := range in.PropertyIDs {
 		if p == uuid.Nil || seen[p] {
-			fieldErrs["propertyIds"] = "error.invalid"
+			fieldErrs["propertyIds"] = apperr.KeyInvalid
 		}
 
 		seen[p] = true
 	}
 
 	if len(in.PropertyIDs) == 0 || len(in.PropertyIDs) > 100 {
-		fieldErrs["propertyIds"] = "error.invalid"
+		fieldErrs["propertyIds"] = apperr.KeyInvalid
 	}
 
 	ss := map[string]bool{}
 	for _, s := range in.Sections {
 		if !slices.Contains(sections, s) || ss[s] {
-			fieldErrs["sections"] = "error.invalid"
+			fieldErrs["sections"] = apperr.KeyInvalid
 		}
 
 		ss[s] = true
 	}
 
 	if len(in.Sections) == 0 {
-		fieldErrs["sections"] = "error.required"
+		fieldErrs["sections"] = apperr.KeyRequired
 	}
 
 	if in.Format != "pdf" && in.Format != "csv" {
-		fieldErrs["format"] = "error.invalid"
+		fieldErrs["format"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -141,7 +141,7 @@ func exportReport(ctx context.Context, c *ops.Call, input *ExportInput) (ReportF
 	}
 
 	if own != len(input.PropertyIDs) {
-		return ReportFile{}, apperr.E(apperr.NotFound, "error.notFound")
+		return ReportFile{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	rows, err := c.Tx.Query(

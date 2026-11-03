@@ -98,29 +98,29 @@ type RunInput struct {
 func (in *RunInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil || in.UnitID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	var ok bool
 	if in.start, ok = ParseAction(in.StartAction); !ok {
-		fieldErrs["startAction"] = "error.invalid"
+		fieldErrs["startAction"] = apperr.KeyInvalid
 	}
 
 	if in.end, ok = ParseAction(in.EndAction); !ok {
-		fieldErrs["endAction"] = "error.invalid"
+		fieldErrs["endAction"] = apperr.KeyInvalid
 	}
 
 	if in.DurationMinutes < 1 || in.DurationMinutes > 15 {
-		fieldErrs["durationMinutes"] = "error.range"
+		fieldErrs["durationMinutes"] = apperr.KeyRange
 	}
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fieldErrs["reason"] = "error.length"
+		fieldErrs["reason"] = apperr.KeyLength
 	}
 
 	if in.ExpectedUnitVersion < 1 || in.ExpectedJobVersion < 1 {
-		fieldErrs["expectedUnitVersion"] = "error.required"
+		fieldErrs["expectedUnitVersion"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -164,7 +164,7 @@ func (m Diagnostics) create(ctx context.Context, call *ops.Call, in *RunInput) (
 	}
 
 	if !found {
-		return Run{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Run{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	jv, _, _, err := m.Jobs.JobVersion(ctx, call, in.JobID)
@@ -173,15 +173,15 @@ func (m Diagnostics) create(ctx context.Context, call *ops.Call, in *RunInput) (
 	}
 
 	if target.Version != in.ExpectedUnitVersion || jv != in.ExpectedJobVersion {
-		return Run{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Run{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if !in.start.Supports(target.Caps) {
-		return Run{}, apperr.Fields(map[string]string{"startAction": "error.unsupportedAction"})
+		return Run{}, apperr.Fields(map[string]string{"startAction": apperr.KeyUnsupportedAction})
 	}
 
 	if !in.end.Supports(target.Caps) {
-		return Run{}, apperr.Fields(map[string]string{"endAction": "error.unsupportedAction"})
+		return Run{}, apperr.Fields(map[string]string{"endAction": apperr.KeyUnsupportedAction})
 	}
 
 	policy, err := m.Commands.Restrictions.UnitPolicy(ctx, call, in.UnitID)
@@ -289,7 +289,7 @@ type RunIDInput struct {
 // Validate implements ops.Validator.
 func (in *RunIDInput) Validate() map[string]string {
 	if in.DiagnosticRunID == uuid.Nil {
-		return map[string]string{"diagnosticRunId": "error.required"}
+		return map[string]string{"diagnosticRunId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -328,7 +328,7 @@ func (m Diagnostics) get(ctx context.Context, call *ops.Call, in *RunIDInput) (R
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return run, apperr.E(apperr.NotFound, "error.notFound")
+		return run, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -341,7 +341,7 @@ func (m Diagnostics) get(ctx context.Context, call *ops.Call, in *RunIDInput) (R
 			return run, visibleErr
 		}
 
-		return Run{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Run{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return run, nil
@@ -357,7 +357,7 @@ type RunListInput struct {
 // Validate implements ops.Validator.
 func (in *RunListInput) Validate() map[string]string {
 	if in.UnitID == uuid.Nil {
-		return map[string]string{"unitId": "error.required"}
+		return map[string]string{"unitId": apperr.KeyRequired}
 	}
 
 	return nil

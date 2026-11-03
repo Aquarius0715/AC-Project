@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -189,7 +190,7 @@ func TestAlertEvidence(t *testing.T) {
 		"alerts.evidence",
 		`{"alertId":"00000000-0000-0000-0000-000000000000","query":{}}`,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["alertId"] != "error.required" {
+		res["fieldErrors"].(map[string]any)["alertId"] != apperr.KeyRequired {
 		t.Errorf("no alert: %d %v", code, res)
 	}
 
@@ -244,7 +245,7 @@ func TestAlertEvidence(t *testing.T) {
 		"before detection": {[]string{before}, "errors.evidence_unknown"},
 		"suspect reading":  {[]string{suspect}, "errors.evidence_unknown"},
 		"estimate":         {[]string{estimate}, "errors.evidence_unknown"},
-		"twice":            {[]string{after, after}, "error.invalid"},
+		"twice":            {[]string{after, after}, apperr.KeyInvalid},
 		"one of two wrong": {[]string{after, uuid.NewString()}, "errors.evidence_unknown"},
 	} {
 		if code, m := resolve(

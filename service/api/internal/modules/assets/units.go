@@ -391,7 +391,9 @@ func (m *Module) unitsList(
 
 		err := dec.Decode(&unitFilters)
 		if err != nil {
-			return paging.Page[Unit]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+			return paging.Page[Unit]{}, apperr.Fields(
+				map[string]string{"filters": apperr.KeyInvalid},
+			)
 		}
 	}
 
@@ -404,14 +406,14 @@ func (m *Module) unitsList(
 
 	if unitFilters.Status != nil && !connections[*unitFilters.Status] {
 		return paging.Page[Unit]{}, apperr.Fields(
-			map[string]string{"filters.status": "error.invalid"},
+			map[string]string{"filters.status": apperr.KeyInvalid},
 		)
 	}
 
 	for _, s := range unitFilters.Connections {
 		if !connections[s] {
 			return paging.Page[Unit]{}, apperr.Fields(
-				map[string]string{"filters.connections": "error.invalid"},
+				map[string]string{"filters.connections": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -420,7 +422,7 @@ func (m *Module) unitsList(
 		*unitFilters.PowerState != "off" &&
 		*unitFilters.PowerState != "unknown" {
 		return paging.Page[Unit]{}, apperr.Fields(
-			map[string]string{"filters.powerState": "error.invalid"},
+			map[string]string{"filters.powerState": apperr.KeyInvalid},
 		)
 	}
 
@@ -550,7 +552,7 @@ type UnitGetInput struct {
 // Validate implements ops.Validator.
 func (in *UnitGetInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil
@@ -606,7 +608,7 @@ func (m *Module) unitsGet(
 	}
 
 	if len(units) == 0 {
-		return UnitDetail{}, apperr.E(apperr.NotFound, "error.notFound")
+		return UnitDetail{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	gateErr := unitscope.Gate(

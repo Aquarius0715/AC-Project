@@ -1477,7 +1477,7 @@ func TestRestrictionExplicitRelease(t *testing.T) {
 	) // paid outside the payment flow, which would release by itself
 
 	v := ver(get())
-	if code, m := release(v + 1); code != 409 || m["messageKey"] != "error.versionConflict" {
+	if code, m := release(v + 1); code != 409 || m["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("release on a stale version: %d %v", code, m)
 	}
 

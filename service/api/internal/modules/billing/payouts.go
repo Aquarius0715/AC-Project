@@ -206,7 +206,7 @@ func (m Payouts) load(
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == "contractor" &&
 			(statement.ContractorOrgID != call.Principal.OrgID || statement.Status == "draft")) {
-		return statement, apperr.E(apperr.NotFound, "error.notFound")
+		return statement, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -236,7 +236,7 @@ func periodBounds(p string) (time.Time, time.Time, error) {
 func (in *GenerateInput) Validate() map[string]string {
 	_, _, err := periodBounds(in.Period)
 	if err != nil {
-		return map[string]string{"period": "error.invalid"}
+		return map[string]string{"period": apperr.KeyInvalid}
 	}
 
 	return nil
@@ -552,17 +552,17 @@ type TransitionInput struct {
 func (in *TransitionInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.StatementID == uuid.Nil {
-		fieldErrs["statementId"] = "error.required"
+		fieldErrs["statementId"] = apperr.KeyRequired
 	}
 
 	if in.Action != "approve" && in.Action != "mark_paid" {
-		fieldErrs["action"] = "error.invalid"
+		fieldErrs["action"] = apperr.KeyInvalid
 	}
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
 		if utf8.RuneCountInString(*in.Reason) > 1000 {
-			fieldErrs["reason"] = "error.length"
+			fieldErrs["reason"] = apperr.KeyLength
 		}
 	}
 
@@ -607,13 +607,13 @@ func (m Payouts) transition(
 	}
 
 	if statement.Version != *call.ExpectedVersion {
-		return statement, apperr.E(apperr.Conflict, "error.versionConflict")
+		return statement, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	switch input.Action {
 	case "approve":
 		if statement.Status != "draft" {
-			return statement, apperr.E(apperr.Conflict, "error.invalidState")
+			return statement, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 		}
 
 		_, err = call.Tx.Exec(
@@ -703,16 +703,16 @@ var topics = map[string]bool{"amount": true, "deduction": true, "missing_job": t
 func (in *QueryInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.StatementID == uuid.Nil || in.LineID == uuid.Nil {
-		fieldErrs["lineId"] = "error.required"
+		fieldErrs["lineId"] = apperr.KeyRequired
 	}
 
 	if !topics[in.Topic] {
-		fieldErrs["topic"] = "error.invalid"
+		fieldErrs["topic"] = apperr.KeyInvalid
 	}
 
 	in.Message = strings.TrimSpace(in.Message)
 	if n := utf8.RuneCountInString(in.Message); n < 1 || n > 2000 {
-		fieldErrs["message"] = "error.length"
+		fieldErrs["message"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -752,11 +752,11 @@ func (m Payouts) query(ctx context.Context, c *ops.Call, input *QueryInput) (Sta
 	}
 
 	if statement.Version != *c.ExpectedVersion {
-		return statement, apperr.E(apperr.Conflict, "error.versionConflict")
+		return statement, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if statement.Status != "approved" {
-		return statement, apperr.E(apperr.Conflict, "error.invalidState")
+		return statement, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	var job *uuid.UUID
@@ -769,7 +769,7 @@ func (m Payouts) query(ctx context.Context, c *ops.Call, input *QueryInput) (Sta
 	}
 
 	if job == nil {
-		return statement, apperr.E(apperr.NotFound, "error.notFound")
+		return statement, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	_, execErr := c.Tx.Exec(
@@ -822,12 +822,12 @@ type ResolveInput struct {
 func (in *ResolveInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.StatementID == uuid.Nil || in.QueryID == uuid.Nil {
-		fieldErrs["queryId"] = "error.required"
+		fieldErrs["queryId"] = apperr.KeyRequired
 	}
 
 	in.Reply = strings.TrimSpace(in.Reply)
 	if n := utf8.RuneCountInString(in.Reply); n < 1 || n > 2000 {
-		fieldErrs["reply"] = "error.length"
+		fieldErrs["reply"] = apperr.KeyLength
 	}
 
 	if in.AdjustmentMinor != nil && *in.AdjustmentMinor == 0 {
@@ -872,7 +872,7 @@ func (m Payouts) resolve(ctx context.Context, call *ops.Call, in *ResolveInput) 
 	}
 
 	if statement.Version != *call.ExpectedVersion {
-		return statement, apperr.E(apperr.Conflict, "error.versionConflict")
+		return statement, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	var (
@@ -884,7 +884,7 @@ func (m Payouts) resolve(ctx context.Context, call *ops.Call, in *ResolveInput) 
 		UPDATE`, in.QueryID, statement.ID).
 		Scan(&state, &line)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return statement, apperr.E(apperr.NotFound, "error.notFound")
+		return statement, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -892,7 +892,7 @@ func (m Payouts) resolve(ctx context.Context, call *ops.Call, in *ResolveInput) 
 	}
 
 	if state != "open" {
-		return statement, apperr.E(apperr.Conflict, "error.invalidState")
+		return statement, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	next := "answered"
@@ -947,7 +947,7 @@ type PayoutIDInput struct {
 // Validate implements ops.Validator.
 func (in *PayoutIDInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil
@@ -1027,7 +1027,7 @@ func (m Payouts) list(
 		if dec.Decode(&f) != nil ||
 			(f.Status != nil && *f.Status != "draft" && *f.Status != "approved" && *f.Status != "paid") {
 			return paging.Page[Statement]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}

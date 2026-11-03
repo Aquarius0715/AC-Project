@@ -147,7 +147,7 @@ func (m Billing) loadContract(
 
 	contract, err := scanContract(call.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return contract, apperr.E(apperr.NotFound, "error.notFound")
+		return contract, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -203,7 +203,7 @@ func (m Billing) listContracts(
 
 		if dec.Decode(&f) != nil || (f.Kind != nil && !slices.Contains(planTypes, *f.Kind)) {
 			return paging.Page[Contract]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -334,37 +334,37 @@ type ContractInput struct {
 func (in *ContractInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.CustomerID == uuid.Nil {
-		fieldErrs["customerId"] = "error.required"
+		fieldErrs["customerId"] = apperr.KeyRequired
 	}
 
 	seen := map[uuid.UUID]bool{}
 
 	if len(in.UnitIDs) < 1 || len(in.UnitIDs) > 500 {
-		fieldErrs["unitIds"] = "error.count"
+		fieldErrs["unitIds"] = apperr.KeyCount
 	}
 
 	for _, u := range in.UnitIDs {
 		if seen[u] {
-			fieldErrs["unitIds"] = "error.duplicate"
+			fieldErrs["unitIds"] = apperr.KeyDuplicate
 		}
 
 		seen[u] = true
 	}
 
 	if !slices.Contains(planTypes, in.PlanType) {
-		fieldErrs["planType"] = "error.invalid"
+		fieldErrs["planType"] = apperr.KeyInvalid
 	}
 
 	if in.StartAt.IsZero() || !in.StartAt.Before(in.EndAt) {
-		fieldErrs["endAt"] = "error.range"
+		fieldErrs["endAt"] = apperr.KeyRange
 	}
 
 	if in.PriceMinor < 0 {
-		fieldErrs["priceMinor"] = "error.range"
+		fieldErrs["priceMinor"] = apperr.KeyRange
 	}
 
 	if in.Currency != "MYR" && in.Currency != "USD" {
-		fieldErrs["currency"] = "error.invalid"
+		fieldErrs["currency"] = apperr.KeyInvalid
 	}
 
 	switch {
@@ -373,9 +373,9 @@ func (in *ContractInput) Validate() map[string]string {
 	case in.RestrictionEligible &&
 		(in.RulesVersion == nil || utf8.RuneCountInString(strings.TrimSpace(*in.RulesVersion)) < 1 ||
 			utf8.RuneCountInString(*in.RulesVersion) > 64):
-		fieldErrs["rulesVersion"] = "error.required"
+		fieldErrs["rulesVersion"] = apperr.KeyRequired
 	case !in.RestrictionEligible && in.RulesVersion != nil:
-		fieldErrs["rulesVersion"] = "error.notAllowed"
+		fieldErrs["rulesVersion"] = apperr.KeyNotAllowed
 	}
 
 	return fieldErrs
@@ -416,11 +416,13 @@ func (m Billing) saveContract(
 	}
 
 	if !found {
-		return Contract{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Contract{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if !active {
-		return Contract{}, apperr.Fields(map[string]string{"customerId": "error.inactiveCustomer"})
+		return Contract{}, apperr.Fields(
+			map[string]string{"customerId": apperr.KeyInactiveCustomer},
+		)
 	}
 
 	for _, u := range input.UnitIDs {
@@ -455,7 +457,7 @@ func (m Billing) saveContract(
 		}
 
 		if cur.Version != *call.ExpectedVersion {
-			return cur, apperr.E(apperr.Conflict, "error.versionConflict")
+			return cur, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
 		if len(cur.ActiveRestrictionIDs) > 0 || cur.HasUnresolvedRecovery {
@@ -646,19 +648,19 @@ type InvoiceInput struct {
 func (in *InvoiceInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.AmountMinor < 1 {
-		fieldErrs["amountMinor"] = "error.range"
+		fieldErrs["amountMinor"] = apperr.KeyRange
 	}
 
 	if in.ContractID == uuid.Nil || in.ContractVersion < 1 {
-		fieldErrs["contractId"] = "error.required"
+		fieldErrs["contractId"] = apperr.KeyRequired
 	}
 
 	if in.Period.From.IsZero() || !in.Period.From.Before(in.Period.To) {
-		fieldErrs["period"] = "error.range"
+		fieldErrs["period"] = apperr.KeyRange
 	}
 
 	if in.DueAt.IsZero() || in.DueAt.Before(in.Period.From) {
-		fieldErrs["dueAt"] = "error.range"
+		fieldErrs["dueAt"] = apperr.KeyRange
 	}
 
 	return fieldErrs
@@ -696,7 +698,7 @@ func (m Billing) createInvoice(
 	input *InvoiceInput,
 ) (Invoice, error) {
 	if !input.DueAt.After(call.Now) {
-		return Invoice{}, apperr.Fields(map[string]string{"dueAt": "error.past"})
+		return Invoice{}, apperr.Fields(map[string]string{"dueAt": apperr.KeyPast})
 	}
 
 	contract, err := m.loadContract(ctx, call, input.ContractID, true)
@@ -795,7 +797,7 @@ func (m Billing) loadInvoice(
 	invoice, err := scanInvoice(call.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == "client" && invoice.customerOrg != call.Principal.OrgID) {
-		return invoice, apperr.E(apperr.NotFound, "error.notFound")
+		return invoice, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return invoice, err
@@ -809,7 +811,7 @@ type IDInput struct {
 // Validate implements ops.Validator.
 func (in *IDInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil
@@ -975,13 +977,13 @@ func (m Billing) listInvoices(
 		if dec.Decode(&f) != nil ||
 			(f.Status != nil && !slices.Contains(invoiceStatuses, *f.Status)) {
 			return paging.Page[Invoice]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 
 		if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
 			return paging.Page[Invoice]{}, apperr.Fields(
-				map[string]string{"filters.to": "error.range"},
+				map[string]string{"filters.to": apperr.KeyRange},
 			)
 		}
 	}
@@ -1114,16 +1116,16 @@ type RemindInput struct {
 func (in *RemindInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.InvoiceID == uuid.Nil || in.RecipientMembershipID == uuid.Nil {
-		fieldErrs["invoiceId"] = "error.required"
+		fieldErrs["invoiceId"] = apperr.KeyRequired
 	}
 
 	if in.Channel != "inApp" && in.Channel != "email" && in.Channel != "whatsapp" {
-		fieldErrs["channel"] = "error.invalid"
+		fieldErrs["channel"] = apperr.KeyInvalid
 	}
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fieldErrs["reason"] = "error.length"
+		fieldErrs["reason"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -1169,7 +1171,7 @@ func (m Billing) remind(ctx context.Context, call *ops.Call, in *RemindInput) (R
 	}
 
 	if invoice.Version != *call.ExpectedVersion {
-		return Receipt{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Receipt{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if invoice.Status != "unpaid" || !call.Now.After(invoice.DueAt) {

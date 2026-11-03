@@ -95,7 +95,7 @@ func E(c Code, messageKey string) *DomainError {
 func Fields(fe map[string]string) *DomainError {
 	return &DomainError{
 		Code:              Validation,
-		MessageKey:        "error.validation",
+		MessageKey:        KeyValidation,
 		FieldErrors:       fe,
 		CorrelationID:     "",
 		RetryAfterSeconds: nil,
@@ -133,40 +133,40 @@ func From(err error) *DomainError {
 	}
 
 	if errors.Is(err, context.DeadlineExceeded) {
-		return caused(E(Timeout, "error.timeout"), err)
+		return caused(E(Timeout, KeyTimeout), err)
 	}
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return caused(E(NotFound, "error.notFound"), err)
+		return caused(E(NotFound, KeyNotFound), err)
 	}
 
 	pgError, ok := errors.AsType[*pgconn.PgError](err)
 	if ok {
 		switch pgError.Code {
 		case "23514", "22P02", "22001", "22003", "22007", "22008":
-			return caused(E(Validation, "error.validation"), err)
+			return caused(E(Validation, KeyValidation), err)
 		case "42501":
 			if strings.HasPrefix(
 				pgError.Message,
 				"permission denied",
 			) { // a missing table privilege is a defect (IR194), not RLS
-				return caused(E(Unavailable, "error.unavailable"), err)
+				return caused(E(Unavailable, KeyUnavailable), err)
 			}
 
 			return caused(
-				E(NotFound, "error.notFound"),
+				E(NotFound, KeyNotFound),
 				err,
 			) // row-level security: never reveal other tenants
 		case "23503":
-			return caused(E(NotFound, "error.notFound"), err)
+			return caused(E(NotFound, KeyNotFound), err)
 		case "23505", "23P01":
-			return caused(E(Conflict, "error.conflict"), err)
+			return caused(E(Conflict, KeyConflict), err)
 		case "40001", "40P01":
-			return caused(E(Unavailable, "error.unavailable").RetryAfter(1), err)
+			return caused(E(Unavailable, KeyUnavailable).RetryAfter(1), err)
 		case "57014":
-			return caused(E(Timeout, "error.timeout"), err)
+			return caused(E(Timeout, KeyTimeout), err)
 		}
 	}
 
-	return caused(E(Unavailable, "error.unavailable"), err)
+	return caused(E(Unavailable, KeyUnavailable), err)
 }

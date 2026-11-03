@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // TestSubmitErrors covers the IR100 checks jobs.submit applies to a draft: every component recorded once with a
@@ -143,18 +145,18 @@ func TestSubmitErrors(t *testing.T) {
 			func(r *Report) { r.Items[1].ComponentKey = "filter" },
 			map[string]string{"items": "errors.components_mismatch"},
 		},
-		"short work text": {func(r *Report) { r.WorkText = "Done." }, map[string]string{"workText": "error.length"}},
-		"no next action":  {func(r *Report) { r.NextAction = nil }, map[string]string{"nextAction": "error.required"}},
+		"short work text": {func(r *Report) { r.WorkText = "Done." }, map[string]string{"workText": apperr.KeyLength}},
+		"no next action":  {func(r *Report) { r.NextAction = nil }, map[string]string{"nextAction": apperr.KeyRequired}},
 		"follow-up no note": {
 			func(r *Report) { r.NextAction = &NextAction{Kind: "follow_up", Date: at(48), Note: nil} },
-			map[string]string{"nextAction": "error.invalid"},
+			map[string]string{"nextAction": apperr.KeyInvalid},
 		},
 		"follow-up past": {
 			func(r *Report) { r.NextAction = &NextAction{Kind: "follow_up", Date: at(-1), Note: str("check again")} },
-			map[string]string{"nextAction": "error.invalid"},
+			map[string]string{"nextAction": apperr.KeyInvalid},
 		},
-		"zero parts":     {func(r *Report) { r.Parts[0].Quantity = 0 }, map[string]string{"parts": "error.range"}},
-		"too many parts": {func(r *Report) { r.Parts[0].Quantity = 1000 }, map[string]string{"parts": "error.range"}},
+		"zero parts":     {func(r *Report) { r.Parts[0].Quantity = 0 }, map[string]string{"parts": apperr.KeyRange}},
+		"too many parts": {func(r *Report) { r.Parts[0].Quantity = 1000 }, map[string]string{"parts": apperr.KeyRange}},
 		"photo processing": {
 			func(r *Report) { r.AttachmentRefs[0].Status = "processing" },
 			map[string]string{"attachmentIds": "errors.attachment_not_ready"},

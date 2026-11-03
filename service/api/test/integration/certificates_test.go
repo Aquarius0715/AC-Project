@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -89,7 +90,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		),
 		0,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["file"] != "error.invalidFile" {
+		res["fieldErrors"].(map[string]any)["file"] != apperr.KeyInvalidFile {
 		t.Fatalf("a file over 10 MB is a field error, not a body error: %d %v", code, res)
 	}
 

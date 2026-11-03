@@ -27,7 +27,7 @@ func decodeFilters(raw json.RawMessage, dst any) error {
 	dec.DisallowUnknownFields()
 
 	if dec.Decode(dst) != nil {
-		return apperr.Fields(map[string]string{"filters": "error.invalid"})
+		return apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
 	}
 
 	return nil
@@ -211,7 +211,7 @@ func (m *Module) customersList(
 	if f.Kind != nil {
 		if !profiles[*f.Kind] {
 			return paging.Page[Customer]{}, apperr.Fields(
-				map[string]string{"filters.kind": "error.invalid"},
+				map[string]string{"filters.kind": apperr.KeyInvalid},
 			)
 		}
 
@@ -221,7 +221,7 @@ func (m *Module) customersList(
 	if f.Status != nil {
 		if *f.Status != "active" && *f.Status != "inactive" {
 			return paging.Page[Customer]{}, apperr.Fields(
-				map[string]string{"filters.status": "error.invalid"},
+				map[string]string{"filters.status": apperr.KeyInvalid},
 			)
 		}
 
@@ -255,19 +255,19 @@ func (in *CustomerSave) Validate() map[string]string {
 
 	in.Name = strings.TrimSpace(in.Name)
 	if !strLen(in.Name, 1, 120) {
-		fieldErrs["name"] = "error.length"
+		fieldErrs["name"] = apperr.KeyLength
 	}
 
 	if in.OrganizationID == uuid.Nil {
-		fieldErrs["organizationId"] = "error.required"
+		fieldErrs["organizationId"] = apperr.KeyRequired
 	}
 
 	if !profiles[in.ServiceProfile] {
-		fieldErrs["serviceProfile"] = "error.invalid"
+		fieldErrs["serviceProfile"] = apperr.KeyInvalid
 	}
 
 	if in.Status != "active" && in.Status != "inactive" {
-		fieldErrs["status"] = "error.invalid"
+		fieldErrs["status"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -357,7 +357,7 @@ func (m *Module) customersSave(
 		}
 
 		if units {
-			return Customer{}, conflict("error.customerActive")
+			return Customer{}, conflict(apperr.KeyCustomerActive)
 		}
 
 		for _, a := range m.OrgActive {
@@ -367,7 +367,7 @@ func (m *Module) customersSave(
 			}
 
 			if busy {
-				return Customer{}, conflict("error.customerActive")
+				return Customer{}, conflict(apperr.KeyCustomerActive)
 			}
 		}
 	}
@@ -477,7 +477,7 @@ func (m *Module) propertiesList(
 	if f.Kind != nil {
 		if *f.Kind != "home" && *f.Kind != "office" {
 			return paging.Page[Property]{}, apperr.Fields(
-				map[string]string{"filters.kind": "error.invalid"},
+				map[string]string{"filters.kind": apperr.KeyInvalid},
 			)
 		}
 
@@ -555,7 +555,7 @@ func (m *Module) spacesList(
 	if f.Kind != nil {
 		if !spaceKinds[*f.Kind] {
 			return paging.Page[Space]{}, apperr.Fields(
-				map[string]string{"filters.kind": "error.invalid"},
+				map[string]string{"filters.kind": apperr.KeyInvalid},
 			)
 		}
 
@@ -580,15 +580,15 @@ type RenameInput struct {
 func (in *RenameInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.Target.Kind != "property" && in.Target.Kind != "space" && in.Target.Kind != "unit" {
-		fieldErrs["target.kind"] = "error.invalid"
+		fieldErrs["target.kind"] = apperr.KeyInvalid
 	}
 
 	if in.Target.ID == uuid.Nil {
-		fieldErrs["target.id"] = "error.required"
+		fieldErrs["target.id"] = apperr.KeyRequired
 	}
 
 	if !strLen(strings.TrimSpace(in.Name), 1, 120) {
-		fieldErrs["name"] = "error.length"
+		fieldErrs["name"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -684,7 +684,7 @@ func (m *Module) locationsRename(
 	}
 
 	if dup {
-		return nil, conflict("error.duplicateSiblingName")
+		return nil, conflict(apperr.KeyDuplicateSiblingName)
 	}
 
 	var v int
@@ -693,7 +693,7 @@ func (m *Module) locationsRename(
 		"platform.app_now() WHERE id = $1 AND version = $2 AND NOT archived AND "+updScope+" RETURNING version", updArgs...).
 		Scan(&v)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, conflict("error.versionConflict")
+		return nil, conflict(apperr.KeyVersionConflict)
 	}
 
 	if err != nil {

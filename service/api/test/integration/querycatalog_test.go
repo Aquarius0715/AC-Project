@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -312,7 +313,8 @@ func sortError(m map[string]any) bool {
 // filterError reports whether a VALIDATION result names the filters.
 func filterError(m map[string]any) bool {
 	fe, _ := m["fieldErrors"].(map[string]any)
-	if fe["zzUnknown"] == "error.notAllowed" { // REST: filters are query parameters, an unknown one is not allowed (IR222)
+	if fe["zzUnknown"] == apperr.KeyNotAllowed {
+		// REST: filters are query parameters, an unknown one is not allowed (IR222)
 		return true
 	}
 

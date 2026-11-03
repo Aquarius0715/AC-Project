@@ -132,7 +132,7 @@ func (m Plans) load(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (
 
 	plan, err := scanPlan(c.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return plan, apperr.E(apperr.NotFound, "error.notFound")
+		return plan, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -173,7 +173,7 @@ type IDInput struct {
 // Validate implements ops.Validator.
 func (in *IDInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil
@@ -251,7 +251,9 @@ func (m Plans) list(
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil {
-			return paging.Page[Plan]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+			return paging.Page[Plan]{}, apperr.Fields(
+				map[string]string{"filters": apperr.KeyInvalid},
+			)
 		}
 	}
 
@@ -381,16 +383,16 @@ type PlanSaveInput struct {
 func (in *PlanSaveInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.UnitID == uuid.Nil {
-		fieldErrs["unitId"] = "error.required"
+		fieldErrs["unitId"] = apperr.KeyRequired
 	}
 
 	if in.Recurrence.Kind != "monthly" || in.Recurrence.IntervalMonths < 1 ||
 		in.Recurrence.IntervalMonths > 12 {
-		fieldErrs["recurrence"] = "error.invalid"
+		fieldErrs["recurrence"] = apperr.KeyInvalid
 	}
 
 	if in.NextDueAt.IsZero() {
-		fieldErrs["nextDueAt"] = "error.required"
+		fieldErrs["nextDueAt"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -422,7 +424,7 @@ func (in *PlanSaveInput) Validate() map[string]string {
 //	@Router			/v1/plans [post]
 func (m Plans) save(ctx context.Context, call *ops.Call, in *PlanSaveInput) (Plan, error) {
 	if !in.NextDueAt.After(call.Now) {
-		return Plan{}, apperr.Fields(map[string]string{"nextDueAt": "error.past"})
+		return Plan{}, apperr.Fields(map[string]string{"nextDueAt": apperr.KeyPast})
 	}
 
 	_, archived, found, err := m.Jobs.Units.UnitState(ctx, call, in.UnitID)
@@ -431,11 +433,11 @@ func (m Plans) save(ctx context.Context, call *ops.Call, in *PlanSaveInput) (Pla
 	}
 
 	if !found {
-		return Plan{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Plan{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if archived {
-		return Plan{}, apperr.Fields(map[string]string{"unitId": "error.unitArchived"})
+		return Plan{}, apperr.Fields(map[string]string{"unitId": apperr.KeyUnitArchived})
 	}
 
 	next := in.NextDueAt.UTC()
@@ -464,7 +466,7 @@ func (m Plans) save(ctx context.Context, call *ops.Call, in *PlanSaveInput) (Pla
 		}
 
 		if plan.Version != *call.ExpectedVersion {
-			return plan, apperr.E(apperr.Conflict, "error.versionConflict")
+			return plan, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
 		anchor := plan.AnchorDay
@@ -527,11 +529,11 @@ type GenerateInput struct {
 func (in *GenerateInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.ID == uuid.Nil {
-		fieldErrs["id"] = "error.required"
+		fieldErrs["id"] = apperr.KeyRequired
 	}
 
 	if in.OccurrenceDate.IsZero() {
-		fieldErrs["occurrenceDate"] = "error.required"
+		fieldErrs["occurrenceDate"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -583,7 +585,7 @@ func (m Plans) generateNextJob(
 	}
 
 	if plan.Version != *c.ExpectedVersion {
-		return Job{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if !input.OccurrenceDate.Equal(plan.NextDueAt) {
@@ -606,7 +608,7 @@ func (m Plans) generateNextJob(
 	}
 
 	if !found || archived {
-		return Job{}, apperr.E(apperr.Conflict, "error.unitArchived")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyUnitArchived)
 	}
 
 	start := input.OccurrenceDate.UTC()

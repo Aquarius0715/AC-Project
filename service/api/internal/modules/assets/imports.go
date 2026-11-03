@@ -102,15 +102,15 @@ type ImportPreviewInput struct {
 func (in *ImportPreviewInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.CustomerID == uuid.Nil {
-		fieldErrs["customerId"] = "error.required"
+		fieldErrs["customerId"] = apperr.KeyRequired
 	}
 
 	if !strLen(in.FileName, 1, 200) {
-		fieldErrs["fileName"] = "error.length"
+		fieldErrs["fileName"] = apperr.KeyLength
 	}
 
 	if strings.TrimSpace(in.CSVText) == "" {
-		fieldErrs["csvText"] = "error.required"
+		fieldErrs["csvText"] = apperr.KeyRequired
 	}
 
 	for k := range in.Mapping {
@@ -121,7 +121,7 @@ func (in *ImportPreviewInput) Validate() map[string]string {
 
 	for _, k := range []string{"property", "unit_name", "model_code"} {
 		if strings.TrimSpace(in.Mapping[k]) == "" {
-			fieldErrs["mapping."+k] = "error.required"
+			fieldErrs["mapping."+k] = apperr.KeyRequired
 		}
 	}
 
@@ -193,7 +193,7 @@ func (m *Module) unitsImportPreview(
 	}
 
 	if status != "active" {
-		return ImportPreview{}, conflict("error.customerInactive")
+		return ImportPreview{}, conflict(apperr.KeyCustomerInactive)
 	}
 
 	reader := csv.NewReader(strings.NewReader(strings.TrimPrefix(input.CSVText, "\ufeff")))
@@ -201,7 +201,7 @@ func (m *Module) unitsImportPreview(
 
 	header, err := reader.Read()
 	if err != nil {
-		return ImportPreview{}, apperr.Fields(map[string]string{"csvText": "error.malformedCsv"})
+		return ImportPreview{}, apperr.Fields(map[string]string{"csvText": apperr.KeyMalformedCsv})
 	}
 
 	idx := map[string]int{}
@@ -236,7 +236,7 @@ func (m *Module) unitsImportPreview(
 
 		if err != nil {
 			return ImportPreview{}, apperr.Fields(
-				map[string]string{"csvText": "error.malformedCsv"},
+				map[string]string{"csvText": apperr.KeyMalformedCsv},
 			)
 		}
 
@@ -301,7 +301,7 @@ func (m *Module) unitsImportPreview(
 		case row.PropertyName == "" || row.UnitName == "" || row.ModelCode == "":
 			fail("error.importMissingField")
 		case !strLen(row.UnitName, 1, 120):
-			fail("error.length")
+			fail(apperr.KeyLength)
 		}
 
 		if row.Result != "error" {
@@ -355,7 +355,7 @@ func (m *Module) unitsImportPreview(
 			); t.After(
 				call.Now,
 			) {
-				fail("error.future")
+				fail(apperr.KeyFuture)
 			}
 		}
 
@@ -368,13 +368,13 @@ func (m *Module) unitsImportPreview(
 
 			switch key := strings.ToUpper(*row.Serial); {
 			case serials[key]:
-				fail("error.duplicateSerial")
+				fail(apperr.KeyDuplicateSerial)
 			case state == "unknown":
 				fail("error.unknownSerial")
 			case state == "bound":
 				fail("error.serialBound")
 			case state == "tamper":
-				fail("error.tamperUnresolved")
+				fail(apperr.KeyTamperUnresolved)
 			default:
 				row.DeviceID = &id
 				serials[key] = true
@@ -431,7 +431,7 @@ func (m *Module) unitsImportPreview(
 			}
 
 			if exists || unitNames[key] {
-				fail("error.duplicateSiblingName")
+				fail(apperr.KeyDuplicateSiblingName)
 			}
 
 			unitNames[key] = true
@@ -544,11 +544,11 @@ type ImportCommitInput struct {
 func (in *ImportCommitInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.PreviewID == uuid.Nil {
-		fieldErrs["previewId"] = "error.required"
+		fieldErrs["previewId"] = apperr.KeyRequired
 	}
 
 	if in.CustomerID == uuid.Nil {
-		fieldErrs["customerId"] = "error.required"
+		fieldErrs["customerId"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -598,7 +598,7 @@ func (m *Module) unitsImportCommit(
 		Scan(&raw, &fileName, &expires, &customer)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && (!call.Now.Before(expires) || customer != input.CustomerID)) {
-		return UnitImport{}, conflict("error.previewExpired") // validate again
+		return UnitImport{}, conflict(apperr.KeyPreviewExpired) // validate again
 	}
 
 	if err != nil {
@@ -611,7 +611,7 @@ func (m *Module) unitsImportCommit(
 		'active'`, customer).
 		Scan(&org)
 	if scanErr != nil {
-		return UnitImport{}, conflict("error.customerInactive")
+		return UnitImport{}, conflict(apperr.KeyCustomerInactive)
 	}
 
 	var rows []storedRow
@@ -647,7 +647,7 @@ func (m *Module) unitsImportCommit(
 		}
 
 		if taken {
-			return uuid.Nil, conflict("error.previewExpired")
+			return uuid.Nil, conflict(apperr.KeyPreviewExpired)
 		}
 
 		id := uuid.Must(uuid.NewV7())
@@ -820,7 +820,7 @@ func (m *Module) unitsImportCommit(
 			}
 
 			if !ok {
-				return UnitImport{}, conflict("error.previewExpired")
+				return UnitImport{}, conflict(apperr.KeyPreviewExpired)
 			}
 		}
 	}
@@ -888,11 +888,11 @@ type ImportUndoInput struct {
 func (in *ImportUndoInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.ImportID == uuid.Nil {
-		fieldErrs["importId"] = "error.required"
+		fieldErrs["importId"] = apperr.KeyRequired
 	}
 
 	if !strLen(in.Reason, 1, 1000) {
-		fieldErrs["reason"] = "error.length"
+		fieldErrs["reason"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -947,7 +947,7 @@ func (m *Module) unitsImportUndo(
 
 	switch {
 	case unitImport.Version != *call.ExpectedVersion:
-		return UnitImport{}, conflict("error.versionConflict")
+		return UnitImport{}, conflict(apperr.KeyVersionConflict)
 	case unitImport.State != "imported":
 		return UnitImport{}, conflict("error.alreadyUndone")
 	case !call.Now.Before(unitImport.UndoUntil):

@@ -87,7 +87,7 @@ type unitIn struct {
 
 func (u *unitIn) Validate() map[string]string {
 	if u.Name == "bad" {
-		return map[string]string{"name": "error.invalid"}
+		return map[string]string{"name": apperr.KeyInvalid}
 	}
 
 	return nil
@@ -117,7 +117,7 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 		}
 
 		if in.Name == "conflict" {
-			return out{}, apperr.E(apperr.Conflict, "error.versionConflict")
+			return out{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
 		calls++
@@ -363,7 +363,7 @@ func TestPipeline(t *testing.T) {
 
 func TestRecorderFailureRollsBack(t *testing.T) {
 	r, e, rec, idem, _ := setup(t)
-	rec.err = apperr.E(apperr.Unavailable, "error.unavailable")
+	rec.err = apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 	_ = r
 
 	if recorder := do(
@@ -583,7 +583,7 @@ func TestBodyLimits(t *testing.T) {
 		`{"name":"`+big+`"}`,
 		"key-12345678",
 	); recorder.Code != http.StatusUnprocessableEntity ||
-		!strings.Contains(recorder.Body.String(), "error.bodyTooLarge") {
+		!strings.Contains(recorder.Body.String(), apperr.KeyBodyTooLarge) {
 		t.Fatalf(
 			"2 MiB to an ordinary operation: %d %s",
 			recorder.Code,
@@ -621,7 +621,7 @@ func TestBodyLimits(t *testing.T) {
 		"key-23456789",
 	)
 	if rec.Code == http.StatusUnprocessableEntity &&
-		strings.Contains(rec.Body.String(), "error.bodyTooLarge") {
+		strings.Contains(rec.Body.String(), apperr.KeyBodyTooLarge) {
 		t.Fatalf("a 4 MiB photo must pass the body limit: %d", rec.Code)
 	}
 
@@ -633,7 +633,7 @@ func TestBodyLimits(t *testing.T) {
 		`{"jobId":"j1","reportId":"r1","file":{"bytes":"`+huge+`"}}`,
 		"key-34567890",
 	); recorder.Code != http.StatusUnprocessableEntity ||
-		!strings.Contains(recorder.Body.String(), "error.bodyTooLarge") {
+		!strings.Contains(recorder.Body.String(), apperr.KeyBodyTooLarge) {
 		t.Fatalf("a body above the file limit: %d", recorder.Code)
 	}
 }

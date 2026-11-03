@@ -44,7 +44,7 @@ func lockDevice(ctx context.Context, c *ops.Call, id uuid.UUID) (devState, error
 		FROM devices.devices WHERE id = $1 FOR UPDATE`, id).
 		Scan(&s.unit, &s.target, &s.creator, &s.version, &s.connection, &s.tamper, &s.firmware)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return s, apperr.E(apperr.NotFound, "error.notFound")
+		return s, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -57,7 +57,7 @@ func lockDevice(ctx context.Context, c *ops.Call, id uuid.UUID) (devState, error
 // current checks the expected version of a locked device (CONFLICT).
 func (s devState) current(c *ops.Call) error {
 	if c.ExpectedVersion != nil && s.version != *c.ExpectedVersion {
-		return apperr.E(apperr.Conflict, "error.versionConflict")
+		return apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	return nil
@@ -119,15 +119,15 @@ type BindInput struct {
 func (in *BindInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.DeviceID == uuid.Nil {
-		fieldErrs["deviceId"] = "error.required"
+		fieldErrs["deviceId"] = apperr.KeyRequired
 	}
 
 	if in.UnitID == uuid.Nil {
-		fieldErrs["unitId"] = "error.required"
+		fieldErrs["unitId"] = apperr.KeyRequired
 	}
 
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fieldErrs["reason"] = "error.length"
+		fieldErrs["reason"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -201,7 +201,7 @@ func (m *Module) bindDetail(
 	}
 
 	if s.tamper == "detected" {
-		return DeviceDetail{}, apperr.E(apperr.Conflict, "error.tamperUnresolved")
+		return DeviceDetail{}, apperr.E(apperr.Conflict, apperr.KeyTamperUnresolved)
 	}
 
 	unitInfo, ok, err := m.Units.UnitInfo(ctx, call, in.UnitID)
@@ -210,7 +210,7 @@ func (m *Module) bindDetail(
 	}
 
 	if !ok {
-		return DeviceDetail{}, apperr.E(apperr.NotFound, "error.notFound")
+		return DeviceDetail{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	units := []uuid.UUID{in.UnitID}
@@ -379,7 +379,7 @@ func (m *Module) startOperation(
 	}
 
 	if s.unit == nil {
-		return DeviceOperation{}, apperr.E(apperr.Conflict, "error.deviceNotBound")
+		return DeviceOperation{}, apperr.E(apperr.Conflict, apperr.KeyDeviceNotBound)
 	}
 
 	technicianGateErr := m.technicianGate(ctx, call, jobID, *s.unit)
@@ -490,7 +490,7 @@ type CheckInput struct {
 // Validate implements ops.Validator.
 func (in *CheckInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil
@@ -546,11 +546,11 @@ type FirmwareInput struct {
 func (in *FirmwareInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.DeviceID == uuid.Nil {
-		fieldErrs["deviceId"] = "error.required"
+		fieldErrs["deviceId"] = apperr.KeyRequired
 	}
 
 	if n := utf8.RuneCountInString(in.FirmwareVersion); n < 1 || n > 64 {
-		fieldErrs["firmwareVersion"] = "error.required"
+		fieldErrs["firmwareVersion"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -632,11 +632,11 @@ type CalibrateInput struct {
 func (in *CalibrateInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.DeviceID == uuid.Nil {
-		fieldErrs["deviceId"] = "error.required"
+		fieldErrs["deviceId"] = apperr.KeyRequired
 	}
 
 	if in.SensorID == uuid.Nil {
-		fieldErrs["sensorId"] = "error.required"
+		fieldErrs["sensorId"] = apperr.KeyRequired
 	}
 
 	if metricUnit[in.Metric] == "" || metricUnit[in.Metric] != in.Unit {
@@ -645,12 +645,12 @@ func (in *CalibrateInput) Validate() map[string]string {
 
 	for k, v := range map[string]float64{"referenceValue": in.ReferenceValue, "measuredValue": in.MeasuredValue} {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
-			fieldErrs[k] = "error.invalid"
+			fieldErrs[k] = apperr.KeyInvalid
 		}
 	}
 
 	if in.CalibratedAt.IsZero() {
-		fieldErrs["calibratedAt"] = "error.required"
+		fieldErrs["calibratedAt"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -689,7 +689,9 @@ func (m *Module) calibrate(
 	input *CalibrateInput,
 ) (CalibrationRecord, error) {
 	if input.CalibratedAt.After(call.Now) {
-		return CalibrationRecord{}, apperr.Fields(map[string]string{"calibratedAt": "error.future"})
+		return CalibrationRecord{}, apperr.Fields(
+			map[string]string{"calibratedAt": apperr.KeyFuture},
+		)
 	}
 
 	s, err := lockDevice(ctx, call, input.DeviceID)
@@ -698,7 +700,7 @@ func (m *Module) calibrate(
 	}
 
 	if s.unit == nil {
-		return CalibrationRecord{}, apperr.E(apperr.Conflict, "error.deviceNotBound")
+		return CalibrationRecord{}, apperr.E(apperr.Conflict, apperr.KeyDeviceNotBound)
 	}
 
 	technicianGateErr := m.technicianGate(ctx, call, input.JobID, *s.unit)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -151,7 +152,7 @@ func TestUnitsImport(t *testing.T) {
 
 	for unit, key := range map[string]string{
 		"X": "warning.importCreatesProperty", "Meeting AC": "warning.importCreatesSpace", "Lobby AC 2": "error.serialBound",
-		"Serial AC 2": "error.duplicateSerial", "Ghost AC": "error.unknownSerial",
+		"Serial AC 2": apperr.KeyDuplicateSerial, "Ghost AC": "error.unknownSerial",
 	} {
 		if keys[unit] != key {
 			t.Errorf("%s: %q, want %q", unit, keys[unit], key)
@@ -470,14 +471,14 @@ func TestUnitsImportRefusals(t *testing.T) {
 
 	owner(t, `UPDATE assets.customers SET status = 'active' WHERE id = $1`, cust)
 
-	if code != 409 || resp["messageKey"] != "error.customerInactive" {
+	if code != 409 || resp["messageKey"] != apperr.KeyCustomerInactive {
 		t.Errorf("preview for an inactive customer: %d %v", code, resp)
 	}
 
 	if code, m := preview(
 		`"Property,Unit`,
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["csvText"] != "error.malformedCsv" {
+		m["fieldErrors"].(map[string]any)["csvText"] != apperr.KeyMalformedCsv {
 		t.Errorf("a header that is not CSV: %d %v", code, m)
 	}
 	// a long unit name and a tampered device are row errors
@@ -511,8 +512,8 @@ func TestUnitsImportRefusals(t *testing.T) {
 		}
 	}
 
-	if keys[strings.Repeat("u", 121)] != "error.length" ||
-		keys["Tampered AC"] != "error.tamperUnresolved" {
+	if keys[strings.Repeat("u", 121)] != apperr.KeyLength ||
+		keys["Tampered AC"] != apperr.KeyTamperUnresolved {
 		t.Errorf("row errors: %v", keys)
 	}
 	// a preview whose new property exists by now, and a customer gone inactive before the commit
@@ -542,7 +543,7 @@ func TestUnitsImportRefusals(t *testing.T) {
 		`{"previewId":"`+stale+`","customerId":"`+cust.String()+`"}`,
 		0,
 	); code != 409 ||
-		res["messageKey"] != "error.previewExpired" {
+		res["messageKey"] != apperr.KeyPreviewExpired {
 		t.Errorf("commit after the property was created: %d %v", code, res)
 	}
 
@@ -561,7 +562,7 @@ func TestUnitsImportRefusals(t *testing.T) {
 	)
 	owner(t, `UPDATE assets.customers SET status = 'active' WHERE id = $1`, cust)
 
-	if code != 409 || resp["messageKey"] != "error.customerInactive" {
+	if code != 409 || resp["messageKey"] != apperr.KeyCustomerInactive {
 		t.Errorf("commit for an inactive customer: %d %v", code, resp)
 	}
 }
@@ -648,7 +649,7 @@ func TestUnitsImportRevalidation(t *testing.T) {
 		`{"previewId":"`+data(pm)["previewId"].(string)+`","customerId":"`+cust+`"}`,
 		0,
 	); code != 409 ||
-		res["messageKey"] != "error.previewExpired" {
+		res["messageKey"] != apperr.KeyPreviewExpired {
 		t.Errorf("serial bound since the preview: %d %v", code, res)
 	}
 	// nothing imported: units.list has no search filter, so look through the customer's units (IR388: the earlier

@@ -93,10 +93,10 @@ type Filter struct {
 func list(ctx context.Context, call *ops.Call, in *paging.Query) (paging.Page[View], error) {
 	var filter Filter
 
-	bad := apperr.Fields(map[string]string{"filters": "error.invalid"})
+	bad := apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
 	if len(in.Filters) == 0 {
 		return paging.Page[View]{}, apperr.Fields(
-			map[string]string{"filters.from": "error.required", "filters.to": "error.required"},
+			map[string]string{"filters.from": apperr.KeyRequired, "filters.to": apperr.KeyRequired},
 		)
 	}
 
@@ -112,11 +112,11 @@ func list(ctx context.Context, call *ops.Call, in *paging.Query) (paging.Page[Vi
 		filter.To == nil { // the period is required: name the end that is missing
 		fieldErrs := map[string]string{}
 		if filter.From == nil {
-			fieldErrs["filters.from"] = "error.required"
+			fieldErrs["filters.from"] = apperr.KeyRequired
 		}
 
 		if filter.To == nil {
-			fieldErrs["filters.to"] = "error.required"
+			fieldErrs["filters.to"] = apperr.KeyRequired
 		}
 
 		return paging.Page[View]{}, apperr.Fields(fieldErrs)

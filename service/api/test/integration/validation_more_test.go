@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -67,7 +68,7 @@ func TestCommandCreateValidation(t *testing.T) {
 		)+`}`,
 		0,
 	); code != 422 ||
-		resp["fieldErrors"].(map[string]any)["reason"] != "error.required" {
+		resp["fieldErrors"].(map[string]any)["reason"] != apperr.KeyRequired {
 		t.Errorf("technician without a reason: %d %v", code, resp)
 	}
 

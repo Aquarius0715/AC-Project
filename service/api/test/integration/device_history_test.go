@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -212,7 +213,7 @@ func TestDeviceBindingRefusals(t *testing.T) {
 			`"referenceValue":25,"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z"}`,
 		1,
 	); code != 409 ||
-		res["messageKey"] != "error.deviceNotBound" {
+		res["messageKey"] != apperr.KeyDeviceNotBound {
 		t.Errorf("calibrate an unbound device: %d %v", code, res)
 	}
 

@@ -43,16 +43,16 @@ func (in *ListAttachmentsInput) Validate() map[string]string {
 	}
 
 	if !ok {
-		fieldErrs["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
 	switch {
 	case in.From.IsZero():
-		fieldErrs["from"] = "error.required"
+		fieldErrs["from"] = apperr.KeyRequired
 	case in.To.IsZero():
-		fieldErrs["to"] = "error.required"
+		fieldErrs["to"] = apperr.KeyRequired
 	case !in.To.After(in.From) || in.To.Sub(in.From) > 366*24*time.Hour:
-		fieldErrs["to"] = "error.range"
+		fieldErrs["to"] = apperr.KeyRange
 	}
 
 	return fieldErrs

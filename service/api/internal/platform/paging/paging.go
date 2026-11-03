@@ -42,7 +42,7 @@ func (q Query) HasFilters() bool {
 // NoFilters is VALIDATION on field when an operation without catalogued filters receives some (SR06: unknown keys).
 func NoFilters(q Query, field string) error {
 	if q.HasFilters() {
-		return apperr.Fields(map[string]string{field: "error.invalid"})
+		return apperr.Fields(map[string]string{field: apperr.KeyInvalid})
 	}
 
 	return nil
@@ -81,7 +81,7 @@ func Resolve(query Query, conditions any, scopeVersion, snapshot int) (Window, e
 	}
 	if query.Limit != nil {
 		if *query.Limit < 1 || *query.Limit > MaxLimit {
-			return window, apperr.Fields(map[string]string{"limit": "error.range"})
+			return window, apperr.Fields(map[string]string{"limit": apperr.KeyRange})
 		}
 
 		window.Limit = *query.Limit
@@ -89,7 +89,7 @@ func Resolve(query Query, conditions any, scopeVersion, snapshot int) (Window, e
 
 	if query.Sort != nil {
 		if query.Sort.Direction != "asc" && query.Sort.Direction != "desc" {
-			return window, apperr.Fields(map[string]string{"sort.direction": "error.invalid"})
+			return window, apperr.Fields(map[string]string{"sort.direction": apperr.KeyInvalid})
 		}
 	}
 
@@ -109,7 +109,7 @@ func Resolve(query Query, conditions any, scopeVersion, snapshot int) (Window, e
 
 	var c cursor
 	if err != nil || json.Unmarshal(raw, &c) != nil || c.Offset < 0 {
-		return window, apperr.Fields(map[string]string{"cursor": "error.invalid"})
+		return window, apperr.Fields(map[string]string{"cursor": apperr.KeyInvalid})
 	}
 
 	if c.Hash != window.hash {
@@ -147,7 +147,7 @@ func OrderBy(sortSpec *SortSpec, allowed map[string]string, def string) (string,
 
 	col, ok := allowed[sortSpec.Field]
 	if !ok {
-		return "", apperr.Fields(map[string]string{"sort.field": "error.invalid"})
+		return "", apperr.Fields(map[string]string{"sort.field": apperr.KeyInvalid})
 	}
 
 	dir, err := Direction(sortSpec)
@@ -177,7 +177,7 @@ func Direction(s *SortSpec) (string, error) {
 		return "DESC", nil
 	}
 
-	return "", apperr.Fields(map[string]string{"sort.direction": "error.invalid"})
+	return "", apperr.Fields(map[string]string{"sort.direction": apperr.KeyInvalid})
 }
 
 // likeEscape takes the LIKE wildcards of a search term literally; the backslash is PostgreSQL's default escape
@@ -200,11 +200,11 @@ func SortSlice[T any](items []T, sortSpec *SortSpec, keys map[string]func(a, b T
 
 	cmp, ok := keys[sortSpec.Field]
 	if !ok {
-		return apperr.Fields(map[string]string{"sort.field": "error.invalid"})
+		return apperr.Fields(map[string]string{"sort.field": apperr.KeyInvalid})
 	}
 
 	if sortSpec.Direction != "asc" && sortSpec.Direction != "desc" {
-		return apperr.Fields(map[string]string{"sort.direction": "error.invalid"})
+		return apperr.Fields(map[string]string{"sort.direction": apperr.KeyInvalid})
 	}
 
 	id := keys["id"]

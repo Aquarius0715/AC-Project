@@ -26,7 +26,7 @@ type ConnectionFaultInput struct {
 // Validate implements ops.Validator.
 func (in *ConnectionFaultInput) Validate() map[string]string {
 	if in.DeviceID == uuid.Nil {
-		return map[string]string{"deviceId": "error.required"}
+		return map[string]string{"deviceId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -56,7 +56,7 @@ func connectionFault(
 	err := call.Tx.QueryRow(ctx, `SELECT binding_id FROM devices.devices WHERE id = $1`, input.DeviceID).
 		Scan(&out.BindingID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return out, apperr.E(apperr.NotFound, "error.notFound")
+		return out, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {

@@ -126,7 +126,7 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 		reverseProxy.ErrorHandler = func(writer http.ResponseWriter, r *http.Request, err error) {
 			app.Logger.Error("upstream failed", "domain", d, "error", err)
 
-			domainErr := apperr.E(apperr.Unavailable, "error.unavailable")
+			domainErr := apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 			domainErr.CorrelationID = writer.Header().Get(echo.HeaderXRequestID)
 			writer.Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 			writer.WriteHeader(domainErr.HTTPStatus())
@@ -160,7 +160,7 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 
 func forward(c *echo.Context, reverseProxy *httputil.ReverseProxy) error {
 	if reverseProxy == nil {
-		return apperr.E(apperr.NotFound, "error.unknownOperation")
+		return apperr.E(apperr.NotFound, apperr.KeyUnknownOperation)
 	}
 	// the services keep the correlation ID: forward the one this request got
 	c.Request().Header.Set(echo.HeaderXRequestID, c.Response().Header().Get(echo.HeaderXRequestID))

@@ -72,7 +72,7 @@ func (m FollowUps) lock(ctx context.Context, call *ops.Call, id uuid.UUID) (jobS
 		Scan(&s.status, &s.org, &s.unit, &s.completedAt, &s.rating, &s.followUp, &s.claims, &v)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == "client" && s.org != call.Principal.OrgID) {
-		return s, apperr.E(apperr.NotFound, "error.notFound")
+		return s, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -80,7 +80,7 @@ func (m FollowUps) lock(ctx context.Context, call *ops.Call, id uuid.UUID) (jobS
 	}
 
 	if v != *call.ExpectedVersion {
-		return s, apperr.E(apperr.Conflict, "error.versionConflict")
+		return s, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	return s, nil
@@ -133,22 +133,22 @@ type RateInput struct {
 func (in *RateInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if in.Stars < 1 || in.Stars > 5 {
-		fieldErrs["stars"] = "error.range"
+		fieldErrs["stars"] = apperr.KeyRange
 	}
 
 	seen := map[string]bool{}
 
 	if in.Tags == nil {
-		fieldErrs["tags"] = "error.required"
+		fieldErrs["tags"] = apperr.KeyRequired
 	}
 
 	for _, t := range in.Tags {
 		if !slices.Contains(RatingTags, t) || seen[t] {
-			fieldErrs["tags"] = "error.invalid"
+			fieldErrs["tags"] = apperr.KeyInvalid
 		}
 
 		seen[t] = true
@@ -157,7 +157,7 @@ func (in *RateInput) Validate() map[string]string {
 	if in.Comment != nil {
 		*in.Comment = strings.TrimSpace(*in.Comment)
 		if utf8.RuneCountInString(*in.Comment) > 1000 {
-			fieldErrs["comment"] = "error.length"
+			fieldErrs["comment"] = apperr.KeyLength
 		}
 
 		if *in.Comment == "" {
@@ -207,7 +207,7 @@ func (m FollowUps) rateJob(ctx context.Context, call *ops.Call, in *RateInput) (
 	}
 
 	if s.status != "completed" {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	rating := Rating{
@@ -354,25 +354,25 @@ func ContentMatches(mime string, b []byte) bool {
 func (in *ProblemInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if !problemCodes[in.ReasonCode] {
-		fieldErrs["reasonCode"] = "error.invalid"
+		fieldErrs["reasonCode"] = apperr.KeyInvalid
 	}
 
 	in.Details = strings.TrimSpace(in.Details)
 	if n := utf8.RuneCountInString(in.Details); n < 10 || n > 2000 {
-		fieldErrs["details"] = "error.length"
+		fieldErrs["details"] = apperr.KeyLength
 	}
 
 	if in.Photos == nil || len(in.Photos) > 5 {
-		fieldErrs["photos"] = "error.count"
+		fieldErrs["photos"] = apperr.KeyCount
 	}
 
 	for _, p := range in.Photos {
 		if !ValidBlob(p, 5<<20) {
-			fieldErrs["photos"] = "error.invalidFile"
+			fieldErrs["photos"] = apperr.KeyInvalidFile
 		}
 	}
 
@@ -427,7 +427,7 @@ func (m FollowUps) reportProblemJob(
 
 	if s.status != "completed" || s.completedAt == nil ||
 		!call.Now.Before(s.completedAt.Add(7*24*time.Hour)) {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	var requested Slot
@@ -436,7 +436,7 @@ func (m FollowUps) reportProblemJob(
 
 	if input.PreferredSlot != nil {
 		if !PreferredSlotsOK(call.Now, []Slot{*input.PreferredSlot}) {
-			return Job{}, apperr.Fields(map[string]string{"preferredSlot": "error.slotRules"})
+			return Job{}, apperr.Fields(map[string]string{"preferredSlot": apperr.KeySlotRules})
 		}
 
 		requested, preferred = *input.PreferredSlot, []Slot{*input.PreferredSlot}
@@ -550,11 +550,11 @@ type ClassifyInput struct {
 func (in *ClassifyInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if in.Classification != "rework" && in.Classification != "new_request" {
-		fieldErrs["classification"] = "error.invalid"
+		fieldErrs["classification"] = apperr.KeyInvalid
 	}
 
 	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
@@ -609,7 +609,7 @@ func (m FollowUps) classifyJob(
 	}
 
 	if s.followUp == nil || *s.followUp != "pending" {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	bumpErr := m.bump(
@@ -656,11 +656,11 @@ type CostInput struct {
 func (in *CostInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if in.CostLines == nil || len(in.CostLines) > 50 {
-		fieldErrs["costLines"] = "error.count"
+		fieldErrs["costLines"] = apperr.KeyCount
 	}
 
 	for i := range in.CostLines {
@@ -673,7 +673,7 @@ func (in *CostInput) Validate() map[string]string {
 			n < 1 ||
 			n > 200 ||
 			(costLine.Visibility != "internal" && costLine.Visibility != "customer") {
-			fieldErrs["costLines"] = "error.invalid"
+			fieldErrs["costLines"] = apperr.KeyInvalid
 		}
 	}
 
@@ -722,7 +722,7 @@ func (m FollowUps) saveCostJob(ctx context.Context, c *ops.Call, input *CostInpu
 	}
 
 	if s.status == "cancelled" {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	raw, _ := json.Marshal(input.CostLines)
@@ -748,11 +748,11 @@ type ExtendInput struct {
 func (in *ExtendInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if in.AccessValidUntil.IsZero() {
-		fieldErrs["accessValidUntil"] = "error.required"
+		fieldErrs["accessValidUntil"] = apperr.KeyRequired
 	}
 
 	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
@@ -877,17 +877,17 @@ type ClaimInput struct {
 func (in *ClaimInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	trimmedReason(&in.PartLabel, 120, "partLabel", fieldErrs)
 
 	if in.AmountMinor < 1 {
-		fieldErrs["amountMinor"] = "error.range"
+		fieldErrs["amountMinor"] = apperr.KeyRange
 	}
 
 	if in.Currency != "MYR" && in.Currency != "USD" {
-		fieldErrs["currency"] = "error.invalid"
+		fieldErrs["currency"] = apperr.KeyInvalid
 	}
 
 	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
@@ -954,7 +954,7 @@ func (m FollowUps) recordWarrantyClaimJob(
 	}
 
 	if s.status != "completed" || s.completedAt == nil {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	end, err := m.Warranty.WarrantyEnd(ctx, call, s.unit)

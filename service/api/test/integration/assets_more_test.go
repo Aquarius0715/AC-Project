@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -353,7 +354,7 @@ func TestOrganizations(t *testing.T) {
 		`{"name":" chong family office `+suffix+`","kind":"customer","status":"active"}`,
 		0,
 	); code != 409 ||
-		res["messageKey"] != "error.duplicateName" {
+		res["messageKey"] != apperr.KeyDuplicateName {
 		t.Errorf("duplicate billing name: %d %v", code, res)
 	}
 
@@ -364,7 +365,7 @@ func TestOrganizations(t *testing.T) {
 		`{"id":"`+id+`","name":"Demo Customer A","kind":"customer","status":"active"}`,
 		1,
 	); code != 409 ||
-		res["messageKey"] != "error.duplicateName" {
+		res["messageKey"] != apperr.KeyDuplicateName {
 		t.Errorf("rename to another customer's name: %d %v", code, res)
 	}
 

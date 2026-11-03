@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -101,7 +102,7 @@ func TestNotificationsInbox(t *testing.T) {
 		"notifications.list",
 		`{"filters":{"from":"2026-09-14T00:00:00Z","to":"2026-09-01T00:00:00Z"}}`,
 	); code != 422 ||
-		resp["fieldErrors"].(map[string]any)["filters.to"] != "error.range" {
+		resp["fieldErrors"].(map[string]any)["filters.to"] != apperr.KeyRange {
 		t.Errorf("a reversed period: %d %v", code, resp)
 	}
 
@@ -412,7 +413,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			`"recipientMembershipId":"`+recipient+`","message":"Please `+
 			`pay"}`,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["target"] != "error.invalid" {
+		res["fieldErrors"].(map[string]any)["target"] != apperr.KeyInvalid {
 		t.Errorf("a payment reminder about a job: %d %v", code, res)
 	}
 
@@ -452,7 +453,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 				`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
 				`"recipientMembershipId":"`+recipient+`",`+body+`}`,
 		); code != 422 ||
-			res["fieldErrors"].(map[string]any)[field] != "error.length" {
+			res["fieldErrors"].(map[string]any)[field] != apperr.KeyLength {
 			t.Errorf("%s too long: %d %v", field, code, res)
 		}
 	}

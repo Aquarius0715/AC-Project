@@ -156,7 +156,7 @@ func TestOrderByDirection(t *testing.T) {
 
 		var de *apperr.DomainError
 		if got != "" || !errors.As(err, &de) ||
-			de.FieldErrors["sort.direction"] != "error.invalid" {
+			de.FieldErrors["sort.direction"] != apperr.KeyInvalid {
 			t.Errorf("direction %q: %q %v", dir, got, err)
 		}
 	}

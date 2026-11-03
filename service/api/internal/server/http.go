@@ -94,7 +94,7 @@ func newEcho(
 	app.GET("/readyz", func(ectx *echo.Context) error {
 		err := txm.Writer.Ping(ectx.Request().Context())
 		if err != nil {
-			return apperr.E(apperr.Unavailable, "error.unavailable")
+			return apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 		}
 
 		return ectx.NoContent(http.StatusOK)
@@ -135,7 +135,7 @@ func principalHandler(authenticator *auth.Authenticator, token string) echo.Hand
 	return func(ectx *echo.Context) error {
 		got, _ := strings.CutPrefix(ectx.Request().Header.Get(echo.HeaderAuthorization), "Bearer ")
 		if subtle.ConstantTimeCompare([]byte(got), []byte(token)) != 1 {
-			return apperr.E(apperr.Unauthenticated, "error.unauthenticated")
+			return apperr.E(apperr.Unauthenticated, apperr.KeyUnauthenticated)
 		}
 
 		params := ectx.QueryParams()
@@ -151,7 +151,7 @@ func principalHandler(authenticator *auth.Authenticator, token string) echo.Hand
 		}
 
 		if err1 != nil || err2 != nil || err3 != nil || params.Get("subject") == "" {
-			return apperr.Fields(map[string]string{"_": "error.malformedInput"})
+			return apperr.Fields(map[string]string{"_": apperr.KeyMalformedInput})
 		}
 
 		principal, err := authenticator.Principal(
@@ -164,7 +164,7 @@ func principalHandler(authenticator *auth.Authenticator, token string) echo.Hand
 		if err != nil {
 			de := apperr.From(err)
 			if de.Code == apperr.NotFound {
-				return apperr.E(apperr.NotFound, "error.membershipInvalid")
+				return apperr.E(apperr.NotFound, apperr.KeyMembershipInvalid)
 			}
 
 			return apperr.Wrap(err, "auth.Authenticator.Principal")

@@ -24,14 +24,14 @@ type Input struct {
 func (in *Input) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if strings.TrimSpace(in.Operation) == "" {
-		fieldErrs["operation"] = "error.required"
+		fieldErrs["operation"] = apperr.KeyRequired
 	}
 
 	if n := utf8.RuneCountInString(
 		in.IdempotencyKey,
 	); n < 8 ||
 		n > 128 { // 8–128 characters (review-resolution-contracts writes.getResult)
-		fieldErrs["idempotencyKey"] = "error.invalid"
+		fieldErrs["idempotencyKey"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -73,7 +73,7 @@ type Result struct {
 //	@Router			/v1/writes/{idempotencyKey} [get]
 func get(ctx context.Context, c *ops.Call, input *Input) (Result, error) {
 	if _, ok := ops.SpecByName()[input.Operation]; !ok {
-		return Result{}, apperr.Fields(map[string]string{"operation": "error.invalid"})
+		return Result{}, apperr.Fields(map[string]string{"operation": apperr.KeyInvalid})
 	}
 
 	var (
@@ -130,7 +130,7 @@ type ResetInput struct {
 func (in *ResetInput) Validate() map[string]string {
 	in.DemoEmail = strings.TrimSpace(in.DemoEmail)
 	if !strings.Contains(in.DemoEmail, "@") || len(in.DemoEmail) > 254 {
-		return map[string]string{"demoEmail": "error.invalid"}
+		return map[string]string{"demoEmail": apperr.KeyInvalid}
 	}
 
 	return nil

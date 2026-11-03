@@ -137,7 +137,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		uv,
 		jv,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["endAction"] != "error.unsupportedAction" {
+		res["fieldErrors"].(map[string]any)["endAction"] != apperr.KeyUnsupportedAction {
 		t.Errorf("an end action the unit does not support: %d %v", code, res)
 	}
 

@@ -288,7 +288,7 @@ func FinishOperation(
 		WHERE id = $1 FOR UPDATE`, id).
 		Scan(&device, &kind, &status, &target, &expires)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return apperr.E(apperr.NotFound, "error.notFound")
+		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -441,7 +441,7 @@ func RecordSignal(
 		UPDATE`, signal.DeviceID).
 		Scan(&binding, &unit, &serial)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return false, apperr.E(apperr.NotFound, "error.notFound")
+		return false, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {

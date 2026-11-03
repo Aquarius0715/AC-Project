@@ -175,7 +175,7 @@ func (m Automations) load(
 
 	x, err := scanAutomation(call.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && x.customerOrg != call.Principal.OrgID) {
-		return Automation{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Automation{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return x, err
@@ -228,7 +228,7 @@ func (m Automations) list(
 
 		if dec.Decode(&f) != nil || (f.Kind != nil && *f.Kind != "schedule" && *f.Kind != "event") {
 			return paging.Page[Automation]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -373,7 +373,7 @@ func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondit
 	dec.DisallowUnknownFields()
 
 	if dec.Decode(&out) != nil || len(out) > 3 {
-		return nil, "error.invalid"
+		return nil, apperr.KeyInvalid
 	}
 
 	seen := map[string]bool{}
@@ -392,7 +392,7 @@ func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondit
 			days := map[int]bool{}
 			for _, d := range x.Weekdays {
 				if d < 1 || d > 7 || days[d] {
-					return nil, "error.invalid"
+					return nil, apperr.KeyInvalid
 				}
 
 				days[d] = true
@@ -400,12 +400,12 @@ func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondit
 
 			if len(x.Weekdays) == 0 || x.Occupied != nil || x.Metric != nil || x.Operator != nil ||
 				x.Value != nil {
-				return nil, "error.invalid"
+				return nil, apperr.KeyInvalid
 			}
 		case "occupancy":
 			if x.Occupied == nil || x.Weekdays != nil || x.Metric != nil || x.Operator != nil ||
 				x.Value != nil {
-				return nil, "error.invalid"
+				return nil, apperr.KeyInvalid
 			}
 		case "weather":
 			if x.Metric == nil || *x.Metric != "temperature" || x.Operator == nil ||
@@ -415,10 +415,10 @@ func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondit
 				*x.Value > 100 ||
 				x.Weekdays != nil ||
 				x.Occupied != nil {
-				return nil, "error.invalid"
+				return nil, apperr.KeyInvalid
 			}
 		default:
-			return nil, "error.invalid"
+			return nil, apperr.KeyInvalid
 		}
 
 		if x.Type == conditionType {
@@ -505,34 +505,34 @@ func (in *AutomationInput) Validate() map[string]string {
 
 	in.Name = strings.TrimSpace(in.Name)
 	if n := utf8.RuneCountInString(in.Name); n < 1 || n > 120 {
-		fieldErrs["name"] = "error.length"
+		fieldErrs["name"] = apperr.KeyLength
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fieldErrs["unitIds"] = "error.invalid"
+			fieldErrs["unitIds"] = apperr.KeyInvalid
 		}
 
 		seen[u] = true
 	}
 
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 50 {
-		fieldErrs["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
 	if !validTimezone(in.Timezone) {
-		fieldErrs["timezone"] = "error.invalid"
+		fieldErrs["timezone"] = apperr.KeyInvalid
 	}
 
 	if in.Priority < 0 || in.Priority > 100 {
-		fieldErrs["priority"] = "error.range"
+		fieldErrs["priority"] = apperr.KeyRange
 	}
 
 	action := func(k string, raw json.RawMessage) {
 		unitAction, ok := ParseAction(raw)
 		if !ok {
-			fieldErrs[k] = "error.invalid"
+			fieldErrs[k] = apperr.KeyInvalid
 
 			return
 		}
@@ -543,7 +543,7 @@ func (in *AutomationInput) Validate() map[string]string {
 	switch in.Kind {
 	case "schedule":
 		if in.Condition != nil || in.Action != nil {
-			fieldErrs["kind"] = "error.invalid"
+			fieldErrs["kind"] = apperr.KeyInvalid
 		}
 
 		validSchedule(fieldErrs, in.Weekdays, in.StartLocal, in.EndLocal, in.EndsNextDay)
@@ -554,18 +554,18 @@ func (in *AutomationInput) Validate() map[string]string {
 			in.EndsNextDay != nil ||
 			in.StartAction != nil ||
 			in.EndAction != nil {
-			fieldErrs["kind"] = "error.invalid"
+			fieldErrs["kind"] = apperr.KeyInvalid
 		}
 
 		cnd, ok := parseCondition(in.Condition)
 		if !ok {
-			fieldErrs["condition"] = "error.invalid"
+			fieldErrs["condition"] = apperr.KeyInvalid
 		}
 
 		in.condition = cnd
 		action("action", in.Action)
 	default:
-		fieldErrs["kind"] = "error.invalid"
+		fieldErrs["kind"] = apperr.KeyInvalid
 	}
 
 	extras, why := parseExtras(in.OnlyIf, in.Kind, in.condition.Type)
@@ -589,26 +589,26 @@ func validSchedule(
 	days := map[int]bool{}
 	for _, d := range weekdays {
 		if d < 1 || d > 7 || days[d] {
-			fieldErrs["weekdays"] = "error.invalid"
+			fieldErrs["weekdays"] = apperr.KeyInvalid
 		}
 
 		days[d] = true
 	}
 
 	if len(weekdays) == 0 {
-		fieldErrs["weekdays"] = "error.required"
+		fieldErrs["weekdays"] = apperr.KeyRequired
 	}
 
 	if !hhmm.MatchString(startLocal) {
-		fieldErrs["startLocal"] = "error.invalid"
+		fieldErrs["startLocal"] = apperr.KeyInvalid
 	}
 
 	if !hhmm.MatchString(endLocal) {
-		fieldErrs["endLocal"] = "error.invalid"
+		fieldErrs["endLocal"] = apperr.KeyInvalid
 	}
 
 	if endsNextDay == nil {
-		fieldErrs["endsNextDay"] = "error.required"
+		fieldErrs["endsNextDay"] = apperr.KeyRequired
 	}
 
 	if fieldErrs["startLocal"] == "" && fieldErrs["endLocal"] == "" && endsNextDay != nil {
@@ -741,7 +741,7 @@ func (m Automations) save(
 		}
 
 		if !found || target.OrgID != call.Principal.OrgID {
-			return Automation{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Automation{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		var archived bool
@@ -759,7 +759,7 @@ func (m Automations) save(
 		for _, a := range input.actions {
 			if !a.Supports(target.Caps) {
 				return Automation{}, apperr.Fields(
-					map[string]string{"unitIds": "error.unsupportedAction"},
+					map[string]string{"unitIds": apperr.KeyUnsupportedAction},
 				)
 			}
 		}
@@ -835,11 +835,11 @@ func (m Automations) save(
 		}
 
 		if cur.Version != *call.ExpectedVersion {
-			return cur, apperr.E(apperr.Conflict, "error.versionConflict")
+			return cur, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
 		if cur.Kind != input.Kind {
-			return cur, apperr.Fields(map[string]string{"kind": "error.immutable"})
+			return cur, apperr.Fields(map[string]string{"kind": apperr.KeyImmutable})
 		}
 		// IR27: explicit enabling rechecks (done above) and clears the stop reason; editing while disabled keeps it
 		_, execErr := call.Tx.Exec(
@@ -921,13 +921,13 @@ func (in *NextRunsInput) Validate() map[string]string {
 
 	switch {
 	case (in.AutomationID == nil) == (in.Draft == nil):
-		fieldErrs["automationId"] = "error.exactlyOneTarget"
+		fieldErrs["automationId"] = apperr.KeyExactlyOneTarget
 	case in.AutomationID != nil && *in.AutomationID == uuid.Nil:
-		fieldErrs["automationId"] = "error.required"
+		fieldErrs["automationId"] = apperr.KeyRequired
 	case in.Draft != nil:
 		scheduleDraft := in.Draft
 		if !validTimezone(scheduleDraft.Timezone) {
-			fieldErrs["draft.timezone"] = "error.invalid"
+			fieldErrs["draft.timezone"] = apperr.KeyInvalid
 		}
 
 		sub := map[string]string{}
@@ -948,13 +948,13 @@ func (in *NextRunsInput) Validate() map[string]string {
 			"draft.endAction":   scheduleDraft.EndAction,
 		} {
 			if _, ok := ParseAction(raw); !ok {
-				fieldErrs[k] = "error.invalid"
+				fieldErrs[k] = apperr.KeyInvalid
 			}
 		}
 	}
 
 	if in.Count != 8 {
-		fieldErrs["count"] = "error.invalid"
+		fieldErrs["count"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -1058,7 +1058,7 @@ type AutomationIDInput struct {
 // Validate implements ops.Validator.
 func (in *AutomationIDInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil
@@ -1108,7 +1108,7 @@ func (m Automations) delete(
 	}
 
 	if cur.Version != *call.ExpectedVersion {
-		return Deleted{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Deleted{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	_, execErr := call.Tx.Exec(

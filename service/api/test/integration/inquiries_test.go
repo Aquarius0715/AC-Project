@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -274,13 +275,13 @@ func TestAuditList(t *testing.T) {
 	}
 	// the period is required (both ends named when missing), from < to and at most 366 days
 	for b, want := range map[string]map[string]string{
-		`{}`: {"filters.from": "error.required", "filters.to": "error.required"},
-		`{"filters":{"from":"` + clock.Format(time.RFC3339) + `"}}`:         {"filters.to": "error.required"},
-		`{"filters":{"to":"` + clock.Format(time.RFC3339) + `"}}`:           {"filters.from": "error.required"},
+		`{}`: {"filters.from": apperr.KeyRequired, "filters.to": apperr.KeyRequired},
+		`{"filters":{"from":"` + clock.Format(time.RFC3339) + `"}}`:         {"filters.to": apperr.KeyRequired},
+		`{"filters":{"to":"` + clock.Format(time.RFC3339) + `"}}`:           {"filters.from": apperr.KeyRequired},
 		`{"filters":{` + period(clock, clock.Add(-time.Hour)) + `}}`:        {"filters.to": "errors.period_range"},
 		`{"filters":{` + period(clock.Add(-400*24*time.Hour), clock) + `}}`: {"filters.to": "errors.period_range"},
-		`{"filters":{` + day + `,"result":"ok"}}`:                           {"filters": "error.invalid"},
-		`{"filters":{` + day + `,"x":1}}`:                                   {"x": "error.notAllowed"},
+		`{"filters":{` + day + `,"result":"ok"}}`:                           {"filters": apperr.KeyInvalid},
+		`{"filters":{` + day + `,"x":1}}`:                                   {"x": apperr.KeyNotAllowed},
 	} {
 		code, m := post(srv, &hq, "audit.list", b)
 

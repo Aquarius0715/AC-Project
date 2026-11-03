@@ -406,14 +406,14 @@ func TestRESTQueryInput(t *testing.T) {
 	}
 
 	for target, wantFE := range map[string]map[string]string{
-		"?count=x":          {"count": "error.invalid"},
-		"?count=1&count=2":  {"count": "error.invalid"},
-		"?on=yes":           {"on": "error.invalid"},
-		"?ratio=NaN":        {"ratio": "error.invalid"},
-		"?sort=:asc":        {"sort": "error.invalid"},
-		"?nope=1":           {"nope": "error.notAllowed"},
-		"?jobId=" + job:     {"jobId": "error.notAllowed"}, // a path parameter is not repeated in the query
-		"?limit=2&target=x": {"target": "error.notAllowed"},
+		"?count=x":          {"count": apperr.KeyInvalid},
+		"?count=1&count=2":  {"count": apperr.KeyInvalid},
+		"?on=yes":           {"on": apperr.KeyInvalid},
+		"?ratio=NaN":        {"ratio": apperr.KeyInvalid},
+		"?sort=:asc":        {"sort": apperr.KeyInvalid},
+		"?nope=1":           {"nope": apperr.KeyNotAllowed},
+		"?jobId=" + job:     {"jobId": apperr.KeyNotAllowed}, // a path parameter is not repeated in the query
+		"?limit=2&target=x": {"target": apperr.KeyNotAllowed},
 	} {
 		if _, fieldErrs := bind(
 			t,
@@ -437,7 +437,7 @@ func TestRESTQueryInput(t *testing.T) {
 		"/v1/jobs/x/things",
 		"",
 		map[string]string{"jobId": ""},
-	); fieldErrs["jobId"] != "error.invalid" {
+	); fieldErrs["jobId"] != apperr.KeyInvalid {
 		t.Errorf("empty path parameter: %v", fieldErrs)
 	}
 	// an ID in the path that is not a UUID names no resource
@@ -501,12 +501,12 @@ func TestRESTBodyInput(t *testing.T) {
 	}
 
 	for body, wantFE := range map[string]map[string]string{
-		`{"jobId":"` + other + `"}`:     {"jobId": "error.pathMismatch"},
-		`{"action":"mark_paid"}`:        {"action": "error.pathMismatch"},
-		`{"target":"unit"}`:             {"target.kind": "error.pathMismatch"},
-		`[1]`:                           {"_": "error.malformedInput"},
-		`null`:                          {"_": "error.malformedInput"},
-		`{"a":1} {"b":2}`:               {"_": "error.malformedInput"},
+		`{"jobId":"` + other + `"}`:     {"jobId": apperr.KeyPathMismatch},
+		`{"action":"mark_paid"}`:        {"action": apperr.KeyPathMismatch},
+		`{"target":"unit"}`:             {"target.kind": apperr.KeyPathMismatch},
+		`[1]`:                           {"_": apperr.KeyMalformedInput},
+		`null`:                          {"_": apperr.KeyMalformedInput},
+		`{"a":1} {"b":2}`:               {"_": apperr.KeyMalformedInput},
 		`{"action":"approve"}`:          nil,
 		`{"target":{"kind":"space a"}}`: nil,
 	} {
@@ -522,7 +522,7 @@ func TestRESTBodyInput(t *testing.T) {
 		"/?ratio=1",
 		`{}`,
 		path,
-	); fe["ratio"] != "error.notAllowed" {
+	); fe["ratio"] != apperr.KeyNotAllowed {
 		t.Errorf("query on a body route: %v", fe)
 	}
 }
@@ -756,7 +756,7 @@ func TestRESTRoutes(t *testing.T) {
 		"key-update-2",
 		"3",
 	); code != 422 ||
-		!strings.Contains(body, "error.pathMismatch") {
+		!strings.Contains(body, apperr.KeyPathMismatch) {
 		t.Fatalf("update mismatch: %d %s", code, body)
 	}
 
@@ -792,7 +792,7 @@ func TestRESTRoutes(t *testing.T) {
 		"",
 		"",
 	); code != 404 ||
-		!strings.Contains(body, "error.notFound") { // outside the scope reads as absent
+		!strings.Contains(body, apperr.KeyNotFound) { // outside the scope reads as absent
 		t.Fatalf("get other: %d %s", code, body)
 	}
 
@@ -804,7 +804,7 @@ func TestRESTRoutes(t *testing.T) {
 		"",
 		"",
 	); code != 422 ||
-		!strings.Contains(body, "error.notAllowed") {
+		!strings.Contains(body, apperr.KeyNotAllowed) {
 		t.Fatalf("unknown parameter: %d %s", code, body)
 	}
 

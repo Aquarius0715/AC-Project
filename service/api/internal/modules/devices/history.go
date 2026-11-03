@@ -40,7 +40,7 @@ func (in *HistoryInput) device() uuid.UUID { return in.DeviceID }
 // Validate implements ops.Validator.
 func (in *HistoryInput) Validate() map[string]string {
 	if in.DeviceID == uuid.Nil {
-		return map[string]string{"deviceId": "error.required"}
+		return map[string]string{"deviceId": apperr.KeyRequired}
 	}
 
 	return nil // the filters are checked per operation (decodeHistory)
@@ -58,7 +58,7 @@ func (in *EventsInput) device() uuid.UUID { return in.ID }
 // Validate implements ops.Validator.
 func (in *EventsInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil
@@ -80,7 +80,7 @@ func (m *Module) historyAccess(
 		deviceScope(call, &args, unitscope.List), args...).
 		Scan(&unit)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil, apperr.E(apperr.NotFound, "error.notFound")
+		return "", nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -90,7 +90,7 @@ func (m *Module) historyAccess(
 	switch call.Principal.Role {
 	case "technician":
 		if unit == nil {
-			return "", nil, apperr.E(apperr.NotFound, "error.notFound")
+			return "", nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		err := m.UnitAccess.TechnicianUnit(
@@ -129,11 +129,11 @@ func decodeHistory(query paging.Query, period bool) (historyFilter, error) {
 	dec.DisallowUnknownFields()
 
 	if !period || dec.Decode(&f) != nil {
-		return f, apperr.Fields(map[string]string{"query.filters": "error.invalid"})
+		return f, apperr.Fields(map[string]string{"query.filters": apperr.KeyInvalid})
 	}
 
 	if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
-		return f, apperr.Fields(map[string]string{"query.filters.to": "error.range"})
+		return f, apperr.Fields(map[string]string{"query.filters.to": apperr.KeyRange})
 	}
 
 	return f, nil
@@ -557,16 +557,16 @@ type NoteInput struct {
 func (in *NoteInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.DeviceID == uuid.Nil {
-		fieldErrs["deviceId"] = "error.required"
+		fieldErrs["deviceId"] = apperr.KeyRequired
 	}
 
 	if in.EventID == uuid.Nil {
-		fieldErrs["eventId"] = "error.required"
+		fieldErrs["eventId"] = apperr.KeyRequired
 	}
 
 	in.ResponseNote = strings.TrimSpace(in.ResponseNote)
 	if n := utf8.RuneCountInString(in.ResponseNote); n < 1 || n > 1000 {
-		fieldErrs["responseNote"] = "error.length"
+		fieldErrs["responseNote"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -619,7 +619,7 @@ func (m *Module) addResponseNote(
 	if errors.Is(err, pgx.ErrNoRows) {
 		return DeviceEvent{}, apperr.E(
 			apperr.NotFound,
-			"error.notFound",
+			apperr.KeyNotFound,
 		) // event outside the occurrence scope (SR24)
 	}
 
@@ -628,7 +628,7 @@ func (m *Module) addResponseNote(
 	}
 
 	if v != *call.ExpectedVersion {
-		return DeviceEvent{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return DeviceEvent{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	_, execErr := call.Tx.Exec(

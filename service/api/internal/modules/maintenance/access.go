@@ -104,7 +104,7 @@ func (Access) JobVersion(
 }
 
 func forbidden(key string) error { return apperr.E(apperr.Forbidden, key) }
-func notFound() error            { return apperr.E(apperr.NotFound, "error.notFound") }
+func notFound() error            { return apperr.E(apperr.NotFound, apperr.KeyNotFound) }
 
 type assignment struct {
 	unit                uuid.UUID

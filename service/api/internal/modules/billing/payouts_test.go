@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // TestEndedPeriod: the monthly drafts are for the month that ended last in Kuala Lumpur — UTC 16:00 on the last day
@@ -46,15 +48,15 @@ func TestTransitionInput(t *testing.T) {
 		},
 		"unknown action": {
 			TransitionInput{StatementID: uuid.New(), Action: "refund", Reason: nil},
-			map[string]string{"action": "error.invalid"},
+			map[string]string{"action": apperr.KeyInvalid},
 		},
 		"no statement": {
 			TransitionInput{Action: "approve", StatementID: uuid.UUID{}, Reason: nil},
-			map[string]string{"statementId": "error.required"},
+			map[string]string{"statementId": apperr.KeyRequired},
 		},
 		"long reason": {
 			TransitionInput{StatementID: uuid.New(), Action: "approve", Reason: &long},
-			map[string]string{"reason": "error.length"},
+			map[string]string{"reason": apperr.KeyLength},
 		},
 	} {
 		in := c.in

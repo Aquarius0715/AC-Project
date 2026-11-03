@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -61,7 +62,7 @@ func TestProposalRefusalsByState(t *testing.T) {
 		`{"jobId":"`+job+`","proposalId":"`+unknown+`"}`,
 		2,
 	); code != 404 ||
-		res["messageKey"] != "error.notFound" {
+		res["messageKey"] != apperr.KeyNotFound {
 		t.Errorf("withdraw an unknown proposal: %d %v", code, res)
 	}
 
@@ -72,7 +73,7 @@ func TestProposalRefusalsByState(t *testing.T) {
 		`{"jobId":"`+job+`","proposalId":"`+unknown+`","decision":"accept"}`,
 		2,
 	); code != 404 ||
-		res["messageKey"] != "error.notFound" {
+		res["messageKey"] != apperr.KeyNotFound {
 		t.Errorf("answer an unknown proposal: %d %v", code, res)
 	}
 
@@ -93,7 +94,7 @@ func TestProposalRefusalsByState(t *testing.T) {
 		`{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`,
 		3,
 	); code != 409 ||
-		res["messageKey"] != "error.invalidState" {
+		res["messageKey"] != apperr.KeyInvalidState {
 		t.Errorf("answer a withdrawn proposal: %d %v", code, res)
 	}
 

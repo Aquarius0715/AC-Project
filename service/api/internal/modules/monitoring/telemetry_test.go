@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -47,7 +48,7 @@ func TestSeriesInputFilters(t *testing.T) {
 	if fe := input(
 		`{"unitId":"x"}`,
 	).Validate(); len(fe) != 1 ||
-		fe["query.filters"] != "error.invalid" {
+		fe["query.filters"] != apperr.KeyInvalid {
 		t.Errorf("a filter: %v", fe)
 	}
 }

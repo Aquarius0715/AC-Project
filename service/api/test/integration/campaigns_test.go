@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -97,7 +98,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 		0,
 	)
 	for name, c := range map[string]struct{ device, key string }{
-		"tampered device": {tampered, "error.tamperUnresolved"},
+		"tampered device": {tampered, apperr.KeyTamperUnresolved},
 		"other model":     {data(od)["id"].(string), "error.otherModel"},
 	} {
 		if code, res := write(

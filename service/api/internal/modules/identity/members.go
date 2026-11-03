@@ -262,7 +262,7 @@ func membersList(
 		if dec.Decode(&f) != nil || (f.Role != nil && !slices.Contains(roles, *f.Role)) ||
 			(f.Qualification != nil && !slices.Contains(qualificationCodes, *f.Qualification)) {
 			return paging.Page[Member]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -431,7 +431,7 @@ func (in *MemberInput) Validate() map[string]string {
 
 	if in.NewUser != nil {
 		if in.UserID != uuid.Nil || in.ID != nil {
-			fieldErrs["newUser"] = "error.notAllowed"
+			fieldErrs["newUser"] = apperr.KeyNotAllowed
 		}
 
 		in.NewUser.Email, in.NewUser.DisplayName = strings.TrimSpace(
@@ -445,34 +445,34 @@ func (in *MemberInput) Validate() map[string]string {
 		)
 		if err != nil || a.Address != in.NewUser.Email ||
 			len(in.NewUser.Email) > 254 {
-			fieldErrs["newUser.email"] = "error.invalid"
+			fieldErrs["newUser.email"] = apperr.KeyInvalid
 		}
 
 		if n := utf8.RuneCountInString(in.NewUser.DisplayName); n < 1 || n > 120 {
-			fieldErrs["newUser.displayName"] = "error.length"
+			fieldErrs["newUser.displayName"] = apperr.KeyLength
 		}
 	} else if in.UserID == uuid.Nil {
-		fieldErrs["userId"] = "error.required"
+		fieldErrs["userId"] = apperr.KeyRequired
 	}
 
 	if in.OrganizationID == uuid.Nil {
-		fieldErrs["organizationId"] = "error.required"
+		fieldErrs["organizationId"] = apperr.KeyRequired
 	}
 
 	if !slices.Contains(roles, in.Role) {
-		fieldErrs["role"] = "error.invalid"
+		fieldErrs["role"] = apperr.KeyInvalid
 	}
 
 	switch {
 	case in.Role == "technician" &&
 		(in.Employment == nil || (*in.Employment != "internal" && *in.Employment != "external")):
-		fieldErrs["employment"] = "error.required"
+		fieldErrs["employment"] = apperr.KeyRequired
 	case in.Role != "technician" && in.Employment != nil:
-		fieldErrs["employment"] = "error.notAllowed"
+		fieldErrs["employment"] = apperr.KeyNotAllowed
 	}
 
 	if in.Permissions == nil || in.Scopes == nil {
-		fieldErrs["permissions"] = "error.required"
+		fieldErrs["permissions"] = apperr.KeyRequired
 	}
 
 	seen := map[string]bool{}
@@ -484,7 +484,7 @@ func (in *MemberInput) Validate() map[string]string {
 		}
 
 		if !allowed || seen[p] {
-			fieldErrs["permissions"] = "error.invalid"
+			fieldErrs["permissions"] = apperr.KeyInvalid
 		}
 
 		seen[p] = true
@@ -506,20 +506,20 @@ func (in *MemberInput) Validate() map[string]string {
 	}[in.Role]
 	for _, sc := range in.Scopes {
 		if !slices.Contains(kinds, sc.Kind) {
-			fieldErrs["scopes"] = "error.invalid"
+			fieldErrs["scopes"] = apperr.KeyInvalid
 		}
 	}
 
 	if in.Role == "admin" && len(in.Scopes) > 1 {
-		fieldErrs["scopes"] = "error.invalid"
+		fieldErrs["scopes"] = apperr.KeyInvalid
 	}
 
 	if in.ValidFrom.IsZero() {
-		fieldErrs["validFrom"] = "error.required"
+		fieldErrs["validFrom"] = apperr.KeyRequired
 	}
 
 	if in.ValidUntil != nil && !in.ValidFrom.Before(*in.ValidUntil) {
-		fieldErrs["validUntil"] = "error.range"
+		fieldErrs["validUntil"] = apperr.KeyRange
 	}
 
 	if in.Role == "technician" && in.Employment != nil && *in.Employment == "external" &&
@@ -529,7 +529,7 @@ func (in *MemberInput) Validate() map[string]string {
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fieldErrs["reason"] = "error.length"
+		fieldErrs["reason"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -592,7 +592,7 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 	err := c.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, input.OrganizationID).
 		Scan(&kind)
 	if !exists || errors.Is(err, pgx.ErrNoRows) {
-		return Member{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Member{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -770,7 +770,7 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 			),
 		)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Member{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Member{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		if err != nil {
@@ -783,7 +783,7 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 		}
 
 		if member.Version != *c.ExpectedVersion {
-			return Member{}, apperr.E(apperr.Conflict, "error.versionConflict")
+			return Member{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 		// last active identity.write holder: a membership that loses the permission or stops being valid now (ended, or
 		// its start moved later). The tenant's changes to holders wait for each other here, so two at once — each taking
@@ -1045,12 +1045,12 @@ type RevokeSessionsInput struct {
 func (in *RevokeSessionsInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.MembershipID == uuid.Nil {
-		fieldErrs["membershipId"] = "error.required"
+		fieldErrs["membershipId"] = apperr.KeyRequired
 	}
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fieldErrs["reason"] = "error.length"
+		fieldErrs["reason"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -1112,7 +1112,7 @@ func membersRevokeSessions(
 	err := call.Tx.QueryRow(ctx, `SELECT user_id, role FROM identity.memberships WHERE id = $1`, input.MembershipID).
 		Scan(&user, &role)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return SessionsRevoked{}, apperr.E(apperr.NotFound, "error.notFound")
+		return SessionsRevoked{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {

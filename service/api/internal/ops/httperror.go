@@ -26,11 +26,11 @@ func HTTPErrorHandler(ectx *echo.Context, err error) {
 	case errors.As(err, &sc):
 		switch sc.StatusCode() {
 		case http.StatusNotFound, http.StatusMethodNotAllowed:
-			domainErr = apperr.E(apperr.NotFound, "error.unknownOperation")
+			domainErr = apperr.E(apperr.NotFound, apperr.KeyUnknownOperation)
 		case http.StatusRequestEntityTooLarge:
-			domainErr = apperr.E(apperr.Validation, "error.bodyTooLarge")
+			domainErr = apperr.E(apperr.Validation, apperr.KeyBodyTooLarge)
 		case http.StatusServiceUnavailable, http.StatusGatewayTimeout:
-			domainErr = apperr.E(apperr.Timeout, "error.timeout")
+			domainErr = apperr.E(apperr.Timeout, apperr.KeyTimeout)
 		default:
 			domainErr = apperr.From(err)
 		}

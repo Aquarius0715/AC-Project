@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -30,7 +31,7 @@ func TestContractUpdateOfAMissingContractIsNotFound(t *testing.T) {
 	}, ",")
 
 	code, m := write(srv, &hq, "contracts.save", "{"+body+"}", 1)
-	if code != 404 || m["messageKey"] != "error.notFound" {
+	if code != 404 || m["messageKey"] != apperr.KeyNotFound {
 		t.Fatalf("revision of a missing contract: %d %v, want 404 NOT_FOUND", code, m)
 	}
 }

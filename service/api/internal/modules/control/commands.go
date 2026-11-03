@@ -175,29 +175,29 @@ type CreateInput struct {
 func (in *CreateInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.UnitID == uuid.Nil {
-		fieldErrs["unitId"] = "error.required"
+		fieldErrs["unitId"] = apperr.KeyRequired
 	}
 
 	a, ok := ParseAction(in.Action)
 	if !ok {
-		fieldErrs["action"] = "error.invalid"
+		fieldErrs["action"] = apperr.KeyInvalid
 	}
 
 	in.action = a
 	if in.ExpectedUnitVersion < 1 {
-		fieldErrs["expectedUnitVersion"] = "error.required"
+		fieldErrs["expectedUnitVersion"] = apperr.KeyRequired
 	}
 
 	if in.Source == "" {
 		in.Source = "ui"
 	} else if in.Source != "ui" && in.Source != "voice" {
-		fieldErrs["source"] = "error.invalid"
+		fieldErrs["source"] = apperr.KeyInvalid
 	}
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
 		if n := utf8.RuneCountInString(*in.Reason); n < 1 || n > 1000 {
-			fieldErrs["reason"] = "error.length"
+			fieldErrs["reason"] = apperr.KeyLength
 		}
 	}
 
@@ -249,7 +249,7 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 		return Command{}, apperr.Wrap(err, "control.Units.Target")
 	}
 
-	notFound := apperr.E(apperr.NotFound, "error.notFound")
+	notFound := apperr.E(apperr.NotFound, apperr.KeyNotFound)
 
 	switch c.Principal.Role {
 	case "client":
@@ -258,11 +258,11 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 		}
 
 		if input.Reason != nil {
-			return Command{}, apperr.Fields(map[string]string{"reason": "error.notAllowed"})
+			return Command{}, apperr.Fields(map[string]string{"reason": apperr.KeyNotAllowed})
 		}
 	case "technician":
 		if input.Source == "voice" {
-			return Command{}, apperr.Fields(map[string]string{"source": "error.notAllowed"})
+			return Command{}, apperr.Fields(map[string]string{"source": apperr.KeyNotAllowed})
 		}
 
 		if !found {
@@ -270,7 +270,7 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 		}
 
 		if input.JobID == nil {
-			return Command{}, apperr.Fields(map[string]string{"jobId": "error.required"})
+			return Command{}, apperr.Fields(map[string]string{"jobId": apperr.KeyRequired})
 		}
 
 		err := m.Access.TechnicianJob(ctx, c, *input.JobID, input.UnitID)
@@ -279,7 +279,7 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 		}
 
 		if input.Reason == nil {
-			return Command{}, apperr.Fields(map[string]string{"reason": "error.required"})
+			return Command{}, apperr.Fields(map[string]string{"reason": apperr.KeyRequired})
 		}
 	default:
 		if !found {
@@ -287,20 +287,20 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 		}
 
 		if input.Source == "voice" { // the assistant is offered only in the Client app (IR115)
-			return Command{}, apperr.Fields(map[string]string{"source": "error.notAllowed"})
+			return Command{}, apperr.Fields(map[string]string{"source": apperr.KeyNotAllowed})
 		}
 
 		if input.Reason == nil {
-			return Command{}, apperr.Fields(map[string]string{"reason": "error.required"})
+			return Command{}, apperr.Fields(map[string]string{"reason": apperr.KeyRequired})
 		}
 	}
 
 	if target.Version != input.ExpectedUnitVersion {
-		return Command{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Command{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if !input.action.Supports(target.Caps) {
-		return Command{}, apperr.Fields(map[string]string{"action": "error.unsupportedAction"})
+		return Command{}, apperr.Fields(map[string]string{"action": apperr.KeyUnsupportedAction})
 	}
 
 	policy, err := m.Restrictions.UnitPolicy(ctx, c, input.UnitID)
@@ -424,7 +424,7 @@ type GetInput struct {
 // Validate implements ops.Validator.
 func (in *GetInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil
@@ -459,7 +459,7 @@ func (m Commands) get(ctx context.Context, call *ops.Call, in *GetInput) (Comman
 		call.Tx.QueryRow(ctx, "SELECT "+commandCols+" FROM control.commands WHERE id = $1", in.ID),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return command, apperr.E(apperr.NotFound, "error.notFound")
+		return command, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -476,7 +476,7 @@ func (m Commands) get(ctx context.Context, call *ops.Call, in *GetInput) (Comman
 			((call.Principal.Role == "client" && target.OrgID == call.Principal.OrgID) ||
 				(call.Principal.Role == "technician" && inScope(call.Principal, command.UnitID, target.PropertyID, target.OrgID)))
 		if !ok {
-			return Command{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Command{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 	}
 
@@ -493,7 +493,7 @@ type ListInput struct {
 // Validate implements ops.Validator.
 func (in *ListInput) Validate() map[string]string {
 	if in.UnitID == uuid.Nil {
-		return map[string]string{"unitId": "error.required"}
+		return map[string]string{"unitId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -563,7 +563,7 @@ func (m Commands) list(
 		return paging.Page[Command]{}, apperr.Wrap(err, "control.Units.Target")
 	}
 
-	notFound := apperr.E(apperr.NotFound, "error.notFound")
+	notFound := apperr.E(apperr.NotFound, apperr.KeyNotFound)
 
 	switch call.Principal.Role {
 	case "client":
@@ -573,7 +573,7 @@ func (m Commands) list(
 	case "technician":
 		if input.JobID == nil {
 			return paging.Page[Command]{}, apperr.Fields(
-				map[string]string{"jobId": "error.required"},
+				map[string]string{"jobId": apperr.KeyRequired},
 			)
 		}
 

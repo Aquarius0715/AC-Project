@@ -80,7 +80,7 @@ type AdvanceInput struct {
 // Validate implements ops.Validator.
 func (in *AdvanceInput) Validate() map[string]string {
 	if in.To.IsZero() {
-		return map[string]string{"to": "error.required"}
+		return map[string]string{"to": apperr.KeyRequired}
 	}
 
 	return nil
@@ -155,7 +155,7 @@ type ResetInput struct {
 // Validate implements ops.Validator.
 func (in *ResetInput) Validate() map[string]string {
 	if !in.Confirmation {
-		return map[string]string{"confirmation": "error.required"}
+		return map[string]string{"confirmation": apperr.KeyRequired}
 	}
 
 	return nil
@@ -265,69 +265,69 @@ type RawMeasurement struct {
 func (in *TriggerInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.EventID == uuid.Nil {
-		fieldErrs["eventId"] = "error.required"
+		fieldErrs["eventId"] = apperr.KeyRequired
 	}
 
 	if in.OccurredAt.IsZero() {
-		fieldErrs["occurredAt"] = "error.required"
+		fieldErrs["occurredAt"] = apperr.KeyRequired
 	}
 
 	switch in.EventType {
 	case "command_sent", "command_ack", "command_fail":
 		if in.CommandID == nil || in.Measurement != nil {
-			fieldErrs["commandId"] = "error.required"
+			fieldErrs["commandId"] = apperr.KeyRequired
 		}
 	case "telemetry":
 		if in.Measurement == nil || in.CommandID != nil {
-			fieldErrs["measurement"] = "error.required"
+			fieldErrs["measurement"] = apperr.KeyRequired
 		}
 	case "restriction_observation":
 		if in.RestrictionID == nil || in.UnitID == nil || in.CommandID != nil ||
 			in.Measurement != nil {
-			fieldErrs["unitId"] = "error.required"
+			fieldErrs["unitId"] = apperr.KeyRequired
 		}
 	case "device":
 		if in.DeviceID == nil {
-			fieldErrs["deviceId"] = "error.required"
+			fieldErrs["deviceId"] = apperr.KeyRequired
 		}
 
 		if in.Sequence == nil || *in.Sequence < 0 {
-			fieldErrs["sequence"] = "error.required"
+			fieldErrs["sequence"] = apperr.KeyRequired
 		}
 
 		switch recovery := in.Recovery; {
 		case in.Kind == "restored" &&
 			(recovery == nil || recovery.SourceEventID == uuid.Nil || devices.RecoveredValue[recovery.Axis] == "" ||
 				devices.RecoveredValue[recovery.Axis] != recovery.Value):
-			fieldErrs["recovery"] = "error.invalid" // DeviceRecovery: connection → online, power → on, tamper → clear
+			fieldErrs["recovery"] = apperr.KeyInvalid // DeviceRecovery: connection → online, power → on, tamper → clear
 		case in.Kind != "restored" && devices.FaultAxis[in.Kind] == "":
-			fieldErrs["kind"] = "error.invalid"
+			fieldErrs["kind"] = apperr.KeyInvalid
 		case in.Kind != "restored" && recovery != nil:
-			fieldErrs["recovery"] = "error.invalid" // faults carry no recovery (SR20)
+			fieldErrs["recovery"] = apperr.KeyInvalid // faults carry no recovery (SR20)
 		}
 	case "state":
 		if in.DeviceID == nil {
-			fieldErrs["deviceId"] = "error.required"
+			fieldErrs["deviceId"] = apperr.KeyRequired
 		}
 
 		switch reportedState := in.State; {
 		case reportedState == nil:
-			fieldErrs["state"] = "error.required"
+			fieldErrs["state"] = apperr.KeyRequired
 		case reportedState.Mode != nil && *reportedState.Mode != "cool" && *reportedState.Mode != "dry" &&
 			*reportedState.Mode != "fan":
-			fieldErrs["state.mode"] = "error.invalid"
+			fieldErrs["state.mode"] = apperr.KeyInvalid
 		case reportedState.FanLevel != nil && *reportedState.FanLevel != "low" && *reportedState.FanLevel != "mid" &&
 			*reportedState.FanLevel != "high":
-			fieldErrs["state.fanLevel"] = "error.invalid"
+			fieldErrs["state.fanLevel"] = apperr.KeyInvalid
 		case reportedState.Celsius != nil && (*reportedState.Celsius < 10 || *reportedState.Celsius > 40):
-			fieldErrs["state.celsius"] = "error.range"
+			fieldErrs["state.celsius"] = apperr.KeyRange
 		}
 	case "automation":
 		switch evaluationInput := in.Event; {
 		case evaluationInput == nil || in.CommandID != nil || in.Measurement != nil:
-			fieldErrs["event"] = "error.required"
+			fieldErrs["event"] = apperr.KeyRequired
 		case evaluationInput.Phase != "condition": // a gateway reports conditions; schedules come from the clock (IR54)
-			fieldErrs["event.phase"] = "error.invalid"
+			fieldErrs["event.phase"] = apperr.KeyInvalid
 		default:
 			for k, v := range evaluationInput.Validate() {
 				fieldErrs["event."+k] = v
@@ -335,11 +335,11 @@ func (in *TriggerInput) Validate() map[string]string {
 		}
 	case "operation":
 		if in.OperationID == nil {
-			fieldErrs["operationId"] = "error.required"
+			fieldErrs["operationId"] = apperr.KeyRequired
 		}
 
 		if in.Result != "succeeded" && in.Result != "failed" {
-			fieldErrs["result"] = "error.invalid"
+			fieldErrs["result"] = apperr.KeyInvalid
 		}
 	default:
 		fieldErrs["eventType"] = "errors.trigger_unsupported"
@@ -437,7 +437,7 @@ func (d *demoOps) inTenant(
 		}
 	}
 
-	return apperr.E(apperr.NotFound, "error.notFound")
+	return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 }
 
 // trigger serves demo.trigger.
@@ -600,7 +600,7 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 	if in.EventType == "automation" { // a gateway's facts: the alert policies of the units, never an automation (IR529)
 		evaluationInput := in.Event
 		if evaluationInput.OccurredAt.After(call.Now) {
-			return out, apperr.Fields(map[string]string{"event.occurredAt": "error.range"})
+			return out, apperr.Fields(map[string]string{"event.occurredAt": apperr.KeyRange})
 		}
 
 		if d.notify == nil {
@@ -656,7 +656,7 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 	if in.EventType == "state" {
 		// the device's state report: the unit's observed settings and when the device was last heard
 		if in.OccurredAt.After(call.Now) {
-			return out, apperr.Fields(map[string]string{"occurredAt": "error.range"})
+			return out, apperr.Fields(map[string]string{"occurredAt": apperr.KeyRange})
 		}
 
 		return out, d.inTenant(

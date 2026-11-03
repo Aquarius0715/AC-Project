@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -108,7 +109,7 @@ func TestArchiveRulesD05(t *testing.T) {
 		body,
 		int(cb["version"].(float64)),
 	); code != 409 ||
-		resp["messageKey"] != "error.customerActive" {
+		resp["messageKey"] != apperr.KeyCustomerActive {
 		t.Fatalf("deactivation with units: %d %v", code, resp)
 	}
 	// an organization with only an unexpired contract also blocks deactivation

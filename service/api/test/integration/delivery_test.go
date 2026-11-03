@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -618,7 +619,7 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 			b,
 			1,
 		); code != 422 ||
-			resp["fieldErrors"].(map[string]any)["_"] != "error.malformedInput" {
+			resp["fieldErrors"].(map[string]any)["_"] != apperr.KeyMalformedInput {
 			t.Errorf("%s with the other decision's field: %d %v", op, code, resp)
 		}
 	}
@@ -630,7 +631,7 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		`{"jobId":"`+job+`","offerId":"`+uuid.NewString()+`"}`,
 		1,
 	); code != 422 ||
-		resp["fieldErrors"].(map[string]any)["reason"] != "error.length" {
+		resp["fieldErrors"].(map[string]any)["reason"] != apperr.KeyLength {
 		t.Errorf("decline without a reason: %d %v", code, resp)
 	}
 
@@ -641,7 +642,7 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		`{"jobId":"`+job+`","offerId":"`+uuid.NewString()+`"}`,
 		1,
 	); code != 422 ||
-		resp["fieldErrors"].(map[string]any)["termsVersion"] != "error.required" {
+		resp["fieldErrors"].(map[string]any)["termsVersion"] != apperr.KeyRequired {
 		t.Errorf("accept without terms: %d %v", code, resp)
 	}
 

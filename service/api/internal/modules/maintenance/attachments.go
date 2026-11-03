@@ -38,7 +38,7 @@ func (m Files) lockDraft(
 	err := call.Tx.QueryRow(ctx, `SELECT status, unit_id FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, job).
 		Scan(&status, &unit)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, apperr.E(apperr.NotFound, "error.notFound")
+		return nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -56,7 +56,7 @@ func (m Files) lockDraft(
 	}
 
 	if status != "in_progress" || draft == nil || draft.ID != report {
-		return nil, apperr.E(apperr.Conflict, "error.invalidState")
+		return nil, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	return draft, nil
@@ -110,11 +110,11 @@ type AddInput struct {
 func (in *AddInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil || in.ReportID == uuid.Nil {
-		fieldErrs["reportId"] = "error.required"
+		fieldErrs["reportId"] = apperr.KeyRequired
 	}
 
 	if !ValidBlob(in.File, 5<<20) {
-		fieldErrs["file"] = "error.invalidFile"
+		fieldErrs["file"] = apperr.KeyInvalidFile
 	}
 
 	return fieldErrs
@@ -155,7 +155,7 @@ func (m Files) add(ctx context.Context, c *ops.Call, input *AddInput) (Attachmen
 	}
 
 	if draft.Version != *c.ExpectedVersion {
-		return AttachmentRef{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return AttachmentRef{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	var n int
@@ -252,7 +252,7 @@ type SignOffInput struct {
 func (in *SignOffInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil || in.ReportID == uuid.Nil || in.ReportVersion < 1 {
-		fieldErrs["reportId"] = "error.required"
+		fieldErrs["reportId"] = apperr.KeyRequired
 	}
 
 	trimmedReason(&in.SignerName, 120, "signerName", fieldErrs)
@@ -260,13 +260,13 @@ func (in *SignOffInput) Validate() map[string]string {
 	switch {
 	case in.Signature != nil && in.AbsentReason == nil && in.SitePhoto == nil:
 		if in.Signature.Mime != "image/png" || !ValidBlob(*in.Signature, 5<<20) {
-			fieldErrs["signature"] = "error.invalidFile"
+			fieldErrs["signature"] = apperr.KeyInvalidFile
 		}
 	case in.Signature == nil && in.AbsentReason != nil && in.SitePhoto != nil:
 		trimmedReason(in.AbsentReason, 1000, "absentReason", fieldErrs)
 
 		if !ValidBlob(*in.SitePhoto, 5<<20) {
-			fieldErrs["sitePhoto"] = "error.invalidFile"
+			fieldErrs["sitePhoto"] = apperr.KeyInvalidFile
 		}
 	default:
 		fieldErrs["signature"] = "errors.signature_or_absence"
@@ -399,7 +399,7 @@ type ContentInput struct {
 func (in *ContentInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil || in.ReportID == uuid.Nil || in.AttachmentID == uuid.Nil ||
 		in.ReportVersion < 1 {
-		return map[string]string{"attachmentId": "error.required"}
+		return map[string]string{"attachmentId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -460,7 +460,7 @@ func (m Files) content(ctx context.Context, call *ops.Call, in *ContentInput) (B
 		in.AttachmentID, in.ReportID, in.JobID).
 		Scan(&key, &out.Name, &out.Mime, &out.Size)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return out, apperr.E(apperr.NotFound, "error.notFound")
+		return out, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -471,7 +471,7 @@ func (m Files) content(ctx context.Context, call *ops.Call, in *ContentInput) (B
 	if errors.Is(err, blob.ErrNotFound) {
 		return out, apperr.E(
 			apperr.NotFound,
-			"error.notFound",
+			apperr.KeyNotFound,
 		) // the row is kept but its content was lost: not retryable (IR229)
 	} else if err != nil {
 		return out, apperr.Wrap(err, "blob.Store.Get")

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -372,7 +373,7 @@ func TestAutomationOnArchivedUnit(t *testing.T) {
 	)
 
 	code, m := write(srv, &customerB, "automations.save", scheduleRule(unit, nil), 0)
-	if code != 404 || m["messageKey"] != "error.notFound" {
+	if code != 404 || m["messageKey"] != apperr.KeyNotFound {
 		t.Fatalf("an archived unit: %d %v", code, m)
 	}
 

@@ -257,7 +257,7 @@ type EvidenceInput struct {
 // Validate implements ops.Validator.
 func (in *EvidenceInput) Validate() map[string]string {
 	if in.AlertID == uuid.Nil {
-		return map[string]string{"alertId": "error.required"}
+		return map[string]string{"alertId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -312,7 +312,7 @@ func (m Alerts) evidence(
 			args...),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return paging.Page[EvidenceCandidate]{}, apperr.E(apperr.NotFound, "error.notFound")
+		return paging.Page[EvidenceCandidate]{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {

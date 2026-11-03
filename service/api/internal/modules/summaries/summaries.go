@@ -42,7 +42,7 @@ type Input struct {
 // Validate implements ops.Validator.
 func (in *Input) Validate() map[string]string {
 	if in.Kind != "customer" && in.Kind != "partner" && in.Kind != "technician" {
-		return map[string]string{"kind": "error.invalid"}
+		return map[string]string{"kind": apperr.KeyInvalid}
 	}
 
 	return nil
@@ -118,7 +118,7 @@ var roleKind = map[string]string{
 //	@Router			/v1/summaries/{kind} [get]
 func (m Summaries) get(ctx context.Context, call *ops.Call, in *Input) (Summary, error) {
 	if roleKind[call.Principal.Role] != in.Kind {
-		return Summary{}, apperr.E(apperr.Forbidden, "error.forbidden")
+		return Summary{}, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
 	out := Summary{
@@ -157,12 +157,12 @@ func (m Summaries) get(ctx context.Context, call *ops.Call, in *Input) (Summary,
 			dec.DisallowUnknownFields()
 
 			if dec.Decode(&f) != nil {
-				return Summary{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+				return Summary{}, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
 			}
 		}
 
 		if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
-			return Summary{}, apperr.Fields(map[string]string{"filters.to": "error.range"})
+			return Summary{}, apperr.Fields(map[string]string{"filters.to": apperr.KeyRange})
 		}
 
 		unitCounts, err := m.Units.CountUnits(

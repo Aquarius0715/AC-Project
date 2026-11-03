@@ -473,25 +473,25 @@ func (b *Binding) Input(ectx *echo.Context, body []byte) ([]byte, error) {
 
 			err := dec.Decode(&obj)
 			if err != nil || obj == nil || dec.More() {
-				return nil, apperr.Fields(map[string]string{"_": "error.malformedInput"})
+				return nil, apperr.Fields(map[string]string{"_": apperr.KeyMalformedInput})
 			}
 		}
 
 		for name := range query {
-			fieldErrs[name] = "error.notAllowed" // a body route reads its input from the body
+			fieldErrs[name] = apperr.KeyNotAllowed // a body route reads its input from the body
 		}
 	} else {
 		for name, values := range query {
 			p, ok := b.Params[name]
 			if !ok || slices.Contains(b.Path, name) || name == b.Route.FixedField {
-				fieldErrs[name] = "error.notAllowed"
+				fieldErrs[name] = apperr.KeyNotAllowed
 
 				continue
 			}
 
 			v, ok := p.value(values)
 			if !ok {
-				fieldErrs[name] = "error.invalid"
+				fieldErrs[name] = apperr.KeyInvalid
 			} else if v != nil {
 				place(obj, p.At, v)
 			}
@@ -505,21 +505,21 @@ func (b *Binding) Input(ectx *echo.Context, body []byte) ([]byte, error) {
 				raw,
 			)
 			if perr != nil { // no resource has this ID: the path names nothing
-				return nil, apperr.E(apperr.NotFound, "error.notFound")
+				return nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 			}
 		}
 
 		v, ok := convert(b.Params[name].Kind, raw)
 		switch {
 		case err != nil || raw == "" || !ok:
-			fieldErrs[name] = "error.invalid"
+			fieldErrs[name] = apperr.KeyInvalid
 		case !place(obj, b.Params[name].At, v):
-			fieldErrs[name] = "error.pathMismatch"
+			fieldErrs[name] = apperr.KeyPathMismatch
 		}
 	}
 
 	if f := b.Route.FixedField; f != "" && !place(obj, b.Params[f].At, b.Route.FixedValue) {
-		fieldErrs[f] = "error.pathMismatch"
+		fieldErrs[f] = apperr.KeyPathMismatch
 	}
 
 	if len(fieldErrs) > 0 {

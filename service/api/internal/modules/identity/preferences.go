@@ -72,11 +72,11 @@ func ValidTimezone(tz string) bool {
 func (in *PreferencesInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.Locale != "en" && in.Locale != "ms" {
-		fieldErrs["locale"] = "error.invalid"
+		fieldErrs["locale"] = apperr.KeyInvalid
 	}
 
 	if !ValidTimezone(in.Timezone) {
-		fieldErrs["timezone"] = "error.invalid"
+		fieldErrs["timezone"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -114,7 +114,7 @@ func updatePreferences(
 ) (Preferences, error) {
 	if input.MonthlyReportEmail != nil && call.Principal.Role != "client" {
 		return Preferences{}, apperr.Fields(
-			map[string]string{"monthlyReportEmail": "error.notAllowed"},
+			map[string]string{"monthlyReportEmail": apperr.KeyNotAllowed},
 		)
 	}
 
@@ -185,7 +185,7 @@ type ConsentGetInput struct {
 // Validate implements ops.Validator.
 func (in *ConsentGetInput) Validate() map[string]string {
 	if in.Purpose != "location_automation" {
-		return map[string]string{"purpose": "error.invalid"}
+		return map[string]string{"purpose": apperr.KeyInvalid}
 	}
 
 	return nil
@@ -205,7 +205,7 @@ func loadConsent(ctx context.Context, call *ops.Call, purpose string, lock bool)
 		Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.MembershipID, &x.Purpose, &x.Granted,
 			&x.GrantedAt, &x.RevokedAt)
 	if errors.Is(err, pgx.ErrNoRows) { // IR84: a missing record is a fixture defect
-		return x, apperr.E(apperr.NotFound, "error.notFound")
+		return x, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return x, apperr.Wrap(err, "update (loadConsent)")
@@ -248,7 +248,7 @@ type ConsentUpdateInput struct {
 // Validate implements ops.Validator.
 func (in *ConsentUpdateInput) Validate() map[string]string {
 	if in.Purpose != "location_automation" {
-		return map[string]string{"purpose": "error.invalid"}
+		return map[string]string{"purpose": apperr.KeyInvalid}
 	}
 
 	return nil
@@ -288,7 +288,7 @@ func updateConsent(ctx context.Context, c *ops.Call, input *ConsentUpdateInput) 
 	}
 
 	if x.Version != *c.ExpectedVersion {
-		return x, apperr.E(apperr.Conflict, "error.versionConflict")
+		return x, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if x.Granted == input.Granted {

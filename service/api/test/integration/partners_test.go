@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -105,7 +106,7 @@ func TestContractorRegister(t *testing.T) {
 		body(`,"id":"`+id+`"`),
 		1,
 	); code != 409 ||
-		res["messageKey"] != "error.versionConflict" {
+		res["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("update of a stale version: %d %v", code, res)
 	}
 
@@ -126,7 +127,7 @@ func TestContractorRegister(t *testing.T) {
 		`{"contractorOrgId":"`+org+`","status":"suspended","reason":"insurance lapsed"}`,
 		1,
 	); code != 409 ||
-		res["messageKey"] != "error.versionConflict" {
+		res["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("suspend a stale version: %d %v", code, res)
 	}
 

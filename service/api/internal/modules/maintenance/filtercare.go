@@ -246,7 +246,7 @@ func (m FilterCare) list(
 		if dec.Decode(&f) != nil ||
 			(f.Status != nil && filterRank[*f.Status] == 0 && *f.Status != "unknown") {
 			return paging.Page[FilterStatus]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -256,7 +256,7 @@ func (m FilterCare) list(
 	if query.Sort != nil {
 		if query.Sort.Field != "status" && query.Sort.Field != "id" {
 			return paging.Page[FilterStatus]{}, apperr.Fields(
-				map[string]string{"sort.field": "error.invalid"},
+				map[string]string{"sort.field": apperr.KeyInvalid},
 			)
 		}
 
@@ -326,7 +326,7 @@ type MarkInput struct {
 // Validate implements ops.Validator.
 func (in *MarkInput) Validate() map[string]string {
 	if in.UnitID == uuid.Nil {
-		return map[string]string{"unitId": "error.required"}
+		return map[string]string{"unitId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -368,11 +368,11 @@ func (m FilterCare) markCleaned(
 	}
 
 	if !found || org != call.Principal.OrgID {
-		return FilterStatus{}, apperr.E(apperr.NotFound, "error.notFound")
+		return FilterStatus{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if archived {
-		return FilterStatus{}, apperr.Fields(map[string]string{"unitId": "error.unitArchived"})
+		return FilterStatus{}, apperr.Fields(map[string]string{"unitId": apperr.KeyUnitArchived})
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -454,15 +454,15 @@ type SettingsInput struct {
 func (in *SettingsInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.ThresholdHours != nil && (*in.ThresholdHours < 50 || *in.ThresholdHours > 2000) {
-		fieldErrs["thresholdHours"] = "error.range"
+		fieldErrs["thresholdHours"] = apperr.KeyRange
 	}
 
 	if in.FallbackDays < 7 || in.FallbackDays > 180 {
-		fieldErrs["fallbackDays"] = "error.range"
+		fieldErrs["fallbackDays"] = apperr.KeyRange
 	}
 
 	if in.Recipients != "owners" && in.Recipients != "all_users" {
-		fieldErrs["recipients"] = "error.invalid"
+		fieldErrs["recipients"] = apperr.KeyInvalid
 	}
 
 	seen := map[string]bool{}
@@ -474,7 +474,7 @@ func (in *SettingsInput) Validate() map[string]string {
 	}
 
 	if !ok || !slices.Contains(in.Channels, "inApp") {
-		fieldErrs["channels"] = "error.invalid"
+		fieldErrs["channels"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -520,7 +520,7 @@ func (m FilterCare) saveSettings(
 	}
 
 	if !ok {
-		return FilterSettings{}, apperr.E(apperr.NotFound, "error.notFound")
+		return FilterSettings{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -611,7 +611,7 @@ func (m FilterCare) getSettings(
 	}
 
 	if !ok {
-		return FilterSettings{}, apperr.E(apperr.NotFound, "error.notFound")
+		return FilterSettings{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return m.settings(ctx, call, cust)

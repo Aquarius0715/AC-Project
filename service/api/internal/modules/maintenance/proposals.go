@@ -86,7 +86,7 @@ func (m Proposals) checkHold(
 	switch hold.Kind {
 	case "internal":
 		if hold.MembershipID == nil || hold.ContractorOrgID != nil {
-			return apperr.Fields(map[string]string{"hold": "error.invalid"})
+			return apperr.Fields(map[string]string{"hold": apperr.KeyInvalid})
 		}
 
 		err := delivery.checkTechnician(ctx, call, unit, *hold.MembershipID, false, nil)
@@ -97,7 +97,7 @@ func (m Proposals) checkHold(
 		return delivery.checkQualified(ctx, call, unit, *hold.MembershipID, slot)
 	case "contractor":
 		if hold.ContractorOrgID == nil || hold.MembershipID != nil {
-			return apperr.Fields(map[string]string{"hold": "error.invalid"})
+			return apperr.Fields(map[string]string{"hold": apperr.KeyInvalid})
 		}
 
 		kind, status, found, err := delivery.Directory.OrgState(ctx, call, *hold.ContractorOrgID)
@@ -106,7 +106,7 @@ func (m Proposals) checkHold(
 		}
 
 		if !found || kind != "contractor" || status != "active" {
-			return apperr.E(apperr.NotFound, "error.notFound")
+			return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		var suspended bool
@@ -141,7 +141,7 @@ func (m Proposals) checkHold(
 		return nil
 	}
 
-	return apperr.Fields(map[string]string{"hold": "error.invalid"})
+	return apperr.Fields(map[string]string{"hold": apperr.KeyInvalid})
 }
 
 // ---- jobs.proposeSlot ----
@@ -159,13 +159,13 @@ type ProposeInput struct {
 func (in *ProposeInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	trimmedReason(&in.Message, 1000, "message", fieldErrs)
 
 	if in.ReplyBy.IsZero() {
-		fieldErrs["replyBy"] = "error.required"
+		fieldErrs["replyBy"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -249,7 +249,7 @@ func (m Proposals) proposeSlotJob(
 	}
 
 	if !allowed {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	p, pendingErr := m.pending(ctx, call, in.JobID)
@@ -262,7 +262,7 @@ func (m Proposals) proposeSlotJob(
 	}
 
 	if !PreferredSlotsOK(call.Now, []Slot{in.Slot}) {
-		return Job{}, apperr.Fields(map[string]string{"slot": "error.slotRules"})
+		return Job{}, apperr.Fields(map[string]string{"slot": apperr.KeySlotRules})
 	}
 
 	for _, p := range r.preferred {
@@ -272,7 +272,7 @@ func (m Proposals) proposeSlotJob(
 	}
 
 	if !replyByOK(call.Now, in.ReplyBy, in.Slot.StartAt) {
-		return Job{}, apperr.Fields(map[string]string{"replyBy": "error.range"})
+		return Job{}, apperr.Fields(map[string]string{"replyBy": apperr.KeyRange})
 	}
 
 	checkHoldErr := m.checkHold(ctx, call, r.unit, in.Hold, in.Slot)
@@ -337,11 +337,11 @@ type ProposalRef struct {
 func (in *ProposalRef) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if in.ProposalID == uuid.Nil {
-		fieldErrs["proposalId"] = "error.required"
+		fieldErrs["proposalId"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -400,7 +400,7 @@ func (m Proposals) withdrawProposalJob(
 		UPDATE`, input.ProposalID, input.JobID).
 		Scan(&status)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Job{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -408,7 +408,7 @@ func (m Proposals) withdrawProposalJob(
 	}
 
 	if status != "pending" {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -459,11 +459,11 @@ type RespondInput struct {
 func (in *RespondInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if in.ProposalID == uuid.Nil {
-		fieldErrs["proposalId"] = "error.required"
+		fieldErrs["proposalId"] = apperr.KeyRequired
 	}
 
 	switch in.Decision {
@@ -474,20 +474,20 @@ func (in *RespondInput) Validate() map[string]string {
 	case "decline":
 		if in.DeclineReason == nil ||
 			(*in.DeclineReason != "not_home" && *in.DeclineReason != "too_late" && *in.DeclineReason != "other") {
-			fieldErrs["declineReason"] = "error.invalid"
+			fieldErrs["declineReason"] = apperr.KeyInvalid
 		}
 
 		if n := len(in.PreferredSlots); n != 0 && n != 3 {
-			fieldErrs["preferredSlots"] = "error.count"
+			fieldErrs["preferredSlots"] = apperr.KeyCount
 		}
 	default:
-		fieldErrs["decision"] = "error.invalid"
+		fieldErrs["decision"] = apperr.KeyInvalid
 	}
 
 	if in.Comment != nil {
 		*in.Comment = strings.TrimSpace(*in.Comment)
 		if utf8.RuneCountInString(*in.Comment) > 1000 {
-			fieldErrs["comment"] = "error.length"
+			fieldErrs["comment"] = apperr.KeyLength
 		}
 	}
 
@@ -548,7 +548,7 @@ func (m Proposals) respondJob(ctx context.Context, c *ops.Call, input *RespondIn
 	}
 
 	if org != c.Principal.OrgID {
-		return Job{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	currentErr := r.current(c)
@@ -567,7 +567,7 @@ func (m Proposals) respondJob(ctx context.Context, c *ops.Call, input *RespondIn
 		input.ProposalID, input.JobID).
 		Scan(&status, &source, &slot.StartAt, &slot.EndAt, &holdRaw)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Job{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -575,7 +575,7 @@ func (m Proposals) respondJob(ctx context.Context, c *ops.Call, input *RespondIn
 	}
 
 	if status != "pending" {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	var hold Hold
@@ -587,7 +587,7 @@ func (m Proposals) respondJob(ctx context.Context, c *ops.Call, input *RespondIn
 
 	if input.Decision == "decline" {
 		if len(input.PreferredSlots) == 3 && !PreferredSlotsOK(c.Now, input.PreferredSlots) {
-			return Job{}, apperr.Fields(map[string]string{"preferredSlots": "error.slotRules"})
+			return Job{}, apperr.Fields(map[string]string{"preferredSlots": apperr.KeySlotRules})
 		}
 
 		_, err := c.Tx.Exec(
@@ -823,17 +823,17 @@ type RescheduleInput struct {
 func (in *RescheduleInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if len(in.PreferredSlots) != 3 {
-		fieldErrs["preferredSlots"] = "error.count"
+		fieldErrs["preferredSlots"] = apperr.KeyCount
 	}
 
 	if in.Comment != nil {
 		*in.Comment = strings.TrimSpace(*in.Comment)
 		if utf8.RuneCountInString(*in.Comment) > 1000 {
-			fieldErrs["comment"] = "error.length"
+			fieldErrs["comment"] = apperr.KeyLength
 		}
 	}
 
@@ -899,7 +899,7 @@ func (m Proposals) requestRescheduleJob(
 	}
 
 	if org != call.Principal.OrgID {
-		return Job{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	currentErr := r.current(call)
@@ -909,7 +909,7 @@ func (m Proposals) requestRescheduleJob(
 
 	if origin != "periodic_plan" ||
 		(r.status != "offered" && r.status != "accepted" && r.status != "assigned") {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	var start *time.Time
@@ -933,7 +933,7 @@ func (m Proposals) requestRescheduleJob(
 	}
 
 	if !PreferredSlotsOK(call.Now, input.PreferredSlots) {
-		return Job{}, apperr.Fields(map[string]string{"preferredSlots": "error.slotRules"})
+		return Job{}, apperr.Fields(map[string]string{"preferredSlots": apperr.KeySlotRules})
 	}
 
 	for _, q := range []string{
@@ -992,11 +992,11 @@ type PartnerProposeInput struct {
 func (in *PartnerProposeInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil || in.OfferID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if in.TechnicianMembershipID == uuid.Nil {
-		fieldErrs["technicianMembershipId"] = "error.required"
+		fieldErrs["technicianMembershipId"] = apperr.KeyRequired
 	}
 
 	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
@@ -1053,7 +1053,7 @@ func (m Proposals) proposePartnerJob(
 		input.OfferID, input.JobID, call.Principal.OrgID).
 		Scan(&expires)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Job{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -1084,7 +1084,7 @@ func (m Proposals) proposePartnerJob(
 	}
 
 	if !PreferredSlotsOK(call.Now, []Slot{input.Slot}) {
-		return Job{}, apperr.Fields(map[string]string{"slot": "error.slotRules"})
+		return Job{}, apperr.Fields(map[string]string{"slot": apperr.KeySlotRules})
 	}
 
 	checkTechnicianErr := m.Delivery.checkTechnician(
@@ -1163,7 +1163,7 @@ func (m Proposals) partnerProposal(
 	err := call.Tx.QueryRow(ctx, q+" FOR UPDATE OF p", args...).
 		Scan(&status, &offer, &slot.StartAt, &slot.EndAt, &tech, &org)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", offer, slot, tech, org, apperr.E(apperr.NotFound, "error.notFound")
+		return "", offer, slot, tech, org, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return status, offer, slot, tech, org, apperr.Wrap(err, "queryrow (partnerProposal)")
@@ -1222,7 +1222,7 @@ func (m Proposals) withdrawPartnerJob(
 	}
 
 	if status != "pending" {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -1257,20 +1257,20 @@ type ResolveInput struct {
 func (in *ResolveInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil || in.ProposalID == uuid.Nil {
-		fieldErrs["proposalId"] = "error.required"
+		fieldErrs["proposalId"] = apperr.KeyRequired
 	}
 
 	switch in.Decision {
 	case "send_to_client":
 		if in.ReplyBy == nil {
-			fieldErrs["replyBy"] = "error.required"
+			fieldErrs["replyBy"] = apperr.KeyRequired
 		}
 	case "keep":
 		if in.ReplyBy != nil {
-			fieldErrs["replyBy"] = "error.notAllowed"
+			fieldErrs["replyBy"] = apperr.KeyNotAllowed
 		}
 	default:
-		fieldErrs["decision"] = "error.invalid"
+		fieldErrs["decision"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -1335,7 +1335,7 @@ func (m Proposals) resolvePartnerJob(
 	}
 
 	if status != "pending" {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	next := "kept"
@@ -1351,7 +1351,7 @@ func (m Proposals) resolvePartnerJob(
 		}
 
 		if !replyByOK(call.Now, *input.ReplyBy, slot.StartAt) {
-			return Job{}, apperr.Fields(map[string]string{"replyBy": "error.range"})
+			return Job{}, apperr.Fields(map[string]string{"replyBy": apperr.KeyRange})
 		}
 
 		hold := Hold{

@@ -70,7 +70,7 @@ func TestAskRoutesQueries(t *testing.T) {
 		"test.twice",
 		"not an object",
 	)
-	if apperr.From(err).FieldErrors["_"] != "error.malformedInput" {
+	if apperr.From(err).FieldErrors["_"] != apperr.KeyMalformedInput {
 		t.Errorf("undecodable input: %v", err)
 	}
 

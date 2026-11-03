@@ -482,7 +482,7 @@ func (m Jobs) projection(ctx context.Context, c *ops.Call, id uuid.UUID) (any, s
 		return hs[0], "history", nil
 	}
 
-	return nil, "", apperr.E(apperr.NotFound, "error.notFound")
+	return nil, "", apperr.E(apperr.NotFound, apperr.KeyNotFound)
 }
 
 // ---- worker: freeze histories (IR124 item 1) ----

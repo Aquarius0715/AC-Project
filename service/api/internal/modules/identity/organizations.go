@@ -95,7 +95,7 @@ func organizationsList(
 
 		if dec.Decode(&f) != nil {
 			return paging.Page[Organization]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -112,7 +112,7 @@ func organizationsList(
 	if f.Kind != nil {
 		if !orgKinds[*f.Kind] {
 			return paging.Page[Organization]{}, apperr.Fields(
-				map[string]string{"filters.kind": "error.invalid"},
+				map[string]string{"filters.kind": apperr.KeyInvalid},
 			)
 		}
 
@@ -122,7 +122,7 @@ func organizationsList(
 	if f.Status != nil {
 		if *f.Status != "active" && *f.Status != "inactive" {
 			return paging.Page[Organization]{}, apperr.Fields(
-				map[string]string{"filters.status": "error.invalid"},
+				map[string]string{"filters.status": apperr.KeyInvalid},
 			)
 		}
 
@@ -202,15 +202,15 @@ func (in *OrganizationSave) Validate() map[string]string {
 
 	in.Name = strings.TrimSpace(in.Name)
 	if n := utf8.RuneCountInString(in.Name); n < 1 || n > 120 {
-		fieldErrs["name"] = "error.length"
+		fieldErrs["name"] = apperr.KeyLength
 	}
 
 	if !orgKinds[in.Kind] {
-		fieldErrs["kind"] = "error.invalid"
+		fieldErrs["kind"] = apperr.KeyInvalid
 	}
 
 	if in.Status != "active" && in.Status != "inactive" {
-		fieldErrs["status"] = "error.invalid"
+		fieldErrs["status"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -231,7 +231,7 @@ func uniqueName(ctx context.Context, c *ops.Call, id uuid.UUID) error {
 	}
 
 	if taken {
-		return apperr.E(apperr.Conflict, "error.duplicateName")
+		return apperr.E(apperr.Conflict, apperr.KeyDuplicateName)
 	}
 
 	return nil
@@ -332,14 +332,14 @@ func organizationsSave(
 		e := call.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, *input.ID).
 			Scan(&kind)
 		if e != nil {
-			return Organization{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Organization{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		if kind != input.Kind {
-			return Organization{}, apperr.Fields(map[string]string{"kind": "error.immutable"})
+			return Organization{}, apperr.Fields(map[string]string{"kind": apperr.KeyImmutable})
 		}
 
-		return Organization{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Organization{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if err != nil {

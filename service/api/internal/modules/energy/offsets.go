@@ -65,30 +65,30 @@ func (in *QuoteInput) Validate() map[string]string {
 
 	in.Purpose = strings.TrimSpace(in.Purpose)
 	if n := utf8.RuneCountInString(in.Purpose); n < 1 || n > 1000 {
-		fieldErrs["purpose"] = "error.length"
+		fieldErrs["purpose"] = apperr.KeyLength
 	}
 
 	if math.IsNaN(in.AmountKg) || in.AmountKg <= 0 || in.AmountKg > 100000 ||
 		math.Abs(in.AmountKg*1000-math.Round(in.AmountKg*1000)) > 1e-6 {
-		fieldErrs["amountKg"] = "error.range"
+		fieldErrs["amountKg"] = apperr.KeyRange
 	}
 
 	if in.Period.From.IsZero() || !in.Period.From.Before(in.Period.To) ||
 		in.Period.To.Sub(in.Period.From) > 366*24*time.Hour {
-		fieldErrs["period"] = "error.range"
+		fieldErrs["period"] = apperr.KeyRange
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fieldErrs["unitIds"] = "error.invalid"
+			fieldErrs["unitIds"] = apperr.KeyInvalid
 		}
 
 		seen[u] = true
 	}
 
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 100 {
-		fieldErrs["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -146,17 +146,17 @@ func customerOf(
 			$1`, call.Principal.OrgID).
 			Scan(&id, &org)
 		if err == nil && given != nil && *given != id {
-			return id, org, apperr.E(apperr.NotFound, "error.notFound")
+			return id, org, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 	case given == nil:
-		return id, org, apperr.Fields(map[string]string{"customerId": "error.required"})
+		return id, org, apperr.Fields(map[string]string{"customerId": apperr.KeyRequired})
 	default:
 		err = call.Tx.QueryRow(ctx, `SELECT id, organization_id FROM energy.ref_customers WHERE id = $1`, *given).
 			Scan(&id, &org)
 	}
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return id, org, apperr.E(apperr.NotFound, "error.notFound")
+		return id, org, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return id, org, apperr.Wrap(err, "select energy.ref_customers")
@@ -204,7 +204,7 @@ func previewQuote(ctx context.Context, c *ops.Call, input *QuoteInput) (Quote, e
 
 	if inOrg != len(input.UnitIDs) {
 		if c.Principal.Role == "client" {
-			return Quote{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Quote{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		return Quote{}, apperr.Fields(map[string]string{"unitIds": "errors.units_outside_customer"})
@@ -387,7 +387,7 @@ func loadRecord(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Reco
 	record, err := scanRecord(c.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && c.Principal.Role == "client" && record.customerOrg != c.Principal.OrgID) {
-		return Record{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Record{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -445,11 +445,13 @@ func listRecords(
 	)
 	if err != nil ||
 		(f.Status != nil && !strings.Contains(" demo_requested demo_purchased demo_retired failed ", " "+*f.Status+" ")) {
-		return paging.Page[Record]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+		return paging.Page[Record]{}, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
 	}
 
 	if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
-		return paging.Page[Record]{}, apperr.Fields(map[string]string{"filters.to": "error.range"})
+		return paging.Page[Record]{}, apperr.Fields(
+			map[string]string{"filters.to": apperr.KeyRange},
+		)
 	}
 
 	order, err := paging.OrderBy(
@@ -576,7 +578,7 @@ type SimulateInput struct {
 func (in *SimulateInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if !in.DemoConfirmed {
-		fieldErrs["demoConfirmed"] = "error.required"
+		fieldErrs["demoConfirmed"] = apperr.KeyRequired
 	}
 
 	switch in.Event {
@@ -584,20 +586,20 @@ func (in *SimulateInput) Validate() map[string]string {
 		if in.QuoteID == nil || in.QuoteVersion == nil || in.RecordID != nil ||
 			in.AttemptID != nil ||
 			in.EventID != nil {
-			fieldErrs["quoteId"] = "error.invalid"
+			fieldErrs["quoteId"] = apperr.KeyInvalid
 		}
 	case "purchase_confirm", "retire", "fail":
 		if in.RecordID == nil || in.AttemptID == nil || in.EventID == nil || in.QuoteID != nil ||
 			in.QuoteVersion != nil {
-			fieldErrs["recordId"] = "error.invalid"
+			fieldErrs["recordId"] = apperr.KeyInvalid
 		}
 	case "retry":
 		if in.RecordID == nil || in.AttemptID == nil || in.EventID != nil || in.QuoteID != nil ||
 			in.QuoteVersion != nil {
-			fieldErrs["recordId"] = "error.invalid"
+			fieldErrs["recordId"] = apperr.KeyInvalid
 		}
 	default:
-		fieldErrs["event"] = "error.invalid"
+		fieldErrs["event"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -652,7 +654,7 @@ func demoRef(prefix string) *string {
 func simulate(ctx context.Context, call *ops.Call, in *SimulateInput) (Record, error) {
 	client := call.Principal.Role == "client"
 	if client && in.Event != "request" && in.Event != "retry" {
-		return Record{}, apperr.E(apperr.Forbidden, "error.forbidden")
+		return Record{}, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
 	conflict := apperr.E(apperr.Conflict, "errors.offset_state")
@@ -666,7 +668,7 @@ func simulate(ctx context.Context, call *ops.Call, in *SimulateInput) (Record, e
 			),
 		)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Record{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Record{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		if err != nil {
@@ -681,7 +683,7 @@ func simulate(ctx context.Context, call *ops.Call, in *SimulateInput) (Record, e
 		}
 
 		if quote.Version != *in.QuoteVersion {
-			return Record{}, apperr.E(apperr.Conflict, "error.versionConflict")
+			return Record{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
 		var used bool
@@ -759,7 +761,7 @@ func simulate(ctx context.Context, call *ops.Call, in *SimulateInput) (Record, e
 	}
 
 	if record.Version != *call.ExpectedVersion {
-		return record, apperr.E(apperr.Conflict, "error.versionConflict")
+		return record, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if record.CurrentAttemptID == nil || *record.CurrentAttemptID != *in.AttemptID {

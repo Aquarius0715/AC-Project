@@ -124,7 +124,7 @@ func (m Certificates) lock(
 	)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == "contractor" && certificate.OrganizationID != call.Principal.OrgID) {
-		return certificate, "", apperr.E(apperr.NotFound, "error.notFound")
+		return certificate, "", apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -138,7 +138,7 @@ func (m Certificates) lock(
 	}
 
 	if certificate.Version != *call.ExpectedVersion {
-		return certificate, "", apperr.E(apperr.Conflict, "error.versionConflict")
+		return certificate, "", apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	return certificate, stored, nil
@@ -184,18 +184,18 @@ type SubmitCertInput struct {
 func (in *SubmitCertInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.MembershipID == uuid.Nil {
-		fieldErrs["membershipId"] = "error.required"
+		fieldErrs["membershipId"] = apperr.KeyRequired
 	}
 
 	if !certCodes[in.Code] {
-		fieldErrs["code"] = "error.invalid"
+		fieldErrs["code"] = apperr.KeyInvalid
 	}
 
 	trimmedReason(&in.Name, 120, "name", fieldErrs)
 	trimmedReason(&in.Number, 64, "number", fieldErrs)
 
 	if in.IssuedAt.IsZero() || !in.IssuedAt.Before(in.ExpiresAt) {
-		fieldErrs["expiresAt"] = "error.range"
+		fieldErrs["expiresAt"] = apperr.KeyRange
 	}
 
 	blobInput := in.File
@@ -206,7 +206,7 @@ func (in *SubmitCertInput) Validate() map[string]string {
 		blobInput.Size > 10*1000*1000 ||
 		!ContentMatches(blobInput.Mime, blobInput.Bytes) ||
 		(blobInput.Mime != "application/pdf" && !ImageSizeOK(blobInput.Mime, blobInput.Bytes)) {
-		fieldErrs["file"] = "error.invalidFile"
+		fieldErrs["file"] = apperr.KeyInvalidFile
 	}
 
 	return fieldErrs
@@ -248,7 +248,7 @@ func (m Certificates) submit(
 	}
 
 	if !found || !technician.Active || technician.OrgID != call.Principal.OrgID {
-		return Certificate{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Certificate{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if input.RenewalOf != nil {
@@ -263,7 +263,7 @@ func (m Certificates) submit(
 		}
 
 		if !ok {
-			return Certificate{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Certificate{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 	}
 
@@ -344,19 +344,19 @@ type VerifyInput struct {
 func (in *VerifyInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.CertificateID == uuid.Nil {
-		fieldErrs["certificateId"] = "error.required"
+		fieldErrs["certificateId"] = apperr.KeyRequired
 	}
 
 	switch in.Decision {
 	case "approve":
 	case "reject":
 		if in.Reason == nil {
-			fieldErrs["reason"] = "error.required"
+			fieldErrs["reason"] = apperr.KeyRequired
 		} else {
 			trimmedReason(in.Reason, 1000, "reason", fieldErrs)
 		}
 	default:
-		fieldErrs["decision"] = "error.invalid"
+		fieldErrs["decision"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -402,7 +402,7 @@ func (m Certificates) verify(
 	}
 
 	if stored != "pending_verification" {
-		return certificate, apperr.E(apperr.Conflict, "error.invalidState")
+		return certificate, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	if input.Decision == "approve" {
@@ -499,7 +499,7 @@ type TrainingInput struct {
 func (in *TrainingInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.CertificateID == uuid.Nil {
-		fieldErrs["certificateId"] = "error.required"
+		fieldErrs["certificateId"] = apperr.KeyRequired
 	}
 
 	trimmedReason(&in.Note, 1000, "note", fieldErrs)
@@ -593,7 +593,7 @@ type CertificateContentInput struct {
 // Validate implements ops.Validator.
 func (in *CertificateContentInput) Validate() map[string]string {
 	if in.CertificateID == uuid.Nil {
-		return map[string]string{"certificateId": "error.required"}
+		return map[string]string{"certificateId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -659,7 +659,7 @@ func (m Certificates) content(
 		Scan(&key, &name, &org)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == "contractor" && org != call.Principal.OrgID) {
-		return DocumentOut{}, apperr.E(apperr.NotFound, "error.notFound")
+		return DocumentOut{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -669,7 +669,7 @@ func (m Certificates) content(
 	if key == nil || *key == "" {
 		return DocumentOut{}, apperr.E(
 			apperr.NotFound,
-			"error.notFound",
+			apperr.KeyNotFound,
 		) // a certificate without an uploaded document
 	}
 
@@ -680,7 +680,7 @@ func (m Certificates) content(
 
 	out.Bytes, err = m.Blobs.Get(ctx, *key)
 	if errors.Is(err, blob.ErrNotFound) {
-		return out, apperr.E(apperr.NotFound, "error.notFound")
+		return out, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	} else if err != nil {
 		return out, apperr.Wrap(err, "blob.Store.Get")
 	}
@@ -742,7 +742,7 @@ func (m Certificates) list(
 			(f.Status != nil && !certStatuses[*f.Status]) ||
 			(f.ExpiringWithinDays != nil && (*f.ExpiringWithinDays < 1 || *f.ExpiringWithinDays > 3650)) {
 			return paging.Page[Certificate]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -880,7 +880,7 @@ func (m Certificates) parts(
 
 		if dec.Decode(&f) != nil {
 			return paging.Page[PartItem]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}

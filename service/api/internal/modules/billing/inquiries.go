@@ -65,7 +65,7 @@ func scanInquiry(r pgx.Row) (Inquiry, error) {
 func textLen(s *string, key string, max int, fe map[string]string) {
 	*s = strings.TrimSpace(*s)
 	if n := utf8.RuneCountInString(*s); n < 1 || n > max {
-		fe[key] = "error.length"
+		fe[key] = apperr.KeyLength
 	}
 }
 
@@ -84,18 +84,18 @@ func (in *InquiryInput) Validate() map[string]string {
 	switch in.SubjectType {
 	case "payment":
 		if in.InvoiceID == nil {
-			fieldErrs["invoiceId"] = "error.required"
+			fieldErrs["invoiceId"] = apperr.KeyRequired
 		}
 
 		if in.RestrictionID != nil {
-			fieldErrs["restrictionId"] = "error.notAllowed"
+			fieldErrs["restrictionId"] = apperr.KeyNotAllowed
 		}
 	case "restriction":
 		if in.RestrictionID == nil {
-			fieldErrs["restrictionId"] = "error.required"
+			fieldErrs["restrictionId"] = apperr.KeyRequired
 		}
 	default:
-		fieldErrs["subjectType"] = "error.invalid"
+		fieldErrs["subjectType"] = apperr.KeyInvalid
 	}
 
 	textLen(&in.Message, "message", 2000, fieldErrs)
@@ -177,7 +177,7 @@ func (m Billing) createInquiry(
 		return Inquiry{}, apperr.Wrap(err, "billing.Customers.CustomerOfOrg")
 	}
 
-	notFound := apperr.E(apperr.NotFound, "error.notFound")
+	notFound := apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	if !ok {
 		return Inquiry{}, notFound
 	}
@@ -293,7 +293,7 @@ func (m Billing) loadInquiry(
 
 	x, err := scanInquiry(call.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return x, apperr.E(apperr.NotFound, "error.notFound")
+		return x, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return x, err
@@ -351,7 +351,7 @@ func (m Billing) listInquiries(
 			(f.Status != nil && !slices.Contains([]string{"received", "answered"}, *f.Status)) ||
 			(f.SubjectType != nil && !slices.Contains([]string{"payment", "restriction"}, *f.SubjectType)) {
 			return paging.Page[Inquiry]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -457,7 +457,7 @@ type AnswerInput struct {
 func (in *AnswerInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.InquiryID == uuid.Nil {
-		fieldErrs["inquiryId"] = "error.required"
+		fieldErrs["inquiryId"] = apperr.KeyRequired
 	}
 
 	textLen(&in.Reply, "reply", 2000, fieldErrs)
@@ -502,7 +502,7 @@ func (m Billing) answerInquiry(
 	}
 
 	if inquiry.Version != *call.ExpectedVersion {
-		return inquiry, apperr.E(apperr.Conflict, "error.versionConflict")
+		return inquiry, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if inquiry.State != "received" {

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -75,7 +76,7 @@ func TestDeniedWritesAudited(t *testing.T) {
 
 	e := got[0]
 	if e["actorRoleAtTime"] != "contractor" || e["result"] != "denied" ||
-		e["reason"] != "error.forbidden" ||
+		e["reason"] != apperr.KeyForbidden ||
 		e["targetRef"].(map[string]any)["kind"] != "unit" ||
 		e["targetRef"].(map[string]any)["id"] != unit ||
 		e["correlationId"] == "" {

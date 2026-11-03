@@ -286,7 +286,7 @@ func (m *Module) list(
 
 		if dec.Decode(&f) != nil {
 			return paging.Page[Device]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -318,7 +318,7 @@ func (m *Module) list(
 		case "online", "offline", "unknown", "connecting", "error":
 		default:
 			return paging.Page[Device]{}, apperr.Fields(
-				map[string]string{"filters.status": "error.invalid"},
+				map[string]string{"filters.status": apperr.KeyInvalid},
 			)
 		}
 
@@ -359,7 +359,7 @@ type IDInput struct {
 // Validate implements ops.Validator.
 func (in *IDInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil
@@ -413,7 +413,7 @@ func (m *Module) detail(
 	}
 
 	if len(items) == 0 {
-		return DeviceDetail{}, apperr.E(apperr.NotFound, "error.notFound")
+		return DeviceDetail{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	deviceDetail := DeviceDetail{Device: items[0], CalibrationRefs: nil, ActiveOperation: nil}
@@ -490,15 +490,15 @@ func (in *RegisterInput) Validate() map[string]string {
 	}
 
 	if in.SensorTypes == nil {
-		fieldErrs["sensorTypes"] = "error.required"
+		fieldErrs["sensorTypes"] = apperr.KeyRequired
 	}
 
 	if !uniqueIn(in.SensorTypes, nil) {
-		fieldErrs["sensorTypes"] = "error.duplicate"
+		fieldErrs["sensorTypes"] = apperr.KeyDuplicate
 	}
 
 	if in.UnitID == uuid.Nil {
-		fieldErrs["unitId"] = "error.required"
+		fieldErrs["unitId"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -516,7 +516,7 @@ func (m *Module) technicianGate(
 	}
 
 	if jobID == nil {
-		return apperr.Fields(map[string]string{"jobId": "error.required"})
+		return apperr.Fields(map[string]string{"jobId": apperr.KeyRequired})
 	}
 
 	return apperr.Wrap(
@@ -573,7 +573,7 @@ func (m *Module) registerDetail(
 	}
 
 	if !ok {
-		return DeviceDetail{}, apperr.E(apperr.NotFound, "error.notFound")
+		return DeviceDetail{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	var sensorsRaw []byte
@@ -614,7 +614,7 @@ func (m *Module) registerDetail(
 	if dup {
 		return DeviceDetail{}, apperr.E(
 			apperr.Conflict,
-			"error.duplicateSerial",
+			apperr.KeyDuplicateSerial,
 		) // tenant-wide after normalisation (D05)
 	}
 	// D05: register reserves targetUnitId; unitId stays null until devices.bind

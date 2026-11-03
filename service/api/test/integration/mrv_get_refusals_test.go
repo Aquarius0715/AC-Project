@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // TestMRVReadRefusals: an MRV report that does not exist is NOT_FOUND; a version below 1 and a nil id are refused as
@@ -14,7 +16,7 @@ func TestMRVReadRefusals(t *testing.T) {
 	missing := uuid.NewString()
 
 	code, res := post(srv, &hq, "mrv.get", `{"id":"`+missing+`"}`)
-	if code != 404 || res["messageKey"] != "error.notFound" {
+	if code != 404 || res["messageKey"] != apperr.KeyNotFound {
 		t.Fatalf("mrv.get of a missing report: %d %v, want 404 NOT_FOUND", code, res)
 	}
 

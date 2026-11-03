@@ -111,7 +111,7 @@ func LoadBaseline(
 
 	x, err := scanBaseline(call.Tx.QueryRow(ctx, q, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return x, apperr.E(apperr.NotFound, "error.notFound")
+		return x, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return x, err
@@ -176,13 +176,13 @@ func listBaselines(
 		if dec.Decode(&f) != nil || (f.Method != nil && !slices.Contains(methods, *f.Method)) ||
 			(f.BoundaryID != nil && !slices.Contains(boundaries, *f.BoundaryID)) {
 			return paging.Page[Baseline]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 
 		if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
 			return paging.Page[Baseline]{}, apperr.Fields(
-				map[string]string{"filters.to": "error.range"},
+				map[string]string{"filters.to": apperr.KeyRange},
 			)
 		}
 	}
@@ -332,14 +332,14 @@ func (in *BaselineInput) Validate() map[string]string {
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fieldErrs["unitIds"] = "error.invalid"
+			fieldErrs["unitIds"] = apperr.KeyInvalid
 		}
 
 		seen[u] = true
 	}
 
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 100 {
-		fieldErrs["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
 	if CheckRange(in.Period.From, in.Period.To) != nil {
@@ -347,13 +347,13 @@ func (in *BaselineInput) Validate() map[string]string {
 	}
 
 	if !slices.Contains(boundaries, in.BoundaryID) {
-		fieldErrs["boundaryId"] = "error.invalid"
+		fieldErrs["boundaryId"] = apperr.KeyInvalid
 	}
 
 	text := func(k string, s *string, max int) {
 		*s = strings.TrimSpace(*s)
 		if n := utf8.RuneCountInString(*s); n < 1 || n > max {
-			fieldErrs[k] = "error.length"
+			fieldErrs[k] = apperr.KeyLength
 		}
 	}
 	text("boundary", &in.Boundary, 500)
@@ -364,18 +364,18 @@ func (in *BaselineInput) Validate() map[string]string {
 	case "demo_fixed":
 		if in.BaselineKWh == nil || math.IsNaN(*in.BaselineKWh) || math.IsInf(*in.BaselineKWh, 0) ||
 			*in.BaselineKWh < 0 {
-			fieldErrs["baselineKWh"] = "error.range"
+			fieldErrs["baselineKWh"] = apperr.KeyRange
 		}
 	case "demo_period_comparison":
 		if in.BaselineKWh != nil {
-			fieldErrs["baselineKWh"] = "error.notAllowed"
+			fieldErrs["baselineKWh"] = apperr.KeyNotAllowed
 		}
 
 		if in.BoundaryID != Boundary {
 			fieldErrs["boundaryId"] = "errors.boundary_not_measurable"
 		}
 	default:
-		fieldErrs["method"] = "error.invalid"
+		fieldErrs["method"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -444,7 +444,7 @@ func saveBaseline(ctx context.Context, c *ops.Call, input *BaselineInput) (Basel
 		}
 
 		if cur.Version != *c.ExpectedVersion {
-			return cur, apperr.E(apperr.Conflict, "error.versionConflict")
+			return cur, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
 		id, version = cur.ID, cur.Version+1

@@ -317,26 +317,26 @@ func ContactWindowOK(s string) bool {
 func (in *CreateInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.UnitID == uuid.Nil {
-		fieldErrs["unitId"] = "error.required"
+		fieldErrs["unitId"] = apperr.KeyRequired
 	}
 
 	if !jobTypes[in.Type] {
-		fieldErrs["type"] = "error.invalid"
+		fieldErrs["type"] = apperr.KeyInvalid
 	}
 
 	in.Symptom = strings.TrimSpace(in.Symptom)
 	if n := utf8.RuneCountInString(in.Symptom); n < 10 || n > 2000 {
-		fieldErrs["symptom"] = "error.length"
+		fieldErrs["symptom"] = apperr.KeyLength
 	}
 
 	if in.AlternativeSlots == nil {
-		fieldErrs["alternativeSlots"] = "error.required"
+		fieldErrs["alternativeSlots"] = apperr.KeyRequired
 	}
 
 	if in.ContactWindow != nil {
 		*in.ContactWindow = strings.TrimSpace(*in.ContactWindow)
 		if utf8.RuneCountInString(*in.ContactWindow) > 200 {
-			fieldErrs["contactWindow"] = "error.length"
+			fieldErrs["contactWindow"] = apperr.KeyLength
 		} else if !ContactWindowOK(*in.ContactWindow) {
 			fieldErrs["contactWindow"] = "errors.contact_details_forbidden"
 		}
@@ -409,7 +409,7 @@ func (m Jobs) create(ctx context.Context, c *ops.Call, in *CreateInput) (Mainten
 // createJob is create answering the job with its detail extras.
 func (m Jobs) createJob(ctx context.Context, call *ops.Call, in *CreateInput) (Job, error) {
 	if call.Principal.Role == "client" && in.DueAt != nil {
-		return Job{}, apperr.Fields(map[string]string{"dueAt": "error.notAllowed"})
+		return Job{}, apperr.Fields(map[string]string{"dueAt": apperr.KeyNotAllowed})
 	}
 
 	org, archived, found, err := m.Units.UnitState(ctx, call, in.UnitID)
@@ -418,22 +418,22 @@ func (m Jobs) createJob(ctx context.Context, call *ops.Call, in *CreateInput) (J
 	}
 
 	if !found || (call.Principal.Role == "client" && org != call.Principal.OrgID) {
-		return Job{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if archived {
-		return Job{}, apperr.Fields(map[string]string{"unitId": "error.unitArchived"})
+		return Job{}, apperr.Fields(map[string]string{"unitId": apperr.KeyUnitArchived})
 	}
 
 	slots := append([]Slot{{in.RequestedStart, in.RequestedEnd}}, in.AlternativeSlots...)
 
 	alts := len(in.AlternativeSlots)
 	if (call.Principal.Role == "client" && alts != 2) || alts > 2 {
-		return Job{}, apperr.Fields(map[string]string{"alternativeSlots": "error.count"})
+		return Job{}, apperr.Fields(map[string]string{"alternativeSlots": apperr.KeyCount})
 	}
 
 	if !PreferredSlotsOK(call.Now, slots) {
-		return Job{}, apperr.Fields(map[string]string{"alternativeSlots": "error.slotRules"})
+		return Job{}, apperr.Fields(map[string]string{"alternativeSlots": apperr.KeySlotRules})
 	}
 
 	due := in.RequestedEnd
@@ -533,7 +533,7 @@ type JobIDInput struct {
 // Validate implements ops.Validator.
 func (in *JobIDInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
-		return map[string]string{"jobId": "error.required"}
+		return map[string]string{"jobId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -565,7 +565,7 @@ func (m Jobs) load(
 			args...),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return job, apperr.E(apperr.NotFound, "error.notFound")
+		return job, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -945,7 +945,7 @@ type JobAttachmentInput struct {
 // Validate implements ops.Validator.
 func (in *JobAttachmentInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil || in.AttachmentID == uuid.Nil {
-		return map[string]string{"attachmentId": "error.required"}
+		return map[string]string{"attachmentId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -997,7 +997,7 @@ func (m Jobs) getAttachment(
 		input.AttachmentID, input.JobID).
 		Scan(&key, &out.Name, &out.Mime, &out.Size)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return out, apperr.E(apperr.NotFound, "error.notFound")
+		return out, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -1006,7 +1006,7 @@ func (m Jobs) getAttachment(
 
 	out.Bytes, err = m.Blobs.Get(ctx, key)
 	if errors.Is(err, blob.ErrNotFound) {
-		return out, apperr.E(apperr.NotFound, "error.notFound")
+		return out, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	} else if err != nil {
 		return out, apperr.Wrap(err, "blob.Store.Get")
 	}
@@ -1175,7 +1175,9 @@ func (m Jobs) list(
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil {
-			return paging.Page[any]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+			return paging.Page[any]{}, apperr.Fields(
+				map[string]string{"filters": apperr.KeyInvalid},
+			)
 		}
 	}
 
@@ -1189,7 +1191,7 @@ func (m Jobs) list(
 	if query.Sort != nil {
 		if !slices.Contains([]string{"id", "severity", "dueAt", "status"}, query.Sort.Field) {
 			return paging.Page[any]{}, apperr.Fields(
-				map[string]string{"sort.field": "error.invalid"},
+				map[string]string{"sort.field": apperr.KeyInvalid},
 			)
 		}
 
@@ -1245,7 +1247,7 @@ func (m Jobs) list(
 // check validates the shared job filters (IR26).
 func (f *listFilters) check() error {
 	bad := func(k string) error {
-		return apperr.Fields(map[string]string{"filters." + k: "error.invalid"})
+		return apperr.Fields(map[string]string{"filters." + k: apperr.KeyInvalid})
 	}
 
 	switch {
@@ -1262,7 +1264,7 @@ func (f *listFilters) check() error {
 	case f.Type != nil && !jobTypes[*f.Type]:
 		return bad("type")
 	case f.From != nil && f.To != nil && !f.From.Before(*f.To):
-		return apperr.Fields(map[string]string{"filters.to": "error.range"})
+		return apperr.Fields(map[string]string{"filters.to": apperr.KeyRange})
 	}
 
 	if f.Statuses != nil {
@@ -1520,7 +1522,7 @@ type EventsInput struct {
 // Validate implements ops.Validator.
 func (in *EventsInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil {
-		return map[string]string{"jobId": "error.required"}
+		return map[string]string{"jobId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -1719,14 +1721,14 @@ func (m Jobs) events(
 
 		if dec.Decode(&f) != nil {
 			return paging.Page[Event]{}, apperr.Fields(
-				map[string]string{"query.filters": "error.invalid"},
+				map[string]string{"query.filters": apperr.KeyInvalid},
 			)
 		}
 	}
 
 	if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
 		return paging.Page[Event]{}, apperr.Fields(
-			map[string]string{"query.filters.to": "error.range"},
+			map[string]string{"query.filters.to": apperr.KeyRange},
 		)
 	}
 
@@ -1908,7 +1910,7 @@ func (m Jobs) lockJob(ctx context.Context, call *ops.Call, id uuid.UUID) (string
 		" FOR UPDATE", args...).
 		Scan(&status, &v)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", apperr.E(apperr.NotFound, "error.notFound")
+		return "", apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -1916,7 +1918,7 @@ func (m Jobs) lockJob(ctx context.Context, call *ops.Call, id uuid.UUID) (string
 	}
 
 	if v != *call.ExpectedVersion {
-		return status, apperr.E(apperr.Conflict, "error.versionConflict")
+		return status, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	return status, nil
@@ -1925,7 +1927,7 @@ func (m Jobs) lockJob(ctx context.Context, call *ops.Call, id uuid.UUID) (string
 func trimmedReason(s *string, max int, key string, fe map[string]string) {
 	*s = strings.TrimSpace(*s)
 	if n := utf8.RuneCountInString(*s); n < 1 || n > max {
-		fe[key] = "error.length"
+		fe[key] = apperr.KeyLength
 	}
 }
 
@@ -1939,7 +1941,7 @@ type CancelInput struct {
 func (in *CancelInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	trimmedReason(&in.CancelReason, 1000, "cancelReason", fieldErrs)
@@ -2063,7 +2065,7 @@ func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, input *CancelInput) (J
 	}
 
 	if !allowed {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	_, execErr := c.Tx.Exec(
@@ -2153,7 +2155,7 @@ type ReasonInput struct {
 func (in *ReasonInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
@@ -2199,7 +2201,7 @@ func (m Jobs) holdJob(ctx context.Context, c *ops.Call, input *ReasonInput) (Job
 	}
 
 	if status != "in_progress" && status != "submitted" {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	_, execErr := c.Tx.Exec(
@@ -2263,7 +2265,7 @@ func (m Jobs) resumeHoldJob(ctx context.Context, call *ops.Call, in *ReasonInput
 	}
 
 	if status != "on_hold" {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -2304,13 +2306,13 @@ type NoteInput struct {
 func (in *NoteInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	trimmedReason(&in.Message, 2000, "message", fieldErrs)
 
 	if in.Visibility != "internal" && in.Visibility != "customer" {
-		fieldErrs["visibility"] = "error.invalid"
+		fieldErrs["visibility"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -2344,7 +2346,7 @@ func (in *NoteInput) Validate() map[string]string {
 //	@Router			/v1/jobs/{jobId}/notes [post]
 func (m Jobs) addNote(ctx context.Context, c *ops.Call, input *NoteInput) (Note, error) {
 	if c.Principal.Role == "client" && input.Visibility != "customer" {
-		return Note{}, apperr.E(apperr.Forbidden, "error.forbidden")
+		return Note{}, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
 	status, err := m.lockJob(ctx, c, input.JobID)
@@ -2353,7 +2355,7 @@ func (m Jobs) addNote(ctx context.Context, c *ops.Call, input *NoteInput) (Note,
 	}
 
 	if status == "completed" || status == "cancelled" {
-		return Note{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Note{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	var note uuid.UUID
@@ -2425,7 +2427,7 @@ func (m Jobs) jobsOpen(
 	input *notify.JobsOpenInput,
 ) ([]uuid.UUID, error) {
 	if len(input.JobIDs) > 100 {
-		return nil, apperr.Fields(map[string]string{"jobIds": "error.range"})
+		return nil, apperr.Fields(map[string]string{"jobIds": apperr.KeyRange})
 	}
 
 	out := []uuid.UUID{}

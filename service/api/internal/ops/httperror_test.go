@@ -17,11 +17,11 @@ func TestHTTPErrorHandler(t *testing.T) {
 	app.HTTPErrorHandler = HTTPErrorHandler
 	app.GET(
 		"/domain",
-		func(*echo.Context) error { return apperr.E(apperr.Conflict, "error.versionConflict") },
+		func(*echo.Context) error { return apperr.E(apperr.Conflict, apperr.KeyVersionConflict) },
 	)
 	app.HEAD(
 		"/domain",
-		func(*echo.Context) error { return apperr.E(apperr.Conflict, "error.versionConflict") },
+		func(*echo.Context) error { return apperr.E(apperr.Conflict, apperr.KeyVersionConflict) },
 	)
 	app.GET("/plain", func(*echo.Context) error { return errors.New("database exploded") })
 	app.GET("/large", func(*echo.Context) error { return echo.ErrStatusRequestEntityTooLarge })

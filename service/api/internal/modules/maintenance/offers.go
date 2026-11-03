@@ -86,7 +86,7 @@ func (m Delivery) lock(ctx context.Context, call *ops.Call, id uuid.UUID) (jobRo
 // current checks the expected version of a loaded job (CONFLICT).
 func (r jobRow) current(c *ops.Call) error {
 	if r.version != *c.ExpectedVersion {
-		return apperr.E(apperr.Conflict, "error.versionConflict")
+		return apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	return nil
@@ -109,7 +109,7 @@ func (m Delivery) load(ctx context.Context, call *ops.Call, id uuid.UUID) (jobRo
 		Scan(&r.status, &r.unit, &r.contractor, &r.planID, &r.occurrence, &r.requested.StartAt, &r.requested.EndAt, &pref,
 			&ss, &se, &r.assignment, &r.version)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return r, apperr.E(apperr.NotFound, "error.notFound")
+		return r, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -184,19 +184,19 @@ type OfferInput struct {
 func (in *OfferInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if in.ContractorOrgID == uuid.Nil {
-		fieldErrs["contractorOrgId"] = "error.required"
+		fieldErrs["contractorOrgId"] = apperr.KeyRequired
 	}
 
 	if !in.VisitSlot.StartAt.Before(in.VisitSlot.EndAt) {
-		fieldErrs["visitSlot"] = "error.range"
+		fieldErrs["visitSlot"] = apperr.KeyRange
 	}
 
 	if !in.AccessValidFrom.Before(in.AccessValidUntil) {
-		fieldErrs["accessValidUntil"] = "error.range"
+		fieldErrs["accessValidUntil"] = apperr.KeyRange
 	}
 
 	if in.OfferExpiresAt.After(in.AccessValidUntil) {
@@ -212,7 +212,7 @@ func (in *OfferInput) Validate() map[string]string {
 	}
 
 	if n := utf8.RuneCountInString(in.TermsVersion); n < 1 || n > 64 {
-		fieldErrs["termsVersion"] = "error.length"
+		fieldErrs["termsVersion"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -254,7 +254,7 @@ func (m Delivery) offer(ctx context.Context, c *ops.Call, in *OfferInput) (Maint
 // offerJob is offer answering the job with its detail extras.
 func (m Delivery) offerJob(ctx context.Context, call *ops.Call, in *OfferInput) (Job, error) {
 	if !call.Now.Before(in.OfferExpiresAt) {
-		return Job{}, apperr.Fields(map[string]string{"offerExpiresAt": "error.past"})
+		return Job{}, apperr.Fields(map[string]string{"offerExpiresAt": apperr.KeyPast})
 	}
 
 	kind, status, found, err := m.Directory.OrgState(ctx, call, in.ContractorOrgID)
@@ -263,7 +263,7 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, in *OfferInput) 
 	}
 
 	if !found || kind != "contractor" || status != "active" {
-		return Job{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	var suspended bool
@@ -281,7 +281,7 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, in *OfferInput) 
 	}
 
 	if r.status != "requested" {
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	if suspended {
@@ -349,9 +349,9 @@ type AcceptInput struct {
 func (in *AcceptInput) Validate() map[string]string {
 	fieldErrs := decisionRefs(in.JobID, in.OfferID)
 	if in.TermsVersion == "" {
-		fieldErrs["termsVersion"] = "error.required"
+		fieldErrs["termsVersion"] = apperr.KeyRequired
 	} else if utf8.RuneCountInString(in.TermsVersion) > 64 {
-		fieldErrs["termsVersion"] = "error.length"
+		fieldErrs["termsVersion"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -375,11 +375,11 @@ func (in *DeclineInput) Validate() map[string]string {
 func decisionRefs(job, offer uuid.UUID) map[string]string {
 	fieldErrs := map[string]string{}
 	if job == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if offer == uuid.Nil {
-		fieldErrs["offerId"] = "error.required"
+		fieldErrs["offerId"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -412,7 +412,7 @@ func (m Delivery) decide(
 		offer, job, call.Principal.OrgID).
 		Scan(&terms, &expires, &decided)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Receipt{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Receipt{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -422,7 +422,7 @@ func (m Delivery) decide(
 	if decided != nil {
 		return Receipt{}, apperr.E(
 			apperr.NotFound,
-			"error.notFound",
+			apperr.KeyNotFound,
 		) // declined / decided offers are only reachable through the IR01 receipt
 	}
 
@@ -436,7 +436,7 @@ func (m Delivery) decide(
 	}
 
 	if r.status != "offered" {
-		return Receipt{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Receipt{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	if decision == "accept" {
@@ -624,21 +624,21 @@ type AssignInput struct {
 func (in *AssignInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if in.TechnicianMembershipID == uuid.Nil {
-		fieldErrs["technicianMembershipId"] = "error.required"
+		fieldErrs["technicianMembershipId"] = apperr.KeyRequired
 	}
 
 	if !in.StartAt.Before(in.EndAt) {
-		fieldErrs["endAt"] = "error.range"
+		fieldErrs["endAt"] = apperr.KeyRange
 	}
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
 		if utf8.RuneCountInString(*in.Reason) > 1000 {
-			fieldErrs["reason"] = "error.length"
+			fieldErrs["reason"] = apperr.KeyLength
 		}
 	}
 
@@ -705,7 +705,7 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, input *AssignInput
 			Scan(&visit.StartAt, &visit.EndAt, &from, &until)
 		if errors.Is(err, pgx.ErrNoRows) || r.contractor == nil ||
 			*r.contractor != c.Principal.OrgID {
-			return Job{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		if err != nil {
@@ -741,7 +741,7 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, input *AssignInput
 		if !slot.EndAt.After(
 			c.Now,
 		) { // a time already over cannot be worked (IR456): HQ proposes another
-			return Job{}, apperr.Fields(map[string]string{"endAt": "error.past"})
+			return Job{}, apperr.Fields(map[string]string{"endAt": apperr.KeyPast})
 		}
 
 		ok := contractor && sameSlot(visit, slot)
@@ -767,10 +767,10 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, input *AssignInput
 		}
 
 		if input.Reason == nil || *input.Reason == "" {
-			return Job{}, apperr.Fields(map[string]string{"reason": "error.required"})
+			return Job{}, apperr.Fields(map[string]string{"reason": apperr.KeyRequired})
 		}
 	default:
-		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
+		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	checkQualifiedErr := m.checkQualified(ctx, c, r.unit, input.TechnicianMembershipID, slot)
@@ -848,7 +848,7 @@ func (m Delivery) checkTechnician(
 	}
 
 	if !found || !tech.Active {
-		return apperr.E(apperr.NotFound, "error.notFound")
+		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	own := call.Principal.OrgID

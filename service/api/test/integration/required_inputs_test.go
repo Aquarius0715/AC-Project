@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // TestRequiredInputs covers the input rules each operation applies before any permission or state check (the
@@ -16,7 +17,7 @@ func TestRequiredInputs(t *testing.T) {
 	srv := server(t)
 	long := func(n int) string { return `"` + strings.Repeat("x", n) + `"` }
 
-	req, inv, length, rng := "error.required", "error.invalid", "error.length", "error.range"
+	req, inv, length, rng := apperr.KeyRequired, apperr.KeyInvalid, apperr.KeyLength, apperr.KeyRange
 	for _, c := range []struct {
 		op   string
 		body string            // without the path parameters
@@ -79,7 +80,7 @@ func TestRequiredInputs(t *testing.T) {
 		{
 			"rateCards.save", `{"currency":"XYZ",` +
 				`"lines":[]}`,
-			map[string]string{"contractorOrgId": req, "effectiveFrom": req, "currency": inv, "lines": "error.count"},
+			map[string]string{"contractorOrgId": req, "effectiveFrom": req, "currency": inv, "lines": apperr.KeyCount},
 		},
 		{"rateCards.save", `{"currency":"MYR","lines":[{"workType":"emergency","amountMinor":100,` +
 			`"note":` + long(201) + `}]}`, map[string]string{"lines": length}},
@@ -101,13 +102,13 @@ func TestRequiredInputs(t *testing.T) {
 		{"payments.simulate", `{"event":"confirm",` +
 			`"paymentReference":` + long(129) + `}`, map[string]string{"paymentId": req, "paymentReference": length}},
 		{"payments.simulate", `{"event":"instructions",` +
-			`"method":"demo_credit_card"}`, map[string]string{"invoiceId": req, "method": "error.notAllowed"}},
+			`"method":"demo_credit_card"}`, map[string]string{"invoiceId": req, "method": apperr.KeyNotAllowed}},
 		// the route fixes the action
 		{"payouts.transition", `{"reason":` + long(1001) + `}`, map[string]string{"statementId": req, "reason": length}},
 		{"payouts.query", `{"message":` + long(2001) + `}`, map[string]string{"lineId": req, "message": length}},
 		{"payouts.resolveQuery", `{"reply":` + long(2001) + `}`, map[string]string{"queryId": req, "reply": length}},
 		// control, monitoring, restrictions
-		{"automations.nextRuns", `{}`, map[string]string{"automationId": "error.exactlyOneTarget"}},
+		{"automations.nextRuns", `{}`, map[string]string{"automationId": apperr.KeyExactlyOneTarget}},
 		{"automations.nextRuns", `{"automationId":"00000000-0000-0000-0000-000000000000",` +
 			`"count":8}`, map[string]string{"automationId": req}},
 		{"diagnosticRuns.create", `{}`, map[string]string{"jobId": req, "expectedUnitVersion": req}},
@@ -194,15 +195,15 @@ func TestRequiredInputs(t *testing.T) {
 		{"jobs.saveDraft", `{"items":[],"measurements":[],"parts":[],"refrigerant":[],"attachmentIds":[],` +
 			`"nextAction":{"kind":"follow_up"}}`, map[string]string{"nextAction": inv}},
 		{"reports.signOff", `{"signerName":"Tan","absentReason":"not at home","sitePhoto":{"name":"p.png",` +
-			`"mime":"image/png","size":3,"bytes":"AAAA"}}`, map[string]string{"sitePhoto": "error.invalidFile"}},
+			`"mime":"image/png","size":3,"bytes":"AAAA"}}`, map[string]string{"sitePhoto": apperr.KeyInvalidFile}},
 		{"policies.save", `{}`, map[string]string{"kind": inv}},
-		{"policies.save", `{"kind":"default_alert"}`, map[string]string{"id": req, "rules": "error.fixedRules"}},
+		{"policies.save", `{"kind":"default_alert"}`, map[string]string{"id": req, "rules": apperr.KeyFixedRules}},
 		{
 			"policies.save", `{"kind":"alert"}`,
 			map[string]string{"name": req, "timezone": req, "enabled": req, "priority": rng, "customerId": req},
 		},
 		// the REST binding refuses an unknown query parameter first
-		{"telemetry.series", `{"query":{"filters":{"x":"1"}}}`, map[string]string{"x": "error.notAllowed"}},
+		{"telemetry.series", `{"query":{"filters":{"x":"1"}}}`, map[string]string{"x": apperr.KeyNotAllowed}},
 	} {
 		body := map[string]any{}
 

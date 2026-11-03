@@ -78,7 +78,7 @@ func scanClientUser(r pgx.Row) (ClientUser, error) {
 // ownerOnly enforces the client:self-customer:owner alternative: clients must be owners (FORBIDDEN).
 func ownerOnly(c *ops.Call) error {
 	if c.Principal.Role == "client" && c.Principal.ClientRole != "owner" {
-		return apperr.E(apperr.Forbidden, "error.forbidden")
+		return apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
 	return nil
@@ -139,7 +139,7 @@ func clientUsersList(
 			(f.Status != nil && !slices.Contains([]string{"invited", "active", "disabled"}, *f.Status)) ||
 			(f.ClientRole != nil && *f.ClientRole != "owner" && *f.ClientRole != "member") {
 			return paging.Page[ClientUser]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -260,7 +260,7 @@ func loadClientUser(
 	clientUser, err := scanClientUser(call.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == "client" && clientUser.customerOrg != call.Principal.OrgID) {
-		return ClientUser{}, apperr.E(apperr.NotFound, "error.notFound")
+		return ClientUser{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return clientUser, err
@@ -282,7 +282,7 @@ type ClientUserInput struct {
 func (in *ClientUserInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.CustomerID == uuid.Nil {
-		fieldErrs["customerId"] = "error.required"
+		fieldErrs["customerId"] = apperr.KeyRequired
 	}
 
 	in.Email = strings.TrimSpace(in.Email)
@@ -292,33 +292,33 @@ func (in *ClientUserInput) Validate() map[string]string {
 	)
 	if err != nil || a.Address != in.Email ||
 		len(in.Email) > 254 {
-		fieldErrs["email"] = "error.invalid"
+		fieldErrs["email"] = apperr.KeyInvalid
 	}
 
 	if in.ClientRole != "owner" && in.ClientRole != "member" {
-		fieldErrs["clientRole"] = "error.invalid"
+		fieldErrs["clientRole"] = apperr.KeyInvalid
 	}
 
 	if in.Status != nil && *in.Status != "active" && *in.Status != "disabled" {
-		fieldErrs["status"] = "error.invalid"
+		fieldErrs["status"] = apperr.KeyInvalid
 	}
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
 		if n := utf8.RuneCountInString(*in.Reason); n < 1 || n > 1000 {
-			fieldErrs["reason"] = "error.length"
+			fieldErrs["reason"] = apperr.KeyLength
 		}
 	}
 
 	if in.ID == nil { // a new user is named (IR461)
 		if in.DisplayName == nil {
-			fieldErrs["displayName"] = "error.required"
+			fieldErrs["displayName"] = apperr.KeyRequired
 		} else if *in.DisplayName = strings.TrimSpace(*in.DisplayName); utf8.RuneCountInString(*in.DisplayName) < 1 ||
 			utf8.RuneCountInString(*in.DisplayName) > 120 {
-			fieldErrs["displayName"] = "error.length"
+			fieldErrs["displayName"] = apperr.KeyLength
 		}
 	} else if in.DisplayName != nil {
-		fieldErrs["displayName"] = "error.notAllowed"
+		fieldErrs["displayName"] = apperr.KeyNotAllowed
 	}
 
 	return fieldErrs
@@ -393,7 +393,7 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 		Scan(&org)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == "client" && org != call.Principal.OrgID) {
-		return ClientUser{}, apperr.E(apperr.NotFound, "error.notFound")
+		return ClientUser{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -423,7 +423,7 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 		// a new user: an owner (or HQ) adds members and owners, whose account is created now and gets the set-up e-mail
 		// (IR417, IR461)
 		if in.Status != nil {
-			return ClientUser{}, apperr.Fields(map[string]string{"status": "error.notAllowed"})
+			return ClientUser{}, apperr.Fields(map[string]string{"status": apperr.KeyNotAllowed})
 		}
 
 		role := in.ClientRole
@@ -489,7 +489,7 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 	}
 
 	if clientUser.Version != *call.ExpectedVersion {
-		return clientUser, apperr.E(apperr.Conflict, "error.versionConflict")
+		return clientUser, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if call.Principal.Role == "client" && clientUser.MembershipID != nil &&
@@ -498,16 +498,16 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 	}
 	// the e-mail is the sign-in account's, created with the user (IR461): it stays, for HQ too (IR422)
 	if !strings.EqualFold(in.Email, clientUser.Email) {
-		return clientUser, apperr.Fields(map[string]string{"email": "error.immutable"})
+		return clientUser, apperr.Fields(map[string]string{"email": apperr.KeyImmutable})
 	}
 
 	in.Email = clientUser.Email // the same address in other letter case keeps the stored spelling
 	if clientUser.CustomerID != in.CustomerID {
-		return clientUser, apperr.Fields(map[string]string{"customerId": "error.immutable"})
+		return clientUser, apperr.Fields(map[string]string{"customerId": apperr.KeyImmutable})
 	}
 
 	if in.Reason == nil {
-		return clientUser, apperr.Fields(map[string]string{"reason": "error.required"})
+		return clientUser, apperr.Fields(map[string]string{"reason": apperr.KeyRequired})
 	}
 
 	status := clientUser.Status
@@ -600,12 +600,12 @@ type RemoveInput struct {
 func (in *RemoveInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.ID == uuid.Nil {
-		fieldErrs["id"] = "error.required"
+		fieldErrs["id"] = apperr.KeyRequired
 	}
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fieldErrs["reason"] = "error.length"
+		fieldErrs["reason"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -657,7 +657,7 @@ func clientUsersRemove(ctx context.Context, c *ops.Call, input *RemoveInput) (De
 	}
 
 	if clientUser.Version != *c.ExpectedVersion {
-		return Deleted{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Deleted{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if c.Principal.Role == "client" && clientUser.MembershipID != nil &&
@@ -722,7 +722,7 @@ type ResendInput struct {
 // Validate implements ops.Validator.
 func (in *ResendInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil

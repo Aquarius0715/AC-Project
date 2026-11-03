@@ -27,11 +27,11 @@ type ExceptionInput struct {
 func (in *ExceptionInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fieldErrs["restrictionId"] = "error.required"
+		fieldErrs["restrictionId"] = apperr.KeyRequired
 	}
 
 	if in.Until.IsZero() {
-		fieldErrs["until"] = "error.required"
+		fieldErrs["until"] = apperr.KeyRequired
 	}
 
 	trimReason(&in.Reason, "reason", fieldErrs)
@@ -190,7 +190,7 @@ type ReleaseInput struct {
 // Validate implements ops.Validator.
 func (in *ReleaseInput) Validate() map[string]string {
 	if in.RestrictionID == uuid.Nil {
-		return map[string]string{"restrictionId": "error.required"}
+		return map[string]string{"restrictionId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -247,7 +247,7 @@ func (m Restrictions) release(
 	}
 
 	if restriction.Version != *call.ExpectedVersion {
-		return restriction, apperr.E(apperr.Conflict, "error.versionConflict")
+		return restriction, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	paid, err := causesPaid(ctx, call, restriction.ID)
@@ -288,7 +288,7 @@ type OverrideInput struct {
 func (in *OverrideInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fieldErrs["restrictionId"] = "error.required"
+		fieldErrs["restrictionId"] = apperr.KeyRequired
 	}
 
 	trimReason(&in.Reason, "reason", fieldErrs)
@@ -344,7 +344,7 @@ func (m Restrictions) override(
 	}
 
 	if restriction.Version != *call.ExpectedVersion {
-		return ReleaseView{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return ReleaseView{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	requestReleaseErr := m.RequestRelease(ctx, call, restriction.ID, "override")
@@ -428,11 +428,11 @@ type ReconcileInput struct {
 func (in *ReconcileInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fieldErrs["restrictionId"] = "error.required"
+		fieldErrs["restrictionId"] = apperr.KeyRequired
 	}
 
 	if !uniqueIDs(in.UnitIDs) {
-		fieldErrs["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -485,7 +485,7 @@ func (m Restrictions) reconcile(
 	}
 
 	if !overrideOnlyAllowed(c, restriction) {
-		return nil, apperr.E(apperr.Forbidden, "error.forbidden")
+		return nil, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
 	if restriction.State == "released" ||
@@ -652,19 +652,19 @@ type RetryInput struct {
 func (in *RetryInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fieldErrs["restrictionId"] = "error.required"
+		fieldErrs["restrictionId"] = apperr.KeyRequired
 	}
 
 	if !uniqueIDs(in.UnitIDs) {
-		fieldErrs["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
 	if in.Phase != "apply" && in.Phase != "release" {
-		fieldErrs["phase"] = "error.invalid"
+		fieldErrs["phase"] = apperr.KeyInvalid
 	}
 
 	if strings.TrimSpace(in.ConfirmedRulesVersion) == "" {
-		fieldErrs["confirmedRulesVersion"] = "error.required"
+		fieldErrs["confirmedRulesVersion"] = apperr.KeyRequired
 	}
 
 	trimReason(&in.Reason, "reason", fieldErrs)
@@ -711,7 +711,7 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput)
 
 	if input.Phase == "apply" && !c.Principal.Permissions["restriction.write"] ||
 		input.Phase == "release" && !overrideOnlyAllowed(c, restriction) {
-		return nil, apperr.E(apperr.Forbidden, "error.forbidden")
+		return nil, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
 	if input.ConfirmedRulesVersion != restriction.RulesVersion {

@@ -356,8 +356,8 @@ func TestFrom(t *testing.T) {
 }
 
 func TestFieldsAndError(t *testing.T) {
-	domainError := Fields(map[string]string{"name": "error.required"})
-	if domainError.Code != Validation || domainError.FieldErrors["name"] != "error.required" ||
+	domainError := Fields(map[string]string{"name": KeyRequired})
+	if domainError.Code != Validation || domainError.FieldErrors["name"] != KeyRequired ||
 		domainError.HTTPStatus() != http.StatusUnprocessableEntity {
 		t.Fatal("Fields")
 	}
@@ -381,7 +381,7 @@ func TestWrap(t *testing.T) {
 		t.Fatal("the wrapped error is still found inside")
 	}
 
-	de := E(Conflict, "error.versionConflict")
+	de := E(Conflict, KeyVersionConflict)
 
 	got := From(Wrap(Wrap(de, "jobs.save"), "transaction"))
 	if got != de {

@@ -40,35 +40,35 @@ func (in *Conditions) check(fieldErrs map[string]string, prefix string) {
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fieldErrs[prefix+"unitIds"] = "error.invalid"
+			fieldErrs[prefix+"unitIds"] = apperr.KeyInvalid
 		}
 
 		seen[u] = true
 	}
 
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 100 {
-		fieldErrs[prefix+"unitIds"] = "error.invalid"
+		fieldErrs[prefix+"unitIds"] = apperr.KeyInvalid
 	}
 
 	if in.BaselineID == uuid.Nil || in.BaselineVersion < 1 {
-		fieldErrs[prefix+"baselineId"] = "error.required"
+		fieldErrs[prefix+"baselineId"] = apperr.KeyRequired
 	}
 
 	if in.FactorID == uuid.Nil || in.FactorVersion < 1 {
-		fieldErrs[prefix+"factorId"] = "error.required"
+		fieldErrs[prefix+"factorId"] = apperr.KeyRequired
 	}
 
 	if !slices.Contains(boundaries, in.BoundaryID) {
-		fieldErrs[prefix+"boundaryId"] = "error.invalid"
+		fieldErrs[prefix+"boundaryId"] = apperr.KeyInvalid
 	}
 
 	in.Boundary = strings.TrimSpace(in.Boundary)
 	if n := utf8.RuneCountInString(in.Boundary); n < 1 || n > 500 {
-		fieldErrs[prefix+"boundary"] = "error.length"
+		fieldErrs[prefix+"boundary"] = apperr.KeyLength
 	}
 
 	if in.OrganizationID == uuid.Nil {
-		fieldErrs[prefix+"organizationId"] = "error.required"
+		fieldErrs[prefix+"organizationId"] = apperr.KeyRequired
 	}
 }
 
@@ -130,7 +130,7 @@ func preview(ctx context.Context, c *ops.Call, input *Conditions) (Preview, erro
 	err := c.Tx.QueryRow(ctx, `SELECT kind FROM energy.ref_organizations WHERE id = $1`, input.OrganizationID).
 		Scan(&kind)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && kind != "customer") {
-		return Preview{}, apperr.Fields(map[string]string{"organizationId": "error.invalid"})
+		return Preview{}, apperr.Fields(map[string]string{"organizationId": apperr.KeyInvalid})
 	}
 
 	if err != nil {
@@ -283,7 +283,7 @@ func latestVersion(ctx context.Context, c *ops.Call, id uuid.UUID) (int, error) 
 	}
 
 	if v == nil {
-		return 0, apperr.E(apperr.NotFound, "error.notFound")
+		return 0, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return *v, nil
@@ -312,7 +312,7 @@ func LoadReport(ctx context.Context, call *ops.Call, id uuid.UUID, version *int)
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return report, apperr.E(apperr.NotFound, "error.notFound")
+		return report, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -331,7 +331,7 @@ type GetInput struct {
 // Validate implements ops.Validator.
 func (in *GetInput) Validate() map[string]string {
 	if in.ID == uuid.Nil || (in.ReportVersion != nil && *in.ReportVersion < 1) {
-		return map[string]string{"id": "error.invalid"}
+		return map[string]string{"id": apperr.KeyInvalid}
 	}
 
 	return nil
@@ -489,7 +489,7 @@ func listReports(
 			(f.Status != nil && *f.Status != "draft" && *f.Status != "demo_reviewed") ||
 			(f.From != nil && f.To != nil && !f.From.Before(*f.To)) {
 			return paging.Page[Report]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -551,7 +551,7 @@ type VersionsInput struct {
 // Validate implements ops.Validator.
 func (in *VersionsInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil
@@ -586,7 +586,7 @@ func (in *VersionsInput) Validate() map[string]string {
 func versions(ctx context.Context, c *ops.Call, input *VersionsInput) (paging.Page[Report], error) {
 	if input.Query.HasFilters() { // no filters (query catalog)
 		return paging.Page[Report]{}, apperr.Fields(
-			map[string]string{"query.filters": "error.invalid"},
+			map[string]string{"query.filters": apperr.KeyInvalid},
 		)
 	}
 
@@ -622,14 +622,14 @@ func (in *SaveInput) Validate() map[string]string {
 	seen := map[uuid.UUID]bool{}
 	for _, e := range in.EvidenceIDs {
 		if e == uuid.Nil || seen[e] {
-			fieldErrs["evidenceIds"] = "error.invalid"
+			fieldErrs["evidenceIds"] = apperr.KeyInvalid
 		}
 
 		seen[e] = true
 	}
 
 	if in.EvidenceIDs == nil || len(in.EvidenceIDs) > 20 {
-		fieldErrs["evidenceIds"] = "error.invalid"
+		fieldErrs["evidenceIds"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -702,7 +702,7 @@ func saveDraft(ctx context.Context, c *ops.Call, input *SaveInput) (Report, erro
 		}
 
 		if latest != *c.ExpectedVersion {
-			return Report{}, apperr.E(apperr.Conflict, "error.versionConflict")
+			return Report{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
 		id, version = *input.ID, latest+1
@@ -754,16 +754,16 @@ type ReviewInput struct {
 func (in *ReviewInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.ReportID == uuid.Nil {
-		fieldErrs["reportId"] = "error.required"
+		fieldErrs["reportId"] = apperr.KeyRequired
 	}
 
 	if in.ReportVersion < 1 {
-		fieldErrs["reportVersion"] = "error.required"
+		fieldErrs["reportVersion"] = apperr.KeyRequired
 	}
 
 	in.ReviewComment = strings.TrimSpace(in.ReviewComment)
 	if n := utf8.RuneCountInString(in.ReviewComment); n < 1 || n > 1000 {
-		fieldErrs["reviewComment"] = "error.length"
+		fieldErrs["reviewComment"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -805,7 +805,7 @@ func recordReview(ctx context.Context, call *ops.Call, in *ReviewInput) (Report,
 	}
 
 	if latest != in.ReportVersion || latest != *call.ExpectedVersion {
-		return Report{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Report{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	report, err := LoadReport(ctx, call, in.ReportID, &latest)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -173,7 +174,7 @@ func TestCapabilities(t *testing.T) {
 		capBody(id, model, ""),
 		1,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["changeReason"] != "error.required" {
+		res["fieldErrors"].(map[string]any)["changeReason"] != apperr.KeyRequired {
 		t.Errorf("update without a change reason: %d %v", code, res)
 	}
 

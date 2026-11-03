@@ -126,7 +126,7 @@ func partnerUsersList(
 			(f.Status != nil && !slices.Contains([]string{"invited", "active", "disabled"}, *f.Status)) ||
 			(f.PartnerRole != nil && *f.PartnerRole != "contractor" && *f.PartnerRole != "technician") {
 			return paging.Page[PartnerUser]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -279,7 +279,7 @@ func loadPartnerUser(
 
 	x, err := scanPartnerUser(call.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && x.OrganizationID != call.Principal.OrgID) {
-		return PartnerUser{}, apperr.E(apperr.NotFound, "error.notFound")
+		return PartnerUser{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return x, err
@@ -309,41 +309,41 @@ func (in *PartnerUserInput) Validate() map[string]string {
 	)
 	if err != nil || a.Address != in.Email ||
 		len(in.Email) > 254 {
-		fieldErrs["email"] = "error.invalid"
+		fieldErrs["email"] = apperr.KeyInvalid
 	}
 
 	if in.PartnerRole != "contractor" && in.PartnerRole != "technician" {
-		fieldErrs["partnerRole"] = "error.invalid"
+		fieldErrs["partnerRole"] = apperr.KeyInvalid
 	}
 
 	if in.Status != nil && *in.Status != "active" && *in.Status != "disabled" {
-		fieldErrs["status"] = "error.invalid"
+		fieldErrs["status"] = apperr.KeyInvalid
 	}
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
 		if n := utf8.RuneCountInString(*in.Reason); n < 1 || n > 1000 {
-			fieldErrs["reason"] = "error.length"
+			fieldErrs["reason"] = apperr.KeyLength
 		}
 	}
 
 	if in.ID == nil { // a new user is named (IR461)
 		if in.DisplayName == nil {
-			fieldErrs["displayName"] = "error.required"
+			fieldErrs["displayName"] = apperr.KeyRequired
 		} else if *in.DisplayName = strings.TrimSpace(*in.DisplayName); utf8.RuneCountInString(*in.DisplayName) < 1 ||
 			utf8.RuneCountInString(*in.DisplayName) > 120 {
-			fieldErrs["displayName"] = "error.length"
+			fieldErrs["displayName"] = apperr.KeyLength
 		}
 
 		if in.PartnerRole == "technician" && in.AccessUntil == nil {
-			fieldErrs["accessUntil"] = "error.required"
+			fieldErrs["accessUntil"] = apperr.KeyRequired
 		}
 	} else if in.DisplayName != nil {
-		fieldErrs["displayName"] = "error.notAllowed"
+		fieldErrs["displayName"] = apperr.KeyNotAllowed
 	}
 
 	if in.AccessUntil != nil && in.PartnerRole != "technician" {
-		fieldErrs["accessUntil"] = "error.notAllowed"
+		fieldErrs["accessUntil"] = apperr.KeyNotAllowed
 	}
 
 	return fieldErrs
@@ -503,11 +503,11 @@ func partnerUsersSave(
 
 	if input.ID == nil { // a new user: the account is created now and gets the set-up e-mail (IR461)
 		if input.Status != nil {
-			return PartnerUser{}, apperr.Fields(map[string]string{"status": "error.notAllowed"})
+			return PartnerUser{}, apperr.Fields(map[string]string{"status": apperr.KeyNotAllowed})
 		}
 
 		if input.Reason != nil {
-			return PartnerUser{}, apperr.Fields(map[string]string{"reason": "error.notAllowed"})
+			return PartnerUser{}, apperr.Fields(map[string]string{"reason": apperr.KeyNotAllowed})
 		}
 
 		acct := newAccount{
@@ -523,7 +523,9 @@ func partnerUsersSave(
 		}
 		if input.PartnerRole == "technician" {
 			if !accessUntilOK(c.Now, *input.AccessUntil) {
-				return PartnerUser{}, apperr.Fields(map[string]string{"accessUntil": "error.range"})
+				return PartnerUser{}, apperr.Fields(
+					map[string]string{"accessUntil": apperr.KeyRange},
+				)
 			}
 
 			ext := "external"
@@ -581,11 +583,11 @@ func partnerUsersSave(
 	}
 
 	if partnerUser.Version != *c.ExpectedVersion {
-		return partnerUser, apperr.E(apperr.Conflict, "error.versionConflict")
+		return partnerUser, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if input.Reason == nil {
-		return partnerUser, apperr.Fields(map[string]string{"reason": "error.required"})
+		return partnerUser, apperr.Fields(map[string]string{"reason": apperr.KeyRequired})
 	}
 
 	status := partnerUser.Status
@@ -605,9 +607,9 @@ func partnerUsersSave(
 	}
 	// the account exists from the start (IR461): its e-mail and role are fixed; remove the user and add them again
 	if !strings.EqualFold(input.Email, partnerUser.Email) {
-		return partnerUser, apperr.Fields(map[string]string{"email": "error.immutable"})
+		return partnerUser, apperr.Fields(map[string]string{"email": apperr.KeyImmutable})
 	} else if input.PartnerRole != partnerUser.PartnerRole {
-		return partnerUser, apperr.Fields(map[string]string{"partnerRole": "error.immutable"})
+		return partnerUser, apperr.Fields(map[string]string{"partnerRole": apperr.KeyImmutable})
 	} else {
 		input.Email = partnerUser.Email // the same address in other letter case keeps the stored spelling
 	}
@@ -659,11 +661,11 @@ func partnerUsersSave(
 
 	if input.AccessUntil != nil { // a technician's access end, set by the contractor (IR461)
 		if !accessUntilOK(c.Now, *input.AccessUntil) {
-			return partnerUser, apperr.Fields(map[string]string{"accessUntil": "error.range"})
+			return partnerUser, apperr.Fields(map[string]string{"accessUntil": apperr.KeyRange})
 		}
 
 		if partnerUser.MembershipID == nil {
-			return partnerUser, apperr.E(apperr.Conflict, "error.invalidState")
+			return partnerUser, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 		}
 
 		if partnerUser.AccessUntil != nil &&
@@ -747,12 +749,12 @@ type PartnerRemoveInput struct {
 func (in *PartnerRemoveInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.ID == uuid.Nil {
-		fieldErrs["id"] = "error.required"
+		fieldErrs["id"] = apperr.KeyRequired
 	}
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fieldErrs["reason"] = "error.length"
+		fieldErrs["reason"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -797,7 +799,7 @@ func partnerUsersRemove(
 	}
 
 	if partnerUser.Version != *call.ExpectedVersion {
-		return Deleted{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Deleted{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	notSelfOrLastErr := notSelfOrLast(ctx, call, partnerUser)
@@ -851,7 +853,7 @@ type PartnerResendInput struct {
 // Validate implements ops.Validator.
 func (in *PartnerResendInput) Validate() map[string]string {
 	if in.ID == uuid.Nil {
-		return map[string]string{"id": "error.required"}
+		return map[string]string{"id": apperr.KeyRequired}
 	}
 
 	return nil

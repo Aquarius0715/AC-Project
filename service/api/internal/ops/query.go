@@ -59,7 +59,7 @@ func RegisterQuery[I any, O any](
 
 			err := json.Unmarshal(raw, input)
 			if err != nil {
-				return nil, apperr.Fields(map[string]string{"_": "error.malformedInput"})
+				return nil, apperr.Fields(map[string]string{"_": apperr.KeyMalformedInput})
 			}
 			// an input that validates itself is checked here too, as the operations' inputs are (IR431)
 			if v, ok := any(input).(Validator); ok {
@@ -133,7 +133,7 @@ func Ask[O any](ctx context.Context, reg *Registry, c *Call, name string, in any
 	}
 
 	if reg.Remote == nil {
-		return out, apperr.E(apperr.Unavailable, "error.unavailable")
+		return out, apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 	}
 
 	body, err := reg.Remote.Query(ctx, c, q.domain, name, raw)
@@ -170,7 +170,7 @@ func (h *HTTPQueries) Query(
 ) (json.RawMessage, error) {
 	base := h.Targets[domain]
 	if base == nil || call.Principal == nil {
-		return nil, apperr.E(apperr.Unavailable, "error.unavailable")
+		return nil, apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 	}
 
 	path := "/internal/v1/queries/" // the caller's user and membership
@@ -215,13 +215,13 @@ func (h *HTTPQueries) Query(
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, apperr.E(apperr.Unavailable, "error.unavailable")
+		return nil, apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
-		return nil, apperr.E(apperr.Unavailable, "error.unavailable")
+		return nil, apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -236,7 +236,7 @@ func (h *HTTPQueries) Query(
 			return nil, domainErr
 		}
 
-		return nil, apperr.E(apperr.Unavailable, "error.unavailable")
+		return nil, apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 	}
 
 	var env struct {
@@ -268,7 +268,7 @@ func (r *Registry) ServeSystemQuery(token string) echo.HandlerFunc {
 	return func(ectx *echo.Context) error {
 		tenant, err := uuid.Parse(ectx.Request().Header.Get("X-Tenant-Id"))
 		if err != nil {
-			return apperr.E(apperr.Unauthenticated, "error.unauthenticated")
+			return apperr.E(apperr.Unauthenticated, apperr.KeyUnauthenticated)
 		}
 
 		return r.serveQuery(
@@ -301,21 +301,21 @@ func (r *Registry) serveQuery(ectx *echo.Context, token string, p *Principal, be
 			[]byte(ectx.Request().Header.Get(InternalTokenHeader)),
 			[]byte(token),
 		) != 1 {
-		return apperr.E(apperr.Unauthenticated, "error.unauthenticated")
+		return apperr.E(apperr.Unauthenticated, apperr.KeyUnauthenticated)
 	}
 
 	name := ectx.Param("query")
 
 	q, ok := r.queries[name]
 	if !ok || (r.domains != nil && !r.domains[q.domain]) {
-		return apperr.E(apperr.NotFound, "error.unknownOperation")
+		return apperr.E(apperr.NotFound, apperr.KeyUnknownOperation)
 	}
 
 	ctx := ectx.Request().Context()
 
 	raw, err := io.ReadAll(io.LimitReader(ectx.Request().Body, 1<<20))
 	if err != nil {
-		return apperr.E(apperr.Validation, "error.bodyTooLarge")
+		return apperr.E(apperr.Validation, apperr.KeyBodyTooLarge)
 	}
 
 	now := r.Clock()

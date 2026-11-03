@@ -107,7 +107,7 @@ func decodeTechFilter(query paging.Query) (techFilter, error) {
 
 	if dec.Decode(&f) != nil ||
 		(f.Qualification != nil && (!certCodes[*f.Qualification] || *f.Qualification == "other")) {
-		return f, apperr.Fields(map[string]string{"filters": "error.invalid"})
+		return f, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
 	}
 
 	return f, nil
@@ -217,11 +217,11 @@ type EligibleInput struct {
 func (in *EligibleInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = "error.required"
+		fieldErrs["jobId"] = apperr.KeyRequired
 	}
 
 	if !in.StartAt.Before(in.EndAt) {
-		fieldErrs["endAt"] = "error.range"
+		fieldErrs["endAt"] = apperr.KeyRange
 	}
 
 	return fieldErrs
@@ -274,7 +274,7 @@ func (m Workforce) eligible(
 		Scan(&unit, &contractor)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == "contractor" && (contractor == nil || *contractor != call.Principal.OrgID)) {
-		return paging.Page[identity.Member]{}, apperr.E(apperr.NotFound, "error.notFound")
+		return paging.Page[identity.Member]{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -365,7 +365,7 @@ type CapacityInput struct {
 func (in *CapacityInput) Validate() map[string]string {
 	_, err := time.ParseInLocation("2006-01-02", in.Date, kualaLumpur)
 	if err != nil {
-		return map[string]string{"date": "error.invalid"}
+		return map[string]string{"date": apperr.KeyInvalid}
 	}
 
 	return nil
@@ -603,17 +603,17 @@ func (in *UnavailabilityInput) Validate() map[string]string {
 
 	t, err2 := time.Parse("2006-01-02", in.To)
 	if err1 != nil || err2 != nil || t.Before(f) || t.Sub(f) > 30*24*time.Hour {
-		fieldErrs["to"] = "error.range"
+		fieldErrs["to"] = apperr.KeyRange
 	}
 
 	if !unavailabilityTypes[in.Type] {
-		fieldErrs["type"] = "error.invalid"
+		fieldErrs["type"] = apperr.KeyInvalid
 	}
 
 	if in.Note != nil {
 		*in.Note = strings.TrimSpace(*in.Note)
 		if utf8.RuneCountInString(*in.Note) > 500 {
-			fieldErrs["note"] = "error.length"
+			fieldErrs["note"] = apperr.KeyLength
 		}
 
 		if *in.Note == "" {
@@ -679,7 +679,7 @@ func (m Workforce) setUnavailability(
 
 		if !found ||
 			(call.Principal.Role == "contractor" && technician.OrgID != call.Principal.OrgID) {
-			return Unavailability{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Unavailability{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		org = technician.OrgID
@@ -855,7 +855,7 @@ func (m Workforce) unavailabilityList(
 
 		if dec.Decode(&f) != nil {
 			return paging.Page[Unavailability]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -942,12 +942,12 @@ type ClearUnavailabilityInput struct {
 func (in *ClearUnavailabilityInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.ID == uuid.Nil {
-		fieldErrs["id"] = "error.required"
+		fieldErrs["id"] = apperr.KeyRequired
 	}
 
 	_, err := time.Parse("2006-01-02", in.From)
 	if err != nil {
-		fieldErrs["from"] = "error.invalid"
+		fieldErrs["from"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -1005,7 +1005,7 @@ func (m Workforce) clearUnavailability(
 	)
 	if errors.Is(err, pgx.ErrNoRows) ||
 		(err == nil && call.Principal.Role == "contractor" && unavailability.OrganizationID != call.Principal.OrgID) {
-		return UnavailabilityCleared{}, apperr.E(apperr.NotFound, "error.notFound")
+		return UnavailabilityCleared{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -1013,12 +1013,12 @@ func (m Workforce) clearUnavailability(
 	}
 
 	if unavailability.Version != *call.ExpectedVersion {
-		return UnavailabilityCleared{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return UnavailabilityCleared{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if input.From < call.Now.In(kualaLumpur).Format("2006-01-02") ||
 		input.From > unavailability.To {
-		return UnavailabilityCleared{}, apperr.Fields(map[string]string{"from": "error.range"})
+		return UnavailabilityCleared{}, apperr.Fields(map[string]string{"from": apperr.KeyRange})
 	}
 
 	payload := map[string]any{"organizationId": unavailability.OrganizationID, "from": input.From}

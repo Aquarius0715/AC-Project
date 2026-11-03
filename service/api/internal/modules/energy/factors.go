@@ -69,7 +69,7 @@ func LoadFactor(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) (F
 
 	x, err := scanFactor(c.Tx.QueryRow(ctx, q, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return x, apperr.E(apperr.NotFound, "error.notFound")
+		return x, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return x, err
@@ -119,7 +119,7 @@ func listFactors(
 
 		if dec.Decode(&f) != nil {
 			return paging.Page[Factor]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
@@ -226,23 +226,23 @@ func (in *FactorInput) Validate() map[string]string {
 
 	in.Region, in.Source = strings.TrimSpace(in.Region), strings.TrimSpace(in.Source)
 	if n := utf8.RuneCountInString(in.Region); n < 1 || n > 120 {
-		fieldErrs["region"] = "error.length"
+		fieldErrs["region"] = apperr.KeyLength
 	}
 
 	if in.Year < 2000 || in.Year > 2100 {
-		fieldErrs["year"] = "error.range"
+		fieldErrs["year"] = apperr.KeyRange
 	}
 
 	if math.IsNaN(in.KgCO2ePerKWh) || in.KgCO2ePerKWh <= 0 || in.KgCO2ePerKWh > 10 {
-		fieldErrs["kgCO2ePerKWh"] = "error.range"
+		fieldErrs["kgCO2ePerKWh"] = apperr.KeyRange
 	}
 
 	if n := utf8.RuneCountInString(in.Source); n < 1 || n > 500 {
-		fieldErrs["source"] = "error.length"
+		fieldErrs["source"] = apperr.KeyLength
 	}
 
 	if !in.IsDemo {
-		fieldErrs["isDemo"] = "error.invalid"
+		fieldErrs["isDemo"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -283,7 +283,7 @@ func saveFactor(ctx context.Context, call *ops.Call, in *FactorInput) (Factor, e
 		}
 
 		if cur.Version != *call.ExpectedVersion {
-			return cur, apperr.E(apperr.Conflict, "error.versionConflict")
+			return cur, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
 		id, version = cur.ID, cur.Version+1

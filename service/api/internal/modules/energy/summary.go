@@ -257,18 +257,18 @@ func (in *SummaryInput) Validate() map[string]string {
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fieldErrs["unitIds"] = "error.invalid"
+			fieldErrs["unitIds"] = apperr.KeyInvalid
 		}
 
 		seen[u] = true
 	}
 
 	if in.UnitIDs == nil || len(in.UnitIDs) > 100 {
-		fieldErrs["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
 	if in.TariffVersion != nil && *in.TariffVersion != TariffVersion {
-		fieldErrs["tariffVersion"] = "error.invalid"
+		fieldErrs["tariffVersion"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -315,7 +315,7 @@ func summary(ctx context.Context, c *ops.Call, input *SummaryInput) (Summary, er
 		}
 
 		if mine != len(input.UnitIDs) {
-			return Summary{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Summary{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 	}
 
@@ -328,7 +328,7 @@ func summary(ctx context.Context, c *ops.Call, input *SummaryInput) (Summary, er
 	}
 
 	if known != len(input.UnitIDs) {
-		return Summary{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Summary{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	factor, err := DefaultFactor(ctx, c)

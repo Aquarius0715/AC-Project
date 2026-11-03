@@ -13,6 +13,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/idp"
@@ -924,7 +925,7 @@ func TestPartnerUserInputs(t *testing.T) {
 		`{"id":"`+id+`","reason":"left the company"}`,
 		2,
 	); code != 409 ||
-		res["messageKey"] != "error.versionConflict" {
+		res["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("remove on a stale version: %d %v", code, res)
 	}
 

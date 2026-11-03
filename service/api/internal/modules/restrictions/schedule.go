@@ -51,7 +51,7 @@ func parsePolicy(raw json.RawMessage) (Policy, bool) {
 func trimReason(s *string, key string, fe map[string]string) {
 	*s = strings.TrimSpace(*s)
 	if n := utf8.RuneCountInString(*s); n < 1 || n > 1000 {
-		fe[key] = "error.length"
+		fe[key] = apperr.KeyLength
 	}
 }
 
@@ -85,29 +85,29 @@ type ScheduleInput struct {
 func (in *ScheduleInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.ContractID == uuid.Nil {
-		fieldErrs["contractId"] = "error.required"
+		fieldErrs["contractId"] = apperr.KeyRequired
 	}
 
 	if in.ExpectedContractVersion < 1 {
-		fieldErrs["expectedContractVersion"] = "error.required"
+		fieldErrs["expectedContractVersion"] = apperr.KeyRequired
 	}
 
 	if !uniqueIDs(in.CauseInvoiceIDs) {
-		fieldErrs["causeInvoiceIds"] = "error.invalid"
+		fieldErrs["causeInvoiceIds"] = apperr.KeyInvalid
 	}
 
 	if !uniqueIDs(in.UnitIDs) || len(in.UnitIDs) > 100 {
-		fieldErrs["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
 	p, ok := parsePolicy(in.Policy)
 	if !ok {
-		fieldErrs["policy"] = "error.invalid"
+		fieldErrs["policy"] = apperr.KeyInvalid
 	}
 
 	in.policy = p
 	if in.ExecuteAfter.IsZero() {
-		fieldErrs["executeAfter"] = "error.required"
+		fieldErrs["executeAfter"] = apperr.KeyRequired
 	}
 
 	trimReason(&in.Reason, "reason", fieldErrs)
@@ -116,7 +116,7 @@ func (in *ScheduleInput) Validate() map[string]string {
 		in.RulesVersion,
 	); in.RulesVersion == "" ||
 		len(in.RulesVersion) > 64 {
-		fieldErrs["rulesVersion"] = "error.required"
+		fieldErrs["rulesVersion"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -194,7 +194,7 @@ func (m Restrictions) schedule(
 		FROM billing.contracts k WHERE k.id = $1 AND k.is_current FOR UPDATE`, input.ContractID).
 		Scan(&version, &planType, &eligible, &rules, &customer, &org, &termStart, &termUntil, &contractUnits)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Restriction{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Restriction{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -202,7 +202,7 @@ func (m Restrictions) schedule(
 	}
 
 	if version != input.ExpectedContractVersion {
-		return Restriction{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Restriction{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if planType != "rto" || !eligible || rules == nil || call.Now.Before(termStart) ||
@@ -441,11 +441,11 @@ type ExecuteInput struct {
 func (in *ExecuteInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fieldErrs["restrictionId"] = "error.required"
+		fieldErrs["restrictionId"] = apperr.KeyRequired
 	}
 
 	if strings.TrimSpace(in.ConfirmedRulesVersion) == "" {
-		fieldErrs["confirmedRulesVersion"] = "error.required"
+		fieldErrs["confirmedRulesVersion"] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -459,7 +459,7 @@ func lockCurrent(ctx context.Context, call *ops.Call, id uuid.UUID) (Restriction
 	}
 
 	if restriction.Version != *call.ExpectedVersion {
-		return restriction, apperr.E(apperr.Conflict, "error.versionConflict")
+		return restriction, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	return restriction, nil
@@ -784,7 +784,7 @@ type CancelInput struct {
 func (in *CancelInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fieldErrs["restrictionId"] = "error.required"
+		fieldErrs["restrictionId"] = apperr.KeyRequired
 	}
 
 	trimReason(&in.Reason, "reason", fieldErrs)
@@ -838,7 +838,7 @@ func (m Restrictions) cancel(
 	}
 
 	if restriction.Version != *call.ExpectedVersion {
-		return restriction, apperr.E(apperr.Conflict, "error.versionConflict")
+		return restriction, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	next := restriction.Version + 1

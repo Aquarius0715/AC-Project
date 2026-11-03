@@ -138,20 +138,20 @@ func (m *Module) unitsCoverage(
 
 	if f.Coverage != nil && !coverageStatuses[*f.Coverage] {
 		return paging.Page[UnitCoverage]{}, apperr.Fields(
-			map[string]string{"filters.coverage": "error.invalid"},
+			map[string]string{"filters.coverage": apperr.KeyInvalid},
 		)
 	}
 
 	if f.ExpiringWithinDays != nil && (*f.ExpiringWithinDays < 1 || *f.ExpiringWithinDays > 3650) {
 		return paging.Page[UnitCoverage]{}, apperr.Fields(
-			map[string]string{"filters.expiringWithinDays": "error.range"},
+			map[string]string{"filters.expiringWithinDays": apperr.KeyRange},
 		)
 	}
 
 	if query.Sort != nil && query.Sort.Field != "id" && query.Sort.Field != "name" &&
 		query.Sort.Field != "dueAt" {
 		return paging.Page[UnitCoverage]{}, apperr.Fields(
-			map[string]string{"sort.field": "error.invalid"},
+			map[string]string{"sort.field": apperr.KeyInvalid},
 		)
 	}
 

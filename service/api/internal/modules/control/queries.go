@@ -24,7 +24,7 @@ type RequestedInput struct {
 // Validate implements ops.Validator.
 func (in *RequestedInput) Validate() map[string]string {
 	if in.Limit < 1 || in.Limit > 100 {
-		return map[string]string{"limit": "error.range"}
+		return map[string]string{"limit": apperr.KeyRange}
 	}
 
 	return nil

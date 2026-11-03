@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -370,7 +371,7 @@ func TestClientUserMembershipSync(t *testing.T) {
 		"active",
 		1,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["customerId"] != "error.immutable" {
+		res["fieldErrors"].(map[string]any)["customerId"] != apperr.KeyImmutable {
 		t.Errorf("move a user to another customer: %d %v", code, res)
 	}
 	// the e-mail of a signed-in user is the sign-in identity's: HQ cannot change it either (IR422)
@@ -421,7 +422,7 @@ func TestClientUserMembershipSync(t *testing.T) {
 		`{"id":"`+user+`","reason":"left the company"}`,
 		3,
 	); code != 409 ||
-		res["messageKey"] != "error.versionConflict" {
+		res["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("remove on a stale version: %d %v", code, res)
 	}
 

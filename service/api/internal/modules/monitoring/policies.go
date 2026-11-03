@@ -234,15 +234,15 @@ func (a *AlertCondition) validate(
 	fieldErrs map[string]string,
 ) {
 	if !metrics[a.Metric] {
-		fieldErrs[prefix+"metric"] = "error.invalid"
+		fieldErrs[prefix+"metric"] = apperr.KeyInvalid
 	}
 
 	if !operators[a.Operator] {
-		fieldErrs[prefix+"operator"] = "error.invalid"
+		fieldErrs[prefix+"operator"] = apperr.KeyInvalid
 	}
 
 	if math.IsNaN(a.Threshold) || math.IsInf(a.Threshold, 0) {
-		fieldErrs[prefix+"threshold"] = "error.invalid"
+		fieldErrs[prefix+"threshold"] = apperr.KeyInvalid
 	}
 
 	up := a.Operator == "gt" || a.Operator == "gte"
@@ -252,11 +252,11 @@ func (a *AlertCondition) validate(
 	}
 
 	if a.DurationSeconds < 1 || a.DurationSeconds > 86400 {
-		fieldErrs[prefix+"durationSeconds"] = "error.range"
+		fieldErrs[prefix+"durationSeconds"] = apperr.KeyRange
 	}
 
 	if !severities[a.Severity] {
-		fieldErrs[prefix+"severity"] = "error.invalid"
+		fieldErrs[prefix+"severity"] = apperr.KeyInvalid
 	}
 
 	if activeWindow := a.ActiveWindow; activeWindow != nil {
@@ -272,7 +272,7 @@ func (a *AlertCondition) validate(
 		}
 
 		if !ok {
-			fieldErrs[prefix+"activeWindow.weekdays"] = "error.invalid"
+			fieldErrs[prefix+"activeWindow.weekdays"] = apperr.KeyInvalid
 		}
 
 		if !hhmm.MatchString(activeWindow.StartLocal) || !hhmm.MatchString(activeWindow.EndLocal) ||
@@ -658,14 +658,14 @@ func (m Policies) list(
 
 		if dec.Decode(&f) != nil {
 			return paging.Page[Policy]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
 
 	if f.Kind != nil && kindRank[*f.Kind] == 0 && *f.Kind != "default_alert" {
 		return paging.Page[Policy]{}, apperr.Fields(
-			map[string]string{"filters.kind": "error.invalid"},
+			map[string]string{"filters.kind": apperr.KeyInvalid},
 		)
 	}
 
@@ -690,7 +690,7 @@ func (m Policies) list(
 			less = func(a, b Policy) int { return dir * a.UpdatedAt.Compare(b.UpdatedAt) }
 		default:
 			return paging.Page[Policy]{}, apperr.Fields(
-				map[string]string{"sort.field": "error.invalid"},
+				map[string]string{"sort.field": apperr.KeyInvalid},
 			)
 		}
 	} else {
@@ -953,7 +953,7 @@ type PolicyIDInput struct {
 // Validate implements ops.Validator.
 func (in *PolicyIDInput) Validate() map[string]string {
 	if in.PolicyID == uuid.Nil {
-		return map[string]string{"policyId": "error.required"}
+		return map[string]string{"policyId": apperr.KeyRequired}
 	}
 
 	return nil
@@ -994,7 +994,7 @@ func (m Policies) loadKinds(
 	}
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return policy, apperr.E(apperr.NotFound, "error.notFound")
+		return policy, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -1002,7 +1002,7 @@ func (m Policies) loadKinds(
 	}
 
 	if !kinds[policy.Kind] {
-		return policy, apperr.E(apperr.NotFound, "error.notFound")
+		return policy, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if call.Principal.Role == "client" && policy.Kind == "alert" {
@@ -1012,7 +1012,7 @@ func (m Policies) loadKinds(
 		}
 
 		if policy.CustomerID == nil || *policy.CustomerID != own {
-			return policy, apperr.E(apperr.NotFound, "error.notFound")
+			return policy, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 	}
 
@@ -1108,18 +1108,18 @@ func (in *SaveInput) Validate() map[string]string {
 	switch in.Kind {
 	case "default_alert":
 		if in.ID == nil {
-			fieldErrs["id"] = "error.required"
+			fieldErrs["id"] = apperr.KeyRequired
 		}
 
 		if len(in.Rules) != len(DefaultRules) {
-			fieldErrs["rules"] = "error.fixedRules"
+			fieldErrs["rules"] = apperr.KeyFixedRules
 		}
 
 		for i, defaultAlertRule := range in.Rules {
 			if i < len(DefaultRules) &&
 				(defaultAlertRule.RuleKey != DefaultRules[i].RuleKey || defaultAlertRule.Name != DefaultRules[i].Name ||
 					defaultAlertRule.Category != DefaultRules[i].Category) {
-				fieldErrs["rules"] = "error.fixedRules"
+				fieldErrs["rules"] = apperr.KeyFixedRules
 			}
 
 			if i < len(DefaultRules) {
@@ -1131,48 +1131,48 @@ func (in *SaveInput) Validate() map[string]string {
 		return fieldErrs
 	case "alert", "automation":
 	default:
-		fieldErrs["kind"] = "error.invalid"
+		fieldErrs["kind"] = apperr.KeyInvalid
 
 		return fieldErrs
 	}
 
 	if in.Name == nil {
-		fieldErrs["name"] = "error.required"
+		fieldErrs["name"] = apperr.KeyRequired
 	} else {
 		*in.Name = strings.TrimSpace(*in.Name)
 		if n := utf8.RuneCountInString(*in.Name); n < 1 || n > 120 {
-			fieldErrs["name"] = "error.length"
+			fieldErrs["name"] = apperr.KeyLength
 		}
 	}
 
 	if in.Timezone == nil {
-		fieldErrs["timezone"] = "error.required"
+		fieldErrs["timezone"] = apperr.KeyRequired
 	} else {
 		_, err := time.LoadLocation(*in.Timezone)
 		if err != nil || *in.Timezone == "" || *in.Timezone == "Local" {
-			fieldErrs["timezone"] = "error.invalid"
+			fieldErrs["timezone"] = apperr.KeyInvalid
 		}
 	}
 
 	if in.Enabled == nil {
-		fieldErrs["enabled"] = "error.required"
+		fieldErrs["enabled"] = apperr.KeyRequired
 	}
 
 	if in.Priority == nil || *in.Priority < 0 || *in.Priority > 100 {
-		fieldErrs["priority"] = "error.range"
+		fieldErrs["priority"] = apperr.KeyRange
 	}
 
 	if in.Kind == "automation" {
 		if n := len(in.UnitIDs); n < 1 || n > 500 || hasDup(in.UnitIDs) {
-			fieldErrs["unitIds"] = "error.invalid"
+			fieldErrs["unitIds"] = apperr.KeyInvalid
 		}
 
 		if !validAutoCondition(in.Condition) {
-			fieldErrs["condition"] = "error.invalid"
+			fieldErrs["condition"] = apperr.KeyInvalid
 		}
 
 		if _, ok := control.ParseAction(in.Action); !ok {
-			fieldErrs["action"] = "error.invalid"
+			fieldErrs["action"] = apperr.KeyInvalid
 		}
 
 		if in.CustomerID != nil || in.Metric != nil || in.RecipientMembershipIDs != nil ||
@@ -1188,7 +1188,7 @@ func (in *SaveInput) Validate() map[string]string {
 		}
 
 		if in.CustomerID == nil {
-			fieldErrs["customerId"] = "error.required"
+			fieldErrs["customerId"] = apperr.KeyRequired
 		}
 
 		if in.UnitIDs != nil {
@@ -1199,7 +1199,7 @@ func (in *SaveInput) Validate() map[string]string {
 			in.RecoveryThreshold == nil ||
 			in.DurationSeconds == nil ||
 			in.Severity == nil {
-			fieldErrs["condition"] = "error.required"
+			fieldErrs["condition"] = apperr.KeyRequired
 		} else {
 			cond := in.condition()
 			cond.validate(hqMetrics, "", fieldErrs)
@@ -1209,7 +1209,7 @@ func (in *SaveInput) Validate() map[string]string {
 			in.RecipientMembershipIDs,
 		); n < 1 || n > 20 ||
 			hasDup(in.RecipientMembershipIDs) {
-			fieldErrs["recipientMembershipIds"] = "error.invalid"
+			fieldErrs["recipientMembershipIds"] = apperr.KeyInvalid
 		}
 
 		seen := map[string]bool{}
@@ -1221,16 +1221,16 @@ func (in *SaveInput) Validate() map[string]string {
 		}
 
 		if !ok || !seen["inApp"] {
-			fieldErrs["channels"] = "error.invalid"
+			fieldErrs["channels"] = apperr.KeyInvalid
 		}
 
 		if in.EscalateAfterMinutes == nil || *in.EscalateAfterMinutes < 1 ||
 			*in.EscalateAfterMinutes > 1440 {
-			fieldErrs["escalateAfterMinutes"] = "error.range"
+			fieldErrs["escalateAfterMinutes"] = apperr.KeyRange
 		}
 
 		if in.CooldownMinutes == nil || *in.CooldownMinutes < 1 || *in.CooldownMinutes > 1440 {
-			fieldErrs["cooldownMinutes"] = "error.range"
+			fieldErrs["cooldownMinutes"] = apperr.KeyRange
 		}
 	}
 
@@ -1290,7 +1290,7 @@ func hasDup(ids []uuid.UUID) bool {
 //	@Router			/v1/policies [post]
 func (m Policies) save(ctx context.Context, call *ops.Call, in *SaveInput) (Policy, error) {
 	if !grantedKinds(call)[in.Kind] {
-		return Policy{}, apperr.E(apperr.Forbidden, "error.forbidden")
+		return Policy{}, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
 	switch in.Kind {
@@ -1310,11 +1310,11 @@ func (m Policies) saveDefault(ctx context.Context, call *ops.Call, in *SaveInput
 	}
 
 	if policy.Kind != "default_alert" {
-		return policy, apperr.Fields(map[string]string{"kind": "error.kindFixed"})
+		return policy, apperr.Fields(map[string]string{"kind": apperr.KeyKindFixed})
 	}
 
 	if policy.Version != *call.ExpectedVersion {
-		return policy, apperr.E(apperr.Conflict, "error.versionConflict")
+		return policy, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	rules, _ := json.Marshal(in.Rules)
@@ -1350,7 +1350,7 @@ func (m Policies) saveAlert(ctx context.Context, call *ops.Call, in *SaveInput) 
 		}
 
 		if *in.CustomerID != own {
-			return Policy{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Policy{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 	}
 
@@ -1360,11 +1360,11 @@ func (m Policies) saveAlert(ctx context.Context, call *ops.Call, in *SaveInput) 
 	}
 
 	if !found {
-		return Policy{}, apperr.E(apperr.NotFound, "error.notFound")
+		return Policy{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if !active {
-		return Policy{}, apperr.Fields(map[string]string{"customerId": "error.inactiveCustomer"})
+		return Policy{}, apperr.Fields(map[string]string{"customerId": apperr.KeyInactiveCustomer})
 	}
 
 	bad, err := m.Recipients.NonReaders(ctx, call, in.RecipientMembershipIDs, org)
@@ -1406,7 +1406,7 @@ func (m Policies) saveAlert(ctx context.Context, call *ops.Call, in *SaveInput) 
 	}
 
 	if policy.Kind != "alert" {
-		return policy, apperr.Fields(map[string]string{"kind": "error.kindFixed"})
+		return policy, apperr.Fields(map[string]string{"kind": apperr.KeyKindFixed})
 	}
 
 	if policy.CustomerID == nil || *policy.CustomerID != *in.CustomerID {
@@ -1414,7 +1414,7 @@ func (m Policies) saveAlert(ctx context.Context, call *ops.Call, in *SaveInput) 
 	}
 
 	if policy.Version != *call.ExpectedVersion {
-		return policy, apperr.E(apperr.Conflict, "error.versionConflict")
+		return policy, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -1510,11 +1510,11 @@ func (m Policies) saveAutomation(
 		}
 
 		if !found {
-			return Policy{}, apperr.E(apperr.NotFound, "error.notFound")
+			return Policy{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		if !action.Supports(caps) {
-			return Policy{}, apperr.Fields(map[string]string{"action": "error.unsupportedAction"})
+			return Policy{}, apperr.Fields(map[string]string{"action": apperr.KeyUnsupportedAction})
 		}
 	}
 
@@ -1539,11 +1539,11 @@ func (m Policies) saveAutomation(
 		}
 
 		if policy.Kind != "automation" {
-			return policy, apperr.Fields(map[string]string{"kind": "error.kindFixed"})
+			return policy, apperr.Fields(map[string]string{"kind": apperr.KeyKindFixed})
 		}
 
 		if policy.Version != *call.ExpectedVersion {
-			return policy, apperr.E(apperr.Conflict, "error.versionConflict")
+			return policy, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
 		_, execErr := call.Tx.Exec(
@@ -1679,7 +1679,7 @@ func (m Policies) delete(ctx context.Context, call *ops.Call, in *PolicyIDInput)
 	}
 
 	if policy.Version != *call.ExpectedVersion {
-		return Deleted{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Deleted{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	switch policy.Kind {
@@ -1748,15 +1748,15 @@ type SetDefaultRuleInput struct {
 func (in *SetDefaultRuleInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.PolicyID == uuid.Nil {
-		fieldErrs["policyId"] = "error.required"
+		fieldErrs["policyId"] = apperr.KeyRequired
 	}
 
 	if in.CustomerID == uuid.Nil {
-		fieldErrs["customerId"] = "error.required"
+		fieldErrs["customerId"] = apperr.KeyRequired
 	}
 
 	if in.Enabled == nil {
-		fieldErrs["enabled"] = "error.required"
+		fieldErrs["enabled"] = apperr.KeyRequired
 	}
 
 	known := false
@@ -1765,13 +1765,13 @@ func (in *SetDefaultRuleInput) Validate() map[string]string {
 	}
 
 	if !known {
-		fieldErrs["ruleKey"] = "error.invalid"
+		fieldErrs["ruleKey"] = apperr.KeyInvalid
 	}
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
 		if utf8.RuneCountInString(*in.Reason) > 500 {
-			fieldErrs["reason"] = "error.length"
+			fieldErrs["reason"] = apperr.KeyLength
 		}
 	}
 
@@ -1818,7 +1818,7 @@ func (m Policies) setDefaultRule(
 		}
 
 		if input.CustomerID != own {
-			return RuleSetting{}, apperr.E(apperr.NotFound, "error.notFound")
+			return RuleSetting{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
 		if call.Principal.ClientRole != "owner" {
@@ -1831,7 +1831,7 @@ func (m Policies) setDefaultRule(
 	err := call.Tx.QueryRow(ctx, `SELECT kind FROM monitoring.alert_policies WHERE id = $1`, input.PolicyID).
 		Scan(&kind)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return RuleSetting{}, apperr.E(apperr.NotFound, "error.notFound")
+		return RuleSetting{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -1846,7 +1846,7 @@ func (m Policies) setDefaultRule(
 	if customerStateErr != nil {
 		return RuleSetting{}, apperr.Wrap(customerStateErr, "monitoring.PolicyUnits.CustomerState")
 	} else if !found {
-		return RuleSetting{}, apperr.E(apperr.NotFound, "error.notFound")
+		return RuleSetting{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	var cur int
@@ -1861,7 +1861,7 @@ func (m Policies) setDefaultRule(
 	}
 
 	if cur != *call.ExpectedVersion {
-		return RuleSetting{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return RuleSetting{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	var ruleSetting RuleSetting

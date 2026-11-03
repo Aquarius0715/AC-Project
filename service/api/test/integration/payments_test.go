@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -104,7 +105,7 @@ func TestPaymentSimulation(t *testing.T) {
 		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`,
 		9,
 	); code != 409 ||
-		m["messageKey"] != "error.versionConflict" {
+		m["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("initiate on a stale invoice version: %d %v", code, m)
 	}
 
@@ -151,7 +152,7 @@ func TestPaymentSimulation(t *testing.T) {
 		`{"event":"processing","paymentId":"`+pay+`"`+ev("processing")+`}`,
 		2,
 	); code != 409 ||
-		m["messageKey"] != "error.invalidState" {
+		m["messageKey"] != apperr.KeyInvalidState {
 		t.Errorf("a second processing event: %d %v", code, m)
 	}
 
@@ -159,7 +160,7 @@ func TestPaymentSimulation(t *testing.T) {
 		`{"event":"fail","paymentId":"`+pay+`"`+ev("fail")+`}`,
 		1,
 	); code != 409 ||
-		m["messageKey"] != "error.versionConflict" {
+		m["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("an event on a stale payment version: %d %v", code, m)
 	}
 
@@ -362,7 +363,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		refusal(t, c.op+" "+c.body, code, m, c.want)
 	}
 
-	if code, m := manual("5000", 9); code != 409 || m["messageKey"] != "error.versionConflict" {
+	if code, m := manual("5000", 9); code != 409 || m["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("manual on a stale invoice version: %d %v", code, m)
 	}
 
@@ -464,7 +465,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		t.Error("manual on an invoice with a payment")
 	}
 
-	if code, m := confirm(9); code != 409 || m["messageKey"] != "error.versionConflict" {
+	if code, m := confirm(9); code != 409 || m["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("hq confirm on a stale version: %d %v", code, m)
 	}
 

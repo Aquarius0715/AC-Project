@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 // The less common paths of a work report (IR100, SR07): a draft or submission of a job that does not exist, an item
@@ -24,7 +26,7 @@ func TestWorkReportEdges(t *testing.T) {
 		`{"jobId":"`+job+`","reportVersion":1}`,
 		2,
 	); code != 409 ||
-		resp["messageKey"] != "error.invalidState" {
+		resp["messageKey"] != apperr.KeyInvalidState {
 		t.Errorf("submit before the start: %d %v", code, resp)
 	}
 
@@ -66,7 +68,7 @@ func TestWorkReportEdges(t *testing.T) {
 		`{"jobId":"`+job+`","reportVersion":1}`,
 		2,
 	); code != 409 ||
-		resp["messageKey"] != "error.versionConflict" {
+		resp["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("submit of a stale job version: %d %v", code, resp)
 	}
 
@@ -86,7 +88,7 @@ func TestWorkReportEdges(t *testing.T) {
 		draftBody(job, "", map[string]string{"reportId": `"` + rep + `"`, "items": elsewhere}),
 		1,
 	); code != 422 ||
-		resp["fieldErrors"].(map[string]any)["items"] != "error.otherReportAttachment" {
+		resp["fieldErrors"].(map[string]any)["items"] != apperr.KeyOtherReportAttachment {
 		t.Errorf("an item citing another report's attachment: %d %v", code, resp)
 	}
 	// an empty reason is no reason; a measurement saved again by its ID keeps it and counts a version

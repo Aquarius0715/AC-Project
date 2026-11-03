@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
 func TestRoutesEachOperationToItsDomain(t *testing.T) {
@@ -75,7 +76,7 @@ func TestRoutesEachOperationToItsDomain(t *testing.T) {
 	)
 
 	if recorder.Code != http.StatusNotFound ||
-		!strings.Contains(recorder.Body.String(), "error.unknownOperation") {
+		!strings.Contains(recorder.Body.String(), apperr.KeyUnknownOperation) {
 		t.Fatalf("unknown: %d %s", recorder.Code, recorder.Body)
 	}
 }

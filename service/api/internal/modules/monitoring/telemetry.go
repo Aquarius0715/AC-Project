@@ -146,7 +146,7 @@ func (m Telemetry) readableUnits(ctx context.Context, call *ops.Call, units []uu
 	}
 
 	if len(vis) != len(units) {
-		return apperr.E(apperr.NotFound, "error.notFound")
+		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return apperr.Wrap(
@@ -177,11 +177,11 @@ const maxBuckets = 1000
 func validRange(from, until time.Time, max time.Duration, fe map[string]string) {
 	switch {
 	case from.IsZero():
-		fe["from"] = "error.required"
+		fe["from"] = apperr.KeyRequired
 	case until.IsZero():
-		fe["to"] = "error.required"
+		fe["to"] = apperr.KeyRequired
 	case !from.Before(until):
-		fe["to"] = "error.range"
+		fe["to"] = apperr.KeyRange
 	case max > 0 && until.Sub(from) > max:
 		fe["to"] = "error.rangeTooLong"
 	}
@@ -193,25 +193,25 @@ func (in *SeriesInput) Validate() map[string]string {
 	validRange(in.From, in.To, maxSeriesRange, fieldErrs)
 
 	if (in.UnitIDs == nil) == (in.SpaceID == nil) {
-		fieldErrs["unitIds"] = "error.exactlyOneTarget"
+		fieldErrs["unitIds"] = apperr.KeyExactlyOneTarget
 	} else if in.UnitIDs != nil && (len(in.UnitIDs) < 1 || len(in.UnitIDs) > 20 || hasDup(in.UnitIDs)) {
-		fieldErrs["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
 	if !metrics[in.Metric] {
-		fieldErrs["metric"] = "error.invalid"
+		fieldErrs["metric"] = apperr.KeyInvalid
 	}
 
 	if len(in.Query.Filters) > 0 && string(in.Query.Filters) != "{}" &&
 		string(in.Query.Filters) != "null" {
-		fieldErrs["query.filters"] = "error.invalid"
+		fieldErrs["query.filters"] = apperr.KeyInvalid
 	}
 
 	if b := in.BucketMinutes; b != nil {
 		if *b != 5 && *b != 60 {
-			fieldErrs["bucketMinutes"] = "error.invalid"
+			fieldErrs["bucketMinutes"] = apperr.KeyInvalid
 		} else if fieldErrs["to"] == "" && in.To.Sub(in.From) > time.Duration(maxBuckets)*time.Duration(*b)*time.Minute {
-			fieldErrs["bucketMinutes"] = "error.range"
+			fieldErrs["bucketMinutes"] = apperr.KeyRange
 		}
 	}
 
@@ -294,7 +294,7 @@ func (m Telemetry) series(ctx context.Context, call *ops.Call, in *SeriesInput) 
 		}
 
 		if len(units) == 0 {
-			return AirSeries{}, apperr.E(apperr.NotFound, "error.notFound")
+			return AirSeries{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 	} else {
 		err := m.readableUnits(ctx, call, units)
@@ -304,7 +304,7 @@ func (m Telemetry) series(ctx context.Context, call *ops.Call, in *SeriesInput) 
 	}
 
 	if in.Query.Sort != nil && in.Query.Sort.Field != "observedAt" {
-		return AirSeries{}, apperr.Fields(map[string]string{"query.sort.field": "error.invalid"})
+		return AirSeries{}, apperr.Fields(map[string]string{"query.sort.field": apperr.KeyInvalid})
 	}
 
 	dir := "ASC"
@@ -541,11 +541,11 @@ func (in *SummaryInput) Validate() map[string]string {
 	validRange(in.From, in.To, 0, fieldErrs)
 
 	if len(in.UnitIDs) < 1 || len(in.UnitIDs) > 100 || hasDup(in.UnitIDs) {
-		fieldErrs["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 
 	if in.Metric != nil && !metrics[*in.Metric] {
-		fieldErrs["metric"] = "error.invalid"
+		fieldErrs["metric"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -697,15 +697,15 @@ type VentLogInput struct {
 func (in *VentLogInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.SpaceID == uuid.Nil {
-		fieldErrs["spaceId"] = "error.required"
+		fieldErrs["spaceId"] = apperr.KeyRequired
 	}
 
 	if !ventMethods[in.Method] {
-		fieldErrs["method"] = "error.invalid"
+		fieldErrs["method"] = apperr.KeyInvalid
 	}
 
 	if in.DurationMinutes < 1 || in.DurationMinutes > 240 {
-		fieldErrs["durationMinutes"] = "error.range"
+		fieldErrs["durationMinutes"] = apperr.KeyRange
 	}
 
 	return fieldErrs
@@ -748,7 +748,7 @@ func (m Telemetry) log(
 	}
 
 	if !found || org != call.Principal.OrgID {
-		return VentilationLog{}, apperr.E(apperr.NotFound, "error.notFound")
+		return VentilationLog{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	src := spaceUnits
@@ -894,14 +894,14 @@ func (m Telemetry) list(
 		err := dec.Decode(&f)
 		if err != nil {
 			return paging.Page[VentilationLog]{}, apperr.Fields(
-				map[string]string{"filters": "error.invalid"},
+				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
 
 	if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
 		return paging.Page[VentilationLog]{}, apperr.Fields(
-			map[string]string{"filters.to": "error.range"},
+			map[string]string{"filters.to": apperr.KeyRange},
 		)
 	}
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
@@ -23,7 +24,7 @@ func TestDomainServiceServesOnlyItsOperations(t *testing.T) {
 		"units.list",
 		`{"limit":1}`,
 	); code != 404 ||
-		res["messageKey"] != "error.unknownOperation" {
+		res["messageKey"] != apperr.KeyUnknownOperation {
 		t.Fatalf("billing-api units.list: %d %v", code, res)
 	}
 

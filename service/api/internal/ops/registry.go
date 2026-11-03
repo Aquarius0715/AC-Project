@@ -96,7 +96,7 @@ func (c *Call) Require(f authz.Facts) error {
 		return nil
 	}
 
-	return apperr.E(apperr.NotFound, "error.notFound")
+	return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 }
 
 // Operation is a registered handler bound to its catalog spec.
@@ -463,9 +463,9 @@ func expectedVersion(spec Spec, body []byte, header string) (*int, error) {
 
 	switch {
 	case rule == "required" && header == "":
-		return nil, apperr.Fields(map[string]string{"expectedVersion": "error.required"})
+		return nil, apperr.Fields(map[string]string{"expectedVersion": apperr.KeyRequired})
 	case rule != "required" && header != "":
-		return nil, apperr.Fields(map[string]string{"expectedVersion": "error.notAllowed"})
+		return nil, apperr.Fields(map[string]string{"expectedVersion": apperr.KeyNotAllowed})
 	case header == "":
 		return nil, nil
 	}
@@ -473,7 +473,7 @@ func expectedVersion(spec Spec, body []byte, header string) (*int, error) {
 	n, err := strconv.Atoi(header)
 	if err != nil ||
 		n < 0 { // 0 names an absent row (IR120 item 7: a default rule without a stored setting)
-		return nil, apperr.Fields(map[string]string{"expectedVersion": "error.invalid"})
+		return nil, apperr.Fields(map[string]string{"expectedVersion": apperr.KeyInvalid})
 	}
 
 	return &n, nil
@@ -518,7 +518,7 @@ func readBody(c *echo.Context, operation string) ([]byte, error) {
 
 	body, err := io.ReadAll(io.LimitReader(c.Request().Body, limit+1))
 	if err != nil || int64(len(body)) > limit {
-		return nil, apperr.E(apperr.Validation, "error.bodyTooLarge")
+		return nil, apperr.E(apperr.Validation, apperr.KeyBodyTooLarge)
 	}
 
 	return body, nil
@@ -544,7 +544,7 @@ func (r *Registry) run(ectx *echo.Context, op *Operation, body []byte, corr stri
 
 	err := dec.Decode(input)
 	if err != nil {
-		return fail(ectx, apperr.Fields(map[string]string{"_": "error.malformedInput"}), corr)
+		return fail(ectx, apperr.Fields(map[string]string{"_": apperr.KeyMalformedInput}), corr)
 	}
 
 	if v, ok := input.(Validator); ok {
@@ -563,10 +563,10 @@ func (r *Registry) run(ectx *echo.Context, op *Operation, body []byte, corr stri
 	cands := op.Expr.Candidates(ap)
 	if len(cands) == 0 {
 		if principal == nil {
-			return fail(ectx, apperr.E(apperr.Unauthenticated, "error.unauthenticated"), corr)
+			return fail(ectx, apperr.E(apperr.Unauthenticated, apperr.KeyUnauthenticated), corr)
 		}
 
-		denied := apperr.E(apperr.Forbidden, "error.forbidden")
+		denied := apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 		if op.Spec.Mode == Write {
 			r.recordDenied(
 				ctx,
@@ -598,7 +598,7 @@ func (r *Registry) run(ectx *echo.Context, op *Operation, body []byte, corr stri
 		if len(key) < 8 || len(key) > 128 { // platform.idempotency_keys CHECK (8–128)
 			return fail(
 				ectx,
-				apperr.Fields(map[string]string{"Idempotency-Key": "error.required"}),
+				apperr.Fields(map[string]string{"Idempotency-Key": apperr.KeyRequired}),
 				corr,
 			)
 		}

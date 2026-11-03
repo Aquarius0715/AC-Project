@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -287,7 +288,7 @@ func TestOffsets(t *testing.T) {
 		"offsets.list",
 		`{"filters":{"from":"2026-09-14T00:00:00Z","to":"2026-09-01T00:00:00Z"}}`,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["filters.to"] != "error.range" {
+		res["fieldErrors"].(map[string]any)["filters.to"] != apperr.KeyRange {
 		t.Errorf("a reversed created period: %d %v", code, res)
 	}
 

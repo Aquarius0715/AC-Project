@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -145,7 +146,7 @@ func TestPayouts(t *testing.T) {
 		`{"statementId":"`+jid+`","action":"approve"}`,
 		1,
 	); code != 409 ||
-		res["messageKey"] != "error.versionConflict" {
+		res["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("approve on a stale version: %d %v", code, res)
 	}
 
@@ -156,7 +157,7 @@ func TestPayouts(t *testing.T) {
 		`{"statementId":"`+jid+`","action":"approve"}`,
 		2,
 	); code != 409 ||
-		res["messageKey"] != "error.invalidState" {
+		res["messageKey"] != apperr.KeyInvalidState {
 		t.Errorf("approve twice: %d %v", code, res)
 	}
 	// question on the July line, answered with an adjustment
@@ -190,7 +191,7 @@ func TestPayouts(t *testing.T) {
 		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"why"}`,
 		1,
 	); code != 409 ||
-		res["messageKey"] != "error.versionConflict" {
+		res["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("question on a stale version: %d %v", code, res)
 	}
 
@@ -236,7 +237,7 @@ func TestPayouts(t *testing.T) {
 		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"Added travel","adjustmentMinor":12000}`,
 		2,
 	); code != 409 ||
-		res["messageKey"] != "error.versionConflict" {
+		res["messageKey"] != apperr.KeyVersionConflict {
 		t.Errorf("answer on a stale version: %d %v", code, res)
 	}
 
@@ -359,7 +360,7 @@ func TestPayouts(t *testing.T) {
 		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"late question"}`,
 		ver(resp),
 	); code != 409 ||
-		res["messageKey"] != "error.invalidState" {
+		res["messageKey"] != apperr.KeyInvalidState {
 		t.Errorf("question on a paid statement: %d %v", code, res)
 	}
 	// contractor sees approved/paid only

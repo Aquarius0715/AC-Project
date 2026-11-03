@@ -67,7 +67,7 @@ func (m Billing) loadPayment(
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return payment, Invoice{}, apperr.E(apperr.NotFound, "error.notFound")
+		return payment, Invoice{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
@@ -191,27 +191,27 @@ func (in *SimulateInput) Validate() map[string]string {
 		if in.InvoiceID == nil || in.DemoConfirmed == nil || !*in.DemoConfirmed ||
 			in.PaymentID != nil ||
 			in.EventID != nil {
-			fieldErrs["invoiceId"] = "error.required"
+			fieldErrs["invoiceId"] = apperr.KeyRequired
 		}
 
 		if in.Event == "initiate" &&
 			(in.Method == nil || !slices.Contains(paymentMethods, *in.Method)) {
-			fieldErrs["method"] = "error.invalid"
+			fieldErrs["method"] = apperr.KeyInvalid
 		}
 
 		if in.Event == "instructions" && in.Method != nil {
-			fieldErrs["method"] = "error.notAllowed"
+			fieldErrs["method"] = apperr.KeyNotAllowed
 		}
 	case "processing", "confirm", "fail":
 		if in.PaymentID == nil || in.EventID == nil || in.InvoiceID != nil {
-			fieldErrs["paymentId"] = "error.required"
+			fieldErrs["paymentId"] = apperr.KeyRequired
 		}
 
 		if !refOK(in.PaymentReference) {
-			fieldErrs["paymentReference"] = "error.length"
+			fieldErrs["paymentReference"] = apperr.KeyLength
 		}
 	default:
-		fieldErrs["event"] = "error.invalid"
+		fieldErrs["event"] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -252,11 +252,11 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, input *SimulateInput
 		}
 
 		if inv.Version != *c.ExpectedVersion {
-			return nil, apperr.E(apperr.Conflict, "error.versionConflict")
+			return nil, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
 		if inv.Status != "unpaid" {
-			return nil, apperr.E(apperr.Conflict, "error.invalidState")
+			return nil, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 		}
 
 		if input.Event == "initiate" {
@@ -340,7 +340,7 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, input *SimulateInput
 	}
 
 	if payment.Version != *c.ExpectedVersion {
-		return nil, apperr.E(apperr.Conflict, "error.versionConflict")
+		return nil, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	next, invoiceStatus := "", ""
@@ -348,13 +348,13 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, input *SimulateInput
 	switch input.Event {
 	case "processing":
 		if payment.Status != "initiated" {
-			return nil, apperr.E(apperr.Conflict, "error.invalidState")
+			return nil, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 		}
 
 		next, invoiceStatus = "processing", "processing"
 	case "confirm":
 		if payment.Status != "processing" {
-			return nil, apperr.E(apperr.Conflict, "error.invalidState")
+			return nil, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 		}
 
 		free, err := referenceFree(ctx, c, *input.PaymentReference, payment.ID)
@@ -369,7 +369,7 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, input *SimulateInput
 		next = "confirmed"
 	case "fail":
 		if payment.Status != "initiated" && payment.Status != "processing" {
-			return nil, apperr.E(apperr.Conflict, "error.invalidState")
+			return nil, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 		}
 
 		next, invoiceStatus = "failed", "unpaid"
@@ -431,16 +431,16 @@ type PaymentEntry struct {
 
 func (in *PaymentEntry) check(fieldErrs map[string]string) map[string]string {
 	if !refOK(&in.PaymentReference) {
-		fieldErrs["paymentReference"] = "error.length"
+		fieldErrs["paymentReference"] = apperr.KeyLength
 	}
 
 	if in.Currency != "MYR" && in.Currency != "USD" {
-		fieldErrs["currency"] = "error.invalid"
+		fieldErrs["currency"] = apperr.KeyInvalid
 	}
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fieldErrs["reason"] = "error.length"
+		fieldErrs["reason"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -457,7 +457,7 @@ type ConfirmInput struct {
 func (in *ConfirmInput) Validate() map[string]string {
 	fe := map[string]string{}
 	if in.PaymentID == uuid.Nil {
-		fe["paymentId"] = "error.required"
+		fe["paymentId"] = apperr.KeyRequired
 	}
 
 	return in.check(fe)
@@ -473,7 +473,7 @@ type ManualInput struct {
 func (in *ManualInput) Validate() map[string]string {
 	fe := map[string]string{}
 	if in.InvoiceID == uuid.Nil {
-		fe["invoiceId"] = "error.required"
+		fe["invoiceId"] = apperr.KeyRequired
 	}
 
 	return in.check(fe)
@@ -519,11 +519,11 @@ func (m Billing) confirm(ctx context.Context, call *ops.Call, in *ConfirmInput) 
 	}
 
 	if payment.Version != *call.ExpectedVersion {
-		return payment, apperr.E(apperr.Conflict, "error.versionConflict")
+		return payment, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	if payment.Status != "processing" {
-		return payment, apperr.E(apperr.Conflict, "error.invalidState")
+		return payment, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
 	amountOKErr := amountOK(in.PaymentEntry, inv)
@@ -617,7 +617,7 @@ func (m Billing) recordManual(
 	}
 
 	if inv.Version != *c.ExpectedVersion {
-		return Payment{}, apperr.E(apperr.Conflict, "error.versionConflict")
+		return Payment{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
 	var any bool

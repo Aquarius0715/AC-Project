@@ -30,7 +30,7 @@ func strLen(s string, lo, hi int) bool {
 	return n >= lo && n <= hi
 }
 
-func notFound() error           { return apperr.E(apperr.NotFound, "error.notFound") }
+func notFound() error           { return apperr.E(apperr.NotFound, apperr.KeyNotFound) }
 func conflict(key string) error { return apperr.E(apperr.Conflict, key) }
 
 // versionedUpdate turns "no row updated" into NOT_FOUND (target missing / out of scope) or CONFLICT (version moved).
@@ -54,7 +54,7 @@ func versionedUpdate(
 	}
 
 	if exists {
-		return conflict("error.versionConflict")
+		return conflict(apperr.KeyVersionConflict)
 	}
 
 	return notFound()
@@ -116,23 +116,23 @@ func (in *PropertySave) Validate() map[string]string {
 
 	in.Name = strings.TrimSpace(in.Name) // 1–120 characters after trim, as in locations.rename
 	if in.CustomerOrgID == uuid.Nil {
-		fieldErrs["customerOrgId"] = "error.required"
+		fieldErrs["customerOrgId"] = apperr.KeyRequired
 	}
 
 	if in.Kind != "home" && in.Kind != "office" {
-		fieldErrs["kind"] = "error.invalid"
+		fieldErrs["kind"] = apperr.KeyInvalid
 	}
 
 	if !strLen(in.Name, 1, 120) {
-		fieldErrs["name"] = "error.length"
+		fieldErrs["name"] = apperr.KeyLength
 	}
 
 	if in.Address != nil && !strLen(*in.Address, 0, 500) {
-		fieldErrs["address"] = "error.length"
+		fieldErrs["address"] = apperr.KeyLength
 	}
 
 	if in.AccessInstructions != nil && !strLen(*in.AccessInstructions, 0, 1000) {
-		fieldErrs["accessInstructions"] = "error.length"
+		fieldErrs["accessInstructions"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -152,7 +152,7 @@ func (m *Module) customerActive(ctx context.Context, c *ops.Call, org uuid.UUID)
 	}
 
 	if status != "active" {
-		return conflict("error.customerInactive")
+		return conflict(apperr.KeyCustomerInactive)
 	}
 
 	return nil
@@ -164,7 +164,7 @@ func dupSibling(err error) error {
 	var pg *pgconn.PgError
 	if errors.As(err, &pg) && pg.Code == "23505" &&
 		(pg.ConstraintName == "properties_name" || pg.ConstraintName == "spaces_name") {
-		return conflict("error.duplicateSiblingName")
+		return conflict(apperr.KeyDuplicateSiblingName)
 	}
 
 	return err
@@ -197,7 +197,7 @@ func siblingName(ctx context.Context, c *ops.Call, kind string, id uuid.UUID) er
 	}
 
 	if taken {
-		return conflict("error.duplicateSiblingName")
+		return conflict(apperr.KeyDuplicateSiblingName)
 	}
 
 	return nil
@@ -386,15 +386,15 @@ func (in *SpaceSave) Validate() map[string]string {
 
 	in.Name = strings.TrimSpace(in.Name)
 	if in.PropertyID == uuid.Nil {
-		fieldErrs["propertyId"] = "error.required"
+		fieldErrs["propertyId"] = apperr.KeyRequired
 	}
 
 	if !spaceKinds[in.Kind] {
-		fieldErrs["kind"] = "error.invalid"
+		fieldErrs["kind"] = apperr.KeyInvalid
 	}
 
 	if !strLen(in.Name, 1, 120) {
-		fieldErrs["name"] = "error.length"
+		fieldErrs["name"] = apperr.KeyLength
 	}
 
 	if in.ID != nil && in.ParentSpaceID != nil && *in.ID == *in.ParentSpaceID {
@@ -619,23 +619,23 @@ func (in *UnitSave) Validate() map[string]string {
 
 	in.DisplayName = strings.TrimSpace(in.DisplayName)
 	if in.CustomerOrgID == uuid.Nil {
-		fieldErrs["customerOrgId"] = "error.required"
+		fieldErrs["customerOrgId"] = apperr.KeyRequired
 	}
 
 	if in.PropertyID == uuid.Nil {
-		fieldErrs["propertyId"] = "error.required"
+		fieldErrs["propertyId"] = apperr.KeyRequired
 	}
 
 	if in.ModelID == uuid.Nil {
-		fieldErrs["modelId"] = "error.required"
+		fieldErrs["modelId"] = apperr.KeyRequired
 	}
 
 	if in.Type != "split" {
-		fieldErrs["type"] = "error.invalid"
+		fieldErrs["type"] = apperr.KeyInvalid
 	}
 
 	if !strLen(in.DisplayName, 1, 120) {
-		fieldErrs["displayName"] = "error.length"
+		fieldErrs["displayName"] = apperr.KeyLength
 	}
 
 	if len(in.WarrantyEndsAt) > 0 {
@@ -645,9 +645,9 @@ func (in *UnitSave) Validate() map[string]string {
 
 			err := json.Unmarshal(in.WarrantyEndsAt, &t)
 			if err != nil {
-				fieldErrs["warrantyEndsAt"] = "error.invalid"
+				fieldErrs["warrantyEndsAt"] = apperr.KeyInvalid
 			} else if in.InstalledAt != nil && t.Before(*in.InstalledAt) {
-				fieldErrs["warrantyEndsAt"] = "error.range" // a warranty cannot end before the installation
+				fieldErrs["warrantyEndsAt"] = apperr.KeyRange // a warranty cannot end before the installation
 			} else {
 				in.warranty = &t
 			}
@@ -657,18 +657,18 @@ func (in *UnitSave) Validate() map[string]string {
 	seen := map[string]bool{}
 	for _, s := range in.ServiceScope {
 		if !scopes[s] || seen[s] {
-			fieldErrs["serviceScope"] = "error.invalid"
+			fieldErrs["serviceScope"] = apperr.KeyInvalid
 		}
 
 		seen[s] = true
 	}
 
 	if len(in.ServiceScope) == 0 {
-		fieldErrs["serviceScope"] = "error.required"
+		fieldErrs["serviceScope"] = apperr.KeyRequired
 	}
 
 	if in.ChangeReason != nil && !strLen(*in.ChangeReason, 1, 1000) {
-		fieldErrs["changeReason"] = "error.length"
+		fieldErrs["changeReason"] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -708,7 +708,7 @@ func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (ACUn
 // unitsSaveUnit is unitsSave answering the unit with its summary fields.
 func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, input *UnitSave) (Unit, error) {
 	if input.InstalledAt != nil && input.InstalledAt.After(c.Now) {
-		return Unit{}, apperr.Fields(map[string]string{"installedAt": "error.future"})
+		return Unit{}, apperr.Fields(map[string]string{"installedAt": apperr.KeyFuture})
 	}
 
 	var propOrg uuid.UUID
@@ -832,7 +832,7 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, input *UnitSave
 
 	if moved {
 		if input.ChangeReason == nil {
-			return Unit{}, apperr.Fields(map[string]string{"changeReason": "error.required"})
+			return Unit{}, apperr.Fields(map[string]string{"changeReason": apperr.KeyRequired})
 		}
 
 		reason = *input.ChangeReason
@@ -844,7 +844,7 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, input *UnitSave
 	}
 
 	if warranty != nil && input.InstalledAt != nil && warranty.Before(*input.InstalledAt) {
-		return Unit{}, apperr.Fields(map[string]string{"warrantyEndsAt": "error.range"})
+		return Unit{}, apperr.Fields(map[string]string{"warrantyEndsAt": apperr.KeyRange})
 	}
 
 	var v int
@@ -931,11 +931,11 @@ type ArchiveInput struct {
 func (in *ArchiveInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.ID == uuid.Nil {
-		fieldErrs["id"] = "error.required"
+		fieldErrs["id"] = apperr.KeyRequired
 	}
 
 	if !strLen(in.Reason, 1, 1000) {
-		fieldErrs["reason"] = "error.length"
+		fieldErrs["reason"] = apperr.KeyLength
 	}
 
 	return fieldErrs

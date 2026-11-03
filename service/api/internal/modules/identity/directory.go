@@ -120,7 +120,7 @@ func orgName(ctx context.Context, c *ops.Call, in *OrgInput) (string, error) {
 	err := c.Tx.QueryRow(ctx, `SELECT name FROM identity.organizations WHERE id = $1`, in.OrgID).
 		Scan(&name)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", apperr.E(apperr.NotFound, "error.notFound")
+		return "", apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return name, apperr.Wrap(err, "select identity.organizations")
