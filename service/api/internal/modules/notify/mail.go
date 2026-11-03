@@ -77,11 +77,11 @@ type Apps struct{ Customer, Partner, Technician, Admin string }
 // of is the app of a membership role: a client's customer app, a contractor's partner app, a technician's app, HQ's.
 func (a Apps) of(role string) string {
 	switch role {
-	case "client":
+	case authz.RoleClient:
 		return a.Customer
-	case "contractor":
+	case authz.RoleContractor:
 		return a.Partner
-	case "technician":
+	case authz.RoleTechnician:
 		return a.Technician
 	default:
 		return a.Admin
@@ -90,20 +90,20 @@ func (a Apps) of(role string) string {
 
 // subjects of the notification e-mails by template key; the in-app texts of the web stay the reference.
 var subjects = map[string]string{
-	"alert":              "Alert: %s",
-	"quality":            "Report quality: %s",
-	"schedule_change":    "Schedule change: %s",
-	"report_return":      "Report returned: %s",
-	"completion":         "Work completed: %s",
-	"payment":            "Payment: %s",
-	"payment_reminder":   "Payment reminder: %s",
-	"restriction":        "Service restriction: %s",
-	"inquiry":            "Inquiry: %s",
-	"job_update":         "Job update: %s",
-	"device_operation":   "Device operation: %s",
-	"invite":             "Invitation: %s",
-	"certificate_expiry": "Certificate expiring: %s",
-	"warranty_expiring":  "Warranty ending: %s",
+	noticeAlert:           "Alert: %s",
+	noticeQuality:         "Report quality: %s",
+	noticeScheduleChange:  "Schedule change: %s",
+	noticeReportReturn:    "Report returned: %s",
+	noticeCompletion:      "Work completed: %s",
+	noticePayment:         "Payment: %s",
+	noticePaymentReminder: "Payment reminder: %s",
+	targetRestriction:     "Service restriction: %s",
+	targetInquiry:         "Inquiry: %s",
+	noticeJobUpdate:       "Job update: %s",
+	noticeDeviceOperation: "Device operation: %s",
+	"invite":              "Invitation: %s",
+	"certificate_expiry":  "Certificate expiring: %s",
+	"warranty_expiring":   "Warranty ending: %s",
 }
 
 const footer = "\n\n— AC Project (demo). This message was sent by the demo stack; in development it only reaches the " +
@@ -132,7 +132,7 @@ func notificationMail(
 	var builder strings.Builder
 	builder.WriteString(subject)
 
-	for _, k := range []string{"status", "reason", "message"} {
+	for _, k := range []string{keyStatus, "reason", "message"} {
 		if v, ok := params[k].(string); ok && v != "" {
 			fmt.Fprintf(&builder, "\n%s: %s", strings.ToUpper(k[:1])+k[1:], v)
 		}

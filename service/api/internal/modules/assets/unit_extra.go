@@ -11,6 +11,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/monitoring"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 // UnitUsage is implemented by modules whose records block physical deletion of a unit (contracts, jobs, IoT).
@@ -121,12 +122,17 @@ func (m *Module) unitsDelete(
 	}
 
 	call.Emit(
-		ops.Event{AggregateType: "unit", AggregateID: input.ID, Type: "UnitDeleted", Payload: nil},
+		ops.Event{
+			AggregateType: kindUnit,
+			AggregateID:   input.ID,
+			Type:          "UnitDeleted",
+			Payload:       nil,
+		},
 	)
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "units.delete",
-			TargetKind:      "unit",
+			TargetKind:      kindUnit,
 			TargetID:        input.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			Reason:          input.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
@@ -228,7 +234,7 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 		return Unit{}, apperr.Wrap(err, "select assets.units")
 	}
 
-	if call.Principal.Role == "client" && org != call.Principal.OrgID {
+	if call.Principal.Role == authz.RoleClient && org != call.Principal.OrgID {
 		return Unit{}, notFound()
 	}
 
@@ -293,16 +299,16 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "unit",
+			AggregateType: kindUnit,
 			AggregateID:   input.UnitID,
-			Type:          "UnitChanged",
+			Type:          eventUnitChanged,
 			Payload:       nil,
 		},
 	)
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "units.setAlertPolicies",
-			TargetKind:      "unit",
+			TargetKind:      kindUnit,
 			TargetID:        input.UnitID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,

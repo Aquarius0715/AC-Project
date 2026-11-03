@@ -1,0 +1,37 @@
+package control
+
+// The values the control module compares and writes by name: kinds, condition types, phases, decisions and keys.
+const (
+	condBattery           = "battery"
+	condLocation          = "location"
+	condOccupancy         = "occupancy"
+	condPeak              = "peak"
+	condSolar             = "solar"
+	condTariff            = "tariff"
+	condWeather           = "weather"
+	decisionRequested     = "requested"
+	decisionSuppressed    = "suppressed"
+	eventCommandRequested = "CommandRequested"
+	jsonNull              = "null"
+	keyAction             = "action"
+	keyCondition          = "condition"
+	keyReason             = "reason"
+	keySource             = "source"
+	keyUnitID             = "unitId"
+	kindAutomation        = "automation"
+	kindCommand           = "command"
+	kindEvent             = "event"
+	kindSchedule          = "schedule"
+	metricTemperature     = "temperature"
+	opGTE                 = "gte"
+	phaseScheduleEnd      = "schedule_end"
+	phaseScheduleStart    = "schedule_start"
+	qualityStale          = "stale"
+	reasonMissingData     = "missing_data"
+	reasonNoMatch         = "no_match"
+	sourceVoice           = "voice"
+	unitEvent             = "event" // the unit of a location fact (an arrival or a departure)
+	valueBoolean          = "boolean"
+	valueLocation         = "location"
+	valueNumber           = "number"
+)

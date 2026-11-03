@@ -38,10 +38,10 @@ func (unitDetails) Detail(
 	case err != nil:
 		return detailExtras, apperr.Wrap(err, "restrictions.Busy.UnitRestriction")
 	case !unitRestriction.Found:
-		detailExtras.EffectiveControlPolicy = map[string]any{"state": "unrestricted"}
+		detailExtras.EffectiveControlPolicy = map[string]any{keyState: "unrestricted"}
 	default:
 		detailExtras.EffectiveControlPolicy = map[string]any{
-			"state":     "restricted",
+			keyState:    "restricted",
 			"phase":     unitRestriction.Phase,
 			"policy":    unitRestriction.Policy,
 			"reasonKey": "control.restriction_active",
@@ -53,10 +53,10 @@ func (unitDetails) Detail(
 		return detailExtras, apperr.Wrap(err, "restrictions.Busy.UnitRecovering")
 	}
 
-	detailExtras.ControlAvailability = map[string]any{"state": "available"}
+	detailExtras.ControlAvailability = map[string]any{keyState: "available"}
 	if blocked {
 		detailExtras.ControlAvailability = map[string]any{
-			"state":     "blocked",
+			keyState:    "blocked",
 			"reasonKey": "control.reconciliation_required",
 		}
 	}

@@ -40,10 +40,10 @@ type LiveField struct {
 var LiveNodes = map[string][]LiveField{
 	"node_1": {
 		{Field: "temp", Sensor: "sensor-live-temperature", Scale: 1, Gate: "temp"},
-		{Field: "humidity", Sensor: "sensor-live-humidity", Scale: 1, Gate: "humidity"},
+		{Field: sensorHumidity, Sensor: "sensor-live-humidity", Scale: 1, Gate: sensorHumidity},
 	},
 	"node_2": {
-		{Field: "power", Sensor: "sensor-live-power", Scale: 0.001, Gate: "voltage"},
+		{Field: sensorPower, Sensor: "sensor-live-power", Scale: 0.001, Gate: "voltage"},
 	},
 }
 
@@ -132,7 +132,7 @@ func LiveTriggers(node string, payload []byte, when time.Time) ([]Trigger, error
 				ObservedAt: slot,
 				ReceivedAt: when,
 				Origin:     "measured",
-				Quality:    "valid",
+				Quality:    qualityValid,
 				EventID:    event, Sequence: nil,
 			}, CommandID: nil, DeviceID: nil, State: nil, Event: nil, BindingID: nil, Sequence: nil, Kind: "", Recovery: nil,
 		})
@@ -153,7 +153,7 @@ func LiveTriggers(node string, payload []byte, when time.Time) ([]Trigger, error
 				Value:      *measurement.Value,
 				Unit:       measurement.Unit,
 				ObservedAt: slot,
-				Quality:    "valid",
+				Quality:    qualityValid,
 			},
 		)
 	}
@@ -175,7 +175,7 @@ func LiveTriggers(node string, payload []byte, when time.Time) ([]Trigger, error
 			[]byte(fmt.Sprintf("%s/state/%s", dev, slot.Format(time.RFC3339))),
 		),
 		OccurredAt: slot,
-		EventType:  "state",
+		EventType:  eventState,
 		DeviceID:   &dev,
 		State: &devicesim.ReportedState{
 			Power:    nil,
@@ -203,7 +203,7 @@ func liveEvaluation(key string, when time.Time, facts []Fact) Trigger {
 		ScenarioID: Scenario,
 		EventID:    event,
 		OccurredAt: when,
-		EventType:  "automation",
+		EventType:  eventAutomation,
 		Event: &Evaluation{
 			EventID:    event,
 			OccurredAt: when,
@@ -232,7 +232,7 @@ func LiveGapTrigger(gap time.Duration, slot time.Time) Trigger {
 				Value:      minutes,
 				Unit:       "min",
 				ObservedAt: slot,
-				Quality:    "valid",
+				Quality:    qualityValid,
 			},
 		},
 	)
@@ -304,7 +304,11 @@ func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, when time.Time)
 		)
 	case f.FaultID != nil && gap < LiveOnlineWithin:
 		trigger.Kind = "restored"
-		trigger.Recovery = &Recovery{Axis: "connection", SourceEventID: *f.FaultID, Value: "online"}
+		trigger.Recovery = &Recovery{
+			Axis:          "connection",
+			SourceEventID: *f.FaultID,
+			Value:         connectionOnline,
+		}
 		trigger.EventID = uuid.NewSHA1(seed.Namespace, []byte("live/restored/"+f.FaultID.String()))
 	default:
 		return Trigger{
@@ -488,7 +492,7 @@ func LiveSentTriggers(
 			ScenarioID:  Scenario,
 			EventID:     uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/state/%s", dev, cmd))),
 			OccurredAt:  stateAt.UTC(),
-			EventType:   "state",
+			EventType:   eventState,
 			DeviceID:    &dev,
 			State:       state,
 			CommandID:   nil,

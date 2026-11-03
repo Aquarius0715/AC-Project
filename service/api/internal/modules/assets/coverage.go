@@ -51,11 +51,11 @@ func CoverageStatus(now time.Time, warrantyEnds *time.Time, contracts int) strin
 	case contracts > 0:
 		return "contract"
 	case warrantyEnds == nil || !now.Before(*warrantyEnds):
-		return "no_coverage"
+		return coverageNone
 	case now.Before(warrantyEnds.Add(-90 * 24 * time.Hour)):
 		return "under_warranty"
 	default:
-		return "expiring"
+		return coverageExpiring
 	}
 }
 
@@ -85,8 +85,8 @@ func claimable(jobs map[uuid.UUID]time.Time, ends *time.Time) []uuid.UUID {
 var coverageStatuses = map[string]bool{
 	"under_warranty": true,
 	"contract":       true,
-	"expiring":       true,
-	"no_coverage":    true,
+	coverageExpiring: true,
+	coverageNone:     true,
 }
 
 // unitsCoverage serves units.coverage.
@@ -149,8 +149,8 @@ func (m *Module) unitsCoverage(
 		)
 	}
 
-	if query.Sort != nil && query.Sort.Field != "id" && query.Sort.Field != "name" &&
-		query.Sort.Field != "dueAt" {
+	if query.Sort != nil && query.Sort.Field != "id" && query.Sort.Field != keyName &&
+		query.Sort.Field != keyDueAt {
 		return paging.Page[UnitCoverage]{}, apperr.Fields(
 			map[string]string{"sort.field": apperr.KeyInvalid},
 		)
@@ -169,7 +169,7 @@ func (m *Module) unitsCoverage(
 		return fmt.Sprintf("$%d", len(args))
 	}
 
-	conds := []string{"NOT u.archived"}
+	conds := []string{unarchivedUnits}
 	if filters.CustomerID != nil {
 		conds = append(conds, "cu.id = "+add(*filters.CustomerID))
 	}
@@ -266,7 +266,7 @@ func (m *Module) unitsCoverage(
 
 	desc := query.Sort != nil && query.Sort.Direction == "desc"
 
-	field := "dueAt"
+	field := keyDueAt
 	if query.Sort != nil {
 		field = query.Sort.Field
 	}
@@ -276,9 +276,9 @@ func (m *Module) unitsCoverage(
 		less, equal := false, false
 
 		switch field {
-		case "name":
+		case keyName:
 			less, equal = unitCoverage.name < otherCoverage.name, unitCoverage.name == otherCoverage.name
-		case "dueAt": // warrantyEndsAt, null last
+		case keyDueAt: // warrantyEndsAt, null last
 			switch {
 			case unitCoverage.WarrantyEndsAt == nil || otherCoverage.WarrantyEndsAt == nil:
 				less, equal = otherCoverage.WarrantyEndsAt == nil &&

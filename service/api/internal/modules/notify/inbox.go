@@ -15,6 +15,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -45,21 +46,21 @@ const targetLateral = `LATERAL (
 
 // adminKinds lists the target kinds an HQ membership can read and the permissions that grant each (IR142).
 var adminKinds = map[string][]string{
-	"unit": {
+	targetUnit: {
 		"asset.read",
 		"alert.read",
 		"device.read",
 		"control.execute",
 	},
-	"job":     {"job.read", "job.write"},
-	"invoice": {"billing.read", "billing.write"},
-	"restriction": {
+	targetJob:     {"job.read", "job.write"},
+	targetInvoice: {"billing.read", "billing.write"},
+	targetRestriction: {
 		"restriction.read",
 		"restriction.write",
 		"restriction.override",
 	},
-	"device":  {"device.read", "device.write"},
-	"inquiry": {"billing.read", "billing.write"},
+	"device":      {"device.read", "device.write"},
+	targetInquiry: {"billing.read", "billing.write"},
 }
 
 func kindsFor(perms map[string]bool) []string {
@@ -92,11 +93,11 @@ func readableSQL(principal *ops.Principal, now time.Time, kind, id string, args 
 	}
 
 	switch principal.Role {
-	case "admin":
+	case authz.RoleAdmin:
 		return kind + " = ANY(" + add(kindsFor(principal.Permissions)) + ")"
-	case "client":
+	case authz.RoleClient:
 		return "t.org = " + add(principal.OrgID)
-	case "contractor":
+	case authz.RoleContractor:
 		org := add(principal.OrgID)
 
 		return "((" + kind + " = 'job' AND EXISTS (SELECT 1 FROM notify.ref_offers o WHERE o.job_id = " + id +
@@ -104,7 +105,7 @@ func readableSQL(principal *ops.Principal, now time.Time, kind, id string, args 
 			kind + " = 'certificate' AND t.org = " + org + "))"
 	default:
 		unitScope := "(t.unit_id = ANY(" + add(
-			principal.Scopes["unit"],
+			principal.Scopes[targetUnit],
 		) + ") OR t.property_id = ANY(" + add(
 			principal.Scopes["property"],
 		) + ") OR t.org = ANY(" + add(
@@ -159,7 +160,7 @@ type Params struct {
 }
 
 func deliveryState(channel string) string {
-	if channel == "inApp" {
+	if channel == channelInApp {
 		return "simulated"
 	}
 
@@ -258,7 +259,7 @@ type JobsOpenInput struct {
 // openTargets clears TargetOpen on the job notices of a contractor or a technician whose job page does not open for
 // them (IR602); every other target opens wherever its notice is readable (IR58).
 func openTargets(ctx context.Context, call *ops.Call, items []Notification) error {
-	if call.Principal.Role != "contractor" && call.Principal.Role != "technician" {
+	if call.Principal.Role != authz.RoleContractor && call.Principal.Role != authz.RoleTechnician {
 		return nil
 	}
 
@@ -268,7 +269,7 @@ func openTargets(ctx context.Context, call *ops.Call, items []Notification) erro
 		id, err := uuid.Parse(
 			x.Target["id"],
 		)
-		if err == nil && x.Target["kind"] == "job" &&
+		if err == nil && x.Target["kind"] == targetJob &&
 			!slices.Contains(ids, id) {
 			ids = append(ids, id)
 		}
@@ -285,7 +286,7 @@ func openTargets(ctx context.Context, call *ops.Call, items []Notification) erro
 
 	for i, x := range items {
 		id, err := uuid.Parse(x.Target["id"])
-		if err == nil && x.Target["kind"] == "job" {
+		if err == nil && x.Target["kind"] == targetJob {
 			items[i].TargetOpen = slices.Contains(open, id)
 		}
 	}
@@ -305,20 +306,20 @@ func inboxFrom() string {
 }
 
 var (
-	severities = []string{"critical", "warning", "normal"}
+	severities = []string{"critical", "warning", severityNormal}
 	types      = []string{
 		"cleaning_due",
 		"fault",
-		"quality",
-		"schedule_change",
-		"report_return",
-		"completion",
-		"payment",
-		"payment_reminder",
-		"restriction",
-		"inquiry",
-		"job_update",
-		"device_operation",
+		noticeQuality,
+		noticeScheduleChange,
+		noticeReportReturn,
+		noticeCompletion,
+		noticePayment,
+		noticePaymentReminder,
+		targetRestriction,
+		targetInquiry,
+		noticeJobUpdate,
+		noticeDeviceOperation,
 		"certificate_expiry",
 		"warranty_expiring",
 	}
@@ -600,17 +601,17 @@ type MarkAllReadInput struct {
 // Validate implements ops.Validator: 1–100 distinct IDs, the size of one inbox page.
 func (in *MarkAllReadInput) Validate() map[string]string {
 	if len(in.IDs) == 0 {
-		return map[string]string{"ids": apperr.KeyRequired}
+		return map[string]string{keyIDs: apperr.KeyRequired}
 	}
 
 	if len(in.IDs) > 100 {
-		return map[string]string{"ids": apperr.KeyCount}
+		return map[string]string{keyIDs: apperr.KeyCount}
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, id := range in.IDs {
 		if id == uuid.Nil || seen[id] {
-			return map[string]string{"ids": apperr.KeyInvalid}
+			return map[string]string{keyIDs: apperr.KeyInvalid}
 		}
 
 		seen[id] = true
@@ -704,22 +705,34 @@ type TargetInput struct {
 }
 
 var (
-	kinds     = []string{"unit", "job", "invoice", "restriction", "device", "inquiry"}
-	templates = []string{
-		"alert",
-		"quality",
-		"schedule_change",
-		"report_return",
-		"completion",
-		"payment",
-		"payment_reminder",
-		"restriction",
-		"inquiry",
-		"job_update",
-		"device_operation",
+	kinds = []string{
+		targetUnit,
+		targetJob,
+		targetInvoice,
+		targetRestriction,
+		"device",
+		targetInquiry,
 	}
-	channels = []string{"inApp", "email", "whatsapp"}
-	roles    = []string{"client", "contractor", "technician", "admin"}
+	templates = []string{
+		noticeAlert,
+		noticeQuality,
+		noticeScheduleChange,
+		noticeReportReturn,
+		noticeCompletion,
+		noticePayment,
+		noticePaymentReminder,
+		targetRestriction,
+		targetInquiry,
+		noticeJobUpdate,
+		noticeDeviceOperation,
+	}
+	channels = []string{channelInApp, "email", "whatsapp"}
+	roles    = []string{
+		authz.RoleClient,
+		authz.RoleContractor,
+		authz.RoleTechnician,
+		authz.RoleAdmin,
+	}
 )
 
 func (in *TargetInput) validate(fieldErrs map[string]string) {
@@ -759,12 +772,12 @@ func resolve(ctx context.Context, c *ops.Call, input *TargetInput) (target, erro
 		return t, apperr.Wrap(err, "select t.org")
 	}
 
-	if input.TemplateKey == "payment_reminder" {
-		if c.Principal.Role != "admin" || !c.Principal.Permissions["billing.write"] {
+	if input.TemplateKey == noticePaymentReminder {
+		if c.Principal.Role != authz.RoleAdmin || !c.Principal.Permissions["billing.write"] {
 			return t, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 		}
 
-		if input.Target.Kind != "invoice" {
+		if input.Target.Kind != targetInvoice {
 			return t, apperr.Fields(map[string]string{"target": apperr.KeyInvalid})
 		}
 
@@ -812,7 +825,7 @@ const recipientsSQL = `SELECT m.id, m.role, u.display_name,
 // adminPerms are the permissions that make an HQ member a recipient: one that reads the target kind (IR142); for an
 // alert about a unit only alert.read, as for the recipients an alert policy may notify (IR120 item 3, IR345).
 func adminPerms(in *TargetInput) []string {
-	if in.TemplateKey == "alert" && in.Target.Kind == "unit" {
+	if in.TemplateKey == noticeAlert && in.Target.Kind == targetUnit {
 		return []string{"alert.read"}
 	}
 
@@ -837,7 +850,7 @@ func recipients(
 		org,
 		input.Target.Kind,
 		input.Target.ID,
-		input.TemplateKey == "payment_reminder",
+		input.TemplateKey == noticePaymentReminder,
 		adminPerms(input),
 		input.Channel,
 	}
@@ -992,7 +1005,7 @@ func (in *PreviewInput) Validate() map[string]string {
 
 	if in.Severity != nil {
 		switch {
-		case in.TemplateKey != "alert":
+		case in.TemplateKey != noticeAlert:
 			fieldErrs["severity"] = apperr.KeyNotAllowed
 		case !slices.Contains(severities, *in.Severity):
 			fieldErrs["severity"] = apperr.KeyInvalid
@@ -1070,13 +1083,13 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, input *PreviewInput) (Not
 	}
 
 	typ, status := input.TemplateKey, input.TemplateKey
-	if typ == "alert" { // as the notifier sends it: a fault of the policy's severity about an open alert (IR104, IR348)
+	if typ == noticeAlert { // as the notifier sends it: a fault of the policy's severity about an open alert (IR104, IR348)
 		typ, status = "fault", "open"
 	}
 
-	severity := "normal"
-	if input.TemplateKey == "payment_reminder" || input.TemplateKey == "restriction" ||
-		input.TemplateKey == "alert" {
+	severity := severityNormal
+	if input.TemplateKey == noticePaymentReminder || input.TemplateKey == targetRestriction ||
+		input.TemplateKey == noticeAlert {
 		severity = "warning"
 	}
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"github.com/pradita/ac-project/service/api/internal/platform/idp"
 )
@@ -35,12 +36,12 @@ type AccountApps struct{ Customer, Partner, Technician, Admin string }
 
 func (a AccountApps) of(role string) (url, client string) {
 	switch role {
-	case "client":
-		return a.Customer, "ac-web"
-	case "contractor":
-		return a.Partner, "ac-web"
-	case "technician":
-		return a.Technician, "ac-web"
+	case authz.RoleClient:
+		return a.Customer, appClientID
+	case authz.RoleContractor:
+		return a.Partner, appClientID
+	case authz.RoleTechnician:
+		return a.Technician, appClientID
 	}
 
 	return a.Admin, "ac-admin-web"
@@ -58,9 +59,9 @@ const TechnicianAccessMax = 366 * 24 * time.Hour
 // defaultPermissions and the scopes of an account a contractor or a customer owner adds: the sets the demo accounts of
 // each role hold. An external technician has no unit scope: the contractor assigns them only on its accepted offers.
 var defaultPermissions = map[string][]string{
-	"client":     {"control.execute"},
-	"contractor": {"partner.accept", "partner.assign", "partner.review"},
-	"technician": {"alert.read", "alert.resolve", "control.diagnose", "device.maintain"},
+	authz.RoleClient:     {"control.execute"},
+	authz.RoleContractor: {"partner.accept", "partner.assign", "partner.review"},
+	authz.RoleTechnician: {"alert.read", "alert.resolve", "control.diagnose", "device.maintain"},
 }
 
 // DefaultPermissions are the permissions an account of the role gets when it is added (a copy): the development seed
@@ -88,7 +89,7 @@ var AccountsPerOrgPerDay = 30
 // organization row is locked so two adds at once count each other. Memberships dated after now (the seed's, written
 // on the wall clock ahead of the demo clock) do not count.
 func addCap(ctx context.Context, call *ops.Call, org uuid.UUID) error {
-	if call.Principal.Role == "admin" {
+	if call.Principal.Role == authz.RoleAdmin {
 		return nil
 	}
 
@@ -187,14 +188,14 @@ func createAccount(
 
 	user, err = personFor(ctx, call, account.Email, account.DisplayName)
 	if errors.Is(err, errEmailTaken) {
-		return user, membership, apperr.Fields(map[string]string{"email": "errors.email_taken"})
+		return user, membership, apperr.Fields(map[string]string{keyEmail: keyEmailTaken})
 	}
 
 	if err != nil {
 		return user, membership, err
 	}
 
-	if call.Principal.Role != "admin" {
+	if call.Principal.Role != authz.RoleAdmin {
 		// a person whose access HQ ended comes back only through HQ (IR508), not as a new account
 		var revoked bool
 
@@ -208,7 +209,7 @@ func createAccount(
 
 		if revoked {
 			return user, membership, apperr.Fields(
-				map[string]string{"email": "errors.revoked_by_hq"},
+				map[string]string{keyEmail: "errors.revoked_by_hq"},
 			)
 		}
 	}
@@ -249,7 +250,7 @@ func createAccount(
 		}
 	}
 
-	if account.Role == "client" { // IR84 initial Consent
+	if account.Role == authz.RoleClient { // IR84 initial Consent
 		_, err = call.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES
@@ -263,10 +264,10 @@ func createAccount(
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "membership",
+			AggregateType: kindMembership,
 			AggregateID:   membership,
 			Type:          "MembershipSaved",
-			Payload:       map[string]any{"role": account.Role},
+			Payload:       map[string]any{keyRole: account.Role},
 		},
 	)
 	requestAccount(call, user, membership, account.Role)
@@ -279,10 +280,14 @@ func createAccount(
 func requestAccount(c *ops.Call, user, membership uuid.UUID, role string) {
 	c.Emit(
 		ops.Event{
-			AggregateType: "membership",
+			AggregateType: kindMembership,
 			AggregateID:   membership,
 			Type:          EventAccountRequested,
-			Payload:       map[string]any{"userId": user, "membershipId": membership, "role": role},
+			Payload: map[string]any{
+				"userId":        user,
+				keyMembershipID: membership,
+				keyRole:         role,
+			},
 		},
 	)
 }
@@ -292,10 +297,10 @@ func requestAccount(c *ops.Call, user, membership uuid.UUID, role string) {
 func setAccountEnabled(c *ops.Call, membership uuid.UUID, enabled bool) {
 	c.Emit(
 		ops.Event{
-			AggregateType: "membership",
+			AggregateType: kindMembership,
 			AggregateID:   membership,
 			Type:          EventAccountEnabled,
-			Payload:       map[string]any{"membershipId": membership, "enabled": enabled},
+			Payload:       map[string]any{keyMembershipID: membership, "enabled": enabled},
 		},
 	)
 }
@@ -449,7 +454,7 @@ func AccountHandlers(provider Provider, apps AccountApps) map[string]events.Hand
 				slog.WarnContext(
 					ctx,
 					"identity: the provider account was not turned on or off",
-					"membership",
+					kindMembership,
 					input.MembershipID,
 					"err",
 					setEnabledErr,

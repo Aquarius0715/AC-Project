@@ -13,6 +13,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 // TariffVersion is the only fictional tariff version (0.5 MYR/kWh, D07).
@@ -260,20 +261,20 @@ type SummaryInput struct {
 func (in *SummaryInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if CheckRange(in.From, in.To) != nil {
-		fieldErrs["from"] = "errors.energy_range"
+		fieldErrs["from"] = keyEnergyRange
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fieldErrs["unitIds"] = apperr.KeyInvalid
+			fieldErrs[keyUnitIDs] = apperr.KeyInvalid
 		}
 
 		seen[u] = true
 	}
 
 	if in.UnitIDs == nil || len(in.UnitIDs) > 100 {
-		fieldErrs["unitIds"] = apperr.KeyInvalid
+		fieldErrs[keyUnitIDs] = apperr.KeyInvalid
 	}
 
 	if in.TariffVersion != nil && *in.TariffVersion != TariffVersion {
@@ -313,7 +314,7 @@ func (in *SummaryInput) Validate() map[string]string {
 //	@Security		BearerAuth
 //	@Router			/v1/energy/summary [get]
 func summary(ctx context.Context, call *ops.Call, input *SummaryInput) (Summary, error) {
-	if call.Principal.Role == "client" {
+	if call.Principal.Role == authz.RoleClient {
 		var mine int
 
 		err := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id =

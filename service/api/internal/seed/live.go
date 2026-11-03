@@ -46,7 +46,7 @@ var LiveSite = struct {
 	Unit, Device, Binding                             string
 	Sensors                                           []LiveSensor
 }{
-	Tenant:        "tenant-a",
+	Tenant:        demoTenant,
 	CustomerOrgID: "org-customer-live",
 	Customer:      "cust-live",
 	CustomerName:  "Live Sensor Customer",
@@ -71,7 +71,7 @@ var LiveSite = struct {
 	Sensors: []LiveSensor{
 		{Name: "sensor-live-temperature", Metric: "temperature", Unit: "°C", Boundary: ""},
 		{Name: "sensor-live-humidity", Metric: "humidity", Unit: "%", Boundary: ""},
-		{Name: "sensor-live-power", Metric: "power", Unit: "kW", Boundary: "ac_input_electricity"},
+		{Name: "sensor-live-power", Metric: keyPower, Unit: "kW", Boundary: "ac_input_electricity"},
 	},
 }
 
@@ -200,11 +200,11 @@ func ApplyLive(ctx context.Context, txn pgx.Tx, at time.Time) error {
 	// the air conditioner's settings are unknown until a command sets them (the nodes report none)
 	state, _ := json.Marshal(
 		map[string]any{
-			"power":      nil,
-			"celsius":    nil,
-			"mode":       nil,
-			"fanLevel":   nil,
-			"observedAt": at.UTC(),
+			keyPower:      nil,
+			"celsius":     nil,
+			"mode":        nil,
+			"fanLevel":    nil,
+			keyObservedAt: at.UTC(),
 		},
 	)
 

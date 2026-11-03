@@ -51,7 +51,7 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 	want := map[string]struct {
 		sensor, unit string
 		value        float64
-	}{"temperature": {"sensor-live-temperature", "°C", 27.2}, "humidity": {"sensor-live-humidity", "%", 50.9}}
+	}{sensorTemperature: {"sensor-live-temperature", "°C", 27.2}, sensorHumidity: {"sensor-live-humidity", "%", 50.9}}
 
 	for _, trigger := range out[:2] {
 		measurement := trigger.Measurement
@@ -80,7 +80,7 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 			)
 		}
 
-		if measurement.Origin != "measured" || measurement.Quality != "valid" ||
+		if measurement.Origin != "measured" || measurement.Quality != qualityValid ||
 			measurement.EventID != trigger.EventID ||
 			measurement.Sequence != nil {
 			t.Errorf("%s origin, quality, event or sequence: %+v", measurement.Metric, measurement)
@@ -88,7 +88,7 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 	}
 
 	ev := out[2] // the readings as facts of the unit's alert policies (IR529)
-	if ev.EventType != "automation" || ev.Event == nil || ev.Event.EventID != ev.EventID ||
+	if ev.EventType != eventAutomation || ev.Event == nil || ev.Event.EventID != ev.EventID ||
 		ev.Event.Phase != "condition" ||
 		!ev.Event.OccurredAt.Equal(slot) ||
 		len(ev.Event.UnitIDs) != 1 ||
@@ -98,20 +98,20 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 	}
 
 	for idx, want := range []iotbridge.Fact{
-		{UnitID: seed.ID("unit-live-ac"), Metric: "temperature", Value: 27.2, Unit: "°C", ObservedAt: slot, Quality: "valid"},
-		{UnitID: seed.ID("unit-live-ac"), Metric: "humidity", Value: 50.9, Unit: "%", ObservedAt: slot, Quality: "valid"},
+		{UnitID: seed.ID("unit-live-ac"), Metric: sensorTemperature, Value: 27.2, Unit: "°C", ObservedAt: slot, Quality: qualityValid},
+		{UnitID: seed.ID("unit-live-ac"), Metric: sensorHumidity, Value: 50.9, Unit: "%", ObservedAt: slot, Quality: qualityValid},
 	} {
 		if f := ev.Event.Facts[idx]; f.UnitID != want.UnitID || f.Metric != want.Metric ||
 			f.Value != want.Value ||
 			f.Unit != want.Unit ||
 			!f.ObservedAt.Equal(slot) ||
-			f.Quality != "valid" {
+			f.Quality != qualityValid {
 			t.Errorf("fact %d %+v, want %+v", idx, f, want)
 		}
 	}
 
 	heartbeat := out[3]
-	if heartbeat.EventType != "state" || heartbeat.DeviceID == nil ||
+	if heartbeat.EventType != eventState || heartbeat.DeviceID == nil ||
 		*heartbeat.DeviceID != seed.ID("device-live-ac") ||
 		!heartbeat.OccurredAt.Equal(slot) {
 		t.Errorf("heartbeat %+v", heartbeat)
@@ -127,7 +127,7 @@ func TestLiveTriggersRoomNode(t *testing.T) {
 	var body map[string]any
 
 	_ = json.Unmarshal(raw, &body)
-	if _, ok := body["state"].(map[string]any); !ok { // the API refuses a state report without its state object
+	if _, ok := body[eventState].(map[string]any); !ok { // the API refuses a state report without its state object
 		t.Errorf("heartbeat body %s", raw)
 	}
 }
@@ -140,13 +140,13 @@ func TestLiveTriggersPowerNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(out) != 3 || out[0].Measurement == nil || out[0].Measurement.Metric != "power" ||
-		out[1].EventType != "automation" ||
-		out[2].EventType != "state" {
+	if len(out) != 3 || out[0].Measurement == nil || out[0].Measurement.Metric != sensorPower ||
+		out[1].EventType != eventAutomation ||
+		out[2].EventType != eventState {
 		t.Fatalf("triggers %+v", out)
 	}
 
-	if f := out[1].Event.Facts; len(f) != 1 || f[0].Metric != "power" || f[0].Value != 0.742 ||
+	if f := out[1].Event.Facts; len(f) != 1 || f[0].Metric != sensorPower || f[0].Value != 0.742 ||
 		f[0].Unit != "kW" {
 		t.Errorf("power fact %+v", f)
 	}
@@ -181,7 +181,7 @@ func TestLiveTriggersPowerNode(t *testing.T) {
 // nothing measured sends nothing, not even the heartbeat.
 func TestLiveTriggersSkipWhatIsNotMeasured(t *testing.T) {
 	out, err := iotbridge.LiveTriggers("node_1", []byte(`{"temp":26.4,"humidity":0.0}`), liveAt)
-	if err != nil || len(out) != 3 || out[0].Measurement.Metric != "temperature" ||
+	if err != nil || len(out) != 3 || out[0].Measurement.Metric != sensorTemperature ||
 		len(out[1].Event.Facts) != 1 {
 		t.Errorf("temperature only: %+v, %v", out, err)
 	}
@@ -362,7 +362,7 @@ func TestLiveSentTriggers(t *testing.T) {
 
 	on := iotbridge.LiveSentTriggers(waiting, liveAt, liveAt.Add(-2*time.Second), state)
 	if len(on) != 3 || on[0].EventType != "command_sent" || on[1].EventType != "command_ack" ||
-		on[2].EventType != "state" {
+		on[2].EventType != eventState {
 		t.Fatalf("power on triggers %+v", on)
 	}
 
@@ -416,7 +416,7 @@ func TestLiveHeartbeatGap(t *testing.T) {
 	trigger := iotbridge.LiveGapTrigger(17*time.Minute+50*time.Second, slot)
 
 	f := trigger.Event.Facts
-	if trigger.EventType != "automation" || len(f) != 1 || f[0].Metric != "heartbeat_gap" ||
+	if trigger.EventType != eventAutomation || len(f) != 1 || f[0].Metric != "heartbeat_gap" ||
 		f[0].Unit != "min" ||
 		f[0].Value != 17.8 ||
 		!f[0].ObservedAt.Equal(slot) ||
@@ -519,7 +519,7 @@ func TestLiveConnectionTrigger(t *testing.T) {
 		when,
 	)
 	if !ok || back.Kind != "restored" || *back.Sequence != 9 || back.Recovery == nil ||
-		*back.Recovery != (iotbridge.Recovery{Axis: "connection", SourceEventID: fault, Value: "online"}) {
+		*back.Recovery != (iotbridge.Recovery{Axis: "connection", SourceEventID: fault, Value: connectionOnline}) {
 		t.Fatalf("recovery %+v", back)
 	}
 

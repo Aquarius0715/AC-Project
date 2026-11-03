@@ -14,6 +14,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -116,7 +117,7 @@ func (in *RunInput) Validate() map[string]string {
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fieldErrs["reason"] = apperr.KeyLength
+		fieldErrs[keyReason] = apperr.KeyLength
 	}
 
 	if in.ExpectedUnitVersion < 1 || in.ExpectedJobVersion < 1 {
@@ -242,11 +243,11 @@ func (m Diagnostics) create(ctx context.Context, call *ops.Call, in *RunInput) (
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "command",
+			AggregateType: kindCommand,
 			AggregateID:   cmd,
-			Type:          "CommandRequested",
+			Type:          eventCommandRequested,
 			Payload: map[string]any{
-				"unitId":          in.UnitID,
+				keyUnitID:         in.UnitID,
 				"deviceId":        dev,
 				"diagnosticRunId": runID,
 			},
@@ -268,7 +269,7 @@ func (m Diagnostics) create(ctx context.Context, call *ops.Call, in *RunInput) (
 // visible applies the IR139 read scope to a run: technicians see runs of jobs they hold or held an Assignment of,
 // read from equipment's projection of maintenance assignments (IR187).
 func visible(ctx context.Context, call *ops.Call, run Run) (bool, error) {
-	if call.Principal.Role != "technician" {
+	if call.Principal.Role != authz.RoleTechnician {
 		return true, nil
 	}
 
@@ -357,7 +358,7 @@ type RunListInput struct {
 // Validate implements ops.Validator.
 func (in *RunListInput) Validate() map[string]string {
 	if in.UnitID == uuid.Nil {
-		return map[string]string{"unitId": apperr.KeyRequired}
+		return map[string]string{keyUnitID: apperr.KeyRequired}
 	}
 
 	return nil
@@ -426,7 +427,7 @@ func (m Diagnostics) list(
 		where += " AND r.job_id = $2"
 	}
 
-	if call.Principal.Role == "technician" {
+	if call.Principal.Role == authz.RoleTechnician {
 		args = append(args, call.Principal.MembershipID)
 		where += fmt.Sprintf(
 			" AND EXISTS (SELECT 1 FROM assets.unit_assignment_access a WHERE a.job_id = r.job_id AND "+

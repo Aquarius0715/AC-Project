@@ -18,7 +18,7 @@ func batch(device string, seqs ...int64) devicesim.Batch {
 	b := devicesim.Batch{DeviceID: iotbridge.DeviceID(device).String(), Measurements: nil}
 
 	for i, s := range seqs {
-		name := []string{"temperature", "power"}[i%2]
+		name := []string{sensorTemperature, sensorPower}[i%2]
 		v := 24.5
 		b.Measurements = append(
 			b.Measurements,
@@ -70,7 +70,8 @@ func TestTriggersUseTheFixtureIDs(t *testing.T) {
 		t.Errorf("value or receipt time %+v", trigger.Measurement)
 	}
 	// the API keys a repeat on the measurement's own event ID and the scenario sequence: both must be the reading's
-	if trigger.Measurement.Quality != "valid" || trigger.Measurement.EventID != trigger.EventID ||
+	if trigger.Measurement.Quality != qualityValid ||
+		trigger.Measurement.EventID != trigger.EventID ||
 		trigger.Measurement.Sequence != nil {
 		t.Errorf("quality, event ID or sequence of the measurement: %+v", trigger.Measurement)
 	}
@@ -121,8 +122,8 @@ func TestUnknownSensorSkipsOnlyThatReading(t *testing.T) {
 	b.Measurements = append(
 		b.Measurements,
 		devicesim.Measurement{
-			SensorID:   "humidity",
-			Metric:     "humidity",
+			SensorID:   sensorHumidity,
+			Metric:     sensorHumidity,
 			Value:      new(float64(50)),
 			Unit:       "%",
 			ObservedAt: at,

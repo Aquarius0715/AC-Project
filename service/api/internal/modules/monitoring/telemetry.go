@@ -14,6 +14,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 	"github.com/pradita/ac-project/service/api/internal/platform/unitscope"
 )
@@ -124,16 +125,16 @@ func scanMeasurement(row pgx.Row) (Measurement, error) {
 }
 
 var metrics = map[string]bool{
-	"temperature":          true,
-	"humidity":             true,
-	"co2":                  true,
-	"pm25":                 true,
-	"power":                true,
-	"vibration":            true,
-	"refrigerant_pressure": true,
-	"compressor_cycles":    true,
-	"airflow_drop":         true,
-	"heartbeat_gap":        true,
+	metricTemperature:         true,
+	metricHumidity:            true,
+	metricCO2:                 true,
+	metricPM25:                true,
+	metricPower:               true,
+	metricVibration:           true,
+	metricRefrigerantPressure: true,
+	"compressor_cycles":       true,
+	"airflow_drop":            true,
+	"heartbeat_gap":           true,
 }
 
 const maxSeriesRange = 35 * 24 * time.Hour
@@ -508,7 +509,7 @@ func (m Telemetry) PowerMeasured(
 			return nil, apperr.Wrap(err, "select monitoring.measurements")
 		}
 
-		latest.ok = origin == "measured" && quality == "valid" && value != nil
+		latest.ok = origin == "measured" && quality == qualityValid && value != nil
 		readings, sensors = append(readings, latest), append(sensors, latest.sensor)
 	}
 
@@ -537,15 +538,15 @@ func (m Telemetry) PowerMeasured(
 // metricOrder lists every Metric for the latest-reading lookup (one index probe per unit and metric).
 var metricOrder = []string{
 	"airflow_drop",
-	"co2",
+	metricCO2,
 	"compressor_cycles",
 	"heartbeat_gap",
-	"humidity",
-	"pm25",
-	"power",
-	"refrigerant_pressure",
-	"temperature",
-	"vibration",
+	metricHumidity,
+	metricPM25,
+	metricPower,
+	metricRefrigerantPressure,
+	metricTemperature,
+	metricVibration,
 }
 
 // LatestMeasurements implements assets.Monitoring (UnitSummary.latestMeasurements, IR213): per unit, the latest
@@ -606,7 +607,7 @@ func (m Telemetry) LatestMeasurements(
 	}
 
 	for _, measurement := range all {
-		if limit, known := limits[measurement.SensorID]; measurement.Quality == "valid" &&
+		if limit, known := limits[measurement.SensorID]; measurement.Quality == qualityValid &&
 			(!known || call.Now.Sub(measurement.ObservedAt) > limit) {
 			measurement.Quality = "stale"
 		}
@@ -670,7 +671,7 @@ func (m Telemetry) RunHours(
 			return nil, apperr.Wrap(err, "select sensor_id")
 		}
 
-		reading.on = origin == "measured" && quality == "valid" && value != nil && *value > 0
+		reading.on = origin == "measured" && quality == qualityValid && value != nil && *value > 0
 		readings, sensors = append(readings, reading), append(sensors, reading.sensor)
 	}
 
@@ -1038,7 +1039,7 @@ func (m Telemetry) log(
 
 		if !ok {
 			return VentilationLog{}, apperr.Fields(
-				map[string]string{"unitId": "error.unitNotInSpace"},
+				map[string]string{keyUnitID: "error.unitNotInSpace"},
 			)
 		}
 
@@ -1110,7 +1111,7 @@ func (m Telemetry) currentCO2(
 
 	for _, u := range units { // units in a stable order: the first unit wins a tie
 		for _, x := range latest[u] {
-			if x.Metric == "co2" && x.Quality == "valid" && x.Value != nil &&
+			if x.Metric == metricCO2 && x.Quality == qualityValid && x.Value != nil &&
 				(out == nil || x.ObservedAt.After(out.ObservedAt)) {
 				out = &CO2Reading{Value: *x.Value, Unit: x.Unit, ObservedAt: x.ObservedAt}
 			}
@@ -1169,7 +1170,7 @@ func (m Telemetry) list(
 		err := dec.Decode(&filters)
 		if err != nil {
 			return paging.Page[VentilationLog]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{keyFilters: apperr.KeyInvalid},
 			)
 		}
 	}
@@ -1182,7 +1183,7 @@ func (m Telemetry) list(
 
 	order, err := paging.OrderBy(
 		query.Sort,
-		map[string]string{"id": "v.id", "createdAt": "v.created_at"},
+		map[string]string{"id": "v.id", keyCreatedAt: "v.created_at"},
 		"v.created_at DESC, v.id ASC",
 	)
 	if err != nil {
@@ -1206,7 +1207,7 @@ func (m Telemetry) list(
 
 	switch call.Principal.Role {
 	case "admin":
-	case "client":
+	case authz.RoleClient:
 		spaces, err := m.Units.SpacesOfOrg(ctx, call, call.Principal.OrgID)
 		if err != nil {
 			return paging.Page[VentilationLog]{}, apperr.Wrap(

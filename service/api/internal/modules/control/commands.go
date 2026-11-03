@@ -15,6 +15,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
@@ -175,12 +176,12 @@ type CreateInput struct {
 func (in *CreateInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.UnitID == uuid.Nil {
-		fieldErrs["unitId"] = apperr.KeyRequired
+		fieldErrs[keyUnitID] = apperr.KeyRequired
 	}
 
 	a, ok := ParseAction(in.Action)
 	if !ok {
-		fieldErrs["action"] = apperr.KeyInvalid
+		fieldErrs[keyAction] = apperr.KeyInvalid
 	}
 
 	in.action = a
@@ -190,14 +191,14 @@ func (in *CreateInput) Validate() map[string]string {
 
 	if in.Source == "" {
 		in.Source = "ui"
-	} else if in.Source != "ui" && in.Source != "voice" {
-		fieldErrs["source"] = apperr.KeyInvalid
+	} else if in.Source != "ui" && in.Source != sourceVoice {
+		fieldErrs[keySource] = apperr.KeyInvalid
 	}
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
 		if n := utf8.RuneCountInString(*in.Reason); n < 1 || n > 1000 {
-			fieldErrs["reason"] = apperr.KeyLength
+			fieldErrs[keyReason] = apperr.KeyLength
 		}
 	}
 
@@ -252,17 +253,17 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 	notFound := apperr.E(apperr.NotFound, apperr.KeyNotFound)
 
 	switch c.Principal.Role {
-	case "client":
+	case authz.RoleClient:
 		if !found || target.OrgID != c.Principal.OrgID {
 			return Command{}, notFound
 		}
 
 		if input.Reason != nil {
-			return Command{}, apperr.Fields(map[string]string{"reason": apperr.KeyNotAllowed})
+			return Command{}, apperr.Fields(map[string]string{keyReason: apperr.KeyNotAllowed})
 		}
-	case "technician":
-		if input.Source == "voice" {
-			return Command{}, apperr.Fields(map[string]string{"source": apperr.KeyNotAllowed})
+	case authz.RoleTechnician:
+		if input.Source == sourceVoice {
+			return Command{}, apperr.Fields(map[string]string{keySource: apperr.KeyNotAllowed})
 		}
 
 		if !found {
@@ -279,19 +280,19 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 		}
 
 		if input.Reason == nil {
-			return Command{}, apperr.Fields(map[string]string{"reason": apperr.KeyRequired})
+			return Command{}, apperr.Fields(map[string]string{keyReason: apperr.KeyRequired})
 		}
 	default:
 		if !found {
 			return Command{}, notFound
 		}
 
-		if input.Source == "voice" { // the assistant is offered only in the Client app (IR115)
-			return Command{}, apperr.Fields(map[string]string{"source": apperr.KeyNotAllowed})
+		if input.Source == sourceVoice { // the assistant is offered only in the Client app (IR115)
+			return Command{}, apperr.Fields(map[string]string{keySource: apperr.KeyNotAllowed})
 		}
 
 		if input.Reason == nil {
-			return Command{}, apperr.Fields(map[string]string{"reason": apperr.KeyRequired})
+			return Command{}, apperr.Fields(map[string]string{keyReason: apperr.KeyRequired})
 		}
 	}
 
@@ -300,7 +301,7 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 	}
 
 	if !input.action.Supports(target.Caps) {
-		return Command{}, apperr.Fields(map[string]string{"action": apperr.KeyUnsupportedAction})
+		return Command{}, apperr.Fields(map[string]string{keyAction: apperr.KeyUnsupportedAction})
 	}
 
 	policy, err := m.Restrictions.UnitPolicy(ctx, c, input.UnitID)
@@ -310,7 +311,7 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 
 	if !Allowed(input.action, policy) {
 		e := apperr.E(apperr.Forbidden, "errors.restriction_active")
-		e.FieldErrors = map[string]string{"action": "errors.restriction_active"}
+		e.FieldErrors = map[string]string{keyAction: "errors.restriction_active"}
 
 		return Command{}, e
 	}
@@ -346,13 +347,13 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 	// requested: the IoT gateway sends it to the device and reports it sent (demo trigger command_sent)
 	c.Emit(
 		ops.Event{
-			AggregateType: "command",
+			AggregateType: kindCommand,
 			AggregateID:   command.ID,
-			Type:          "CommandRequested",
+			Type:          eventCommandRequested,
 			Payload: map[string]any{
-				"unitId":   input.UnitID,
+				keyUnitID:  input.UnitID,
 				"deviceId": dev,
-				"action":   json.RawMessage(input.Action),
+				keyAction:  json.RawMessage(input.Action),
 			},
 		},
 	)
@@ -360,7 +361,7 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 	c.Audit(
 		ops.AuditEntry{
 			Action:      "commands.create",
-			TargetKind:  "command",
+			TargetKind:  kindCommand,
 			TargetID:    command.ID.String(),
 			NextVersion: &command.Version,
 			Reason:      deref(input.Reason),
@@ -466,15 +467,15 @@ func (m Commands) get(ctx context.Context, call *ops.Call, in *GetInput) (Comman
 		return command, err
 	}
 
-	if call.Principal.Role == "client" || call.Principal.Role == "technician" {
+	if call.Principal.Role == authz.RoleClient || call.Principal.Role == authz.RoleTechnician {
 		target, found, err := m.Units.Target(ctx, call, command.UnitID)
 		if err != nil {
 			return command, apperr.Wrap(err, "control.Units.Target")
 		}
 
 		ok := found &&
-			((call.Principal.Role == "client" && target.OrgID == call.Principal.OrgID) ||
-				(call.Principal.Role == "technician" && inScope(call.Principal, command.UnitID, target.PropertyID, target.OrgID)))
+			((call.Principal.Role == authz.RoleClient && target.OrgID == call.Principal.OrgID) ||
+				(call.Principal.Role == authz.RoleTechnician && inScope(call.Principal, command.UnitID, target.PropertyID, target.OrgID)))
 		if !ok {
 			return Command{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
@@ -493,7 +494,7 @@ type ListInput struct {
 // Validate implements ops.Validator.
 func (in *ListInput) Validate() map[string]string {
 	if in.UnitID == uuid.Nil {
-		return map[string]string{"unitId": apperr.KeyRequired}
+		return map[string]string{keyUnitID: apperr.KeyRequired}
 	}
 
 	return nil
@@ -566,11 +567,11 @@ func (m Commands) list(
 	notFound := apperr.E(apperr.NotFound, apperr.KeyNotFound)
 
 	switch call.Principal.Role {
-	case "client":
+	case authz.RoleClient:
 		if !found || target.OrgID != call.Principal.OrgID {
 			return paging.Page[Command]{}, notFound
 		}
-	case "technician":
+	case authz.RoleTechnician:
 		if input.JobID == nil {
 			return paging.Page[Command]{}, apperr.Fields(
 				map[string]string{"jobId": apperr.KeyRequired},
@@ -637,7 +638,7 @@ func (m Commands) list(
 			return paging.Page[Command]{}, err
 		}
 
-		if call.Principal.Role == "client" &&
+		if call.Principal.Role == authz.RoleClient &&
 			command.ActorMembershipID != call.Principal.MembershipID {
 			command.Reason = nil // another actor's reason (a technician's or HQ's) is not the customer's
 		}
@@ -676,7 +677,7 @@ func AuditResult(
 		return apperr.Wrap(err, "select control.commands")
 	}
 
-	if (source != "ui" && source != "voice") || corr == nil || *corr == "" {
+	if (source != "ui" && source != sourceVoice) || corr == nil || *corr == "" {
 		return nil
 	}
 
@@ -688,7 +689,7 @@ func AuditResult(
 			ActorID:         actor,
 			ActorRole:       "system",
 			Action:          "commands.create",
-			TargetKind:      "command",
+			TargetKind:      kindCommand,
 			TargetID:        command.String(),
 			OccurredAt:      when,
 			CorrelationID:   *corr,

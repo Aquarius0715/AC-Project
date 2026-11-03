@@ -37,11 +37,11 @@ func (Store) Create(ctx context.Context, call *ops.Call, n New) (uuid.UUID, erro
 	}
 
 	if n.Severity == "" {
-		n.Severity = "normal"
+		n.Severity = severityNormal
 	}
 
 	if n.Channel == "" {
-		n.Channel = "inApp"
+		n.Channel = channelInApp
 	}
 
 	id := uuid.Must(uuid.NewV7())
@@ -126,78 +126,78 @@ var Replicas = []events.Replica{
 		Source: "assets.units",
 		Table:  "notify.ref_units",
 		Keys:   []string{"id"},
-		Cols:   []string{"tenant_id", "customer_org_id", "property_id", "display_name"},
+		Cols:   []string{colTenantID, colCustomerOrgID, "property_id", "display_name"},
 	},
 	{
 		Source: "assets.customers",
 		Table:  "notify.ref_customers",
 		Keys:   []string{"id"},
-		Cols:   []string{"tenant_id", "organization_id"},
+		Cols:   []string{colTenantID, "organization_id"},
 	},
 	{
 		Source: "maintenance.jobs",
 		Table:  "notify.ref_jobs",
 		Keys:   []string{"id"},
-		Cols:   []string{"tenant_id", "unit_id", "customer_org_id"},
+		Cols:   []string{colTenantID, colUnitID, colCustomerOrgID},
 	},
 	{
 		Source: "maintenance.offers",
 		Table:  "notify.ref_offers",
 		Keys:   []string{"id"},
-		Cols:   []string{"tenant_id", "job_id", "contractor_org_id"},
+		Cols:   []string{colTenantID, colJobID, "contractor_org_id"},
 	},
 	{
 		Source: "maintenance.assignments",
 		Table:  "notify.ref_assignments",
 		Keys:   []string{"id"},
-		Cols:   []string{"tenant_id", "job_id", "technician_membership_id", "status", "scheduled"},
+		Cols:   []string{colTenantID, colJobID, "technician_membership_id", keyStatus, "scheduled"},
 	},
 	{
 		Source: "billing.invoices",
 		Table:  "notify.ref_invoices",
 		Keys:   []string{"id"},
-		Cols:   []string{"tenant_id", "number", "customer_id", "status", "due_at"},
+		Cols:   []string{colTenantID, "number", colCustomerID, keyStatus, "due_at"},
 	},
 	{
 		Source: "billing.inquiries",
 		Table:  "notify.ref_inquiries",
 		Keys:   []string{"id"},
-		Cols:   []string{"tenant_id", "customer_id", "subject_type"},
+		Cols:   []string{colTenantID, colCustomerID, "subject_type"},
 	},
 	{
 		Source: "restrictions.restrictions",
 		Table:  "notify.ref_restrictions",
 		Keys:   []string{"id"},
-		Cols:   []string{"tenant_id", "customer_id"},
+		Cols:   []string{colTenantID, colCustomerID},
 	},
 	{
 		Source: "restrictions.restriction_units",
 		Table:  "notify.ref_restriction_units",
-		Keys:   []string{"restriction_id", "unit_id"},
-		Cols:   []string{"tenant_id"},
+		Keys:   []string{"restriction_id", colUnitID},
+		Cols:   []string{colTenantID},
 	},
 	{
 		Source: "devices.devices",
 		Table:  "notify.ref_devices",
 		Keys:   []string{"id"},
-		Cols:   []string{"tenant_id", "serial", "unit_id"},
+		Cols:   []string{colTenantID, "serial", colUnitID},
 	},
 	{
 		Source: "assets.properties",
 		Table:  "notify.ref_properties",
 		Keys:   []string{"id"},
-		Cols:   []string{"tenant_id", "customer_org_id"},
+		Cols:   []string{colTenantID, colCustomerOrgID},
 	}, // identity scopes (IR194)
 	{
 		Source: "maintenance.certificates",
 		Table:  "notify.ref_certificates",
 		Keys:   []string{"id"},
-		Cols:   []string{"tenant_id", "organization_id", "membership_id", "name"},
+		Cols:   []string{colTenantID, "organization_id", "membership_id", "name"},
 	}, // IR336
 	{
 		Source: "maintenance.job_history_snapshots",
 		Table:  "notify.ref_job_histories",
 		Keys:   []string{"id"},
-		Cols:   []string{"tenant_id", "job_id", "owner_kind", "owner_id"},
+		Cols:   []string{colTenantID, colJobID, "owner_kind", "owner_id"},
 	}, // IR601
 }

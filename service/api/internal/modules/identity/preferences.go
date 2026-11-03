@@ -11,6 +11,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
@@ -112,7 +113,7 @@ func updatePreferences(
 	call *ops.Call,
 	input *PreferencesInput,
 ) (Preferences, error) {
-	if input.MonthlyReportEmail != nil && call.Principal.Role != "client" {
+	if input.MonthlyReportEmail != nil && call.Principal.Role != authz.RoleClient {
 		return Preferences{}, apperr.Fields(
 			map[string]string{"monthlyReportEmail": apperr.KeyNotAllowed},
 		)

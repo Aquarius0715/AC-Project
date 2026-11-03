@@ -23,11 +23,11 @@ func TestCoverageStatus(t *testing.T) {
 		{daysFromNow(10), 1, "contract"},
 		{nil, 1, "contract"},
 		{daysFromNow(91), 0, "under_warranty"},
-		{daysFromNow(90), 0, "expiring"},
-		{daysFromNow(1), 0, "expiring"},
-		{daysFromNow(0), 0, "no_coverage"},
-		{daysFromNow(-5), 0, "no_coverage"},
-		{nil, 0, "no_coverage"},
+		{daysFromNow(90), 0, coverageExpiring},
+		{daysFromNow(1), 0, coverageExpiring},
+		{daysFromNow(0), 0, coverageNone},
+		{daysFromNow(-5), 0, coverageNone},
+		{nil, 0, coverageNone},
 	}
 	for i, c := range cases {
 		if got := CoverageStatus(now, c.ends, c.contracts); got != c.want {

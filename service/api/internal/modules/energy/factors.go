@@ -124,7 +124,7 @@ func listFactors(
 
 		if dec.Decode(&filter) != nil {
 			return paging.Page[Factor]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{keyFilters: apperr.KeyInvalid},
 			)
 		}
 	}
@@ -132,11 +132,11 @@ func listFactors(
 	order, err := paging.OrderBy(
 		query.Sort,
 		map[string]string{
-			"id":        "f.id",
-			"year":      "f.year",
-			"region":    "f.region",
-			"createdAt": "f.created_at",
-			"updatedAt": "f.created_at",
+			"id":         "f.id",
+			"year":       "f.year",
+			"region":     "f.region",
+			keyCreatedAt: "f.created_at",
+			keyUpdatedAt: "f.created_at",
 		},
 		"f.year DESC, f.region ASC, f.id ASC",
 	)

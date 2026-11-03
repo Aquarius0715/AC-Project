@@ -164,7 +164,7 @@ func publishRestrictionCommands(
 			ctx,
 			txn,
 			tenantID,
-			"command",
+			kindCommand,
 			byTenant[tenantID][0],
 			eventType,
 			events.Commands{CommandIDs: byTenant[tenantID], At: when, Statuses: tenantStatuses},

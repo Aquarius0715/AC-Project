@@ -201,23 +201,23 @@ func (r notifyingRecorder) send(
 func jobEvent(operation, status string) (event, template string) {
 	switch {
 	case operation == "jobs.create" || operation == "jobs.reportProblem":
-		return "requested", "job_update"
+		return "requested", noticeJobUpdate
 	case operation == "jobs.offer":
-		return "offered", "job_update"
+		return eventOffered, noticeJobUpdate
 	case operation == "jobs.accept":
-		return "accepted", "job_update"
+		return "accepted", noticeJobUpdate
 	case operation == "jobs.decline":
-		return "declined", "job_update"
+		return "declined", noticeJobUpdate
 	case operation == "jobs.assign":
 		return "assigned", "schedule_change"
 	case operation == "jobs.submit":
-		return "submitted", "job_update"
+		return "submitted", noticeJobUpdate
 	case operation == "jobs.review" && status == "rework_requested":
 		return "returned", "report_return"
-	case operation == "jobs.review" && status == "completed":
-		return "completed", "completion"
+	case operation == "jobs.review" && status == statusCompleted:
+		return statusCompleted, "completion"
 	case operation == "jobs.cancel", operation == "jobs.hold", operation == "jobs.resumeHold":
-		return status, "job_update"
+		return status, noticeJobUpdate
 	}
 
 	return "", ""
@@ -333,7 +333,7 @@ func (r notifyingRecorder) job(
 		return nil
 	}
 
-	if event == "offered" { // the contractor of the latest open offer
+	if event == eventOffered { // the contractor of the latest open offer
 		var offered uuid.UUID
 
 		err := call.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.offers WHERE job_id = $1 ORDER BY offered_at
@@ -360,7 +360,7 @@ func (r notifyingRecorder) job(
 	switch event {
 	case "requested":
 		steps = []func() error{clients, hqJob}
-	case "offered":
+	case eventOffered:
 		steps = []func() error{func() error { return partner("partner.accept") }, clients}
 	case "accepted":
 		steps = []func() error{hqJob, clients}
@@ -381,7 +381,7 @@ func (r notifyingRecorder) job(
 		}
 	case "returned":
 		steps = []func() error{tech, hqJob}
-	case "completed":
+	case statusCompleted:
 		steps = []func() error{
 			clients,
 			hqJob,

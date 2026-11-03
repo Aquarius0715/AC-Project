@@ -17,6 +17,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
@@ -39,7 +40,7 @@ func parsePolicy(raw json.RawMessage) (Policy, bool) {
 	switch policy.Kind {
 	case "power_off":
 		return policy, policy.MinimumCoolingSetpoint == nil
-	case "temperature_limit":
+	case policyTemperatureLimit:
 		return policy, policy.MinimumCoolingSetpoint != nil &&
 			!math.IsNaN(*policy.MinimumCoolingSetpoint) &&
 			!math.IsInf(*policy.MinimumCoolingSetpoint, 0)
@@ -97,17 +98,17 @@ func (in *ScheduleInput) Validate() map[string]string {
 	}
 
 	if !uniqueIDs(in.UnitIDs) || len(in.UnitIDs) > 100 {
-		fieldErrs["unitIds"] = apperr.KeyInvalid
+		fieldErrs[keyUnitIDs] = apperr.KeyInvalid
 	}
 
 	p, ok := parsePolicy(in.Policy)
 	if !ok {
-		fieldErrs["policy"] = apperr.KeyInvalid
+		fieldErrs[keyPolicy] = apperr.KeyInvalid
 	}
 
 	in.policy = p
 	if in.ExecuteAfter.IsZero() {
-		fieldErrs["executeAfter"] = apperr.KeyRequired
+		fieldErrs[keyExecuteAfter] = apperr.KeyRequired
 	}
 
 	trimReason(&in.Reason, "reason", fieldErrs)
@@ -116,7 +117,7 @@ func (in *ScheduleInput) Validate() map[string]string {
 		in.RulesVersion,
 	); in.RulesVersion == "" ||
 		len(in.RulesVersion) > 64 {
-		fieldErrs["rulesVersion"] = apperr.KeyRequired
+		fieldErrs[keyRulesVersion] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -214,12 +215,14 @@ func (m Restrictions) schedule(
 
 	if *rules != input.RulesVersion {
 		return Restriction{}, apperr.Fields(
-			map[string]string{"rulesVersion": "errors.rules_version_mismatch"},
+			map[string]string{keyRulesVersion: keyRulesVersionMismatch},
 		)
 	}
 
 	if input.ExecuteAfter.Before(call.Now.Add(24 * time.Hour)) {
-		return Restriction{}, apperr.Fields(map[string]string{"executeAfter": "errors.notice_24h"})
+		return Restriction{}, apperr.Fields(
+			map[string]string{keyExecuteAfter: "errors.notice_24h"},
+		)
 	}
 
 	overdue, err := overdueInvoices(ctx, call, input.ContractID)
@@ -240,7 +243,7 @@ func (m Restrictions) schedule(
 	for _, unitID := range input.UnitIDs {
 		if !slices.Contains(contractUnits, unitID) {
 			return Restriction{}, apperr.Fields(
-				map[string]string{"unitIds": "errors.unit_not_in_contract"},
+				map[string]string{keyUnitIDs: "errors.unit_not_in_contract"},
 			)
 		}
 
@@ -254,18 +257,18 @@ func (m Restrictions) schedule(
 		}
 
 		if !unitCaps.Control ||
-			(input.policy.Kind == "temperature_limit" && !unitCaps.HasTemperature) {
+			(input.policy.Kind == policyTemperatureLimit && !unitCaps.HasTemperature) {
 			return Restriction{}, apperr.Fields(
-				map[string]string{"unitIds": "errors.unsupported_capability"},
+				map[string]string{keyUnitIDs: "errors.unsupported_capability"},
 			)
 		}
 
-		if input.policy.Kind == "temperature_limit" {
+		if input.policy.Kind == policyTemperatureLimit {
 			v := *input.policy.MinimumCoolingSetpoint
 			if v < unitCaps.TempMin || v > unitCaps.TempMax ||
 				(unitCaps.Step > 0 && math.Abs(math.Remainder(v-unitCaps.TempMin, unitCaps.Step)) > 1e-9) {
 				return Restriction{}, apperr.Fields(
-					map[string]string{"policy": "errors.setpoint_out_of_range"},
+					map[string]string{keyPolicy: "errors.setpoint_out_of_range"},
 				)
 			}
 		}
@@ -305,7 +308,7 @@ func (m Restrictions) schedule(
 
 	if len(recipients) == 0 {
 		return Restriction{}, apperr.Fields(
-			map[string]string{"unitIds": "errors.no_notice_recipient"},
+			map[string]string{keyUnitIDs: "errors.no_notice_recipient"},
 		)
 	}
 
@@ -364,14 +367,14 @@ func (m Restrictions) schedule(
 	for _, r := range recipients {
 		notificationID, err := m.Notify.Create(ctx, call, notify.New{
 			RecipientMembershipID: r,
-			Type:                  "restriction",
-			TemplateKey:           "restriction",
-			TargetKind:            "restriction",
+			Type:                  kindRestriction,
+			TemplateKey:           kindRestriction,
+			TargetKind:            kindRestriction,
 			TargetID:              restrictionID,
 			Severity:              "warning",
 			Params: map[string]any{
-				"executeAfter": input.ExecuteAfter,
-				"policyKind":   input.policy.Kind,
+				keyExecuteAfter: input.ExecuteAfter,
+				"policyKind":    input.policy.Kind,
 			}, Channel: "", SourceAlertID: nil,
 		})
 		if err != nil {
@@ -393,10 +396,13 @@ func (m Restrictions) schedule(
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "restriction",
+			AggregateType: kindRestriction,
 			AggregateID:   restrictionID,
 			Type:          "RestrictionScheduled",
-			Payload:       map[string]any{"contractId": input.ContractID, "unitIds": input.UnitIDs},
+			Payload: map[string]any{
+				"contractId": input.ContractID,
+				keyUnitIDs:   input.UnitIDs,
+			},
 		},
 	)
 
@@ -404,7 +410,7 @@ func (m Restrictions) schedule(
 	call.Audit(
 		ops.AuditEntry{
 			Action:      "restrictions.schedule",
-			TargetKind:  "restriction",
+			TargetKind:  kindRestriction,
 			TargetID:    restrictionID.String(),
 			NextVersion: &nextVersion,
 			Reason:      input.Reason, PreviousVersion: nil, Result: "", Before: nil, After: nil,
@@ -422,7 +428,7 @@ func noticeRecipients(ctx context.Context, c *ops.Call, org uuid.UUID) ([]uuid.U
 		c,
 		identity.QueryMembers,
 		identity.MembersInput{
-			Role:           "client",
+			Role:           authz.RoleClient,
 			OrganizationID: &org,
 			IDs:            nil,
 			Permission:     "",
@@ -441,7 +447,7 @@ type ExecuteInput struct {
 func (in *ExecuteInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fieldErrs["restrictionId"] = apperr.KeyRequired
+		fieldErrs[keyRestrictionID] = apperr.KeyRequired
 	}
 
 	if strings.TrimSpace(in.ConfirmedRulesVersion) == "" {
@@ -513,13 +519,13 @@ func (m Restrictions) execute(
 		return restriction, err
 	}
 
-	if restriction.State != "scheduled" {
+	if restriction.State != stateScheduled {
 		return restriction, apperr.E(apperr.Conflict, "errors.restriction_state")
 	}
 
 	if input.ConfirmedRulesVersion != restriction.RulesVersion {
 		return restriction, apperr.Fields(
-			map[string]string{"confirmedRulesVersion": "errors.rules_version_mismatch"},
+			map[string]string{"confirmedRulesVersion": keyRulesVersionMismatch},
 		)
 	}
 
@@ -586,16 +592,16 @@ func (m Restrictions) execute(
 
 		call.Emit(
 			ops.Event{
-				AggregateType: "restriction",
+				AggregateType: kindRestriction,
 				AggregateID:   restriction.ID,
 				Type:          "RestrictionCancelled",
-				Payload:       map[string]any{"source": "payment"},
+				Payload:       map[string]any{keySource: "payment"},
 			},
 		)
 		call.Audit(
 			ops.AuditEntry{
-				Action:          "restrictions.execute",
-				TargetKind:      "restriction",
+				Action:          opExecute,
+				TargetKind:      kindRestriction,
 				TargetID:        restriction.ID.String(),
 				PreviousVersion: call.ExpectedVersion,
 				NextVersion:     &next,
@@ -608,10 +614,10 @@ func (m Restrictions) execute(
 
 	action, _ := json.Marshal(
 		map[string]any{
-			"kind":          "apply_restriction",
-			"restrictionId": restriction.ID,
-			"rulesVersion":  restriction.RulesVersion,
-			"policy":        restriction.Policy,
+			keyKind:          actionApplyRestriction,
+			keyRestrictionID: restriction.ID,
+			keyRulesVersion:  restriction.RulesVersion,
+			keyPolicy:        restriction.Policy,
 		},
 	)
 	for _, unit := range restriction.PerUnit {
@@ -620,9 +626,9 @@ func (m Restrictions) execute(
 			return restriction, err
 		}
 
-		state := "not_sent"
+		state := applyNotSent
 		if delivered {
-			state = "sent_unknown"
+			state = applySentUnknown
 		}
 
 		_, execErr := call.Tx.Exec(
@@ -653,16 +659,16 @@ func (m Restrictions) execute(
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "restriction",
+			AggregateType: kindRestriction,
 			AggregateID:   restriction.ID,
 			Type:          "RestrictionRequested",
-			Payload:       map[string]any{"unitIds": restriction.UnitIDs},
+			Payload:       map[string]any{keyUnitIDs: restriction.UnitIDs},
 		},
 	)
 	call.Audit(
 		ops.AuditEntry{
-			Action:          "restrictions.execute",
-			TargetKind:      "restriction",
+			Action:          opExecute,
+			TargetKind:      kindRestriction,
 			TargetID:        restriction.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
@@ -694,7 +700,7 @@ func (m Restrictions) send(
 	var reason *string
 
 	switch {
-	case !bound || conn != "online" || power == "off":
+	case !bound || conn != connectionOnline || power == powerOff:
 		r := "offline"
 		reason = &r
 	case opBusy:
@@ -709,7 +715,7 @@ func (m Restrictions) send(
 
 	status, delivery, sentAt := "sent", "sent", &call.Now
 	if reason != nil {
-		status, delivery, sentAt = "requested", "not_sent", nil
+		status, delivery, sentAt = stateRequested, applyNotSent, nil
 	}
 	// the command row is equipment's (IR185): billing assigns the ID and publishes the decided command
 	commandID := uuid.Must(uuid.NewV7())
@@ -787,7 +793,7 @@ type CancelInput struct {
 func (in *CancelInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fieldErrs["restrictionId"] = apperr.KeyRequired
+		fieldErrs[keyRestrictionID] = apperr.KeyRequired
 	}
 
 	trimReason(&in.Reason, "reason", fieldErrs)
@@ -834,9 +840,9 @@ func (m Restrictions) cancel(
 	}
 
 	switch restriction.State {
-	case "release_requested": // IR96: idempotent, no version or audit
+	case stateReleaseRequested: // IR96: idempotent, no version or audit
 		return restriction, nil
-	case "released", "cancelled":
+	case stateReleased, stateCancelled:
 		return restriction, apperr.E(apperr.Conflict, "errors.restriction_state")
 	}
 
@@ -845,7 +851,7 @@ func (m Restrictions) cancel(
 	}
 
 	next := restriction.Version + 1
-	if restriction.State == "scheduled" {
+	if restriction.State == stateScheduled {
 		_, err := call.Tx.Exec(
 			ctx,
 			`UPDATE restrictions.restrictions SET state = 'cancelled', version = version + 1, updated_at = $2 WHERE id = $1`,
@@ -858,10 +864,10 @@ func (m Restrictions) cancel(
 
 		call.Emit(
 			ops.Event{
-				AggregateType: "restriction",
+				AggregateType: kindRestriction,
 				AggregateID:   restriction.ID,
 				Type:          "RestrictionCancelled",
-				Payload:       map[string]any{"source": "cancel"},
+				Payload:       map[string]any{keySource: "cancel"},
 			},
 		)
 	} else {
@@ -874,7 +880,7 @@ func (m Restrictions) cancel(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "restrictions.cancel",
-			TargetKind:      "restriction",
+			TargetKind:      kindRestriction,
 			TargetID:        restriction.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next,

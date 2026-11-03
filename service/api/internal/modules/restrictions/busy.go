@@ -241,10 +241,10 @@ func (m Restrictions) OnInvoicePaid(
 	for _, restrictionID := range out {
 		call.Emit(
 			ops.Event{
-				AggregateType: "restriction",
+				AggregateType: kindRestriction,
 				AggregateID:   restrictionID,
 				Type:          "RestrictionReleaseRequested",
-				Payload:       map[string]any{"source": "payment", "invoiceId": invoice},
+				Payload:       map[string]any{keySource: "payment", "invoiceId": invoice},
 			},
 		)
 
@@ -260,7 +260,7 @@ func (m Restrictions) OnInvoicePaid(
 		call.Audit(
 			ops.AuditEntry{
 				Action:          "payments.release",
-				TargetKind:      "restriction",
+				TargetKind:      kindRestriction,
 				TargetID:        restrictionID.String(),
 				Reason:          "cause invoices paid",
 				PreviousVersion: nil,

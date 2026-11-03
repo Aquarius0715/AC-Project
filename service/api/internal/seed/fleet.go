@@ -82,11 +82,11 @@ func ApplyFleet(ctx context.Context, tx pgx.Tx, fleet devicesim.Fleet, at time.T
 	for i, pattern := range fleet.Patterns {
 		state, _ := json.Marshal(
 			map[string]any{
-				"power":      pattern.State.Power,
-				"celsius":    pattern.State.Celsius,
-				"mode":       pattern.State.Mode,
-				"fanLevel":   pattern.State.FanLevel,
-				"observedAt": at.UTC(),
+				keyPower:      pattern.State.Power,
+				"celsius":     pattern.State.Celsius,
+				"mode":        pattern.State.Mode,
+				"fanLevel":    pattern.State.FanLevel,
+				keyObservedAt: at.UTC(),
 			},
 		)
 		unit := ID(devicesim.UnitName(pattern))

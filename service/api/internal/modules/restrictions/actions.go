@@ -27,7 +27,7 @@ type ExceptionInput struct {
 func (in *ExceptionInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fieldErrs["restrictionId"] = apperr.KeyRequired
+		fieldErrs[keyRestrictionID] = apperr.KeyRequired
 	}
 
 	if in.Until.IsZero() {
@@ -136,7 +136,7 @@ func (m Restrictions) except(
 		return restriction, err
 	}
 
-	if restriction.State == "released" || restriction.State == "cancelled" {
+	if restriction.State == stateReleased || restriction.State == stateCancelled {
 		return restriction, apperr.E(apperr.Conflict, "errors.restriction_state")
 	}
 
@@ -151,7 +151,7 @@ func (m Restrictions) except(
 	}
 
 	next := restriction.Version + 1
-	if restriction.State == "requested" || restriction.State == "applied" {
+	if restriction.State == stateRequested || restriction.State == stateApplied {
 		err := m.RequestRelease(ctx, call, restriction.ID, "exception")
 		if err != nil {
 			return restriction, err
@@ -162,7 +162,7 @@ func (m Restrictions) except(
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "restriction",
+			AggregateType: kindRestriction,
 			AggregateID:   restriction.ID,
 			Type:          "RestrictionExceptionRecorded",
 			Payload:       map[string]any{"action": action, "until": input.Until},
@@ -171,7 +171,7 @@ func (m Restrictions) except(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          action,
-			TargetKind:      "restriction",
+			TargetKind:      kindRestriction,
 			TargetID:        restriction.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next,
@@ -190,7 +190,7 @@ type ReleaseInput struct {
 // Validate implements ops.Validator.
 func (in *ReleaseInput) Validate() map[string]string {
 	if in.RestrictionID == uuid.Nil {
-		return map[string]string{"restrictionId": apperr.KeyRequired}
+		return map[string]string{keyRestrictionID: apperr.KeyRequired}
 	}
 
 	return nil
@@ -239,9 +239,9 @@ func (m Restrictions) release(
 	}
 
 	switch restriction.State {
-	case "release_requested": // IR35: idempotent
+	case stateReleaseRequested: // IR35: idempotent
 		return restriction, nil
-	case "requested", "applied":
+	case stateRequested, stateApplied:
 	default:
 		return restriction, apperr.E(apperr.Conflict, "errors.restriction_state")
 	}
@@ -268,7 +268,7 @@ func (m Restrictions) release(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "restrictions.release",
-			TargetKind:      "restriction",
+			TargetKind:      kindRestriction,
 			TargetID:        restriction.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
@@ -288,7 +288,7 @@ type OverrideInput struct {
 func (in *OverrideInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fieldErrs["restrictionId"] = apperr.KeyRequired
+		fieldErrs[keyRestrictionID] = apperr.KeyRequired
 	}
 
 	trimReason(&in.Reason, "reason", fieldErrs)
@@ -336,9 +336,9 @@ func (m Restrictions) override(
 	}
 
 	switch restriction.State {
-	case "release_requested":
+	case stateReleaseRequested:
 		return releaseView(restriction), nil
-	case "requested", "applied":
+	case stateRequested, stateApplied:
 	default:
 		return ReleaseView{}, apperr.E(apperr.Conflict, "errors.restriction_state")
 	}
@@ -356,7 +356,7 @@ func (m Restrictions) override(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "restrictions.override",
-			TargetKind:      "restriction",
+			TargetKind:      kindRestriction,
 			TargetID:        restriction.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next,
@@ -380,12 +380,12 @@ func overrideOnlyAllowed(c *ops.Call, restriction Restriction) bool {
 	}
 
 	_ = json.Unmarshal(restriction.ReleaseIntent, &intent)
-	if (restriction.State == "released" || restriction.State == "cancelled") &&
+	if (restriction.State == stateReleased || restriction.State == stateCancelled) &&
 		unresolvedCase(restriction) { // IR03: terminal recovery
 		return true
 	}
 
-	return restriction.State == "release_requested" && intent.Source == "override"
+	return restriction.State == stateReleaseRequested && intent.Source == "override"
 }
 
 func unresolvedCase(x Restriction) bool {
@@ -393,7 +393,7 @@ func unresolvedCase(x Restriction) bool {
 
 	_ = json.Unmarshal(x.RecoveryCases, &cases)
 	for _, k := range cases {
-		if k.State != "resolved" {
+		if k.State != caseResolved {
 			return true
 		}
 	}
@@ -408,7 +408,7 @@ func unitsOf(restriction Restriction, ids []uuid.UUID) ([]Unit, error) {
 		idx := slices.IndexFunc(restriction.PerUnit, func(u Unit) bool { return u.UnitID == id })
 		if idx < 0 {
 			return nil, apperr.Fields(
-				map[string]string{"unitIds": "errors.unit_not_in_restriction"},
+				map[string]string{keyUnitIDs: "errors.unit_not_in_restriction"},
 			)
 		}
 
@@ -428,11 +428,11 @@ type ReconcileInput struct {
 func (in *ReconcileInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fieldErrs["restrictionId"] = apperr.KeyRequired
+		fieldErrs[keyRestrictionID] = apperr.KeyRequired
 	}
 
 	if !uniqueIDs(in.UnitIDs) {
-		fieldErrs["unitIds"] = apperr.KeyInvalid
+		fieldErrs[keyUnitIDs] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -488,13 +488,13 @@ func (m Restrictions) reconcile(
 		return nil, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
-	if restriction.State == "released" ||
-		restriction.State == "cancelled" { // SR26 recovery of a terminal restriction
+	if restriction.State == stateReleased ||
+		restriction.State == stateCancelled { // SR26 recovery of a terminal restriction
 		return m.reconcileTerminal(ctx, call, restriction, input.UnitIDs)
 	}
 
-	if restriction.State != "requested" && restriction.State != "applied" &&
-		restriction.State != "release_requested" {
+	if restriction.State != stateRequested && restriction.State != stateApplied &&
+		restriction.State != stateReleaseRequested {
 		return nil, apperr.E(apperr.Conflict, "errors.restriction_state")
 	}
 
@@ -505,15 +505,17 @@ func (m Restrictions) reconcile(
 
 	remove, _ := json.Marshal(
 		map[string]any{
-			"kind":          "remove_restriction",
-			"restrictionId": restriction.ID,
-			"rulesVersion":  restriction.RulesVersion,
+			keyKind:          actionRemoveRestriction,
+			keyRestrictionID: restriction.ID,
+			keyRulesVersion:  restriction.RulesVersion,
 		},
 	)
 
 	for _, unit := range targets {
-		if unit.ApplyState != "sent_unknown" {
-			return nil, apperr.Fields(map[string]string{"unitIds": "errors.reconcile_not_needed"})
+		if unit.ApplyState != applySentUnknown {
+			return nil, apperr.Fields(
+				map[string]string{keyUnitIDs: "errors.reconcile_not_needed"},
+			)
 		}
 
 		var open bool
@@ -534,7 +536,7 @@ func (m Restrictions) reconcile(
 			return nil, apperr.Wrap(err, "restrictions.Devices.BoundDevice")
 		}
 
-		if !bound || conn != "online" || power == "off" {
+		if !bound || conn != connectionOnline || power == powerOff {
 			return nil, apperr.E(apperr.Offline, "errors.device_offline")
 		}
 
@@ -632,7 +634,7 @@ func (m Restrictions) reconcile(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "restrictions.reconcile",
-			TargetKind:      "restriction",
+			TargetKind:      kindRestriction,
 			TargetID:        restriction.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
@@ -656,14 +658,14 @@ type RetryInput struct {
 func (in *RetryInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fieldErrs["restrictionId"] = apperr.KeyRequired
+		fieldErrs[keyRestrictionID] = apperr.KeyRequired
 	}
 
 	if !uniqueIDs(in.UnitIDs) {
-		fieldErrs["unitIds"] = apperr.KeyInvalid
+		fieldErrs[keyUnitIDs] = apperr.KeyInvalid
 	}
 
-	if in.Phase != "apply" && in.Phase != "release" {
+	if in.Phase != phaseApply && in.Phase != phaseRelease {
 		fieldErrs["phase"] = apperr.KeyInvalid
 	}
 
@@ -713,14 +715,14 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput)
 		return nil, err
 	}
 
-	if input.Phase == "apply" && !c.Principal.Permissions["restriction.write"] ||
-		input.Phase == "release" && !overrideOnlyAllowed(c, restriction) {
+	if input.Phase == phaseApply && !c.Principal.Permissions["restriction.write"] ||
+		input.Phase == phaseRelease && !overrideOnlyAllowed(c, restriction) {
 		return nil, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
 	if input.ConfirmedRulesVersion != restriction.RulesVersion {
 		return nil, apperr.Fields(
-			map[string]string{"confirmedRulesVersion": "errors.rules_version_mismatch"},
+			map[string]string{"confirmedRulesVersion": keyRulesVersionMismatch},
 		)
 	}
 
@@ -729,8 +731,8 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput)
 		return nil, err
 	}
 
-	if input.Phase == "apply" {
-		if restriction.State != "requested" {
+	if input.Phase == phaseApply {
+		if restriction.State != stateRequested {
 			return nil, apperr.E(apperr.Conflict, "errors.restriction_state")
 		}
 
@@ -742,24 +744,24 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput)
 		if paid || exempted(restriction, c.Now) {
 			return nil, apperr.E(apperr.Conflict, "errors.restriction_not_applicable")
 		}
-	} else if restriction.State != "release_requested" {
+	} else if restriction.State != stateReleaseRequested {
 		return nil, apperr.E(apperr.Conflict, "errors.restriction_state")
 	}
 
 	action, _ := json.Marshal(
 		map[string]any{
-			"kind":          "apply_restriction",
-			"restrictionId": restriction.ID,
-			"rulesVersion":  restriction.RulesVersion,
-			"policy":        restriction.Policy,
+			keyKind:          actionApplyRestriction,
+			keyRestrictionID: restriction.ID,
+			keyRulesVersion:  restriction.RulesVersion,
+			keyPolicy:        restriction.Policy,
 		},
 	)
-	if input.Phase == "release" {
+	if input.Phase == phaseRelease {
 		action, _ = json.Marshal(
 			map[string]any{
-				"kind":          "remove_restriction",
-				"restrictionId": restriction.ID,
-				"rulesVersion":  restriction.RulesVersion,
+				keyKind:          actionRemoveRestriction,
+				keyRestrictionID: restriction.ID,
+				keyRulesVersion:  restriction.RulesVersion,
 			},
 		)
 	}
@@ -776,11 +778,11 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput)
 			return nil, apperr.Wrap(err, "select restrictions.restriction_commands")
 		}
 
-		if input.Phase == "apply" {
+		if input.Phase == phaseApply {
 			switch {
-			case unit.ApplyState == "applied":
+			case unit.ApplyState == stateApplied:
 				continue
-			case unit.ApplyState == "sent_unknown":
+			case unit.ApplyState == applySentUnknown:
 				return nil, apperr.E(apperr.Conflict, "errors.reconcile_required")
 			case open:
 				return nil, apperr.E(apperr.Conflict, "errors.command_pending")
@@ -791,9 +793,9 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput)
 				return nil, err
 			}
 
-			state := "not_sent"
+			state := applyNotSent
 			if delivered {
-				state = "sent_unknown"
+				state = applySentUnknown
 			}
 
 			_, execErr := c.Tx.Exec(
@@ -817,13 +819,13 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput)
 		}
 
 		switch {
-		case unit.ReleaseState == "released" || unit.ReleaseState == "not_required":
+		case unit.ReleaseState == stateReleased || unit.ReleaseState == "not_required":
 			continue
 		case unit.ReleaseState == "waiting_reconcile":
 			return nil, apperr.E(apperr.Conflict, "errors.reconcile_required")
-		case unit.ReleaseState == "requested" || open:
+		case unit.ReleaseState == stateRequested || open:
 			return nil, apperr.E(apperr.Conflict, "errors.command_pending")
-		case unit.ApplyState != "applied":
+		case unit.ApplyState != stateApplied:
 			return nil, apperr.E(apperr.Conflict, "errors.reconcile_required")
 		}
 
@@ -870,7 +872,7 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput)
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "restrictions.retry",
-			TargetKind:      "restriction",
+			TargetKind:      kindRestriction,
 			TargetID:        restriction.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &next,

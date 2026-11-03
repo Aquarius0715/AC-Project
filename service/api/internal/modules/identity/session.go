@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 // Session is Session of service-contracts.ts (generation and viewEpoch are owned by the BFF session; the Core API
@@ -83,7 +84,7 @@ func sessionGet(ctx context.Context, call *ops.Call, _ *struct{}) (Session, erro
 	sort.Strings(perms)
 
 	var clientRole *string
-	if principal.Role == "client" && principal.ClientRole != "" {
+	if principal.Role == authz.RoleClient && principal.ClientRole != "" {
 		clientRole = &principal.ClientRole
 	}
 
@@ -119,7 +120,7 @@ func sessionGet(ctx context.Context, call *ops.Call, _ *struct{}) (Session, erro
 	}
 
 	if err == nil &&
-		principal.Role == "client" { // identity's reference copy of the customers (IR188)
+		principal.Role == authz.RoleClient { // identity's reference copy of the customers (IR188)
 		var id uuid.UUID
 		switch scanErr := call.Tx.QueryRow(ctx, `SELECT c.id FROM notify.ref_customers c JOIN identity.memberships m ON
 			m.organization_id = c.organization_id WHERE m.id = $1`,

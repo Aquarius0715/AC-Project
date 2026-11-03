@@ -101,7 +101,7 @@ func StateTrigger(hb devicesim.Heartbeat, when time.Time) (Trigger, error) {
 			[]byte(fmt.Sprintf("%s/state/%s", dev, when.Format(time.RFC3339Nano))),
 		),
 		OccurredAt:  when,
-		EventType:   "state",
+		EventType:   eventState,
 		DeviceID:    &dev,
 		State:       state,
 		CommandID:   nil,

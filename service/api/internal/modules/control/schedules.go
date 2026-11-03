@@ -146,8 +146,8 @@ func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, er
 			return order[left].at.Before(order[right].at)
 		}
 
-		return order[left].phase == "schedule_end" &&
-			order[right].phase != "schedule_end" // end, then the next start
+		return order[left].phase == phaseScheduleEnd &&
+			order[right].phase != phaseScheduleEnd // end, then the next start
 	})
 
 	last := map[uuid.UUID]time.Time{} // the last minute the tick passed for each unit (IR473)
@@ -196,7 +196,7 @@ func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, er
 		}
 
 		for _, decision := range r.Results {
-			if decision.Decision == "requested" && decision.RuleID != nil &&
+			if decision.Decision == decisionRequested && decision.RuleID != nil &&
 				decision.CommandID != nil &&
 				decision.fresh {
 				created++
@@ -204,7 +204,7 @@ func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, er
 				call.Audit(
 					ops.AuditEntry{
 						Action:          "automations.schedule",
-						TargetKind:      "automation",
+						TargetKind:      kindAutomation,
 						TargetID:        decision.RuleID.String(),
 						Reason:          scheduleTick.phase,
 						PreviousVersion: nil,

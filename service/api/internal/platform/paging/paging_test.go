@@ -10,8 +10,8 @@ import (
 
 // The sort values the tests ask for.
 const (
-	sortDesc      = "desc"
-	sortCreatedAt = "createdAt"
+	sortDesc     = "desc"
+	keyCreatedAt = "createdAt"
 )
 
 func code(err error) apperr.Code {
@@ -25,7 +25,7 @@ func code(err error) apperr.Code {
 func TestResolveDefaults(t *testing.T) {
 	t.Parallel()
 
-	cond := map[string]any{"propertyId": "p1"}
+	cond := map[string]any{keyPropertyID: "p1"}
 
 	window, err := paging.Resolve(
 		paging.Query{Cursor: nil, Limit: nil, Sort: nil, Filters: nil},
@@ -45,7 +45,7 @@ func TestResolveDefaults(t *testing.T) {
 func TestResolveAndNext(t *testing.T) {
 	t.Parallel()
 
-	cond := map[string]any{"propertyId": "p1"}
+	cond := map[string]any{keyPropertyID: "p1"}
 
 	window, _ := paging.Resolve(
 		paging.Query{Limit: new(2), Cursor: nil, Sort: nil, Filters: nil},
@@ -81,7 +81,7 @@ func TestResolveAndNext(t *testing.T) {
 func TestResolveRefuses(t *testing.T) {
 	t.Parallel()
 
-	cond := map[string]any{"propertyId": "p1"}
+	cond := map[string]any{keyPropertyID: "p1"}
 	window, _ := paging.Resolve(
 		paging.Query{Limit: new(2), Cursor: nil, Sort: nil, Filters: nil},
 		cond,
@@ -133,7 +133,7 @@ func TestResolveRefuses(t *testing.T) {
 		}, // {} → hash mismatch
 		{
 			paging.Query{Limit: new(2), Cursor: next, Sort: nil, Filters: nil},
-			map[string]any{"propertyId": "p2"},
+			map[string]any{keyPropertyID: "p2"},
 			1,
 			apperr.Validation,
 		}, // changed conditions
@@ -200,13 +200,13 @@ func TestOrderBy(t *testing.T) {
 func TestOrderByDirection(t *testing.T) {
 	t.Parallel()
 
-	allowed := map[string]string{"id": "r.id", sortCreatedAt: "r.created_at"}
+	allowed := map[string]string{"id": "r.id", keyCreatedAt: "r.created_at"}
 	for dir, want := range map[string]string{
 		"asc":    "r.created_at ASC, r.id ASC",
 		sortDesc: "r.created_at DESC, r.id ASC",
 	} {
 		got, err := paging.OrderBy(
-			&paging.SortSpec{Field: sortCreatedAt, Direction: dir},
+			&paging.SortSpec{Field: keyCreatedAt, Direction: dir},
 			allowed,
 			"",
 		)
@@ -218,7 +218,7 @@ func TestOrderByDirection(t *testing.T) {
 
 	for _, dir := range []string{"DESC", "", "sideways", "desc, (SELECT pg_sleep(5))", "asc; DROP TABLE x --"} {
 		got, err := paging.OrderBy(
-			&paging.SortSpec{Field: sortCreatedAt, Direction: dir},
+			&paging.SortSpec{Field: keyCreatedAt, Direction: dir},
 			allowed,
 			"",
 		)

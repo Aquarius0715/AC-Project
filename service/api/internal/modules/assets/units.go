@@ -159,11 +159,11 @@ type UnitFilters struct {
 }
 
 var connections = map[string]bool{
-	"online":     true,
-	"offline":    true,
-	"unknown":    true,
-	"connecting": true,
-	"error":      true,
+	connectionOnline: true,
+	"offline":        true,
+	stateUnknown:     true,
+	"connecting":     true,
+	stateError:       true,
 }
 
 // scopeSQL restricts unit rows (alias u) to the caller's List-mode scope (unitscope, IR169).
@@ -269,19 +269,20 @@ func (m *Module) query(
 // 120 s old, and the latest valid measured power reading is fresh; otherwise unknown.
 func EffectivePower(u *Unit, now time.Time, measuredFresh, ok bool) string {
 	observedState := u.ObservedState
-	if u.Connection != "online" || observedState.Power == nil || observedState.ObservedAt == nil ||
+	if u.Connection != connectionOnline || observedState.Power == nil ||
+		observedState.ObservedAt == nil ||
 		observedState.ObservedAt.After(now) ||
 		now.Sub(*observedState.ObservedAt) > 120*time.Second ||
 		!ok ||
 		!measuredFresh {
-		return "unknown"
+		return stateUnknown
 	}
 
 	if *observedState.Power {
 		return "on"
 	}
 
-	return "off"
+	return powerOff
 }
 
 func (m *Module) enrich(ctx context.Context, call *ops.Call, units []Unit) error {
@@ -419,8 +420,8 @@ func (m *Module) unitsList(
 	}
 
 	if unitFilters.PowerState != nil && *unitFilters.PowerState != "on" &&
-		*unitFilters.PowerState != "off" &&
-		*unitFilters.PowerState != "unknown" {
+		*unitFilters.PowerState != powerOff &&
+		*unitFilters.PowerState != stateUnknown {
 		return paging.Page[Unit]{}, apperr.Fields(
 			map[string]string{"filters.powerState": apperr.KeyInvalid},
 		)
@@ -448,7 +449,7 @@ func (m *Module) unitsList(
 		return fmt.Sprintf("$%d", len(args))
 	}
 
-	conds := []string{"NOT u.archived", scopeSQL(call, &args)}
+	conds := []string{unarchivedUnits, scopeSQL(call, &args)}
 	if unitFilters.CustomerID != nil {
 		conds = append(
 			conds,

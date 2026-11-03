@@ -37,22 +37,22 @@ type Link struct {
 // beats) and their connection.
 var Links = []Link{
 	{Device: "device-online-rto", Unit: "unit-online-rto", Sensors: map[string]string{
-		"temperature": "sensor-online-temperature",
-		"power":       "sensor-online-power",
-		"humidity":    "sensor-online-humidity",
-		"co2":         "sensor-online-co2",
-		"pm25":        "sensor-online-pm25",
-	}, Connection: "online"},
+		sensorTemperature: "sensor-online-temperature",
+		sensorPower:       "sensor-online-power",
+		sensorHumidity:    "sensor-online-humidity",
+		"co2":             "sensor-online-co2",
+		"pm25":            "sensor-online-pm25",
+	}, Connection: connectionOnline},
 	{Device: "device-tamper", Unit: "unit-non-rto", Sensors: map[string]string{
-		"temperature": "sensor-tamper-temperature", "power": "sensor-tamper-power",
-		"humidity": "sensor-tamper-humidity",
-	}, Connection: "online"},
+		sensorTemperature: "sensor-tamper-temperature", sensorPower: "sensor-tamper-power",
+		sensorHumidity: "sensor-tamper-humidity",
+	}, Connection: connectionOnline},
 	{
 		Device: "device-offline-rto",
 		Unit:   "unit-offline-rto",
 		Sensors: map[string]string{
-			"temperature": "sensor-offline-temperature",
-			"power":       "sensor-offline-power",
+			sensorTemperature: "sensor-offline-temperature",
+			sensorPower:       "sensor-offline-power",
 		},
 		Connection: "offline",
 	},
@@ -60,16 +60,16 @@ var Links = []Link{
 		Device: "device-limited",
 		Unit:   "unit-limited",
 		Sensors: map[string]string{
-			"temperature": "sensor-limited-temperature",
-			"power":       "sensor-limited-power",
+			sensorTemperature: "sensor-limited-temperature",
+			sensorPower:       "sensor-limited-power",
 		},
-		Connection: "online",
+		Connection: connectionOnline,
 	},
 	{
 		Device:     "device-no-sensor",
 		Unit:       "unit-other-customer",
 		Sensors:    map[string]string{},
-		Connection: "online",
+		Connection: connectionOnline,
 	},
 }
 
@@ -226,7 +226,7 @@ func (r *Resolver) Triggers(batch devicesim.Batch, received time.Time) ([]Trigge
 				ObservedAt: measurement.ObservedAt,
 				ReceivedAt: received.UTC(),
 				Origin:     "measured",
-				Quality:    "valid",
+				Quality:    qualityValid,
 				EventID:    event, // no sequence: the API numbers the reading after the latest (IR77)
 				Sequence:   nil,
 			}, CommandID: nil, DeviceID: nil, State: nil, Event: nil, BindingID: nil, Sequence: nil, Kind: "", Recovery: nil,

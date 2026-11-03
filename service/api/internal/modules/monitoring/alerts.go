@@ -135,7 +135,7 @@ func alertScope(c *ops.Call, args *[]any, mode unitscope.Mode) string {
 
 var (
 	severities    = map[string]bool{"critical": true, "warning": true, "normal": true}
-	alertStatuses = map[string]bool{"open": true, "acknowledged": true, "resolved": true}
+	alertStatuses = map[string]bool{statusOpen: true, "acknowledged": true, "resolved": true}
 )
 
 const severityRank = `CASE a.severity WHEN 'normal' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END`
@@ -335,7 +335,7 @@ func (m Alerts) list(
 
 		if dec.Decode(&filters) != nil {
 			return paging.Page[Alert]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{keyFilters: apperr.KeyInvalid},
 			)
 		}
 	}
@@ -367,9 +367,9 @@ func (m Alerts) list(
 			fieldOrder, err := paging.OrderBy(
 				query.Sort,
 				map[string]string{
-					"id":        "a.id",
-					"createdAt": "a.created_at",
-					"updatedAt": "a.updated_at",
+					"id":         "a.id",
+					keyCreatedAt: "a.created_at",
+					keyUpdatedAt: "a.updated_at",
 				},
 				"",
 			)
@@ -616,7 +616,7 @@ func (m Alerts) acknowledge(ctx context.Context, call *ops.Call, input *AckInput
 		return Alert{}, err
 	}
 
-	if status != "open" {
+	if status != statusOpen {
 		return Alert{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -636,16 +636,16 @@ func (m Alerts) acknowledge(ctx context.Context, call *ops.Call, input *AckInput
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "alert",
+			AggregateType: kindAlert,
 			AggregateID:   alert.ID,
 			Type:          "AlertAcknowledged",
-			Payload:       map[string]any{"unitId": unit},
+			Payload:       map[string]any{keyUnitID: unit},
 		},
 	)
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "alerts.acknowledge",
-			TargetKind:      "alert",
+			TargetKind:      kindAlert,
 			TargetID:        alert.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &alert.Version, Reason: "", Result: "", Before: nil, After: nil,
@@ -729,16 +729,16 @@ func (m Alerts) resolve(ctx context.Context, call *ops.Call, input *ResolveInput
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "alert",
+			AggregateType: kindAlert,
 			AggregateID:   alert.ID,
 			Type:          "AlertResolved",
-			Payload:       map[string]any{"unitId": unit},
+			Payload:       map[string]any{keyUnitID: unit},
 		},
 	)
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "alerts.resolve",
-			TargetKind:      "alert",
+			TargetKind:      kindAlert,
 			TargetID:        alert.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &alert.Version,

@@ -36,7 +36,7 @@ func (m *Module) CountUnits(
 		return fmt.Sprintf("$%d", len(args))
 	}
 
-	conds := []string{"NOT u.archived"}
+	conds := []string{unarchivedUnits}
 	if scoped {
 		conds = append(conds, scopeSQL(call, &args))
 	}
@@ -77,7 +77,7 @@ func (m *Module) CountUnits(
 		unitCounts.Total++
 
 		switch u.Connection {
-		case "online":
+		case connectionOnline:
 			unitCounts.Online++
 		case "offline":
 			unitCounts.Offline++
@@ -88,7 +88,7 @@ func (m *Module) CountUnits(
 		switch u.EffectivePowerState {
 		case "on":
 			unitCounts.PowerOn++
-		case "off":
+		case powerOff:
 			unitCounts.PowerOff++
 		default:
 			unitCounts.PowerUnknown++

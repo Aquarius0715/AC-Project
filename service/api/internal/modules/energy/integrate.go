@@ -30,7 +30,7 @@ type Integration struct {
 func CheckRange(from, to time.Time) error {
 	if from.IsZero() || to.IsZero() || !from.Before(to) || to.Sub(from) > 366*24*time.Hour ||
 		!from.Equal(from.Truncate(time.Minute)) || !to.Equal(to.Truncate(time.Minute)) {
-		return apperr.Fields(map[string]string{"period": "errors.energy_range"})
+		return apperr.Fields(map[string]string{"period": keyEnergyRange})
 	}
 
 	return nil

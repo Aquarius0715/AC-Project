@@ -6,6 +6,8 @@ import (
 	"net"
 	"strings"
 	"testing"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 // TestMailTexts: a notification e-mail names its template and target and links to the recipient's app.
@@ -18,9 +20,9 @@ func TestMailTexts(t *testing.T) {
 	}
 
 	subject, body := notificationMail(
-		"alert",
-		map[string]any{"targetName": "Bedroom AC", "status": "open"},
-		"client",
+		noticeAlert,
+		map[string]any{"targetName": "Bedroom AC", keyStatus: "open"},
+		authz.RoleClient,
 		apps,
 	)
 	if subject != "Alert: Bedroom AC" || !strings.Contains(body, "Status: open") ||
@@ -29,25 +31,30 @@ func TestMailTexts(t *testing.T) {
 	}
 
 	if s, _ := notificationMail(
-		"alert",
+		noticeAlert,
 		map[string]any{"targetName": "Bed\r\nroom AC"},
-		"client",
+		authz.RoleClient,
 		apps,
 	); s != "Alert: Bed room AC" { // a name with a line break
 		t.Errorf("subject on one line: %q", s)
 	}
 
-	if s, _ := notificationMail("unknown", nil, "admin", apps); s != "Notification: unknown" {
+	if s, _ := notificationMail(
+		"unknown",
+		nil,
+		authz.RoleAdmin,
+		apps,
+	); s != "Notification: unknown" {
 		t.Errorf("unknown template: %q", s)
 	}
 
 	for role, app := range map[string]string{
-		"client": "http://c", "contractor": "http://p", "technician": "http://t",
-		"admin": "http://a",
+		authz.RoleClient: "http://c", authz.RoleContractor: "http://p", authz.RoleTechnician: "http://t",
+		authz.RoleAdmin: "http://a",
 	} {
 		// each role's own app
 		if _, body := notificationMail(
-			"alert",
+			noticeAlert,
 			nil,
 			role,
 			apps,

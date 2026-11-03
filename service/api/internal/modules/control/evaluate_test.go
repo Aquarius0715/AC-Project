@@ -18,8 +18,8 @@ func TestCompare(t *testing.T) {
 	}{
 		{"gt", 2, 1, true},
 		{"gt", 1, 1, false},
-		{"gte", 1, 1, true},
-		{"gte", 0.5, 1, false},
+		{opGTE, 1, 1, true},
+		{opGTE, 0.5, 1, false},
 		{"lt", 0.5, 1, true},
 		{"lt", 1, 1, false},
 		{"lte", 1, 1, true},
@@ -36,10 +36,10 @@ func TestConditionMetric(t *testing.T) {
 	for cond, want := range map[string]string{
 		`{"type":"occupancy",` +
 			`"occupied":true}`: "occupied", `{"type":"weather","operator":"gt",` +
-			`"value":30}`: "weather_temperature", `{"type":"location","event":"arrival"}`: "location",
+			`"value":30}`: "weather_temperature", `{"type":"location","event":"arrival"}`: condLocation,
 		`{"type":"peak",` +
-			`"active":true}`: "peak", `{"type":"tariff"}`: "tariff", `{"type":"solar"}`: "solar",
-		`{"type":"battery"}`: "battery", `{"type":"pattern","localTime":"09:00"}`: "", `not json`: "",
+			`"active":true}`: condPeak, `{"type":"tariff"}`: condTariff, `{"type":"solar"}`: condSolar,
+		`{"type":"battery"}`: condBattery, `{"type":"pattern","localTime":"09:00"}`: "", `not json`: "",
 	} {
 		if got := conditionMetric(json.RawMessage(cond)); got != want {
 			t.Errorf("conditionMetric(%s) = %q, want %q", cond, got, want)
@@ -69,17 +69,17 @@ func testFacts(unit uuid.UUID, when time.Time) map[string]Fact {
 			ObservedAt: time.Time{},
 			Quality:    "",
 		}, // overwritten below to keep the literal readable
-		unit.String() + "/tariff":   fact("tariff", "0.6", "MYR_per_kWh", when),
-		unit.String() + "/solar":    fact("solar", "3", "kW", when),
-		unit.String() + "/battery":  fact("battery", "0.5", "kW", when),
-		unit.String() + "/location": fact("location", `"arrival"`, "event", when),
+		unit.String() + "/tariff":   fact(condTariff, "0.6", "MYR_per_kWh", when),
+		unit.String() + "/solar":    fact(condSolar, "3", "kW", when),
+		unit.String() + "/battery":  fact(condBattery, "0.5", "kW", when),
+		unit.String() + "/location": fact(condLocation, `"arrival"`, unitEvent, when),
 		unit.String() + "/weather_temperature": fact(
 			"weather_temperature",
 			"31",
 			"°C",
 			when.Add(-10*time.Minute),
 		), // within the 30-minute TTL
-		unit.String() + "/occupied": fact("occupied", "true", "boolean", when),
+		unit.String() + "/occupied": fact("occupied", "true", valueBoolean, when),
 	}
 }
 
@@ -89,27 +89,27 @@ func TestMatchConditions(t *testing.T) {
 	facts := testFacts(unit, when)
 	facts[unit.String()+"/peak"] = Fact{
 		UnitID:     unit,
-		Metric:     "peak",
+		Metric:     condPeak,
 		Value:      json.RawMessage("true"),
-		Unit:       "boolean",
+		Unit:       valueBoolean,
 		ObservedAt: when,
 		Quality:    "valid",
 	}
 
 	matchCond := func(cond string) string { return match(json.RawMessage(cond), unit, facts, when, kualaLumpur) }
 	for cond, want := range map[string]string{
-		`{"type":"peak","active":true}`: "", `{"type":"peak","active":false}`: "no_match",
-		`{"type":"occupancy","occupied":true}`: "", `{"type":"occupancy","occupied":false}`: "no_match",
+		`{"type":"peak","active":true}`: "", `{"type":"peak","active":false}`: reasonNoMatch,
+		`{"type":"occupancy","occupied":true}`: "", `{"type":"occupancy","occupied":false}`: reasonNoMatch,
 		`{"type":"tariff","operator":"gte",` +
 			`"value":0.5}`: "", `{"type":"tariff","operator":"gt",` +
-			`"value":0.6}`: "no_match", `{"type":"tariff","operator":"lte","value":0.6}`: "",
+			`"value":0.6}`: reasonNoMatch, `{"type":"tariff","operator":"lte","value":0.6}`: "",
 		`{"type":"solar","operator":"gt",` +
 			`"value":2.5}`: "", `{"type":"battery","operator":"lt",` +
-			`"value":1}`: "", `{"type":"battery","operator":"gte","value":1}`: "no_match",
-		`{"type":"location","event":"arrival"}`: "", `{"type":"location","event":"departure"}`: "no_match",
-		`{"type":"pattern","localTime":"09:00"}`: "", `{"type":"pattern","localTime":"09:01"}`: "no_match",
-		`{"type":"weather","operator":"gt","value":30}`: "", `{"type":"weather","operator":"lt","value":30}`: "no_match",
-		`{"type":"unknown"}`: "no_match",
+			`"value":1}`: "", `{"type":"battery","operator":"gte","value":1}`: reasonNoMatch,
+		`{"type":"location","event":"arrival"}`: "", `{"type":"location","event":"departure"}`: reasonNoMatch,
+		`{"type":"pattern","localTime":"09:00"}`: "", `{"type":"pattern","localTime":"09:01"}`: reasonNoMatch,
+		`{"type":"weather","operator":"gt","value":30}`: "", `{"type":"weather","operator":"lt","value":30}`: reasonNoMatch,
+		`{"type":"unknown"}`: reasonNoMatch,
 	} {
 		if got := matchCond(cond); got != want {
 			t.Errorf("match(%s) = %q, want %q", cond, got, want)
@@ -122,7 +122,7 @@ func TestMatchConditions(t *testing.T) {
 		facts,
 		when,
 		"Mars/Olympus",
-	); got != "no_match" {
+	); got != reasonNoMatch {
 		t.Errorf("unknown time zone: %q", got)
 	}
 
@@ -133,7 +133,7 @@ func TestMatchConditions(t *testing.T) {
 		facts,
 		when,
 		kualaLumpur,
-	); got != "missing_data" {
+	); got != reasonMissingData {
 		t.Errorf("no fact for the unit: %q", got)
 	}
 
@@ -143,7 +143,7 @@ func TestMatchConditions(t *testing.T) {
 		facts,
 		when.Add(2*time.Minute),
 		kualaLumpur,
-	); got != "stale" {
+	); got != qualityStale {
 		t.Errorf("a location event of another minute is stale: %q", got)
 	}
 
@@ -153,7 +153,7 @@ func TestMatchConditions(t *testing.T) {
 		facts,
 		when.Add(10*time.Minute),
 		kualaLumpur,
-	); got != "stale" {
+	); got != qualityStale {
 		t.Errorf("a tariff older than its TTL is stale: %q", got)
 	}
 }
@@ -175,9 +175,9 @@ func TestExtrasMatch(t *testing.T) {
 	for raw, want := range map[string]string{
 		`[{"type":"weekday",` +
 			`"weekdays":[7]}]`: "", `[{"type":"weekday","weekdays":[1,` +
-			`6]}]`: "no_match", `[{"type":"weekday","weekdays":[7]},{"type":"occupancy","occupied":true}]`: "",
+			`6]}]`: reasonNoMatch, `[{"type":"weekday","weekdays":[7]},{"type":"occupancy","occupied":true}]`: "",
 		`[{"type":"occupancy",` +
-			`"occupied":false}]`: "no_match", `[{"type":"weather","operator":"gt",` +
+			`"occupied":false}]`: reasonNoMatch, `[{"type":"weather","operator":"gt",` +
 			`"value":30}]`: "", `[]`: "", `{"type":"weekday"}`: "",
 	} {
 		if got := extrasMatch(json.RawMessage(raw), unit, facts, sunday, kualaLumpur); got != want {
@@ -191,7 +191,7 @@ func TestExtrasMatch(t *testing.T) {
 		facts,
 		sunday,
 		"Mars/Olympus",
-	); got != "no_match" {
+	); got != reasonNoMatch {
 		t.Errorf("unknown time zone: %q", got)
 	}
 
@@ -201,7 +201,7 @@ func TestExtrasMatch(t *testing.T) {
 		facts,
 		sunday,
 		kualaLumpur,
-	); got != "missing_data" {
+	); got != reasonMissingData {
 		t.Errorf("missing occupancy data never matches: %q", got)
 	}
 }

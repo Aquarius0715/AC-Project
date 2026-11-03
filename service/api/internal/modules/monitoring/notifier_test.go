@@ -48,7 +48,7 @@ func TestCompareAndRecover(t *testing.T) {
 		op         string
 		at, beyond bool // the value equal to the threshold, and one past it on the limit's side
 	}{
-		{"gt", false, true}, {"gte", true, true}, {"lt", false, true}, {"lte", true, true},
+		{"gt", false, true}, {opGTE, true, true}, {"lt", false, true}, {"lte", true, true},
 	} {
 		past := 29.0
 		if testCase.op == "lt" || testCase.op == "lte" {
@@ -65,7 +65,7 @@ func TestCompareAndRecover(t *testing.T) {
 	}
 
 	high, low := AlertCondition{
-		Operator:          "gte",
+		Operator:          opGTE,
 		Threshold:         28,
 		RecoveryThreshold: 26, Metric: "", DurationSeconds: 0, ActiveWindow: nil, Severity: "",
 	}, AlertCondition{

@@ -14,6 +14,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
@@ -49,7 +50,11 @@ func scanOrg(r pgx.Row) (Organization, error) {
 	return organization, apperr.Wrap(err, "scan (scanOrg)")
 }
 
-var orgKinds = map[string]bool{"customer": true, "contractor": true, "operator": true}
+var orgKinds = map[string]bool{
+	orgKindCustomer:   true,
+	orgKindContractor: true,
+	orgKindOperator:   true,
+}
 
 // organizationsList serves organizations.list.
 //
@@ -95,7 +100,7 @@ func organizationsList(
 
 		if dec.Decode(&filters) != nil {
 			return paging.Page[Organization]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{keyFilters: apperr.KeyInvalid},
 			)
 		}
 	}
@@ -107,7 +112,7 @@ func organizationsList(
 
 		return fmt.Sprintf("$%d", len(args))
 	}
-	conds := []string{"TRUE"}
+	conds := []string{everyRow}
 
 	if filters.Kind != nil {
 		if !orgKinds[*filters.Kind] {
@@ -120,7 +125,7 @@ func organizationsList(
 	}
 
 	if filters.Status != nil {
-		if *filters.Status != "active" && *filters.Status != "inactive" {
+		if *filters.Status != statusActive && *filters.Status != "inactive" {
 			return paging.Page[Organization]{}, apperr.Fields(
 				map[string]string{"filters.status": apperr.KeyInvalid},
 			)
@@ -131,7 +136,7 @@ func organizationsList(
 
 	order, err := paging.OrderBy(
 		query.Sort,
-		map[string]string{"id": "id", "createdAt": "created_at", "updatedAt": "updated_at"},
+		map[string]string{"id": "id", keyCreatedAt: "created_at", keyUpdatedAt: "updated_at"},
 		"id ASC",
 	)
 	if err != nil {
@@ -206,11 +211,11 @@ func (in *OrganizationSave) Validate() map[string]string {
 	}
 
 	if !orgKinds[in.Kind] {
-		fieldErrs["kind"] = apperr.KeyInvalid
+		fieldErrs[keyKind] = apperr.KeyInvalid
 	}
 
-	if in.Status != "active" && in.Status != "inactive" {
-		fieldErrs["status"] = apperr.KeyInvalid
+	if in.Status != statusActive && in.Status != "inactive" {
+		fieldErrs[keyStatus] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -292,7 +297,7 @@ func organizationsSave(
 		call.Audit(
 			ops.AuditEntry{
 				Action:          "organizations.save",
-				TargetKind:      "organization",
+				TargetKind:      scopeOrganization,
 				TargetID:        orgID.String(),
 				NextVersion:     &organization.Version,
 				PreviousVersion: nil,
@@ -304,7 +309,7 @@ func organizationsSave(
 		)
 		call.Emit(
 			ops.Event{
-				AggregateType: "organization",
+				AggregateType: scopeOrganization,
 				AggregateID:   orgID,
 				Type:          "OrganizationChanged",
 				Payload:       nil,
@@ -336,7 +341,7 @@ func organizationsSave(
 		}
 
 		if kind != input.Kind {
-			return Organization{}, apperr.Fields(map[string]string{"kind": apperr.KeyImmutable})
+			return Organization{}, apperr.Fields(map[string]string{keyKind: apperr.KeyImmutable})
 		}
 
 		return Organization{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
@@ -354,7 +359,7 @@ func organizationsSave(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "organizations.save",
-			TargetKind:      "organization",
+			TargetKind:      scopeOrganization,
 			TargetID:        org.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &org.Version, Reason: "", Result: "", Before: nil, After: nil,
@@ -362,7 +367,7 @@ func organizationsSave(
 	)
 	call.Emit(
 		ops.Event{
-			AggregateType: "organization",
+			AggregateType: scopeOrganization,
 			AggregateID:   org.ID,
 			Type:          "OrganizationChanged",
 			Payload:       nil,
@@ -487,7 +492,7 @@ func (Directory) SetGrant(
 			ctx,
 			call.Tx,
 			tenant,
-			"membership",
+			kindMembership,
 			membership,
 			events.QualificationGranted,
 			events.Grant{
@@ -514,7 +519,7 @@ func (Directory) ActiveClientOf(
 		QueryMembers,
 		MembersInput{
 			IDs:            []uuid.UUID{membership},
-			Role:           "client",
+			Role:           authz.RoleClient,
 			OrganizationID: &org,
 			Permission:     "",
 			ClientRole:     "",

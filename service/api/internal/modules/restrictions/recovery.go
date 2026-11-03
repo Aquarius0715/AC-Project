@@ -94,7 +94,7 @@ func saveCases(
 		ctx,
 		txn,
 		restrictionID,
-		"restriction",
+		kindRestriction,
 		restrictionID,
 		events.RecoveryCasesChanged,
 		events.Units{RestrictionID: restrictionID, UnitIDs: units},
@@ -138,7 +138,7 @@ func Observe(
 		return false, nil
 	}
 
-	if err != nil || (state != "released" && state != "cancelled") {
+	if err != nil || (state != stateReleased && state != stateCancelled) {
 		return false, err
 	}
 
@@ -165,7 +165,7 @@ func Observe(
 
 	for i := range cases {
 		c := &cases[i]
-		if c.State != "resolved" && c.UnitID == unit &&
+		if c.State != caseResolved && c.UnitID == unit &&
 			c.ObservedRestrictionID == observed.RestrictionID &&
 			c.ObservedRulesVersion == observed.RulesVersion {
 			c.ObservationEventID, c.SuccessorRestrictionID, found = eventID, successor, true
@@ -195,7 +195,7 @@ func Observe(
 		ctx,
 		txn,
 		observed.RestrictionID,
-		"restriction",
+		kindRestriction,
 		observed.RestrictionID,
 		events.ReconciliationRequired,
 		events.Units{RestrictionID: observed.RestrictionID, UnitIDs: []uuid.UUID{unit}},
@@ -225,17 +225,19 @@ func (m Restrictions) reconcileTerminal(
 		idx := -1
 
 		for i, k := range cases {
-			if k.UnitID == unitID && k.State != "resolved" {
+			if k.UnitID == unitID && k.State != caseResolved {
 				idx = i
 			}
 		}
 
 		if idx < 0 {
-			return nil, apperr.Fields(map[string]string{"unitIds": "errors.reconcile_not_needed"})
+			return nil, apperr.Fields(
+				map[string]string{keyUnitIDs: "errors.reconcile_not_needed"},
+			)
 		}
 
 		recoveryCase := &cases[idx]
-		if recoveryCase.State == "removing" {
+		if recoveryCase.State == caseRemoving {
 			return nil, apperr.E(apperr.Conflict, "errors.command_pending")
 		}
 
@@ -244,7 +246,7 @@ func (m Restrictions) reconcileTerminal(
 			return nil, apperr.Wrap(err, "restrictions.Devices.BoundDevice")
 		}
 
-		if !bound || conn != "online" || power == "off" {
+		if !bound || conn != connectionOnline || power == powerOff {
 			return nil, apperr.E(apperr.Offline, "errors.device_offline")
 		}
 
@@ -271,14 +273,14 @@ func (m Restrictions) reconcileTerminal(
 		switch {
 		case observed == nil ||
 			(recoveryCase.SuccessorRestrictionID != nil && observed.RestrictionID == *recoveryCase.SuccessorRestrictionID):
-			recoveryCase.State, recoveryCase.ResolvedAt = "resolved", &call.Now
+			recoveryCase.State, recoveryCase.ResolvedAt = caseResolved, &call.Now
 		case observed.RestrictionID == recoveryCase.ObservedRestrictionID &&
 			observed.RulesVersion == recoveryCase.ObservedRulesVersion:
 			remove, _ := json.Marshal(
 				map[string]any{
-					"kind":          "remove_restriction",
-					"restrictionId": restriction.ID,
-					"rulesVersion":  recoveryCase.ObservedRulesVersion,
+					keyKind:          actionRemoveRestriction,
+					keyRestrictionID: restriction.ID,
+					keyRulesVersion:  recoveryCase.ObservedRulesVersion,
 				},
 			)
 
@@ -291,7 +293,7 @@ func (m Restrictions) reconcileTerminal(
 				return nil, apperr.E(apperr.Conflict, "errors.unit_busy")
 			}
 
-			recoveryCase.State, recoveryCase.CommandIDs = "removing", append(
+			recoveryCase.State, recoveryCase.CommandIDs = caseRemoving, append(
 				recoveryCase.CommandIDs,
 				cmd,
 			)
@@ -318,7 +320,7 @@ func (m Restrictions) reconcileTerminal(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "restrictions.reconcile",
-			TargetKind:      "restriction",
+			TargetKind:      kindRestriction,
 			TargetID:        restriction.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
@@ -371,7 +373,7 @@ func recoveryAcknowledged(
 	when time.Time,
 ) (bool, error) {
 	cases, state, _, err := loadCases(ctx, txn, restriction, true)
-	if err != nil || (state != "released" && state != "cancelled") {
+	if err != nil || (state != stateReleased && state != stateCancelled) {
 		return false, err
 	}
 
@@ -379,8 +381,8 @@ func recoveryAcknowledged(
 
 	for i := range cases {
 		for _, id := range cases[i].CommandIDs {
-			if id == command && cases[i].State == "removing" {
-				cases[i].State, cases[i].ResolvedAt, hit = "resolved", &when, true
+			if id == command && cases[i].State == caseRemoving {
+				cases[i].State, cases[i].ResolvedAt, hit = caseResolved, &when, true
 			}
 		}
 	}
@@ -428,7 +430,7 @@ func recoveryEnded(ctx context.Context, txn pgx.Tx, commands []uuid.UUID, now ti
 
 	for _, restrictionID := range ids {
 		cases, state, _, err := loadCases(ctx, txn, restrictionID, true)
-		if err != nil || (state != "released" && state != "cancelled") {
+		if err != nil || (state != stateReleased && state != stateCancelled) {
 			if err != nil {
 				return err
 			}
@@ -441,7 +443,7 @@ func recoveryEnded(ctx context.Context, txn pgx.Tx, commands []uuid.UUID, now ti
 		for i := range cases {
 			for _, id := range cases[i].CommandIDs {
 				for _, done := range commands {
-					if id == done && cases[i].State == "removing" {
+					if id == done && cases[i].State == caseRemoving {
 						cases[i].State, hit = "pending", true
 					}
 				}

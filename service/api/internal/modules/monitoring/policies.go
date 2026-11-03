@@ -19,6 +19,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/control"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -157,13 +158,23 @@ func rule(
 
 // DefaultRules are the six IR120 default rules in their fixed order.
 var DefaultRules = []DefaultAlertRule{
-	rule("ventilation_co2", "Ventilation", "air_quality", "co2", "gte", 1000, 900, 600, "warning"),
-	rule("dust_pm25", "Dust / filter", "air_quality", "pm25", "gte", 35, 30, 1800, "warning"),
+	rule(
+		"ventilation_co2",
+		"Ventilation",
+		"air_quality",
+		metricCO2,
+		opGTE,
+		1000,
+		900,
+		600,
+		"warning",
+	),
+	rule("dust_pm25", "Dust / filter", "air_quality", metricPM25, opGTE, 35, 30, 1800, "warning"),
 	rule(
 		"refrigerant_low_pressure",
 		"Refrigerant low pressure",
 		"fault",
-		"refrigerant_pressure",
+		metricRefrigerantPressure,
 		"lte",
 		350,
 		380,
@@ -175,7 +186,7 @@ var DefaultRules = []DefaultAlertRule{
 		"Compressor short-cycling",
 		"fault",
 		"compressor_cycles",
-		"gte",
+		opGTE,
 		4,
 		3,
 		10800,
@@ -186,7 +197,7 @@ var DefaultRules = []DefaultAlertRule{
 		"Clogged filter",
 		"maintenance",
 		"airflow_drop",
-		"gte",
+		opGTE,
 		30,
 		20,
 		3600,
@@ -197,7 +208,7 @@ var DefaultRules = []DefaultAlertRule{
 		"AC offline",
 		"connection",
 		"heartbeat_gap",
-		"gte",
+		opGTE,
 		15,
 		1,
 		1,
@@ -207,22 +218,22 @@ var DefaultRules = []DefaultAlertRule{
 
 var (
 	hqMetrics = map[string]bool{
-		"temperature":          true,
-		"humidity":             true,
-		"co2":                  true,
-		"pm25":                 true,
-		"refrigerant_pressure": true,
-		"vibration":            true,
-		"power":                true,
+		metricTemperature:         true,
+		metricHumidity:            true,
+		metricCO2:                 true,
+		metricPM25:                true,
+		metricRefrigerantPressure: true,
+		metricVibration:           true,
+		metricPower:               true,
 	}
 	clientMetrics = map[string]bool{
-		"temperature": true,
-		"humidity":    true,
-		"co2":         true,
-		"pm25":        true,
-		"power":       true,
+		metricTemperature: true,
+		metricHumidity:    true,
+		metricCO2:         true,
+		metricPM25:        true,
+		metricPower:       true,
 	}
-	operators  = map[string]bool{"gt": true, "gte": true, "lt": true, "lte": true}
+	operators  = map[string]bool{"gt": true, opGTE: true, "lt": true, "lte": true}
 	channelSet = map[string]bool{"inApp": true, "email": true, "whatsapp": true}
 	hhmm       = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)
 )
@@ -245,7 +256,7 @@ func (a *AlertCondition) validate(
 		fieldErrs[prefix+"threshold"] = apperr.KeyInvalid
 	}
 
-	up := a.Operator == "gt" || a.Operator == "gte"
+	up := a.Operator == "gt" || a.Operator == opGTE
 	if (up && !(a.RecoveryThreshold < a.Threshold)) ||
 		(!up && !(a.RecoveryThreshold > a.Threshold)) {
 		fieldErrs[prefix+"recoveryThreshold"] = "error.recoveryDirection"
@@ -337,9 +348,9 @@ func (p Policy) MarshalJSON() ([]byte, error) {
 		"id":                p.ID,
 		"tenantId":          p.TenantID,
 		"version":           p.Version,
-		"createdAt":         p.CreatedAt,
-		"updatedAt":         p.UpdatedAt,
-		"kind":              p.Kind,
+		keyCreatedAt:        p.CreatedAt,
+		keyUpdatedAt:        p.UpdatedAt,
+		keyKind:             p.Kind,
 		"name":              p.Name,
 		"unitIds":           p.UnitIDs,
 		"ownerMembershipId": p.OwnerMembershipID,
@@ -350,8 +361,8 @@ func (p Policy) MarshalJSON() ([]byte, error) {
 		"disabledReason":    p.DisabledReason,
 	}
 	switch p.Kind {
-	case "alert":
-		fields["customerId"] = p.CustomerID
+	case kindAlert:
+		fields[keyCustomerID] = p.CustomerID
 		fields["recipientMembershipIds"] = p.RecipientMembershipIDs
 		fields["channels"] = p.Channels
 		fields["escalateAfterMinutes"], fields["cooldownMinutes"] = p.EscalateAfterMinutes, p.CooldownMinutes
@@ -359,9 +370,9 @@ func (p Policy) MarshalJSON() ([]byte, error) {
 		fields["threshold"], fields["recoveryThreshold"] = p.Condition.Threshold, p.Condition.RecoveryThreshold
 		fields["durationSeconds"], fields["activeWindow"] = p.Condition.DurationSeconds, p.Condition.ActiveWindow
 		fields["severity"] = p.Condition.Severity
-	case "default_alert":
-		fields["customerId"], fields["rules"], fields["ruleSettings"] = nil, p.Rules, p.RuleSettings
-	case "automation":
+	case kindDefaultAlert:
+		fields[keyCustomerID], fields["rules"], fields["ruleSettings"] = nil, p.Rules, p.RuleSettings
+	case kindAutomation:
 		fields["condition"], fields["action"] = p.AutoCondition, p.Action
 	}
 
@@ -432,7 +443,7 @@ const autoPolicyCols = `p.id, p.tenant_id, p.version, p.created_at, p.updated_at
 
 func scanAutoPolicy(row pgx.Row) (Policy, error) {
 	policy := Policy{
-		Kind:              "automation",
+		Kind:              kindAutomation,
 		ID:                uuid.UUID{},
 		TenantID:          uuid.UUID{},
 		Version:           0,
@@ -507,7 +518,7 @@ func grantedKinds(c *ops.Call) map[string]bool {
 
 // clientCustomer returns the customer of a client caller (uuid.Nil for other roles).
 func (m Policies) clientCustomer(ctx context.Context, c *ops.Call) (uuid.UUID, error) {
-	if c.Principal.Role != "client" {
+	if c.Principal.Role != authz.RoleClient {
 		return uuid.Nil, nil
 	}
 
@@ -529,7 +540,7 @@ func (m Policies) decorate(
 	var alertIDs []uuid.UUID
 
 	for _, p := range policies {
-		if p.Kind == "alert" {
+		if p.Kind == kindAlert {
 			alertIDs = append(alertIDs, p.ID)
 		}
 	}
@@ -548,7 +559,7 @@ func (m Policies) decorate(
 	}
 
 	for idx := range policies {
-		if policies[idx].Kind != "default_alert" {
+		if policies[idx].Kind != kindDefaultAlert {
 			continue
 		}
 
@@ -606,7 +617,7 @@ func (m Policies) decorate(
 
 // ---- policies.list ----
 
-var kindRank = map[string]int{"default_alert": 0, "alert": 1, "automation": 2}
+var kindRank = map[string]int{kindDefaultAlert: 0, kindAlert: 1, kindAutomation: 2}
 
 // list serves policies.list.
 //
@@ -660,12 +671,12 @@ func (m Policies) list(
 
 		if dec.Decode(&filters) != nil {
 			return paging.Page[Policy]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{keyFilters: apperr.KeyInvalid},
 			)
 		}
 	}
 
-	if filters.Kind != nil && kindRank[*filters.Kind] == 0 && *filters.Kind != "default_alert" {
+	if filters.Kind != nil && kindRank[*filters.Kind] == 0 && *filters.Kind != kindDefaultAlert {
 		return paging.Page[Policy]{}, apperr.Fields(
 			map[string]string{"filters.kind": apperr.KeyInvalid},
 		)
@@ -682,13 +693,13 @@ func (m Policies) list(
 		switch query.Sort.Field {
 		case "id":
 			less = func(a, b Policy) int { return dir * strings.Compare(a.ID.String(), b.ID.String()) }
-		case "createdAt":
+		case keyCreatedAt:
 			less = func(a, b Policy) int { return dir * a.CreatedAt.Compare(b.CreatedAt) }
 		case "name":
 			less = func(a, b Policy) int { return dir * strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) }
 		case "priority":
 			less = func(a, b Policy) int { return dir * (a.Priority - b.Priority) }
-		case "updatedAt":
+		case keyUpdatedAt:
 			less = func(a, b Policy) int { return dir * a.UpdatedAt.Compare(b.UpdatedAt) }
 		default:
 			return paging.Page[Policy]{}, apperr.Fields(
@@ -740,7 +751,7 @@ func (m Policies) list(
 
 	var all []Policy
 
-	if kinds["alert"] || kinds["default_alert"] {
+	if kinds[kindAlert] || kinds[kindDefaultAlert] {
 		var args []any
 
 		add := func(v any) string {
@@ -751,14 +762,14 @@ func (m Policies) list(
 
 		var alertKinds []string
 
-		for _, k := range []string{"alert", "default_alert"} {
-			if kinds[k] && (k != "default_alert" || units == nil) {
+		for _, k := range []string{kindAlert, kindDefaultAlert} {
+			if kinds[k] && (k != kindDefaultAlert || units == nil) {
 				alertKinds = append(alertKinds, k)
 			}
 		}
 
 		conds := []string{"p.kind = ANY(" + add(alertKinds) + ")"}
-		if own != uuid.Nil || call.Principal.Role == "client" {
+		if own != uuid.Nil || call.Principal.Role == authz.RoleClient {
 			conds = append(conds, "(p.kind = 'default_alert' OR p.customer_id = "+add(own)+")")
 		}
 
@@ -815,7 +826,7 @@ func (m Policies) list(
 		}
 	}
 
-	if kinds["automation"] {
+	if kinds[kindAutomation] {
 		autos, err := m.automationPolicies(ctx, call, filters.Enabled)
 		if err != nil {
 			return paging.Page[Policy]{}, err
@@ -881,7 +892,7 @@ func (m Policies) list(
 	}
 
 	settingsFor := filters.CustomerID
-	if call.Principal.Role == "client" {
+	if call.Principal.Role == authz.RoleClient {
 		settingsFor = &own
 	}
 
@@ -955,7 +966,7 @@ type PolicyIDInput struct {
 // Validate implements ops.Validator.
 func (in *PolicyIDInput) Validate() map[string]string {
 	if in.PolicyID == uuid.Nil {
-		return map[string]string{"policyId": apperr.KeyRequired}
+		return map[string]string{keyPolicyID: apperr.KeyRequired}
 	}
 
 	return nil
@@ -1007,7 +1018,7 @@ func (m Policies) loadKinds(
 		return policy, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
-	if call.Principal.Role == "client" && policy.Kind == "alert" {
+	if call.Principal.Role == authz.RoleClient && policy.Kind == kindAlert {
 		own, err := m.clientCustomer(ctx, call)
 		if err != nil {
 			return policy, err
@@ -1053,7 +1064,7 @@ func (m Policies) get(ctx context.Context, call *ops.Call, in *PolicyIDInput) (P
 
 	var settingsFor *uuid.UUID
 
-	if call.Principal.Role == "client" {
+	if call.Principal.Role == authz.RoleClient {
 		own, err := m.clientCustomer(ctx, call)
 		if err != nil {
 			return policy, err
@@ -1108,7 +1119,7 @@ func (in *SaveInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 
 	switch in.Kind {
-	case "default_alert":
+	case kindDefaultAlert:
 		if in.ID == nil {
 			fieldErrs["id"] = apperr.KeyRequired
 		}
@@ -1131,9 +1142,9 @@ func (in *SaveInput) Validate() map[string]string {
 		}
 
 		return fieldErrs
-	case "alert", "automation":
+	case kindAlert, kindAutomation:
 	default:
-		fieldErrs["kind"] = apperr.KeyInvalid
+		fieldErrs[keyKind] = apperr.KeyInvalid
 
 		return fieldErrs
 	}
@@ -1164,7 +1175,7 @@ func (in *SaveInput) Validate() map[string]string {
 		fieldErrs["priority"] = apperr.KeyRange
 	}
 
-	if in.Kind == "automation" {
+	if in.Kind == kindAutomation {
 		if n := len(in.UnitIDs); n < 1 || n > 500 || hasDup(in.UnitIDs) {
 			fieldErrs["unitIds"] = apperr.KeyInvalid
 		}
@@ -1180,17 +1191,17 @@ func (in *SaveInput) Validate() map[string]string {
 		if in.CustomerID != nil || in.Metric != nil || in.RecipientMembershipIDs != nil ||
 			in.Channels != nil ||
 			in.Rules != nil {
-			fieldErrs["kind"] = "error.fieldsOfOtherKind"
+			fieldErrs[keyKind] = "error.fieldsOfOtherKind"
 		}
 	}
 
-	if in.Kind == "alert" {
+	if in.Kind == kindAlert {
 		if in.Condition != nil || in.Action != nil {
-			fieldErrs["kind"] = "error.fieldsOfOtherKind"
+			fieldErrs[keyKind] = "error.fieldsOfOtherKind"
 		}
 
 		if in.CustomerID == nil {
-			fieldErrs["customerId"] = apperr.KeyRequired
+			fieldErrs[keyCustomerID] = apperr.KeyRequired
 		}
 
 		if in.UnitIDs != nil {
@@ -1296,9 +1307,9 @@ func (m Policies) save(ctx context.Context, call *ops.Call, input *SaveInput) (P
 	}
 
 	switch input.Kind {
-	case "default_alert":
+	case kindDefaultAlert:
 		return m.saveDefault(ctx, call, input)
-	case "automation":
+	case kindAutomation:
 		return m.saveAutomation(ctx, call, input)
 	}
 
@@ -1315,8 +1326,8 @@ func (m Policies) saveDefault(
 		return policy, err
 	}
 
-	if policy.Kind != "default_alert" {
-		return policy, apperr.Fields(map[string]string{"kind": apperr.KeyKindFixed})
+	if policy.Kind != kindDefaultAlert {
+		return policy, apperr.Fields(map[string]string{keyKind: apperr.KeyKindFixed})
 	}
 
 	if policy.Version != *call.ExpectedVersion {
@@ -1342,7 +1353,7 @@ func (m Policies) saveDefault(
 func (m Policies) saveAlert(ctx context.Context, call *ops.Call, input *SaveInput) (Policy, error) {
 	cond := input.condition()
 
-	if call.Principal.Role == "client" {
+	if call.Principal.Role == authz.RoleClient {
 		fe := map[string]string{}
 		cond.validate(clientMetrics, "", fe)
 
@@ -1370,7 +1381,7 @@ func (m Policies) saveAlert(ctx context.Context, call *ops.Call, input *SaveInpu
 	}
 
 	if !active {
-		return Policy{}, apperr.Fields(map[string]string{"customerId": apperr.KeyInactiveCustomer})
+		return Policy{}, apperr.Fields(map[string]string{keyCustomerID: apperr.KeyInactiveCustomer})
 	}
 
 	bad, err := m.Recipients.NonReaders(ctx, call, input.RecipientMembershipIDs, org)
@@ -1411,12 +1422,12 @@ func (m Policies) saveAlert(ctx context.Context, call *ops.Call, input *SaveInpu
 		return policy, err
 	}
 
-	if policy.Kind != "alert" {
-		return policy, apperr.Fields(map[string]string{"kind": apperr.KeyKindFixed})
+	if policy.Kind != kindAlert {
+		return policy, apperr.Fields(map[string]string{keyKind: apperr.KeyKindFixed})
 	}
 
 	if policy.CustomerID == nil || *policy.CustomerID != *input.CustomerID {
-		return policy, apperr.Fields(map[string]string{"customerId": "error.ownerFixed"})
+		return policy, apperr.Fields(map[string]string{keyCustomerID: "error.ownerFixed"})
 	}
 
 	if policy.Version != *call.ExpectedVersion {
@@ -1547,8 +1558,8 @@ func (m Policies) saveAutomation(
 			return policy, err
 		}
 
-		if policy.Kind != "automation" {
-			return policy, apperr.Fields(map[string]string{"kind": apperr.KeyKindFixed})
+		if policy.Kind != kindAutomation {
+			return policy, apperr.Fields(map[string]string{keyKind: apperr.KeyKindFixed})
 		}
 
 		if policy.Version != *call.ExpectedVersion {
@@ -1619,16 +1630,16 @@ func (m Policies) finishSave(
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "policy",
+			AggregateType: kindPolicy,
 			AggregateID:   policy.ID,
 			Type:          event,
-			Payload:       map[string]any{"kind": policy.Kind},
+			Payload:       map[string]any{keyKind: policy.Kind},
 		},
 	)
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "policies.save",
-			TargetKind:      "policy",
+			TargetKind:      kindPolicy,
 			TargetID:        policy.ID.String(),
 			PreviousVersion: prev,
 			NextVersion:     &policy.Version, Reason: "", Result: "", Before: nil, After: nil,
@@ -1676,15 +1687,15 @@ type Deleted struct {
 func (m Policies) delete(ctx context.Context, call *ops.Call, in *PolicyIDInput) (Deleted, error) {
 	kinds := grantedKinds(call)
 	// the default policy is visible to alert writers so its delete is VALIDATION (IR108)
-	kinds["default_alert"] = kinds["alert"]
+	kinds[kindDefaultAlert] = kinds[kindAlert]
 
 	policy, err := m.loadKinds(ctx, call, in.PolicyID, true, kinds)
 	if err != nil {
 		return Deleted{}, err
 	}
 
-	if policy.Kind == "default_alert" {
-		return Deleted{}, apperr.Fields(map[string]string{"policyId": "error.defaultPolicyFixed"})
+	if policy.Kind == kindDefaultAlert {
+		return Deleted{}, apperr.Fields(map[string]string{keyPolicyID: "error.defaultPolicyFixed"})
 	}
 
 	if policy.Version != *call.ExpectedVersion {
@@ -1692,7 +1703,7 @@ func (m Policies) delete(ctx context.Context, call *ops.Call, in *PolicyIDInput)
 	}
 
 	switch policy.Kind {
-	case "alert":
+	case kindAlert:
 		err := m.Units.DetachPolicy(ctx, call, policy.ID)
 		if err != nil {
 			return Deleted{}, apperr.Wrap(err, "monitoring.PolicyUnits.DetachPolicy")
@@ -1706,7 +1717,7 @@ func (m Policies) delete(ctx context.Context, call *ops.Call, in *PolicyIDInput)
 		if err != nil {
 			return Deleted{}, apperr.Wrap(err, "delete monitoring.alert_policies")
 		}
-	case "automation":
+	case kindAutomation:
 		_, err := call.Tx.Exec(
 			ctx,
 			`DELETE FROM control.automation_policies WHERE id = $1`,
@@ -1719,16 +1730,16 @@ func (m Policies) delete(ctx context.Context, call *ops.Call, in *PolicyIDInput)
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "policy",
+			AggregateType: kindPolicy,
 			AggregateID:   policy.ID,
 			Type:          "PolicyDeleted",
-			Payload:       map[string]any{"kind": policy.Kind},
+			Payload:       map[string]any{keyKind: policy.Kind},
 		},
 	)
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "policies.delete",
-			TargetKind:      "policy",
+			TargetKind:      kindPolicy,
 			TargetID:        policy.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     nil,
@@ -1757,11 +1768,11 @@ type SetDefaultRuleInput struct {
 func (in *SetDefaultRuleInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.PolicyID == uuid.Nil {
-		fieldErrs["policyId"] = apperr.KeyRequired
+		fieldErrs[keyPolicyID] = apperr.KeyRequired
 	}
 
 	if in.CustomerID == uuid.Nil {
-		fieldErrs["customerId"] = apperr.KeyRequired
+		fieldErrs[keyCustomerID] = apperr.KeyRequired
 	}
 
 	if in.Enabled == nil {
@@ -1820,7 +1831,7 @@ func (m Policies) setDefaultRule(
 	call *ops.Call,
 	input *SetDefaultRuleInput,
 ) (RuleSetting, error) {
-	if call.Principal.Role == "client" {
+	if call.Principal.Role == authz.RoleClient {
 		own, err := m.clientCustomer(ctx, call)
 		if err != nil {
 			return RuleSetting{}, err
@@ -1847,8 +1858,10 @@ func (m Policies) setDefaultRule(
 		return RuleSetting{}, apperr.Wrap(err, "select monitoring.alert_policies")
 	}
 
-	if kind != "default_alert" {
-		return RuleSetting{}, apperr.Fields(map[string]string{"policyId": "error.notDefaultPolicy"})
+	if kind != kindDefaultAlert {
+		return RuleSetting{}, apperr.Fields(
+			map[string]string{keyPolicyID: "error.notDefaultPolicy"},
+		)
 	}
 
 	_, _, found, customerStateErr := m.Units.CustomerState(ctx, call, input.CustomerID)
@@ -1893,13 +1906,13 @@ func (m Policies) setDefaultRule(
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "policy",
+			AggregateType: kindPolicy,
 			AggregateID:   input.PolicyID,
 			Type:          "DefaultRuleChanged",
 			Payload: map[string]any{
-				"ruleKey":    input.RuleKey,
-				"customerId": input.CustomerID,
-				"enabled":    ruleSetting.Enabled,
+				"ruleKey":     input.RuleKey,
+				keyCustomerID: input.CustomerID,
+				"enabled":     ruleSetting.Enabled,
 			},
 		},
 	)

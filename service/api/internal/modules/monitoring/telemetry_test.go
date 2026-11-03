@@ -22,7 +22,7 @@ func TestSeriesInputFilters(t *testing.T) {
 			From:          from,
 			To:            from.Add(time.Hour),
 			UnitIDs:       []uuid.UUID{uuid.New()},
-			Metric:        "temperature",
+			Metric:        metricTemperature,
 			SpaceID:       nil,
 			SensorID:      nil,
 			BucketMinutes: nil,

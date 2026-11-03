@@ -31,11 +31,11 @@ func EventHandlers() map[string]events.Handler {
 					[]map[string]any{
 						{
 							"id":            uuid.New(),
-							"policyId":      nil,
+							keyPolicyID:     nil,
 							"eventId":       event.ID,
 							"occurredAt":    filterReminder.At,
-							"reason":        "no_recipient",
-							"deliveryState": "failed",
+							"reason":        reasonNoRecipient,
+							"deliveryState": outcomeFailed,
 						},
 					},
 				)

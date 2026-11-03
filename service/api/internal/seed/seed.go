@@ -381,7 +381,7 @@ func Apply(ctx context.Context, txn pgx.Tx, f *Fixture) error {
 
 	for _, m := range f.DemoSeed.Capabilities {
 		var temp any
-		if len(m.Temperature) > 0 && string(m.Temperature) != "null" {
+		if len(m.Temperature) > 0 && string(m.Temperature) != jsonNull {
 			temp = []byte(m.Temperature)
 		}
 
@@ -526,14 +526,14 @@ func Apply(ctx context.Context, txn pgx.Tx, f *Fixture) error {
 		}
 
 		state := []byte(u.ObservedState)
-		if len(state) == 0 || string(state) == "null" {
+		if len(state) == 0 || string(state) == jsonNull {
 			state = []byte(
 				`{"power":null,"celsius":null,"mode":null,"fanLevel":null,"observedAt":null}`,
 			)
 		}
 
 		var restr any
-		if len(u.ObservedRestriction) > 0 && string(u.ObservedRestriction) != "null" {
+		if len(u.ObservedRestriction) > 0 && string(u.ObservedRestriction) != jsonNull {
 			restr = []byte(u.ObservedRestriction)
 		}
 
@@ -863,7 +863,7 @@ func applyPolicies(ex func(string, ...any) error, f *Fixture) error {
 			return fmt.Errorf("default policy %s: %w", a.TenantID, err)
 		}
 
-		if a.TenantID == "tenant-a" {
+		if a.TenantID == demoTenant {
 			err := ex(
 				`INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id, enabled,
 					changed_by_membership_id, reason)
@@ -884,7 +884,7 @@ func applyPolicies(ex func(string, ...any) error, f *Fixture) error {
 
 // DefaultPolicyID is the ID of a tenant's default alert policy (policy-default for tenant-a).
 func DefaultPolicyID(tenant string) uuid.UUID {
-	if tenant == "tenant-a" {
+	if tenant == demoTenant {
 		return ID("policy-default")
 	}
 
@@ -1136,7 +1136,7 @@ func applyBusiness(ex func(string, ...any) error, fixture *Fixture) error {
 				"restrictionId": ID(str(r, "id")).String(),
 				"rulesVersion":  str(r, "rulesVersion"),
 				"policy":        r["policy"],
-				"observedAt":    u["observedAt"],
+				keyObservedAt:   u[keyObservedAt],
 			}
 
 			var observed any
@@ -1159,7 +1159,7 @@ func applyBusiness(ex func(string, ...any) error, fixture *Fixture) error {
 				ids(u["applyCommandIds"]),
 				ids(u["releaseCommandIds"]),
 				observed,
-				opt(u, "observedAt"),
+				opt(u, keyObservedAt),
 				opt(u, "pendingReason"),
 			)
 			if err != nil {
@@ -1261,7 +1261,7 @@ func applyBusiness(ex func(string, ...any) error, fixture *Fixture) error {
 				"evidenceKind",
 			),
 			str(a, "evidenceText"),
-			str(a, "observedAt"),
+			str(a, keyObservedAt),
 			str(a, "detectedAt"),
 			optID(a, "previousAlertId"),
 		)

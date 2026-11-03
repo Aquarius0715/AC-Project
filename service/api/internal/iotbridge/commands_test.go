@@ -122,7 +122,7 @@ func TestStateTriggerFromAHeartbeat(t *testing.T) {
 		},
 		when,
 	)
-	if err != nil || trigger.EventType != "state" || trigger.DeviceID == nil ||
+	if err != nil || trigger.EventType != eventState || trigger.DeviceID == nil ||
 		*trigger.DeviceID != dev ||
 		trigger.State == nil ||
 		*trigger.State.Celsius != 24 ||
@@ -134,7 +134,7 @@ func TestStateTriggerFromAHeartbeat(t *testing.T) {
 		devicesim.Heartbeat{DeviceID: dev.String(), At: time.Time{}, Firmware: "", State: nil},
 		when,
 	)
-	if err != nil || trigger.EventType != "state" || trigger.State == nil ||
+	if err != nil || trigger.EventType != eventState || trigger.State == nil ||
 		*trigger.State != (devicesim.ReportedState{Power: nil, Celsius: nil, Mode: nil, FanLevel: nil}) ||
 		!trigger.OccurredAt.Equal(when) {
 		t.Errorf("a heartbeat without a state: %+v err=%v", trigger, err)

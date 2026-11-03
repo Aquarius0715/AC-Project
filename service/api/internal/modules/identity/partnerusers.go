@@ -16,6 +16,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -123,10 +124,10 @@ func partnerUsersList(
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&filters) != nil ||
-			(filters.Status != nil && !slices.Contains([]string{"invited", "active", "disabled"}, *filters.Status)) ||
-			(filters.PartnerRole != nil && *filters.PartnerRole != "contractor" && *filters.PartnerRole != "technician") {
+			(filters.Status != nil && !slices.Contains([]string{statusInvited, statusActive, statusDisabled}, *filters.Status)) ||
+			(filters.PartnerRole != nil && *filters.PartnerRole != authz.RoleContractor && *filters.PartnerRole != authz.RoleTechnician) {
 			return paging.Page[PartnerUser]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{keyFilters: apperr.KeyInvalid},
 			)
 		}
 	}
@@ -134,12 +135,12 @@ func partnerUsersList(
 	order, err := paging.OrderBy(
 		query.Sort,
 		map[string]string{
-			"id":        "x.id",
-			"name":      "lower(COALESCE(x.display_name, x.email::text))",
-			"email":     "x.email",
-			"invitedAt": "x.invited_at",
-			"createdAt": "x.created_at",
-			"updatedAt": "x.updated_at",
+			"id":         "x.id",
+			"name":       "lower(COALESCE(x.display_name, x.email::text))",
+			keyEmail:     "x.email",
+			"invitedAt":  "x.invited_at",
+			keyCreatedAt: "x.created_at",
+			keyUpdatedAt: "x.updated_at",
 		},
 		"lower(COALESCE(x.display_name, x.email::text)) ASC, x.id ASC",
 	)
@@ -237,7 +238,8 @@ func markBooked(ctx context.Context, call *ops.Call, items []PartnerUser) error 
 	var ids []uuid.UUID
 
 	for _, x := range items {
-		if x.PartnerRole == "technician" && x.Status == "active" && x.MembershipID != nil {
+		if x.PartnerRole == authz.RoleTechnician && x.Status == statusActive &&
+			x.MembershipID != nil {
 			ids = append(ids, *x.MembershipID)
 		}
 	}
@@ -309,21 +311,21 @@ func (in *PartnerUserInput) Validate() map[string]string {
 	)
 	if err != nil || a.Address != in.Email ||
 		len(in.Email) > 254 {
-		fieldErrs["email"] = apperr.KeyInvalid
+		fieldErrs[keyEmail] = apperr.KeyInvalid
 	}
 
-	if in.PartnerRole != "contractor" && in.PartnerRole != "technician" {
+	if in.PartnerRole != authz.RoleContractor && in.PartnerRole != authz.RoleTechnician {
 		fieldErrs["partnerRole"] = apperr.KeyInvalid
 	}
 
-	if in.Status != nil && *in.Status != "active" && *in.Status != "disabled" {
-		fieldErrs["status"] = apperr.KeyInvalid
+	if in.Status != nil && *in.Status != statusActive && *in.Status != statusDisabled {
+		fieldErrs[keyStatus] = apperr.KeyInvalid
 	}
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
 		if n := utf8.RuneCountInString(*in.Reason); n < 1 || n > 1000 {
-			fieldErrs["reason"] = apperr.KeyLength
+			fieldErrs[keyReason] = apperr.KeyLength
 		}
 	}
 
@@ -335,14 +337,14 @@ func (in *PartnerUserInput) Validate() map[string]string {
 			fieldErrs["displayName"] = apperr.KeyLength
 		}
 
-		if in.PartnerRole == "technician" && in.AccessUntil == nil {
+		if in.PartnerRole == authz.RoleTechnician && in.AccessUntil == nil {
 			fieldErrs["accessUntil"] = apperr.KeyRequired
 		}
 	} else if in.DisplayName != nil {
 		fieldErrs["displayName"] = apperr.KeyNotAllowed
 	}
 
-	if in.AccessUntil != nil && in.PartnerRole != "technician" {
+	if in.AccessUntil != nil && in.PartnerRole != authz.RoleTechnician {
 		fieldErrs["accessUntil"] = apperr.KeyNotAllowed
 	}
 
@@ -415,13 +417,13 @@ func notSelfOrLast(ctx context.Context, c *ops.Call, partnerUser PartnerUser) er
 		return apperr.E(apperr.Conflict, "errors.own_account")
 	}
 
-	if partnerUser.PartnerRole == "technician" && partnerUser.Status == "active" &&
+	if partnerUser.PartnerRole == authz.RoleTechnician && partnerUser.Status == statusActive &&
 		partnerUser.MembershipID != nil {
 		booked, err := ops.Query[bool](
 			ctx,
 			c,
 			"maintenance.technicianBooked",
-			map[string]any{"membershipId": *partnerUser.MembershipID},
+			map[string]any{keyMembershipID: *partnerUser.MembershipID},
 		)
 		if err != nil {
 			return err
@@ -432,7 +434,7 @@ func notSelfOrLast(ctx context.Context, c *ops.Call, partnerUser PartnerUser) er
 		}
 	}
 
-	if partnerUser.PartnerRole == "contractor" && partnerUser.Status == "active" {
+	if partnerUser.PartnerRole == authz.RoleContractor && partnerUser.Status == statusActive {
 		ok, err := otherActiveContractor(ctx, c, partnerUser.OrganizationID, partnerUser.ID)
 		if err != nil {
 			return err
@@ -499,16 +501,20 @@ func partnerUsersSave(
 	}
 
 	if dup {
-		return PartnerUser{}, apperr.Fields(map[string]string{"email": "errors.email_taken"})
+		return PartnerUser{}, apperr.Fields(map[string]string{keyEmail: keyEmailTaken})
 	}
 
 	if input.ID == nil { // a new user: the account is created now and gets the set-up e-mail (IR461)
 		if input.Status != nil {
-			return PartnerUser{}, apperr.Fields(map[string]string{"status": apperr.KeyNotAllowed})
+			return PartnerUser{}, apperr.Fields(
+				map[string]string{keyStatus: apperr.KeyNotAllowed},
+			)
 		}
 
 		if input.Reason != nil {
-			return PartnerUser{}, apperr.Fields(map[string]string{"reason": apperr.KeyNotAllowed})
+			return PartnerUser{}, apperr.Fields(
+				map[string]string{keyReason: apperr.KeyNotAllowed},
+			)
 		}
 
 		acct := newAccount{
@@ -522,17 +528,17 @@ func partnerUsersSave(
 			ValidUntil:  nil,
 			Scopes:      nil,
 		}
-		if input.PartnerRole == "technician" {
+		if input.PartnerRole == authz.RoleTechnician {
 			if !accessUntilOK(call.Now, *input.AccessUntil) {
 				return PartnerUser{}, apperr.Fields(
 					map[string]string{"accessUntil": apperr.KeyRange},
 				)
 			}
 
-			ext := "external"
+			ext := employmentExternal
 			acct.Employment, acct.ValidUntil, acct.Scopes = &ext, input.AccessUntil, []ScopeRef{}
 		} else {
-			acct.Scopes = []ScopeRef{{Kind: "organization", ID: call.Principal.OrgID}}
+			acct.Scopes = []ScopeRef{{Kind: scopeOrganization, ID: call.Principal.OrgID}}
 		}
 
 		_, membership, err := createAccount(ctx, call, acct)
@@ -564,7 +570,7 @@ func partnerUsersSave(
 		call.Audit(
 			ops.AuditEntry{
 				Action:          "partnerUsers.save",
-				TargetKind:      "partner_user",
+				TargetKind:      targetPartnerUser,
 				TargetID:        partnerUserID.String(),
 				NextVersion:     &version,
 				Reason:          "account created",
@@ -588,7 +594,7 @@ func partnerUsersSave(
 	}
 
 	if input.Reason == nil {
-		return partnerUser, apperr.Fields(map[string]string{"reason": apperr.KeyRequired})
+		return partnerUser, apperr.Fields(map[string]string{keyReason: apperr.KeyRequired})
 	}
 
 	status := partnerUser.Status
@@ -596,26 +602,26 @@ func partnerUsersSave(
 		status = *input.Status
 	}
 
-	if partnerUser.Status == "invited" && status != "invited" &&
+	if partnerUser.Status == statusInvited && status != statusInvited &&
 		input.Status != nil { // active at the first sign-in (IR461)
 		return partnerUser, apperr.E(apperr.Conflict, "errors.invite_pending")
 	}
 
 	if partnerUser.RevokedAt != nil &&
-		(partnerUser.Status == "disabled" && status != "disabled" || input.AccessUntil != nil) {
+		(partnerUser.Status == statusDisabled && status != statusDisabled || input.AccessUntil != nil) {
 		// HQ ended the access: only HQ gives it back (IR508)
 		return partnerUser, apperr.E(apperr.Conflict, "errors.revoked_by_hq")
 	}
 	// the account exists from the start (IR461): its e-mail and role are fixed; remove the user and add them again
 	if !strings.EqualFold(input.Email, partnerUser.Email) {
-		return partnerUser, apperr.Fields(map[string]string{"email": apperr.KeyImmutable})
+		return partnerUser, apperr.Fields(map[string]string{keyEmail: apperr.KeyImmutable})
 	} else if input.PartnerRole != partnerUser.PartnerRole {
 		return partnerUser, apperr.Fields(map[string]string{"partnerRole": apperr.KeyImmutable})
 	} else {
 		input.Email = partnerUser.Email // the same address in other letter case keeps the stored spelling
 	}
 
-	if partnerUser.Status != "invited" && status != partnerUser.Status ||
+	if partnerUser.Status != statusInvited && status != partnerUser.Status ||
 		partnerUser.PartnerRole != input.PartnerRole {
 		err := notSelfOrLast(ctx, call, partnerUser)
 		if err != nil {
@@ -625,7 +631,7 @@ func partnerUsersSave(
 
 	kept := partnerUser.accessKept
 	if partnerUser.MembershipID != nil && status != partnerUser.Status {
-		if status == "disabled" { // keep the access end, and close the membership now
+		if status == statusDisabled { // keep the access end, and close the membership now
 			kept = partnerUser.AccessUntil
 
 			_, err := call.Tx.Exec(
@@ -677,7 +683,7 @@ func partnerUsersSave(
 				ctx,
 				call,
 				"maintenance.technicianBooked",
-				map[string]any{"membershipId": *partnerUser.MembershipID},
+				map[string]any{keyMembershipID: *partnerUser.MembershipID},
 			)
 			if err != nil {
 				return partnerUser, err
@@ -688,7 +694,7 @@ func partnerUsersSave(
 			}
 		}
 
-		if status == "disabled" {
+		if status == statusDisabled {
 			kept = input.AccessUntil // comes back when re-enabled
 		} else {
 			_, err := call.Tx.Exec(
@@ -721,15 +727,15 @@ func partnerUsersSave(
 	}
 
 	if partnerUser.MembershipID != nil && status != partnerUser.Status &&
-		(status == "disabled" || partnerUser.Status == "disabled") { // the sign-in follows (IR461)
-		setAccountEnabled(call, *partnerUser.MembershipID, status != "disabled")
+		(status == statusDisabled || partnerUser.Status == statusDisabled) { // the sign-in follows (IR461)
+		setAccountEnabled(call, *partnerUser.MembershipID, status != statusDisabled)
 	}
 
 	next := partnerUser.Version + 1
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "partnerUsers.save",
-			TargetKind:      "partner_user",
+			TargetKind:      targetPartnerUser,
 			TargetID:        partnerUser.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next,
@@ -755,7 +761,7 @@ func (in *PartnerRemoveInput) Validate() map[string]string {
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fieldErrs["reason"] = apperr.KeyLength
+		fieldErrs[keyReason] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -836,7 +842,7 @@ func partnerUsersRemove(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "partnerUsers.remove",
-			TargetKind:      "partner_user",
+			TargetKind:      targetPartnerUser,
 			TargetID:        partnerUser.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			Reason:          input.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
@@ -898,7 +904,7 @@ func partnerUsersResend(
 		return InvitePreview{}, err
 	}
 
-	if partnerUser.Status != "invited" {
+	if partnerUser.Status != statusInvited {
 		return InvitePreview{}, apperr.E(apperr.Conflict, "errors.invite_not_pending")
 	}
 
@@ -937,7 +943,7 @@ func partnerUsersResend(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "partnerUsers.resendInvite",
-			TargetKind:      "partner_user",
+			TargetKind:      targetPartnerUser,
 			TargetID:        partnerUser.ID.String(),
 			Reason:          "set-up e-mail sent again",
 			PreviousVersion: nil,
@@ -955,20 +961,20 @@ func partnerUsersResend(
 		CreatedAt:   call.Now,
 		UpdatedAt:   call.Now,
 		TargetOpen:  true,
-		Type:        "invite",
-		Target:      map[string]string{"kind": "partner_user", "id": partnerUser.ID.String()},
-		TemplateKey: "invite",
+		Type:        noticeInvite,
+		Target:      map[string]string{keyKind: targetPartnerUser, "id": partnerUser.ID.String()},
+		TemplateKey: noticeInvite,
 		Params: map[string]any{
 			"targetName":  partnerUser.Email,
 			"at":          call.Now,
-			"status":      "invited",
-			"reason":      nil,
+			keyStatus:     statusInvited,
+			keyReason:     nil,
 			"amountMinor": nil,
 			"currency":    nil,
 			"method":      nil,
 			"message":     nil,
 		},
-		Channel:                "email",
+		Channel:                keyEmail,
 		DeliveryState:          "queued",
 		Severity:               "normal",
 		OccurredAt:             call.Now,

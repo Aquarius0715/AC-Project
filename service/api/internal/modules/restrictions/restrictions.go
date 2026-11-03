@@ -16,6 +16,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -258,7 +259,7 @@ func decorate(ctx context.Context, call *ops.Call, x *Restriction) error {
 	hist, err := audit.History(
 		ctx,
 		call,
-		"restriction",
+		kindRestriction,
 		x.ID.String(),
 	) // identity's audit log (IR196)
 	if err != nil {
@@ -275,16 +276,16 @@ func decorate(ctx context.Context, call *ops.Call, x *Restriction) error {
 
 // stateEvents maps audited actions to the state-change events clients may see (IR42).
 var stateEvents = map[string]string{
-	"restrictions.schedule": "scheduled",
-	"restrictions.execute":  "requested",
-	"restriction.applied":   "applied",
-	"restrictions.cancel":   "release_requested",
-	"restrictions.release":  "release_requested",
-	"restrictions.override": "release_requested",
-	"restriction.released":  "released",
+	"restrictions.schedule": stateScheduled,
+	opExecute:               stateRequested,
+	"restriction.applied":   stateApplied,
+	"restrictions.cancel":   stateReleaseRequested,
+	"restrictions.release":  stateReleaseRequested,
+	"restrictions.override": stateReleaseRequested,
+	"restriction.released":  stateReleased,
 	"restrictions.defer":    "defer",
 	"restrictions.exempt":   "exempt",
-	"payments.release":      "release_requested",
+	"payments.release":      stateReleaseRequested,
 }
 
 // maskForClient applies the client RestrictionDetail projection (IR42).
@@ -320,7 +321,7 @@ func releaseView(restriction Restriction) ReleaseView {
 
 	var ri map[string]any
 	if json.Unmarshal(restriction.ReleaseIntent, &ri) == nil && ri != nil {
-		intent, _ = json.Marshal(map[string]any{"source": ri["source"], "at": ri["at"]})
+		intent, _ = json.Marshal(map[string]any{keySource: ri[keySource], "at": ri["at"]})
 	}
 
 	return ReleaseView{
@@ -336,7 +337,7 @@ func releaseView(restriction Restriction) ReleaseView {
 		RecoveryCases: restriction.RecoveryCases,
 		NoticeAt:      restriction.NoticeAt,
 		ExecuteAfter:  restriction.ExecuteAfter,
-		Projection:    "release",
+		Projection:    phaseRelease,
 		ReleaseIntent: intent,
 	}
 }
@@ -350,7 +351,7 @@ func fullReader(c *ops.Call) bool {
 // project returns the RestrictionRead the caller may receive (IR03 / IR42).
 func project(call *ops.Call, restriction Restriction) any {
 	switch {
-	case call.Principal.Role == "client":
+	case call.Principal.Role == authz.RoleClient:
 		maskForClient(&restriction)
 
 		return restriction
@@ -432,12 +433,12 @@ func (m Restrictions) get(ctx context.Context, call *ops.Call, in *GetInput) (an
 }
 
 var states = []string{
-	"scheduled",
-	"requested",
-	"applied",
-	"release_requested",
-	"released",
-	"cancelled",
+	stateScheduled,
+	stateRequested,
+	stateApplied,
+	stateReleaseRequested,
+	stateReleased,
+	stateCancelled,
 }
 
 type listFilter struct {
@@ -455,11 +456,11 @@ func (m Restrictions) query(
 	order, err := paging.OrderBy(
 		query.Sort,
 		map[string]string{
-			"id":           "r.id",
-			"createdAt":    "r.created_at",
-			"updatedAt":    "r.updated_at",
-			"executeAfter": "r.execute_after",
-			"noticeAt":     "r.notice_at",
+			"id":            "r.id",
+			"createdAt":     "r.created_at",
+			"updatedAt":     "r.updated_at",
+			keyExecuteAfter: "r.execute_after",
+			"noticeAt":      "r.notice_at",
 		},
 		"r.created_at DESC, r.id DESC",
 	)
@@ -690,7 +691,7 @@ func (m Restrictions) forInvoice(
 		i.contract_id AND k.version = i.contract_version WHERE i.id = $1`, input.InvoiceID).
 		Scan(&org)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && call.Principal.Role == "client" && org != call.Principal.OrgID) {
+		(err == nil && call.Principal.Role == authz.RoleClient && org != call.Principal.OrgID) {
 		return paging.Page[Restriction]{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
@@ -713,7 +714,7 @@ func (m Restrictions) forInvoice(
 		return paging.Page[Restriction]{}, err
 	}
 
-	if call.Principal.Role == "client" {
+	if call.Principal.Role == authz.RoleClient {
 		for i := range results {
 			maskForClient(&results[i])
 		}
@@ -733,7 +734,7 @@ func Register(reg *ops.Registry, module Restrictions) {
 	ops.Register(reg, "restrictions.list", module.list)
 	ops.Register(reg, "restrictions.forInvoice", module.forInvoice)
 	ops.Register(reg, "restrictions.schedule", module.schedule)
-	ops.Register(reg, "restrictions.execute", module.execute)
+	ops.Register(reg, opExecute, module.execute)
 	ops.Register(reg, "restrictions.cancel", module.cancel)
 	RegisterActions(reg, module)
 }

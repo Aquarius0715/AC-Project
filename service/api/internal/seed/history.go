@@ -87,7 +87,7 @@ func ApplyFleetHistory(
 
 		for _, s := range devicesim.Sensors {
 			switch s.Metric {
-			case "power":
+			case keyPower:
 				power = s
 			case "temperature":
 				temperature = s

@@ -24,7 +24,7 @@ func (m Restrictions) RequestRelease(
 ) error {
 	intent, _ := json.Marshal(
 		map[string]any{
-			"source":            source,
+			keySource:           source,
 			"at":                call.Now,
 			"actorMembershipId": call.Principal.MembershipID,
 		},
@@ -44,10 +44,10 @@ func (m Restrictions) RequestRelease(
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "restriction",
+			AggregateType: kindRestriction,
 			AggregateID:   restrictionID,
 			Type:          "RestrictionReleaseRequested",
-			Payload:       map[string]any{"source": source},
+			Payload:       map[string]any{keySource: source},
 		},
 	)
 
@@ -102,7 +102,11 @@ func (m Restrictions) evaluateRelease(ctx context.Context, call *ops.Call, id uu
 	}
 
 	remove, _ := json.Marshal(
-		map[string]any{"kind": "remove_restriction", "restrictionId": id, "rulesVersion": rules},
+		map[string]any{
+			keyKind:          actionRemoveRestriction,
+			keyRestrictionID: id,
+			keyRulesVersion:  rules,
+		},
 	)
 
 	for _, pendingUnit := range units {
@@ -116,14 +120,14 @@ func (m Restrictions) evaluateRelease(ctx context.Context, call *ops.Call, id uu
 		}
 
 		switch pendingUnit.apply {
-		case "not_sent": // undelivered apply is finalized as cancelled: zero-delivery evidence
+		case applyNotSent: // undelivered apply is finalized as cancelled: zero-delivery evidence
 			unit := pendingUnit.unit
 
 			publishErr := events.Publish(
 				ctx,
 				call.Tx,
 				call.Principal.TenantID,
-				"restriction",
+				kindRestriction,
 				id,
 				events.RestrictionCommandsCancelled,
 				events.CommandsCancelled{RestrictionID: id, UnitID: &unit, CommandIDs: nil},
@@ -149,9 +153,9 @@ func (m Restrictions) evaluateRelease(ctx context.Context, call *ops.Call, id uu
 			)
 		case "not_applied":
 			err = set(`release_state = 'not_required', pending_reason = NULL`)
-		case "sent_unknown":
+		case applySentUnknown:
 			err = set(`release_state = 'waiting_reconcile'`)
-		case "applied":
+		case stateApplied:
 			var (
 				cmd       uuid.UUID
 				delivered bool
@@ -173,7 +177,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, call *ops.Call, id uu
 					ctx,
 					call.Tx,
 					call.Principal.TenantID,
-					"restriction",
+					kindRestriction,
 					id,
 					events.RestrictionCommandsCancelled,
 					events.CommandsCancelled{
@@ -254,7 +258,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, when
 		return apperr.Wrap(execErr, "select restrictions.restrictions")
 	}
 
-	if kind == "remove_restriction" { // SR26: removes of terminal restrictions only resolve recovery cases
+	if kind == actionRemoveRestriction { // SR26: removes of terminal restrictions only resolve recovery cases
 		terminal, err := recoveryAcknowledged(
 			ctx,
 			tx,
@@ -269,7 +273,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, when
 		}
 	}
 
-	if kind == "apply_restriction" {
+	if kind == actionApplyRestriction {
 		_, execErr := tx.Exec(
 			ctx,
 			`UPDATE restrictions.restriction_units ru SET apply_state = 'applied', observed_at = $3, pending_reason = NULL,

@@ -42,20 +42,20 @@ func (in *Conditions) Validate() map[string]string {
 
 func (in *Conditions) check(fieldErrs map[string]string, prefix string) {
 	if CheckRange(in.From, in.To) != nil {
-		fieldErrs[prefix+"from"] = "errors.energy_range"
+		fieldErrs[prefix+"from"] = keyEnergyRange
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fieldErrs[prefix+"unitIds"] = apperr.KeyInvalid
+			fieldErrs[prefix+keyUnitIDs] = apperr.KeyInvalid
 		}
 
 		seen[u] = true
 	}
 
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 100 {
-		fieldErrs[prefix+"unitIds"] = apperr.KeyInvalid
+		fieldErrs[prefix+keyUnitIDs] = apperr.KeyInvalid
 	}
 
 	if in.BaselineID == uuid.Nil || in.BaselineVersion < 1 {
@@ -148,7 +148,7 @@ func preview(ctx context.Context, call *ops.Call, input *Conditions) (Preview, e
 
 	if inOrg != len(input.UnitIDs) {
 		return Preview{}, apperr.Fields(
-			map[string]string{"unitIds": "errors.units_outside_organization"},
+			map[string]string{keyUnitIDs: "errors.units_outside_organization"},
 		)
 	}
 
@@ -494,7 +494,7 @@ func listReports(
 			(filter.Status != nil && *filter.Status != "draft" && *filter.Status != "demo_reviewed") ||
 			(filter.From != nil && filter.To != nil && !filter.From.Before(*filter.To)) {
 			return paging.Page[Report]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{keyFilters: apperr.KeyInvalid},
 			)
 		}
 	}
@@ -503,8 +503,8 @@ func listReports(
 		query.Sort,
 		map[string]string{
 			"id":         "r.id",
-			"createdAt":  "r.created_at",
-			"updatedAt":  "r.created_at",
+			keyCreatedAt: colCreatedAt,
+			keyUpdatedAt: colCreatedAt,
 			"periodFrom": "lower(r.period)",
 		},
 		"r.created_at DESC, r.id DESC",

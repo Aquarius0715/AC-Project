@@ -81,7 +81,7 @@ func EventHandlers() map[string]events.Handler {
 
 			for _, commandID := range commands.CommandIDs { // billing's record takes equipment's final status (IR194)
 				status := commands.Statuses[commandID]
-				if status != "failed" && status != "cancelled" {
+				if status != "failed" && status != stateCancelled {
 					status = "expired"
 				}
 

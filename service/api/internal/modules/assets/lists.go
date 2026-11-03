@@ -13,6 +13,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -107,8 +108,8 @@ func list[T any](
 
 // clientOrg restricts client callers to their own customer organization (client:self-customer).
 func clientOrg(c *ops.Call, column string, args *[]any) string {
-	if c.Principal.Role != "client" {
-		return "TRUE"
+	if c.Principal.Role != authz.RoleClient {
+		return everyRow
 	}
 
 	*args = append(*args, c.Principal.OrgID)
@@ -206,12 +207,12 @@ func (m *Module) customersList(
 
 		return fmt.Sprintf("$%d", len(args))
 	}
-	conds := []string{"TRUE"}
+	conds := []string{everyRow}
 
 	if filters.Kind != nil {
 		if !profiles[*filters.Kind] {
 			return paging.Page[Customer]{}, apperr.Fields(
-				map[string]string{"filters.kind": apperr.KeyInvalid},
+				map[string]string{keyFiltersKind: apperr.KeyInvalid},
 			)
 		}
 
@@ -219,7 +220,7 @@ func (m *Module) customersList(
 	}
 
 	if filters.Status != nil {
-		if *filters.Status != "active" && *filters.Status != "inactive" {
+		if *filters.Status != statusActive && *filters.Status != statusInactive {
 			return paging.Page[Customer]{}, apperr.Fields(
 				map[string]string{"filters.status": apperr.KeyInvalid},
 			)
@@ -265,7 +266,7 @@ func (in *CustomerSave) Validate() map[string]string {
 
 	in.Name = strings.TrimSpace(in.Name)
 	if !strLen(in.Name, 1, 120) {
-		fieldErrs["name"] = apperr.KeyLength
+		fieldErrs[keyName] = apperr.KeyLength
 	}
 
 	if in.OrganizationID == uuid.Nil {
@@ -276,7 +277,7 @@ func (in *CustomerSave) Validate() map[string]string {
 		fieldErrs["serviceProfile"] = apperr.KeyInvalid
 	}
 
-	if in.Status != "active" && in.Status != "inactive" {
+	if in.Status != statusActive && in.Status != statusInactive {
 		fieldErrs["status"] = apperr.KeyInvalid
 	}
 
@@ -334,7 +335,7 @@ func (m *Module) customersSave(
 		call.Audit(
 			ops.AuditEntry{
 				Action:          "customers.save",
-				TargetKind:      "customer",
+				TargetKind:      kindCustomer,
 				TargetID:        customerID.String(),
 				NextVersion:     &customer.Version,
 				PreviousVersion: nil,
@@ -346,7 +347,7 @@ func (m *Module) customersSave(
 		)
 		call.Emit(
 			ops.Event{
-				AggregateType: "customer",
+				AggregateType: kindCustomer,
 				AggregateID:   customerID,
 				Type:          "CustomerChanged",
 				Payload:       nil,
@@ -356,7 +357,7 @@ func (m *Module) customersSave(
 		return customer, nil
 	}
 
-	if input.Status == "inactive" { // D05: deactivation conflicts with active units, contracts or jobs
+	if input.Status == statusInactive { // D05: deactivation conflicts with active units, contracts or jobs
 		var units bool
 
 		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE customer_org_id = $1 AND NOT
@@ -403,7 +404,7 @@ func (m *Module) customersSave(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "customers.save",
-			TargetKind:      "customer",
+			TargetKind:      kindCustomer,
 			TargetID:        updated.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &updated.Version, Reason: "", Result: "", Before: nil, After: nil,
@@ -411,7 +412,7 @@ func (m *Module) customersSave(
 	)
 	call.Emit(
 		ops.Event{
-			AggregateType: "customer",
+			AggregateType: kindCustomer,
 			AggregateID:   updated.ID,
 			Type:          "CustomerChanged",
 			Payload:       nil,
@@ -487,7 +488,7 @@ func (m *Module) propertiesList(
 	if filters.Kind != nil {
 		if *filters.Kind != "home" && *filters.Kind != "office" {
 			return paging.Page[Property]{}, apperr.Fields(
-				map[string]string{"filters.kind": apperr.KeyInvalid},
+				map[string]string{keyFiltersKind: apperr.KeyInvalid},
 			)
 		}
 
@@ -559,7 +560,7 @@ func (m *Module) spacesList(
 	}
 
 	conds := []string{"NOT archived"}
-	if call.Principal.Role == "client" {
+	if call.Principal.Role == authz.RoleClient {
 		conds = append(
 			conds,
 			"property_id IN (SELECT id FROM assets.properties WHERE customer_org_id = "+add(
@@ -575,7 +576,7 @@ func (m *Module) spacesList(
 	if filters.Kind != nil {
 		if !spaceKinds[*filters.Kind] {
 			return paging.Page[Space]{}, apperr.Fields(
-				map[string]string{"filters.kind": apperr.KeyInvalid},
+				map[string]string{keyFiltersKind: apperr.KeyInvalid},
 			)
 		}
 
@@ -599,7 +600,7 @@ type RenameInput struct {
 // Validate implements ops.Validator.
 func (in *RenameInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
-	if in.Target.Kind != "property" && in.Target.Kind != "space" && in.Target.Kind != "unit" {
+	if in.Target.Kind != kindProperty && in.Target.Kind != kindSpace && in.Target.Kind != kindUnit {
 		fieldErrs["target.kind"] = apperr.KeyInvalid
 	}
 
@@ -608,7 +609,7 @@ func (in *RenameInput) Validate() map[string]string {
 	}
 
 	if !strLen(strings.TrimSpace(in.Name), 1, 120) {
-		fieldErrs["name"] = apperr.KeyLength
+		fieldErrs[keyName] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -652,12 +653,12 @@ func (m *Module) locationsRename(
 	var table, col, org, siblings string
 
 	switch input.Target.Kind {
-	case "property":
-		table, col, org = "assets.properties", "name", "customer_org_id"
+	case kindProperty:
+		table, col, org = "assets.properties", keyName, "customer_org_id"
 		siblings = `SELECT 1 FROM assets.properties o, assets.properties t WHERE t.id = $1 AND o.customer_org_id =
 			t.customer_org_id AND o.id <> t.id AND NOT o.archived AND lower(o.name) = lower($2)`
-	case "space":
-		table, col, org = "assets.spaces", "name", "(SELECT customer_org_id FROM assets.properties p WHERE p.id = "+
+	case kindSpace:
+		table, col, org = "assets.spaces", keyName, "(SELECT customer_org_id FROM assets.properties p WHERE p.id = "+
 			"property_id)"
 		siblings = `SELECT 1 FROM assets.spaces o, assets.spaces t WHERE t.id = $1 AND o.property_id = t.property_id AND
 			o.parent_space_id IS NOT DISTINCT FROM t.parent_space_id AND o.id <> t.id AND NOT o.archived AND lower(o.name) =
@@ -669,9 +670,9 @@ func (m *Module) locationsRename(
 	}
 
 	visArgs, updArgs := []any{input.Target.ID}, []any{input.Target.ID, *call.ExpectedVersion, name}
-	visScope, updScope := "TRUE", "TRUE"
+	visScope, updScope := everyRow, everyRow
 
-	if call.Principal.Role == "client" { // client:self-customer
+	if call.Principal.Role == authz.RoleClient { // client:self-customer
 		visArgs, updArgs = append(
 			visArgs,
 			call.Principal.OrgID,
@@ -720,9 +721,9 @@ func (m *Module) locationsRename(
 		return nil, apperr.Wrap(err, "update (locationsRename)")
 	}
 
-	typ := "LocationChanged"
-	if input.Target.Kind == "unit" {
-		typ = "UnitChanged"
+	typ := eventLocationChanged
+	if input.Target.Kind == kindUnit {
+		typ = eventUnitChanged
 	}
 
 	call.Emit(
@@ -744,7 +745,7 @@ func (m *Module) locationsRename(
 	)
 
 	switch input.Target.Kind {
-	case "property":
+	case kindProperty:
 		return scanProperty(
 			call.Tx.QueryRow(
 				ctx,
@@ -752,7 +753,7 @@ func (m *Module) locationsRename(
 				input.Target.ID,
 			),
 		)
-	case "space":
+	case kindSpace:
 		return scanSpace(
 			call.Tx.QueryRow(
 				ctx,

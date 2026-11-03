@@ -16,6 +16,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -77,7 +78,7 @@ func scanClientUser(r pgx.Row) (ClientUser, error) {
 
 // ownerOnly enforces the client:self-customer:owner alternative: clients must be owners (FORBIDDEN).
 func ownerOnly(c *ops.Call) error {
-	if c.Principal.Role == "client" && c.Principal.ClientRole != "owner" {
+	if c.Principal.Role == authz.RoleClient && c.Principal.ClientRole != clientRoleOwner {
 		return apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
@@ -136,10 +137,10 @@ func clientUsersList(
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&filters) != nil ||
-			(filters.Status != nil && !slices.Contains([]string{"invited", "active", "disabled"}, *filters.Status)) ||
-			(filters.ClientRole != nil && *filters.ClientRole != "owner" && *filters.ClientRole != "member") {
+			(filters.Status != nil && !slices.Contains([]string{statusInvited, statusActive, statusDisabled}, *filters.Status)) ||
+			(filters.ClientRole != nil && *filters.ClientRole != clientRoleOwner && *filters.ClientRole != clientRoleMember) {
 			return paging.Page[ClientUser]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{keyFilters: apperr.KeyInvalid},
 			)
 		}
 	}
@@ -147,12 +148,12 @@ func clientUsersList(
 	order, err := paging.OrderBy(
 		query.Sort,
 		map[string]string{
-			"id":        "x.id",
-			"name":      "lower(COALESCE(x.display_name, x.email::text))",
-			"email":     "x.email",
-			"invitedAt": "x.invited_at",
-			"createdAt": "x.created_at",
-			"updatedAt": "x.updated_at",
+			"id":         "x.id",
+			"name":       "lower(COALESCE(x.display_name, x.email::text))",
+			keyEmail:     "x.email",
+			"invitedAt":  "x.invited_at",
+			keyCreatedAt: "x.created_at",
+			keyUpdatedAt: "x.updated_at",
 		},
 		"lower(COALESCE(x.display_name, x.email::text)) ASC, x.id ASC",
 	)
@@ -173,8 +174,8 @@ func clientUsersList(
 		return fmt.Sprintf("$%d", len(args))
 	}
 
-	conds := []string{"TRUE"}
-	if call.Principal.Role == "client" {
+	conds := []string{everyRow}
+	if call.Principal.Role == authz.RoleClient {
 		conds = append(conds, "cu.organization_id = "+add(call.Principal.OrgID))
 	}
 
@@ -259,7 +260,7 @@ func loadClientUser(
 
 	clientUser, err := scanClientUser(call.Tx.QueryRow(ctx, q, clientUserID))
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && call.Principal.Role == "client" && clientUser.customerOrg != call.Principal.OrgID) {
+		(err == nil && call.Principal.Role == authz.RoleClient && clientUser.customerOrg != call.Principal.OrgID) {
 		return ClientUser{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
@@ -292,21 +293,21 @@ func (in *ClientUserInput) Validate() map[string]string {
 	)
 	if err != nil || a.Address != in.Email ||
 		len(in.Email) > 254 {
-		fieldErrs["email"] = apperr.KeyInvalid
+		fieldErrs[keyEmail] = apperr.KeyInvalid
 	}
 
-	if in.ClientRole != "owner" && in.ClientRole != "member" {
+	if in.ClientRole != clientRoleOwner && in.ClientRole != clientRoleMember {
 		fieldErrs["clientRole"] = apperr.KeyInvalid
 	}
 
-	if in.Status != nil && *in.Status != "active" && *in.Status != "disabled" {
-		fieldErrs["status"] = apperr.KeyInvalid
+	if in.Status != nil && *in.Status != statusActive && *in.Status != statusDisabled {
+		fieldErrs[keyStatus] = apperr.KeyInvalid
 	}
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
 		if n := utf8.RuneCountInString(*in.Reason); n < 1 || n > 1000 {
-			fieldErrs["reason"] = apperr.KeyLength
+			fieldErrs[keyReason] = apperr.KeyLength
 		}
 	}
 
@@ -392,7 +393,7 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 	err := call.Tx.QueryRow(ctx, `SELECT organization_id FROM notify.ref_customers WHERE id = $1`, in.CustomerID).
 		Scan(&org)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && call.Principal.Role == "client" && org != call.Principal.OrgID) {
+		(err == nil && call.Principal.Role == authz.RoleClient && org != call.Principal.OrgID) {
 		return ClientUser{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
@@ -416,14 +417,14 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 	}
 
 	if dup {
-		return ClientUser{}, apperr.Fields(map[string]string{"email": "errors.email_taken"})
+		return ClientUser{}, apperr.Fields(map[string]string{keyEmail: keyEmailTaken})
 	}
 
 	if in.ID == nil {
 		// a new user: an owner (or HQ) adds members and owners, whose account is created now and gets the set-up e-mail
 		// (IR417, IR461)
 		if in.Status != nil {
-			return ClientUser{}, apperr.Fields(map[string]string{"status": apperr.KeyNotAllowed})
+			return ClientUser{}, apperr.Fields(map[string]string{keyStatus: apperr.KeyNotAllowed})
 		}
 
 		role := in.ClientRole
@@ -431,12 +432,12 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 		_, membership, err := createAccount(ctx, call, newAccount{
 			Email:       in.Email,
 			DisplayName: *in.DisplayName,
-			Role:        "client",
+			Role:        authz.RoleClient,
 			OrgID:       org,
 			ClientRole:  &role,
-			Permissions: defaultPermissions["client"],
+			Permissions: defaultPermissions[authz.RoleClient],
 			Scopes: []ScopeRef{
-				{Kind: "organization", ID: org},
+				{Kind: scopeOrganization, ID: org},
 			},
 			Employment: nil,
 			ValidUntil: nil,
@@ -469,7 +470,7 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 		call.Audit(
 			ops.AuditEntry{
 				Action:          "clientUsers.save",
-				TargetKind:      "client_user",
+				TargetKind:      targetClientUser,
 				TargetID:        clientUserID.String(),
 				NextVersion:     &version,
 				Reason:          "account created",
@@ -492,13 +493,13 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 		return clientUser, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	if call.Principal.Role == "client" && clientUser.MembershipID != nil &&
+	if call.Principal.Role == authz.RoleClient && clientUser.MembershipID != nil &&
 		*clientUser.MembershipID == call.Principal.MembershipID { // an owner never changes the own account (IR417)
 		return clientUser, apperr.E(apperr.Conflict, "errors.own_account")
 	}
 	// the e-mail is the sign-in account's, created with the user (IR461): it stays, for HQ too (IR422)
 	if !strings.EqualFold(in.Email, clientUser.Email) {
-		return clientUser, apperr.Fields(map[string]string{"email": apperr.KeyImmutable})
+		return clientUser, apperr.Fields(map[string]string{keyEmail: apperr.KeyImmutable})
 	}
 
 	in.Email = clientUser.Email // the same address in other letter case keeps the stored spelling
@@ -507,7 +508,7 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 	}
 
 	if in.Reason == nil {
-		return clientUser, apperr.Fields(map[string]string{"reason": apperr.KeyRequired})
+		return clientUser, apperr.Fields(map[string]string{keyReason: apperr.KeyRequired})
 	}
 
 	status := clientUser.Status
@@ -515,19 +516,19 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 		status = *in.Status
 	}
 
-	if status == "active" && clientUser.Status == "invited" ||
-		status == "active" && clientUser.Status != "active" &&
+	if status == statusActive && clientUser.Status == statusInvited ||
+		status == statusActive && clientUser.Status != statusActive &&
 			clientUser.MembershipID == nil { // an invite becomes active only on first sign-in
 		return clientUser, apperr.E(apperr.Conflict, "errors.invite_pending")
 	}
 
 	if clientUser.RevokedAt != nil &&
-		status != "disabled" { // HQ ended the access: a save would open the membership again, only HQ gives it back (IR508)
+		status != statusDisabled { // HQ ended the access: a save would open the membership again, only HQ gives it back (IR508)
 		return clientUser, apperr.E(apperr.Conflict, "errors.revoked_by_hq")
 	}
 
-	if clientUser.ClientRole == "owner" && clientUser.Status == "active" &&
-		(in.ClientRole != "owner" || status != "active") {
+	if clientUser.ClientRole == clientRoleOwner && clientUser.Status == statusActive &&
+		(in.ClientRole != clientRoleOwner || status != statusActive) {
 		ok, err := otherActiveOwner(ctx, call, clientUser.CustomerID, clientUser.ID)
 		if err != nil {
 			return clientUser, err
@@ -570,8 +571,8 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 		}
 
 		if status != clientUser.Status &&
-			(status == "disabled" || clientUser.Status == "disabled") { // the sign-in follows (IR461)
-			setAccountEnabled(call, *clientUser.MembershipID, status != "disabled")
+			(status == statusDisabled || clientUser.Status == statusDisabled) { // the sign-in follows (IR461)
+			setAccountEnabled(call, *clientUser.MembershipID, status != statusDisabled)
 		}
 	}
 
@@ -579,7 +580,7 @@ func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "clientUsers.save",
-			TargetKind:      "client_user",
+			TargetKind:      targetClientUser,
 			TargetID:        clientUser.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next,
@@ -605,7 +606,7 @@ func (in *RemoveInput) Validate() map[string]string {
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fieldErrs["reason"] = apperr.KeyLength
+		fieldErrs[keyReason] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -660,12 +661,12 @@ func clientUsersRemove(ctx context.Context, c *ops.Call, input *RemoveInput) (De
 		return Deleted{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	if c.Principal.Role == "client" && clientUser.MembershipID != nil &&
+	if c.Principal.Role == authz.RoleClient && clientUser.MembershipID != nil &&
 		*clientUser.MembershipID == c.Principal.MembershipID { // IR417
 		return Deleted{}, apperr.E(apperr.Conflict, "errors.own_account")
 	}
 
-	if clientUser.ClientRole == "owner" && clientUser.Status == "active" {
+	if clientUser.ClientRole == clientRoleOwner && clientUser.Status == statusActive {
 		ok, err := otherActiveOwner(ctx, c, clientUser.CustomerID, clientUser.ID)
 		if err != nil {
 			return Deleted{}, err
@@ -704,7 +705,7 @@ func clientUsersRemove(ctx context.Context, c *ops.Call, input *RemoveInput) (De
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "clientUsers.remove",
-			TargetKind:      "client_user",
+			TargetKind:      targetClientUser,
 			TargetID:        clientUser.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			Reason:          input.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
@@ -794,7 +795,7 @@ func clientUsersResend(
 		return InvitePreview{}, err
 	}
 
-	if clientUser.Status != "invited" {
+	if clientUser.Status != statusInvited {
 		return InvitePreview{}, apperr.E(apperr.Conflict, "errors.invite_not_pending")
 	}
 
@@ -811,7 +812,7 @@ func clientUsersResend(
 		return InvitePreview{}, apperr.Wrap(scanErr, "select identity.memberships")
 	}
 
-	requestAccount(call, user, *clientUser.MembershipID, "client")
+	requestAccount(call, user, *clientUser.MembershipID, authz.RoleClient)
 
 	_, execErr := call.Tx.Exec(
 		ctx,
@@ -826,7 +827,7 @@ func clientUsersResend(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "clientUsers.resendInvite",
-			TargetKind:      "client_user",
+			TargetKind:      targetClientUser,
 			TargetID:        clientUser.ID.String(),
 			Reason:          "set-up e-mail sent again",
 			PreviousVersion: nil,
@@ -844,20 +845,20 @@ func clientUsersResend(
 		CreatedAt:   call.Now,
 		UpdatedAt:   call.Now,
 		TargetOpen:  true,
-		Type:        "invite",
-		Target:      map[string]string{"kind": "client_user", "id": clientUser.ID.String()},
-		TemplateKey: "invite",
+		Type:        noticeInvite,
+		Target:      map[string]string{keyKind: targetClientUser, "id": clientUser.ID.String()},
+		TemplateKey: noticeInvite,
 		Params: map[string]any{
 			"targetName":  clientUser.Email,
 			"at":          call.Now,
-			"status":      "invited",
-			"reason":      nil,
+			keyStatus:     statusInvited,
+			keyReason:     nil,
 			"amountMinor": nil,
 			"currency":    nil,
 			"method":      nil,
 			"message":     nil,
 		},
-		Channel:                "email",
+		Channel:                keyEmail,
 		DeliveryState:          "queued",
 		Severity:               "normal",
 		OccurredAt:             call.Now,

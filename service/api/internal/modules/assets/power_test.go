@@ -54,29 +54,34 @@ func TestEffectivePower(t *testing.T) {
 		fresh, have bool
 		want        string
 	}{
-		{newUnit("online", &powerOn, fromNow(-30*time.Second)), true, true, "on"},
-		{newUnit("online", &off, fromNow(-120*time.Second)), true, true, "off"},
-		{newUnit("online", &powerOn, fromNow(-121*time.Second)), true, true, "unknown"}, // too old
+		{newUnit(connectionOnline, &powerOn, fromNow(-30*time.Second)), true, true, "on"},
+		{newUnit(connectionOnline, &off, fromNow(-120*time.Second)), true, true, powerOff},
 		{
-			newUnit("online", &powerOn, fromNow(time.Second)),
+			newUnit(connectionOnline, &powerOn, fromNow(-121*time.Second)),
 			true,
 			true,
-			"unknown",
+			stateUnknown,
+		}, // too old
+		{
+			newUnit(connectionOnline, &powerOn, fromNow(time.Second)),
+			true,
+			true,
+			stateUnknown,
 		}, // future observation
-		{newUnit("offline", &powerOn, fromNow(-time.Second)), true, true, "unknown"},
-		{newUnit("online", nil, fromNow(-time.Second)), true, true, "unknown"},
-		{newUnit("online", &powerOn, nil), true, true, "unknown"},
+		{newUnit("offline", &powerOn, fromNow(-time.Second)), true, true, stateUnknown},
+		{newUnit(connectionOnline, nil, fromNow(-time.Second)), true, true, stateUnknown},
+		{newUnit(connectionOnline, &powerOn, nil), true, true, stateUnknown},
 		{
-			newUnit("online", &powerOn, fromNow(-time.Second)),
+			newUnit(connectionOnline, &powerOn, fromNow(-time.Second)),
 			false,
 			true,
-			"unknown",
+			stateUnknown,
 		}, // measured power stale / invalid
 		{
-			newUnit("online", &powerOn, fromNow(-time.Second)),
+			newUnit(connectionOnline, &powerOn, fromNow(-time.Second)),
 			true,
 			false,
-			"unknown",
+			stateUnknown,
 		}, // no power measurement at all
 	}
 	for i, c := range cases {

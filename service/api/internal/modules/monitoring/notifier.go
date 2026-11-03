@@ -17,6 +17,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 // Notifier evaluates alert-policy notifications for automations.simulate / fire (SR21, SR25, SR28, SR12, IR155).
@@ -59,7 +60,7 @@ func cmp(op string, value, threshold float64) bool {
 	switch op {
 	case "gt":
 		return value > threshold
-	case "gte":
+	case opGTE:
 		return value >= threshold
 	case "lt":
 		return value < threshold
@@ -238,7 +239,7 @@ func recipientsOf(
 			call,
 			identity.QueryMembers,
 			identity.MembersInput{
-				Role:           "client",
+				Role:           authz.RoleClient,
 				OrganizationID: &org,
 				IDs:            nil,
 				Permission:     "",
@@ -259,7 +260,7 @@ func recipientsOf(
 		identity.QueryMembers,
 		identity.MembersInput{
 			IDs:            policy.recipients,
-			Role:           "client",
+			Role:           authz.RoleClient,
 			OrganizationID: &org,
 			Permission:     "",
 			ClientRole:     "",
@@ -298,7 +299,7 @@ func recipientsOf(
 // the tick and not after it (late or future observations decide nothing, D08).
 func freshValue(f fact, at time.Time) (float64, bool) {
 	var value float64
-	if f.Quality != "valid" || string(f.Value) == "null" ||
+	if f.Quality != qualityValid || string(f.Value) == "null" ||
 		json.Unmarshal(f.Value, &value) != nil ||
 		f.ObservedAt.After(at) ||
 		at.Sub(f.ObservedAt) > 120*time.Second {
@@ -310,7 +311,7 @@ func freshValue(f fact, at time.Time) (float64, bool) {
 
 // recovered reports whether v is past the recovery threshold: below it for a high limit, above it for a low one (D08).
 func recovered(c AlertCondition, v float64) bool {
-	if c.Operator == "gt" || c.Operator == "gte" {
+	if c.Operator == "gt" || c.Operator == opGTE {
 		return v < c.RecoveryThreshold
 	}
 
@@ -337,7 +338,7 @@ func recoverAlert(
 	}
 
 	dir := ">"
-	if cnd.Operator == "gt" || cnd.Operator == "gte" {
+	if cnd.Operator == "gt" || cnd.Operator == opGTE {
 		dir = "<"
 	}
 
@@ -394,10 +395,10 @@ func recoverAlert(
 	for _, id := range ids {
 		call.Emit(
 			ops.Event{
-				AggregateType: "alert",
+				AggregateType: kindAlert,
 				AggregateID:   id,
 				Type:          "AlertResolved",
-				Payload:       map[string]any{"unitId": unit, "recovered": true},
+				Payload:       map[string]any{keyUnitID: unit, "recovered": true},
 			},
 		)
 	}
@@ -595,8 +596,8 @@ func (n Notifier) Evaluate(
 		case reason != "":
 			outcome.Decision, outcome.Reason = "suppressed", &reason
 		case len(recips) == 0 || len(channels) == 0:
-			r := "no_recipient"
-			outcome.Decision, outcome.Reason = "failed", &r
+			r := reasonNoRecipient
+			outcome.Decision, outcome.Reason = outcomeFailed, &r
 		default:
 			outcome.Decision = "selected"
 		}
@@ -607,7 +608,7 @@ func (n Notifier) Evaluate(
 				return nil, err
 			}
 
-			if outcome.Decision == "failed" {
+			if outcome.Decision == outcomeFailed {
 				fid, err := deliveryFailure(ctx, call, alert, policy.id, eventID, when)
 				if err != nil {
 					return nil, err
@@ -624,12 +625,12 @@ func (n Notifier) Evaluate(
 							RecipientMembershipID: r,
 							Channel:               ch,
 							Type:                  typ,
-							TemplateKey:           "alert",
+							TemplateKey:           kindAlert,
 							TargetKind:            "unit",
 							TargetID:              unit,
 							Severity:              hit.Severity,
 							SourceAlertID:         &alert,
-							Params:                map[string]any{"status": "open"},
+							Params:                map[string]any{"status": statusOpen},
 						})
 						if err != nil {
 							return nil, apperr.Wrap(err, "notify.Store.Create")
@@ -755,7 +756,7 @@ func deliveryFailure(
 
 	_ = json.Unmarshal(raw, &failures)
 	for _, f := range failures {
-		if f["eventId"] == eventID.String() && f["policyId"] == policy.String() {
+		if f["eventId"] == eventID.String() && f[keyPolicyID] == policy.String() {
 			id, _ := uuid.Parse(f["id"].(string))
 
 			return id, nil
@@ -767,11 +768,11 @@ func deliveryFailure(
 		failures,
 		map[string]any{
 			"id":            failureID,
-			"policyId":      policy,
+			keyPolicyID:     policy,
 			"eventId":       eventID,
 			"occurredAt":    when,
-			"reason":        "no_recipient",
-			"deliveryState": "failed",
+			"reason":        reasonNoRecipient,
+			"deliveryState": outcomeFailed,
 		},
 	)
 	b, _ := json.Marshal(failures)

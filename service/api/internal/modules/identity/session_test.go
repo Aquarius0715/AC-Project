@@ -41,8 +41,8 @@ func TestSessionGet(t *testing.T) {
 
 	principal := &ops.Principal{
 		Principal: authz.Principal{
-			Role:       "client",
-			ClientRole: "owner",
+			Role:       authz.RoleClient,
+			ClientRole: clientRoleOwner,
 			Permissions: map[string]bool{
 				"control.execute": true,
 				"alert.read":      true,
@@ -68,7 +68,7 @@ func TestSessionGet(t *testing.T) {
 	}
 
 	session := res.Data
-	if session.Role != "client" || session.ScopeVersion != 3 ||
+	if session.Role != authz.RoleClient || session.ScopeVersion != 3 ||
 		session.UserID != principal.UserID ||
 		strings.Join(session.Permissions, ",") != "alert.read,control.execute" ||
 		!session.ExpiresAt.Equal(now.Add(SessionTTL)) ||

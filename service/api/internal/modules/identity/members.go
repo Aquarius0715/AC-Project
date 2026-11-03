@@ -170,7 +170,7 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 		return apperr.Wrap(err, "query (fillMembers)")
 	}
 
-	if c.Principal.Role != "contractor" {
+	if c.Principal.Role != authz.RoleContractor {
 		var permission string
 
 		err := each(
@@ -275,7 +275,7 @@ func membersList(
 			(filters.Role != nil && !slices.Contains(roles, *filters.Role)) ||
 			(filters.Qualification != nil && !slices.Contains(qualificationCodes, *filters.Qualification)) {
 			return paging.Page[Member]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{keyFilters: apperr.KeyInvalid},
 			)
 		}
 	}
@@ -283,10 +283,10 @@ func membersList(
 	order, err := paging.OrderBy(
 		query.Sort,
 		map[string]string{
-			"id":        "m.id",
-			"validFrom": "m.valid_from",
-			"createdAt": "m.created_at",
-			"updatedAt": "m.updated_at",
+			"id":         "m.id",
+			"validFrom":  "m.valid_from",
+			keyCreatedAt: "m.created_at",
+			keyUpdatedAt: "m.updated_at",
 		},
 		"m.id ASC",
 	)
@@ -307,8 +307,8 @@ func membersList(
 		return fmt.Sprintf("$%d", len(args))
 	}
 
-	conds := []string{"TRUE"}
-	if call.Principal.Role == "contractor" {
+	conds := []string{everyRow}
+	if call.Principal.Role == authz.RoleContractor {
 		conds = append(
 			conds,
 			"m.role = 'technician' AND m.organization_id = "+add(call.Principal.OrgID),
@@ -402,16 +402,16 @@ func membersList(
 
 // ---- members.save ----
 
-var roles = []string{"client", "contractor", "technician", "admin"}
+var roles = []string{authz.RoleClient, authz.RoleContractor, authz.RoleTechnician, authz.RoleAdmin}
 
 // qualificationCodes are the demo QualificationCode values (SR13).
 var qualificationCodes = []string{"demo_indoor", "demo_outdoor", "demo_electrical"}
 
 // RolePermissions are the permissions each role may hold (IR132 item 1).
 var RolePermissions = map[string][]string{
-	"contractor": {"partner.accept", "partner.assign", "partner.review"},
-	"technician": {"alert.read", "alert.resolve", "control.diagnose", "device.maintain"},
-	"client":     {},
+	authz.RoleContractor: {"partner.accept", "partner.assign", "partner.review"},
+	authz.RoleTechnician: {"alert.read", "alert.resolve", "control.diagnose", "device.maintain"},
+	authz.RoleClient:     {},
 }
 
 // MemberInput is members.save input. The display name is the user's own (IR172): a Membership result carries it, the
@@ -473,14 +473,14 @@ func (in *MemberInput) Validate() map[string]string {
 	}
 
 	if !slices.Contains(roles, in.Role) {
-		fieldErrs["role"] = apperr.KeyInvalid
+		fieldErrs[keyRole] = apperr.KeyInvalid
 	}
 
 	switch {
-	case in.Role == "technician" &&
-		(in.Employment == nil || (*in.Employment != "internal" && *in.Employment != "external")):
+	case in.Role == authz.RoleTechnician &&
+		(in.Employment == nil || (*in.Employment != employmentInternal && *in.Employment != employmentExternal)):
 		fieldErrs["employment"] = apperr.KeyRequired
-	case in.Role != "technician" && in.Employment != nil:
+	case in.Role != authz.RoleTechnician && in.Employment != nil:
 		fieldErrs["employment"] = apperr.KeyNotAllowed
 	}
 
@@ -514,8 +514,8 @@ func (in *MemberInput) Validate() map[string]string {
 	}
 
 	kinds := map[string][]string{
-		"admin": {"tenant"}, "client": {"organization"}, "contractor": {"organization"},
-		"technician": {"unit", "property", "organization"},
+		authz.RoleAdmin: {"tenant"}, authz.RoleClient: {scopeOrganization}, authz.RoleContractor: {scopeOrganization},
+		authz.RoleTechnician: {"unit", "property", scopeOrganization},
 	}[in.Role]
 	for _, sc := range in.Scopes {
 		if !slices.Contains(kinds, sc.Kind) {
@@ -523,7 +523,7 @@ func (in *MemberInput) Validate() map[string]string {
 		}
 	}
 
-	if in.Role == "admin" && len(in.Scopes) > 1 {
+	if in.Role == authz.RoleAdmin && len(in.Scopes) > 1 {
 		fieldErrs["scopes"] = apperr.KeyInvalid
 	}
 
@@ -535,14 +535,15 @@ func (in *MemberInput) Validate() map[string]string {
 		fieldErrs["validUntil"] = apperr.KeyRange
 	}
 
-	if in.Role == "technician" && in.Employment != nil && *in.Employment == "external" &&
+	if in.Role == authz.RoleTechnician && in.Employment != nil &&
+		*in.Employment == employmentExternal &&
 		in.ValidUntil == nil {
 		fieldErrs["validUntil"] = "errors.external_needs_end"
 	}
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fieldErrs["reason"] = apperr.KeyLength
+		fieldErrs[keyReason] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -584,7 +585,7 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 
 		input.UserID, err = personFor(ctx, c, input.NewUser.Email, input.NewUser.DisplayName)
 		if errors.Is(err, errEmailTaken) {
-			return Member{}, apperr.Fields(map[string]string{"newUser.email": "errors.email_taken"})
+			return Member{}, apperr.Fields(map[string]string{"newUser.email": keyEmailTaken})
 		}
 
 		if err != nil {
@@ -612,9 +613,13 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 		return Member{}, apperr.Wrap(err, "select identity.organizations")
 	}
 
-	want := map[string]string{"admin": "operator", "client": "customer", "contractor": "contractor"}[input.Role]
-	if input.Role == "technician" {
-		want = map[string]string{"internal": "operator", "external": "contractor"}[*input.Employment]
+	want := map[string]string{
+		authz.RoleAdmin:      orgKindOperator,
+		authz.RoleClient:     orgKindCustomer,
+		authz.RoleContractor: orgKindContractor,
+	}[input.Role]
+	if input.Role == authz.RoleTechnician {
+		want = map[string]string{employmentInternal: orgKindOperator, employmentExternal: orgKindContractor}[*input.Employment]
 	}
 
 	if kind != want {
@@ -629,11 +634,11 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 		switch scopeRef.Kind {
 		case "tenant":
 			valid = scopeRef.ID == c.Principal.TenantID
-		case "organization":
+		case scopeOrganization:
 			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.organizations WHERE id = $1 AND (kind = 'customer' OR
 				id = $2))`, scopeRef.ID, input.OrganizationID).
 				Scan(&valid)
-			if input.Role != "technician" {
+			if input.Role != authz.RoleTechnician {
 				valid = valid && scopeRef.ID == input.OrganizationID
 			}
 		case "property":
@@ -687,8 +692,8 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 	if input.ID == nil {
 		var clientRole *string
 
-		if input.Role == "client" { // HQ adds a member; a customer owner adds owners in the customer app (IR417)
-			cr := "member"
+		if input.Role == authz.RoleClient { // HQ adds a member; a customer owner adds owners in the customer app (IR417)
+			cr := clientRoleMember
 			clientRole = &cr
 		}
 
@@ -716,12 +721,12 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 			}
 		}
 
-		listed := "active" // the status the customer's or contractor's user list shows: invited until the first sign-in
+		listed := statusActive // the status the customer's or contractor's user list shows: invited until the first sign-in
 		if account {
-			listed = "invited"
+			listed = statusInvited
 		}
 
-		if input.Role == "client" { // IR84 initial Consent
+		if input.Role == authz.RoleClient { // IR84 initial Consent
 			_, err := c.Tx.Exec(
 				ctx,
 				`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES
@@ -754,7 +759,7 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 		}
 		// FR-P11: the contractor company's user list includes the new account, listed as not signed in yet when the
 		// person was created with it (IR461); an address already on the list keeps its row
-		if input.Role == "contractor" || input.Role == "technician" {
+		if input.Role == authz.RoleContractor || input.Role == authz.RoleTechnician {
 			_, err := c.Tx.Exec(
 				ctx,
 				`INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role,
@@ -792,7 +797,9 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 
 		if member.UserID != input.UserID || member.OrganizationID != input.OrganizationID ||
 			member.Role != input.Role {
-			return Member{}, apperr.Fields(map[string]string{"role": "errors.membership_fixed"})
+			return Member{}, apperr.Fields(
+				map[string]string{keyRole: "errors.membership_fixed"},
+			)
 		}
 
 		if member.Version != *c.ExpectedVersion {
@@ -1023,10 +1030,10 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 
 	c.Emit(
 		ops.Event{
-			AggregateType: "membership",
+			AggregateType: kindMembership,
 			AggregateID:   memberID,
 			Type:          "MembershipSaved",
-			Payload:       map[string]any{"role": input.Role},
+			Payload:       map[string]any{keyRole: input.Role},
 		},
 	)
 
@@ -1041,7 +1048,7 @@ func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, 
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "members.save",
-			TargetKind:      "membership",
+			TargetKind:      kindMembership,
 			TargetID:        memberID.String(),
 			PreviousVersion: prev,
 			NextVersion:     &memberList[0].Version,
@@ -1062,12 +1069,12 @@ type RevokeSessionsInput struct {
 func (in *RevokeSessionsInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.MembershipID == uuid.Nil {
-		fieldErrs["membershipId"] = apperr.KeyRequired
+		fieldErrs[keyMembershipID] = apperr.KeyRequired
 	}
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fieldErrs["reason"] = apperr.KeyLength
+		fieldErrs[keyReason] = apperr.KeyLength
 	}
 
 	return fieldErrs
@@ -1136,7 +1143,7 @@ func membersRevokeSessions(
 		return SessionsRevoked{}, apperr.Wrap(err, "select identity.memberships")
 	}
 
-	requireErr := call.Require(authz.Facts{"client-membership": role == "client"})
+	requireErr := call.Require(authz.Facts{"client-membership": role == authz.RoleClient})
 	if requireErr != nil {
 		return SessionsRevoked{}, apperr.Wrap(requireErr, "ops.Call.Require")
 	}
@@ -1166,7 +1173,7 @@ func membersRevokeSessions(
 	when := revokedAt.Format(time.RFC3339)
 	call.Audit(ops.AuditEntry{
 		Action:     "members.revokeSessions",
-		TargetKind: "membership",
+		TargetKind: kindMembership,
 		TargetID:   input.MembershipID.String(),
 		Reason:     input.Reason,
 		After: map[string]*string{
@@ -1179,7 +1186,7 @@ func membersRevokeSessions(
 	})
 	call.Emit(
 		ops.Event{
-			AggregateType: "membership",
+			AggregateType: kindMembership,
 			AggregateID:   input.MembershipID,
 			Type:          EventSessionsRevoked,
 			Payload:       map[string]any{"userId": user, "revokedAt": revokedAt},

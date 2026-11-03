@@ -227,7 +227,7 @@ func (m Automations) list(
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&filters) != nil ||
-			(filters.Kind != nil && *filters.Kind != "schedule" && *filters.Kind != "event") {
+			(filters.Kind != nil && *filters.Kind != kindSchedule && *filters.Kind != kindEvent) {
 			return paging.Page[Automation]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
@@ -366,7 +366,7 @@ type extraCondition struct {
 // schedule (it has its own weekdays) and not the type of the rule's own condition. Returns the error key or "".
 func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondition, string) {
 	out := []extraCondition{}
-	if len(raw) == 0 || string(raw) == "null" {
+	if len(raw) == 0 || string(raw) == jsonNull {
 		return out, ""
 	}
 
@@ -386,7 +386,7 @@ func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondit
 		seen[extra.Type] = true
 		switch extra.Type {
 		case "weekday":
-			if kind == "schedule" {
+			if kind == kindSchedule {
 				return nil, "errors.weekday_on_schedule"
 			}
 
@@ -404,15 +404,15 @@ func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondit
 				extra.Value != nil {
 				return nil, apperr.KeyInvalid
 			}
-		case "occupancy":
+		case condOccupancy:
 			if extra.Occupied == nil || extra.Weekdays != nil || extra.Metric != nil ||
 				extra.Operator != nil ||
 				extra.Value != nil {
 				return nil, apperr.KeyInvalid
 			}
-		case "weather":
-			if extra.Metric == nil || *extra.Metric != "temperature" || extra.Operator == nil ||
-				!slices.Contains([]string{"gt", "gte", "lt", "lte"}, *extra.Operator) ||
+		case condWeather:
+			if extra.Metric == nil || *extra.Metric != metricTemperature || extra.Operator == nil ||
+				!slices.Contains([]string{"gt", opGTE, "lt", "lte"}, *extra.Operator) ||
 				extra.Value == nil ||
 				*extra.Value < -50 ||
 				*extra.Value > 100 ||
@@ -456,12 +456,12 @@ func parseCondition(raw json.RawMessage) (condition, bool) {
 	}
 
 	switch cond.Type {
-	case "occupancy":
+	case condOccupancy:
 		return cond, cond.Occupied != nil && cond.Event == nil && cond.LocalTime == nil &&
 			cond.Metric == nil &&
 			cond.Operator == nil &&
 			cond.Value == nil
-	case "location":
+	case condLocation:
 		return cond, cond.Event != nil &&
 			(*cond.Event == "arrival" || *cond.Event == "departure") &&
 			cond.Occupied == nil &&
@@ -476,9 +476,10 @@ func parseCondition(raw json.RawMessage) (condition, bool) {
 			cond.Metric == nil &&
 			cond.Operator == nil &&
 			cond.Value == nil
-	case "weather":
-		return cond, cond.Metric != nil && *cond.Metric == "temperature" && cond.Operator != nil &&
-			slices.Contains([]string{"gt", "gte", "lt", "lte"}, *cond.Operator) &&
+	case condWeather:
+		return cond, cond.Metric != nil && *cond.Metric == metricTemperature &&
+			cond.Operator != nil &&
+			slices.Contains([]string{"gt", opGTE, "lt", "lte"}, *cond.Operator) &&
 			cond.Value != nil &&
 			*cond.Value >= -50 &&
 			*cond.Value <= 100 &&
@@ -547,7 +548,7 @@ func (in *AutomationInput) Validate() map[string]string {
 	}
 
 	switch in.Kind {
-	case "schedule":
+	case kindSchedule:
 		if in.Condition != nil || in.Action != nil {
 			fieldErrs["kind"] = apperr.KeyInvalid
 		}
@@ -555,7 +556,7 @@ func (in *AutomationInput) Validate() map[string]string {
 		validSchedule(fieldErrs, in.Weekdays, in.StartLocal, in.EndLocal, in.EndsNextDay)
 		action("startAction", in.StartAction)
 		action("endAction", in.EndAction)
-	case "event":
+	case kindEvent:
 		if in.Weekdays != nil || in.StartLocal != "" || in.EndLocal != "" ||
 			in.EndsNextDay != nil ||
 			in.StartAction != nil ||
@@ -565,11 +566,11 @@ func (in *AutomationInput) Validate() map[string]string {
 
 		cnd, ok := parseCondition(in.Condition)
 		if !ok {
-			fieldErrs["condition"] = apperr.KeyInvalid
+			fieldErrs[keyCondition] = apperr.KeyInvalid
 		}
 
 		in.condition = cnd
-		action("action", in.Action)
+		action(keyAction, in.Action)
 	default:
 		fieldErrs["kind"] = apperr.KeyInvalid
 	}
@@ -685,12 +686,12 @@ func occurrences(
 		out = append(
 			out,
 			ScheduledOccurrence{
-				Phase:  "schedule_start",
+				Phase:  phaseScheduleStart,
 				At:     instantOf(day, def.StartLocal).UTC(),
 				Action: def.StartAction, AutomationID: nil,
 			},
 			ScheduledOccurrence{
-				Phase:  "schedule_end",
+				Phase:  phaseScheduleEnd,
 				At:     instantOf(end, def.EndLocal).UTC(),
 				Action: def.EndAction, AutomationID: nil,
 			},
@@ -771,8 +772,8 @@ func (m Automations) save(
 		}
 	}
 
-	if input.Kind == "event" &&
-		input.condition.Type == "location" { // location conditions need the owner's consent (SR02)
+	if input.Kind == kindEvent &&
+		input.condition.Type == condLocation { // location conditions need the owner's consent (SR02)
 		granted, err := identity.ConsentGranted(
 			ctx,
 			call,
@@ -785,7 +786,7 @@ func (m Automations) save(
 
 		if !granted {
 			return Automation{}, apperr.Fields(
-				map[string]string{"condition": "errors.consent_required"},
+				map[string]string{keyCondition: "errors.consent_required"},
 			)
 		}
 	}
@@ -804,7 +805,7 @@ func (m Automations) save(
 		def.OnlyIf, _ = json.Marshal(input.extras)
 	}
 
-	if input.Kind == "schedule" {
+	if input.Kind == kindSchedule {
 		loc, _ := time.LoadLocation(input.Timezone)
 		if _, bad := occurrences(def, loc, call.Now.In(loc), 367); bad {
 			return Automation{}, apperr.Fields(
@@ -893,7 +894,7 @@ func (m Automations) save(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "automations.save",
-			TargetKind:      "automation",
+			TargetKind:      kindAutomation,
 			TargetID:        automationID.String(),
 			PreviousVersion: prev,
 			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
@@ -1027,7 +1028,7 @@ func (m Automations) nextRuns(
 			return nil, err
 		}
 
-		if automation.Kind != "schedule" {
+		if automation.Kind != kindSchedule {
 			return nil, apperr.Fields(map[string]string{"automationId": "errors.not_schedule"})
 		}
 
@@ -1128,7 +1129,7 @@ func (m Automations) delete(
 
 	call.Emit(
 		ops.Event{
-			AggregateType: "automation",
+			AggregateType: kindAutomation,
 			AggregateID:   cur.ID,
 			Type:          "AutomationDeleted",
 			Payload:       map[string]any{"kind": cur.Kind},
@@ -1137,7 +1138,7 @@ func (m Automations) delete(
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "automations.delete",
-			TargetKind:      "automation",
+			TargetKind:      kindAutomation,
 			TargetID:        cur.ID.String(),
 			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     nil,

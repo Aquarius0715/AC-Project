@@ -25,10 +25,18 @@ var (
 	errNoGrantingAlternative  = errors.New("no granting alternative")
 )
 
+// The roles of a Membership (Membership.role of service-contracts.ts).
+const (
+	RoleClient     = "client"
+	RoleContractor = "contractor"
+	RoleTechnician = "technician"
+	RoleAdmin      = "admin"
+)
+
 // isRole reports whether name is a Membership.role or one of the two pseudo roles used in the catalog.
 func isRole(name string) bool {
 	switch name {
-	case "client", "contractor", "technician", "admin", "authenticated", "public":
+	case RoleClient, RoleContractor, RoleTechnician, RoleAdmin, "authenticated", "public":
 		return true
 	default:
 		return false

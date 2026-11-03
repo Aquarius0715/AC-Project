@@ -120,7 +120,7 @@ func (m *Module) RemindWarranties(ctx context.Context, call *ops.Call) (int, err
 
 		severity := "normal"
 		if days == warrantyReminderDays[0] {
-			severity = "warning"
+			severity = severityWarning
 		}
 
 		for _, r := range recipients {
@@ -128,12 +128,12 @@ func (m *Module) RemindWarranties(ctx context.Context, call *ops.Call) (int, err
 				RecipientMembershipID: r,
 				Type:                  "warranty_expiring",
 				TemplateKey:           "warranty_expiring",
-				TargetKind:            "unit",
+				TargetKind:            kindUnit,
 				TargetID:              dueUnit.id,
 				Severity:              severity,
 				Params: map[string]any{
 					"at":     dueUnit.ends,
-					"status": "expiring",
+					"status": coverageExpiring,
 				},
 				Channel:       "",
 				SourceAlertID: nil,
@@ -159,7 +159,7 @@ func (m *Module) RemindWarranties(ctx context.Context, call *ops.Call) (int, err
 		call.Audit(
 			ops.AuditEntry{
 				Action:     "units.remindWarranty",
-				TargetKind: "unit",
+				TargetKind: kindUnit,
 				TargetID:   dueUnit.id.String(),
 				Reason: fmt.Sprintf(
 					"%d days before the warranty ends",

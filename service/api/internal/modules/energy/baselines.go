@@ -16,6 +16,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -77,7 +78,7 @@ func scanBaseline(r pgx.Row) (Baseline, error) {
 
 // clientUnits restricts clients to baselines whose units all belong to their organization (IR90).
 func clientUnits(c *ops.Call, args *[]any) string {
-	if c.Principal.Role != "client" {
+	if c.Principal.Role != authz.RoleClient {
 		return "TRUE"
 	}
 
@@ -177,7 +178,7 @@ func listBaselines(
 			(filter.Method != nil && !slices.Contains(methods, *filter.Method)) ||
 			(filter.BoundaryID != nil && !slices.Contains(boundaries, *filter.BoundaryID)) {
 			return paging.Page[Baseline]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{keyFilters: apperr.KeyInvalid},
 			)
 		}
 
@@ -192,8 +193,8 @@ func listBaselines(
 		query.Sort,
 		map[string]string{
 			"id":         "b.id",
-			"createdAt":  "b.created_at",
-			"updatedAt":  "b.created_at",
+			keyCreatedAt: "b.created_at",
+			keyUpdatedAt: "b.created_at",
 			"periodFrom": "lower(b.period)",
 		},
 		"b.created_at DESC, b.id DESC",
@@ -309,7 +310,7 @@ func listBaselines(
 }
 
 var (
-	methods    = []string{"demo_fixed", "demo_period_comparison"}
+	methods    = []string{"demo_fixed", methodPeriodComparison}
 	boundaries = []string{"ac_input_electricity", "whole_building_electricity"}
 )
 
@@ -333,18 +334,18 @@ func (in *BaselineInput) Validate() map[string]string {
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fieldErrs["unitIds"] = apperr.KeyInvalid
+			fieldErrs[keyUnitIDs] = apperr.KeyInvalid
 		}
 
 		seen[u] = true
 	}
 
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 100 {
-		fieldErrs["unitIds"] = apperr.KeyInvalid
+		fieldErrs[keyUnitIDs] = apperr.KeyInvalid
 	}
 
 	if CheckRange(in.Period.From, in.Period.To) != nil {
-		fieldErrs["period"] = "errors.energy_range"
+		fieldErrs["period"] = keyEnergyRange
 	}
 
 	if !slices.Contains(boundaries, in.BoundaryID) {
@@ -367,7 +368,7 @@ func (in *BaselineInput) Validate() map[string]string {
 			*in.BaselineKWh < 0 {
 			fieldErrs["baselineKWh"] = apperr.KeyRange
 		}
-	case "demo_period_comparison":
+	case methodPeriodComparison:
 		if in.BaselineKWh != nil {
 			fieldErrs["baselineKWh"] = apperr.KeyNotAllowed
 		}
@@ -434,7 +435,7 @@ func saveBaseline(ctx context.Context, call *ops.Call, input *BaselineInput) (Ba
 	}
 
 	if known != len(input.UnitIDs) {
-		return Baseline{}, apperr.Fields(map[string]string{"unitIds": "errors.unit_unknown"})
+		return Baseline{}, apperr.Fields(map[string]string{keyUnitIDs: "errors.unit_unknown"})
 	}
 
 	baselineID, version := uuid.New(), 1
@@ -453,7 +454,7 @@ func saveBaseline(ctx context.Context, call *ops.Call, input *BaselineInput) (Ba
 	}
 
 	quality, value := []byte(modeledQuality), input.BaselineKWh
-	if input.Method == "demo_period_comparison" {
+	if input.Method == methodPeriodComparison {
 		integration, err := Integrate(ctx, call, input.UnitIDs, input.Period.From, input.Period.To)
 		if err != nil {
 			return Baseline{}, err

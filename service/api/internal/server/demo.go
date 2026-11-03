@@ -296,23 +296,23 @@ func (in *TriggerInput) Validate() map[string]string {
 		}
 
 		switch recovery := in.Recovery; {
-		case in.Kind == "restored" &&
+		case in.Kind == kindRestored &&
 			(recovery == nil || recovery.SourceEventID == uuid.Nil || devices.RecoveredValue[recovery.Axis] == "" ||
 				devices.RecoveredValue[recovery.Axis] != recovery.Value):
 			fieldErrs["recovery"] = apperr.KeyInvalid // DeviceRecovery: connection → online, power → on, tamper → clear
-		case in.Kind != "restored" && devices.FaultAxis[in.Kind] == "":
+		case in.Kind != kindRestored && devices.FaultAxis[in.Kind] == "":
 			fieldErrs["kind"] = apperr.KeyInvalid
-		case in.Kind != "restored" && recovery != nil:
+		case in.Kind != kindRestored && recovery != nil:
 			fieldErrs["recovery"] = apperr.KeyInvalid // faults carry no recovery (SR20)
 		}
-	case "state":
+	case keyState:
 		if in.DeviceID == nil {
 			fieldErrs["deviceId"] = apperr.KeyRequired
 		}
 
 		switch reportedState := in.State; {
 		case reportedState == nil:
-			fieldErrs["state"] = apperr.KeyRequired
+			fieldErrs[keyState] = apperr.KeyRequired
 		case reportedState.Mode != nil && *reportedState.Mode != "cool" && *reportedState.Mode != "dry" &&
 			*reportedState.Mode != "fan":
 			fieldErrs["state.mode"] = apperr.KeyInvalid
@@ -658,7 +658,7 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, input *TriggerInp
 		)
 	}
 
-	if input.EventType == "state" {
+	if input.EventType == keyState {
 		// the device's state report: the unit's observed settings and when the device was last heard
 		if input.OccurredAt.After(call.Now) {
 			return out, apperr.Fields(map[string]string{"occurredAt": apperr.KeyRange})

@@ -18,6 +18,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 // Fact is Fact of service-contracts.ts.
@@ -45,44 +46,44 @@ var factSpec = map[string]struct {
 	kind string // number | boolean | location
 	ttl  time.Duration
 }{
-	"temperature": {
+	metricTemperature: {
 		"°C",
-		"number",
+		valueNumber,
 		120 * time.Second,
 	},
-	"humidity": {"%", "number", 120 * time.Second},
-	"co2":      {"ppm", "number", 120 * time.Second},
+	"humidity": {"%", valueNumber, 120 * time.Second},
+	"co2":      {"ppm", valueNumber, 120 * time.Second},
 	"pm25": {
 		"µg/m³",
-		"number",
+		valueNumber,
 		120 * time.Second,
 	},
-	"power":                {"kW", "number", 120 * time.Second},
-	"vibration":            {"mm/s", "number", 120 * time.Second},
-	"refrigerant_pressure": {"kPa", "number", 120 * time.Second},
+	"power":                {"kW", valueNumber, 120 * time.Second},
+	"vibration":            {"mm/s", valueNumber, 120 * time.Second},
+	"refrigerant_pressure": {"kPa", valueNumber, 120 * time.Second},
 	// the contract's other Metric values (D07 units), which default rules watch (IR120, IR529)
 	"compressor_cycles": {
 		"cycles/h",
-		"number",
+		valueNumber,
 		120 * time.Second,
 	},
-	"airflow_drop":  {"%", "number", 120 * time.Second},
-	"heartbeat_gap": {"min", "number", 120 * time.Second},
+	"airflow_drop":  {"%", valueNumber, 120 * time.Second},
+	"heartbeat_gap": {"min", valueNumber, 120 * time.Second},
 	"weather_temperature": {
 		"°C",
-		"number",
+		valueNumber,
 		1800 * time.Second,
 	},
-	"tariff":  {"MYR_per_kWh", "number", 300 * time.Second},
-	"solar":   {"kW", "number", 120 * time.Second},
-	"battery": {"kW", "number", 120 * time.Second},
+	condTariff:  {"MYR_per_kWh", valueNumber, 300 * time.Second},
+	condSolar:   {"kW", valueNumber, 120 * time.Second},
+	condBattery: {"kW", valueNumber, 120 * time.Second},
 	"occupied": {
-		"boolean",
-		"boolean",
+		valueBoolean,
+		valueBoolean,
 		120 * time.Second,
 	},
-	"peak":     {"boolean", "boolean", 120 * time.Second},
-	"location": {"event", "location", 0},
+	condPeak:     {valueBoolean, valueBoolean, 120 * time.Second},
+	condLocation: {unitEvent, valueLocation, 0},
 }
 
 // Validate implements ops.Validator (D02 / IR16 / IR21).
@@ -120,7 +121,7 @@ func (in *EvaluationInput) Validate() map[string]string {
 
 		key := fact.UnitID.String() + "/" + fact.Metric
 		if !ok || fact.Unit != spec.unit || !units[fact.UnitID] || seen[key] ||
-			(fact.Quality != "valid" && fact.Quality != "missing" && fact.Quality != "stale" && fact.Quality != "suspect") {
+			(fact.Quality != "valid" && fact.Quality != "missing" && fact.Quality != qualityStale && fact.Quality != "suspect") {
 			fieldErrs["facts"] = apperr.KeyInvalid
 
 			continue
@@ -128,17 +129,17 @@ func (in *EvaluationInput) Validate() map[string]string {
 
 		seen[key] = true
 
-		if string(fact.Value) == "null" {
+		if string(fact.Value) == jsonNull {
 			continue
 		}
 
 		switch spec.kind {
-		case "number":
+		case valueNumber:
 			var v float64
 			if json.Unmarshal(fact.Value, &v) != nil || math.IsNaN(v) || math.IsInf(v, 0) {
 				fieldErrs["facts"] = apperr.KeyInvalid
 			}
-		case "boolean":
+		case valueBoolean:
 			var v bool
 			if json.Unmarshal(fact.Value, &v) != nil {
 				fieldErrs["facts"] = apperr.KeyInvalid
@@ -192,11 +193,11 @@ func conditionMetric(raw json.RawMessage) string {
 
 	_ = json.Unmarshal(raw, &cond)
 	switch cond.Type {
-	case "occupancy":
+	case condOccupancy:
 		return "occupied"
-	case "weather":
+	case condWeather:
 		return "weather_temperature"
-	case "location", "peak", "tariff", "solar", "battery":
+	case condLocation, condPeak, condTariff, condSolar, condBattery:
 		return cond.Type
 	}
 
@@ -227,7 +228,7 @@ func extrasMatch(
 		if extra.Type == "weekday" {
 			loc, err := time.LoadLocation(timezone)
 			if err != nil {
-				return "no_match"
+				return reasonNoMatch
 			}
 
 			wd := int(when.In(loc).Weekday())
@@ -236,7 +237,7 @@ func extrasMatch(
 			}
 
 			if !slices.Contains(extra.Weekdays, wd) {
-				return "no_match"
+				return reasonNoMatch
 			}
 
 			continue
@@ -265,15 +266,16 @@ func factState(
 	now time.Time,
 ) (json.RawMessage, string) {
 	fact, ok := facts[unit.String()+"/"+metric]
-	if !ok || string(fact.Value) == "null" || fact.ObservedAt.After(now) ||
-		(fact.Quality != "valid" && fact.Quality != "stale") {
-		return nil, "missing_data"
+	if !ok || string(fact.Value) == jsonNull || fact.ObservedAt.After(now) ||
+		(fact.Quality != "valid" && fact.Quality != qualityStale) {
+		return nil, reasonMissingData
 	}
 
 	spec := factSpec[metric]
-	if fact.Quality == "stale" || (metric != "location" && now.Sub(fact.ObservedAt) > spec.ttl) ||
-		(metric == "location" && !fact.ObservedAt.Truncate(time.Minute).Equal(now.Truncate(time.Minute))) {
-		return nil, "stale"
+	if fact.Quality == qualityStale ||
+		(metric != condLocation && now.Sub(fact.ObservedAt) > spec.ttl) ||
+		(metric == condLocation && !fact.ObservedAt.Truncate(time.Minute).Equal(now.Truncate(time.Minute))) {
+		return nil, qualityStale
 	}
 
 	return fact.Value, ""
@@ -283,7 +285,7 @@ func compare(op string, value, threshold float64) bool {
 	switch op {
 	case "gt":
 		return value > threshold
-	case "gte":
+	case opGTE:
 		return value >= threshold
 	case "lt":
 		return value < threshold
@@ -324,7 +326,7 @@ func match(
 			return ""
 		}
 
-		return "no_match"
+		return reasonNoMatch
 	}
 	numFact := func(metric string) string {
 		rawMessage, why := factState(facts, unit, metric, when)
@@ -339,16 +341,16 @@ func match(
 			return ""
 		}
 
-		return "no_match"
+		return reasonNoMatch
 	}
 
 	switch cond.Type {
-	case "occupancy":
+	case condOccupancy:
 		return boolFact("occupied", *cond.Occupied)
-	case "peak":
-		return boolFact("peak", *cond.Active)
-	case "location":
-		rawMessage, why := factState(facts, unit, "location", when)
+	case condPeak:
+		return boolFact(condPeak, *cond.Active)
+	case condLocation:
+		rawMessage, why := factState(facts, unit, condLocation, when)
 		if why != "" {
 			return why
 		}
@@ -360,23 +362,23 @@ func match(
 			return ""
 		}
 
-		return "no_match"
+		return reasonNoMatch
 	case "pattern": // IR52: local time of occurredAt equals localTime
 		loc, err := time.LoadLocation(timezone)
 		if err != nil || when.In(loc).Format("15:04") != *cond.LocalTime {
-			return "no_match"
+			return reasonNoMatch
 		}
 
 		return ""
-	case "weather":
+	case condWeather:
 		return numFact("weather_temperature")
-	case "tariff":
-		return numFact("tariff")
-	case "solar", "battery":
+	case condTariff:
+		return numFact(condTariff)
+	case condSolar, condBattery:
 		return numFact(cond.Type)
 	}
 
-	return "no_match"
+	return reasonNoMatch
 }
 
 // ownerValid re-authorizes a rule owner at evaluation time (D02): an active membership with control.execute (client
@@ -498,7 +500,7 @@ func (m Automations) candidates(
 			return nil, apperr.Wrap(err, "select control.automation_policies")
 		}
 
-		if input.Phase == "condition" {
+		if input.Phase == keyCondition {
 			out = append(out, cand)
 		}
 	}
@@ -519,7 +521,7 @@ func (m Automations) candidates(
 
 	for rows.Next() {
 		cand := candidate{
-			kind:     "automation",
+			kind:     kindAutomation,
 			hq:       false,
 			id:       uuid.UUID{},
 			priority: 0,
@@ -555,9 +557,9 @@ func (m Automations) candidates(
 		cand.extras = def.OnlyIf
 
 		switch {
-		case kind == "event" && input.Phase == "condition":
+		case kind == kindEvent && input.Phase == keyCondition:
 			cand.cond, cand.action = def.Condition, def.Action
-		case kind == "schedule" && input.Phase != "condition": // due when an occurrence of this phase is at the tick
+		case kind == kindSchedule && input.Phase != keyCondition: // due when an occurrence of this phase is at the tick
 			loc, err := time.LoadLocation(cand.tz)
 			if err != nil {
 				continue
@@ -617,13 +619,13 @@ func (m Automations) decide(
 		return Decision{}, nil, nil, apperr.Wrap(err, "control.Units.Target")
 	}
 
-	if input.Phase == "schedule_end" &&
+	if input.Phase == phaseScheduleEnd &&
 		slices.ContainsFunc(cands, func(x candidate) bool { return x.enabled }) {
 		// a schedule that starts on the unit in the same minute wins over the end (IR326 item 4, IR504): when its
 		// start would run, the end is not sent and each enabled end rule records superseded. A start that would not
 		// run (owner, restriction, capability, offline …) leaves the end as before.
 		start := *input
-		start.Phase = "schedule_start"
+		start.Phase = phaseScheduleStart
 
 		sd, _, _, err := m.decide(ctx, call, unit, &start, facts)
 		if err != nil {
@@ -643,7 +645,7 @@ func (m Automations) decide(
 
 			return Decision{
 				UnitID:    unit,
-				Decision:  "suppressed",
+				Decision:  decisionSuppressed,
 				Reason:    &superseded,
 				RuleID:    nil,
 				CommandID: nil,
@@ -673,7 +675,7 @@ func (m Automations) decide(
 		case cand.cond != nil && match(cand.cond, unit, facts, input.OccurredAt, cand.tz) != "":
 			reason = match(cand.cond, unit, facts, input.OccurredAt, cand.tz)
 			_, present := facts[unit.String()+"/"+conditionMetric(cand.cond)] // its own data arrived, but missing or stale
-			own = present && (reason == "missing_data" || reason == "stale")
+			own = present && (reason == reasonMissingData || reason == qualityStale)
 		default:
 			own = true
 			reason = extrasMatch(cand.extras, unit, facts, input.OccurredAt, cand.tz)
@@ -690,7 +692,7 @@ func (m Automations) decide(
 			}
 		}
 
-		if reason == "" && cond.Type == "location" {
+		if reason == "" && cond.Type == condLocation {
 			granted, err := identity.ConsentGranted(ctx, call, cand.owner, "location_automation")
 			if err != nil {
 				return Decision{}, nil, nil, apperr.Wrap(err, "identity.ConsentGranted")
@@ -755,17 +757,17 @@ func (m Automations) decide(
 				cand:   cand,
 				reason: reason,
 				recorded: reason != "disabled" &&
-					(own || (reason != "no_match" && reason != "missing_data" && reason != "stale")),
+					(own || (reason != reasonNoMatch && reason != reasonMissingData && reason != qualityStale)),
 			},
 		)
 	}
 
 	if len(cands) == 0 {
-		r := "no_match"
+		r := reasonNoMatch
 
 		return Decision{
 			UnitID:    unit,
-			Decision:  "suppressed",
+			Decision:  decisionSuppressed,
 			Reason:    &r,
 			RuleID:    nil,
 			CommandID: nil,
@@ -783,7 +785,7 @@ func (m Automations) decide(
 
 	return Decision{
 		UnitID:    unit,
-		Decision:  "suppressed",
+		Decision:  decisionSuppressed,
 		Reason:    &r,
 		RuleID:    nil,
 		CommandID: nil,
@@ -819,7 +821,7 @@ func (m Automations) targets(ctx context.Context, call *ops.Call, in *Evaluation
 			return apperr.Wrap(err, "control.Units.Target")
 		}
 
-		if !found || (call.Principal.Role == "client" && t.OrgID != call.Principal.OrgID) {
+		if !found || (call.Principal.Role == authz.RoleClient && t.OrgID != call.Principal.OrgID) {
 			return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 	}
@@ -851,7 +853,7 @@ func (m Automations) evaluate(
 		}
 
 		ref := input.EventID.String() + "/" + input.Phase
-		if input.Phase != "condition" {
+		if input.Phase != keyCondition {
 			ref = scheduleRef(input.Phase, input.OccurredAt)
 		}
 
@@ -888,7 +890,7 @@ func (m Automations) evaluate(
 				Scan(&earlier)
 			switch {
 			case err == nil: // this trigger already ran for the rule and unit
-				decision.Decision, decision.CommandID = "requested", &earlier
+				decision.Decision, decision.CommandID = decisionRequested, &earlier
 			case !errors.Is(err, pgx.ErrNoRows):
 				return Result{}, apperr.Wrap(err, "select control.automation_runs")
 			default:
@@ -897,7 +899,7 @@ func (m Automations) evaluate(
 					return Result{}, err
 				}
 
-				decision.Decision, decision.CommandID, decision.fresh = "requested", &commandID, true
+				decision.Decision, decision.CommandID, decision.fresh = decisionRequested, &commandID, true
 
 				_, execErr := call.Tx.Exec(
 					ctx,
@@ -945,11 +947,11 @@ func (m Automations) evaluate(
 				}
 
 				_ = json.Unmarshal(n, &x)
-				matched = matched || x.Decision != "suppressed"
+				matched = matched || x.Decision != decisionSuppressed
 			}
 
-			if matched && decision.Decision == "suppressed" && decision.Reason != nil &&
-				*decision.Reason == "no_match" {
+			if matched && decision.Decision == decisionSuppressed && decision.Reason != nil &&
+				*decision.Reason == reasonNoMatch {
 				r := "no_control_action"
 				decision.Reason = &r
 			}
@@ -987,13 +989,13 @@ func (m Automations) automationCommand(
 	if err == nil {
 		call.Emit(
 			ops.Event{
-				AggregateType: "command",
+				AggregateType: kindCommand,
 				AggregateID:   commandID,
-				Type:          "CommandRequested",
+				Type:          eventCommandRequested,
 				Payload: map[string]any{
-					"unitId": unit,
-					"source": "automation",
-					"ruleId": win.id,
+					keyUnitID: unit,
+					keySource: kindAutomation,
+					"ruleId":  win.id,
 				},
 			},
 		)

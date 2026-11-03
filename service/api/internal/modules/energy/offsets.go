@@ -15,6 +15,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/audit"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -81,14 +82,14 @@ func (in *QuoteInput) Validate() map[string]string {
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fieldErrs["unitIds"] = apperr.KeyInvalid
+			fieldErrs[keyUnitIDs] = apperr.KeyInvalid
 		}
 
 		seen[u] = true
 	}
 
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 100 {
-		fieldErrs["unitIds"] = apperr.KeyInvalid
+		fieldErrs[keyUnitIDs] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -141,7 +142,7 @@ func customerOf(
 	)
 
 	switch {
-	case call.Principal.Role == "client":
+	case call.Principal.Role == authz.RoleClient:
 		err = call.Tx.QueryRow(ctx, `SELECT id, organization_id FROM energy.ref_customers WHERE organization_id =
 			$1`, call.Principal.OrgID).
 			Scan(&customerID, &org)
@@ -203,11 +204,13 @@ func previewQuote(ctx context.Context, call *ops.Call, input *QuoteInput) (Quote
 	}
 
 	if inOrg != len(input.UnitIDs) {
-		if call.Principal.Role == "client" {
+		if call.Principal.Role == authz.RoleClient {
 			return Quote{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
-		return Quote{}, apperr.Fields(map[string]string{"unitIds": "errors.units_outside_customer"})
+		return Quote{}, apperr.Fields(
+			map[string]string{keyUnitIDs: "errors.units_outside_customer"},
+		)
 	}
 
 	var quoteID uuid.UUID
@@ -372,7 +375,7 @@ func decorateRecord(ctx context.Context, call *ops.Call, record *Record) error {
 
 	for _, v := range hist {
 		e := Event(v)
-		if call.Principal.Role == "client" { // a customer never sees an actor's name (IR305)
+		if call.Principal.Role == authz.RoleClient { // a customer never sees an actor's name (IR305)
 			e.ActorName = nil
 		}
 
@@ -390,7 +393,7 @@ func loadRecord(ctx context.Context, call *ops.Call, id uuid.UUID, lock bool) (R
 
 	record, err := scanRecord(call.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && call.Principal.Role == "client" && record.customerOrg != call.Principal.OrgID) {
+		(err == nil && call.Principal.Role == authz.RoleClient && record.customerOrg != call.Principal.OrgID) {
 		return Record{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
@@ -450,7 +453,9 @@ func listRecords(
 	if err != nil ||
 		(filter.Status != nil &&
 			!strings.Contains(" demo_requested demo_purchased demo_retired failed ", " "+*filter.Status+" ")) {
-		return paging.Page[Record]{}, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
+		return paging.Page[Record]{}, apperr.Fields(
+			map[string]string{keyFilters: apperr.KeyInvalid},
+		)
 	}
 
 	if filter.From != nil && filter.To != nil && !filter.From.Before(*filter.To) {
@@ -461,7 +466,11 @@ func listRecords(
 
 	order, err := paging.OrderBy(
 		query.Sort,
-		map[string]string{"id": "r.id", "createdAt": "r.created_at", "updatedAt": "r.updated_at"},
+		map[string]string{
+			"id":         "r.id",
+			keyCreatedAt: colCreatedAt,
+			keyUpdatedAt: "r.updated_at",
+		},
 		"r.created_at DESC, r.id DESC",
 	)
 	if err != nil {
@@ -482,7 +491,7 @@ func listRecords(
 	}
 
 	conds := []string{"TRUE"}
-	if call.Principal.Role == "client" { // IR90 / REV19-030: every quote unit must be the client's
+	if call.Principal.Role == authz.RoleClient { // IR90 / REV19-030: every quote unit must be the client's
 		conds = append(
 			conds,
 			"cu.organization_id = "+add(call.Principal.OrgID),
@@ -587,7 +596,7 @@ func (in *SimulateInput) Validate() map[string]string {
 	}
 
 	switch in.Event {
-	case "request":
+	case eventRequest:
 		if in.QuoteID == nil || in.QuoteVersion == nil || in.RecordID != nil ||
 			in.AttemptID != nil ||
 			in.EventID != nil {
@@ -598,7 +607,7 @@ func (in *SimulateInput) Validate() map[string]string {
 			in.QuoteVersion != nil {
 			fieldErrs["recordId"] = apperr.KeyInvalid
 		}
-	case "retry":
+	case eventRetry:
 		if in.RecordID == nil || in.AttemptID == nil || in.EventID != nil || in.QuoteID != nil ||
 			in.QuoteVersion != nil {
 			fieldErrs["recordId"] = apperr.KeyInvalid
@@ -657,14 +666,14 @@ func demoRef(prefix string) *string {
 //	@Security		BearerAuth
 //	@Router			/v1/offsets/simulate [post]
 func simulate(ctx context.Context, call *ops.Call, input *SimulateInput) (Record, error) {
-	client := call.Principal.Role == "client"
-	if client && input.Event != "request" && input.Event != "retry" {
+	client := call.Principal.Role == authz.RoleClient
+	if client && input.Event != eventRequest && input.Event != eventRetry {
 		return Record{}, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
 	conflict := apperr.E(apperr.Conflict, "errors.offset_state")
 
-	if input.Event == "request" {
+	if input.Event == eventRequest {
 		quote, err := scanQuote(
 			call.Tx.QueryRow(
 				ctx,
@@ -806,8 +815,8 @@ func simulate(ctx context.Context, call *ops.Call, input *SimulateInput) (Record
 	}
 
 	switch {
-	case input.Event == "purchase_confirm" && record.State == "demo_requested" && cur.Stage == "purchase" &&
-		cur.Status == "pending":
+	case input.Event == "purchase_confirm" && record.State == stateDemoRequested && cur.Stage == "purchase" &&
+		cur.Status == statusPending:
 		finishErr := finish("succeeded")
 		if finishErr != nil {
 			return record, finishErr
@@ -818,32 +827,32 @@ func simulate(ctx context.Context, call *ops.Call, input *SimulateInput) (Record
 			ref = demoRef("DEMO-PUR")
 		}
 
-		setStateErr := setState("demo_purchased", ref, nil, nil)
+		setStateErr := setState(stateDemoPurchased, ref, nil, nil)
 		if setStateErr != nil {
 			return record, setStateErr
 		}
 
 		err = newAttempt(ctx, call, record.ID, "retirement")
-	case input.Event == "retire" && record.State == "demo_purchased" && cur.Stage == "retirement" &&
-		cur.Status == "pending":
+	case input.Event == "retire" && record.State == stateDemoPurchased && cur.Stage == "retirement" &&
+		cur.Status == statusPending:
 		finishErr := finish("succeeded")
 		if finishErr != nil {
 			return record, finishErr
 		}
 
 		err = setState("demo_retired", nil, demoRef("DEMO-RET"), demoRef("DEMO-CERT"))
-	case input.Event == "fail" && (record.State == "demo_requested" || record.State == "demo_purchased") &&
-		cur.Status == "pending":
+	case input.Event == "fail" && (record.State == stateDemoRequested || record.State == stateDemoPurchased) &&
+		cur.Status == statusPending:
 		finishErr := finish("failed")
 		if finishErr != nil {
 			return record, finishErr
 		}
 
 		err = setState("failed", nil, nil, nil)
-	case input.Event == "retry" && record.State == "failed" && cur.Status == "failed":
-		next := "demo_requested"
+	case input.Event == eventRetry && record.State == "failed" && cur.Status == "failed":
+		next := stateDemoRequested
 		if cur.Stage == "retirement" {
-			next = "demo_purchased"
+			next = stateDemoPurchased
 		}
 
 		setStateErr := setState(next, nil, nil, nil)

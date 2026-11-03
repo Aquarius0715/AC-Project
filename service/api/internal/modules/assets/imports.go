@@ -47,7 +47,7 @@ const (
 )
 
 var importColumns = map[string]bool{
-	"property": true, "floor": true, "room": true, "unit_name": true, "model_code": true,
+	kindProperty: true, levelFloor: true, levelRoom: true, "unit_name": true, "model_code": true,
 	"serial": true, "installed_on": true, "warranty_end": true,
 }
 
@@ -110,7 +110,7 @@ func (in *ImportPreviewInput) Validate() map[string]string {
 	}
 
 	if strings.TrimSpace(in.CSVText) == "" {
-		fieldErrs["csvText"] = apperr.KeyRequired
+		fieldErrs[keyCSVText] = apperr.KeyRequired
 	}
 
 	for k := range in.Mapping {
@@ -119,7 +119,7 @@ func (in *ImportPreviewInput) Validate() map[string]string {
 		}
 	}
 
-	for _, k := range []string{"property", "unit_name", "model_code"} {
+	for _, k := range []string{kindProperty, "unit_name", "model_code"} {
 		if strings.TrimSpace(in.Mapping[k]) == "" {
 			fieldErrs["mapping."+k] = apperr.KeyRequired
 		}
@@ -192,7 +192,7 @@ func (m *Module) unitsImportPreview(
 		return ImportPreview{}, apperr.Wrap(err, "select assets.customers")
 	}
 
-	if status != "active" {
+	if status != statusActive {
 		return ImportPreview{}, conflict(apperr.KeyCustomerInactive)
 	}
 
@@ -201,7 +201,9 @@ func (m *Module) unitsImportPreview(
 
 	header, err := reader.Read()
 	if err != nil {
-		return ImportPreview{}, apperr.Fields(map[string]string{"csvText": apperr.KeyMalformedCsv})
+		return ImportPreview{}, apperr.Fields(
+			map[string]string{keyCSVText: apperr.KeyMalformedCsv},
+		)
 	}
 
 	idx := map[string]int{}
@@ -236,18 +238,20 @@ func (m *Module) unitsImportPreview(
 
 		if err != nil {
 			return ImportPreview{}, apperr.Fields(
-				map[string]string{"csvText": apperr.KeyMalformedCsv},
+				map[string]string{keyCSVText: apperr.KeyMalformedCsv},
 			)
 		}
 
 		if rowNumber > maxImportRows {
-			return ImportPreview{}, apperr.Fields(map[string]string{"csvText": "error.tooManyRows"})
+			return ImportPreview{}, apperr.Fields(
+				map[string]string{keyCSVText: "error.tooManyRows"},
+			)
 		}
 
 		row := storedRow{
 			ImportRow: ImportRow{
 				RowNumber:    rowNumber,
-				Result:       "ready",
+				Result:       rowReady,
 				PropertyName: "",
 				FloorName:    nil,
 				RoomName:     nil,
@@ -267,14 +271,14 @@ func (m *Module) unitsImportPreview(
 			CapVersion:  0,
 		}
 		get := func(k string) *string { return cell(rec, idx, k) }
-		fail := func(key string) { row.Result, row.MessageKey = "error", new(key) }
+		fail := func(key string) { row.Result, row.MessageKey = rowError, new(key) }
 		warn := func(key string) {
-			if row.Result == "ready" {
-				row.Result, row.MessageKey = "warning", new(key)
+			if row.Result == rowReady {
+				row.Result, row.MessageKey = rowWarning, new(key)
 			}
 		}
 
-		if p := get("property"); p != nil {
+		if p := get(kindProperty); p != nil {
 			row.PropertyName = *p
 		}
 
@@ -287,9 +291,9 @@ func (m *Module) unitsImportPreview(
 		}
 
 		row.FloorName, row.RoomName, row.Serial, row.InstalledOn, row.WarrantyEnd = get(
-			"floor",
+			levelFloor,
 		), get(
-			"room",
+			levelRoom,
 		), get(
 			"serial",
 		), get(
@@ -304,7 +308,7 @@ func (m *Module) unitsImportPreview(
 			fail(apperr.KeyLength)
 		}
 
-		if row.Result != "error" {
+		if row.Result != rowError {
 			err := call.Tx.QueryRow(ctx, `SELECT id FROM assets.properties WHERE customer_org_id = $1 AND NOT archived AND
 				lower(name) = lower($2) ORDER BY id LIMIT 1`,
 				org, row.PropertyName).
@@ -325,7 +329,7 @@ func (m *Module) unitsImportPreview(
 			}
 		}
 
-		if row.Result != "error" {
+		if row.Result != rowError {
 			modelID, capVersion, ok, err := m.Import.ByCode(ctx, call, row.ModelCode)
 			if err != nil {
 				return ImportPreview{}, apperr.Wrap(err, "assets.ImportModels.ByCode")
@@ -339,7 +343,7 @@ func (m *Module) unitsImportPreview(
 		}
 
 		for _, d := range []*string{row.InstalledOn, row.WarrantyEnd} {
-			if row.Result != "error" && d != nil {
+			if row.Result != rowError && d != nil {
 				_, err := time.ParseInLocation("2006-01-02", *d, kualaLumpur)
 				if err != nil {
 					fail("error.importInvalidDate")
@@ -347,7 +351,7 @@ func (m *Module) unitsImportPreview(
 			}
 		}
 
-		if row.Result != "error" && row.InstalledOn != nil {
+		if row.Result != rowError && row.InstalledOn != nil {
 			if t, _ := time.ParseInLocation(
 				"2006-01-02",
 				*row.InstalledOn,
@@ -359,7 +363,7 @@ func (m *Module) unitsImportPreview(
 			}
 		}
 
-		if row.Result != "error" &&
+		if row.Result != rowError &&
 			row.Serial != nil { // the device must exist, be free and untampered; one row per serial
 			deviceID, state, err := m.Import.SerialState(ctx, call, *row.Serial)
 			if err != nil {
@@ -369,7 +373,7 @@ func (m *Module) unitsImportPreview(
 			switch key := strings.ToUpper(*row.Serial); {
 			case serials[key]:
 				fail(apperr.KeyDuplicateSerial)
-			case state == "unknown":
+			case state == stateUnknown:
 				fail("error.unknownSerial")
 			case state == "bound":
 				fail("error.serialBound")
@@ -389,8 +393,8 @@ func (m *Module) unitsImportPreview(
 			name *string
 			kind string
 			dst  **uuid.UUID
-		}{{row.FloorName, "floor", &row.FloorID}, {row.RoomName, "room", &row.RoomID}} {
-			if row.Result == "error" || lvl.name == nil {
+		}{{row.FloorName, levelFloor, &row.FloorID}, {row.RoomName, levelRoom, &row.RoomID}} {
+			if row.Result == rowError || lvl.name == nil {
 				continue
 			}
 
@@ -417,7 +421,7 @@ func (m *Module) unitsImportPreview(
 			parent, parentSpace = spaceID, &spaceID
 		}
 
-		if row.Result != "error" {
+		if row.Result != rowError {
 			key := parent.String() + "/" + strings.ToLower(row.UnitName)
 
 			var exists bool
@@ -441,7 +445,7 @@ func (m *Module) unitsImportPreview(
 	}
 
 	if len(stored) == 0 {
-		return ImportPreview{}, apperr.Fields(map[string]string{"csvText": "error.noRows"})
+		return ImportPreview{}, apperr.Fields(map[string]string{keyCSVText: "error.noRows"})
 	}
 
 	importPreview := ImportPreview{
@@ -459,9 +463,9 @@ func (m *Module) unitsImportPreview(
 	for _, s := range stored {
 		importPreview.Rows = append(importPreview.Rows, s.ImportRow)
 		switch s.Result {
-		case "ready":
+		case rowReady:
 			importPreview.ReadyCount++
-		case "warning":
+		case rowWarning:
 			importPreview.WarningCount++
 		default:
 			importPreview.ErrorCount++
@@ -668,9 +672,9 @@ func (m *Module) unitsImportCommit(
 		properties = append(properties, propertyID)
 		call.Emit(
 			ops.Event{
-				AggregateType: "property",
+				AggregateType: kindProperty,
 				AggregateID:   propertyID,
-				Type:          "LocationChanged",
+				Type:          eventLocationChanged,
 				Payload:       nil,
 			},
 		)
@@ -721,9 +725,9 @@ func (m *Module) unitsImportCommit(
 		spaces = append(spaces, spaceID)
 		call.Emit(
 			ops.Event{
-				AggregateType: "space",
+				AggregateType: kindSpace,
 				AggregateID:   spaceID,
-				Type:          "LocationChanged",
+				Type:          eventLocationChanged,
 				Payload:       nil,
 			},
 		)
@@ -732,7 +736,7 @@ func (m *Module) unitsImportCommit(
 	}
 
 	for _, row := range rows {
-		if row.Result == "error" {
+		if row.Result == rowError {
 			skipped = append(skipped, int32(row.RowNumber))
 
 			continue
@@ -752,12 +756,12 @@ func (m *Module) unitsImportCommit(
 			return UnitImport{}, err
 		}
 
-		floor, err := resolve(propertyID, row.FloorID, nil, "floor", floorName)
+		floor, err := resolve(propertyID, row.FloorID, nil, levelFloor, floorName)
 		if err != nil {
 			return UnitImport{}, err
 		}
 
-		room, err := resolve(propertyID, row.RoomID, floor, "room", roomName)
+		room, err := resolve(propertyID, row.RoomID, floor, levelRoom, roomName)
 		if err != nil {
 			return UnitImport{}, err
 		}
@@ -804,9 +808,9 @@ func (m *Module) unitsImportCommit(
 		units = append(units, unitID)
 		call.Emit(
 			ops.Event{
-				AggregateType: "unit",
+				AggregateType: kindUnit,
 				AggregateID:   unitID,
-				Type:          "UnitChanged",
+				Type:          eventUnitChanged,
 				Payload:       nil,
 			},
 		)
@@ -1015,7 +1019,12 @@ func (m *Module) unitsImportUndo(
 
 	for _, u := range unitImport.CreatedUnitIDs {
 		call.Emit(
-			ops.Event{AggregateType: "unit", AggregateID: u, Type: "UnitChanged", Payload: nil},
+			ops.Event{
+				AggregateType: kindUnit,
+				AggregateID:   u,
+				Type:          eventUnitChanged,
+				Payload:       nil,
+			},
 		)
 	}
 
