@@ -146,8 +146,8 @@ func runMail(ctx context.Context) {
 
 	log.Printf("notification worker: sending e-mails through %s", addr)
 
-	t := time.NewTicker(5 * time.Second)
-	defer t.Stop()
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 
 	for {
 		n, err := notify.DeliverAll(
@@ -167,7 +167,7 @@ func runMail(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.C:
+		case <-ticker.C:
 		}
 	}
 }
@@ -198,22 +198,22 @@ func runHousekeeping(ctx context.Context) {
 	}
 	defer srv.DB.Close()
 
-	t := time.NewTicker(time.Hour)
-	defer t.Stop()
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
 
 	for {
 		now := srv.Registry.Clock()
 
-		s, err := events.Housekeep(ctx, srv.DB, now, srv.Consumers)
+		swept, err := events.Housekeep(ctx, srv.DB, now, srv.Consumers)
 		if err != nil {
 			log.Printf("housekeeping: %v", err)
 		} else {
 			log.Printf(
 				"housekeeping: removed %d outbox events, %d processed-event records, %d failure records, %d idempotency keys",
-				s.Outbox,
-				s.Processed,
-				s.Failures,
-				s.IdempotencyKeys,
+				swept.Outbox,
+				swept.Processed,
+				swept.Failures,
+				swept.IdempotencyKeys,
 			)
 		}
 
@@ -234,7 +234,7 @@ func runHousekeeping(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.C:
+		case <-ticker.C:
 		}
 	}
 }

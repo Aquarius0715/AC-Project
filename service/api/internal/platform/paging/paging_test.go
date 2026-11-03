@@ -18,18 +18,18 @@ func code(err error) apperr.Code {
 func TestResolveAndNext(t *testing.T) {
 	cond := map[string]any{"propertyId": "p1"}
 
-	w, err := Resolve(Query{Cursor: nil, Limit: nil, Sort: nil, Filters: nil}, cond, 1, 1)
-	if err != nil || w.Limit != 25 || w.Offset != 0 {
-		t.Fatalf("defaults: %+v %v", w, err)
+	window, err := Resolve(Query{Cursor: nil, Limit: nil, Sort: nil, Filters: nil}, cond, 1, 1)
+	if err != nil || window.Limit != 25 || window.Offset != 0 {
+		t.Fatalf("defaults: %+v %v", window, err)
 	}
 
-	if w.Next(25) != nil || w.Next(10) != nil {
+	if window.Next(25) != nil || window.Next(10) != nil {
 		t.Fatal("no next page at the end")
 	}
 
-	w, _ = Resolve(Query{Limit: new(2), Cursor: nil, Sort: nil, Filters: nil}, cond, 1, 1)
+	window, _ = Resolve(Query{Limit: new(2), Cursor: nil, Sort: nil, Filters: nil}, cond, 1, 1)
 
-	next := w.Next(5)
+	next := window.Next(5)
 	if next == nil {
 		t.Fatal("next")
 	}
@@ -169,7 +169,7 @@ func TestOrderByDirection(t *testing.T) {
 
 // TestContains: the search term is matched as written, anywhere in the value (IR388).
 func TestContains(t *testing.T) {
-	for in, want := range map[string]string{
+	for input, want := range map[string]string{
 		"filter":   `%filter%`,
 		"  mesh  ": `%mesh%`,
 		"50%":      `%50\%%`,
@@ -177,8 +177,8 @@ func TestContains(t *testing.T) {
 		`C:\x`:     `%C:\\x%`,
 		"%_%":      `%\%\_\%%`,
 	} {
-		if got := Contains(in); got != want {
-			t.Errorf("Contains(%q) = %q, want %q", in, got, want)
+		if got := Contains(input); got != want {
+			t.Errorf("Contains(%q) = %q, want %q", input, got, want)
 		}
 	}
 }

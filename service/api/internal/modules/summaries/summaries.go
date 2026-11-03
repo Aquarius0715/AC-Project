@@ -116,14 +116,14 @@ var roleKind = map[string]string{
 //	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/summaries/{kind} [get]
-func (m Summaries) get(ctx context.Context, c *ops.Call, in *Input) (Summary, error) {
-	if roleKind[c.Principal.Role] != in.Kind {
+func (m Summaries) get(ctx context.Context, call *ops.Call, in *Input) (Summary, error) {
+	if roleKind[call.Principal.Role] != in.Kind {
 		return Summary{}, apperr.E(apperr.Forbidden, "error.forbidden")
 	}
 
 	out := Summary{
 		Kind: in.Kind,
-		AsOf: c.Now,
+		AsOf: call.Now,
 		Counts: Counts{
 			Total:           0,
 			Online:          0,
@@ -165,20 +165,28 @@ func (m Summaries) get(ctx context.Context, c *ops.Call, in *Input) (Summary, er
 			return Summary{}, apperr.Fields(map[string]string{"filters.to": "error.range"})
 		}
 
-		n, err := m.Units.CountUnits(ctx, c, true, f.UnitIDs, f.CustomerID, f.PropertyID, f.UnitID)
+		unitCounts, err := m.Units.CountUnits(
+			ctx,
+			call,
+			true,
+			f.UnitIDs,
+			f.CustomerID,
+			f.PropertyID,
+			f.UnitID,
+		)
 		if err != nil {
 			return Summary{}, apperr.Wrap(err, "summaries.Units.CountUnits")
 		}
 
 		out.Counts = Counts{
-			Total:           n.Total,
-			Online:          n.Online,
-			Offline:         n.Offline,
-			Unknown:         n.Unknown,
-			PowerOn:         n.PowerOn,
-			PowerOff:        n.PowerOff,
-			PowerUnknown:    n.PowerUnknown,
-			AlertCount:      n.AlertCount,
+			Total:           unitCounts.Total,
+			Online:          unitCounts.Online,
+			Offline:         unitCounts.Offline,
+			Unknown:         unitCounts.Unknown,
+			PowerOn:         unitCounts.PowerOn,
+			PowerOff:        unitCounts.PowerOff,
+			PowerUnknown:    unitCounts.PowerUnknown,
+			AlertCount:      unitCounts.AlertCount,
 			OfferCount:      0,
 			ActiveCount:     0,
 			ReviewCount:     0,
@@ -191,10 +199,10 @@ func (m Summaries) get(ctx context.Context, c *ops.Call, in *Input) (Summary, er
 		return out, nil
 	}
 
-	j, err := ops.Ask[maintenance.JobCounts](
+	jobCounts, err := ops.Ask[maintenance.JobCounts](
 		ctx,
 		m.Registry,
-		c,
+		call,
 		maintenance.QueryCountJobs,
 		maintenance.CountJobsInput{Filters: in.Filters},
 	)
@@ -203,13 +211,13 @@ func (m Summaries) get(ctx context.Context, c *ops.Call, in *Input) (Summary, er
 	}
 
 	out.Counts = Counts{
-		OfferCount:      j.Offer,
-		ActiveCount:     j.Active,
-		ReviewCount:     j.Review,
-		ScheduledCount:  j.Scheduled,
-		InProgressCount: j.InProgress,
-		OverdueCount:    j.Overdue,
-		AssignedCount:   j.Assigned,
+		OfferCount:      jobCounts.Offer,
+		ActiveCount:     jobCounts.Active,
+		ReviewCount:     jobCounts.Review,
+		ScheduledCount:  jobCounts.Scheduled,
+		InProgressCount: jobCounts.InProgress,
+		OverdueCount:    jobCounts.Overdue,
+		AssignedCount:   jobCounts.Assigned,
 		Total:           0,
 		Online:          0,
 		Offline:         0,
@@ -220,12 +228,12 @@ func (m Summaries) get(ctx context.Context, c *ops.Call, in *Input) (Summary, er
 		AlertCount:      0,
 	}
 	if in.Kind == "technician" { // assigned-equipment counts deduplicate the units of current rows (IR26, IR49)
-		ids := j.Units
+		ids := jobCounts.Units
 		if ids == nil {
 			ids = []uuid.UUID{}
 		}
 
-		n, err := m.Units.CountUnits(ctx, c, false, &ids, nil, nil, nil)
+		n, err := m.Units.CountUnits(ctx, call, false, &ids, nil, nil, nil)
 		if err != nil {
 			return Summary{}, apperr.Wrap(err, "summaries.Units.CountUnits")
 		}

@@ -12,17 +12,17 @@ import (
 )
 
 func TestContractsAndInvoices(t *testing.T) {
-	s := server(t)
-	u := newUnit(t, s, "Billing AC")
+	srv := server(t)
+	unit := newUnit(t, srv, "Billing AC")
 	cust := seed.ID("cust-b").String()
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	body := func(extra map[string]string) string {
 		f := map[string]string{
 			"customerId":          `"` + cust + `"`,
-			"unitIds":             `["` + u + `"]`,
+			"unitIds":             `["` + unit + `"]`,
 			"planType":            `"rto"`,
-			"startAt":             `"` + ts(-24*30) + `"`,
-			"endAt":               `"` + ts(24*365) + `"`,
+			"startAt":             `"` + stamp(-24*30) + `"`,
+			"endAt":               `"` + stamp(24*365) + `"`,
 			"priceMinor":          "12000",
 			"currency":            `"MYR"`,
 			"restrictionEligible": "true",
@@ -54,19 +54,19 @@ func TestContractsAndInvoices(t *testing.T) {
 		"general restricted":  {"planType": `"general"`},
 		"rto without rules":   {"rulesVersion": "null"},
 		"rules not eligible":  {"restrictionEligible": "false"},
-		"reversed term":       {"startAt": `"` + ts(10) + `"`, "endAt": `"` + ts(1) + `"`},
+		"reversed term":       {"startAt": `"` + stamp(10) + `"`, "endAt": `"` + stamp(1) + `"`},
 		"negative price":      {"priceMinor": "-1"},
 		"bad currency":        {"currency": `"EUR"`},
 		"no units":            {"unitIds": "[]"},
 		"other customer unit": {"unitIds": `["` + seed.ID("unit-non-rto").String() + `"]`},
-		"duplicate unit":      {"unitIds": `["` + u + `","` + u + `"]`},
+		"duplicate unit":      {"unitIds": `["` + unit + `","` + unit + `"]`},
 	} {
-		code, m := write(s, &hq, "contracts.save", body(e), 0)
+		code, m := write(srv, &hq, "contracts.save", body(e), 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"contracts.save",
 		body(map[string]string{"customerId": `"` + uuid.NewString() + `"`}),
@@ -75,22 +75,23 @@ func TestContractsAndInvoices(t *testing.T) {
 		t.Error("unknown customer")
 	}
 
-	code, m := write(s, &hq, "contracts.save", body(nil), 0)
-	if code != 200 || data(m)["version"].(float64) != 1 || len(data(m)["unitIds"].([]any)) != 1 ||
-		data(m)["customerOrgId"] != seed.ID("org-customer-b").String() {
-		t.Fatalf("create: %d %v", code, m)
+	code, resp := write(srv, &hq, "contracts.save", body(nil), 0)
+	if code != 200 || data(resp)["version"].(float64) != 1 ||
+		len(data(resp)["unitIds"].([]any)) != 1 ||
+		data(resp)["customerOrgId"] != seed.ID("org-customer-b").String() {
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	k := data(m)["id"].(string)
-	if code, m := write(
-		s,
+	key := data(resp)["id"].(string)
+	if code, res := write(
+		srv,
 		&hq,
 		"contracts.save",
-		body(map[string]string{"id": `"` + k + `"`, "priceMinor": "15000"}),
+		body(map[string]string{"id": `"` + key + `"`, "priceMinor": "15000"}),
 		1,
 	); code != 200 ||
-		data(m)["version"].(float64) != 2 {
-		t.Fatalf("revise: %d %v", code, m)
+		data(res)["version"].(float64) != 2 {
+		t.Fatalf("revise: %d %v", code, res)
 	}
 
 	day := `"from":"` + clock.Add(-time.Hour).
@@ -99,10 +100,10 @@ func TestContractsAndInvoices(t *testing.T) {
 		Format(time.RFC3339) +
 		`"`
 	if _, am := post(
-		s,
+		srv,
 		&hq,
 		"audit.list",
-		`{"filters":{`+day+`,"targetKind":"contract","targetId":"`+k+`"},"limit":10}`,
+		`{"filters":{`+day+`,"targetKind":"contract","targetId":"`+key+`"},"limit":10}`,
 	); !hasChange(
 		items(am),
 		2,
@@ -114,60 +115,60 @@ func TestContractsAndInvoices(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"contracts.save",
-		body(map[string]string{"id": `"` + k + `"`}),
+		body(map[string]string{"id": `"` + key + `"`}),
 		1,
 	); code != 409 {
 		t.Error("stale contract version")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"contracts.save",
 		body(
 			map[string]string{
-				"id":         `"` + k + `"`,
+				"id":         `"` + key + `"`,
 				"customerId": `"` + seed.ID("cust-a").String() + `"`,
 				"unitIds":    `["` + seed.ID("unit-non-rto").String() + `"]`,
 			},
 		),
 		2,
 	); code != 422 ||
-		fields(m) != "customerId=error.customerFixed" {
-		t.Errorf("customer fixed: %d %s", code, fields(m))
+		fields(res) != "customerId=error.customerFixed" {
+		t.Errorf("customer fixed: %d %s", code, fields(res))
 	}
 	// lists
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&customerB,
 		"contracts.list",
-		`{"filters":{"unitId":"`+u+`"}}`,
-	); len(items(m)) != 1 ||
-		items(m)[0]["priceMinor"].(float64) != 15000 {
-		t.Fatalf("client contracts: %v", m)
+		`{"filters":{"unitId":"`+unit+`"}}`,
+	); len(items(res)) != 1 ||
+		items(res)[0]["priceMinor"].(float64) != 15000 {
+		t.Fatalf("client contracts: %v", res)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerA,
 		"contracts.list",
-		`{"filters":{"unitId":"`+u+`"}}`,
+		`{"filters":{"unitId":"`+unit+`"}}`,
 	); code != 200 ||
-		len(items(m)) != 0 {
+		len(items(res)) != 0 {
 		t.Error("other customer's contract")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"contracts.list",
 		`{"filters":{"kind":"vip"}}`,
 	); code != 422 ||
-		fields(m) != "filters=error.invalid" {
-		t.Errorf("bad plan filter: %d %s", code, fields(m))
+		fields(res) != "filters=error.invalid" {
+		t.Errorf("bad plan filter: %d %s", code, fields(res))
 	}
 	// a restriction on the contract blocks revisions
 	rid := uuid.NewString()
@@ -178,28 +179,28 @@ func TestContractsAndInvoices(t *testing.T) {
 		VALUES ($1,$2,$3,2,$4,'r',$5,$6,'demo','{"kind":"power_off"}','scheduled')`,
 		rid,
 		seed.ID("tenant-a"),
-		k,
+		key,
 		cust,
 		clock,
 		clock.Add(25*time.Hour),
 	)
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"contracts.list",
-		`{"filters":{"customerId":"`+cust+`","unitId":"`+u+`"}}`,
+		`{"filters":{"customerId":"`+cust+`","unitId":"`+unit+`"}}`,
 	); len(
-		items(m)[0]["activeRestrictionIds"].([]any),
+		items(res)[0]["activeRestrictionIds"].([]any),
 	) != 1 {
 		t.Fatal("active restriction listed")
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"contracts.save",
-		body(map[string]string{"id": `"` + k + `"`}),
+		body(map[string]string{"id": `"` + key + `"`}),
 		2,
 	); code != 409 {
 		t.Error("restricted contract revision")
@@ -212,14 +213,14 @@ func TestContractsAndInvoices(t *testing.T) {
 		f := map[string]string{
 			"amountMinor":     "15000",
 			"currency":        `"MYR"`,
-			"contractId":      `"` + k + `"`,
+			"contractId":      `"` + key + `"`,
 			"contractVersion": "2",
-			"period": `{"from":"` + ts(
+			"period": `{"from":"` + stamp(
 				-24*14,
-			) + `","to":"` + ts(
+			) + `","to":"` + stamp(
 				24*16,
 			) + `"}`,
-			"dueAt": `"` + ts(48) + `"`,
+			"dueAt": `"` + stamp(48) + `"`,
 		}
 		maps.Copy(f, extra)
 
@@ -228,7 +229,7 @@ func TestContractsAndInvoices(t *testing.T) {
 			parts = append(parts, `"`+kk+`":`+v)
 		}
 
-		return write(s, &hq, "invoices.create", "{"+strings.Join(parts, ",")+"}", 0)
+		return write(srv, &hq, "invoices.create", "{"+strings.Join(parts, ",")+"}", 0)
 	}
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"due in the past": "dueAt=error.past",
@@ -243,9 +244,12 @@ func TestContractsAndInvoices(t *testing.T) {
 	}{
 		"old contract version": {map[string]string{"contractVersion": "1"}, 409},
 		"other currency":       {map[string]string{"currency": `"USD"`}, 422},
-		"due in the past":      {map[string]string{"dueAt": `"` + ts(-1) + `"`}, 422},
+		"due in the past":      {map[string]string{"dueAt": `"` + stamp(-1) + `"`}, 422},
 		"zero amount":          {map[string]string{"amountMinor": "0"}, 422},
-		"outside term":         {map[string]string{"period": `{"from":"` + ts(-24*60) + `","to":"` + ts(24) + `"}`}, 422},
+		"outside term": {
+			map[string]string{"period": `{"from":"` + stamp(-24*60) + `","to":"` + stamp(24) + `"}`},
+			422,
+		},
 	} {
 		code, m := inv(tc.e)
 		if w, ok := refused[name]; ok {
@@ -255,69 +259,69 @@ func TestContractsAndInvoices(t *testing.T) {
 		}
 	}
 
-	code, m = inv(nil)
-	if code != 200 || data(m)["status"] != "unpaid" ||
-		!strings.HasPrefix(data(m)["number"].(string), "INV-202608-") {
-		t.Fatalf("invoice: %d %v", code, m)
+	code, resp = inv(nil)
+	if code != 200 || data(resp)["status"] != "unpaid" ||
+		!strings.HasPrefix(data(resp)["number"].(string), "INV-202608-") {
+		t.Fatalf("invoice: %d %v", code, resp)
 	}
 
-	invoice := data(m)["id"].(string)
+	invoice := data(resp)["id"].(string)
 
 	if code, _ := inv(nil); code != 409 {
 		t.Error("same period twice")
 	}
 	// IR469: a period overlapping an invoiced one would bill those days twice; the next period may start where it ends
-	overlap := `{"from":"` + ts(24*10) + `","to":"` + ts(24*40) + `"}`
+	overlap := `{"from":"` + stamp(24*10) + `","to":"` + stamp(24*40) + `"}`
 	if code, m := inv(
-		map[string]string{"period": overlap, "dueAt": `"` + ts(24*11) + `"`},
+		map[string]string{"period": overlap, "dueAt": `"` + stamp(24*11) + `"`},
 	); code != 409 ||
 		m["messageKey"] != "errors.invoice_period_exists" {
 		t.Errorf("overlapping period: %d %v", code, m)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerB,
 		"invoices.get",
 		`{"id":"`+invoice+`"}`,
 	); code != 200 ||
-		len(data(m)["paymentRefs"].([]any)) != 0 {
-		t.Fatalf("client invoice detail: %d %v", code, m)
+		len(data(res)["paymentRefs"].([]any)) != 0 {
+		t.Fatalf("client invoice detail: %d %v", code, res)
 	}
 
-	if code, _ := post(s, &customerA, "invoices.get", `{"id":"`+invoice+`"}`); code != 404 {
+	if code, _ := post(srv, &customerA, "invoices.get", `{"id":"`+invoice+`"}`); code != 404 {
 		t.Error("other customer's invoice")
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&customerB,
 		"invoices.list",
-		`{"filters":{"contractId":"`+k+`","status":"unpaid"}}`,
+		`{"filters":{"contractId":"`+key+`","status":"unpaid"}}`,
 	); len(
-		items(m),
+		items(res),
 	) != 1 {
 		t.Error("client invoice list")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"invoices.list",
-		`{"filters":{"contractId":"`+k+`","overdueOnly":true}}`,
+		`{"filters":{"contractId":"`+key+`","overdueOnly":true}}`,
 	); code != 200 ||
-		len(items(m)) != 0 {
+		len(items(res)) != 0 {
 		t.Error("not yet overdue")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"invoices.list",
 		`{"filters":{"status":"late"}}`,
 	); code != 422 ||
-		fields(m) != "filters=error.invalid" {
-		t.Errorf("bad invoice status: %d %s", code, fields(m))
+		fields(res) != "filters=error.invalid" {
+		t.Errorf("bad invoice status: %d %s", code, fields(res))
 	}
 	// scope filters: the property of the contract version's units, [from, to) on the period start
 	for name, tc := range map[string]struct {
@@ -326,34 +330,34 @@ func TestContractsAndInvoices(t *testing.T) {
 	}{
 		"property":           {`"propertyId":"` + seed.ID("property-home-b").String() + `"`, 1},
 		"other property":     {`"propertyId":"` + seed.ID("property-home-a").String() + `"`, 0},
-		"period start in":    {`"from":"` + ts(-24*15) + `","to":"` + ts(-24*13) + `"`, 1},
-		"period start at to": {`"to":"` + ts(-24*14) + `"`, 0},
-		"period start after": {`"from":"` + ts(-24*13) + `"`, 0},
+		"period start in":    {`"from":"` + stamp(-24*15) + `","to":"` + stamp(-24*13) + `"`, 1},
+		"period start at to": {`"to":"` + stamp(-24*14) + `"`, 0},
+		"period start after": {`"from":"` + stamp(-24*13) + `"`, 0},
 	} {
-		if code, m := post(
-			s,
+		if code, res := post(
+			srv,
 			&hq,
 			"invoices.list",
-			`{"filters":{"contractId":"`+k+`",`+tc.f+`}}`,
+			`{"filters":{"contractId":"`+key+`",`+tc.f+`}}`,
 		); code != 200 ||
-			len(items(m)) != tc.n {
-			t.Errorf("invoice filter %s: %v", name, m)
+			len(items(res)) != tc.n {
+			t.Errorf("invoice filter %s: %v", name, res)
 		}
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"invoices.list",
-		`{"filters":{"from":"`+ts(1)+`","to":"`+ts(1)+`"}}`,
+		`{"filters":{"from":"`+stamp(1)+`","to":"`+stamp(1)+`"}}`,
 	); code != 422 ||
-		fields(m) != "filters.to=error.range" {
-		t.Errorf("empty invoice range: %d %s", code, fields(m))
+		fields(res) != "filters.to=error.range" {
+		t.Errorf("empty invoice range: %d %s", code, fields(res))
 	}
 	// reminders: only overdue unpaid, active client recipient
 	remind := func(recipient, channel string, v int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&hq,
 			"invoices.remind",
 			`{"invoiceId":"`+invoice+`","recipientMembershipId":"`+recipient+`","channel":"`+channel+`","reason":"overdue"}`,
@@ -371,34 +375,35 @@ func TestContractsAndInvoices(t *testing.T) {
 		clock.Add(-time.Hour),
 	)
 
-	if code, m := remind(
+	if code, res := remind(
 		seed.ID("customer-a").String(),
 		"inApp",
 		1,
 	); code != 422 ||
-		fields(m) != "recipientMembershipId=errors.recipient_not_eligible" {
-		t.Errorf("recipient of another customer: %d %s", code, fields(m))
+		fields(res) != "recipientMembershipId=errors.recipient_not_eligible" {
+		t.Errorf("recipient of another customer: %d %s", code, fields(res))
 	}
 
-	if code, m := remind(
+	if code, res := remind(
 		seed.ID("customer-b").String(),
 		"sms",
 		1,
 	); code != 422 ||
-		fields(m) != "channel=error.invalid" {
-		t.Errorf("bad channel: %d %s", code, fields(m))
+		fields(res) != "channel=error.invalid" {
+		t.Errorf("bad channel: %d %s", code, fields(res))
 	}
 
-	code, m = remind(seed.ID("customer-b").String(), "email", 1)
-	if code != 200 || data(m)["invoiceVersion"].(float64) != 2 || data(m)["notificationId"] == nil {
-		t.Fatalf("remind: %d %v", code, m)
+	code, resp = remind(seed.ID("customer-b").String(), "email", 1)
+	if code != 200 || data(resp)["invoiceVersion"].(float64) != 2 ||
+		data(resp)["notificationId"] == nil {
+		t.Fatalf("remind: %d %v", code, resp)
 	}
 
 	var channel string
 	ownerScan(
 		t,
 		`SELECT channel FROM notify.notifications WHERE id = $1`,
-		[]any{data(m)["notificationId"]},
+		[]any{data(resp)["notificationId"]},
 		&channel,
 	)
 
@@ -410,13 +415,13 @@ func TestContractsAndInvoices(t *testing.T) {
 		t.Error("stale invoice version")
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"invoices.list",
-		`{"filters":{"contractId":"`+k+`","overdueOnly":true}}`,
+		`{"filters":{"contractId":"`+key+`","overdueOnly":true}}`,
 	); len(
-		items(m),
+		items(res),
 	) != 1 {
 		t.Error("overdue list")
 	}

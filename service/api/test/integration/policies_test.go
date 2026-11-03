@@ -53,7 +53,7 @@ func alertPolicyBody(extra map[string]string) string {
 }
 
 func TestPolicies(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	def := seed.DefaultPolicyID("tenant-a").String()
 
 	owner(
@@ -63,47 +63,47 @@ func TestPolicies(t *testing.T) {
 	)
 
 	// create (client owner) and read back
-	code, m := write(
-		s,
+	code, resp := write(
+		srv,
 		&customerA,
 		"policies.save",
 		alertPolicyBody(map[string]string{"name": `"  Warm room  "`}),
 		0,
 	)
-	if code != 200 || data(m)["kind"] != "alert" || data(m)["name"] != "Warm room" ||
-		data(m)["metric"] != "temperature" ||
-		len(data(m)["unitIds"].([]any)) != 0 {
-		t.Fatalf("create: %d %v", code, m)
+	if code != 200 || data(resp)["kind"] != "alert" || data(resp)["name"] != "Warm room" ||
+		data(resp)["metric"] != "temperature" ||
+		len(data(resp)["unitIds"].([]any)) != 0 {
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	pid := data(m)["id"].(string)
-	if code, m := post(
-		s,
+	pid := data(resp)["id"].(string)
+	if code, res := post(
+		srv,
 		&customerA,
 		"policies.get",
 		`{"policyId":"`+pid+`"}`,
 	); code != 200 ||
-		data(m)["customerId"] != seed.ID("cust-a").String() {
-		t.Fatalf("get: %d %v", code, m)
+		data(res)["customerId"] != seed.ID("cust-a").String() {
+		t.Fatalf("get: %d %v", code, res)
 	}
 
-	if code, _ := post(s, &customerB, "policies.get", `{"policyId":"`+pid+`"}`); code != 404 {
+	if code, _ := post(srv, &customerB, "policies.get", `{"policyId":"`+pid+`"}`); code != 404 {
 		t.Error("customer-b must not read customer-a's policy")
 	}
 	// default policy: clients see it with only their own settings; HQ sees all settings
-	_, m = post(s, &customerA, "policies.get", `{"policyId":"`+def+`"}`)
-	if len(data(m)["rules"].([]any)) != 6 || data(m)["customerId"] != nil {
-		t.Fatalf("default policy: %v", m)
+	_, resp = post(srv, &customerA, "policies.get", `{"policyId":"`+def+`"}`)
+	if len(data(resp)["rules"].([]any)) != 6 || data(resp)["customerId"] != nil {
+		t.Fatalf("default policy: %v", resp)
 	}
 
-	for _, rs := range data(m)["ruleSettings"].([]any) {
+	for _, rs := range data(resp)["ruleSettings"].([]any) {
 		if rs.(map[string]any)["customerId"] != seed.ID("cust-a").String() {
 			t.Fatal("client sees another customer's rule setting")
 		}
 	}
 
-	_, m = post(s, &customerB, "policies.get", `{"policyId":"`+def+`"}`)
-	if len(data(m)["ruleSettings"].([]any)) != 0 {
+	_, resp = post(srv, &customerB, "policies.get", `{"policyId":"`+def+`"}`)
+	if len(data(resp)["ruleSettings"].([]any)) != 0 {
 		t.Fatal("customer-b sees customer-a's setting")
 	}
 
@@ -181,19 +181,19 @@ func TestPolicies(t *testing.T) {
 	}
 	for name, e := range bad {
 		field, key, _ := strings.Cut(want[name], "=")
-		if code, m := write(
-			s,
+		if code, res := write(
+			srv,
 			&customerA,
 			"policies.save",
 			alertPolicyBody(e),
 			0,
 		); code != 422 ||
-			m["fieldErrors"].(map[string]any)[field] != key {
-			t.Errorf("%s: %d %v, want %s", name, code, m["fieldErrors"], want[name])
+			res["fieldErrors"].(map[string]any)[field] != key {
+			t.Errorf("%s: %d %v, want %s", name, code, res["fieldErrors"], want[name])
 		}
 	}
 	// overnight window, HQ-only metric and HQ recipient are valid for HQ
-	code, m = write(s, &hq, "policies.save", alertPolicyBody(map[string]string{
+	code, resp = write(srv, &hq, "policies.save", alertPolicyBody(map[string]string{
 		"metric":       `"vibration"`,
 		"activeWindow": `{"weekdays":[5,6],"startLocal":"22:00","endLocal":"06:00"}`,
 		"recipientMembershipIds": `["` + seed.ID("hq-operator").
@@ -202,14 +202,14 @@ func TestPolicies(t *testing.T) {
 			String() +
 			`"]`,
 	}), 0)
-	if code != 200 || data(m)["ownerMembershipId"] != seed.ID("hq-operator").String() {
-		t.Fatalf("hq create: %d %v", code, m)
+	if code != 200 || data(resp)["ownerMembershipId"] != seed.ID("hq-operator").String() {
+		t.Fatalf("hq create: %d %v", code, resp)
 	}
 
-	hqPolicy := data(m)["id"].(string)
+	hqPolicy := data(resp)["id"].(string)
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerA,
 		"policies.save",
 		alertPolicyBody(map[string]string{"customerId": `"` + seed.ID("cust-b").String() + `"`}),
@@ -219,7 +219,7 @@ func TestPolicies(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"policies.save",
 		alertPolicyBody(map[string]string{"customerId": `"` + uuid.NewString() + `"`}),
@@ -228,11 +228,11 @@ func TestPolicies(t *testing.T) {
 		t.Error("unknown customer → NOT_FOUND")
 	}
 
-	_, dm := post(s, &hq, "policies.get", `{"policyId":"`+def+`"}`)
+	_, dm := post(srv, &hq, "policies.get", `{"policyId":"`+def+`"}`)
 
 	defRules, _ := json.Marshal(data(dm)["rules"])
 	if code, _ := write(
-		s,
+		srv,
 		&customerA,
 		"policies.save",
 		`{"kind":"default_alert","id":"`+def+`","rules":`+string(defRules)+`}`,
@@ -241,7 +241,7 @@ func TestPolicies(t *testing.T) {
 		t.Error("client cannot edit default limits")
 	}
 
-	if code, _ := write(s, &customerA, "policies.save", autoPolicyBody(nil), 0); code != 403 {
+	if code, _ := write(srv, &customerA, "policies.save", autoPolicyBody(nil), 0); code != 403 {
 		t.Error("client cannot save automation policies")
 	}
 
@@ -249,22 +249,22 @@ func TestPolicies(t *testing.T) {
 	upd := func(a *actor, extra map[string]string, v int) (int, map[string]any) {
 		extra["id"] = `"` + pid + `"`
 
-		return write(s, a, "policies.save", alertPolicyBody(extra), v)
+		return write(srv, a, "policies.save", alertPolicyBody(extra), v)
 	}
-	if code, m := upd(
+	if code, res := upd(
 		&customerA,
 		map[string]string{"threshold": "30", "recoveryThreshold": "27"},
 		1,
-	); code != 200 || data(m)["threshold"].(float64) != 30 ||
-		data(m)["version"].(float64) != 2 {
-		t.Fatalf("update: %d %v", code, m)
+	); code != 200 || data(res)["threshold"].(float64) != 30 ||
+		data(res)["version"].(float64) != 2 {
+		t.Fatalf("update: %d %v", code, res)
 	}
 
 	if code, _ := upd(&customerA, map[string]string{}, 1); code != 409 {
 		t.Error("stale version")
 	}
 
-	if code, m := upd(
+	if code, res := upd(
 		&hq,
 		map[string]string{
 			"customerId":             `"` + seed.ID("cust-b").String() + `"`,
@@ -272,35 +272,35 @@ func TestPolicies(t *testing.T) {
 		},
 		2,
 	); code != 422 ||
-		fields(m) != "customerId=error.ownerFixed" {
-		t.Errorf("owner customer is fixed: %d %s", code, fields(m))
+		fields(res) != "customerId=error.ownerFixed" {
+		t.Errorf("owner customer is fixed: %d %s", code, fields(res))
 	}
 	// the default policy cannot become an alert policy (upd always targets the customer's policy: it tested that one,
 	// stale)
-	_, dp := post(s, &hq, "policies.get", `{"policyId":"`+def+`"}`)
-	if code, m := write(
-		s,
+	_, dp := post(srv, &hq, "policies.get", `{"policyId":"`+def+`"}`)
+	if code, res := write(
+		srv,
 		&hq,
 		"policies.save",
 		alertPolicyBody(map[string]string{"id": `"` + def + `"`}),
 		ver(dp),
 	); code != 422 ||
-		fields(m) != "kind=error.kindFixed" {
-		t.Errorf("default policy is not an alert policy: %d %s", code, fields(m))
+		fields(res) != "kind=error.kindFixed" {
+		t.Errorf("default policy is not an alert policy: %d %s", code, fields(res))
 	}
 
 	// attach to a unit, then list filters
 	unit := seed.ID("unit-non-rto").String()
 
-	_, u := post(s, &customerA, "units.get", `{"id":"`+unit+`"}`)
-	if code, m := write(
-		s,
+	_, u := post(srv, &customerA, "units.get", `{"id":"`+unit+`"}`)
+	if code, res := write(
+		srv,
 		&customerA,
 		"units.setAlertPolicies",
 		`{"unitId":"`+unit+`","alertPolicyIds":["`+pid+`"]}`,
 		ver(u),
 	); code != 200 {
-		t.Fatalf("attach: %d %v", code, m)
+		t.Fatalf("attach: %d %v", code, res)
 	}
 
 	ids := func(m map[string]any) map[string]bool {
@@ -311,14 +311,14 @@ func TestPolicies(t *testing.T) {
 
 		return out
 	}
-	_, m = post(s, &customerA, "policies.list", `{"limit":100}`)
+	_, resp = post(srv, &customerA, "policies.list", `{"limit":100}`)
 
-	got := ids(m)
-	if !got[def] || !got[pid] || !got[hqPolicy] || items(m)[0]["id"] != def {
+	got := ids(resp)
+	if !got[def] || !got[pid] || !got[hqPolicy] || items(resp)[0]["id"] != def {
 		t.Fatalf("client list: default first + own policies: %v", got)
 	}
 
-	for _, it := range items(m) {
+	for _, it := range items(resp) {
 		if it["kind"] == "automation" ||
 			(it["kind"] == "alert" && it["customerId"] != seed.ID("cust-a").String()) {
 			t.Fatal("client list leaks")
@@ -329,52 +329,57 @@ func TestPolicies(t *testing.T) {
 		}
 	}
 
-	_, m = post(s, &customerB, "policies.list", `{"limit":100}`)
-	if ids(m)[pid] || !ids(m)[def] {
+	_, resp = post(srv, &customerB, "policies.list", `{"limit":100}`)
+	if ids(resp)[pid] || !ids(resp)[def] {
 		t.Fatal("customer-b list")
 	}
 
-	_, m = post(s, &hq, "policies.list", `{"filters":{"unitId":"`+unit+`"},"limit":100}`)
-	if got := ids(m); !got[pid] || got[def] || got[hqPolicy] {
+	_, resp = post(srv, &hq, "policies.list", `{"filters":{"unitId":"`+unit+`"},"limit":100}`)
+	if got := ids(resp); !got[pid] || got[def] || got[hqPolicy] {
 		t.Fatalf("unitId filter: %v", got)
 	}
 
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&hq,
 		"policies.list",
 		`{"filters":{"propertyId":"`+seed.ID("property-home-a").
 			String()+
 			`","kind":"alert"},"limit":100}`,
 	)
-	if !ids(m)[pid] {
+	if !ids(resp)[pid] {
 		t.Fatal("propertyId filter")
 	}
 
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&hq,
 		"policies.list",
 		`{"filters":{"customerId":"`+seed.ID("cust-b").String()+`"},"limit":100}`,
 	)
-	if got := ids(m); got[pid] || !got[def] {
+	if got := ids(resp); got[pid] || !got[def] {
 		t.Fatalf("customerId filter: %v", got)
 	}
 
-	_, m = post(s, &hq, "policies.list", `{"filters":{"kind":"default_alert"}}`)
-	if len(items(m)) != 1 {
+	_, resp = post(srv, &hq, "policies.list", `{"filters":{"kind":"default_alert"}}`)
+	if len(items(resp)) != 1 {
 		t.Fatal("kind filter")
 	}
 
-	_, m = post(s, &hq, "policies.list", `{"filters":{"enabled":false,"kind":"alert"}}`)
-	if ids(m)[pid] {
+	_, resp = post(srv, &hq, "policies.list", `{"filters":{"enabled":false,"kind":"alert"}}`)
+	if ids(resp)[pid] {
 		t.Fatal("enabled filter")
 	}
 
-	_, m = post(s, &hq, "policies.list", `{"sort":{"field":"name","direction":"desc"},"limit":100}`)
+	_, resp = post(
+		srv,
+		&hq,
+		"policies.list",
+		`{"sort":{"field":"name","direction":"desc"},"limit":100}`,
+	)
 
 	names := []string{}
-	for _, it := range items(m) {
+	for _, it := range items(resp) {
 		names = append(names, strings.ToLower(it["name"].(string)))
 	}
 
@@ -392,13 +397,13 @@ func TestPolicies(t *testing.T) {
 
 	for _, b := range []string{`{"filters":{"kind":"air_quality"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"metric",` +
 		`"direction":"asc"}}`} {
-		code, m := post(s, &hq, "policies.list", b)
+		code, m := post(srv, &hq, "policies.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
 	for _, sf := range []string{"priority", "updatedAt"} {
 		if code, _ := post(
-			s,
+			srv,
 			&hq,
 			"policies.list",
 			`{"sort":{"field":"`+sf+`","direction":"asc"}}`,
@@ -407,28 +412,28 @@ func TestPolicies(t *testing.T) {
 		}
 	}
 
-	if code, _ := post(s, &techB, "policies.list", `{}`); code != 403 {
+	if code, _ := post(srv, &techB, "policies.list", `{}`); code != 403 {
 		t.Error("technicians do not read policies")
 	}
 
 	// default limits (HQ): fixed keys and order, validated conditions
-	_, m = post(s, &hq, "policies.get", `{"policyId":"`+def+`"}`)
-	dv := ver(m)
-	rules := data(m)["rules"].([]any)
+	_, resp = post(srv, &hq, "policies.get", `{"policyId":"`+def+`"}`)
+	dv := ver(resp)
+	rules := data(resp)["rules"].([]any)
 	raw, _ := json.Marshal(rules)
 	rules[0].(map[string]any)["threshold"] = 1200.0
 	rules[0].(map[string]any)["recoveryThreshold"] = 1000.0
 
 	changed, _ := json.Marshal(rules)
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"policies.save",
 		`{"kind":"default_alert","id":"`+def+`","rules":`+string(changed)+`}`,
 		dv,
 	); code != 200 ||
-		data(m)["rules"].([]any)[0].(map[string]any)["threshold"].(float64) != 1200 {
-		t.Fatalf("default limits: %d %v", code, m)
+		data(res)["rules"].([]any)[0].(map[string]any)["threshold"].(float64) != 1200 {
+		t.Fatalf("default limits: %d %v", code, res)
 	}
 
 	dv++
@@ -451,29 +456,29 @@ func TestPolicies(t *testing.T) {
 			"}]",
 		"metric changed": string(wrongMetric),
 	} {
-		code, m := write(
-			s,
+		code, res := write(
+			srv,
 			&hq,
 			"policies.save",
 			`{"kind":"default_alert","id":"`+def+`","rules":`+body+`}`,
 			dv,
 		)
-		refusal(t, name, code, m, want[name])
+		refusal(t, name, code, res, want[name])
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"policies.save",
 		`{"kind":"default_alert","id":"`+pid+`","rules":`+string(raw)+`}`,
 		3,
 	); code != 422 ||
-		fields(m) != "kind=error.kindFixed" {
-		t.Errorf("alert policy saved as default: %d %s", code, fields(m))
+		fields(res) != "kind=error.kindFixed" {
+		t.Errorf("alert policy saved as default: %d %s", code, fields(res))
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"policies.save",
 		`{"kind":"default_alert","id":"`+def+`","rules":`+string(raw)+`}`,
@@ -483,7 +488,7 @@ func TestPolicies(t *testing.T) {
 	}
 
 	write(
-		s,
+		srv,
 		&hq,
 		"policies.save",
 		`{"kind":"default_alert","id":"`+def+`","rules":`+string(raw)+`}`,
@@ -498,7 +503,7 @@ func TestPolicies(t *testing.T) {
 		}
 
 		return write(
-			s,
+			srv,
 			a,
 			"policies.setDefaultRule",
 			`{"policyId":"`+def+`","ruleKey":"`+key+`","customerId":"`+seed.ID(cust).
@@ -514,15 +519,15 @@ func TestPolicies(t *testing.T) {
 		seed.ID("cust-b"),
 	)
 
-	if code, m := sdr(
+	if code, res := sdr(
 		&customerB,
 		"cust-b",
 		"refrigerant_low_pressure",
 		false,
 		versionZero,
-	); code != 200 || data(m)["version"].(float64) != 1 ||
-		data(m)["reason"] != "test" {
-		t.Fatalf("first switch: %d %v", code, m)
+	); code != 200 || data(res)["version"].(float64) != 1 ||
+		data(res)["reason"] != "test" {
+		t.Fatalf("first switch: %d %v", code, res)
 	}
 
 	if code, _ := sdr(
@@ -535,19 +540,19 @@ func TestPolicies(t *testing.T) {
 		t.Error("stale setting version")
 	}
 
-	if code, m := sdr(
+	if code, res := sdr(
 		&hq,
 		"cust-b",
 		"refrigerant_low_pressure",
 		true,
 		1,
-	); code != 200 || data(m)["enabled"] != true ||
-		data(m)["version"].(float64) != 2 {
+	); code != 200 || data(res)["enabled"] != true ||
+		data(res)["version"].(float64) != 2 {
 		t.Fatalf("hq switch: %d", code)
 	}
 
-	_, m = post(s, &customerA, "policies.get", `{"policyId":"`+def+`"}`)
-	for _, rs := range data(m)["ruleSettings"].([]any) {
+	_, resp = post(srv, &customerA, "policies.get", `{"policyId":"`+def+`"}`)
+	for _, rs := range data(resp)["ruleSettings"].([]any) {
 		if rs.(map[string]any)["ruleKey"] == "refrigerant_low_pressure" {
 			t.Fatal("customer-a unchanged by customer-b's switch")
 		}
@@ -557,8 +562,8 @@ func TestPolicies(t *testing.T) {
 		t.Error("client switches only its own customer")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"policies.setDefaultRule",
 		`{"policyId":"`+def+`","ruleKey":"noise","customerId":"`+seed.ID("cust-b").
@@ -566,12 +571,12 @@ func TestPolicies(t *testing.T) {
 			`","enabled":true}`,
 		versionZero,
 	); code != 422 ||
-		fields(m) != "ruleKey=error.invalid" {
-		t.Errorf("unknown rule key: %d %s", code, fields(m))
+		fields(res) != "ruleKey=error.invalid" {
+		t.Errorf("unknown rule key: %d %s", code, fields(res))
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"policies.setDefaultRule",
 		`{"policyId":"`+pid+`","ruleKey":"dust_pm25","customerId":"`+seed.ID("cust-b").
@@ -579,12 +584,12 @@ func TestPolicies(t *testing.T) {
 			`","enabled":true}`,
 		versionZero,
 	); code != 422 ||
-		fields(m) != "policyId=error.notDefaultPolicy" {
-		t.Errorf("not the default policy: %d %s", code, fields(m))
+		fields(res) != "policyId=error.notDefaultPolicy" {
+		t.Errorf("not the default policy: %d %s", code, fields(res))
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"policies.setDefaultRule",
 		`{"policyId":"`+def+`","ruleKey":"dust_pm25","customerId":"`+uuid.NewString()+`","enabled":true}`,
@@ -594,7 +599,7 @@ func TestPolicies(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"policies.setDefaultRule",
 		`{"policyId":"`+uuid.NewString()+`","ruleKey":"dust_pm25","customerId":"`+seed.ID("cust-b").
@@ -605,8 +610,8 @@ func TestPolicies(t *testing.T) {
 		t.Error("unknown policy")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"policies.setDefaultRule",
 		`{"policyId":"`+def+`","ruleKey":"dust_pm25","customerId":"`+seed.ID("cust-b").
@@ -617,8 +622,8 @@ func TestPolicies(t *testing.T) {
 		)+`"}`,
 		versionZero,
 	); code != 422 ||
-		fields(m) != "reason=error.length" {
-		t.Errorf("reason too long: %d %s", code, fields(m))
+		fields(res) != "reason=error.length" {
+		t.Errorf("reason too long: %d %s", code, fields(res))
 	}
 
 	owner(
@@ -644,8 +649,8 @@ func TestPolicies(t *testing.T) {
 		seed.ID("customer-b"),
 	)
 	// a switch without a reason records none
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"policies.setDefaultRule",
 		`{"policyId":"`+def+`","ruleKey":"dust_pm25","customerId":"`+seed.ID("cust-b").
@@ -653,24 +658,24 @@ func TestPolicies(t *testing.T) {
 			`","enabled":false}`,
 		versionZero,
 	); code != 200 ||
-		data(m)["reason"] != nil {
-		t.Errorf("switch without a reason: %d %v", code, m)
+		data(res)["reason"] != nil {
+		t.Errorf("switch without a reason: %d %v", code, res)
 	}
 
 	// delete: default fixed, detach from units, version
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"policies.delete",
 		`{"policyId":"`+def+`"}`,
 		dv+1,
 	); code != 422 ||
-		fields(m) != "policyId=error.defaultPolicyFixed" {
-		t.Errorf("default policy cannot be deleted: %d %v", code, m)
+		fields(res) != "policyId=error.defaultPolicyFixed" {
+		t.Errorf("default policy cannot be deleted: %d %v", code, res)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerA,
 		"policies.delete",
 		`{"policyId":"`+pid+`"}`,
@@ -680,7 +685,7 @@ func TestPolicies(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerB,
 		"policies.delete",
 		`{"policyId":"`+pid+`"}`,
@@ -691,27 +696,33 @@ func TestPolicies(t *testing.T) {
 
 	uv := ver(u) + 1
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerA,
 		"policies.delete",
 		`{"policyId":"`+pid+`"}`,
 		2,
 	); code != 200 ||
-		data(m)["deleted"] != true {
-		t.Fatalf("delete: %d %v", code, m)
+		data(res)["deleted"] != true {
+		t.Fatalf("delete: %d %v", code, res)
 	}
 
-	_, u = post(s, &customerA, "units.get", `{"id":"`+unit+`"}`)
+	_, u = post(srv, &customerA, "units.get", `{"id":"`+unit+`"}`)
 	if len(data(u)["alertPolicyIds"].([]any)) != 0 || ver(u) != uv+1 {
 		t.Fatalf("unit detached with a new version: %v %d", data(u)["alertPolicyIds"], ver(u))
 	}
 
-	if code, _ := post(s, &customerA, "policies.get", `{"policyId":"`+pid+`"}`); code != 404 {
+	if code, _ := post(srv, &customerA, "policies.get", `{"policyId":"`+pid+`"}`); code != 404 {
 		t.Error("deleted policy")
 	}
 
-	if code, _ := write(s, &hq, "policies.delete", `{"policyId":"`+hqPolicy+`"}`, 1); code != 200 {
+	if code, _ := write(
+		srv,
+		&hq,
+		"policies.delete",
+		`{"policyId":"`+hqPolicy+`"}`,
+		1,
+	); code != 200 {
 		t.Error("delete unattached policy")
 	}
 }
@@ -719,32 +730,33 @@ func TestPolicies(t *testing.T) {
 // TestPolicySaveRefusals covers two refusals of policies.save: a customer that is no longer active cannot get an alert
 // policy, and the kind of a saved policy is fixed (an automation policy cannot be saved as an alert policy).
 func TestPolicySaveRefusals(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	owner(t, `UPDATE assets.customers SET status = 'inactive' WHERE id = $1`, seed.ID("cust-a"))
 
-	code, m := write(s, &hq, "policies.save", alertPolicyBody(nil), 0)
+	code, res := write(srv, &hq, "policies.save", alertPolicyBody(nil), 0)
 
 	owner(t, `UPDATE assets.customers SET status = 'active' WHERE id = $1`, seed.ID("cust-a"))
 
-	if code != 422 || m["fieldErrors"].(map[string]any)["customerId"] != "error.inactiveCustomer" {
-		t.Errorf("inactive customer: %d %v", code, m)
+	if code != 422 ||
+		res["fieldErrors"].(map[string]any)["customerId"] != "error.inactiveCustomer" {
+		t.Errorf("inactive customer: %d %v", code, res)
 	}
 
-	code, m = write(s, &hq, "policies.save", autoPolicyBody(nil), 0)
+	code, res = write(srv, &hq, "policies.save", autoPolicyBody(nil), 0)
 	if code != 200 {
-		t.Fatalf("automation policy: %d %v", code, m)
+		t.Fatalf("automation policy: %d %v", code, res)
 	}
 
-	id, v := data(m)["id"].(string), ver(m)
-	if code, m := write(
-		s,
+	id, v := data(res)["id"].(string), ver(res)
+	if code, resp := write(
+		srv,
 		&hq,
 		"policies.save",
 		alertPolicyBody(map[string]string{"id": `"` + id + `"`}),
 		v,
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["kind"] != "error.kindFixed" {
-		t.Errorf("alert save over an automation policy: %d %v", code, m)
+		resp["fieldErrors"].(map[string]any)["kind"] != "error.kindFixed" {
+		t.Errorf("alert save over an automation policy: %d %v", code, resp)
 	}
 
 	owner(t, `DELETE FROM control.automation_policies WHERE id = $1`, id)

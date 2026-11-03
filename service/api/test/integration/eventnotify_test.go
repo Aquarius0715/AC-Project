@@ -23,7 +23,7 @@ func countNotes(t *testing.T, target, recipient, template string) int {
 }
 
 func TestBusinessEventNotifications(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	// job.requested by the client: HQ job.write holders, not the acting client
 	owner(
 		t,
@@ -31,18 +31,18 @@ func TestBusinessEventNotifications(t *testing.T) {
 		seed.ID("tech-internal-a"),
 	)
 
-	code, m := write(
-		s,
+	code, resp := write(
+		srv,
 		&customerA,
 		"jobs.create",
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("create: %d %v", code, m)
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	job := data(m)["id"].(string)
+	job := data(resp)["id"].(string)
 	if countNotes(t, job, "hq-operator", "job_update") != 1 ||
 		countNotes(t, job, "customer-a", "job_update") != 0 {
 		t.Errorf(
@@ -52,21 +52,21 @@ func TestBusinessEventNotifications(t *testing.T) {
 		)
 	}
 	// job.assigned: technician and client get schedule_change; the acting HQ member does not
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	if code, m := write(
-		s,
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.assign",
 		`{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-internal-a").
 			String()+
-			`","startAt":"`+ts(
+			`","startAt":"`+stamp(
 			25,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			27,
 		)+`"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("assign: %d %v", code, m)
+		t.Fatalf("assign: %d %v", code, res)
 	}
 
 	if countNotes(t, job, "tech-internal-a", "schedule_change") != 1 ||
@@ -76,15 +76,15 @@ func TestBusinessEventNotifications(t *testing.T) {
 		t.Error("job.assigned recipients")
 	}
 	// job.cancelled
-	_, g := post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
-	if code, m := write(
-		s,
+	_, g := post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"no longer needed"}`,
 		ver(g),
 	); code != 200 {
-		t.Fatalf("cancel: %d %v", code, m)
+		t.Fatalf("cancel: %d %v", code, res)
 	}
 
 	if countNotes(t, job, "tech-internal-a", "job_update") != 1 ||
@@ -99,10 +99,10 @@ func TestBusinessEventNotifications(t *testing.T) {
 		)
 	}
 	// restriction transition and payment confirmation
-	u := boundUnit(t, s, "online")
-	k, inv := overdueContract(t, s, u)
+	u := boundUnit(t, srv, "online")
+	k, inv := overdueContract(t, srv, u)
 
-	rid, _ := executed(t, s, k, inv, []string{u})
+	rid, _ := executed(t, srv, k, inv, []string{u})
 	if countNotes(t, rid, "customer-b", "restriction") != 2 ||
 		countNotes(t, rid, "hq-operator", "restriction") != 0 ||
 		countNotes(t, rid, "hq-restriction-manager", "restriction") != 0 {
@@ -114,15 +114,15 @@ func TestBusinessEventNotifications(t *testing.T) {
 		)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"payments.recordManual",
 		`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+rid[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
 			`"reason":"bank"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("payment: %d %v", code, m)
+		t.Fatalf("payment: %d %v", code, res)
 	}
 
 	if countNotes(t, inv, "customer-b", "payment") != 1 ||

@@ -12,16 +12,17 @@ import (
 
 // The gateway serves the API description built from the handler annotations (make swagger) and Swagger UI.
 func TestServesTheAPIDescription(t *testing.T) {
-	e := New(Targets{}, nil)
-	w := httptest.NewRecorder()
-	e.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/docs", nil))
+	app := New(Targets{}, nil)
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/docs", nil))
 
-	if w.Code != http.StatusOK || !strings.Contains(w.Header().Get("Content-Type"), "text/html") ||
-		!strings.Contains(w.Body.String(), `<script src="/docs/init.js">`) {
-		t.Fatalf("/docs: %d %s", w.Code, w.Header().Get("Content-Type"))
+	if rec.Code != http.StatusOK ||
+		!strings.Contains(rec.Header().Get("Content-Type"), "text/html") ||
+		!strings.Contains(rec.Body.String(), `<script src="/docs/init.js">`) {
+		t.Fatalf("/docs: %d %s", rec.Code, rec.Header().Get("Content-Type"))
 	}
 	// IR371: the Swagger UI files are one pinned release, checked by their hashes, and the page runs no inline script
-	page, csp := w.Body.String(), w.Header().Get("Content-Security-Policy")
+	page, csp := rec.Body.String(), rec.Header().Get("Content-Security-Policy")
 	for _, want := range []string{`swagger-ui-dist@` + swaggerUIVersion + `/swagger-ui-bundle.js" ` +
 		`integrity="sha384-`, `swagger-ui-dist@` + swaggerUIVersion + `/swagger-ui.css" integrity="sha384-`} {
 		if !strings.Contains(page, want) {
@@ -39,21 +40,21 @@ func TestServesTheAPIDescription(t *testing.T) {
 		t.Errorf("/docs CSP: %q", csp)
 	}
 
-	w = httptest.NewRecorder()
-	e.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/docs/init.js", nil))
+	rec = httptest.NewRecorder()
+	app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/docs/init.js", nil))
 
-	if w.Code != http.StatusOK ||
-		!strings.HasPrefix(w.Header().Get("Content-Type"), "text/javascript") ||
-		!strings.Contains(w.Body.String(), `url: "/swagger.json"`) {
-		t.Fatalf("/docs/init.js: %d %s", w.Code, w.Header().Get("Content-Type"))
+	if rec.Code != http.StatusOK ||
+		!strings.HasPrefix(rec.Header().Get("Content-Type"), "text/javascript") ||
+		!strings.Contains(rec.Body.String(), `url: "/swagger.json"`) {
+		t.Fatalf("/docs/init.js: %d %s", rec.Code, rec.Header().Get("Content-Type"))
 	}
 
-	w = httptest.NewRecorder()
-	e.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/swagger.json", nil))
+	rec = httptest.NewRecorder()
+	app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/swagger.json", nil))
 
-	if w.Code != http.StatusOK ||
-		!strings.Contains(w.Header().Get("Content-Type"), "application/json") {
-		t.Fatalf("/swagger.json: %d %s", w.Code, w.Header().Get("Content-Type"))
+	if rec.Code != http.StatusOK ||
+		!strings.Contains(rec.Header().Get("Content-Type"), "application/json") {
+		t.Fatalf("/swagger.json: %d %s", rec.Code, rec.Header().Get("Content-Type"))
 	}
 
 	var doc struct {
@@ -65,22 +66,22 @@ func TestServesTheAPIDescription(t *testing.T) {
 		} `json:"paths"`
 	}
 
-	err := json.Unmarshal(w.Body.Bytes(), &doc)
+	err := json.Unmarshal(rec.Body.Bytes(), &doc)
 	if err != nil || doc.Swagger != "2.0" {
 		t.Fatalf("swagger document: %v %q", err, doc.Swagger)
 	}
 	// every REST route of the catalog (IR222) is documented with its path parameters, write headers and responses
 	documented := 0
 
-	for _, s := range ops.Catalog {
-		for _, rt := range s.Routes {
-			p, ok := doc.Paths[rt.Path][strings.ToLower(rt.Method)]
+	for _, spec := range ops.Catalog {
+		for _, route := range spec.Routes {
+			p, ok := doc.Paths[route.Path][strings.ToLower(route.Method)]
 			if !ok {
 				t.Errorf(
 					"%s %s (%s) is not documented (run make swagger)",
-					rt.Method,
-					rt.Path,
-					s.Name,
+					route.Method,
+					route.Path,
+					spec.Name,
 				)
 
 				continue
@@ -88,8 +89,14 @@ func TestServesTheAPIDescription(t *testing.T) {
 
 			documented++
 
-			if p.OperationID != s.Name && !strings.HasPrefix(p.OperationID, s.Name+".") {
-				t.Errorf("%s %s: operationId %s for %s", rt.Method, rt.Path, p.OperationID, s.Name)
+			if p.OperationID != spec.Name && !strings.HasPrefix(p.OperationID, spec.Name+".") {
+				t.Errorf(
+					"%s %s: operationId %s for %s",
+					route.Method,
+					route.Path,
+					p.OperationID,
+					spec.Name,
+				)
 			}
 
 			idem, path := false, map[string]bool{}
@@ -100,24 +107,29 @@ func TestServesTheAPIDescription(t *testing.T) {
 				}
 			}
 
-			if idem != (s.Mode == ops.Write) {
+			if idem != (spec.Mode == ops.Write) {
 				t.Errorf(
 					"%s: Idempotency-Key documented %v for a %s operation",
-					s.Name,
+					spec.Name,
 					idem,
-					s.Mode,
+					spec.Mode,
 				)
 			}
 
-			for _, name := range ops.PathParams(rt.Path) {
+			for _, name := range ops.PathParams(route.Path) {
 				if !path[name] {
-					t.Errorf("%s %s: path parameter %s undocumented", rt.Method, rt.Path, name)
+					t.Errorf(
+						"%s %s: path parameter %s undocumented",
+						route.Method,
+						route.Path,
+						name,
+					)
 				}
 			}
 
 			for _, code := range []string{"200", "401", "403", "404", "409", "422"} {
 				if _, ok := p.Responses[code]; !ok {
-					t.Errorf("%s: response %s missing", s.Name, code)
+					t.Errorf("%s: response %s missing", spec.Name, code)
 				}
 			}
 		}

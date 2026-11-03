@@ -92,36 +92,36 @@ const commandCols = `id, tenant_id, version, created_at, updated_at, unit_id, ac
 	requested_at, sent_at, acknowledged_at, expires_at, failure_code, correlation_id, source`
 
 func scanCommand(r pgx.Row) (Command, error) {
-	var x Command
+	var command Command
 
 	err := r.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.UpdatedAt,
-		&x.UnitID,
-		&x.ActorMembershipID,
-		&x.Action,
-		&x.DiagnosticRunID,
-		&x.JobID,
-		&x.Reason,
-		&x.Status,
-		&x.Delivery,
-		&x.RequestedAt,
-		&x.SentAt,
-		&x.AcknowledgedAt,
-		&x.ExpiresAt,
-		&x.FailureCode,
-		&x.CorrelationID,
-		&x.Source,
+		&command.ID,
+		&command.TenantID,
+		&command.Version,
+		&command.CreatedAt,
+		&command.UpdatedAt,
+		&command.UnitID,
+		&command.ActorMembershipID,
+		&command.Action,
+		&command.DiagnosticRunID,
+		&command.JobID,
+		&command.Reason,
+		&command.Status,
+		&command.Delivery,
+		&command.RequestedAt,
+		&command.SentAt,
+		&command.AcknowledgedAt,
+		&command.ExpiresAt,
+		&command.FailureCode,
+		&command.CorrelationID,
+		&command.Source,
 	)
 
-	return x, apperr.Wrap(err, "scan (scanCommand)")
+	return command, apperr.Wrap(err, "scan (scanCommand)")
 }
 
 // Allowed applies the IR46 restriction table to an action (policy is RestrictionPolicy JSON or nil).
-func Allowed(a UnitAction, policy []byte) bool {
+func Allowed(unitAction UnitAction, policy []byte) bool {
 	if len(policy) == 0 {
 		return true
 	}
@@ -135,11 +135,11 @@ func Allowed(a UnitAction, policy []byte) bool {
 	}
 
 	if p.Kind == "power_off" {
-		return a.Kind == "set_power" && a.Power != nil && !*a.Power
+		return unitAction.Kind == "set_power" && unitAction.Power != nil && !*unitAction.Power
 	}
 
-	if a.Kind == "set_temperature" && p.MinimumCoolingSetpoint != nil {
-		return *a.Celsius >= *p.MinimumCoolingSetpoint
+	if unitAction.Kind == "set_temperature" && p.MinimumCoolingSetpoint != nil {
+		return *unitAction.Celsius >= *p.MinimumCoolingSetpoint
 	}
 
 	return true
@@ -173,35 +173,35 @@ type CreateInput struct {
 
 // Validate implements ops.Validator.
 func (in *CreateInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.UnitID == uuid.Nil {
-		fe["unitId"] = "error.required"
+		fieldErrs["unitId"] = "error.required"
 	}
 
 	a, ok := ParseAction(in.Action)
 	if !ok {
-		fe["action"] = "error.invalid"
+		fieldErrs["action"] = "error.invalid"
 	}
 
 	in.action = a
 	if in.ExpectedUnitVersion < 1 {
-		fe["expectedUnitVersion"] = "error.required"
+		fieldErrs["expectedUnitVersion"] = "error.required"
 	}
 
 	if in.Source == "" {
 		in.Source = "ui"
 	} else if in.Source != "ui" && in.Source != "voice" {
-		fe["source"] = "error.invalid"
+		fieldErrs["source"] = "error.invalid"
 	}
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
 		if n := utf8.RuneCountInString(*in.Reason); n < 1 || n > 1000 {
-			fe["reason"] = "error.length"
+			fieldErrs["reason"] = "error.length"
 		}
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // inScope reports whether a technician's membership scopes contain the unit.
@@ -243,84 +243,84 @@ func inScope(p *ops.Principal, unit, property, org uuid.UUID) bool {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/commands [post]
-func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Command, error) {
-	t, found, err := m.Units.Target(ctx, c, in.UnitID)
+func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (Command, error) {
+	target, found, err := m.Units.Target(ctx, c, input.UnitID)
 	if err != nil {
 		return Command{}, apperr.Wrap(err, "control.Units.Target")
 	}
 
-	nf := apperr.E(apperr.NotFound, "error.notFound")
+	notFound := apperr.E(apperr.NotFound, "error.notFound")
 
 	switch c.Principal.Role {
 	case "client":
-		if !found || t.OrgID != c.Principal.OrgID {
-			return Command{}, nf
+		if !found || target.OrgID != c.Principal.OrgID {
+			return Command{}, notFound
 		}
 
-		if in.Reason != nil {
+		if input.Reason != nil {
 			return Command{}, apperr.Fields(map[string]string{"reason": "error.notAllowed"})
 		}
 	case "technician":
-		if in.Source == "voice" {
+		if input.Source == "voice" {
 			return Command{}, apperr.Fields(map[string]string{"source": "error.notAllowed"})
 		}
 
 		if !found {
-			return Command{}, nf
+			return Command{}, notFound
 		}
 
-		if in.JobID == nil {
+		if input.JobID == nil {
 			return Command{}, apperr.Fields(map[string]string{"jobId": "error.required"})
 		}
 
-		err := m.Access.TechnicianJob(ctx, c, *in.JobID, in.UnitID)
+		err := m.Access.TechnicianJob(ctx, c, *input.JobID, input.UnitID)
 		if err != nil {
 			return Command{}, apperr.Wrap(err, "control.TechAccess.TechnicianJob")
 		}
 
-		if in.Reason == nil {
+		if input.Reason == nil {
 			return Command{}, apperr.Fields(map[string]string{"reason": "error.required"})
 		}
 	default:
 		if !found {
-			return Command{}, nf
+			return Command{}, notFound
 		}
 
-		if in.Source == "voice" { // the assistant is offered only in the Client app (IR115)
+		if input.Source == "voice" { // the assistant is offered only in the Client app (IR115)
 			return Command{}, apperr.Fields(map[string]string{"source": "error.notAllowed"})
 		}
 
-		if in.Reason == nil {
+		if input.Reason == nil {
 			return Command{}, apperr.Fields(map[string]string{"reason": "error.required"})
 		}
 	}
 
-	if t.Version != in.ExpectedUnitVersion {
+	if target.Version != input.ExpectedUnitVersion {
 		return Command{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if !in.action.Supports(t.Caps) {
+	if !input.action.Supports(target.Caps) {
 		return Command{}, apperr.Fields(map[string]string{"action": "error.unsupportedAction"})
 	}
 
-	policy, err := m.Restrictions.UnitPolicy(ctx, c, in.UnitID)
+	policy, err := m.Restrictions.UnitPolicy(ctx, c, input.UnitID)
 	if err != nil {
 		return Command{}, apperr.Wrap(err, "control.Restrictions.UnitPolicy")
 	}
 
-	if !Allowed(in.action, policy) {
+	if !Allowed(input.action, policy) {
 		e := apperr.E(apperr.Forbidden, "errors.restriction_active")
 		e.FieldErrors = map[string]string{"action": "errors.restriction_active"}
 
 		return Command{}, e
 	}
 
-	dev, err := m.ready(ctx, c, in.UnitID)
+	dev, err := m.ready(ctx, c, input.UnitID)
 	if err != nil {
 		return Command{}, err
 	}
 
-	x, err := scanCommand(
+	command, err := scanCommand(
 		c.Tx.QueryRow(
 			ctx,
 			`INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, job_id, reason,
@@ -328,31 +328,31 @@ func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Com
 		requested_at, sent_at, expires_at, correlation_id, created_at, updated_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $10, $4, $5, $6, 'requested', 'not_sent', $7, NULL, $8,
 		$9, $7, $7) RETURNING `+commandCols,
-			in.UnitID,
+			input.UnitID,
 			dev,
 			c.Principal.MembershipID,
-			[]byte(in.Action),
-			in.JobID,
-			in.Reason,
+			[]byte(input.Action),
+			input.JobID,
+			input.Reason,
 			c.Now,
 			c.Now.Add(CommandTTL),
 			c.CorrelationID,
-			in.Source,
+			input.Source,
 		),
 	)
 	if err != nil {
-		return x, err
+		return command, err
 	}
 	// requested: the IoT gateway sends it to the device and reports it sent (demo trigger command_sent)
 	c.Emit(
 		ops.Event{
 			AggregateType: "command",
-			AggregateID:   x.ID,
+			AggregateID:   command.ID,
 			Type:          "CommandRequested",
 			Payload: map[string]any{
-				"unitId":   in.UnitID,
+				"unitId":   input.UnitID,
 				"deviceId": dev,
-				"action":   json.RawMessage(in.Action),
+				"action":   json.RawMessage(input.Action),
 			},
 		},
 	)
@@ -361,21 +361,21 @@ func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Com
 		ops.AuditEntry{
 			Action:      "commands.create",
 			TargetKind:  "command",
-			TargetID:    x.ID.String(),
-			NextVersion: &x.Version,
-			Reason:      deref(in.Reason),
+			TargetID:    command.ID.String(),
+			NextVersion: &command.Version,
+			Reason:      deref(input.Reason),
 			Result:      "pending", PreviousVersion: nil, Before: nil, After: nil,
 		},
 	)
 
-	return x, nil
+	return command, nil
 }
 
 // ready applies the D04 mutual exclusion and IR47 delivery checks and returns the bound device.
-func (m Commands) ready(ctx context.Context, c *ops.Call, unit uuid.UUID) (uuid.UUID, error) {
+func (m Commands) ready(ctx context.Context, call *ops.Call, unit uuid.UUID) (uuid.UUID, error) {
 	blocked, err := m.Restrictions.UnitRecovering(
 		ctx,
-		c,
+		call,
 		unit,
 	) // SR26: an unresolved terminal-restriction recovery case blocks ordinary control
 	if err != nil {
@@ -386,12 +386,12 @@ func (m Commands) ready(ctx context.Context, c *ops.Call, unit uuid.UUID) (uuid.
 		return uuid.Nil, apperr.E(apperr.Conflict, "errors.reconciliation_required")
 	}
 
-	busy, err := Busy{}.UnitBusy(ctx, c, unit)
+	busy, err := Busy{}.UnitBusy(ctx, call, unit)
 	if err != nil {
 		return uuid.Nil, err
 	}
 
-	opBusy, err := m.Devices.OperationBusy(ctx, c, unit)
+	opBusy, err := m.Devices.OperationBusy(ctx, call, unit)
 	if err != nil {
 		return uuid.Nil, apperr.Wrap(err, "control.Devices.OperationBusy")
 	}
@@ -400,7 +400,7 @@ func (m Commands) ready(ctx context.Context, c *ops.Call, unit uuid.UUID) (uuid.
 		return uuid.Nil, apperr.E(apperr.Conflict, "errors.unit_busy")
 	}
 
-	dev, conn, power, bound, err := m.Devices.BoundDevice(ctx, c, unit)
+	dev, conn, power, bound, err := m.Devices.BoundDevice(ctx, call, unit)
 	if err != nil {
 		return uuid.Nil, apperr.Wrap(err, "control.Devices.BoundDevice")
 	}
@@ -454,33 +454,33 @@ func (in *GetInput) Validate() map[string]string {
 //	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/commands/{id} [get]
-func (m Commands) get(ctx context.Context, c *ops.Call, in *GetInput) (Command, error) {
-	x, err := scanCommand(
-		c.Tx.QueryRow(ctx, "SELECT "+commandCols+" FROM control.commands WHERE id = $1", in.ID),
+func (m Commands) get(ctx context.Context, call *ops.Call, in *GetInput) (Command, error) {
+	command, err := scanCommand(
+		call.Tx.QueryRow(ctx, "SELECT "+commandCols+" FROM control.commands WHERE id = $1", in.ID),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return x, apperr.E(apperr.NotFound, "error.notFound")
+		return command, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	if err != nil {
-		return x, err
+		return command, err
 	}
 
-	if c.Principal.Role == "client" || c.Principal.Role == "technician" {
-		t, found, err := m.Units.Target(ctx, c, x.UnitID)
+	if call.Principal.Role == "client" || call.Principal.Role == "technician" {
+		target, found, err := m.Units.Target(ctx, call, command.UnitID)
 		if err != nil {
-			return x, apperr.Wrap(err, "control.Units.Target")
+			return command, apperr.Wrap(err, "control.Units.Target")
 		}
 
 		ok := found &&
-			((c.Principal.Role == "client" && t.OrgID == c.Principal.OrgID) ||
-				(c.Principal.Role == "technician" && inScope(c.Principal, x.UnitID, t.PropertyID, t.OrgID)))
+			((call.Principal.Role == "client" && target.OrgID == call.Principal.OrgID) ||
+				(call.Principal.Role == "technician" && inScope(call.Principal, command.UnitID, target.PropertyID, target.OrgID)))
 		if !ok {
 			return Command{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
 	}
 
-	return x, nil
+	return command, nil
 }
 
 // ListInput is commands.list input (IR216).
@@ -533,16 +533,16 @@ func (in *ListInput) Validate() map[string]string {
 //	@Router			/v1/commands [get]
 func (m Commands) list(
 	ctx context.Context,
-	c *ops.Call,
-	in *ListInput,
+	call *ops.Call,
+	input *ListInput,
 ) (paging.Page[Command], error) {
-	err := paging.NoFilters(in.Query, "query.filters")
+	err := paging.NoFilters(input.Query, "query.filters")
 	if err != nil {
 		return paging.Page[Command]{}, apperr.Wrap(err, "paging.NoFilters")
 	}
 
 	order, err := paging.OrderBy(
-		in.Query.Sort,
+		input.Query.Sort,
 		map[string]string{"id": "id", "requestedAt": "requested_at"},
 		"requested_at DESC, id",
 	)
@@ -550,28 +550,28 @@ func (m Commands) list(
 		return paging.Page[Command]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 	// the cursor binds the unit and job, not the paging fields themselves (the next page carries the cursor)
-	w, err := paging.Resolve(in.Query, struct {
+	window, err := paging.Resolve(input.Query, struct {
 		UnitID uuid.UUID  `json:"unitId"`
 		JobID  *uuid.UUID `json:"jobId"`
-	}{in.UnitID, in.JobID}, c.Principal.ScopeVersion, 1)
+	}{input.UnitID, input.JobID}, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Command]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	t, found, err := m.Units.Target(ctx, c, in.UnitID)
+	target, found, err := m.Units.Target(ctx, call, input.UnitID)
 	if err != nil {
 		return paging.Page[Command]{}, apperr.Wrap(err, "control.Units.Target")
 	}
 
-	nf := apperr.E(apperr.NotFound, "error.notFound")
+	notFound := apperr.E(apperr.NotFound, "error.notFound")
 
-	switch c.Principal.Role {
+	switch call.Principal.Role {
 	case "client":
-		if !found || t.OrgID != c.Principal.OrgID {
-			return paging.Page[Command]{}, nf
+		if !found || target.OrgID != call.Principal.OrgID {
+			return paging.Page[Command]{}, notFound
 		}
 	case "technician":
-		if in.JobID == nil {
+		if input.JobID == nil {
 			return paging.Page[Command]{}, apperr.Fields(
 				map[string]string{"jobId": "error.required"},
 			)
@@ -579,48 +579,49 @@ func (m Commands) list(
 
 		var ok bool
 
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND unit_id =
+		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND unit_id
+			=
 			$2 AND technician_membership_id = $3)`,
-			*in.JobID, in.UnitID, c.Principal.MembershipID).
+			*input.JobID, input.UnitID, call.Principal.MembershipID).
 			Scan(&ok)
 		if err != nil {
 			return paging.Page[Command]{}, apperr.Wrap(err, "select assets.unit_assignment_access")
 		}
 
 		if !ok {
-			return paging.Page[Command]{}, nf
+			return paging.Page[Command]{}, notFound
 		}
 	default:
 		if !found {
-			return paging.Page[Command]{}, nf
+			return paging.Page[Command]{}, notFound
 		}
 	}
 
-	args := []any{in.UnitID}
+	args := []any{input.UnitID}
 	where := "unit_id = $1"
 
-	if in.JobID != nil {
-		args = append(args, *in.JobID)
+	if input.JobID != nil {
+		args = append(args, *input.JobID)
 		where += " AND job_id = $2"
 	}
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.commands WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM control.commands WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Command]{}, apperr.Wrap(scanErr, "select control.commands")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM control.commands WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			commandCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -631,23 +632,24 @@ func (m Commands) list(
 	items := []Command{}
 
 	for rows.Next() {
-		x, err := scanCommand(rows)
+		command, err := scanCommand(rows)
 		if err != nil {
 			return paging.Page[Command]{}, err
 		}
 
-		if c.Principal.Role == "client" && x.ActorMembershipID != c.Principal.MembershipID {
-			x.Reason = nil // another actor's reason (a technician's or HQ's) is not the customer's
+		if call.Principal.Role == "client" &&
+			command.ActorMembershipID != call.Principal.MembershipID {
+			command.Reason = nil // another actor's reason (a technician's or HQ's) is not the customer's
 		}
 
-		items = append(items, x)
+		items = append(items, command)
 	}
 
 	return paging.Page[Command]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, apperr.Wrap(rows.Err(), "select control.commands")
 }
 
@@ -657,10 +659,10 @@ func (m Commands) list(
 // saw it. Commands of a restriction, a diagnosis or an automation are recorded under their own operations.
 func AuditResult(
 	ctx context.Context,
-	tx pgx.Tx,
+	txn pgx.Tx,
 	command uuid.UUID,
 	actor, result, reason string,
-	at time.Time,
+	when time.Time,
 ) error {
 	var (
 		tenant uuid.UUID
@@ -668,7 +670,7 @@ func AuditResult(
 		source string
 	)
 
-	err := tx.QueryRow(ctx, `SELECT tenant_id, correlation_id, source FROM control.commands WHERE id = $1`, command).
+	err := txn.QueryRow(ctx, `SELECT tenant_id, correlation_id, source FROM control.commands WHERE id = $1`, command).
 		Scan(&tenant, &corr, &source)
 	if err != nil {
 		return apperr.Wrap(err, "select control.commands")
@@ -681,14 +683,14 @@ func AuditResult(
 	id := uuid.Must(uuid.NewV7())
 
 	return apperr.Wrap(
-		events.Publish(ctx, tx, tenant, "audit", id, events.AuditRecorded, events.Audit{
+		events.Publish(ctx, txn, tenant, "audit", id, events.AuditRecorded, events.Audit{
 			ID:              id,
 			ActorID:         actor,
 			ActorRole:       "system",
 			Action:          "commands.create",
 			TargetKind:      "command",
 			TargetID:        command.String(),
-			OccurredAt:      at,
+			OccurredAt:      when,
 			CorrelationID:   *corr,
 			Result:          result,
 			Reason:          reason,
@@ -707,8 +709,8 @@ func AuditResult(
 const ExpireGrace = 5 * time.Second
 
 // ExpireCommands marks sent commands past their window as expired (worker tick, IR138 item 2), ExpireGrace after it.
-func ExpireCommands(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
-	rows, err := tx.Query(
+func ExpireCommands(ctx context.Context, txn pgx.Tx, now time.Time) (int, error) {
+	rows, err := txn.Query(
 		ctx,
 		`UPDATE control.commands SET status = 'expired', failure_code = 'TIMEOUT', version = version + 1, updated_at = $1
 		WHERE status IN ('requested','sent') AND expires_at <= $2 RETURNING id`,
@@ -727,7 +729,7 @@ func ExpireCommands(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) 
 	for _, id := range ids {
 		err := AuditResult(
 			ctx,
-			tx,
+			txn,
 			id,
 			"system-scheduler",
 			"failed",
@@ -743,7 +745,7 @@ func ExpireCommands(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) 
 			ids,
 		), publishRestrictionCommands(
 			ctx,
-			tx,
+			txn,
 			events.CommandsEnded,
 			ids,
 			now,
@@ -754,11 +756,11 @@ func ExpireCommands(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) 
 // acknowledged; later acknowledgements are only recorded (D04 timing). It returns whether the command was acknowledged.
 func Acknowledge(
 	ctx context.Context,
-	tx pgx.Tx,
+	txn pgx.Tx,
 	command uuid.UUID,
 	receivedAt time.Time,
 ) (bool, error) {
-	tag, err := tx.Exec(
+	tag, err := txn.Exec(
 		ctx,
 		`UPDATE control.commands SET status = 'acknowledged', acknowledged_at = $2, version = version + 1, updated_at = $2
 		WHERE id = $1 AND status = 'sent' AND $2 < expires_at`,
@@ -772,7 +774,7 @@ func Acknowledge(
 	if tag.RowsAffected() == 1 {
 		err := publishRestrictionCommands(
 			ctx,
-			tx,
+			txn,
 			events.CommandAcknowledged,
 			[]uuid.UUID{command},
 			receivedAt,
@@ -783,7 +785,7 @@ func Acknowledge(
 
 		err = AuditResult(
 			ctx,
-			tx,
+			txn,
 			command,
 			"system-iot",
 			"success",
@@ -794,15 +796,15 @@ func Acknowledge(
 			return true, err
 		}
 
-		err = applyObserved(ctx, tx, command, receivedAt)
+		err = applyObserved(ctx, txn, command, receivedAt)
 		if err != nil {
 			return true, err
 		}
 
-		return true, runAcknowledged(ctx, tx, command, receivedAt)
+		return true, runAcknowledged(ctx, txn, command, receivedAt)
 	}
 
-	_, err = tx.Exec(
+	_, err = txn.Exec(
 		ctx,
 		`UPDATE control.commands SET late_ack_at = $2 WHERE id = $1 AND late_ack_at IS NULL`,
 		command,
@@ -815,7 +817,7 @@ func Acknowledge(
 // applyObserved copies an acknowledged unit setting into ACUnit.observedState (power / celsius / mode / fanLevel
 // change only through a Command ack or telemetry, IR45/IR50). observedState is an observation field, so the unit
 // version is unchanged and a fetched expectedUnitVersion stays valid.
-func applyObserved(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.Time) error {
+func applyObserved(ctx context.Context, tx pgx.Tx, command uuid.UUID, when time.Time) error {
 	_, err := tx.Exec(
 		ctx,
 		`UPDATE assets.units u SET observed_state = u.observed_state || CASE c.action->>'kind'
@@ -828,7 +830,7 @@ func applyObserved(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.Ti
 		WHERE c.id = $1 AND u.id = c.unit_id AND c.action->>'kind' IN ('set_power', 'set_temperature', 'set_mode',
 		'set_fan')`,
 		command,
-		at.UTC().Format(time.RFC3339Nano),
+		when.UTC().Format(time.RFC3339Nano),
 	)
 
 	return apperr.Wrap(err, "update assets.units")

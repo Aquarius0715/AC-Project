@@ -140,14 +140,14 @@ func From(err error) *DomainError {
 		return caused(E(NotFound, "error.notFound"), err)
 	}
 
-	pg, ok := errors.AsType[*pgconn.PgError](err)
+	pgError, ok := errors.AsType[*pgconn.PgError](err)
 	if ok {
-		switch pg.Code {
+		switch pgError.Code {
 		case "23514", "22P02", "22001", "22003", "22007", "22008":
 			return caused(E(Validation, "error.validation"), err)
 		case "42501":
 			if strings.HasPrefix(
-				pg.Message,
+				pgError.Message,
 				"permission denied",
 			) { // a missing table privilege is a defect (IR194), not RLS
 				return caused(E(Unavailable, "error.unavailable"), err)

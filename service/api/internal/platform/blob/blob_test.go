@@ -7,33 +7,33 @@ import (
 )
 
 func TestDir(t *testing.T) {
-	d := Dir(t.TempDir())
+	dir := Dir(t.TempDir())
 
 	ctx := context.Background()
 
-	err := d.Put(ctx, "a/b.png", "image/png", []byte("x"))
+	err := dir.Put(ctx, "a/b.png", "image/png", []byte("x"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	b, err := d.Get(ctx, "a/b.png")
+	b, err := dir.Get(ctx, "a/b.png")
 	if err != nil || string(b) != "x" {
 		t.Fatalf("%q %v", b, err)
 	}
 
-	for _, k := range []string{"", "../x", "/abs"} {
-		err := d.Put(ctx, k, "", nil)
+	for _, key := range []string{"", "../x", "/abs"} {
+		err := dir.Put(ctx, key, "", nil)
 		if err == nil {
-			t.Errorf("key %q accepted", k)
+			t.Errorf("key %q accepted", key)
 		}
 
-		_, err = d.Get(ctx, k)
+		_, err = dir.Get(ctx, key)
 		if err == nil {
-			t.Errorf("get %q accepted", k)
+			t.Errorf("get %q accepted", key)
 		}
 	}
 
-	_, err = d.Get(ctx, "missing")
+	_, err = dir.Get(ctx, "missing")
 	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("missing blob: %v", err)
 	}

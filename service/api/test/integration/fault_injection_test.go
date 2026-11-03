@@ -47,7 +47,7 @@ func injectAt(t *testing.T, match string) *apiserver.Server {
 // TestWithdrawRollsBackWhenTheJobCannotBeUpdated: a withdrawal whose job version update fails is not half done. The
 // operation fails as a server error, and the proposal stays pending, because the database rolls the transaction back.
 func TestWithdrawRollsBackWhenTheJobCannotBeUpdated(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = ANY($1) AND status = 'active'
@@ -56,26 +56,26 @@ func TestWithdrawRollsBackWhenTheJobCannotBeUpdated(t *testing.T) {
 		clock.Add(2*time.Hour),
 	)
 	unit := seed.ID("unit-non-rto").String()
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	internalHold := `{"kind":"internal","membershipId":"` + seed.ID("tech-internal-a").
 		String() +
 		`"}`
-	_, m := write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	_, res := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
 
-	job := data(m)["id"].(string)
-	if code, m := write(
-		s,
+	job := data(res)["id"].(string)
+	if code, resp := write(
+		srv,
 		&hq,
 		"jobs.proposeSlot",
 		`{"jobId":"`+job+`","slot":`+slotJSON(
 			97,
 			2,
-		)+`,"hold":`+internalHold+`,"message":"Can we come then?","replyBy":"`+ts(
+		)+`,"hold":`+internalHold+`,"message":"Can we come then?","replyBy":"`+stamp(
 			48,
 		)+`"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("propose: %d %v", code, m)
+		t.Fatalf("propose: %d %v", code, resp)
 	}
 
 	var proposal string
@@ -91,7 +91,7 @@ func TestWithdrawRollsBackWhenTheJobCannotBeUpdated(t *testing.T) {
 		"UPDATE maintenance.jobs SET version = version + 1, updated_at = platform.app_now() WHERE id = $1",
 	)
 
-	code, m := write(
+	code, res := write(
 		broken,
 		&hq,
 		"jobs.withdrawProposal",
@@ -99,7 +99,7 @@ func TestWithdrawRollsBackWhenTheJobCannotBeUpdated(t *testing.T) {
 		2,
 	)
 	if code < 500 {
-		t.Fatalf("withdraw with a failing job update: %d %v, want a server error", code, m)
+		t.Fatalf("withdraw with a failing job update: %d %v, want a server error", code, res)
 	}
 
 	var status string

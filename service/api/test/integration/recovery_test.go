@@ -8,25 +8,25 @@ import (
 )
 
 func TestRestrictionRecoveryCases(t *testing.T) {
-	s := serverWith(t, true)
-	u := boundUnit(t, s, "online")
-	k, inv := overdueContract(t, s, u)
-	id, m := executed(t, s, k, inv, []string{u})
-	ackCommand(t, cmdOf(m, u, "applyCommandIds"), clock.Add(time.Second))
+	srv := serverWith(t, true)
+	unit := boundUnit(t, srv, "online")
+	key, inv := overdueContract(t, srv, unit)
+	id, res := executed(t, srv, key, inv, []string{unit})
+	ackCommand(t, cmdOf(res, unit, "applyCommandIds"), clock.Add(time.Second))
 
 	get := func() map[string]any {
-		_, m := post(s, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
+		_, m := post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
 
 		return m
 	}
-	_, m = write(
-		s,
+	_, res = write(
+		srv,
 		&restrMgr,
 		"restrictions.cancel",
 		`{"restrictionId":"`+id+`","reason":"plan agreed"}`,
 		ver(get()),
 	)
-	ackCommand(t, cmdOf(m, u, "releaseCommandIds"), clock.Add(2*time.Second))
+	ackCommand(t, cmdOf(res, unit, "releaseCommandIds"), clock.Add(2*time.Second))
 
 	if data(get())["state"] != "released" {
 		t.Fatal("released")
@@ -35,17 +35,17 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	observe := func(observed string) {
 		t.Helper()
 
-		if code, m := write(
-			s,
+		if code, resp := write(
+			srv,
 			&customerB,
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(
 				time.RFC3339,
 			)+
-				`","eventType":"restriction_observation","restrictionId":"`+id+`","unitId":"`+u+`","observed":`+observed+`}`,
+				`","eventType":"restriction_observation","restrictionId":"`+id+`","unitId":"`+unit+`","observed":`+observed+`}`,
 			0,
 		); code != 200 {
-			t.Fatalf("observation: %d %v", code, m)
+			t.Fatalf("observation: %d %v", code, resp)
 		}
 	}
 	old := `{"restrictionId":"` + id + `","rulesVersion":"rules-1","policy":{"kind":"temperature_limit",` +
@@ -54,19 +54,19 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	) + `"}`
 	observe(old)
 
-	m = get()
+	res = get()
 
-	cases := data(m)["recoveryCases"].([]any)
-	if data(m)["state"] != "released" || len(cases) != 1 ||
+	cases := data(res)["recoveryCases"].([]any)
+	if data(res)["state"] != "released" || len(cases) != 1 ||
 		cases[0].(map[string]any)["state"] != "pending" {
-		t.Fatalf("recovery case: %v", m)
+		t.Fatalf("recovery case: %v", res)
 	}
 
 	var alerts int
 	ownerScan(
 		t,
 		`SELECT count(*) FROM monitoring.alerts WHERE unit_id = $1 AND type = 'reconciliation_required' AND status = 'open'`,
-		[]any{u},
+		[]any{unit},
 		&alerts,
 	)
 
@@ -81,45 +81,45 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&restrMgr,
 		"restrictions.schedule",
-		scheduleBody(k, inv, []string{u}, nil),
+		scheduleBody(key, inv, []string{unit}, nil),
 		0,
 	); code != 409 {
 		t.Error("an unresolved case blocks new restrictions")
 	}
 
-	if _, m := post(
-		s,
+	if _, resp := post(
+		srv,
 		&hq,
 		"units.get",
-		`{"id":"`+u+`"}`,
-	); data(m)["controlAvailability"].(map[string]any)["state"] != "blocked" {
-		t.Errorf("control blocked while a case is open: %v", data(m)["controlAvailability"])
+		`{"id":"`+unit+`"}`,
+	); data(resp)["controlAvailability"].(map[string]any)["state"] != "blocked" {
+		t.Errorf("control blocked while a case is open: %v", data(resp)["controlAvailability"])
 	}
 
-	if _, g := post(s, &hq, "units.get", `{"id":"`+u+`"}`); true {
-		if code, m := write(
-			s,
+	if _, g := post(srv, &hq, "units.get", `{"id":"`+unit+`"}`); true {
+		if code, resp := write(
+			srv,
 			&hq,
 			"commands.create",
-			`{"unitId":"`+u+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
+			`{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
 				ver(g),
 			)+`,"reason":"check"}`,
 			0,
 		); code != 409 ||
-			m["messageKey"] != "errors.reconciliation_required" {
-			t.Errorf("manual control while blocked: %d %v", code, m)
+			resp["messageKey"] != "errors.reconciliation_required" {
+			t.Errorf("manual control while blocked: %d %v", code, resp)
 		}
 	}
 
 	reconcile := func(a *actor) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			a,
 			"restrictions.reconcile",
-			`{"restrictionId":"`+id+`","unitIds":["`+u+`"]}`,
+			`{"restrictionId":"`+id+`","unitIds":["`+unit+`"]}`,
 			ver(get()),
 		)
 	}
@@ -127,12 +127,12 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 		t.Error("reconcile without restriction permissions")
 	}
 
-	code, m := reconcile(&overrider) // override-only may handle terminal recovery (IR03)
+	code, res := reconcile(&overrider) // override-only may handle terminal recovery (IR03)
 
-	c0, _ := data(m)["recoveryCases"].([]any)
+	c0, _ := data(res)["recoveryCases"].([]any)
 	if code != 200 || len(c0) != 1 || c0[0].(map[string]any)["state"] != "removing" ||
 		len(c0[0].(map[string]any)["commandIds"].([]any)) != 1 {
-		t.Fatalf("reconcile terminal: %d %v", code, m)
+		t.Fatalf("reconcile terminal: %d %v", code, res)
 	}
 
 	if code, _ := reconcile(&restrMgr); code != 409 {
@@ -152,7 +152,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	ownerScan(
 		t,
 		`SELECT count(*) FROM monitoring.alerts WHERE unit_id = $1 AND type = 'reconciliation_required' AND status = 'open'`,
-		[]any{u},
+		[]any{unit},
 		&alerts,
 	)
 
@@ -163,12 +163,12 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	observe(old)
 	observe("null")
 
-	code, m = reconcile(&restrMgr)
+	code, res = reconcile(&restrMgr)
 
-	cs := data(m)["recoveryCases"].([]any)
+	cs := data(res)["recoveryCases"].([]any)
 	if code != 200 || len(cs) != 2 || cs[1].(map[string]any)["state"] != "resolved" ||
 		len(cs[1].(map[string]any)["commandIds"].([]any)) != 0 {
-		t.Fatalf("null observation: %d %v", code, m)
+		t.Fatalf("null observation: %d %v", code, res)
 	}
 
 	if code, m := reconcile(
@@ -179,19 +179,19 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	}
 
 	if _, m := post(
-		s,
+		srv,
 		&hq,
 		"units.get",
-		`{"id":"`+u+`"}`,
+		`{"id":"`+unit+`"}`,
 	); data(m)["controlAvailability"].(map[string]any)["state"] != "available" {
 		t.Error("control available after every case is resolved")
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&restrMgr,
 		"restrictions.schedule",
-		scheduleBody(k, inv, []string{u}, nil),
+		scheduleBody(key, inv, []string{unit}, nil),
 		0,
 	); code != 200 {
 		t.Error("schedule after every case is resolved")

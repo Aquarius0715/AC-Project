@@ -8,10 +8,10 @@ import (
 // name and version. The operation fails as a server error, and the policy reads back as it was, because the database
 // rolls the transaction back (policies.save on an existing policy; the policy write fails).
 func TestAutomationPolicyEditRollsBackWhenItCannotBeWritten(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 
 	code, created := write(
-		s,
+		srv,
 		&hq,
 		"policies.save",
 		autoPolicyBody(map[string]string{"name": `"Before the edit"`}),
@@ -28,11 +28,11 @@ func TestAutomationPolicyEditRollsBackWhenItCannotBeWritten(t *testing.T) {
 		owner(t, `DELETE FROM control.automation_policies WHERE id = $1`, id)
 	})
 
-	_, before := post(s, &hq, "policies.get", `{"policyId":"`+id+`"}`)
+	_, before := post(srv, &hq, "policies.get", `{"policyId":"`+id+`"}`)
 
 	broken := injectAt(t, "UPDATE control.automation_policies SET name = ")
 
-	code, m := write(
+	code, res := write(
 		broken,
 		&hq,
 		"policies.save",
@@ -40,10 +40,10 @@ func TestAutomationPolicyEditRollsBackWhenItCannotBeWritten(t *testing.T) {
 		ver(before),
 	)
 	if code < 500 {
-		t.Fatalf("edit with a failing policy write: %d %v, want a server error", code, m)
+		t.Fatalf("edit with a failing policy write: %d %v, want a server error", code, res)
 	}
 
-	_, after := post(s, &hq, "policies.get", `{"policyId":"`+id+`"}`)
+	_, after := post(srv, &hq, "policies.get", `{"policyId":"`+id+`"}`)
 	if data(after)["name"] != "Before the edit" || ver(after) != ver(before) {
 		t.Errorf("a failed edit changed the policy: before %v, after %v", before, after)
 	}

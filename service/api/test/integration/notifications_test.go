@@ -11,7 +11,7 @@ import (
 )
 
 func TestNotificationsInbox(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	// earlier runs leave many notifications: mark customer-b's existing ones read so unreadOnly shows this run's
 	owner(
 		t,
@@ -19,21 +19,21 @@ func TestNotificationsInbox(t *testing.T) {
 		seed.ID("customer-b"),
 		clock,
 	)
-	u := boundUnit(t, s, "online")
-	k, inv := overdueContract(t, s, u)
+	unit := boundUnit(t, srv, "online")
+	key, inv := overdueContract(t, srv, unit)
 
-	code, m := write(
-		s,
+	code, res := write(
+		srv,
 		&restrMgr,
 		"restrictions.schedule",
-		scheduleBody(k, inv, []string{u}, nil),
+		scheduleBody(key, inv, []string{unit}, nil),
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("schedule: %d %v", code, m)
+		t.Fatalf("schedule: %d %v", code, res)
 	}
 
-	rid := data(m)["id"].(string)
+	rid := data(res)["id"].(string)
 	// a notification whose target customer-b cannot read is hidden (IR58)
 	hidden := uuid.NewString()
 	owner(
@@ -48,8 +48,8 @@ func TestNotificationsInbox(t *testing.T) {
 		clock,
 	)
 
-	_, m = post(
-		s,
+	_, res = post(
+		srv,
 		&customerB,
 		"notifications.list",
 		`{"filters":{"type":"restriction","unreadOnly":true},"limit":100}`,
@@ -57,7 +57,7 @@ func TestNotificationsInbox(t *testing.T) {
 
 	var n map[string]any
 
-	for _, it := range items(m) {
+	for _, it := range items(res) {
 		if it["target"].(map[string]any)["id"] == rid {
 			n = it
 		}
@@ -66,16 +66,16 @@ func TestNotificationsInbox(t *testing.T) {
 	if n == nil || n["deliveryState"] != "simulated" ||
 		n["params"].(map[string]any)["targetName"] == "" ||
 		n["severity"] != "warning" {
-		t.Fatalf("restriction notice: %v", m)
+		t.Fatalf("restriction notice: %v", res)
 	}
 
-	_, m = post(
-		s,
+	_, res = post(
+		srv,
 		&customerB,
 		"notifications.list",
 		`{"filters":{"severity":"critical"},"limit":100}`,
 	)
-	for _, it := range items(m) {
+	for _, it := range items(res) {
 		if it["id"] == hidden {
 			t.Fatal("unreadable target listed")
 		}
@@ -91,34 +91,34 @@ func TestNotificationsInbox(t *testing.T) {
 		`{"filters":{"severity":"high"}}`, `{"filters":{"kind":"x"}}`,
 		`{"filters":{"type":"spam"}}`,
 	} {
-		code, m := post(s, &customerB, "notifications.list", b)
+		code, m := post(srv, &customerB, "notifications.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
-	if code, m := post(
-		s,
+	if code, resp := post(
+		srv,
 		&customerB,
 		"notifications.list",
 		`{"filters":{"from":"2026-09-14T00:00:00Z","to":"2026-09-01T00:00:00Z"}}`,
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["filters.to"] != "error.range" {
-		t.Errorf("a reversed period: %d %v", code, m)
+		resp["fieldErrors"].(map[string]any)["filters.to"] != "error.range" {
+		t.Errorf("a reversed period: %d %v", code, resp)
 	}
 
-	if _, m := post(
-		s,
+	if _, resp := post(
+		srv,
 		&customerB,
 		"notifications.list",
 		`{"sort":{"field":"severity","direction":"desc"},"limit":5}`,
 	); len(
-		items(m),
+		items(resp),
 	) == 0 {
 		t.Error("severity sort")
 	}
 
 	id := n["id"].(string)
 	if code, _ := write(
-		s,
+		srv,
 		&customerB,
 		"notifications.markRead",
 		`{"id":"`+id+`"}`,
@@ -128,7 +128,7 @@ func TestNotificationsInbox(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerA,
 		"notifications.markRead",
 		`{"id":"`+id+`"}`,
@@ -138,7 +138,7 @@ func TestNotificationsInbox(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerB,
 		"notifications.markRead",
 		`{"id":"`+hidden+`"}`,
@@ -147,29 +147,29 @@ func TestNotificationsInbox(t *testing.T) {
 		t.Error("mark an unreadable target")
 	}
 
-	code, m = write(s, &customerB, "notifications.markRead", `{"id":"`+id+`"}`, 1)
-	if code != 200 || data(m)["readAt"] == nil || ver(m) != 2 {
-		t.Fatalf("markRead: %d %v", code, m)
+	code, res = write(srv, &customerB, "notifications.markRead", `{"id":"`+id+`"}`, 1)
+	if code != 200 || data(res)["readAt"] == nil || ver(res) != 2 {
+		t.Fatalf("markRead: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&customerB,
 		"notifications.markRead",
 		`{"id":"`+id+`"}`,
 		2,
 	); code != 200 ||
-		ver(m) != 2 {
+		ver(resp) != 2 {
 		t.Error("markRead again keeps the record")
 	}
 	// HQ sees the restriction notice target; technicians see nothing for it
-	if code, m := post(
-		s,
+	if code, resp := post(
+		srv,
 		&techB,
 		"notifications.list",
 		`{"filters":{"type":"restriction"}}`,
 	); code != 200 ||
-		len(items(m)) != 0 {
+		len(items(resp)) != 0 {
 		t.Error("technician restriction notices")
 	}
 }
@@ -179,7 +179,7 @@ func TestNotificationsInbox(t *testing.T) {
 // (already read, another member's, an unreadable target, unknown) is skipped alike and stays as it is. The list holds
 // 1–100 distinct IDs and takes no expected version.
 func TestMarkAllRead(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	note := func(member, unit string) string {
 		id := uuid.NewString()
 		owner(
@@ -228,27 +228,27 @@ func TestMarkAllRead(t *testing.T) {
 		"a duplicate": {list(mine, mine), "ids=error.invalid"},
 		"the nil ID":  {list(uuid.Nil.String()), "ids=error.invalid"},
 	} {
-		code, m := write(s, &customerB, "notifications.markAllRead", c.body, 0)
+		code, m := write(srv, &customerB, "notifications.markAllRead", c.body, 0)
 		refusal(t, name, code, m, c.want)
 	}
 
-	code, m := write(s, &customerB, "notifications.markAllRead", list(mine), 1)
-	refusal(t, "an expected version", code, m, "expectedVersion=error.notAllowed")
+	code, res := write(srv, &customerB, "notifications.markAllRead", list(mine), 1)
+	refusal(t, "an expected version", code, res, "expectedVersion=error.notAllowed")
 
-	code, m = write(
-		s,
+	code, res = write(
+		srv,
 		&customerB,
 		"notifications.markAllRead",
 		list(mine, read, theirs, hidden, unknown, mine2),
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("markAllRead: %d %v", code, m)
+		t.Fatalf("markAllRead: %d %v", code, res)
 	}
 
 	got := func(k string) string {
 		var out []string
-		for _, v := range data(m)[k].([]any) {
+		for _, v := range data(res)[k].([]any) {
 			out = append(out, v.(string))
 		}
 
@@ -283,9 +283,9 @@ func TestMarkAllRead(t *testing.T) {
 		}
 	}
 	// a second click finds nothing unread: everything is skipped and nothing changes
-	code, m = write(s, &customerB, "notifications.markAllRead", list(mine, mine2), 0)
+	code, res = write(srv, &customerB, "notifications.markAllRead", list(mine, mine2), 0)
 	if code != 200 || got("markedIds") != "" || got("skippedIds") != mine+","+mine2 {
-		t.Fatalf("again: %d %v", code, m)
+		t.Fatalf("again: %d %v", code, res)
 	}
 
 	if _, v := state(mine); v != 2 {
@@ -294,39 +294,39 @@ func TestMarkAllRead(t *testing.T) {
 }
 
 func TestNotificationRecipientsPreview(t *testing.T) {
-	s := server(t)
-	_, inv := newInvoice(t, s)
+	srv := server(t)
+	_, inv := newInvoice(t, srv)
 
 	body := func(channel string) string {
 		return `{"target":{"kind":"invoice",` +
 			`"id":"` + inv + `"},"templateKey":"payment_reminder",` +
 			`"channel":"` + channel + `","query":{}}`
 	}
-	if code, _ := post(s, &hq, "notifications.recipients", body("inApp")); code != 409 {
+	if code, _ := post(srv, &hq, "notifications.recipients", body("inApp")); code != 409 {
 		t.Error("reminder recipients before due")
 	}
 
 	owner(t, `UPDATE billing.invoices SET due_at = $2 WHERE id = $1`, inv, clock.Add(-time.Hour))
 
-	code, m := post(s, &hq, "notifications.recipients", body("inApp"))
-	if code != 200 || len(items(m)) == 0 {
-		t.Fatalf("recipients: %d %v", code, m)
+	code, resp := post(srv, &hq, "notifications.recipients", body("inApp"))
+	if code != 200 || len(items(resp)) == 0 {
+		t.Fatalf("recipients: %d %v", code, resp)
 	}
 
-	for _, r := range items(m) {
+	for _, r := range items(resp) {
 		if r["role"] != "client" {
 			t.Errorf("payment_reminder recipient %v", r)
 		}
 	}
 
-	recipient := items(m)[0]["id"].(string)
+	recipient := items(resp)[0]["id"].(string)
 
-	if code, _ := post(s, &customerB, "notifications.recipients", body("inApp")); code != 403 {
+	if code, _ := post(srv, &customerB, "notifications.recipients", body("inApp")); code != 403 {
 		t.Error("client lists reminder recipients")
 	}
 
 	if code, _ := post(
-		s,
+		srv,
 		&customerA,
 		"notifications.recipients",
 		`{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment","channel":"inApp","query":{}}`,
@@ -348,26 +348,26 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			`"id":"` + inv + `"},"templateKey":"payment","channel":"inApp",` +
 			`"query":{"filters":{"x":1}}}`: "x=error.notAllowed",
 	} {
-		code, m := post(s, &hq, "notifications.recipients", b)
+		code, m := post(srv, &hq, "notifications.recipients", b)
 		refusal(t, b, code, m, want)
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"notifications.recipients",
 		`{"target":{"kind":"invoice",`+
 			`"id":"`+inv+`"},"templateKey":"payment","channel":"email","role":"admin",`+
 			`"query":{"limit":1}}`,
 	); len(
-		items(m),
+		items(res),
 	) != 1 {
-		t.Errorf("admin recipients for payment: %v", m)
+		t.Errorf("admin recipients for payment: %v", res)
 	}
 
 	preview := func(recipient string) (int, map[string]any) {
 		return post(
-			s,
+			srv,
 			&hq,
 			"notifications.preview",
 			`{"target":{"kind":"invoice",`+
@@ -376,18 +376,18 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		)
 	}
 
-	code, m = preview(recipient)
-	if code != 200 || data(m)["deliveryState"] != "preview" ||
-		data(m)["params"].(map[string]any)["message"] != "Please pay" ||
-		data(m)["type"] != "payment_reminder" {
-		t.Fatalf("preview: %d %v", code, m)
+	code, resp = preview(recipient)
+	if code != 200 || data(resp)["deliveryState"] != "preview" ||
+		data(resp)["params"].(map[string]any)["message"] != "Please pay" ||
+		data(resp)["type"] != "payment_reminder" {
+		t.Fatalf("preview: %d %v", code, resp)
 	}
 
 	var saved int
 	ownerScan(
 		t,
 		`SELECT count(*) FROM notify.notifications WHERE id = $1`,
-		[]any{data(m)["id"]},
+		[]any{data(resp)["id"]},
 		&saved,
 	)
 
@@ -402,8 +402,8 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		t.Errorf("ineligible preview recipient: %d %s", code, fields(m))
 	}
 	// a payment reminder is about an invoice only
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"notifications.preview",
 		`{"target":{"kind":"job","id":"`+seed.ID("job-contractor-a").
@@ -412,66 +412,66 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			`"recipientMembershipId":"`+recipient+`","message":"Please `+
 			`pay"}`,
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["target"] != "error.invalid" {
-		t.Errorf("a payment reminder about a job: %d %v", code, m)
+		res["fieldErrors"].(map[string]any)["target"] != "error.invalid" {
+		t.Errorf("a payment reminder about a job: %d %v", code, res)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"notifications.preview",
 		`{"target":{"kind":"invoice",`+
 			`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
 			`"recipientMembershipId":"`+recipient+`","message":" "}`,
 	); code != 422 ||
-		fields(m) != "message=error.length" {
-		t.Errorf("blank message: %d %s", code, fields(m))
+		fields(res) != "message=error.length" {
+		t.Errorf("blank message: %d %s", code, fields(res))
 	}
 	// the message may be as long as a job note (2000, DD-P07); the reason stays at 1000 (IR228)
 	long := strings.Repeat("m", 2000)
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"notifications.preview",
 		`{"target":{"kind":"invoice",`+
 			`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
 			`"recipientMembershipId":"`+recipient+`","message":"`+long+`"}`,
 	); code != 200 {
-		t.Errorf("2000-character message: %d %v", code, m)
+		t.Errorf("2000-character message: %d %v", code, res)
 	}
 
 	for body, field := range map[string]string{
 		`"message":"` + long + `m"`:                    "message",
 		`"reason":"` + strings.Repeat("r", 1001) + `"`: "reason",
 	} {
-		if code, m := post(
-			s,
+		if code, res := post(
+			srv,
 			&hq,
 			"notifications.preview",
 			`{"target":{"kind":"invoice",`+
 				`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
 				`"recipientMembershipId":"`+recipient+`",`+body+`}`,
 		); code != 422 ||
-			m["fieldErrors"].(map[string]any)[field] != "error.length" {
-			t.Errorf("%s too long: %d %v", field, code, m)
+			res["fieldErrors"].(map[string]any)[field] != "error.length" {
+			t.Errorf("%s too long: %d %v", field, code, res)
 		}
 	}
 	// unit target: the client of the unit's organization reads it, another client does not
 	unit := seed.ID("unit-online-rto").String()
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerA,
 		"notifications.recipients",
 		`{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","query":{}}`,
 	); code != 200 ||
-		len(items(m)) == 0 {
-		t.Errorf("unit recipients: %d %v", code, m)
+		len(items(res)) == 0 {
+		t.Errorf("unit recipients: %d %v", code, res)
 	}
 	// an alert message is a fault notification about an open alert, of warning severity unless the policy's is given
 	// (IR348: as the notifier sends it)
 	alertPreview := func(extra string) (int, map[string]any) {
 		return post(
-			s,
+			srv,
 			&hq,
 			"notifications.preview",
 			`{"target":{"kind":"unit",`+
@@ -502,20 +502,20 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		t.Errorf("unknown severity: %d %s", code, fields(m))
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"notifications.preview",
 		`{"target":{"kind":"invoice",`+
 			`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
 			`"recipientMembershipId":"`+recipient+`","message":"Please pay","severity":"critical"}`,
 	); code != 422 ||
-		fields(m) != "severity=error.notAllowed" {
-		t.Errorf("severity of a payment reminder: %d %s", code, fields(m))
+		fields(res) != "severity=error.notAllowed" {
+		t.Errorf("severity of a payment reminder: %d %s", code, fields(res))
 	}
 
 	if code, _ := post(
-		s,
+		srv,
 		&customerB,
 		"notifications.recipients",
 		`{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","query":{}}`,
@@ -552,8 +552,8 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	listed := func(template string) (hqOperator, asset bool) {
 		t.Helper()
 
-		code, m := post(
-			s,
+		code, res := post(
+			srv,
 			&hq,
 			"notifications.recipients",
 			`{"target":{"kind":"unit",`+
@@ -561,10 +561,10 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 				`"query":{"limit":100}}`,
 		)
 		if code != 200 {
-			t.Fatalf("%s recipients: %d %v", template, code, m)
+			t.Fatalf("%s recipients: %d %v", template, code, res)
 		}
 
-		for _, r := range items(m) {
+		for _, r := range items(res) {
 			hqOperator = hqOperator || r["id"] == seed.ID("hq-operator").String()
 			asset = asset || r["id"] == assetOnly
 		}
@@ -579,29 +579,29 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		t.Error("a unit notice other than an alert reaches asset.read")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"notifications.preview",
 		`{"target":{"kind":"unit",`+
 			`"id":"`+unit+`"},"templateKey":"alert","channel":"inApp",`+
 			`"recipientMembershipId":"`+assetOnly+`"}`,
 	); code != 422 ||
-		fields(m) != "recipientMembershipId=errors.recipient_ineligible" {
-		t.Errorf("alert preview for asset.read only: %d %s", code, fields(m))
+		fields(res) != "recipientMembershipId=errors.recipient_ineligible" {
+		t.Errorf("alert preview for asset.read only: %d %s", code, fields(res))
 	}
 }
 
 func TestPreferencesAndConsents(t *testing.T) {
-	s := server(t)
-	if code, m := post(
-		s,
+	srv := server(t)
+	if code, res := post(
+		srv,
 		&techB,
 		"preferences.get",
 		`{}`,
-	); code != 200 || data(m)["currency"] != "MYR" ||
-		data(m)["timezone"] == "" {
-		t.Fatalf("preferences default: %d %v", code, m)
+	); code != 200 || data(res)["currency"] != "MYR" ||
+		data(res)["timezone"] == "" {
+		t.Fatalf("preferences default: %d %v", code, res)
 	}
 
 	want := map[string]string{ // the field each case is refused for
@@ -613,44 +613,44 @@ func TestPreferencesAndConsents(t *testing.T) {
 	for _, b := range []string{`{"locale":"fr",` +
 		`"timezone":"Asia/Kuala_Lumpur"}`, `{"locale":"en",` +
 		`"timezone":"Mars/Base"}`, `{"locale":"en","timezone":"Local"}`} {
-		code, m := write(s, &customerB, "preferences.update", b, 0)
+		code, m := write(srv, &customerB, "preferences.update", b, 0)
 		refusal(t, b, code, m, want[b])
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"preferences.update",
 		`{"locale":"en","timezone":"UTC","monthlyReportEmail":true}`,
 		0,
 	); code != 422 ||
-		fields(m) != "monthlyReportEmail=error.notAllowed" {
-		t.Errorf("monthlyReportEmail for HQ: %d %s", code, fields(m))
+		fields(res) != "monthlyReportEmail=error.notAllowed" {
+		t.Errorf("monthlyReportEmail for HQ: %d %s", code, fields(res))
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"preferences.update",
 		`{"locale":"ms","timezone":"Asia/Singapore","monthlyReportEmail":true}`,
 		0,
 	); code != 200 ||
-		data(m)["locale"] != "ms" {
-		t.Fatalf("update: %d %v", code, m)
+		data(res)["locale"] != "ms" {
+		t.Fatalf("update: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"preferences.update",
 		`{"locale":"en","timezone":"Asia/Kuala_Lumpur"}`,
 		0,
 	); code != 200 ||
-		data(m)["monthlyReportEmail"] != true {
-		t.Fatalf("keep monthly flag: %d %v", code, m)
+		data(res)["monthlyReportEmail"] != true {
+		t.Fatalf("keep monthly flag: %d %v", code, res)
 	}
 
-	if _, m := post(s, &customerB, "preferences.get", `{}`); data(m)["locale"] != "en" {
+	if _, m := post(srv, &customerB, "preferences.get", `{}`); data(m)["locale"] != "en" {
 		t.Error("saved preferences")
 	}
 
@@ -661,32 +661,32 @@ func TestPreferencesAndConsents(t *testing.T) {
 		seed.ID("customer-b"),
 	)
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerB,
 		"consents.get",
 		`{"purpose":"location_automation"}`,
-	); code != 200 || data(m)["granted"] != false ||
-		ver(m) != 1 {
-		t.Fatalf("consent get: %d %v", code, m)
+	); code != 200 || data(res)["granted"] != false ||
+		ver(res) != 1 {
+		t.Fatalf("consent get: %d %v", code, res)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerB,
 		"consents.get",
 		`{"purpose":"marketing"}`,
 	); code != 422 ||
-		fields(m) != "purpose=error.invalid" {
-		t.Errorf("bad purpose: %d %s", code, fields(m))
+		fields(res) != "purpose=error.invalid" {
+		t.Errorf("bad purpose: %d %s", code, fields(res))
 	}
 
-	if code, _ := post(s, &hq, "consents.get", `{"purpose":"location_automation"}`); code != 403 {
+	if code, _ := post(srv, &hq, "consents.get", `{"purpose":"location_automation"}`); code != 403 {
 		t.Error("HQ consent")
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerB,
 		"consents.update",
 		`{"purpose":"location_automation","granted":true}`,
@@ -695,44 +695,44 @@ func TestPreferencesAndConsents(t *testing.T) {
 		t.Error("stale consent version")
 	}
 
-	code, m := write(
-		s,
+	code, resp := write(
+		srv,
 		&customerB,
 		"consents.update",
 		`{"purpose":"location_automation","granted":true}`,
 		1,
 	)
-	if code != 200 || data(m)["grantedAt"] == nil || ver(m) != 2 {
-		t.Fatalf("grant: %d %v", code, m)
+	if code != 200 || data(resp)["grantedAt"] == nil || ver(resp) != 2 {
+		t.Fatalf("grant: %d %v", code, resp)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"consents.update",
 		`{"purpose":"location_automation","granted":true}`,
 		2,
 	); code != 200 ||
-		ver(m) != 2 {
+		ver(res) != 2 {
 		t.Error("same value unchanged")
 	}
 
-	code, m = write(
-		s,
+	code, resp = write(
+		srv,
 		&customerB,
 		"consents.update",
 		`{"purpose":"location_automation","granted":false}`,
 		2,
 	)
-	if code != 200 || data(m)["revokedAt"] == nil || data(m)["grantedAt"] == nil {
-		t.Fatalf("revoke: %d %v", code, m)
+	if code != 200 || data(resp)["revokedAt"] == nil || data(resp)["grantedAt"] == nil {
+		t.Fatalf("revoke: %d %v", code, resp)
 	}
 }
 
 // TestTechnicianJobNotificationScope: a technician's notification about a job is listed and can be marked read only
 // while the assignment lets the technician open the job — active and its scheduled window not over (IR49, IR58, IR253).
 func TestTechnicianJobNotificationScope(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	tenant, tech, job := seed.ID(
 		"tenant-a",
 	), seed.ID(
@@ -770,13 +770,13 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 	})
 
 	listed := func() bool {
-		_, m := post(
-			s,
+		_, res := post(
+			srv,
 			&techInt,
 			"notifications.list",
 			`{"filters":{"type":"schedule_change"},"limit":100}`,
 		)
-		for _, it := range items(m) {
+		for _, it := range items(res) {
 			if it["id"] == nid {
 				return true
 			}
@@ -841,7 +841,13 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 		t.Error("assignment window over: notification still listed")
 	}
 
-	if code, _ := write(s, &techInt, "notifications.markRead", `{"id":"`+nid+`"}`, 1); code != 404 {
+	if code, _ := write(
+		srv,
+		&techInt,
+		"notifications.markRead",
+		`{"id":"`+nid+`"}`,
+		1,
+	); code != 404 {
 		t.Errorf("mark read with the job out of reach: %d", code)
 	}
 
@@ -853,7 +859,13 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 		clock.Add(time.Hour),
 	)
 
-	if code, _ := write(s, &techInt, "notifications.markRead", `{"id":"`+nid+`"}`, 1); code != 200 {
+	if code, _ := write(
+		srv,
+		&techInt,
+		"notifications.markRead",
+		`{"id":"`+nid+`"}`,
+		1,
+	); code != 200 {
 		t.Errorf("mark read inside the window: %d", code)
 	}
 }
@@ -861,7 +873,7 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 // IR58: a contractor reads the notifications of jobs offered to its company, and nothing else — not another job, not
 // a unit.
 func TestContractorInbox(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	note := func(kind, id string) string {
 		n := uuid.NewString()
 		owner(
@@ -882,13 +894,13 @@ func TestContractorInbox(t *testing.T) {
 	other := note("job", uuid.NewString())
 	unit := note("unit", seed.ID("unit-online-rto").String())
 
-	code, m := post(s, &contrA, "notifications.list", `{"limit":100}`)
+	code, resp := post(srv, &contrA, "notifications.list", `{"limit":100}`)
 	if code != 200 {
-		t.Fatalf("contractor inbox: %d %v", code, m)
+		t.Fatalf("contractor inbox: %d %v", code, resp)
 	}
 
 	seen := map[string]bool{}
-	for _, it := range items(m) {
+	for _, it := range items(resp) {
 		seen[it["id"].(string)] = true
 	}
 
@@ -901,20 +913,20 @@ func TestContractorInbox(t *testing.T) {
 		)
 	}
 
-	for _, it := range items(m) { // the accepted job opens for the company: its notice may link it (IR602)
+	for _, it := range items(resp) { // the accepted job opens for the company: its notice may link it (IR602)
 		if it["id"] == offered && it["targetOpen"] != true {
 			t.Errorf("the accepted job's notice: targetOpen %v", it["targetOpen"])
 		}
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&contrB,
 		"notifications.list",
 		`{"limit":100}`,
 	); code != 200 ||
-		len(items(m)) > 0 {
-		for _, it := range items(m) {
+		len(items(res)) > 0 {
+		for _, it := range items(res) {
 			if it["id"] == offered {
 				t.Error("another contractor reads the notification")
 			}
@@ -926,13 +938,13 @@ func TestContractorInbox(t *testing.T) {
 // offer was its own — but the job page no longer opens for it (jobs.get NOT_FOUND), so the notice says targetOpen
 // false and the apps show it without a link.
 func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
-	s := server(t)
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	srv := server(t)
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
 
 	job := data(m)["id"].(string)
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
@@ -941,29 +953,29 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 			49,
 			2,
 		)+
-			`,"offerExpiresAt":"`+ts(
+			`,"offerExpiresAt":"`+stamp(
 			12,
-		)+`","accessValidFrom":"`+ts(
+		)+`","accessValidFrom":"`+stamp(
 			0,
-		)+`","accessValidUntil":"`+ts(
+		)+`","accessValidUntil":"`+stamp(
 			60,
 		)+`","termsVersion":"t"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("offer: %d %v", code, m)
+		t.Fatalf("offer: %d %v", code, res)
 	}
 
 	notice := func() map[string]any {
 		t.Helper()
 		drainEvents(t)
 
-		code, m := post(s, &contrA, "notifications.list", `{"limit":100}`)
+		code, res := post(srv, &contrA, "notifications.list", `{"limit":100}`)
 		if code != 200 {
-			t.Fatalf("contractor inbox: %d %v", code, m)
+			t.Fatalf("contractor inbox: %d %v", code, res)
 		}
 
 		var last map[string]any
-		for _, it := range items(m) { // newest first: the first notice of the job is its latest
+		for _, it := range items(res) { // newest first: the first notice of the job is its latest
 			if tg, _ := it["target"].(map[string]any); tg["kind"] == "job" && tg["id"] == job &&
 				last == nil {
 				last = it
@@ -976,14 +988,14 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 		t.Fatalf("the open offer's notice links the offer: %v", n)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"the customer withdrew"}`,
 		2,
 	); code != 200 {
-		t.Fatalf("cancel: %d %v", code, m)
+		t.Fatalf("cancel: %d %v", code, res)
 	}
 
 	n := notice()
@@ -995,7 +1007,7 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 		t.Errorf("the withdrawn offer's notice still links a page that does not open: %v", n)
 	}
 
-	if code, _ := post(s, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+	if code, _ := post(srv, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Errorf("the withdrawn offer's job opens for the company: %d", code)
 	}
 }

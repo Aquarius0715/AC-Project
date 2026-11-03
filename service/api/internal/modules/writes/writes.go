@@ -22,19 +22,19 @@ type Input struct {
 
 // Validate implements ops.Validator.
 func (in *Input) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if strings.TrimSpace(in.Operation) == "" {
-		fe["operation"] = "error.required"
+		fieldErrs["operation"] = "error.required"
 	}
 
 	if n := utf8.RuneCountInString(
 		in.IdempotencyKey,
 	); n < 8 ||
 		n > 128 { // 8–128 characters (review-resolution-contracts writes.getResult)
-		fe["idempotencyKey"] = "error.invalid"
+		fieldErrs["idempotencyKey"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // Result is WriteResult.
@@ -71,8 +71,8 @@ type Result struct {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/writes/{idempotencyKey} [get]
-func get(ctx context.Context, c *ops.Call, in *Input) (Result, error) {
-	if _, ok := ops.SpecByName()[in.Operation]; !ok {
+func get(ctx context.Context, c *ops.Call, input *Input) (Result, error) {
+	if _, ok := ops.SpecByName()[input.Operation]; !ok {
 		return Result{}, apperr.Fields(map[string]string{"operation": "error.invalid"})
 	}
 
@@ -83,7 +83,7 @@ func get(ctx context.Context, c *ops.Call, in *Input) (Result, error) {
 
 	err := c.Tx.QueryRow(ctx, `SELECT status, response FROM platform.idempotency_keys
 		WHERE membership_id = $1 AND key = $2 AND operation = $3 AND expires_at >
-		$4`, c.Principal.MembershipID, in.IdempotencyKey, in.Operation, c.Now).Scan(&status, &resp)
+		$4`, c.Principal.MembershipID, input.IdempotencyKey, input.Operation, c.Now).Scan(&status, &resp)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Result{State: "not_received", Operation: "", ResourceIDs: nil, Result: nil}, nil
 	}
@@ -110,7 +110,7 @@ func get(ctx context.Context, c *ops.Call, in *Input) (Result, error) {
 
 	out := Result{
 		State:       "succeeded",
-		Operation:   in.Operation,
+		Operation:   input.Operation,
 		ResourceIDs: []string{},
 		Result:      stored.Data,
 	}

@@ -62,27 +62,27 @@ const memberCols = `m.id, m.tenant_id, m.version, m.created_at, m.updated_at, m.
 	`m.user_id), '')`
 
 func scanMember(r pgx.Row) (Member, error) {
-	var x Member
+	var member Member
 
 	err := r.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.UpdatedAt,
-		&x.UserID,
-		&x.OrganizationID,
-		&x.Role,
-		&x.Employment,
-		&x.ScopeVersion,
-		&x.ValidFrom,
-		&x.ValidUntil,
-		&x.ClientRole,
-		&x.RevokedAt,
-		&x.DisplayName,
+		&member.ID,
+		&member.TenantID,
+		&member.Version,
+		&member.CreatedAt,
+		&member.UpdatedAt,
+		&member.UserID,
+		&member.OrganizationID,
+		&member.Role,
+		&member.Employment,
+		&member.ScopeVersion,
+		&member.ValidFrom,
+		&member.ValidUntil,
+		&member.ClientRole,
+		&member.RevokedAt,
+		&member.DisplayName,
 	)
 
-	return x, apperr.Wrap(err, "scan (scanMember)")
+	return member, apperr.Wrap(err, "scan (scanMember)")
 }
 
 // QueryLoadMembers completes members for other domains (IR194: maintenance's technician lists).
@@ -110,11 +110,11 @@ func LoadMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 	return nil
 }
 
-func loadMembers(ctx context.Context, c *ops.Call, in *LoadMembersInput) ([]Member, error) {
+func loadMembers(ctx context.Context, call *ops.Call, in *LoadMembersInput) ([]Member, error) {
 	ms := in.Members
 	for i := range ms {
 		if ms[i].DisplayName == "" {
-			err := c.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT display_name FROM identity.users WHERE id = $1),
+			err := call.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT display_name FROM identity.users WHERE id = $1),
 				'')`, ms[i].UserID).
 				Scan(&ms[i].DisplayName)
 			if err != nil {
@@ -123,7 +123,7 @@ func loadMembers(ctx context.Context, c *ops.Call, in *LoadMembersInput) ([]Memb
 		}
 	}
 
-	return ms, fillMembers(ctx, c, ms)
+	return ms, fillMembers(ctx, call, ms)
 }
 
 // fillMembers loads the permissions, scopes and qualification grants of the members with one query per table for all
@@ -136,13 +136,13 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 	ids := make([]uuid.UUID, 0, len(ms))
 	at := map[uuid.UUID][]int{}
 
-	for i := range ms {
-		ms[i].Permissions, ms[i].Scopes, ms[i].Qualifications = []string{}, []ScopeRef{}, []Grant{}
-		if _, seen := at[ms[i].ID]; !seen {
-			ids = append(ids, ms[i].ID)
+	for idx := range ms {
+		ms[idx].Permissions, ms[idx].Scopes, ms[idx].Qualifications = []string{}, []ScopeRef{}, []Grant{}
+		if _, seen := at[ms[idx].ID]; !seen {
+			ids = append(ids, ms[idx].ID)
 		}
 
-		at[ms[i].ID] = append(at[ms[i].ID], i)
+		at[ms[idx].ID] = append(at[ms[idx].ID], idx)
 	}
 
 	var id uuid.UUID
@@ -177,13 +177,13 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 			return err
 		}
 
-		var s ScopeRef
+		var scopeRef ScopeRef
 
 		err = each(
 			`SELECT membership_id, kind, ref_id FROM identity.membership_scopes WHERE membership_id = ANY($1) ORDER BY
 				membership_id, kind, ref_id`,
-			[]any{&s.Kind, &s.ID},
-			func(x *Member) { x.Scopes = append(x.Scopes, s) },
+			[]any{&scopeRef.Kind, &scopeRef.ID},
+			func(x *Member) { x.Scopes = append(x.Scopes, scopeRef) },
 		)
 		if err != nil {
 			return err
@@ -196,14 +196,14 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 		`SELECT membership_id, code, valid_from, valid_until, revoked_at FROM identity.qualification_grants WHERE
 			membership_id = ANY($1) ORDER BY membership_id, code`,
 		[]any{&g.Code, &g.ValidFrom, &g.ValidUntil, &g.RevokedAt},
-		func(x *Member) {
+		func(member *Member) {
 			grant := g
 			if g.RevokedAt != nil { // the scan target is shared by every row: each grant keeps its own revocation time
 				at := *g.RevokedAt
 				grant.RevokedAt = &at
 			}
 
-			x.Qualifications = append(x.Qualifications, grant)
+			member.Qualifications = append(member.Qualifications, grant)
 		},
 	)
 }
@@ -242,7 +242,11 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/members [get]
-func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Member], error) {
+func membersList(
+	ctx context.Context,
+	call *ops.Call,
+	in *paging.Query,
+) (paging.Page[Member], error) {
 	var f struct {
 		Role           *string    `json:"role,omitempty"`
 		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
@@ -277,7 +281,7 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		return paging.Page[Member]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*in, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Member]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -291,10 +295,10 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	}
 
 	conds := []string{"TRUE"}
-	if c.Principal.Role == "contractor" {
+	if call.Principal.Role == "contractor" {
 		conds = append(
 			conds,
-			"m.role = 'technician' AND m.organization_id = "+add(c.Principal.OrgID),
+			"m.role = 'technician' AND m.organization_id = "+add(call.Principal.OrgID),
 		)
 	}
 
@@ -309,7 +313,7 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	}
 
 	if f.ActiveOnly != nil && *f.ActiveOnly {
-		now := add(c.Now)
+		now := add(call.Now)
 		conds = append(
 			conds,
 			"(m.valid_from <= "+now+" AND (m.valid_until IS NULL OR m.valid_until > "+now+"))",
@@ -317,7 +321,7 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	}
 
 	if f.Qualification != nil {
-		code, now := add(*f.Qualification), add(c.Now)
+		code, now := add(*f.Qualification), add(call.Now)
 		conds = append(
 			conds,
 			"EXISTS (SELECT 1 FROM identity.qualification_grants g WHERE g.membership_id = m.id AND g.code = "+code+
@@ -329,21 +333,21 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.memberships m WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.memberships m WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Member]{}, apperr.Wrap(scanErr, "select identity.memberships")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM identity.memberships m WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			memberCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -353,14 +357,14 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	items := []Member{}
 
 	for rows.Next() {
-		x, err := scanMember(rows)
+		member, err := scanMember(rows)
 		if err != nil {
 			rows.Close()
 
 			return paging.Page[Member]{}, err
 		}
 
-		items = append(items, x)
+		items = append(items, member)
 	}
 
 	rows.Close()
@@ -370,16 +374,16 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		return paging.Page[Member]{}, apperr.Wrap(rowsErr, "select identity.memberships")
 	}
 
-	loadMembersErr := LoadMembers(ctx, c, items)
+	loadMembersErr := LoadMembers(ctx, call, items)
 	if loadMembersErr != nil {
 		return paging.Page[Member]{}, loadMembersErr
 	}
 
 	return paging.Page[Member]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
@@ -423,11 +427,11 @@ type NewUserInput struct {
 
 // Validate implements ops.Validator for the lookup-free rules.
 func (in *MemberInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 
 	if in.NewUser != nil {
 		if in.UserID != uuid.Nil || in.ID != nil {
-			fe["newUser"] = "error.notAllowed"
+			fieldErrs["newUser"] = "error.notAllowed"
 		}
 
 		in.NewUser.Email, in.NewUser.DisplayName = strings.TrimSpace(
@@ -441,34 +445,34 @@ func (in *MemberInput) Validate() map[string]string {
 		)
 		if err != nil || a.Address != in.NewUser.Email ||
 			len(in.NewUser.Email) > 254 {
-			fe["newUser.email"] = "error.invalid"
+			fieldErrs["newUser.email"] = "error.invalid"
 		}
 
 		if n := utf8.RuneCountInString(in.NewUser.DisplayName); n < 1 || n > 120 {
-			fe["newUser.displayName"] = "error.length"
+			fieldErrs["newUser.displayName"] = "error.length"
 		}
 	} else if in.UserID == uuid.Nil {
-		fe["userId"] = "error.required"
+		fieldErrs["userId"] = "error.required"
 	}
 
 	if in.OrganizationID == uuid.Nil {
-		fe["organizationId"] = "error.required"
+		fieldErrs["organizationId"] = "error.required"
 	}
 
 	if !slices.Contains(roles, in.Role) {
-		fe["role"] = "error.invalid"
+		fieldErrs["role"] = "error.invalid"
 	}
 
 	switch {
 	case in.Role == "technician" &&
 		(in.Employment == nil || (*in.Employment != "internal" && *in.Employment != "external")):
-		fe["employment"] = "error.required"
+		fieldErrs["employment"] = "error.required"
 	case in.Role != "technician" && in.Employment != nil:
-		fe["employment"] = "error.notAllowed"
+		fieldErrs["employment"] = "error.notAllowed"
 	}
 
 	if in.Permissions == nil || in.Scopes == nil {
-		fe["permissions"] = "error.required"
+		fieldErrs["permissions"] = "error.required"
 	}
 
 	seen := map[string]bool{}
@@ -480,7 +484,7 @@ func (in *MemberInput) Validate() map[string]string {
 		}
 
 		if !allowed || seen[p] {
-			fe["permissions"] = "error.invalid"
+			fieldErrs["permissions"] = "error.invalid"
 		}
 
 		seen[p] = true
@@ -492,7 +496,7 @@ func (in *MemberInput) Validate() map[string]string {
 			".write",
 		); ok && authz.Permissions[r+".read"] &&
 			!seen[r+".read"] {
-			fe["permissions"] = "errors.write_needs_read"
+			fieldErrs["permissions"] = "errors.write_needs_read"
 		}
 	}
 
@@ -502,33 +506,33 @@ func (in *MemberInput) Validate() map[string]string {
 	}[in.Role]
 	for _, sc := range in.Scopes {
 		if !slices.Contains(kinds, sc.Kind) {
-			fe["scopes"] = "error.invalid"
+			fieldErrs["scopes"] = "error.invalid"
 		}
 	}
 
 	if in.Role == "admin" && len(in.Scopes) > 1 {
-		fe["scopes"] = "error.invalid"
+		fieldErrs["scopes"] = "error.invalid"
 	}
 
 	if in.ValidFrom.IsZero() {
-		fe["validFrom"] = "error.required"
+		fieldErrs["validFrom"] = "error.required"
 	}
 
 	if in.ValidUntil != nil && !in.ValidFrom.Before(*in.ValidUntil) {
-		fe["validUntil"] = "error.range"
+		fieldErrs["validUntil"] = "error.range"
 	}
 
 	if in.Role == "technician" && in.Employment != nil && *in.Employment == "external" &&
 		in.ValidUntil == nil {
-		fe["validUntil"] = "errors.external_needs_end"
+		fieldErrs["validUntil"] = "errors.external_needs_end"
 	}
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fe["reason"] = "error.length"
+		fieldErrs["reason"] = "error.length"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // membersSave serves members.save.
@@ -560,12 +564,12 @@ func (in *MemberInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/members [post]
-func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, error) {
-	newPerson := in.NewUser != nil
+func membersSave(ctx context.Context, c *ops.Call, input *MemberInput) (Member, error) {
+	newPerson := input.NewUser != nil
 	if newPerson { // the person is created with the membership, or taken back if this tenant removed them (IR461, IR462)
 		var err error
 
-		in.UserID, err = personFor(ctx, c, in.NewUser.Email, in.NewUser.DisplayName)
+		input.UserID, err = personFor(ctx, c, input.NewUser.Email, input.NewUser.DisplayName)
 		if errors.Is(err, errEmailTaken) {
 			return Member{}, apperr.Fields(map[string]string{"newUser.email": "errors.email_taken"})
 		}
@@ -577,7 +581,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 
 	var exists bool
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.users WHERE id = $1)`, in.UserID).
+	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.users WHERE id = $1)`, input.UserID).
 		Scan(&exists)
 	if scanErr != nil {
 		return Member{}, apperr.Wrap(scanErr, "select identity.users")
@@ -585,7 +589,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 
 	var kind string
 
-	err := c.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, in.OrganizationID).
+	err := c.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, input.OrganizationID).
 		Scan(&kind)
 	if !exists || errors.Is(err, pgx.ErrNoRows) {
 		return Member{}, apperr.E(apperr.NotFound, "error.notFound")
@@ -595,9 +599,9 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		return Member{}, apperr.Wrap(err, "select identity.organizations")
 	}
 
-	want := map[string]string{"admin": "operator", "client": "customer", "contractor": "contractor"}[in.Role]
-	if in.Role == "technician" {
-		want = map[string]string{"internal": "operator", "external": "contractor"}[*in.Employment]
+	want := map[string]string{"admin": "operator", "client": "customer", "contractor": "contractor"}[input.Role]
+	if input.Role == "technician" {
+		want = map[string]string{"internal": "operator", "external": "contractor"}[*input.Employment]
 	}
 
 	if kind != want {
@@ -606,24 +610,24 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		)
 	}
 	// scope references
-	for _, sc := range in.Scopes {
+	for _, scopeRef := range input.Scopes {
 		var ok bool
 
-		switch sc.Kind {
+		switch scopeRef.Kind {
 		case "tenant":
-			ok = sc.ID == c.Principal.TenantID
+			ok = scopeRef.ID == c.Principal.TenantID
 		case "organization":
 			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.organizations WHERE id = $1 AND (kind = 'customer' OR
-				id = $2))`, sc.ID, in.OrganizationID).
+				id = $2))`, scopeRef.ID, input.OrganizationID).
 				Scan(&ok)
-			if in.Role != "technician" {
-				ok = ok && sc.ID == in.OrganizationID
+			if input.Role != "technician" {
+				ok = ok && scopeRef.ID == input.OrganizationID
 			}
 		case "property":
-			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_properties WHERE id = $1)`, sc.ID).
+			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_properties WHERE id = $1)`, scopeRef.ID).
 				Scan(&ok)
 		case "unit":
-			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_units WHERE id = $1)`, sc.ID).
+			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_units WHERE id = $1)`, scopeRef.ID).
 				Scan(&ok)
 		}
 
@@ -636,16 +640,16 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		}
 	}
 	// self promotion
-	if in.UserID == c.Principal.UserID { // granting identity.write / restriction.override to oneself (DD-A03)
+	if input.UserID == c.Principal.UserID { // granting identity.write / restriction.override to oneself (DD-A03)
 		for _, p := range []string{"identity.write", "restriction.override"} {
-			if !slices.Contains(in.Permissions, p) {
+			if !slices.Contains(input.Permissions, p) {
 				continue
 			}
 
 			had := false
-			if in.ID != nil {
+			if input.ID != nil {
 				err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND
-					permission = $2)`, *in.ID, p).
+					permission = $2)`, *input.ID, p).
 					Scan(&had)
 				if err != nil {
 					return Member{}, apperr.Wrap(err, "select identity.membership_permissions")
@@ -667,10 +671,10 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	// HQ turns the sign-in off with the access, or on when it gives the access back (IR508)
 	revoke, restore := false, false
 
-	if in.ID == nil {
+	if input.ID == nil {
 		var clientRole *string
 
-		if in.Role == "client" { // HQ adds a member; a customer owner adds owners in the customer app (IR417)
+		if input.Role == "client" { // HQ adds a member; a customer owner adds owners in the customer app (IR417)
 			cr := "member"
 			clientRole = &cr
 		}
@@ -678,7 +682,8 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		err := c.Tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, employment,
 			client_role, valid_from, valid_until, created_at, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $8) RETURNING id`,
-			in.UserID, in.OrganizationID, in.Role, in.Employment, clientRole, in.ValidFrom, in.ValidUntil, c.Now).
+			input.UserID, input.OrganizationID, input.Role, input.Employment, clientRole, input.ValidFrom, input.ValidUntil,
+			c.Now).
 			Scan(&id)
 		if err != nil {
 			return Member{}, apperr.Wrap(err, "insert identity.memberships")
@@ -691,7 +696,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				WHERE s.id = u.sign_in_membership_id))
 				AND NOT EXISTS (SELECT 1 FROM identity.memberships m WHERE m.user_id = u.id AND m.id <> $2 AND (m.valid_until IS
 				NULL OR m.valid_until > $3))
-				FROM identity.users u WHERE u.id = $1`, in.UserID, id, c.Now).
+				FROM identity.users u WHERE u.id = $1`, input.UserID, id, c.Now).
 				Scan(&account)
 			if err != nil {
 				return Member{}, apperr.Wrap(err, "select identity.users")
@@ -703,7 +708,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			listed = "invited"
 		}
 
-		if in.Role == "client" { // IR84 initial Consent
+		if input.Role == "client" { // IR84 initial Consent
 			_, err := c.Tx.Exec(
 				ctx,
 				`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted) VALUES
@@ -723,10 +728,10 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				FROM notify.ref_customers cu, identity.users u WHERE cu.organization_id = $2 AND u.id = $5
 				ON CONFLICT (tenant_id, customer_id, email) DO NOTHING`,
 				id,
-				in.OrganizationID,
+				input.OrganizationID,
 				c.Now,
 				c.Principal.MembershipID,
-				in.UserID,
+				input.UserID,
 				*clientRole,
 				listed,
 			)
@@ -736,7 +741,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		}
 		// FR-P11: the contractor company's user list includes the new account, listed as not signed in yet when the
 		// person was created with it (IR461); an address already on the list keeps its row
-		if in.Role == "contractor" || in.Role == "technician" {
+		if input.Role == "contractor" || input.Role == "technician" {
 			_, err := c.Tx.Exec(
 				ctx,
 				`INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role,
@@ -745,11 +750,11 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				FROM identity.organizations o, identity.users u WHERE o.id = $2 AND o.kind = 'contractor' AND u.id = $6
 				ON CONFLICT (tenant_id, organization_id, email) DO NOTHING`,
 				id,
-				in.OrganizationID,
+				input.OrganizationID,
 				c.Now,
 				c.Principal.MembershipID,
-				in.Role,
-				in.UserID,
+				input.Role,
+				input.UserID,
 				listed,
 			)
 			if err != nil {
@@ -757,11 +762,11 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			}
 		}
 	} else {
-		x, err := scanMember(
+		member, err := scanMember(
 			c.Tx.QueryRow(
 				ctx,
 				"SELECT "+memberCols+" FROM identity.memberships m WHERE m.id = $1 FOR UPDATE",
-				*in.ID,
+				*input.ID,
 			),
 		)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -772,18 +777,20 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			return Member{}, err
 		}
 
-		if x.UserID != in.UserID || x.OrganizationID != in.OrganizationID || x.Role != in.Role {
+		if member.UserID != input.UserID || member.OrganizationID != input.OrganizationID ||
+			member.Role != input.Role {
 			return Member{}, apperr.Fields(map[string]string{"role": "errors.membership_fixed"})
 		}
 
-		if x.Version != *c.ExpectedVersion {
+		if member.Version != *c.ExpectedVersion {
 			return Member{}, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
 		// last active identity.write holder: a membership that loses the permission or stops being valid now (ended, or
 		// its start moved later). The tenant's changes to holders wait for each other here, so two at once — each taking
 		// the permission from, or ending, the other of the last two — cannot both see the other still active (IR472).
-		ending := (in.ValidUntil != nil && !in.ValidUntil.After(c.Now)) || in.ValidFrom.After(c.Now)
-		if !slices.Contains(in.Permissions, "identity.write") || ending {
+		ending := (input.ValidUntil != nil && !input.ValidUntil.After(c.Now)) ||
+			input.ValidFrom.After(c.Now)
+		if !slices.Contains(input.Permissions, "identity.write") || ending {
 			_, err := c.Tx.Exec(
 				ctx,
 				`SELECT pg_advisory_xact_lock(hashtext('identity.identity_admins:' || $1::text))`,
@@ -799,7 +806,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			)
 
 			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.membership_permissions WHERE membership_id = $1 AND
-				permission = 'identity.write')`, x.ID).
+				permission = 'identity.write')`, member.ID).
 				Scan(&holds)
 			if err != nil {
 				return Member{}, apperr.Wrap(err, "select identity.membership_permissions")
@@ -807,7 +814,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 
 			err = c.Tx.QueryRow(ctx, `SELECT count(*) FROM identity.memberships m JOIN identity.membership_permissions p ON
 				p.membership_id = m.id AND p.permission = 'identity.write'
-				WHERE m.id <> $1 AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2)`, x.ID, c.Now).
+				WHERE m.id <> $1 AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2)`, member.ID, c.Now).
 				Scan(&others)
 			if err != nil {
 				return Member{}, apperr.Wrap(err, "select identity.memberships")
@@ -819,24 +826,25 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		}
 		// an account its company or customer disabled (IR416, IR417) stays closed: the membership keeps its end, and a
 		// contractor account keeps HQ's new end for when it is enabled again (IR420)
-		until := in.ValidUntil
+		until := input.ValidUntil
 
 		var disabled bool
 
 		scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.partner_users WHERE membership_id = $1 AND status
 			= 'disabled')
-			OR EXISTS (SELECT 1 FROM identity.client_users WHERE membership_id = $1 AND status = 'disabled')`, x.ID).
+			OR EXISTS (SELECT 1 FROM identity.client_users WHERE membership_id = $1 AND status = 'disabled')`, member.ID).
 			Scan(&disabled)
 		if scanErr != nil {
 			return Member{}, apperr.Wrap(scanErr, "select identity.partner_users")
 		}
 
-		if disabled && x.ValidUntil != nil && (until == nil || until.After(*x.ValidUntil)) {
+		if disabled && member.ValidUntil != nil &&
+			(until == nil || until.After(*member.ValidUntil)) {
 			_, err := c.Tx.Exec(
 				ctx,
 				`UPDATE identity.partner_users SET access_until = $2, version = version + 1, updated_at = $3 WHERE membership_id =
 					$1`,
-				x.ID,
+				member.ID,
 				until,
 				c.Now,
 			)
@@ -844,22 +852,22 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				return Member{}, apperr.Wrap(err, "update identity.partner_users")
 			}
 
-			until = x.ValidUntil
+			until = member.ValidUntil
 		}
 		// HQ's revoke (IR508, DEC-83): a new end at or before now — on an open membership, or on one its company or
 		// customer disabled — turns the sign-in off, and only HQ gives the access back. The first revoke keeps its time.
 		// A later end (or none) clears it and turns the sign-in on, unless the company or the customer disabled it.
-		revoked := x.RevokedAt
+		revoked := member.RevokedAt
 		// HQ's form sends whole minutes: an end it did not move (an access that ended by itself, or the time the company
 		// disabled the account) is no revoke when HQ saves other changes (IR514)
-		moved := in.ValidUntil != nil &&
-			(x.ValidUntil == nil || !in.ValidUntil.Truncate(time.Minute).Equal(x.ValidUntil.Truncate(time.Minute)))
+		moved := input.ValidUntil != nil &&
+			(member.ValidUntil == nil || !input.ValidUntil.Truncate(time.Minute).Equal(member.ValidUntil.Truncate(time.Minute)))
 		switch {
-		case moved && !in.ValidUntil.After(c.Now):
+		case moved && !input.ValidUntil.After(c.Now):
 			if revoked == nil {
 				revoked, revoke = &c.Now, true
 			}
-		case x.RevokedAt != nil && (in.ValidUntil == nil || in.ValidUntil.After(c.Now)):
+		case member.RevokedAt != nil && (input.ValidUntil == nil || input.ValidUntil.After(c.Now)):
 			revoked, restore = nil, !disabled
 		}
 
@@ -867,9 +875,9 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			ctx,
 			`UPDATE identity.memberships SET employment = $2, valid_from = $3, valid_until = $4, revoked_at = $6, version =
 				version + 1, updated_at = $5 WHERE id = $1`,
-			x.ID,
-			in.Employment,
-			in.ValidFrom,
+			member.ID,
+			input.Employment,
+			input.ValidFrom,
 			until,
 			c.Now,
 			revoked,
@@ -878,7 +886,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			return Member{}, apperr.Wrap(execErr, "update identity.memberships")
 		}
 
-		id, prev = x.ID, c.ExpectedVersion
+		id, prev = member.ID, c.ExpectedVersion
 	}
 
 	before := Member{
@@ -921,7 +929,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		return Member{}, apperr.Wrap(execErr, "delete identity.membership_permissions")
 	}
 
-	for _, p := range in.Permissions {
+	for _, p := range input.Permissions {
 		_, err := c.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES
@@ -943,15 +951,15 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 		return Member{}, apperr.Wrap(execErr, "delete identity.membership_scopes")
 	}
 
-	for _, sc := range in.Scopes {
+	for _, scopeRef := range input.Scopes {
 		_, err := c.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES
 				(current_setting('app.tenant_id')::uuid, $1, $2, $3)
 			ON CONFLICT DO NOTHING`,
 			id,
-			sc.Kind,
-			sc.ID,
+			scopeRef.Kind,
+			scopeRef.ID,
 		)
 		if err != nil {
 			return Member{}, apperr.Wrap(err, "insert identity.membership_scopes")
@@ -959,12 +967,13 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	}
 
 	if prev != nil {
-		perms := slices.Clone(in.Permissions)
+		perms := slices.Clone(input.Permissions)
 		slices.Sort(perms)
 
-		changed := !slices.Equal(perms, before.Permissions) || len(in.Scopes) != len(before.Scopes)
+		changed := !slices.Equal(perms, before.Permissions) ||
+			len(input.Scopes) != len(before.Scopes)
 		if !changed {
-			for _, sc := range in.Scopes {
+			for _, sc := range input.Scopes {
 				changed = changed || !slices.Contains(before.Scopes, sc)
 			}
 		}
@@ -1000,12 +1009,12 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			AggregateType: "membership",
 			AggregateID:   id,
 			Type:          "MembershipSaved",
-			Payload:       map[string]any{"role": in.Role},
+			Payload:       map[string]any{"role": input.Role},
 		},
 	)
 
 	if account {
-		requestAccount(c, in.UserID, id, in.Role)
+		requestAccount(c, input.UserID, id, input.Role)
 	}
 
 	if revoke || restore {
@@ -1019,7 +1028,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			TargetID:        id.String(),
 			PreviousVersion: prev,
 			NextVersion:     &ms[0].Version,
-			Reason:          in.Reason, Result: "", Before: nil, After: nil,
+			Reason:          input.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -1034,17 +1043,17 @@ type RevokeSessionsInput struct {
 
 // Validate implements ops.Validator: a membership and a reason of 1–1000 characters.
 func (in *RevokeSessionsInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.MembershipID == uuid.Nil {
-		fe["membershipId"] = "error.required"
+		fieldErrs["membershipId"] = "error.required"
 	}
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fe["reason"] = "error.length"
+		fieldErrs["reason"] = "error.length"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // SessionsRevoked is SessionsRevoked of service-contracts.ts.
@@ -1092,15 +1101,15 @@ var wallClock = func() time.Time { return time.Now().UTC() }
 //	@Router			/v1/members/{membershipId}/revoke-sessions [post]
 func membersRevokeSessions(
 	ctx context.Context,
-	c *ops.Call,
-	in *RevokeSessionsInput,
+	call *ops.Call,
+	input *RevokeSessionsInput,
 ) (SessionsRevoked, error) {
 	var (
 		user uuid.UUID
 		role string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT user_id, role FROM identity.memberships WHERE id = $1`, in.MembershipID).
+	err := call.Tx.QueryRow(ctx, `SELECT user_id, role FROM identity.memberships WHERE id = $1`, input.MembershipID).
 		Scan(&user, &role)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return SessionsRevoked{}, apperr.E(apperr.NotFound, "error.notFound")
@@ -1110,14 +1119,14 @@ func membersRevokeSessions(
 		return SessionsRevoked{}, apperr.Wrap(err, "select identity.memberships")
 	}
 
-	requireErr := c.Require(authz.Facts{"client-membership": role == "client"})
+	requireErr := call.Require(authz.Facts{"client-membership": role == "client"})
 	if requireErr != nil {
 		return SessionsRevoked{}, apperr.Wrap(requireErr, "ops.Call.Require")
 	}
 
 	at := wallClock()
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`UPDATE identity.memberships SET sessions_revoked_at = $2 WHERE user_id = $1 RETURNING id`,
 		user,
@@ -1138,11 +1147,11 @@ func membersRevokeSessions(
 	)
 
 	when := at.Format(time.RFC3339)
-	c.Audit(ops.AuditEntry{
+	call.Audit(ops.AuditEntry{
 		Action:     "members.revokeSessions",
 		TargetKind: "membership",
-		TargetID:   in.MembershipID.String(),
-		Reason:     in.Reason,
+		TargetID:   input.MembershipID.String(),
+		Reason:     input.Reason,
 		After: map[string]*string{
 			"sessionsRevokedAt": &when,
 		},
@@ -1151,17 +1160,17 @@ func membersRevokeSessions(
 		Result:          "",
 		Before:          nil,
 	})
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "membership",
-			AggregateID:   in.MembershipID,
+			AggregateID:   input.MembershipID,
 			Type:          EventSessionsRevoked,
 			Payload:       map[string]any{"userId": user, "revokedAt": at},
 		},
 	) // the identity provider's sessions end too (IR386)
 
 	return SessionsRevoked{
-		MembershipID:  in.MembershipID,
+		MembershipID:  input.MembershipID,
 		UserID:        user,
 		RevokedAt:     at,
 		MembershipIDs: ids,

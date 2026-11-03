@@ -13,42 +13,48 @@ import (
 // space. The archive checked for active units and then archived; the unit save checked that the space was not archived
 // and then inserted; neither locked the space, so both could pass. Eight rounds of the two sent at once.
 func TestSpaceArchiveRacesAUnitAdd(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 
 	prop := seed.ID("property-home-b").String()
 	for round := range 8 {
-		code, m := write(
-			s,
+		code, res := write(
+			srv,
 			&hq,
 			"spaces.save",
 			`{"propertyId":"`+prop+`","parentSpaceId":null,"kind":"room","name":"Race `+uuid.NewString()[:8]+`"}`,
 			0,
 		)
 		if code != 200 {
-			t.Fatalf("round %d: space: %d %v", round, code, m)
+			t.Fatalf("round %d: space: %d %v", round, code, res)
 		}
 
-		space := data(m)["id"].(string)
+		space := data(res)["id"].(string)
 
 		var (
 			archived, added int
 			unit            string
-			wg              sync.WaitGroup
+			group           sync.WaitGroup
 		)
 
-		wg.Add(2)
+		group.Add(2)
 		go func() {
-			defer wg.Done()
+			defer group.Done()
 
-			archived, _ = write(s, &hq, "spaces.archive", `{"id":"`+space+`","reason":"closed"}`, 1)
+			archived, _ = write(
+				srv,
+				&hq,
+				"spaces.archive",
+				`{"id":"`+space+`","reason":"closed"}`,
+				1,
+			)
 		}()
 		go func() {
-			defer wg.Done()
+			defer group.Done()
 
-			var m map[string]any
+			var resp map[string]any
 
-			added, m = write(
-				s,
+			added, resp = write(
+				srv,
 				&hq,
 				"units.save",
 				`{"customerOrgId":"`+seed.ID("org-customer-b").
@@ -60,11 +66,11 @@ func TestSpaceArchiveRacesAUnitAdd(t *testing.T) {
 				0,
 			)
 			if added == 200 {
-				unit = data(m)["id"].(string)
+				unit = data(resp)["id"].(string)
 			}
 		}()
 
-		wg.Wait()
+		group.Wait()
 
 		if archived == 200 && added == 200 {
 			t.Fatalf("round %d: the space was archived and unit %s added to it", round, unit)

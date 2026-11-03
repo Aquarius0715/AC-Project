@@ -10,8 +10,8 @@ import (
 )
 
 func TestPlans(t *testing.T) {
-	s := server(t)
-	unit := newUnit(t, s, "Plan AC")
+	srv := server(t)
+	unit := newUnit(t, srv, "Plan AC")
 	next := clock.Add(10 * 24 * time.Hour) // 2026-09-24 01:00 UTC
 	body := func(extra string) string {
 		return `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":3},"nextDueAt":"` + next.Format(
@@ -35,12 +35,12 @@ func TestPlans(t *testing.T) {
 		"past": `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":3},` +
 			`"nextDueAt":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `"}`,
 	} {
-		code, m := write(s, &hq, "plans.save", b, 0)
+		code, m := write(srv, &hq, "plans.save", b, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"plans.save",
 		`{"unitId":"`+uuid.NewString()+`","recurrence":{"kind":"monthly","intervalMonths":3},"nextDueAt":"`+next.Format(
@@ -51,20 +51,20 @@ func TestPlans(t *testing.T) {
 		t.Error("unknown unit")
 	}
 
-	if code, _ := write(s, &customerA, "plans.save", body(""), 0); code != 403 {
+	if code, _ := write(srv, &customerA, "plans.save", body(""), 0); code != 403 {
 		t.Error("client saves plans")
 	}
 
-	code, m := write(s, &hq, "plans.save", body(""), 0)
-	if code != 200 || data(m)["anchorDay"].(float64) != 24 || data(m)["timezone"] != "UTC" ||
-		len(data(m)["generatedOccurrences"].([]any)) != 0 {
-		t.Fatalf("create: %d %v", code, m)
+	code, resp := write(srv, &hq, "plans.save", body(""), 0)
+	if code != 200 || data(resp)["anchorDay"].(float64) != 24 || data(resp)["timezone"] != "UTC" ||
+		len(data(resp)["generatedOccurrences"].([]any)) != 0 {
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	plan := data(m)["id"].(string)
+	plan := data(resp)["id"].(string)
 	// update: interval only keeps the anchor; unit is fixed; version
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"plans.save",
 		`{"id":"`+plan+`","unitId":"`+unit+`","recurrence":{"kind":"monthly","intervalMonths":1},"nextDueAt":"`+next.Format(
@@ -72,13 +72,13 @@ func TestPlans(t *testing.T) {
 		)+`"}`,
 		1,
 	); code != 200 ||
-		data(m)["recurrence"].(map[string]any)["intervalMonths"].(float64) != 1 ||
-		data(m)["version"].(float64) != 2 {
-		t.Fatalf("update: %d %v", code, m)
+		data(res)["recurrence"].(map[string]any)["intervalMonths"].(float64) != 1 ||
+		data(res)["version"].(float64) != 2 {
+		t.Fatalf("update: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"plans.save",
 		`{"id":"`+plan+`","unitId":"`+seed.ID("unit-non-rto").
@@ -88,16 +88,16 @@ func TestPlans(t *testing.T) {
 		)+`"}`,
 		2,
 	); code != 422 ||
-		fields(m) != "unitId=error.unitFixed" {
-		t.Errorf("unit fixed: %d %s", code, fields(m))
+		fields(res) != "unitId=error.unitFixed" {
+		t.Errorf("unit fixed: %d %s", code, fields(res))
 	}
 
-	if code, _ := write(s, &hq, "plans.save", body(`,"id":"`+plan+`"`), 1); code != 409 {
+	if code, _ := write(srv, &hq, "plans.save", body(`,"id":"`+plan+`"`), 1); code != 409 {
 		t.Error("stale plan version")
 	}
 	// another next date re-anchors the recurrence on its day; an unchanged one keeps the anchor
 	{
-		other := newUnit(t, s, "Plan AC 2")
+		other := newUnit(t, srv, "Plan AC 2")
 		later := next.Add(5 * 24 * time.Hour) // the 29th
 		save := func(id string, months int, at time.Time, v int) map[string]any {
 			idField := ""
@@ -105,8 +105,8 @@ func TestPlans(t *testing.T) {
 				idField = `"id":"` + id + `",`
 			}
 
-			code, m := write(
-				s,
+			code, res := write(
+				srv,
 				&hq,
 				"plans.save",
 				`{`+idField+`"unitId":"`+other+`","recurrence":{"kind":"monthly","intervalMonths":`+itoa(
@@ -117,10 +117,10 @@ func TestPlans(t *testing.T) {
 				v,
 			)
 			if code != 200 {
-				t.Fatalf("save: %d %v", code, m)
+				t.Fatalf("save: %d %v", code, res)
 			}
 
-			return data(m)
+			return data(res)
 		}
 
 		p := save("", 3, next, 0)
@@ -135,7 +135,7 @@ func TestPlans(t *testing.T) {
 	// generateNext
 	gen := func(at time.Time, v int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&hq,
 			"plans.generateNext",
 			`{"id":"`+plan+`","occurrenceDate":"`+at.Format(time.RFC3339)+`"}`,
@@ -146,22 +146,22 @@ func TestPlans(t *testing.T) {
 		t.Error("occurrence must be the saved next date")
 	}
 
-	code, m = gen(next, 2)
-	if code != 200 || data(m)["type"] != "periodic" || data(m)["origin"] != "periodic_plan" ||
-		data(m)["symptom"] != "Scheduled periodic maintenance" ||
-		data(m)["requestedSlot"].(map[string]any)["endAt"] != next.Add(time.Hour).
+	code, resp = gen(next, 2)
+	if code != 200 || data(resp)["type"] != "periodic" || data(resp)["origin"] != "periodic_plan" ||
+		data(resp)["symptom"] != "Scheduled periodic maintenance" ||
+		data(resp)["requestedSlot"].(map[string]any)["endAt"] != next.Add(time.Hour).
 			Format(time.RFC3339) ||
-		len(data(m)["preferredSlots"].([]any)) != 0 {
-		t.Fatalf("generate: %d %v", code, m)
+		len(data(resp)["preferredSlots"].([]any)) != 0 {
+		t.Fatalf("generate: %d %v", code, resp)
 	}
 
-	job := data(m)["id"].(string)
+	job := data(resp)["id"].(string)
 
-	_, m = post(s, &hq, "plans.get", `{"id":"`+plan+`"}`)
-	if data(m)["nextDueAt"] != next.AddDate(0, 1, 0).Format(time.RFC3339) ||
-		data(m)["generatedOccurrences"].([]any)[0].(map[string]any)["jobId"] != job ||
-		ver(m) != 3 {
-		t.Fatalf("plan after generate: %v", m)
+	_, resp = post(srv, &hq, "plans.get", `{"id":"`+plan+`"}`)
+	if data(resp)["nextDueAt"] != next.AddDate(0, 1, 0).Format(time.RFC3339) ||
+		data(resp)["generatedOccurrences"].([]any)[0].(map[string]any)["jobId"] != job ||
+		ver(resp) != 3 {
+		t.Fatalf("plan after generate: %v", resp)
 	}
 
 	if code, m := gen(next, 3); code != 409 || m["messageKey"] != "errors.occurrence_mismatch" {
@@ -182,12 +182,12 @@ func TestPlans(t *testing.T) {
 	)
 	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, unit)
 
-	code, m = gen(next.AddDate(0, 1, 0), 3)
+	code, resp = gen(next.AddDate(0, 1, 0), 3)
 
 	owner(t, `UPDATE assets.units SET archived = false WHERE id = $1`, unit)
 
-	if code != 409 || m["messageKey"] != "error.unitArchived" {
-		t.Errorf("archived unit: %d %v", code, m)
+	if code != 409 || resp["messageKey"] != "error.unitArchived" {
+		t.Errorf("archived unit: %d %v", code, resp)
 	}
 	// a past next date must be corrected first
 	owner(
@@ -201,7 +201,7 @@ func TestPlans(t *testing.T) {
 		t.Error("past occurrence")
 	}
 	// reads and filters
-	if code, _ := post(s, &hq, "plans.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
+	if code, _ := post(srv, &hq, "plans.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
 		t.Error("unknown plan")
 	}
 
@@ -212,7 +212,7 @@ func TestPlans(t *testing.T) {
 		`{"filters":{"customerId":"` + seed.ID("cust-a").String() + `","unitId":"` + unit + `"}}`:          false,
 		`{"filters":{"propertyId":"` + seed.ID("property-home-b").String() + `","unitId":"` + unit + `"}}`: true,
 	} {
-		_, m := post(s, &hq, "plans.list", body)
+		_, m := post(srv, &hq, "plans.list", body)
 
 		found := false
 		for _, it := range items(m) {
@@ -224,18 +224,18 @@ func TestPlans(t *testing.T) {
 		}
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"plans.list",
 		`{"filters":{"x":1}}`,
 	); code != 422 ||
-		fields(m) != "x=error.notAllowed" {
-		t.Errorf("bad filter: %d %s", code, fields(m))
+		fields(res) != "x=error.notAllowed" {
+		t.Errorf("bad filter: %d %s", code, fields(res))
 	}
 
 	if code, _ := post(
-		s,
+		srv,
 		&hq,
 		"plans.list",
 		`{"sort":{"field":"updatedAt","direction":"desc"}}`,
@@ -243,20 +243,20 @@ func TestPlans(t *testing.T) {
 		t.Error("sort")
 	}
 
-	if code, _ := post(s, &customerA, "plans.list", `{}`); code != 403 {
+	if code, _ := post(srv, &customerA, "plans.list", `{}`); code != 403 {
 		t.Error("client lists plans")
 	}
 	// archived unit
 	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, unit)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"plans.save",
 		body(""),
 		0,
 	); code != 422 ||
-		fields(m) != "unitId=error.unitArchived" {
-		t.Errorf("archived unit: %d %s", code, fields(m))
+		fields(res) != "unitId=error.unitArchived" {
+		t.Errorf("archived unit: %d %s", code, fields(res))
 	}
 }

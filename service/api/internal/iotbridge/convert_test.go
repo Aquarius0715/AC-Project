@@ -49,39 +49,43 @@ func TestTriggersUseTheFixtureIDs(t *testing.T) {
 		t.Fatalf("%d triggers, want 2", len(out))
 	}
 
-	tr := out[0]
-	if tr.ScenarioID != Scenario || tr.EventType != "telemetry" ||
-		tr.Measurement.Origin != "measured" {
-		t.Errorf("trigger %+v", tr)
+	trigger := out[0]
+	if trigger.ScenarioID != Scenario || trigger.EventType != "telemetry" ||
+		trigger.Measurement.Origin != "measured" {
+		t.Errorf("trigger %+v", trigger)
 	}
 
-	if tr.Measurement.UnitID != seed.ID("unit-online-rto") ||
-		tr.Measurement.SensorID != seed.ID("sensor-online-temperature") {
-		t.Errorf("unit or sensor ID %v %v", tr.Measurement.UnitID, tr.Measurement.SensorID)
+	if trigger.Measurement.UnitID != seed.ID("unit-online-rto") ||
+		trigger.Measurement.SensorID != seed.ID("sensor-online-temperature") {
+		t.Errorf(
+			"unit or sensor ID %v %v",
+			trigger.Measurement.UnitID,
+			trigger.Measurement.SensorID,
+		)
 	}
 
-	if tr.Measurement.Value == nil || *tr.Measurement.Value != 24.5 ||
-		!tr.Measurement.ReceivedAt.Equal(received) {
-		t.Errorf("value or receipt time %+v", tr.Measurement)
+	if trigger.Measurement.Value == nil || *trigger.Measurement.Value != 24.5 ||
+		!trigger.Measurement.ReceivedAt.Equal(received) {
+		t.Errorf("value or receipt time %+v", trigger.Measurement)
 	}
 	// the API keys a repeat on the measurement's own event ID and the scenario sequence: both must be the reading's
-	if tr.Measurement.Quality != "valid" || tr.Measurement.EventID != tr.EventID ||
-		tr.Measurement.Sequence != nil {
-		t.Errorf("quality, event ID or sequence of the measurement: %+v", tr.Measurement)
+	if trigger.Measurement.Quality != "valid" || trigger.Measurement.EventID != trigger.EventID ||
+		trigger.Measurement.Sequence != nil {
+		t.Errorf("quality, event ID or sequence of the measurement: %+v", trigger.Measurement)
 	}
 }
 
 // TestEventIDIsOnePerReading: the same reading twice has the same event ID (a redelivery is one event), and the next
 // reading of the device has another.
 func TestEventIDIsOnePerReading(t *testing.T) {
-	r := NewResolver(Links)
-	a, _ := r.Triggers(batch("device-online-rto", 7), received)
-	b, _ := r.Triggers(batch("device-online-rto", 7), received.Add(time.Minute))
+	resolver := NewResolver(Links)
+	a, _ := resolver.Triggers(batch("device-online-rto", 7), received)
+	b, _ := resolver.Triggers(batch("device-online-rto", 7), received.Add(time.Minute))
 	next := batch("device-online-rto", 8)
 	next.Measurements[0].ObservedAt = at.Add(
 		time.Minute,
 	) // the next reading of the sensor is another reading
-	c, _ := r.Triggers(next, received)
+	c, _ := resolver.Triggers(next, received)
 
 	if a[0].EventID != b[0].EventID {
 		t.Error("a redelivered reading has a new event ID")
@@ -94,7 +98,7 @@ func TestEventIDIsOnePerReading(t *testing.T) {
 	later := batch("device-online-rto", 7)
 	later.Measurements[0].ObservedAt = at.Add(time.Hour)
 
-	d, _ := r.Triggers(later, received)
+	d, _ := resolver.Triggers(later, received)
 	if d[0].EventID == a[0].EventID {
 		t.Error("a restarted sequence at a later time is the same event")
 	}
@@ -148,16 +152,16 @@ func TestCommandTriggerMapsTheAcknowledgement(t *testing.T) {
 		}
 	}
 
-	tr, ok, err := CommandTrigger(ack("applied"), received)
-	if err != nil || !ok || tr.EventType != "command_ack" || tr.CommandID == nil ||
-		tr.CommandID.String() != cmd ||
-		tr.Measurement != nil {
-		t.Fatalf("applied: %+v ok=%v err=%v", tr, ok, err)
+	trigger, ok, err := CommandTrigger(ack("applied"), received)
+	if err != nil || !ok || trigger.EventType != "command_ack" || trigger.CommandID == nil ||
+		trigger.CommandID.String() != cmd ||
+		trigger.Measurement != nil {
+		t.Fatalf("applied: %+v ok=%v err=%v", trigger, ok, err)
 	}
 
-	tr, ok, _ = CommandTrigger(ack("unsupported"), received)
-	if !ok || tr.EventType != "command_fail" {
-		t.Errorf("unsupported: %+v ok=%v", tr, ok)
+	trigger, ok, _ = CommandTrigger(ack("unsupported"), received)
+	if !ok || trigger.EventType != "command_fail" {
+		t.Errorf("unsupported: %+v ok=%v", trigger, ok)
 	}
 
 	if _, ok, _ := CommandTrigger(ack("expired"), received); ok {
@@ -202,9 +206,9 @@ func TestFleetLinksResolve(t *testing.T) {
 		t.Fatalf("%d fleet links, want one per pattern with a module (18)", len(links))
 	}
 
-	r := NewResolver(append(append([]Link{}, Links...), links...))
+	resolver := NewResolver(append(append([]Link{}, Links...), links...))
 
-	out, err := r.Triggers(batch("device-mock-tamper", 1, 2), received)
+	out, err := resolver.Triggers(batch("device-mock-tamper", 1, 2), received)
 	if err != nil || len(out) != 2 {
 		t.Fatalf("fleet reading: %d triggers, err %v", len(out), err)
 	}
@@ -214,7 +218,7 @@ func TestFleetLinksResolve(t *testing.T) {
 		t.Errorf("fleet IDs %v %v", out[0].Measurement.UnitID, out[0].Measurement.SensorID)
 	}
 
-	_, triggersErr := r.Triggers(batch("device-mock-no-module", 1), received)
+	_, triggersErr := resolver.Triggers(batch("device-mock-no-module", 1), received)
 	if triggersErr == nil {
 		t.Error("a unit without a module has a link")
 	}
@@ -264,13 +268,13 @@ func TestToScenarioKeepsTheMinuteSlot(t *testing.T) {
 // TestLinksFollowTheFixture: the links are the fixture contract's devices (demoSeed.devices), each with its unit and
 // its connection there, so the simulator runs every fixture module and plays the connection the seed gives it (IR613).
 func TestLinksFollowTheFixture(t *testing.T) {
-	f, err := seed.Load("../../../../docs/04-agentic-sdlc/fixture-contract.json")
+	fixture, err := seed.Load("../../../../docs/04-agentic-sdlc/fixture-contract.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	devices := map[string]struct{ unit, connection string }{}
-	for _, d := range f.DemoSeed.Devices {
+	for _, d := range fixture.DemoSeed.Devices {
 		unit := ""
 		if d.UnitID != nil {
 			unit = *d.UnitID

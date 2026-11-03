@@ -34,14 +34,14 @@ func jobBody(unit string, extra map[string]string) string {
 		"alternativeSlots": "[" + slotJSON(49, 2) + "," + slotJSON(73, 1) + "]",
 	}
 
-	for k, v := range extra {
+	for key, v := range extra {
 		if v == "" {
-			delete(f, k)
+			delete(f, key)
 
 			continue
 		}
 
-		f[k] = v
+		f[key] = v
 	}
 
 	parts := []string{}
@@ -53,23 +53,23 @@ func jobBody(unit string, extra map[string]string) string {
 }
 
 func TestJobsCreate(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	unit := seed.ID("unit-non-rto").String()
-	code, m := write(
-		s,
+	code, resp := write(
+		srv,
 		&customerA,
 		"jobs.create",
 		jobBody(unit, map[string]string{"contactWindow": `" Weekdays 09:00-18:00 "`}),
 		0,
 	)
 
-	j := data(m)
+	j := data(resp)
 	if code != 200 || j["status"] != "requested" || j["origin"] != "client_request" ||
 		len(j["preferredSlots"].([]any)) != 3 ||
 		j["dueAt"] != clock.Add(27*time.Hour).Format(time.RFC3339) ||
 		j["contactWindow"] != "Weekdays 09:00-18:00" ||
 		j["preferenceRound"].(float64) != 1 {
-		t.Fatalf("create: %d %v", code, m)
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
 	if _, detail := j["projection"]; detail { // the write answers MaintenanceJob; the projections are jobs.get's (IR392)
@@ -91,18 +91,18 @@ func TestJobsCreate(t *testing.T) {
 		)
 	})
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&restrMgr,
 		"jobs.get",
 		`{"jobId":"`+j["id"].(string)+`"}`,
 	); code != 200 ||
-		data(m)["contactWindow"] != "Weekdays 09:00-18:00" {
-		t.Errorf("HQ reader without job.write: %d %v", code, data(m)["contactWindow"])
+		data(res)["contactWindow"] != "Weekdays 09:00-18:00" {
+		t.Errorf("HQ reader without job.write: %d %v", code, data(res)["contactWindow"])
 	}
 	// HQ on behalf: 0 alternatives, explicit dueAt
-	code, m = write(
-		s,
+	code, resp = write(
+		srv,
 		&hq,
 		"jobs.create",
 		jobBody(
@@ -114,9 +114,9 @@ func TestJobsCreate(t *testing.T) {
 		),
 		0,
 	)
-	if code != 200 || len(data(m)["preferredSlots"].([]any)) != 1 ||
-		data(m)["dueAt"] != clock.Add(48*time.Hour).Format(time.RFC3339) {
-		t.Fatalf("hq create: %d %v", code, m)
+	if code != 200 || len(data(resp)["preferredSlots"].([]any)) != 1 ||
+		data(resp)["dueAt"] != clock.Add(48*time.Hour).Format(time.RFC3339) {
+		t.Fatalf("hq create: %d %v", code, resp)
 	}
 
 	bad := map[string]struct {
@@ -226,7 +226,7 @@ func TestJobsCreate(t *testing.T) {
 	}
 
 	for name, tc := range bad {
-		code, m := write(s, tc.a, "jobs.create", jobBody(unit, tc.extra), 0)
+		code, m := write(srv, tc.a, "jobs.create", jobBody(unit, tc.extra), 0)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
 		} else if code != tc.code {
@@ -234,45 +234,45 @@ func TestJobsCreate(t *testing.T) {
 		}
 	}
 
-	archived := newUnit(t, s, "Archived AC")
+	archived := newUnit(t, srv, "Archived AC")
 	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, archived)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.create",
 		jobBody(archived, nil),
 		0,
 	); code != 422 ||
-		fields(m) != "unitId=error.unitArchived" {
-		t.Errorf("archived unit: %d %s", code, fields(m))
+		fields(res) != "unitId=error.unitArchived" {
+		t.Errorf("archived unit: %d %s", code, fields(res))
 	}
 }
 
 func TestJobsReadAndTransitions(t *testing.T) {
-	s := server(t)
-	unit := newUnit(t, s, "Job AC")
-	_, m := write(
-		s,
+	srv := server(t)
+	unit := newUnit(t, srv, "Job AC")
+	_, resp := write(
+		srv,
 		&customerB,
 		"jobs.create",
 		jobBody(unit, map[string]string{"contactWindow": `"Mornings"`}),
 		0,
 	)
-	job := data(m)["id"].(string)
+	job := data(resp)["id"].(string)
 
 	newAlert(t, unit, seed.ID("org-customer-b").String(), "warning", clock.Add(-time.Minute))
 
 	// list: summary projection with severity, display status, filters
-	_, m = post(s, &customerB, "jobs.list", `{"filters":{"unitId":"`+unit+`"}}`)
-	if len(items(m)) != 1 || items(m)[0]["projection"] != "summary" ||
-		items(m)[0]["severity"] != "warning" ||
-		items(m)[0]["displayStatus"] != "requested" {
-		t.Fatalf("list: %v", m)
+	_, resp = post(srv, &customerB, "jobs.list", `{"filters":{"unitId":"`+unit+`"}}`)
+	if len(items(resp)) != 1 || items(resp)[0]["projection"] != "summary" ||
+		items(resp)[0]["severity"] != "warning" ||
+		items(resp)[0]["displayStatus"] != "requested" {
+		t.Fatalf("list: %v", resp)
 	}
 
-	_, m = post(s, &customerA, "jobs.list", `{"filters":{"unitId":"`+unit+`"}}`)
-	if len(items(m)) != 0 {
+	_, resp = post(srv, &customerA, "jobs.list", `{"filters":{"unitId":"`+unit+`"}}`)
+	if len(items(resp)) != 0 {
 		t.Fatal("customer-a sees customer-b's job")
 	}
 
@@ -306,7 +306,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		`{"filters":{"unitId":"` + unit + `","from":"` + clock.Add(26*time.Hour).Format(time.RFC3339) +
 			`"}}`: 0,
 	} {
-		if code, m := post(s, &hq, "jobs.list", body); code != 200 || len(items(m)) != n {
+		if code, m := post(srv, &hq, "jobs.list", body); code != 200 || len(items(m)) != n {
 			t.Errorf("%s: %d want %d", body, len(items(m)), n)
 		}
 	}
@@ -333,14 +333,14 @@ func TestJobsReadAndTransitions(t *testing.T) {
 			`"to":"2026-09-14T00:00:00Z"}}`, `{"sort":{"field":"unitId",` +
 			`"direction":"asc"}}`,
 	} {
-		code, m := post(s, &hq, "jobs.list", b)
+		code, m := post(srv, &hq, "jobs.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
 	for _, f := range []string{"id", "severity", "dueAt", "status"} {
 		for _, d := range []string{"asc", "desc"} {
 			if code, _ := post(
-				s,
+				srv,
 				&hq,
 				"jobs.list",
 				`{"sort":{"field":"`+f+`","direction":"`+d+`"},"limit":5}`,
@@ -350,7 +350,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		}
 	}
 	// status rank order (default sort): requested before cancelled
-	_, m = post(s, &hq, "jobs.list", `{"limit":100}`)
+	_, resp = post(srv, &hq, "jobs.list", `{"limit":100}`)
 	last := -1
 
 	rank := map[string]int{
@@ -365,7 +365,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		"completed":        8,
 		"cancelled":        9,
 	}
-	for _, it := range items(m) {
+	for _, it := range items(resp) {
 		if r := rank[it["status"].(string)]; r < last {
 			t.Fatal("status rank order")
 		} else {
@@ -374,27 +374,27 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	}
 
 	// get / contact window visibility
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerB,
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); code != 200 ||
-		data(m)["contactWindow"] != "Mornings" {
-		t.Fatalf("get: %d %v", code, m)
+		data(res)["contactWindow"] != "Mornings" {
+		t.Fatalf("get: %d %v", code, res)
 	}
 
-	if code, _ := post(s, &customerA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+	if code, _ := post(srv, &customerA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Error("other customer get")
 	}
 
-	if code, _ := post(s, &techB, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+	if code, _ := post(srv, &techB, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Error("unassigned technician")
 	}
 
 	// notes and events
 	if code, _ := write(
-		s,
+		srv,
 		&customerB,
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"internal?","visibility":"internal"}`,
@@ -403,19 +403,19 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		t.Error("client internal note")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"  Please call before arriving  ","visibility":"customer"}`,
 		1,
-	); code != 200 || data(m)["jobId"] != job || data(m)["message"] != "Please call before arriving" ||
-		data(m)["visibility"] != "customer" {
-		t.Fatalf("client note: %d %v", code, m)
+	); code != 200 || data(res)["jobId"] != job || data(res)["message"] != "Please call before arriving" ||
+		data(res)["visibility"] != "customer" {
+		t.Fatalf("client note: %d %v", code, res)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"Check parts stock","visibility":"internal"}`,
@@ -424,30 +424,30 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		t.Fatal("hq internal note")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"   ","visibility":"internal"}`,
 		3,
 	); code != 422 ||
-		fields(m) != "message=error.length" {
-		t.Errorf("blank note: %d %s", code, fields(m))
+		fields(res) != "message=error.length" {
+		t.Errorf("blank note: %d %s", code, fields(res))
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"x","visibility":"public"}`,
 		3,
 	); code != 422 ||
-		fields(m) != "visibility=error.invalid" {
-		t.Errorf("bad visibility: %d %s", code, fields(m))
+		fields(res) != "visibility=error.invalid" {
+		t.Errorf("bad visibility: %d %s", code, fields(res))
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"stale","visibility":"internal"}`,
@@ -456,10 +456,10 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		t.Error("stale note")
 	}
 
-	_, m = post(s, &customerB, "jobs.events", `{"jobId":"`+job+`","query":{}}`)
+	_, resp = post(srv, &customerB, "jobs.events", `{"jobId":"`+job+`","query":{}}`)
 
 	acts := []string{}
-	for _, e := range items(m) {
+	for _, e := range items(resp) {
 		acts = append(acts, e["action"].(string))
 		if n, ok := e["note"].(map[string]any); ok && n["visibility"] == "internal" {
 			t.Fatal("client sees internal note")
@@ -470,8 +470,8 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		t.Fatalf("client events: %v", acts)
 	}
 
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&hq,
 		"jobs.events",
 		`{"jobId":"`+job+`","query":{"sort":{"field":"occurredAt","direction":"desc"},`+
@@ -481,8 +481,8 @@ func TestJobsReadAndTransitions(t *testing.T) {
 			Format(time.RFC3339)+
 			`"}}}`,
 	)
-	if len(items(m)) != 3 || items(m)[0]["createdAt"] != items(m)[0]["occurredAt"] {
-		t.Fatalf("hq events: %v", m)
+	if len(items(resp)) != 3 || items(resp)[0]["createdAt"] != items(resp)[0]["occurredAt"] {
+		t.Fatalf("hq events: %v", resp)
 	}
 
 	for b, want := range map[string]string{
@@ -491,12 +491,12 @@ func TestJobsReadAndTransitions(t *testing.T) {
 			`"to":"2026-09-14T00:00:00Z"}}}`: "query.filters.to=error.range",
 		`{"query":{}}`: "jobId=error.invalid",
 	} {
-		code, m := post(s, &hq, "jobs.events", b)
+		code, m := post(srv, &hq, "jobs.events", b)
 		refusal(t, b, code, m, want)
 	}
 
 	if code, _ := post(
-		s,
+		srv,
 		&customerA,
 		"jobs.events",
 		`{"jobId":"`+job+`","query":{}}`,
@@ -506,7 +506,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	// hold / resume / cancel state table
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"jobs.hold",
 		`{"jobId":"`+uuid.NewString()+`","reason":"parts"}`,
@@ -516,7 +516,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"jobs.hold",
 		`{"jobId":"`+job+`","reason":"parts"}`,
@@ -528,7 +528,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	owner(t, `UPDATE maintenance.jobs SET status = 'in_progress' WHERE id = $1`, job)
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerB,
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"no longer needed"}`,
@@ -537,19 +537,19 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		t.Error("client cancel in_progress")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.hold",
 		`{"jobId":"`+job+`","reason":" waiting for parts "}`,
 		3,
 	); code != 200 ||
-		data(m)["status"] != "on_hold" {
+		data(res)["status"] != "on_hold" {
 		t.Fatalf("hold: %d", code)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"jobs.hold",
 		`{"jobId":"`+job+`","reason":"again"}`,
@@ -558,19 +558,19 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		t.Error("hold twice")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.resumeHold",
 		`{"jobId":"`+job+`","reason":"parts arrived"}`,
 		4,
 	); code != 200 ||
-		data(m)["status"] != "in_progress" {
+		data(res)["status"] != "in_progress" {
 		t.Fatalf("resume: %d", code)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"jobs.resumeHold",
 		`{"jobId":"`+job+`","reason":"x"}`,
@@ -580,7 +580,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"x"}`,
@@ -589,32 +589,32 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		t.Error("hq cancel in_progress")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.hold",
 		`{"jobId":"`+job+`","reason":""}`,
 		5,
 	); code != 422 ||
-		fields(m) != "reason=error.length" {
-		t.Errorf("blank hold reason: %d %s", code, fields(m))
+		fields(res) != "reason=error.length" {
+		t.Errorf("blank hold reason: %d %s", code, fields(res))
 	}
 
-	write(s, &hq, "jobs.hold", `{"jobId":"`+job+`","reason":"stop"}`, 5)
+	write(srv, &hq, "jobs.hold", `{"jobId":"`+job+`","reason":"stop"}`, 5)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"customer withdrew"}`,
 		6,
 	); code != 200 ||
-		data(m)["status"] != "cancelled" {
+		data(res)["status"] != "cancelled" {
 		t.Fatalf("cancel on_hold: %d", code)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"late","visibility":"internal"}`,
@@ -624,7 +624,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"again"}`,
@@ -634,22 +634,22 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	}
 
 	// client cancels a requested job; offers and assignments of an offered job are closed by HQ cancel
-	_, m = write(s, &customerB, "jobs.create", jobBody(unit, nil), 0)
+	_, resp = write(srv, &customerB, "jobs.create", jobBody(unit, nil), 0)
 
-	j2 := data(m)["id"].(string)
-	if code, m := write(
-		s,
+	j2 := data(resp)["id"].(string)
+	if code, res := write(
+		srv,
 		&customerB,
 		"jobs.cancel",
 		`{"jobId":"`+j2+`","cancelReason":"   "}`,
 		1,
 	); code != 422 ||
-		fields(m) != "cancelReason=error.length" {
-		t.Errorf("blank cancel reason: %d %s", code, fields(m))
+		fields(res) != "cancelReason=error.length" {
+		t.Errorf("blank cancel reason: %d %s", code, fields(res))
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerB,
 		"jobs.cancel",
 		`{"jobId":"`+j2+`","cancelReason":"fixed itself"}`,
@@ -658,14 +658,14 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		t.Fatal("client cancel requested")
 	}
 
-	_, m = write(
-		s,
+	_, resp = write(
+		srv,
 		&hq,
 		"jobs.create",
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	j3 := data(m)["id"].(string)
+	j3 := data(resp)["id"].(string)
 	owner(t, `UPDATE maintenance.jobs SET status = 'offered' WHERE id = $1`, j3)
 	owner(
 		t,
@@ -680,7 +680,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	)
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"jobs.cancel",
 		`{"jobId":"`+j3+`","cancelReason":"duplicate"}`,
@@ -690,7 +690,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&techB,
 		"jobs.cancel",
 		`{"jobId":"`+j3+`","cancelReason":"x"}`,

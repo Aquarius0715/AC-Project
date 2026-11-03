@@ -12,7 +12,7 @@ import (
 )
 
 func TestOfferAcceptAssign(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	// earlier runs leave active assignments for these technicians in the same slots
 	owner(
 		t,
@@ -27,20 +27,20 @@ func TestOfferAcceptAssign(t *testing.T) {
 		seed.ID("org-contractor-b"),
 	)
 	unit := seed.ID("unit-non-rto").String()
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, m := write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	job := data(m)["id"].(string)
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, resp := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	job := data(resp)["id"].(string)
 	s2 := slotJSON(49, 2)
 	offerBody := func(extra map[string]string) string {
 		f := map[string]string{
 			"jobId":           `"` + job + `"`,
 			"contractorOrgId": `"` + seed.ID("org-contractor-a").String() + `"`,
 			"visitSlot":       s2,
-			"offerExpiresAt": `"` + ts(
+			"offerExpiresAt": `"` + stamp(
 				12,
 			) + `"`,
-			"accessValidFrom":  `"` + ts(0) + `"`,
-			"accessValidUntil": `"` + ts(100) + `"`,
+			"accessValidFrom":  `"` + stamp(0) + `"`,
+			"accessValidUntil": `"` + stamp(100) + `"`,
 			"termsVersion":     `"terms-v1"`,
 		}
 		maps.Copy(f, extra)
@@ -68,15 +68,15 @@ func TestOfferAcceptAssign(t *testing.T) {
 		extra map[string]string
 		code  int
 	}{
-		"expiry in the past":    {map[string]string{"offerExpiresAt": `"` + ts(-1) + `"`}, 422},
-		"expiry after access":   {map[string]string{"offerExpiresAt": `"` + ts(101) + `"`}, 422},
-		"access does not cover": {map[string]string{"accessValidUntil": `"` + ts(50) + `"`}, 422},
+		"expiry in the past":    {map[string]string{"offerExpiresAt": `"` + stamp(-1) + `"`}, 422},
+		"expiry after access":   {map[string]string{"offerExpiresAt": `"` + stamp(101) + `"`}, 422},
+		"access does not cover": {map[string]string{"accessValidUntil": `"` + stamp(50) + `"`}, 422},
 		"slot not agreed":       {map[string]string{"visitSlot": slotJSON(30, 2)}, 422},
 		"blank terms":           {map[string]string{"termsVersion": `""`}, 422},
 		"customer organization": {map[string]string{"contractorOrgId": `"` + seed.ID("org-customer-a").String() + `"`}, 404},
 		"unknown organization":  {map[string]string{"contractorOrgId": `"` + uuid.NewString() + `"`}, 404},
 	} {
-		code, m := write(s, &hq, "jobs.offer", offerBody(tc.extra), 1)
+		code, m := write(srv, &hq, "jobs.offer", offerBody(tc.extra), 1)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
 		} else if code != tc.code {
@@ -96,7 +96,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 	)
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"jobs.offer",
 		offerBody(
@@ -107,17 +107,17 @@ func TestOfferAcceptAssign(t *testing.T) {
 		t.Error("suspended contractor")
 	}
 
-	if code, _ := write(s, &customerA, "jobs.offer", offerBody(nil), 1); code != 403 {
+	if code, _ := write(srv, &customerA, "jobs.offer", offerBody(nil), 1); code != 403 {
 		t.Error("client offer")
 	}
 
-	code, m := write(s, &hq, "jobs.offer", offerBody(nil), 1)
-	if code != 200 || data(m)["status"] != "offered" ||
-		data(m)["contractorOrgId"] != seed.ID("org-contractor-a").String() {
-		t.Fatalf("offer: %d %v", code, m)
+	code, resp := write(srv, &hq, "jobs.offer", offerBody(nil), 1)
+	if code != 200 || data(resp)["status"] != "offered" ||
+		data(resp)["contractorOrgId"] != seed.ID("org-contractor-a").String() {
+		t.Fatalf("offer: %d %v", code, resp)
 	}
 
-	if code, _ := write(s, &hq, "jobs.offer", offerBody(nil), 2); code != 409 {
+	if code, _ := write(srv, &hq, "jobs.offer", offerBody(nil), 2); code != 409 {
 		t.Error("offer twice")
 	}
 
@@ -131,7 +131,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 
 	acc := func(a *actor, terms string, v int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			a,
 			"jobs.accept",
 			`{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"`+terms+`"}`,
@@ -150,21 +150,22 @@ func TestOfferAcceptAssign(t *testing.T) {
 		t.Error("stale job version")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"jobs.accept",
 		`{"jobId":"`+job+`","offerId":"`+offer+`"}`,
 		2,
 	); code != 422 ||
-		fields(m) != "termsVersion=error.required" {
-		t.Errorf("accept without terms: %d %s", code, fields(m))
+		fields(res) != "termsVersion=error.required" {
+		t.Errorf("accept without terms: %d %s", code, fields(res))
 	}
 
-	code, m = acc(&contrA, "terms-v1", 2)
-	if code != 200 || data(m)["decision"] != "accept" || data(m)["jobVersion"].(float64) != 3 ||
-		len(data(m)) != 4 {
-		t.Fatalf("accept: %d %v", code, m)
+	code, resp = acc(&contrA, "terms-v1", 2)
+	if code != 200 || data(resp)["decision"] != "accept" ||
+		data(resp)["jobVersion"].(float64) != 3 ||
+		len(data(resp)) != 4 {
+		t.Fatalf("accept: %d %v", code, resp)
 	}
 
 	if code, _ := acc(&contrA, "terms-v1", 3); code != 404 {
@@ -180,7 +181,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		}
 
 		return write(
-			s,
+			srv,
 			a,
 			"jobs.assign",
 			`{"jobId":"`+j+`","technicianMembershipId":"`+seed.ID(tech).
@@ -210,7 +211,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		t.Error("contractor assigns another organization's technician")
 	}
 
-	if code, m := asg(
+	if code, res := asg(
 		&contrA,
 		job,
 		"tech-external-a",
@@ -218,26 +219,26 @@ func TestOfferAcceptAssign(t *testing.T) {
 		3,
 		"",
 	); code != 422 ||
-		fields(m) != "startAt=errors.slot_not_agreed" {
-		t.Errorf("contractor slot must be the visit slot: %d %s", code, fields(m))
+		fields(res) != "startAt=errors.slot_not_agreed" {
+		t.Errorf("contractor slot must be the visit slot: %d %s", code, fields(res))
 	}
 
 	if code, _ := asg(&contrB, job, "tech-external-b", s2, 3, ""); code != 404 {
 		t.Error("other contractor assign")
 	}
 
-	code, m = asg(&contrA, job, "tech-external-a", s2, 3, "")
-	if code != 200 || data(m)["status"] != "assigned" || data(m)["assignmentId"] == nil ||
-		data(m)["scheduledSlot"] == nil {
-		t.Fatalf("contractor assign: %d %v", code, m)
+	code, resp = asg(&contrA, job, "tech-external-a", s2, 3, "")
+	if code != 200 || data(resp)["status"] != "assigned" || data(resp)["assignmentId"] == nil ||
+		data(resp)["scheduledSlot"] == nil {
+		t.Fatalf("contractor assign: %d %v", code, resp)
 	}
 
-	if _, extra := data(m)["assignment"]; extra { // the write answers MaintenanceJob, the detail is jobs.get's (IR392)
-		t.Errorf("jobs.assign answers the detail: %v", data(m))
+	if _, extra := data(resp)["assignment"]; extra { // the write answers MaintenanceJob, the detail is jobs.get's (IR392)
+		t.Errorf("jobs.assign answers the detail: %v", data(resp))
 	}
 
 	if _, g := post(
-		s,
+		srv,
 		&contrA,
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
@@ -250,123 +251,123 @@ func TestOfferAcceptAssign(t *testing.T) {
 	}
 
 	// internal job: HQ assigns
-	_, m = write(
-		s,
+	_, resp = write(
+		srv,
 		&hq,
 		"jobs.create",
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	k := data(m)["id"].(string)
+	key := data(resp)["id"].(string)
 
 	s1 := slotJSON(25, 2)
-	if code, _ := asg(&hq, k, "tech-external-a", s1, 1, ""); code != 403 {
+	if code, _ := asg(&hq, key, "tech-external-a", s1, 1, ""); code != 403 {
 		t.Error("HQ assigns external technician")
 	}
 
-	if code, m := asg(
+	if code, res := asg(
 		&hq,
-		k,
+		key,
 		"tech-internal-a",
 		slotJSON(26, 2),
 		1,
 		"",
 	); code != 422 ||
-		fields(m) != "startAt=errors.slot_not_agreed" {
-		t.Errorf("slot not agreed: %d %s", code, fields(m))
+		fields(res) != "startAt=errors.slot_not_agreed" {
+		t.Errorf("slot not agreed: %d %s", code, fields(res))
 	}
 
-	if code, _ := asg(&hq, k, "customer-a", s1, 1, ""); code != 404 {
+	if code, _ := asg(&hq, key, "customer-a", s1, 1, ""); code != 404 {
 		t.Error("not a technician")
 	}
 
-	if code, _ := asg(&hq, k, "tech-internal-a", s1, 1, ""); code != 200 {
+	if code, _ := asg(&hq, key, "tech-internal-a", s1, 1, ""); code != 200 {
 		t.Fatal("hq assign")
 	}
 
-	if code, m := asg(
+	if code, res := asg(
 		&hq,
-		k,
+		key,
 		"tech-internal-a",
 		slotJSON(49, 2),
 		2,
 		"",
 	); code != 422 ||
-		fields(m) != "startAt=errors.slot_not_agreed" {
-		t.Errorf("reassignment keeps the agreed slot: %d %s", code, fields(m))
+		fields(res) != "startAt=errors.slot_not_agreed" {
+		t.Errorf("reassignment keeps the agreed slot: %d %s", code, fields(res))
 	}
 
-	if code, m := asg(
+	if code, res := asg(
 		&hq,
-		k,
+		key,
 		"tech-internal-a",
 		s1,
 		2,
 		"swap",
 	); code != 200 ||
-		data(m)["status"] != "assigned" {
+		data(res)["status"] != "assigned" {
 		t.Fatalf("reassign: %d", code)
 	}
 
-	owner(t, `UPDATE maintenance.jobs SET status = 'in_progress' WHERE id = $1`, k)
+	owner(t, `UPDATE maintenance.jobs SET status = 'in_progress' WHERE id = $1`, key)
 
-	ext := `{"startAt":"` + ts(25) + `","endAt":"` + ts(28) + `"}`
-	if code, m := asg(
+	ext := `{"startAt":"` + stamp(25) + `","endAt":"` + stamp(28) + `"}`
+	if code, res := asg(
 		&hq,
-		k,
+		key,
 		"tech-internal-a",
 		ext,
 		3,
 		"",
 	); code != 422 ||
-		fields(m) != "reason=error.required" {
-		t.Errorf("extension needs a reason: %d %s", code, fields(m))
+		fields(res) != "reason=error.required" {
+		t.Errorf("extension needs a reason: %d %s", code, fields(res))
 	}
 
-	if code, m := asg(
+	if code, res := asg(
 		&hq,
-		k,
+		key,
 		"tech-internal-a",
 		slotJSON(24, 4),
 		3,
 		"x",
 	); code != 422 ||
-		fields(m) != "endAt=errors.extension_only" {
-		t.Errorf("extension keeps the start: %d %s", code, fields(m))
+		fields(res) != "endAt=errors.extension_only" {
+		t.Errorf("extension keeps the start: %d %s", code, fields(res))
 	}
 
-	if code, m := asg(
+	if code, res := asg(
 		&hq,
-		k,
+		key,
 		"tech-internal-a",
 		ext,
 		3,
 		"more work",
 	); code != 200 ||
-		data(m)["status"] != "in_progress" {
-		t.Fatalf("extend: %d %v", code, m)
+		data(res)["status"] != "in_progress" {
+		t.Fatalf("extend: %d %v", code, res)
 	}
 
-	owner(t, `UPDATE maintenance.jobs SET status = 'completed' WHERE id = $1`, k)
+	owner(t, `UPDATE maintenance.jobs SET status = 'completed' WHERE id = $1`, key)
 
-	if code, _ := asg(&hq, k, "tech-internal-a", ext, 4, "x"); code != 409 {
+	if code, _ := asg(&hq, key, "tech-internal-a", ext, 4, "x"); code != 409 {
 		t.Error("assign completed job")
 	}
 	// overlap with the active assignment of the same technician
-	_, m = write(
-		s,
+	_, resp = write(
+		srv,
 		&hq,
 		"jobs.create",
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	l := data(m)["id"].(string)
+	l := data(resp)["id"].(string)
 
-	owner(t, `UPDATE maintenance.jobs SET status = 'requested' WHERE id = $1`, k)
+	owner(t, `UPDATE maintenance.jobs SET status = 'requested' WHERE id = $1`, key)
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET status = 'active' WHERE job_id = $1 AND upper(scheduled) = $2`,
-		k,
+		key,
 		clock.Add(28*time.Hour),
 	)
 
@@ -374,16 +375,16 @@ func TestOfferAcceptAssign(t *testing.T) {
 		t.Error("overlapping assignment")
 	}
 	// out of scope and qualification
-	other := newUnit(t, s, "Scope AC")
+	other := newUnit(t, srv, "Scope AC")
 
-	_, m = write(
-		s,
+	_, resp = write(
+		srv,
 		&hq,
 		"jobs.create",
 		jobBody(other, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	if code, _ := asg(&hq, data(m)["id"].(string), "tech-internal-a", s1, 1, ""); code != 403 {
+	if code, _ := asg(&hq, data(resp)["id"].(string), "tech-internal-a", s1, 1, ""); code != 403 {
 		t.Error("technician out of scope")
 	}
 
@@ -394,13 +395,13 @@ func TestOfferAcceptAssign(t *testing.T) {
 		Format(time.RFC3339) +
 		`"}`
 
-	_, m = write(s, &hq, "jobs.create", jobBody(unit, map[string]string{
+	_, resp = write(srv, &hq, "jobs.create", jobBody(unit, map[string]string{
 		"alternativeSlots": "[]", "requestedStart": `"` + late.Format(time.RFC3339) + `"`,
 		"requestedEnd": `"` + late.Add(2*time.Hour).Format(time.RFC3339) + `"`,
 	}), 0)
 	if code, _ := asg(
 		&hq,
-		data(m)["id"].(string),
+		data(resp)["id"].(string),
 		"tech-internal-a",
 		lateSlot,
 		1,
@@ -410,10 +411,10 @@ func TestOfferAcceptAssign(t *testing.T) {
 	}
 
 	// decline and expiry
-	_, m = write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	job = data(m)["id"].(string)
+	_, resp = write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	job = data(resp)["id"].(string)
 
-	write(s, &hq, "jobs.offer", offerBody(nil), 1)
+	write(srv, &hq, "jobs.offer", offerBody(nil), 1)
 	ownerScan(
 		t,
 		`SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`,
@@ -421,35 +422,35 @@ func TestOfferAcceptAssign(t *testing.T) {
 		&offer,
 	)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"jobs.decline",
 		`{"jobId":"`+job+`","offerId":"`+offer+`","reason":"  "}`,
 		2,
 	); code != 422 ||
-		fields(m) != "reason=error.length" {
-		t.Errorf("blank decline reason: %d %s", code, fields(m))
+		fields(res) != "reason=error.length" {
+		t.Errorf("blank decline reason: %d %s", code, fields(res))
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"jobs.decline",
 		`{"jobId":"`+job+`","offerId":"`+offer+`","reason":"no capacity"}`,
 		2,
 	); code != 200 ||
-		data(m)["decision"] != "decline" {
-		t.Fatalf("decline: %d %v", code, m)
+		data(res)["decision"] != "decline" {
+		t.Fatalf("decline: %d %v", code, res)
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); data(m)["status"] != "requested" ||
-		data(m)["contractorOrgId"] != nil {
+	); data(res)["status"] != "requested" ||
+		data(res)["contractorOrgId"] != nil {
 		t.Fatal("decline returns the job to requested")
 	}
 	// the company's own decision stays readable as offer.declined (history snapshots keep accept / decline records)
@@ -466,7 +467,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		t.Fatalf("decline event action %q", action)
 	}
 
-	write(s, &hq, "jobs.offer", offerBody(nil), 3)
+	write(srv, &hq, "jobs.offer", offerBody(nil), 3)
 	ownerScan(
 		t,
 		`SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`,
@@ -481,7 +482,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 }
 
 func TestAgreedSlotsAndInputs(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
@@ -490,16 +491,16 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		clock.Add(2*time.Hour),
 	)
 	unit := seed.ID("unit-non-rto").String()
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	// an accepted SlotProposal makes its slot agreed
-	_, m := write(
-		s,
+	_, res := write(
+		srv,
 		&hq,
 		"jobs.create",
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	job := data(m)["id"].(string)
+	job := data(res)["id"].(string)
 	owner(
 		t,
 		`INSERT INTO maintenance.slot_proposals (tenant_id, job_id, source, slot, hold, message, reply_by, status)
@@ -510,20 +511,20 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		clock.Add(57*time.Hour),
 	)
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&hq,
 		"jobs.assign",
 		`{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-internal-a").
 			String()+
-			`","startAt":"`+ts(
+			`","startAt":"`+stamp(
 			55,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			57,
 		)+`"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("accepted proposal slot: %d %v", code, m)
+		t.Fatalf("accepted proposal slot: %d %v", code, resp)
 	}
 	// a plan occurrence is agreed for periodic jobs
 	plan, pj := uuid.NewString(), uuid.NewString()
@@ -550,20 +551,20 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		clock.Add(62*time.Hour),
 	)
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&hq,
 		"jobs.assign",
 		`{"jobId":"`+pj+`","technicianMembershipId":"`+seed.ID("tech-internal-a").
 			String()+
-			`","startAt":"`+ts(
+			`","startAt":"`+stamp(
 			60,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			62,
 		)+`"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("plan occurrence slot: %d %v", code, m)
+		t.Fatalf("plan occurrence slot: %d %v", code, resp)
 	}
 	// input shape errors: reversed times, and a field of the other decision (not an input field: malformed)
 	for op, c := range map[string]struct {
@@ -571,20 +572,20 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		fields []string
 	}{
 		"jobs.offer": {`{"jobId":"` + job + `","contractorOrgId":"` + seed.ID("org-contractor-a").String() +
-			`","visitSlot":{"startAt":"` + ts(3) + `","endAt":"` + ts(2) +
-			`"},"offerExpiresAt":"` + ts(5) + `","accessValidFrom":"` + ts(6) + `","accessValidUntil":"` + ts(4) +
+			`","visitSlot":{"startAt":"` + stamp(3) + `","endAt":"` + stamp(2) +
+			`"},"offerExpiresAt":"` + stamp(5) + `","accessValidFrom":"` + stamp(6) + `","accessValidUntil":"` + stamp(4) +
 			`","termsVersion":"t"}`, []string{"visitSlot", "accessValidUntil"}},
 		"jobs.accept":  {`{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","reason":"x"}`, []string{"_"}},
 		"jobs.decline": {`{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t"}`, []string{"_"}},
 		"jobs.assign": {`{"jobId":"` + job + `","technicianMembershipId":"` + seed.ID("tech-internal-a").String() +
-			`","startAt":"` + ts(3) + `","endAt":"` + ts(2) + `"}`, []string{"endAt"}},
+			`","startAt":"` + stamp(3) + `","endAt":"` + stamp(2) + `"}`, []string{"endAt"}},
 	} {
 		a := &hq
 		if op == "jobs.accept" || op == "jobs.decline" {
 			a = &contrA
 		}
 
-		code, m := write(s, a, op, c.body, 1)
+		code, m := write(srv, a, op, c.body, 1)
 
 		fe, _ := m["fieldErrors"].(map[string]any)
 		for _, f := range c.fields {
@@ -594,15 +595,15 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		}
 	}
 	// both terms and a reason: the reason is not an input of accept (it was refused for the missing jobId before)
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&contrA,
 		"jobs.accept",
 		`{"jobId":"`+job+`","offerId":"`+uuid.NewString()+`","termsVersion":"t","reason":"x"}`,
 		1,
 	); code != 422 ||
-		fields(m) != "_=error.malformedInput" {
-		t.Errorf("both terms and reason: %d %s", code, fields(m))
+		fields(resp) != "_=error.malformedInput" {
+		t.Errorf("both terms and reason: %d %s", code, fields(resp))
 	}
 	// each decision takes only its own fields (service-contracts: accept termsVersion, decline reason)
 	for op, b := range map[string]string{
@@ -610,38 +611,38 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		"jobs.decline": `{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t","reason":"no ` +
 			`capacity"}`,
 	} {
-		if code, m := write(
-			s,
+		if code, resp := write(
+			srv,
 			&contrA,
 			op,
 			b,
 			1,
 		); code != 422 ||
-			m["fieldErrors"].(map[string]any)["_"] != "error.malformedInput" {
-			t.Errorf("%s with the other decision's field: %d %v", op, code, m)
+			resp["fieldErrors"].(map[string]any)["_"] != "error.malformedInput" {
+			t.Errorf("%s with the other decision's field: %d %v", op, code, resp)
 		}
 	}
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&contrA,
 		"jobs.decline",
 		`{"jobId":"`+job+`","offerId":"`+uuid.NewString()+`"}`,
 		1,
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["reason"] != "error.length" {
-		t.Errorf("decline without a reason: %d %v", code, m)
+		resp["fieldErrors"].(map[string]any)["reason"] != "error.length" {
+		t.Errorf("decline without a reason: %d %v", code, resp)
 	}
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&contrA,
 		"jobs.accept",
 		`{"jobId":"`+job+`","offerId":"`+uuid.NewString()+`"}`,
 		1,
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["termsVersion"] != "error.required" {
-		t.Errorf("accept without terms: %d %v", code, m)
+		resp["fieldErrors"].(map[string]any)["termsVersion"] != "error.required" {
+		t.Errorf("accept without terms: %d %v", code, resp)
 	}
 
 	long := make([]byte, 1001)
@@ -649,29 +650,29 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		long[i] = 'r'
 	}
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&hq,
 		"jobs.assign",
 		`{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-internal-a").
 			String()+
-			`","startAt":"`+ts(
+			`","startAt":"`+stamp(
 			55,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			57,
 		)+`","reason":"`+string(
 			long,
 		)+`"}`,
 		2,
 	); code != 422 ||
-		fields(m) != "reason=error.length" {
-		t.Errorf("reason too long: %d %s", code, fields(m))
+		fields(resp) != "reason=error.length" {
+		t.Errorf("reason too long: %d %s", code, fields(resp))
 	}
 	// contractor outside the access window
-	_, m = write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	j2 := data(m)["id"].(string)
+	_, res = write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	j2 := data(res)["id"].(string)
 	write(
-		s,
+		srv,
 		&hq,
 		"jobs.offer",
 		`{"jobId":"`+j2+`","contractorOrgId":"`+seed.ID("org-contractor-a").
@@ -679,11 +680,11 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 			`","visitSlot":`+slotJSON(
 			49,
 			2,
-		)+`,"offerExpiresAt":"`+ts(
+		)+`,"offerExpiresAt":"`+stamp(
 			12,
-		)+`","accessValidFrom":"`+ts(
+		)+`","accessValidFrom":"`+stamp(
 			1,
-		)+`","accessValidUntil":"`+ts(
+		)+`","accessValidUntil":"`+stamp(
 			100,
 		)+`","termsVersion":"t"}`,
 		1,
@@ -697,7 +698,7 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		&offer,
 	)
 	write(
-		s,
+		srv,
 		&contrA,
 		"jobs.accept",
 		`{"jobId":"`+j2+`","offerId":"`+offer+`","termsVersion":"t"}`,
@@ -705,14 +706,14 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 	)
 
 	if code, _ := write(
-		s,
+		srv,
 		&contrA,
 		"jobs.assign",
 		`{"jobId":"`+j2+`","technicianMembershipId":"`+seed.ID("tech-external-a").
 			String()+
-			`","startAt":"`+ts(
+			`","startAt":"`+stamp(
 			49,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			51,
 		)+`"}`,
 		3,
@@ -724,7 +725,7 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 // TestAssignWithinAccess (IR433): a technician is assigned only to a slot that ends before their access does; a slot
 // past the access end is FORBIDDEN errors.technician_access_ends, and the same slot is fine once the access lasts.
 func TestAssignWithinAccess(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	tech := seed.ID("tech-internal-a")
 
 	var until *time.Time
@@ -744,28 +745,28 @@ func TestAssignWithinAccess(t *testing.T) {
 		clock.Add(26*time.Hour),
 	)
 
-	code, m := write(
-		s,
+	code, res := write(
+		srv,
 		&customerA,
 		"jobs.create",
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("create: %d %v", code, m)
+		t.Fatalf("create: %d %v", code, res)
 	}
 
-	job := data(m)["id"].(string)
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	job := data(res)["id"].(string)
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 
 	assign := func(from, to int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&hq,
 			"jobs.assign",
-			`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+ts(
+			`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+stamp(
 				from,
-			)+`","endAt":"`+ts(
+			)+`","endAt":"`+stamp(
 				to,
 			)+`"}`,
 			1,
@@ -795,7 +796,7 @@ func TestAssignWithinAccess(t *testing.T) {
 // maintenance scheduler releases the assignment of the job that has not started, the job goes back to be assigned
 // (requested for HQ's own delivery), and HQ's assigners get a job_update notice.
 func TestReleaseEndedAccess(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	ctx := context.Background()
 	tech := seed.ID("tech-internal-a")
 
@@ -816,32 +817,32 @@ func TestReleaseEndedAccess(t *testing.T) {
 		tech,
 	)
 
-	code, m := write(
-		s,
+	code, resp := write(
+		srv,
 		&customerA,
 		"jobs.create",
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("create: %d %v", code, m)
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	job := data(m)["id"].(string)
+	job := data(resp)["id"].(string)
 
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	if code, m := write(
-		s,
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.assign",
-		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+ts(
+		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+stamp(
 			25,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			27,
 		)+`"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("assign: %d %v", code, m)
+		t.Fatalf("assign: %d %v", code, res)
 	}
 
 	before := countNotes(t, job, "hq-operator", "job_update")
@@ -859,7 +860,7 @@ func TestReleaseEndedAccess(t *testing.T) {
 		clock.Add(24*time.Hour),
 	)
 
-	_, err := schedTick(ctx, s, clock.Add(time.Minute))
+	_, err := schedTick(ctx, srv, clock.Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -891,7 +892,7 @@ func TestReleaseEndedAccess(t *testing.T) {
 		t.Errorf("HQ notices: %d, want %d", n, before+1)
 	}
 	// nothing more to release on the next tick
-	_, err = schedTick(ctx, s, clock.Add(2*time.Minute))
+	_, err = schedTick(ctx, srv, clock.Add(2*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -904,7 +905,7 @@ func TestReleaseEndedAccess(t *testing.T) {
 // TestReleaseEndedAccessContractor (IR439): the contractor's job whose technician's access now ends before the visit
 // goes back to accepted with its offer, and the contractor's assigners get the job_update notice.
 func TestReleaseEndedAccessContractor(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	ctx := context.Background()
 	tech := seed.ID("tech-external-a")
 
@@ -934,22 +935,22 @@ func TestReleaseEndedAccessContractor(t *testing.T) {
 		)
 	})
 
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 
-	code, m := write(
-		s,
+	code, resp := write(
+		srv,
 		&customerA,
 		"jobs.create",
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("create: %d %v", code, m)
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	job := data(m)["id"].(string)
-	if code, m := write(
-		s,
+	job := data(resp)["id"].(string)
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
@@ -958,16 +959,16 @@ func TestReleaseEndedAccessContractor(t *testing.T) {
 			49,
 			2,
 		)+
-			`,"offerExpiresAt":"`+ts(
+			`,"offerExpiresAt":"`+stamp(
 			12,
-		)+`","accessValidFrom":"`+ts(
+		)+`","accessValidFrom":"`+stamp(
 			0,
-		)+`","accessValidUntil":"`+ts(
+		)+`","accessValidUntil":"`+stamp(
 			100,
 		)+`","termsVersion":"terms-v1"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("offer: %d %v", code, m)
+		t.Fatalf("offer: %d %v", code, res)
 	}
 
 	var offer string
@@ -978,28 +979,28 @@ func TestReleaseEndedAccessContractor(t *testing.T) {
 		&offer,
 	)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"jobs.accept",
 		`{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"terms-v1"}`,
 		2,
 	); code != 200 {
-		t.Fatalf("accept: %d %v", code, m)
+		t.Fatalf("accept: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"jobs.assign",
-		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+ts(
+		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+stamp(
 			49,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			51,
 		)+`"}`,
 		3,
 	); code != 200 {
-		t.Fatalf("assign: %d %v", code, m)
+		t.Fatalf("assign: %d %v", code, res)
 	}
 
 	before, hqBefore := countNotes(
@@ -1027,7 +1028,7 @@ func TestReleaseEndedAccessContractor(t *testing.T) {
 		clock.Add(50*time.Hour),
 	)
 
-	_, err := schedTick(ctx, s, clock.Add(time.Minute))
+	_, err := schedTick(ctx, srv, clock.Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1068,7 +1069,7 @@ func TestReleaseEndedAccessContractor(t *testing.T) {
 // assigned visit on a unit that requires the code; the not-started assignment is released like an ended access
 // (IR439). A certificate that still covers the visit releases nothing.
 func TestReleaseQualificationEnded(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	tech := seed.ID("tech-external-a")
 
 	var from, until time.Time
@@ -1103,22 +1104,22 @@ func TestReleaseQualificationEnded(t *testing.T) {
 		)
 	})
 
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 
-	code, m := write(
-		s,
+	code, resp := write(
+		srv,
 		&customerA,
 		"jobs.create",
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("create: %d %v", code, m)
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	job := data(m)["id"].(string)
-	if code, m := write(
-		s,
+	job := data(resp)["id"].(string)
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
@@ -1127,16 +1128,16 @@ func TestReleaseQualificationEnded(t *testing.T) {
 			49,
 			2,
 		)+
-			`,"offerExpiresAt":"`+ts(
+			`,"offerExpiresAt":"`+stamp(
 			12,
-		)+`","accessValidFrom":"`+ts(
+		)+`","accessValidFrom":"`+stamp(
 			0,
-		)+`","accessValidUntil":"`+ts(
+		)+`","accessValidUntil":"`+stamp(
 			100,
 		)+`","termsVersion":"terms-v1"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("offer: %d %v", code, m)
+		t.Fatalf("offer: %d %v", code, res)
 	}
 
 	var offer string
@@ -1147,58 +1148,58 @@ func TestReleaseQualificationEnded(t *testing.T) {
 		&offer,
 	)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"jobs.accept",
 		`{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"terms-v1"}`,
 		2,
 	); code != 200 {
-		t.Fatalf("accept: %d %v", code, m)
+		t.Fatalf("accept: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"jobs.assign",
-		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+ts(
+		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+stamp(
 			49,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			51,
 		)+`"}`,
 		3,
 	); code != 200 {
-		t.Fatalf("assign: %d %v", code, m)
+		t.Fatalf("assign: %d %v", code, res)
 	}
 
 	pdf := blobJSON("cert.pdf", "application/pdf", []byte("%PDF-1.4 demo"), 13)
 	approve := func(expires int) {
 		t.Helper()
 
-		code, m := write(
-			s,
+		code, res := write(
+			srv,
 			&contrA,
 			"certificates.submit",
-			`{"membershipId":"`+tech.String()+`","code":"demo_indoor","name":"Indoor AC","number":"N-2","issuedAt":"`+ts(
+			`{"membershipId":"`+tech.String()+`","code":"demo_indoor","name":"Indoor AC","number":"N-2","issuedAt":"`+stamp(
 				-240,
 			)+
-				`","expiresAt":"`+ts(
+				`","expiresAt":"`+stamp(
 				expires,
 			)+`","file":`+pdf+`}`,
 			0,
 		)
 		if code != 200 {
-			t.Fatalf("submit: %d %v", code, m)
+			t.Fatalf("submit: %d %v", code, res)
 		}
 
-		if code, m := write(
-			s,
+		if code, reply := write(
+			srv,
 			&hq,
 			"certificates.verify",
-			`{"certificateId":"`+data(m)["id"].(string)+`","decision":"approve"}`,
+			`{"certificateId":"`+data(res)["id"].(string)+`","decision":"approve"}`,
 			1,
 		); code != 200 {
-			t.Fatalf("approve: %d %v", code, m)
+			t.Fatalf("approve: %d %v", code, reply)
 		}
 	}
 	state := func() (status string, assignment *string, reason *string) {
@@ -1254,10 +1255,16 @@ func TestReleaseQualificationEnded(t *testing.T) {
 
 // TestPastSlotsRefused (IR456): a preferred time that is over can neither be assigned nor offered.
 func TestPastSlotsRefused(t *testing.T) {
-	s := server(t)
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
-	job := data(m)["id"].(string)
+	srv := server(t)
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, resp := write(
+		srv,
+		&customerA,
+		"jobs.create",
+		jobBody(seed.ID("unit-non-rto").String(), nil),
+		0,
+	)
+	job := data(resp)["id"].(string)
 	// the client's preferred times have all passed
 	owner(
 		t,
@@ -1269,52 +1276,58 @@ func TestPastSlotsRefused(t *testing.T) {
 		clock.Add(-time.Hour),
 	)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.assign",
 		`{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-internal-a").
 			String()+
-			`","startAt":"`+ts(
+			`","startAt":"`+stamp(
 			-3,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			-1,
 		)+`"}`,
 		1,
 	); code != 422 ||
-		fields(m) != "endAt=error.past" {
-		t.Errorf("assign a time that is over: %d %s", code, fields(m))
+		fields(res) != "endAt=error.past" {
+		t.Errorf("assign a time that is over: %d %s", code, fields(res))
 	}
 	// an offer must be answered by the visit's start (IR457), so a visit that has begun cannot be offered either
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
-			`","visitSlot":{"startAt":"`+ts(
+			`","visitSlot":{"startAt":"`+stamp(
 			-3,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			-1,
 		)+`"}`+
-			`,"offerExpiresAt":"`+ts(
+			`,"offerExpiresAt":"`+stamp(
 			12,
-		)+`","accessValidFrom":"`+ts(
+		)+`","accessValidFrom":"`+stamp(
 			-4,
-		)+`","accessValidUntil":"`+ts(
+		)+`","accessValidUntil":"`+stamp(
 			100,
 		)+`","termsVersion":"t"}`,
 		1,
 	); code != 422 ||
-		fields(m) != "offerExpiresAt=error.afterVisit" {
-		t.Errorf("offer a visit that is over: %d %s", code, fields(m))
+		fields(res) != "offerExpiresAt=error.afterVisit" {
+		t.Errorf("offer a visit that is over: %d %s", code, fields(res))
 	}
 	// IR457: a future visit whose offer could still be answered after it begins
-	_, m = write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	_, resp = write(
+		srv,
+		&customerA,
+		"jobs.create",
+		jobBody(seed.ID("unit-non-rto").String(), nil),
+		0,
+	)
 
-	later := data(m)["id"].(string)
-	if code, m := write(
-		s,
+	later := data(resp)["id"].(string)
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.offer",
 		`{"jobId":"`+later+`","contractorOrgId":"`+seed.ID("org-contractor-a").
@@ -1323,17 +1336,17 @@ func TestPastSlotsRefused(t *testing.T) {
 			49,
 			2,
 		)+
-			`,"offerExpiresAt":"`+ts(
+			`,"offerExpiresAt":"`+stamp(
 			50,
-		)+`","accessValidFrom":"`+ts(
+		)+`","accessValidFrom":"`+stamp(
 			0,
-		)+`","accessValidUntil":"`+ts(
+		)+`","accessValidUntil":"`+stamp(
 			100,
 		)+`","termsVersion":"t"}`,
 		1,
 	); code != 422 ||
-		fields(m) != "offerExpiresAt=error.afterVisit" {
-		t.Errorf("offer answered after the visit began: %d %s", code, fields(m))
+		fields(res) != "offerExpiresAt=error.afterVisit" {
+		t.Errorf("offer answered after the visit began: %d %s", code, fields(res))
 	}
 }
 
@@ -1341,7 +1354,7 @@ func TestPastSlotsRefused(t *testing.T) {
 // extension for the same technician removes that snapshot, nothing is frozen while the new window is open, and its end
 // freezes the history again.
 func TestExtensionRefreezesTechnicianHistory(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	ctx := context.Background()
 	tech := seed.ID("tech-internal-a")
 	owner(
@@ -1350,22 +1363,22 @@ func TestExtensionRefreezesTechnicianHistory(t *testing.T) {
 		tech,
 	)
 
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
 
 	job := data(m)["id"].(string)
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.assign",
-		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+ts(
+		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+stamp(
 			25,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			27,
 		)+`"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("assign: %d %v", code, m)
+		t.Fatalf("assign: %d %v", code, res)
 	}
 	// the work started and its window ended an hour ago
 	owner(
@@ -1399,7 +1412,7 @@ func TestExtensionRefreezesTechnicianHistory(t *testing.T) {
 		return at
 	}
 
-	_, err := schedTick(ctx, s, clock)
+	_, err := schedTick(ctx, srv, clock)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1411,21 +1424,21 @@ func TestExtensionRefreezesTechnicianHistory(t *testing.T) {
 	var v int
 	ownerScan(t, `SELECT version FROM maintenance.jobs WHERE id = $1`, []any{job}, &v)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.assign",
-		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+ts(
+		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+stamp(
 			-3,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			2,
 		)+`","reason":"more time on site"}`,
 		v,
 	); code != 200 {
-		t.Fatalf("extension: %d %v", code, m)
+		t.Fatalf("extension: %d %v", code, res)
 	}
 
-	_, err = schedTick(ctx, s, clock.Add(time.Minute))
+	_, err = schedTick(ctx, srv, clock.Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1434,7 +1447,7 @@ func TestExtensionRefreezesTechnicianHistory(t *testing.T) {
 		t.Errorf("frozen while the extension is open: %v", at)
 	}
 
-	_, err = schedTick(ctx, s, clock.Add(3*time.Hour))
+	_, err = schedTick(ctx, srv, clock.Add(3*time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}

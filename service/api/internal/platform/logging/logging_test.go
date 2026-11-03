@@ -9,9 +9,9 @@ import (
 
 // IR369: what must never reach a log line is masked, whatever the code passes; IDs, dates and paths stay readable.
 func TestMasking(t *testing.T) {
-	var b bytes.Buffer
+	var buf bytes.Buffer
 
-	log := New(&b, "test")
+	log := New(&buf, "test")
 	log.Info(
 		"sign-in for aisha@example.com failed",
 		"access_token",
@@ -36,7 +36,7 @@ func TestMasking(t *testing.T) {
 		errors.New(`connect postgres://ac_app_login:hunter2@db:5432/ac failed`),
 	)
 
-	out := b.String()
+	out := buf.String()
 	for _, leaked := range []string{
 		"aisha@example.com", "eyJ.a.b", "Bearer x", "s3cr3t", `"k"`, "c=1", "+60 12-345 6789",
 		"hunter2",

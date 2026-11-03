@@ -84,33 +84,33 @@ func kindsFor(perms map[string]bool) []string {
 // then shows it (IR124): the notice of a cancellation or a reassignment stays readable (IR601). A revoked or ended
 // assignment without a snapshot hides the job's notifications. A contractor reads the jobs offered to its organization
 // and the certificates of its technicians (IR336).
-func readableSQL(p *ops.Principal, now time.Time, kind, id string, args *[]any) string {
+func readableSQL(principal *ops.Principal, now time.Time, kind, id string, args *[]any) string {
 	add := func(v any) string {
 		*args = append(*args, v)
 
 		return fmt.Sprintf("$%d", len(*args))
 	}
 
-	switch p.Role {
+	switch principal.Role {
 	case "admin":
-		return kind + " = ANY(" + add(kindsFor(p.Permissions)) + ")"
+		return kind + " = ANY(" + add(kindsFor(principal.Permissions)) + ")"
 	case "client":
-		return "t.org = " + add(p.OrgID)
+		return "t.org = " + add(principal.OrgID)
 	case "contractor":
-		org := add(p.OrgID)
+		org := add(principal.OrgID)
 
 		return "((" + kind + " = 'job' AND EXISTS (SELECT 1 FROM notify.ref_offers o WHERE o.job_id = " + id +
 			" AND o.contractor_org_id = " + org + ")) OR (" +
 			kind + " = 'certificate' AND t.org = " + org + "))"
 	default:
 		unitScope := "(t.unit_id = ANY(" + add(
-			p.Scopes["unit"],
+			principal.Scopes["unit"],
 		) + ") OR t.property_id = ANY(" + add(
-			p.Scopes["property"],
+			principal.Scopes["property"],
 		) + ") OR t.org = ANY(" + add(
-			p.Scopes["organization"],
+			principal.Scopes["organization"],
 		) + "))"
-		me := add(p.MembershipID)
+		me := add(principal.MembershipID)
 
 		return "((" + kind + " = 'job' AND (EXISTS (SELECT 1 FROM notify.ref_assignments a WHERE a.job_id = " + id +
 			" AND a.technician_membership_id = " + me +
@@ -179,7 +179,7 @@ func projectParams(raw []byte, name string, occurred time.Time, typ string) Para
 
 	_ = json.Unmarshal(raw, &s)
 
-	p := Params{
+	params := Params{
 		TargetName:  name,
 		At:          occurred,
 		Status:      typ,
@@ -190,58 +190,58 @@ func projectParams(raw []byte, name string, occurred time.Time, typ string) Para
 		Message:     s.Message,
 	}
 	if s.At != nil {
-		p.At = *s.At
+		params.At = *s.At
 	}
 
 	if s.Status != nil {
-		p.Status = *s.Status
+		params.Status = *s.Status
 	}
 
-	return p
+	return params
 }
 
 const inboxCols = `n.id, n.tenant_id, n.version, n.created_at, n.source_alert_id, n.type, n.recipient_membership_id, ` +
 	`n.scope_version_at_creation, n.target->>'kind',
 	n.target->>'id', n.template_key, n.params, n.channel, n.severity, n.occurred_at, n.read_at, t.name`
 
-func scanNotification(r pgx.Row) (Notification, error) {
+func scanNotification(row pgx.Row) (Notification, error) {
 	var (
-		x              Notification
+		notification   Notification
 		kind, id, name string
 		params         []byte
 	)
 
-	err := r.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.SourceAlertID,
-		&x.Type,
-		&x.RecipientMembershipID,
-		&x.ScopeVersionAtCreation,
+	err := row.Scan(
+		&notification.ID,
+		&notification.TenantID,
+		&notification.Version,
+		&notification.CreatedAt,
+		&notification.SourceAlertID,
+		&notification.Type,
+		&notification.RecipientMembershipID,
+		&notification.ScopeVersionAtCreation,
 		&kind,
 		&id,
-		&x.TemplateKey,
+		&notification.TemplateKey,
 		&params,
-		&x.Channel,
-		&x.Severity,
-		&x.OccurredAt,
-		&x.ReadAt,
+		&notification.Channel,
+		&notification.Severity,
+		&notification.OccurredAt,
+		&notification.ReadAt,
 		&name,
 	)
 
-	x.UpdatedAt = x.CreatedAt
-	if x.ReadAt != nil {
-		x.UpdatedAt = *x.ReadAt
+	notification.UpdatedAt = notification.CreatedAt
+	if notification.ReadAt != nil {
+		notification.UpdatedAt = *notification.ReadAt
 	}
 
-	x.Target = map[string]string{"kind": kind, "id": id}
-	x.Params = projectParams(params, name, x.OccurredAt, x.Type)
-	x.DeliveryState = deliveryState(x.Channel)
-	x.TargetOpen = true
+	notification.Target = map[string]string{"kind": kind, "id": id}
+	notification.Params = projectParams(params, name, notification.OccurredAt, notification.Type)
+	notification.DeliveryState = deliveryState(notification.Channel)
+	notification.TargetOpen = true
 
-	return x, apperr.Wrap(err, "scan (scanNotification)")
+	return notification, apperr.Wrap(err, "scan (scanNotification)")
 }
 
 // QueryJobsOpen asks maintenance which jobs open for the caller — jobs.get answers them, live or as the caller's
@@ -257,8 +257,8 @@ type JobsOpenInput struct {
 
 // openTargets clears TargetOpen on the job notices of a contractor or a technician whose job page does not open for
 // them (IR602); every other target opens wherever its notice is readable (IR58).
-func openTargets(ctx context.Context, c *ops.Call, items []Notification) error {
-	if c.Principal.Role != "contractor" && c.Principal.Role != "technician" {
+func openTargets(ctx context.Context, call *ops.Call, items []Notification) error {
+	if call.Principal.Role != "contractor" && call.Principal.Role != "technician" {
 		return nil
 	}
 
@@ -278,7 +278,7 @@ func openTargets(ctx context.Context, c *ops.Call, items []Notification) error {
 		return nil
 	}
 
-	open, err := ops.Query[[]uuid.UUID](ctx, c, QueryJobsOpen, JobsOpenInput{JobIDs: ids})
+	open, err := ops.Query[[]uuid.UUID](ctx, call, QueryJobsOpen, JobsOpenInput{JobIDs: ids})
 	if err != nil {
 		return err
 	}
@@ -358,8 +358,8 @@ var (
 //	@Router			/v1/notifications [get]
 func (Inbox) list(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[Notification], error) {
 	var f struct {
 		Severity   *string    `json:"severity,omitempty"`
@@ -369,8 +369,8 @@ func (Inbox) list(
 		To         *time.Time `json:"to,omitempty"`
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil ||
@@ -388,7 +388,7 @@ func (Inbox) list(
 		}
 	}
 
-	order, err := paging.OrderBy(in.Sort, map[string]string{
+	order, err := paging.OrderBy(query.Sort, map[string]string{
 		"id":         "n.id",
 		"occurredAt": "n.occurred_at",
 		"createdAt":  "n.created_at",
@@ -399,12 +399,12 @@ func (Inbox) list(
 		return paging.Page[Notification]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Notification]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	args := []any{c.Principal.MembershipID}
+	args := []any{call.Principal.MembershipID}
 	add := func(v any) string {
 		args = append(args, v)
 
@@ -413,7 +413,13 @@ func (Inbox) list(
 
 	conds := []string{
 		"n.recipient_membership_id = $1",
-		readableSQL(c.Principal, c.Now, "(n.target->>'kind')", "(n.target->>'id')::uuid", &args),
+		readableSQL(
+			call.Principal,
+			call.Now,
+			"(n.target->>'kind')",
+			"(n.target->>'id')::uuid",
+			&args,
+		),
 	}
 	if f.Severity != nil {
 		conds = append(conds, "n.severity = "+add(*f.Severity))
@@ -439,13 +445,13 @@ func (Inbox) list(
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+inboxFrom()+" WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM "+inboxFrom()+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Notification]{}, apperr.Wrap(scanErr, "select count")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM %s WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
@@ -453,8 +459,8 @@ func (Inbox) list(
 			inboxFrom(),
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -478,16 +484,16 @@ func (Inbox) list(
 		return paging.Page[Notification]{}, apperr.Wrap(rowsErr, "select (list)")
 	}
 
-	openTargetsErr := openTargets(ctx, c, items)
+	openTargetsErr := openTargets(ctx, call, items)
 	if openTargetsErr != nil {
 		return paging.Page[Notification]{}, openTargetsErr
 	}
 
 	return paging.Page[Notification]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
@@ -531,55 +537,59 @@ func (in *MarkReadInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/notifications/{id}/mark-read [post]
-func (Inbox) markRead(ctx context.Context, c *ops.Call, in *MarkReadInput) (Notification, error) {
-	args := []any{in.ID, c.Principal.MembershipID}
+func (Inbox) markRead(
+	ctx context.Context,
+	call *ops.Call,
+	in *MarkReadInput,
+) (Notification, error) {
+	args := []any{in.ID, call.Principal.MembershipID}
 	q := "SELECT " + inboxCols + " FROM " + inboxFrom() + " WHERE n.id = $1 AND n.recipient_membership_id = $2 AND " +
 		readableSQL(
-			c.Principal,
-			c.Now,
+			call.Principal,
+			call.Now,
 			"(n.target->>'kind')",
 			"(n.target->>'id')::uuid",
 			&args,
 		) + " FOR UPDATE OF n"
 
-	x, err := scanNotification(c.Tx.QueryRow(ctx, q, args...))
+	notification, err := scanNotification(call.Tx.QueryRow(ctx, q, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return x, apperr.E(apperr.NotFound, "error.notFound")
+		return notification, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	if err != nil {
-		return x, err
+		return notification, err
 	}
 
-	if x.Version != *c.ExpectedVersion {
-		return x, apperr.E(apperr.Conflict, "error.versionConflict")
+	if notification.Version != *call.ExpectedVersion {
+		return notification, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	one := []Notification{x}
+	one := []Notification{notification}
 
-	openTargetsErr := openTargets(ctx, c, one)
+	openTargetsErr := openTargets(ctx, call, one)
 	if openTargetsErr != nil {
-		return x, openTargetsErr
+		return notification, openTargetsErr
 	}
 
-	x = one[0]
-	if x.ReadAt != nil { // already read: unchanged
-		return x, nil
+	notification = one[0]
+	if notification.ReadAt != nil { // already read: unchanged
+		return notification, nil
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE notify.notifications SET read_at = $2, version = version + 1 WHERE id = $1`,
-		x.ID,
-		c.Now,
+		notification.ID,
+		call.Now,
 	)
 	if execErr != nil {
-		return x, apperr.Wrap(execErr, "update notify.notifications")
+		return notification, apperr.Wrap(execErr, "update notify.notifications")
 	}
 
-	x.ReadAt, x.Version, x.UpdatedAt = &c.Now, x.Version+1, c.Now
+	notification.ReadAt, notification.Version, notification.UpdatedAt = &call.Now, notification.Version+1, call.Now
 
-	return x, nil
+	return notification, nil
 }
 
 // MarkAllReadInput is notifications.markAllRead input: the listed unread notifications (IR379).
@@ -644,19 +654,23 @@ type Marked struct {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/notifications/mark-all-read [post]
-func (Inbox) markAllRead(ctx context.Context, c *ops.Call, in *MarkAllReadInput) (Marked, error) {
-	args := []any{in.IDs, c.Principal.MembershipID, c.Now}
+func (Inbox) markAllRead(
+	ctx context.Context,
+	call *ops.Call,
+	in *MarkAllReadInput,
+) (Marked, error) {
+	args := []any{in.IDs, call.Principal.MembershipID, call.Now}
 	q := "UPDATE notify.notifications x SET read_at = $3, version = x.version + 1 FROM (SELECT n.id FROM " + inboxFrom() +
 		" WHERE n.id = ANY($1) AND n.recipient_membership_id = $2 AND n.read_at IS NULL AND " +
 		readableSQL(
-			c.Principal,
-			c.Now,
+			call.Principal,
+			call.Now,
 			"(n.target->>'kind')",
 			"(n.target->>'id')::uuid",
 			&args,
 		) + ") r WHERE x.id = r.id RETURNING x.id"
 
-	rows, err := c.Tx.Query(ctx, q, args...)
+	rows, err := call.Tx.Query(ctx, q, args...)
 	if err != nil {
 		return Marked{}, apperr.Wrap(err, "update notify.notifications")
 	}
@@ -708,17 +722,17 @@ var (
 	roles    = []string{"client", "contractor", "technician", "admin"}
 )
 
-func (in *TargetInput) validate(fe map[string]string) {
+func (in *TargetInput) validate(fieldErrs map[string]string) {
 	if !slices.Contains(kinds, in.Target.Kind) || in.Target.ID == uuid.Nil {
-		fe["target"] = "error.invalid"
+		fieldErrs["target"] = "error.invalid"
 	}
 
 	if !slices.Contains(templates, in.TemplateKey) {
-		fe["templateKey"] = "error.invalid"
+		fieldErrs["templateKey"] = "error.invalid"
 	}
 
 	if !slices.Contains(channels, in.Channel) {
-		fe["channel"] = "error.invalid"
+		fieldErrs["channel"] = "error.invalid"
 	}
 }
 
@@ -729,8 +743,8 @@ type target struct {
 
 // resolve loads the target and checks that the caller can read it (NOT_FOUND) and, for payment_reminder, the IR20
 // preconditions (billing.write FORBIDDEN, overdue unpaid invoice CONFLICT).
-func resolve(ctx context.Context, c *ops.Call, in *TargetInput) (target, error) {
-	args := []any{in.Target.Kind, in.Target.ID}
+func resolve(ctx context.Context, c *ops.Call, input *TargetInput) (target, error) {
+	args := []any{input.Target.Kind, input.Target.ID}
 
 	var t target
 
@@ -745,19 +759,19 @@ func resolve(ctx context.Context, c *ops.Call, in *TargetInput) (target, error) 
 		return t, apperr.Wrap(err, "select t.org")
 	}
 
-	if in.TemplateKey == "payment_reminder" {
+	if input.TemplateKey == "payment_reminder" {
 		if c.Principal.Role != "admin" || !c.Principal.Permissions["billing.write"] {
 			return t, apperr.E(apperr.Forbidden, "error.forbidden")
 		}
 
-		if in.Target.Kind != "invoice" {
+		if input.Target.Kind != "invoice" {
 			return t, apperr.Fields(map[string]string{"target": "error.invalid"})
 		}
 
 		var ok bool
 
 		err := c.Tx.QueryRow(ctx, `SELECT status = 'unpaid' AND due_at < $2 FROM notify.ref_invoices WHERE id =
-			$1`, in.Target.ID, c.Now).
+			$1`, input.Target.ID, c.Now).
 			Scan(&ok)
 		if err != nil {
 			return t, apperr.Wrap(err, "select notify.ref_invoices")
@@ -807,8 +821,8 @@ func adminPerms(in *TargetInput) []string {
 
 func recipients(
 	ctx context.Context,
-	c *ops.Call,
-	in *TargetInput,
+	call *ops.Call,
+	input *TargetInput,
 	t target,
 	role *string,
 ) ([]Recipient, error) {
@@ -819,13 +833,13 @@ func recipients(
 
 	q := "SELECT * FROM (" + recipientsSQL + ") r(id, role, label, channels) WHERE $7 = ANY(r.channels)"
 	args := []any{
-		c.Now,
+		call.Now,
 		org,
-		in.Target.Kind,
-		in.Target.ID,
-		in.TemplateKey == "payment_reminder",
-		adminPerms(in),
-		in.Channel,
+		input.Target.Kind,
+		input.Target.ID,
+		input.TemplateKey == "payment_reminder",
+		adminPerms(input),
+		input.Channel,
 	}
 
 	if role != nil {
@@ -834,7 +848,7 @@ func recipients(
 		args = append(args, *role)
 	}
 
-	rows, err := c.Tx.Query(ctx, q+" ORDER BY r.role, r.label, r.id", args...)
+	rows, err := call.Tx.Query(ctx, q+" ORDER BY r.role, r.label, r.id", args...)
 	if err != nil {
 		return nil, apperr.Wrap(err, "query (recipients)")
 	}
@@ -843,14 +857,19 @@ func recipients(
 	out := []Recipient{}
 
 	for rows.Next() {
-		var r Recipient
+		var recipient Recipient
 
-		err := rows.Scan(&r.ID, &r.Role, &r.DisplayLabel, &r.AllowedChannels)
+		err := rows.Scan(
+			&recipient.ID,
+			&recipient.Role,
+			&recipient.DisplayLabel,
+			&recipient.AllowedChannels,
+		)
 		if err != nil {
 			return nil, apperr.Wrap(err, "query (recipients)")
 		}
 
-		out = append(out, r)
+		out = append(out, recipient)
 	}
 
 	return out, apperr.Wrap(rows.Err(), "query (recipients)")
@@ -866,14 +885,14 @@ type RecipientsInput struct {
 
 // Validate implements ops.Validator.
 func (in *RecipientsInput) Validate() map[string]string {
-	fe := map[string]string{}
-	in.validate(fe)
+	fieldErrs := map[string]string{}
+	in.validate(fieldErrs)
 
 	if in.Role != nil && !slices.Contains(roles, *in.Role) {
-		fe["role"] = "error.invalid"
+		fieldErrs["role"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // recipients serves notifications.recipients.
@@ -910,40 +929,41 @@ func (in *RecipientsInput) Validate() map[string]string {
 //	@Router			/v1/notifications/recipients [get]
 func (Inbox) recipients(
 	ctx context.Context,
-	c *ops.Call,
-	in *RecipientsInput,
+	call *ops.Call,
+	input *RecipientsInput,
 ) (paging.Page[Recipient], error) {
-	if len(in.Query.Filters) > 0 && string(in.Query.Filters) != "{}" || in.Query.Sort != nil {
+	if len(input.Query.Filters) > 0 && string(input.Query.Filters) != "{}" ||
+		input.Query.Sort != nil {
 		return paging.Page[Recipient]{}, apperr.Fields(map[string]string{"query": "error.invalid"})
 	}
 
-	w, err := paging.Resolve(in.Query, struct{}{}, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(input.Query, struct{}{}, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Recipient]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	t, err := resolve(ctx, c, &in.TargetInput)
+	t, err := resolve(ctx, call, &input.TargetInput)
 	if err != nil {
 		return paging.Page[Recipient]{}, err
 	}
 
-	all, err := recipients(ctx, c, &in.TargetInput, t, in.Role)
+	all, err := recipients(ctx, call, &input.TargetInput, t, input.Role)
 	if err != nil {
 		return paging.Page[Recipient]{}, err
 	}
 
-	end := min(w.Offset+w.Limit, len(all))
+	end := min(window.Offset+window.Limit, len(all))
 
 	page := []Recipient{}
-	if w.Offset < len(all) {
-		page = all[w.Offset:end]
+	if window.Offset < len(all) {
+		page = all[window.Offset:end]
 	}
 
 	return paging.Page[Recipient]{
 		Items:           page,
-		NextCursor:      w.Next(len(all)),
+		NextCursor:      window.Next(len(all)),
 		Total:           len(all),
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
@@ -961,19 +981,19 @@ type PreviewInput struct {
 
 // Validate implements ops.Validator.
 func (in *PreviewInput) Validate() map[string]string {
-	fe := map[string]string{}
-	in.validate(fe)
+	fieldErrs := map[string]string{}
+	in.validate(fieldErrs)
 
 	if in.RecipientMembershipID == uuid.Nil {
-		fe["recipientMembershipId"] = "error.required"
+		fieldErrs["recipientMembershipId"] = "error.required"
 	}
 
 	if in.Severity != nil {
 		switch {
 		case in.TemplateKey != "alert":
-			fe["severity"] = "error.notAllowed"
+			fieldErrs["severity"] = "error.notAllowed"
 		case !slices.Contains(severities, *in.Severity):
-			fe["severity"] = "error.invalid"
+			fieldErrs["severity"] = "error.invalid"
 		}
 	}
 	// the message carries a job note (1–2000, DD-P07) or a reminder text; the reason stays 1–1000 (IR228)
@@ -984,12 +1004,12 @@ func (in *PreviewInput) Validate() map[string]string {
 		if f.s != nil {
 			*f.s = strings.TrimSpace(*f.s)
 			if n := utf8.RuneCountInString(*f.s); n < 1 || n > f.max {
-				fe[k] = "error.length"
+				fieldErrs[k] = "error.length"
 			}
 		}
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // preview renders an unsaved Notification for one eligible recipient (IR04): nothing is stored and the temporary
@@ -1017,18 +1037,21 @@ func (in *PreviewInput) Validate() map[string]string {
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/notifications/preview [post]
-func (Inbox) preview(ctx context.Context, c *ops.Call, in *PreviewInput) (Notification, error) {
-	t, err := resolve(ctx, c, &in.TargetInput)
+func (Inbox) preview(ctx context.Context, c *ops.Call, input *PreviewInput) (Notification, error) {
+	t, err := resolve(ctx, c, &input.TargetInput)
 	if err != nil {
 		return Notification{}, err
 	}
 
-	all, err := recipients(ctx, c, &in.TargetInput, t, nil)
+	all, err := recipients(ctx, c, &input.TargetInput, t, nil)
 	if err != nil {
 		return Notification{}, err
 	}
 
-	i := slices.IndexFunc(all, func(r Recipient) bool { return r.ID == in.RecipientMembershipID })
+	i := slices.IndexFunc(
+		all,
+		func(r Recipient) bool { return r.ID == input.RecipientMembershipID },
+	)
 	if i < 0 {
 		return Notification{}, apperr.Fields(
 			map[string]string{"recipientMembershipId": "errors.recipient_ineligible"},
@@ -1038,25 +1061,25 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, in *PreviewInput) (Notifi
 	var scope int
 
 	scanErr := c.Tx.QueryRow(ctx, `SELECT scope_version FROM identity.memberships WHERE id =
-		$1`, in.RecipientMembershipID).
+		$1`, input.RecipientMembershipID).
 		Scan(&scope)
 	if scanErr != nil {
 		return Notification{}, apperr.Wrap(scanErr, "select identity.memberships")
 	}
 
-	typ, status := in.TemplateKey, in.TemplateKey
+	typ, status := input.TemplateKey, input.TemplateKey
 	if typ == "alert" { // as the notifier sends it: a fault of the policy's severity about an open alert (IR104, IR348)
 		typ, status = "fault", "open"
 	}
 
 	severity := "normal"
-	if in.TemplateKey == "payment_reminder" || in.TemplateKey == "restriction" ||
-		in.TemplateKey == "alert" {
+	if input.TemplateKey == "payment_reminder" || input.TemplateKey == "restriction" ||
+		input.TemplateKey == "alert" {
 		severity = "warning"
 	}
 
-	if in.Severity != nil {
-		severity = *in.Severity
+	if input.Severity != nil {
+		severity = *input.Severity
 	}
 
 	return Notification{
@@ -1065,23 +1088,23 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, in *PreviewInput) (Notifi
 		Version:                1,
 		CreatedAt:              c.Now,
 		UpdatedAt:              c.Now,
-		SourceAlertID:          in.SourceAlertID,
+		SourceAlertID:          input.SourceAlertID,
 		Type:                   typ,
-		RecipientMembershipID:  in.RecipientMembershipID,
+		RecipientMembershipID:  input.RecipientMembershipID,
 		ScopeVersionAtCreation: scope,
 		Target: map[string]string{
-			"kind": in.Target.Kind,
-			"id":   in.Target.ID.String(),
+			"kind": input.Target.Kind,
+			"id":   input.Target.ID.String(),
 		},
-		TemplateKey: in.TemplateKey,
+		TemplateKey: input.TemplateKey,
 		Params: Params{
 			TargetName: t.name,
 			At:         c.Now,
 			Status:     status,
-			Reason:     in.Reason,
-			Message:    in.Message, AmountMinor: nil, Currency: nil, Method: nil,
+			Reason:     input.Reason,
+			Message:    input.Message, AmountMinor: nil, Currency: nil, Method: nil,
 		},
-		Channel:       in.Channel,
+		Channel:       input.Channel,
 		DeliveryState: "preview",
 		Severity:      severity,
 		OccurredAt:    c.Now,
@@ -1090,11 +1113,11 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, in *PreviewInput) (Notifi
 }
 
 // Register binds the notification operations.
-func Register(r *ops.Registry) {
+func Register(reg *ops.Registry) {
 	var m Inbox
-	ops.Register(r, "notifications.list", m.list)
-	ops.Register(r, "notifications.markRead", m.markRead)
-	ops.Register(r, "notifications.markAllRead", m.markAllRead)
-	ops.Register(r, "notifications.recipients", m.recipients)
-	ops.Register(r, "notifications.preview", m.preview)
+	ops.Register(reg, "notifications.list", m.list)
+	ops.Register(reg, "notifications.markRead", m.markRead)
+	ops.Register(reg, "notifications.markAllRead", m.markAllRead)
+	ops.Register(reg, "notifications.recipients", m.recipients)
+	ops.Register(reg, "notifications.preview", m.preview)
 }

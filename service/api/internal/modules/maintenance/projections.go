@@ -131,14 +131,14 @@ type SiteAddresses interface {
 }
 
 // offers returns the contractor's JobOfferSummary rows valid now (IR124 item 2); job limits the result to one job.
-func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferSummary, error) {
+func (m Jobs) offers(ctx context.Context, call *ops.Call, job *uuid.UUID) ([]OfferSummary, error) {
 	q := `SELECT j.id, j.version, j.type, j.unit_id, lower(j.requested_slot), upper(j.requested_slot), j.due_at, j.origin,
 		o.id, o.decision, o.offer_expires_at, o.terms_version, lower(o.visit_slot), upper(o.visit_slot), o.offered_at,
 		o.access_valid_from, o.access_valid_until
 		FROM maintenance.offers o JOIN maintenance.jobs j ON j.id = o.job_id
 		WHERE o.contractor_org_id = $1 AND ((o.decision IS NULL AND $2 < o.offer_expires_at AND j.status = 'offered') OR
 		(o.decision = 'accept' AND $2 < o.access_valid_from))`
-	args := []any{c.Principal.OrgID, c.Now}
+	args := []any{call.Principal.OrgID, call.Now}
 
 	if job != nil {
 		q += " AND j.id = $3"
@@ -146,7 +146,7 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 		args = append(args, *job)
 	}
 
-	rows, err := c.Tx.Query(ctx, q, args...)
+	rows, err := call.Tx.Query(ctx, q, args...)
 	if err != nil {
 		return nil, apperr.Wrap(err, "query (offers)")
 	}
@@ -158,29 +158,29 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 
 	for rows.Next() {
 		var (
-			o        OfferSummary
-			unit     uuid.UUID
-			decision *string
+			offerSummary OfferSummary
+			unit         uuid.UUID
+			decision     *string
 		)
 
 		err := rows.Scan(
-			&o.JobID,
-			&o.JobVersion,
-			&o.Type,
+			&offerSummary.JobID,
+			&offerSummary.JobVersion,
+			&offerSummary.Type,
 			&unit,
-			&o.RequestedSlot.StartAt,
-			&o.RequestedSlot.EndAt,
-			&o.DueAt,
-			&o.Origin,
-			&o.OfferID,
+			&offerSummary.RequestedSlot.StartAt,
+			&offerSummary.RequestedSlot.EndAt,
+			&offerSummary.DueAt,
+			&offerSummary.Origin,
+			&offerSummary.OfferID,
 			&decision,
-			&o.OfferExpiresAt,
-			&o.TermsVersion,
-			&o.VisitSlot.StartAt,
-			&o.VisitSlot.EndAt,
-			&o.OfferedAt,
-			&o.AccessValidFrom,
-			&o.AccessValidUntil,
+			&offerSummary.OfferExpiresAt,
+			&offerSummary.TermsVersion,
+			&offerSummary.VisitSlot.StartAt,
+			&offerSummary.VisitSlot.EndAt,
+			&offerSummary.OfferedAt,
+			&offerSummary.AccessValidFrom,
+			&offerSummary.AccessValidUntil,
 		)
 		if err != nil {
 			rows.Close()
@@ -188,12 +188,12 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 			return nil, apperr.Wrap(err, "query (offers)")
 		}
 
-		o.Projection, o.Status = "offer", "offered"
+		offerSummary.Projection, offerSummary.Status = "offer", "offered"
 		if decision != nil {
-			o.Status = "accepted"
+			offerSummary.Status = "accepted"
 		}
 
-		out, units = append(out, o), append(units, unit)
+		out, units = append(out, offerSummary), append(units, unit)
 	}
 
 	rows.Close()
@@ -203,24 +203,26 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 		return nil, apperr.Wrap(rowsErr, "query (offers)")
 	}
 
-	for i := range out {
-		addr, scope, err := m.Sites.SiteAddress(ctx, c, units[i])
+	for idx := range out {
+		addr, scope, err := m.Sites.SiteAddress(ctx, call, units[idx])
 		if err != nil {
 			return nil, apperr.Wrap(err, "maintenance.SiteAddresses.SiteAddress")
 		}
 
-		out[i].SiteAddress, out[i].RequiredQualifications = addr, requiredCodes(scope)
+		out[idx].SiteAddress, out[idx].RequiredQualifications = addr, requiredCodes(scope)
 		// the offer's latest time-change proposal (it was never filled before IR226)
-		var pp PartnerSlotProposal
+		var partnerSlotProposal PartnerSlotProposal
 
-		err = c.Tx.QueryRow(ctx, `SELECT id, offer_id, lower(slot), upper(slot), technician_membership_id, reason, sent_at,
+		err = call.Tx.QueryRow(ctx, `SELECT id, offer_id, lower(slot), upper(slot), technician_membership_id, reason, sent_at,
 			status FROM maintenance.partner_slot_proposals
-			WHERE offer_id = $1 AND status <> 'withdrawn' ORDER BY sent_at DESC, id LIMIT 1`, out[i].OfferID).
-			Scan(&pp.ID, &pp.OfferID, &pp.Slot.StartAt, &pp.Slot.EndAt,
-				&pp.TechnicianMembershipID, &pp.Reason, &pp.SentAt, &pp.Status)
+			WHERE offer_id = $1 AND status <> 'withdrawn' ORDER BY sent_at DESC, id LIMIT 1`, out[idx].OfferID).
+			Scan(&partnerSlotProposal.ID, &partnerSlotProposal.OfferID, &partnerSlotProposal.Slot.StartAt,
+				&partnerSlotProposal.Slot.EndAt,
+				&partnerSlotProposal.TechnicianMembershipID, &partnerSlotProposal.Reason, &partnerSlotProposal.SentAt,
+				&partnerSlotProposal.Status)
 		switch {
 		case err == nil:
-			out[i].PartnerSlotProposal = pp
+			out[idx].PartnerSlotProposal = partnerSlotProposal
 		case !errors.Is(err, pgx.ErrNoRows):
 			return nil, apperr.Wrap(err, "select maintenance.partner_slot_proposals")
 		}
@@ -241,10 +243,10 @@ func requiredCodes(scope []string) []string {
 }
 
 // histories returns the caller's frozen snapshots (contractor organization or technician membership).
-func (m Jobs) histories(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]History, error) {
-	kind, owner := "organization", c.Principal.OrgID
-	if c.Principal.Role == "technician" {
-		kind, owner = "membership", c.Principal.MembershipID
+func (m Jobs) histories(ctx context.Context, call *ops.Call, job *uuid.UUID) ([]History, error) {
+	kind, owner := "organization", call.Principal.OrgID
+	if call.Principal.Role == "technician" {
+		kind, owner = "membership", call.Principal.MembershipID
 	}
 
 	q := `SELECT job_id, as_of, type, status, contractor_org_id, completed_at, has_report, acceptance, decision_event_ids
@@ -257,7 +259,7 @@ func (m Jobs) histories(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]His
 		args = append(args, *job)
 	}
 
-	rows, err := c.Tx.Query(ctx, q, args...)
+	rows, err := call.Tx.Query(ctx, q, args...)
 	if err != nil {
 		return nil, apperr.Wrap(err, "query (histories)")
 	}
@@ -269,19 +271,19 @@ func (m Jobs) histories(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]His
 
 	for rows.Next() {
 		var (
-			h   History
-			has bool
-			acc string
-			ids []uuid.UUID
+			history History
+			has     bool
+			acc     string
+			ids     []uuid.UUID
 		)
 
 		err := rows.Scan(
-			&h.JobID,
-			&h.AsOf,
-			&h.Type,
-			&h.Status,
-			&h.ContractorOrgID,
-			&h.CompletedAt,
+			&history.JobID,
+			&history.AsOf,
+			&history.Type,
+			&history.Status,
+			&history.ContractorOrgID,
+			&history.CompletedAt,
 			&has,
 			&acc,
 			&ids,
@@ -292,9 +294,9 @@ func (m Jobs) histories(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]His
 			return nil, apperr.Wrap(err, "query (histories)")
 		}
 
-		h.Projection = "history"
-		h.RedactedReportSummary = map[string]any{"hasReport": has, "acceptance": acc}
-		out, evIDs = append(out, h), append(evIDs, ids)
+		history.Projection = "history"
+		history.RedactedReportSummary = map[string]any{"hasReport": has, "acceptance": acc}
+		out, evIDs = append(out, history), append(evIDs, ids)
 	}
 
 	rows.Close()
@@ -314,7 +316,7 @@ func (m Jobs) histories(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]His
 	if len(all) > 0 {
 		evs, err := m.eventRows(
 			ctx,
-			c,
+			call,
 			"e.id = ANY($1)",
 			[]any{all},
 			"e.occurred_at ASC, e.id ASC",
@@ -382,7 +384,7 @@ func periodTime(h History) *time.Time {
 // extraProjections returns the offer and history rows of contractors and technicians after the IR23 filters.
 func (m Jobs) extraProjections(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	f *listFilters,
 ) ([]listItem, error) {
 	if f.private() {
@@ -391,46 +393,58 @@ func (m Jobs) extraProjections(
 
 	var out []listItem
 
-	if c.Principal.Role == "contractor" {
-		offers, err := m.offers(ctx, c, nil)
+	if call.Principal.Role == "contractor" {
+		offers, err := m.offers(ctx, call, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, o := range offers {
-			start := o.RequestedSlot.StartAt
-			if !f.statusOK(o.Status) || !inPeriod(f, &start) ||
-				(f.Origin != nil && *f.Origin != o.Origin) ||
-				(f.Type != nil && *f.Type != o.Type) ||
-				(f.OrganizationID != nil && *f.OrganizationID != c.Principal.OrgID) ||
-				(f.OverdueOnly != nil && *f.OverdueOnly && !c.Now.After(o.DueAt)) {
+		for _, offerSummary := range offers {
+			start := offerSummary.RequestedSlot.StartAt
+			if !f.statusOK(offerSummary.Status) || !inPeriod(f, &start) ||
+				(f.Origin != nil && *f.Origin != offerSummary.Origin) ||
+				(f.Type != nil && *f.Type != offerSummary.Type) ||
+				(f.OrganizationID != nil && *f.OrganizationID != call.Principal.OrgID) ||
+				(f.OverdueOnly != nil && *f.OverdueOnly && !call.Now.After(offerSummary.DueAt)) {
 				continue
 			}
 
-			due := o.DueAt
+			due := offerSummary.DueAt
 			out = append(
 				out,
-				listItem{rank: rankOf[o.Status], sev: -1, due: &due, id: o.JobID.String(), item: o},
+				listItem{
+					rank: rankOf[offerSummary.Status],
+					sev:  -1,
+					due:  &due,
+					id:   offerSummary.JobID.String(),
+					item: offerSummary,
+				},
 			)
 		}
 	}
 
-	hs, err := m.histories(ctx, c, nil)
+	hs, err := m.histories(ctx, call, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, h := range hs {
-		if !f.statusOK(h.Status) || !inPeriod(f, periodTime(h)) || f.Origin != nil ||
-			(f.Type != nil && *f.Type != h.Type) ||
+	for _, history := range hs {
+		if !f.statusOK(history.Status) || !inPeriod(f, periodTime(history)) || f.Origin != nil ||
+			(f.Type != nil && *f.Type != history.Type) ||
 			(f.OverdueOnly != nil && *f.OverdueOnly) ||
-			(f.OrganizationID != nil && (h.ContractorOrgID == nil || *h.ContractorOrgID != *f.OrganizationID)) {
+			(f.OrganizationID != nil && (history.ContractorOrgID == nil || *history.ContractorOrgID != *f.OrganizationID)) {
 			continue
 		}
 
 		out = append(
 			out,
-			listItem{rank: rankOf[h.Status], sev: -1, id: h.JobID.String(), item: h, due: nil},
+			listItem{
+				rank: rankOf[history.Status],
+				sev:  -1,
+				id:   history.JobID.String(),
+				item: history,
+				due:  nil,
+			},
 		)
 	}
 
@@ -475,10 +489,10 @@ func (m Jobs) projection(ctx context.Context, c *ops.Call, id uuid.UUID) (any, s
 
 // FreezeEnded stores a JobHistorySnapshot for every contractor access window and technician viewing window that has
 // ended by now and has none yet. It runs in the worker tick (one transaction per tenant).
-func FreezeEnded(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
+func FreezeEnded(ctx context.Context, txn pgx.Tx, now time.Time) (int, error) {
 	n := 0
 	// contractors: accepted Offers whose access window ended
-	tag, err := tx.Exec(
+	tag, err := txn.Exec(
 		ctx,
 		`INSERT INTO maintenance.job_history_snapshots (tenant_id, job_id, owner_kind, owner_id, as_of, type, status,
 			contractor_org_id,
@@ -501,7 +515,7 @@ func FreezeEnded(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
 	}
 
 	n += int(tag.RowsAffected())
-	t, err := freezeTechnicians(ctx, tx, now, nil)
+	t, err := freezeTechnicians(ctx, txn, now, nil)
 
 	return n + t, err
 }
@@ -509,7 +523,12 @@ func FreezeEnded(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
 // freezeTechnicians stores the technicians' snapshots whose viewing window has ended: the active Assignment's
 // scheduled end passed, it was revoked after the work window started, or the job completed and released it (IR234);
 // job narrows it to one job.
-func freezeTechnicians(ctx context.Context, tx pgx.Tx, now time.Time, job *uuid.UUID) (int, error) {
+func freezeTechnicians(
+	ctx context.Context,
+	txn pgx.Tx,
+	now time.Time,
+	job *uuid.UUID,
+) (int, error) {
 	q := `INSERT INTO maintenance.job_history_snapshots (tenant_id, job_id, owner_kind, owner_id, owner_user_id, as_of,
 		type, status,
 			contractor_org_id, completed_at, has_report, acceptance)
@@ -537,7 +556,7 @@ func freezeTechnicians(ctx context.Context, tx pgx.Tx, now time.Time, job *uuid.
 		args = append(args, *job)
 	}
 
-	tag, err := tx.Exec(ctx, q+`
+	tag, err := txn.Exec(ctx, q+`
 		ORDER BY a.job_id, a.technician_membership_id, CASE WHEN a.status IN ('revoked', 'completed') THEN a.updated_at ELSE
 		upper(a.scheduled) END DESC, a.updated_at DESC
 		ON CONFLICT (job_id, owner_kind, owner_id) DO NOTHING`, args...)
@@ -552,8 +571,8 @@ func freezeTechnicians(ctx context.Context, tx pgx.Tx, now time.Time, job *uuid.
 // job_completed), so it no longer books the technician (overlap constraint, members.eligible, members.capacity) and
 // no longer grants unit access (change capture publishes active=false); the technician's viewing window ends with it
 // and the history snapshot is stored at once, so the finished job stays in the technician's list (IR124).
-func ReleaseOnCompletion(ctx context.Context, tx pgx.Tx, job uuid.UUID, now time.Time) error {
-	_, execErr := tx.Exec(
+func ReleaseOnCompletion(ctx context.Context, txn pgx.Tx, job uuid.UUID, now time.Time) error {
+	_, execErr := txn.Exec(
 		ctx,
 		`UPDATE maintenance.assignments SET status = 'completed', reason = 'job_completed', version = version + 1, updated_at
 			= $2
@@ -565,7 +584,7 @@ func ReleaseOnCompletion(ctx context.Context, tx pgx.Tx, job uuid.UUID, now time
 		return apperr.Wrap(execErr, "update maintenance.assignments")
 	}
 
-	_, err := freezeTechnicians(ctx, tx, now, &job)
+	_, err := freezeTechnicians(ctx, txn, now, &job)
 
 	return err
 }
@@ -573,8 +592,8 @@ func ReleaseOnCompletion(ctx context.Context, tx pgx.Tx, job uuid.UUID, now time
 // ExpireOffers applies IR48: undecided Offers whose offerExpiresAt has passed return their job from offered to
 // requested (contractorOrgId cleared, version + 1, one offer_expired event by the system actor). Offer.decision stays
 // null.
-func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID) (int, error) {
-	rows, err := tx.Query(
+func ExpireOffers(ctx context.Context, txn pgx.Tx, now time.Time, actor uuid.UUID) (int, error) {
+	rows, err := txn.Query(
 		ctx,
 		`UPDATE maintenance.jobs j SET status = 'requested', contractor_org_id = NULL, version = j.version + 1, updated_at =
 			platform.app_now()
@@ -612,7 +631,7 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 	}
 	// a contractor's time change still waiting for HQ ends with its expired offer (IR444); one sent to the client stays,
 	// as the client's acceptance offers the job to the contractor again (IR128)
-	_, execErr := tx.Exec(
+	_, execErr := txn.Exec(
 		ctx,
 		`UPDATE maintenance.partner_slot_proposals SET status = 'withdrawn' WHERE status = 'pending' AND offer_id IN
 		(SELECT id FROM maintenance.offers WHERE decision IS NULL AND expired_at IS NULL AND offer_expires_at <= $1)`,
@@ -622,7 +641,7 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 		return 0, apperr.Wrap(execErr, "update maintenance.partner_slot_proposals")
 	}
 
-	_, execErr = tx.Exec(
+	_, execErr = txn.Exec(
 		ctx,
 		`UPDATE maintenance.offers SET expired_at = $1 WHERE decision IS NULL AND expired_at IS NULL AND offer_expires_at <=
 			$1`,
@@ -633,7 +652,7 @@ func ExpireOffers(ctx context.Context, tx pgx.Tx, now time.Time, actor uuid.UUID
 	}
 
 	for _, h := range hits {
-		_, err := tx.Exec(
+		_, err := txn.Exec(
 			ctx,
 			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, occurred_at) VALUES ($1,$2,$3,$4,
 				'offer_expired',$5)`,

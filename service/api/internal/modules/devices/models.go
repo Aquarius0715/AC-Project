@@ -39,13 +39,18 @@ func (Models) CurrentVersion(
 }
 
 // ByCode resolves a model code (Capability.model, case-insensitive) to its ID and current version.
-func (Models) ByCode(ctx context.Context, c *ops.Call, code string) (uuid.UUID, int, bool, error) {
+func (Models) ByCode(
+	ctx context.Context,
+	call *ops.Call,
+	code string,
+) (uuid.UUID, int, bool, error) {
 	var (
 		id uuid.UUID
 		v  int
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT id, version FROM devices.capabilities WHERE lower(model) = lower($1) AND is_current
+	err := call.Tx.QueryRow(ctx, `SELECT id, version FROM devices.capabilities WHERE lower(model) = lower($1) AND
+		is_current
 		ORDER BY id LIMIT 1`, code).
 		Scan(&id, &v)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -59,7 +64,7 @@ func (Models) ByCode(ctx context.Context, c *ops.Call, code string) (uuid.UUID, 
 // any unit), "tamper" (an unresolved tamper blocks binding, D05) or "free".
 func (Models) SerialState(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	serial string,
 ) (uuid.UUID, string, error) {
 	var (
@@ -68,7 +73,8 @@ func (Models) SerialState(
 		tamper string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT d.id, d.unit_id IS NOT NULL OR EXISTS (SELECT 1 FROM devices.device_bindings b WHERE
+	err := call.Tx.QueryRow(ctx, `SELECT d.id, d.unit_id IS NOT NULL OR EXISTS (SELECT 1 FROM devices.device_bindings b
+		WHERE
 		b.device_id = d.id AND b.unbound_at IS NULL), d.tamper
 		FROM devices.devices d WHERE upper(d.serial) = upper($1) ORDER BY d.id LIMIT 1`, serial).
 		Scan(&id, &bound, &tamper)
@@ -94,7 +100,7 @@ func (Models) SerialState(
 // was bound or tampered with since the preview.
 func (Models) BindImported(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	device, unit, org uuid.UUID,
 	reason string,
 ) (bool, error) {
@@ -103,7 +109,7 @@ func (Models) BindImported(
 		tamper string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT d.unit_id IS NOT NULL OR EXISTS (SELECT 1 FROM devices.device_bindings b WHERE
+	err := call.Tx.QueryRow(ctx, `SELECT d.unit_id IS NOT NULL OR EXISTS (SELECT 1 FROM devices.device_bindings b WHERE
 		b.device_id = d.id AND b.unbound_at IS NULL), d.tamper
 		FROM devices.devices d WHERE d.id = $1 FOR UPDATE`, device).
 		Scan(&bound, &tamper)
@@ -121,7 +127,7 @@ func (Models) BindImported(
 
 	binding := uuid.Must(uuid.NewV7())
 
-	_, err = c.Tx.Exec(
+	_, err = call.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason,
 			actor_membership_id)
@@ -130,9 +136,9 @@ func (Models) BindImported(
 		device,
 		unit,
 		org,
-		c.Now,
+		call.Now,
 		reason,
-		c.Principal.MembershipID,
+		call.Principal.MembershipID,
 	)
 	if err != nil {
 		return false, apperr.Wrap(err, "insert devices.device_bindings")
@@ -140,7 +146,7 @@ func (Models) BindImported(
 
 	var v int
 
-	err = c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = $2, binding_id = $3, target_unit_id = $2, version =
+	err = call.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = $2, binding_id = $3, target_unit_id = $2, version =
 		version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, device, unit, binding).
 		Scan(&v)
@@ -148,7 +154,7 @@ func (Models) BindImported(
 		return false, apperr.Wrap(err, "update devices.devices")
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "device",
 			AggregateID:   device,
@@ -156,7 +162,7 @@ func (Models) BindImported(
 			Payload:       map[string]any{"unitId": unit, "previousUnitId": nil},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:      "devices.bind",
 			TargetKind:  "device",
@@ -172,16 +178,16 @@ func (Models) BindImported(
 // UnbindUnits ends the active bindings of the units (an undone CSV import); the binding rows keep their history.
 func (Models) UnbindUnits(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	units []uuid.UUID,
 	reason string,
 ) error {
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`UPDATE devices.device_bindings SET unbound_at = $2, reason = $3 WHERE unit_id = ANY($1) AND unbound_at IS NULL
 			RETURNING device_id, unit_id`,
 		units,
-		c.Now,
+		call.Now,
 		reason,
 	)
 	if err != nil {
@@ -215,7 +221,7 @@ func (Models) UnbindUnits(
 	for _, p := range ended {
 		var v int
 
-		err := c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = NULL, binding_id = NULL, version = version + 1,
+		err := call.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = NULL, binding_id = NULL, version = version + 1,
 			updated_at = platform.app_now()
 			WHERE id = $1 RETURNING version`, p.device).
 			Scan(&v)
@@ -223,7 +229,7 @@ func (Models) UnbindUnits(
 			return apperr.Wrap(err, "update devices.devices")
 		}
 
-		c.Emit(
+		call.Emit(
 			ops.Event{
 				AggregateType: "device",
 				AggregateID:   p.device,
@@ -231,7 +237,7 @@ func (Models) UnbindUnits(
 				Payload:       map[string]any{"unitId": nil, "previousUnitId": p.unit},
 			},
 		)
-		c.Audit(
+		call.Audit(
 			ops.AuditEntry{
 				Action:      "devices.bind",
 				TargetKind:  "device",
@@ -252,7 +258,7 @@ func (Models) Caps(
 	modelID uuid.UUID,
 	version int,
 ) (control.Caps, bool, error) {
-	x, err := scanCap(
+	capability, err := scanCap(
 		c.Tx.QueryRow(
 			ctx,
 			`SELECT `+capCols+` FROM devices.capabilities WHERE id = $1 AND version = $2`,
@@ -281,21 +287,23 @@ func (Models) Caps(
 	}
 
 	out := control.Caps{
-		Control:           x.Control,
-		ModeControl:       x.ModeControl,
-		FanControl:        x.FanControl,
-		Modes:             x.Modes,
-		FanLevels:         x.FanLevels,
-		Ventilation:       x.Ventilation,
-		VentilationLevels: x.VentilationLevels,
+		Control:           capability.Control,
+		ModeControl:       capability.ModeControl,
+		FanControl:        capability.FanControl,
+		Modes:             capability.Modes,
+		FanLevels:         capability.FanLevels,
+		Ventilation:       capability.Ventilation,
+		VentilationLevels: capability.VentilationLevels,
 		TempMin:           0,
 		TempMax:           0,
 		TempStep:          0,
 		HasTemperature:    false,
 	}
-	if x.Temperature != nil {
+	if capability.Temperature != nil {
 		out.HasTemperature = true
-		out.TempMin, out.TempMax, out.TempStep = x.Temperature.Min, x.Temperature.Max, x.Temperature.Step
+		out.TempMin = capability.Temperature.Min
+		out.TempMax = capability.Temperature.Max
+		out.TempStep = capability.Temperature.Step
 	}
 
 	return out, true, nil
@@ -339,7 +347,7 @@ func (Models) StaleAfter(
 // BoundDevice returns the connection and power signal of the device currently bound to a unit.
 func (Models) BoundDevice(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
 ) (uuid.UUID, string, string, bool, error) {
 	var (
@@ -347,7 +355,7 @@ func (Models) BoundDevice(
 		conn, power string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT d.id, d.connection, d.power_signal FROM devices.device_bindings b JOIN
+	err := call.Tx.QueryRow(ctx, `SELECT d.id, d.connection, d.power_signal FROM devices.device_bindings b JOIN
 		devices.devices d ON d.id = b.device_id
 		WHERE b.unit_id = $1 AND b.unbound_at IS NULL`, unit).
 		Scan(&id, &conn, &power)

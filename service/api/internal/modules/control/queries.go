@@ -46,13 +46,13 @@ func RegisterQueries(r *ops.Registry) {
 
 // requested reads the waiting commands of the tenant in the order they were requested. A command whose device is not
 // known is left out (it cannot be sent), and a command past its expiry is left for the expiry job.
-func requested(ctx context.Context, c *ops.Call, in *RequestedInput) ([]Requested, error) {
-	rows, err := c.Tx.Query(
+func requested(ctx context.Context, call *ops.Call, in *RequestedInput) ([]Requested, error) {
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT id, device_id, unit_id, action, expires_at FROM control.commands
 		WHERE status = 'requested' AND delivery = 'not_sent' AND device_id IS NOT NULL AND expires_at > $1
 		ORDER BY requested_at, id LIMIT $2`,
-		c.Now,
+		call.Now,
 		in.Limit,
 	)
 	if err != nil {

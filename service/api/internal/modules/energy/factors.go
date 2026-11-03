@@ -37,22 +37,22 @@ const factorCols = `f.id, f.tenant_id, f.version, (SELECT min(created_at) FROM e
 	f.kg_co2e_per_kwh::float8, f.source`
 
 func scanFactor(r pgx.Row) (Factor, error) {
-	var x Factor
+	var factor Factor
 
 	err := r.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.UpdatedAt,
-		&x.Region,
-		&x.Year,
-		&x.KgCO2ePerKWh,
-		&x.Source,
+		&factor.ID,
+		&factor.TenantID,
+		&factor.Version,
+		&factor.CreatedAt,
+		&factor.UpdatedAt,
+		&factor.Region,
+		&factor.Year,
+		&factor.KgCO2ePerKWh,
+		&factor.Source,
 	)
-	x.IsDemo = true
+	factor.IsDemo = true
 
-	return x, apperr.Wrap(err, "scan (scanFactor)")
+	return factor, apperr.Wrap(err, "scan (scanFactor)")
 }
 
 // LoadFactor returns a factor version (current when version is nil).
@@ -103,7 +103,11 @@ func LoadFactor(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) (F
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/factors [get]
-func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Factor], error) {
+func listFactors(
+	ctx context.Context,
+	call *ops.Call,
+	in *paging.Query,
+) (paging.Page[Factor], error) {
 	var f struct {
 		Region *string `json:"region,omitempty"`
 		Year   *int    `json:"year,omitempty"`
@@ -135,7 +139,7 @@ func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		return paging.Page[Factor]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*in, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Factor]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -160,21 +164,21 @@ func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.emission_factors f WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.emission_factors f WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Factor]{}, apperr.Wrap(scanErr, "select energy.emission_factors")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM energy.emission_factors f WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			factorCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -200,9 +204,9 @@ func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 
 	return paging.Page[Factor]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
@@ -218,30 +222,30 @@ type FactorInput struct {
 
 // Validate implements ops.Validator (DD-A14, IR147 item 1).
 func (in *FactorInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 
 	in.Region, in.Source = strings.TrimSpace(in.Region), strings.TrimSpace(in.Source)
 	if n := utf8.RuneCountInString(in.Region); n < 1 || n > 120 {
-		fe["region"] = "error.length"
+		fieldErrs["region"] = "error.length"
 	}
 
 	if in.Year < 2000 || in.Year > 2100 {
-		fe["year"] = "error.range"
+		fieldErrs["year"] = "error.range"
 	}
 
 	if math.IsNaN(in.KgCO2ePerKWh) || in.KgCO2ePerKWh <= 0 || in.KgCO2ePerKWh > 10 {
-		fe["kgCO2ePerKWh"] = "error.range"
+		fieldErrs["kgCO2ePerKWh"] = "error.range"
 	}
 
 	if n := utf8.RuneCountInString(in.Source); n < 1 || n > 500 {
-		fe["source"] = "error.length"
+		fieldErrs["source"] = "error.length"
 	}
 
 	if !in.IsDemo {
-		fe["isDemo"] = "error.invalid"
+		fieldErrs["isDemo"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // saveFactor creates a factor or a new version of it (existing MRV reports keep the version they reference). One
@@ -269,16 +273,16 @@ func (in *FactorInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/factors [post]
-func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, error) {
+func saveFactor(ctx context.Context, call *ops.Call, in *FactorInput) (Factor, error) {
 	id, version := uuid.New(), 1
 
 	if in.ID != nil {
-		cur, err := LoadFactor(ctx, c, *in.ID, nil)
+		cur, err := LoadFactor(ctx, call, *in.ID, nil)
 		if err != nil {
 			return cur, err
 		}
 
-		if cur.Version != *c.ExpectedVersion {
+		if cur.Version != *call.ExpectedVersion {
 			return cur, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
 
@@ -287,7 +291,7 @@ func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, erro
 
 	var taken bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.emission_factors WHERE is_current AND region = $1 AND
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.emission_factors WHERE is_current AND region = $1 AND
 		year = $2 AND id <> $3)`, in.Region, in.Year, id).
 		Scan(&taken)
 	if err != nil {
@@ -299,7 +303,7 @@ func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, erro
 	}
 
 	if version > 1 {
-		_, err := c.Tx.Exec(
+		_, err := call.Tx.Exec(
 			ctx,
 			`UPDATE energy.emission_factors SET is_current = false WHERE id = $1 AND is_current`,
 			id,
@@ -309,7 +313,7 @@ func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, erro
 		}
 	}
 
-	_, err = c.Tx.Exec(
+	_, err = call.Tx.Exec(
 		ctx,
 		`INSERT INTO energy.emission_factors (id, version, tenant_id, region, year, kg_co2e_per_kwh, source, created_by,
 			created_at)
@@ -320,22 +324,22 @@ func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, erro
 		in.Year,
 		in.KgCO2ePerKWh,
 		in.Source,
-		c.Principal.MembershipID,
-		c.Now,
+		call.Principal.MembershipID,
+		call.Now,
 	)
 	if err != nil {
 		return Factor{}, apperr.Wrap(err, "insert energy.emission_factors")
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "factors.save",
 			TargetKind:      "emission_factor",
 			TargetID:        id.String(),
-			PreviousVersion: c.ExpectedVersion,
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return LoadFactor(ctx, c, id, nil)
+	return LoadFactor(ctx, call, id, nil)
 }

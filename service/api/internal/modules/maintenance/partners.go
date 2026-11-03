@@ -90,28 +90,28 @@ const profileCols = `p.id, p.tenant_id, p.version, p.created_at, p.updated_at, p
 	`ORDER BY r.effective_from DESC LIMIT 1)`
 
 func scanProfile(r pgx.Row) (Profile, error) {
-	var p Profile
+	var profile Profile
 
 	err := r.Scan(
-		&p.ID,
-		&p.TenantID,
-		&p.Version,
-		&p.CreatedAt,
-		&p.UpdatedAt,
-		&p.OrganizationID,
-		&p.Name,
-		&p.Status,
-		&p.RegistrationNo,
-		&p.ServiceAreas,
-		&p.ContactEmail,
-		&p.InsuranceValidUntil,
-		&p.Delegation.From,
-		&p.Delegation.To,
-		&p.SuspendedReason,
-		&p.RateCardID,
+		&profile.ID,
+		&profile.TenantID,
+		&profile.Version,
+		&profile.CreatedAt,
+		&profile.UpdatedAt,
+		&profile.OrganizationID,
+		&profile.Name,
+		&profile.Status,
+		&profile.RegistrationNo,
+		&profile.ServiceAreas,
+		&profile.ContactEmail,
+		&profile.InsuranceValidUntil,
+		&profile.Delegation.From,
+		&profile.Delegation.To,
+		&profile.SuspendedReason,
+		&profile.RateCardID,
 	)
 
-	return p, apperr.Wrap(err, "scan (scanProfile)")
+	return profile, apperr.Wrap(err, "scan (scanProfile)")
 }
 
 func pct(n, d int) *float64 {
@@ -125,9 +125,9 @@ func pct(n, d int) *float64 {
 }
 
 // kpis computes ContractorKpis for the 90 days ending now (IR131 item 6).
-func (m Partners) kpis(ctx context.Context, c *ops.Call, org uuid.UUID) (KPIs, error) {
-	k := KPIs{
-		Period:            Range{c.Now.Add(-90 * 24 * time.Hour), c.Now},
+func (m Partners) kpis(ctx context.Context, call *ops.Call, org uuid.UUID) (KPIs, error) {
+	kpIs := KPIs{
+		Period:            Range{call.Now.Add(-90 * 24 * time.Hour), call.Now},
 		OfferAcceptance:   nil,
 		ArrivalInWindow:   nil,
 		FirstTimeAccepted: nil,
@@ -138,26 +138,27 @@ func (m Partners) kpis(ctx context.Context, c *ops.Call, org uuid.UUID) (KPIs, e
 
 	var acc, dec int
 	// offers closed by HQ's cancellation or the client's reschedule were no decision of the contractor (IR452)
-	err := c.Tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE decision = 'accept'), count(*) FILTER (WHERE decision IS NOT
+	err := call.Tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE decision = 'accept'), count(*) FILTER (WHERE decision IS
+		NOT
 		NULL OR expired_at IS NOT NULL)
 		FROM maintenance.offers WHERE contractor_org_id = $1 AND offered_at >= $2 AND offered_at < $3
 		AND NOT COALESCE(decision = 'decline' AND decline_reason IN ('job_cancelled','rescheduled'), false)`,
-		org, k.Period.From, k.Period.To).
+		org, kpIs.Period.From, kpIs.Period.To).
 		Scan(&acc, &dec)
 	if err != nil {
-		return k, apperr.Wrap(err, "select maintenance.offers")
+		return kpIs, apperr.Wrap(err, "select maintenance.offers")
 	}
 
-	k.OfferAcceptance = pct(acc, dec)
+	kpIs.OfferAcceptance = pct(acc, dec)
 
 	jm, err := jobMetrics(
 		ctx,
-		c,
+		call,
 		"j.contractor_org_id = $3",
-		[]any{k.Period.From, k.Period.To, org},
+		[]any{kpIs.Period.From, kpIs.Period.To, org},
 	)
 	if err != nil {
-		return k, err
+		return kpIs, err
 	}
 
 	var arrived, inWin, firstSub, firstOK, completed, rework, stars int
@@ -188,12 +189,12 @@ func (m Partners) kpis(ctx context.Context, c *ops.Call, org uuid.UUID) (KPIs, e
 		}
 
 		if j.stars > 0 {
-			k.RatingCount++
+			kpIs.RatingCount++
 			stars += j.stars
 		}
 	}
 
-	k.ArrivalInWindow, k.FirstTimeAccepted, k.ReworkRate = pct(
+	kpIs.ArrivalInWindow, kpIs.FirstTimeAccepted, kpIs.ReworkRate = pct(
 		inWin,
 		arrived,
 	), pct(
@@ -203,12 +204,12 @@ func (m Partners) kpis(ctx context.Context, c *ops.Call, org uuid.UUID) (KPIs, e
 		rework,
 		completed,
 	)
-	if k.RatingCount > 0 {
-		v := math.Round(float64(stars)*10/float64(k.RatingCount)) / 10
-		k.AverageRating = &v
+	if kpIs.RatingCount > 0 {
+		v := math.Round(float64(stars)*10/float64(kpIs.RatingCount)) / 10
+		kpIs.AverageRating = &v
 	}
 
-	return k, nil
+	return kpIs, nil
 }
 
 type jobMetric struct {
@@ -295,7 +296,7 @@ func jobMetrics(ctx context.Context, c *ops.Call, extra string, args []any) ([]j
 
 func (m Partners) loadProfile(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	where string,
 	args []any,
 	lock bool,
@@ -305,18 +306,18 @@ func (m Partners) loadProfile(
 		q += " FOR UPDATE"
 	}
 
-	p, err := scanProfile(c.Tx.QueryRow(ctx, q, append([]any{c.Now}, args...)...))
+	profile, err := scanProfile(call.Tx.QueryRow(ctx, q, append([]any{call.Now}, args...)...))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return p, apperr.E(apperr.NotFound, "error.notFound")
+		return profile, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	if err != nil {
-		return p, err
+		return profile, err
 	}
 
-	p.KPIs, err = m.kpis(ctx, c, p.OrganizationID)
+	profile.KPIs, err = m.kpis(ctx, call, profile.OrganizationID)
 
-	return p, err
+	return profile, err
 }
 
 // list serves contractors.list.
@@ -348,16 +349,16 @@ func (m Partners) loadProfile(
 //	@Router			/v1/contractors [get]
 func (m Partners) list(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[Profile], error) {
 	var f struct {
 		Status *string `json:"status,omitempty"`
 		Search *string `json:"search,omitempty"` // name, registration number or a service area contains
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil ||
@@ -369,7 +370,7 @@ func (m Partners) list(
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{"id": "p.id", "name": "p.name", "updatedAt": "p.updated_at"},
 		"p.name ASC, p.id ASC",
 	)
@@ -377,12 +378,12 @@ func (m Partners) list(
 		return paging.Page[Profile]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Profile]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	args := []any{c.Now}
+	args := []any{call.Now}
 	conds := []string{"TRUE"}
 
 	if f.Status != nil {
@@ -409,22 +410,22 @@ func (m Partners) list(
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.contractors p WHERE "+where+" AND $1::timestamptz "+
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.contractors p WHERE "+where+" AND $1::timestamptz "+
 		"IS NOT NULL", args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Profile]{}, apperr.Wrap(scanErr, "select maintenance.contractors")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM maintenance.contractors p WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			profileCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -434,14 +435,14 @@ func (m Partners) list(
 	items := []Profile{}
 
 	for rows.Next() {
-		p, err := scanProfile(rows)
+		profile, err := scanProfile(rows)
 		if err != nil {
 			rows.Close()
 
 			return paging.Page[Profile]{}, err
 		}
 
-		items = append(items, p)
+		items = append(items, profile)
 	}
 
 	rows.Close()
@@ -452,7 +453,7 @@ func (m Partners) list(
 	}
 
 	for i := range items {
-		items[i].KPIs, err = m.kpis(ctx, c, items[i].OrganizationID)
+		items[i].KPIs, err = m.kpis(ctx, call, items[i].OrganizationID)
 		if err != nil {
 			return paging.Page[Profile]{}, err
 		}
@@ -460,9 +461,9 @@ func (m Partners) list(
 
 	return paging.Page[Profile]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
@@ -478,28 +479,28 @@ type ProfileInput struct {
 
 // Validate implements ops.Validator (IR131 item 1).
 func (in *ProfileInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.OrganizationID == uuid.Nil {
-		fe["organizationId"] = "error.required"
+		fieldErrs["organizationId"] = "error.required"
 	}
 
-	trimmedReason(&in.RegistrationNo, 64, "registrationNo", fe)
+	trimmedReason(&in.RegistrationNo, 64, "registrationNo", fieldErrs)
 
 	seen := map[string]bool{}
 
 	if len(in.ServiceAreas) < 1 || len(in.ServiceAreas) > 20 {
-		fe["serviceAreas"] = "error.count"
+		fieldErrs["serviceAreas"] = "error.count"
 	}
 
-	for i := range in.ServiceAreas {
-		in.ServiceAreas[i] = strings.TrimSpace(in.ServiceAreas[i])
+	for idx := range in.ServiceAreas {
+		in.ServiceAreas[idx] = strings.TrimSpace(in.ServiceAreas[idx])
 
-		n := utf8.RuneCountInString(in.ServiceAreas[i])
-		if n < 1 || n > 80 || seen[strings.ToLower(in.ServiceAreas[i])] {
-			fe["serviceAreas"] = "error.invalid"
+		n := utf8.RuneCountInString(in.ServiceAreas[idx])
+		if n < 1 || n > 80 || seen[strings.ToLower(in.ServiceAreas[idx])] {
+			fieldErrs["serviceAreas"] = "error.invalid"
 		}
 
-		seen[strings.ToLower(in.ServiceAreas[i])] = true
+		seen[strings.ToLower(in.ServiceAreas[idx])] = true
 	}
 
 	in.ContactEmail = strings.TrimSpace(in.ContactEmail)
@@ -509,10 +510,10 @@ func (in *ProfileInput) Validate() map[string]string {
 	)
 	if err != nil || a.Address != in.ContactEmail ||
 		len(in.ContactEmail) > 254 {
-		fe["contactEmail"] = "error.invalid"
+		fieldErrs["contactEmail"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // save serves contractors.save.
@@ -540,8 +541,8 @@ func (in *ProfileInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/contractors [post]
-func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Profile, error) {
-	kind, _, found, err := m.Orgs.OrgState(ctx, c, in.OrganizationID)
+func (m Partners) save(ctx context.Context, c *ops.Call, input *ProfileInput) (Profile, error) {
+	kind, _, found, err := m.Orgs.OrgState(ctx, c, input.OrganizationID)
 	if err != nil {
 		return Profile{}, apperr.Wrap(err, "maintenance.OrgNames.OrgState")
 	}
@@ -554,14 +555,14 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 		return Profile{}, apperr.Fields(map[string]string{"organizationId": "error.notContractor"})
 	}
 
-	name, err := m.Orgs.OrgName(ctx, c, in.OrganizationID)
+	name, err := m.Orgs.OrgName(ctx, c, input.OrganizationID)
 	if err != nil {
 		return Profile{}, apperr.Wrap(err, "maintenance.OrgNames.OrgName")
 	}
 
 	delegationEnd := func(from time.Time) time.Time {
-		if in.InsuranceValidUntil != nil && in.InsuranceValidUntil.After(from) {
-			return *in.InsuranceValidUntil
+		if input.InsuranceValidUntil != nil && input.InsuranceValidUntil.After(from) {
+			return *input.InsuranceValidUntil
 		}
 
 		return from.Add(365 * 24 * time.Hour)
@@ -569,11 +570,11 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 
 	var id uuid.UUID
 
-	if in.ID == nil {
+	if input.ID == nil {
 		var exists bool
 
 		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id =
-			$1)`, in.OrganizationID).
+			$1)`, input.OrganizationID).
 			Scan(&exists)
 		if err != nil {
 			return Profile{}, apperr.Wrap(err, "select maintenance.contractors")
@@ -588,24 +589,27 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 			insurance_valid_until, delegation, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2,
 			'active', $3, $4, $5, $6, tstzrange($7, $8), $7, $7)
 			RETURNING
-			id`, in.OrganizationID, name, in.RegistrationNo, in.ServiceAreas, in.ContactEmail, in.InsuranceValidUntil, c.Now,
+			id`, input.OrganizationID, name, input.RegistrationNo, input.ServiceAreas, input.ContactEmail,
+			input.InsuranceValidUntil, c.Now,
 			delegationEnd(c.Now)).
 			Scan(&id)
 		if err != nil {
 			return Profile{}, apperr.Wrap(err, "insert maintenance.contractors")
 		}
 	} else {
-		p, err := m.loadProfile(ctx, c, "p.id = $2", []any{*in.ID}, true)
+		profile, err := m.loadProfile(ctx, c, "p.id = $2", []any{*input.ID}, true)
 		if err != nil {
-			return p, err
+			return profile, err
 		}
 
-		if p.OrganizationID != in.OrganizationID {
-			return p, apperr.Fields(map[string]string{"organizationId": "error.organizationFixed"})
+		if profile.OrganizationID != input.OrganizationID {
+			return profile, apperr.Fields(
+				map[string]string{"organizationId": "error.organizationFixed"},
+			)
 		}
 
-		if p.Version != *c.ExpectedVersion {
-			return p, apperr.E(apperr.Conflict, "error.versionConflict")
+		if profile.Version != *c.ExpectedVersion {
+			return profile, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
 
 		_, execErr := c.Tx.Exec(
@@ -613,20 +617,20 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 			`UPDATE maintenance.contractors SET name = $2, registration_no = $3, service_areas = $4, contact_email = $5,
 				insurance_valid_until = $6,
 			delegation = tstzrange(lower(delegation), $7), version = version + 1, updated_at = $8 WHERE id = $1`,
-			p.ID,
+			profile.ID,
 			name,
-			in.RegistrationNo,
-			in.ServiceAreas,
-			in.ContactEmail,
-			in.InsuranceValidUntil,
-			delegationEnd(p.CreatedAt),
+			input.RegistrationNo,
+			input.ServiceAreas,
+			input.ContactEmail,
+			input.InsuranceValidUntil,
+			delegationEnd(profile.CreatedAt),
 			c.Now,
 		)
 		if execErr != nil {
-			return p, apperr.Wrap(execErr, "update maintenance.contractors")
+			return profile, apperr.Wrap(execErr, "update maintenance.contractors")
 		}
 
-		id = p.ID
+		id = profile.ID
 	}
 
 	p, err := m.loadProfile(ctx, c, "p.id = $2", []any{id}, false)
@@ -639,7 +643,7 @@ func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Prof
 			AggregateType: "contractor",
 			AggregateID:   id,
 			Type:          "ContractorSaved",
-			Payload:       map[string]any{"organizationId": in.OrganizationID},
+			Payload:       map[string]any{"organizationId": input.OrganizationID},
 		},
 	)
 	c.Audit(
@@ -664,18 +668,18 @@ type OfferStatusInput struct {
 
 // Validate implements ops.Validator.
 func (in *OfferStatusInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.ContractorOrgID == uuid.Nil {
-		fe["contractorOrgId"] = "error.required"
+		fieldErrs["contractorOrgId"] = "error.required"
 	}
 
 	if in.Status != "active" && in.Status != "suspended" {
-		fe["status"] = "error.invalid"
+		fieldErrs["status"] = "error.invalid"
 	}
 
-	trimmedReason(&in.Reason, 1000, "reason", fe)
+	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
 
-	return fe
+	return fieldErrs
 }
 
 // setOfferStatus serves contractors.setOfferStatus.
@@ -707,65 +711,71 @@ func (in *OfferStatusInput) Validate() map[string]string {
 //	@Router			/v1/contractors/{contractorOrgId}/offer-status [put]
 func (m Partners) setOfferStatus(
 	ctx context.Context,
-	c *ops.Call,
-	in *OfferStatusInput,
+	call *ops.Call,
+	input *OfferStatusInput,
 ) (Profile, error) {
-	p, err := m.loadProfile(ctx, c, "p.organization_id = $2", []any{in.ContractorOrgID}, true)
+	profile, err := m.loadProfile(
+		ctx,
+		call,
+		"p.organization_id = $2",
+		[]any{input.ContractorOrgID},
+		true,
+	)
 	if err != nil {
-		return p, err
+		return profile, err
 	}
 
-	if p.Version != *c.ExpectedVersion {
-		return p, apperr.E(apperr.Conflict, "error.versionConflict")
+	if profile.Version != *call.ExpectedVersion {
+		return profile, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if p.Status == in.Status {
-		return p, apperr.E(apperr.Conflict, "error.invalidState")
+	if profile.Status == input.Status {
+		return profile, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
 	var reason *string
-	if in.Status == "suspended" {
-		reason = &in.Reason
+	if input.Status == "suspended" {
+		reason = &input.Reason
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.contractors SET status = $2, suspended_reason = $3, version = version + 1, updated_at = $4 WHERE
 			id = $1`,
-		p.ID,
-		in.Status,
+		profile.ID,
+		input.Status,
 		reason,
-		c.Now,
+		call.Now,
 	)
 	if execErr != nil {
-		return p, apperr.Wrap(execErr, "update maintenance.contractors")
+		return profile, apperr.Wrap(execErr, "update maintenance.contractors")
 	}
 
-	p, err = m.loadProfile(ctx, c, "p.id = $2", []any{p.ID}, false)
+	profile, err = m.loadProfile(ctx, call, "p.id = $2", []any{profile.ID}, false)
 	if err != nil {
-		return p, err
+		return profile, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "contractor",
-			AggregateID:   p.ID,
+			AggregateID:   profile.ID,
 			Type:          "ContractorOfferStatusChanged",
-			Payload:       map[string]any{"status": in.Status},
+			Payload:       map[string]any{"status": input.Status},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "contractors.setOfferStatus",
 			TargetKind:      "contractor",
-			TargetID:        p.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &p.Version,
-			Reason:          in.Reason, Result: "", Before: nil, After: nil,
+			TargetID:        profile.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			NextVersion:     &profile.Version,
+			Reason:          input.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return p, nil
+	return profile, nil
 }
 
 // ---- rate cards ----
@@ -802,70 +812,71 @@ type RateCardInput struct {
 
 // Validate implements ops.Validator (IR131 item 3).
 func (in *RateCardInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.ContractorOrgID == uuid.Nil {
-		fe["contractorOrgId"] = "error.required"
+		fieldErrs["contractorOrgId"] = "error.required"
 	}
 
 	if in.EffectiveFrom.IsZero() {
-		fe["effectiveFrom"] = "error.required"
+		fieldErrs["effectiveFrom"] = "error.required"
 	}
 
 	if in.Currency != "MYR" && in.Currency != "USD" {
-		fe["currency"] = "error.invalid"
+		fieldErrs["currency"] = "error.invalid"
 	}
 
 	if len(in.Lines) < 1 || len(in.Lines) > 4 {
-		fe["lines"] = "error.count"
+		fieldErrs["lines"] = "error.count"
 	}
 
 	seen := map[string]bool{}
 
 	for i := range in.Lines {
-		l := &in.Lines[i]
-		if !slices.Contains(workTypes, l.WorkType) || seen[l.WorkType] || l.AmountMinor < 0 {
-			fe["lines"] = "error.invalid"
+		rateLine := &in.Lines[i]
+		if !slices.Contains(workTypes, rateLine.WorkType) || seen[rateLine.WorkType] ||
+			rateLine.AmountMinor < 0 {
+			fieldErrs["lines"] = "error.invalid"
 		}
 
-		seen[l.WorkType] = true
-		if l.Note != nil {
-			*l.Note = strings.TrimSpace(*l.Note)
-			if utf8.RuneCountInString(*l.Note) > 200 {
-				fe["lines"] = "error.length"
+		seen[rateLine.WorkType] = true
+		if rateLine.Note != nil {
+			*rateLine.Note = strings.TrimSpace(*rateLine.Note)
+			if utf8.RuneCountInString(*rateLine.Note) > 200 {
+				fieldErrs["lines"] = "error.length"
 			}
 
-			if *l.Note == "" {
-				l.Note = nil
+			if *rateLine.Note == "" {
+				rateLine.Note = nil
 			}
 		}
 	}
 
-	return fe
+	return fieldErrs
 }
 
-func scanRateCard(r pgx.Row) (RateCard, error) {
+func scanRateCard(row pgx.Row) (RateCard, error) {
 	var (
-		x     RateCard
-		lines []byte
+		rateCard RateCard
+		lines    []byte
 	)
 
-	err := r.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.ContractorOrgID,
-		&x.EffectiveFrom,
-		&x.Currency,
+	err := row.Scan(
+		&rateCard.ID,
+		&rateCard.TenantID,
+		&rateCard.Version,
+		&rateCard.CreatedAt,
+		&rateCard.ContractorOrgID,
+		&rateCard.EffectiveFrom,
+		&rateCard.Currency,
 		&lines,
 	)
 
-	x.UpdatedAt = x.CreatedAt
+	rateCard.UpdatedAt = rateCard.CreatedAt
 	if err == nil {
-		err = json.Unmarshal(lines, &x.Lines)
+		err = json.Unmarshal(lines, &rateCard.Lines)
 	}
 
-	return x, apperr.Wrap(err, "json.Unmarshal")
+	return rateCard, apperr.Wrap(err, "json.Unmarshal")
 }
 
 const rateCols = `id, tenant_id, version, created_at, contractor_org_id, effective_from, currency, lines`
@@ -897,17 +908,17 @@ const rateCols = `id, tenant_id, version, created_at, contractor_org_id, effecti
 //	@Router			/v1/rate-cards [post]
 func (m Partners) saveRateCard(
 	ctx context.Context,
-	c *ops.Call,
-	in *RateCardInput,
+	call *ops.Call,
+	input *RateCardInput,
 ) (RateCard, error) {
-	if !in.EffectiveFrom.After(c.Now) {
+	if !input.EffectiveFrom.After(call.Now) {
 		return RateCard{}, apperr.Fields(map[string]string{"effectiveFrom": "error.past"})
 	}
 
 	var exists bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id =
-		$1)`, in.ContractorOrgID).
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id =
+		$1)`, input.ContractorOrgID).
 		Scan(&exists)
 	if err != nil {
 		return RateCard{}, apperr.Wrap(err, "select maintenance.contractors")
@@ -917,41 +928,41 @@ func (m Partners) saveRateCard(
 		return RateCard{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	lines, _ := json.Marshal(in.Lines)
+	lines, _ := json.Marshal(input.Lines)
 
-	x, err := scanRateCard(
-		c.Tx.QueryRow(
+	rateCard, err := scanRateCard(
+		call.Tx.QueryRow(
 			ctx,
 			`INSERT INTO maintenance.rate_cards (tenant_id, contractor_org_id, effective_from, currency, lines, version,
 				created_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4,
 			COALESCE((SELECT max(version) FROM maintenance.rate_cards WHERE contractor_org_id = $1), 0) + 1, $5)
 		RETURNING `+rateCols,
-			in.ContractorOrgID,
-			in.EffectiveFrom,
-			in.Currency,
+			input.ContractorOrgID,
+			input.EffectiveFrom,
+			input.Currency,
 			lines,
-			c.Now,
+			call.Now,
 		),
 	)
 	if err != nil {
-		return x, err
+		return rateCard, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "rate_card",
-			AggregateID:   x.ID,
+			AggregateID:   rateCard.ID,
 			Type:          "RateCardSaved",
-			Payload:       map[string]any{"contractorOrgId": in.ContractorOrgID},
+			Payload:       map[string]any{"contractorOrgId": input.ContractorOrgID},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "rateCards.save",
 			TargetKind:      "rate_card",
-			TargetID:        x.ID.String(),
-			NextVersion:     &x.Version,
+			TargetID:        rateCard.ID.String(),
+			NextVersion:     &rateCard.Version,
 			PreviousVersion: nil,
 			Reason:          "",
 			Result:          "",
@@ -960,7 +971,7 @@ func (m Partners) saveRateCard(
 		},
 	)
 
-	return x, nil
+	return rateCard, nil
 }
 
 // listRateCards serves rateCards.list.
@@ -992,15 +1003,15 @@ func (m Partners) saveRateCard(
 //	@Router			/v1/rate-cards [get]
 func (m Partners) listRateCards(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[RateCard], error) {
 	var f struct {
 		ContractorOrgID *uuid.UUID `json:"contractorOrgId,omitempty"`
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil {
@@ -1010,12 +1021,12 @@ func (m Partners) listRateCards(
 		}
 	}
 
-	if c.Principal.Role == "contractor" {
-		f.ContractorOrgID = &c.Principal.OrgID
+	if call.Principal.Role == "contractor" {
+		f.ContractorOrgID = &call.Principal.OrgID
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{"id": "id", "createdAt": "created_at", "effectiveFrom": "effective_from"},
 		"effective_from DESC, id",
 	)
@@ -1023,7 +1034,7 @@ func (m Partners) listRateCards(
 		return paging.Page[RateCard]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[RateCard]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -1035,21 +1046,21 @@ func (m Partners) listRateCards(
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.rate_cards WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.rate_cards WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[RateCard]{}, apperr.Wrap(scanErr, "select maintenance.rate_cards")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM maintenance.rate_cards WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			rateCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -1070,9 +1081,9 @@ func (m Partners) listRateCards(
 
 	return paging.Page[RateCard]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, apperr.Wrap(rows.Err(), "select maintenance.rate_cards")
 }
 
@@ -1119,28 +1130,28 @@ type TargetsInput struct {
 
 // Validate implements ops.Validator (IR111).
 func (in *TargetsInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if !slices.Contains(planTypes, in.PlanType) {
-		fe["planType"] = "error.invalid"
+		fieldErrs["planType"] = "error.invalid"
 	}
 
 	if in.ResponseHours < 1 || in.ResponseHours > 168 {
-		fe["responseHours"] = "error.range"
+		fieldErrs["responseHours"] = "error.range"
 	}
 
 	if in.ArrivalInWindowPercent < 0 || in.ArrivalInWindowPercent > 100 {
-		fe["arrivalInWindowPercent"] = "error.range"
+		fieldErrs["arrivalInWindowPercent"] = "error.range"
 	}
 
 	if in.FirstTimeFixPercent < 0 || in.FirstTimeFixPercent > 100 {
-		fe["firstTimeFixPercent"] = "error.range"
+		fieldErrs["firstTimeFixPercent"] = "error.range"
 	}
 
 	if in.EffectiveFrom.IsZero() {
-		fe["effectiveFrom"] = "error.required"
+		fieldErrs["effectiveFrom"] = "error.required"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // saveTargets serves sla.saveTargets.
@@ -1171,47 +1182,48 @@ func (in *TargetsInput) Validate() map[string]string {
 //	@Router			/v1/sla/targets/{planType} [put]
 func (m Partners) saveTargets(
 	ctx context.Context,
-	c *ops.Call,
-	in *TargetsInput,
+	call *ops.Call,
+	input *TargetsInput,
 ) (SlaTargets, error) {
-	if in.EffectiveFrom.Before(c.Now) {
+	if input.EffectiveFrom.Before(call.Now) {
 		return SlaTargets{}, apperr.Fields(map[string]string{"effectiveFrom": "error.past"})
 	}
 
-	var t SlaTargets
+	var slaTargets SlaTargets
 
-	err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.sla_targets (tenant_id, plan_type, response_hours,
+	err := call.Tx.QueryRow(ctx, `INSERT INTO maintenance.sla_targets (tenant_id, plan_type, response_hours,
 		arrival_in_window_percent, first_time_fix_percent, effective_from, version)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, COALESCE((SELECT max(version) FROM
 		maintenance.sla_targets WHERE plan_type = $1), 0) + 1)
 		RETURNING id, tenant_id, version, plan_type, response_hours, arrival_in_window_percent::float8,
 		first_time_fix_percent::float8, effective_from`,
-		in.PlanType, in.ResponseHours, in.ArrivalInWindowPercent, in.FirstTimeFixPercent, in.EffectiveFrom).
-		Scan(&t.ID, &t.TenantID, &t.Version, &t.PlanType, &t.ResponseHours, &t.ArrivalInWindowPercent, &t.FirstTimeFixPercent,
-			&t.EffectiveFrom)
+		input.PlanType, input.ResponseHours, input.ArrivalInWindowPercent, input.FirstTimeFixPercent, input.EffectiveFrom).
+		Scan(&slaTargets.ID, &slaTargets.TenantID, &slaTargets.Version, &slaTargets.PlanType, &slaTargets.ResponseHours,
+			&slaTargets.ArrivalInWindowPercent, &slaTargets.FirstTimeFixPercent,
+			&slaTargets.EffectiveFrom)
 	if err != nil {
 		if apperr.From(err).Code == apperr.Conflict {
-			return t, apperr.E(apperr.Conflict, "errors.targets_exist")
+			return slaTargets, apperr.E(apperr.Conflict, "errors.targets_exist")
 		}
 
-		return t, apperr.Wrap(err, "insert maintenance.sla_targets")
+		return slaTargets, apperr.Wrap(err, "insert maintenance.sla_targets")
 	}
 
-	t.CreatedAt, t.UpdatedAt = c.Now, c.Now
-	c.Emit(
+	slaTargets.CreatedAt, slaTargets.UpdatedAt = call.Now, call.Now
+	call.Emit(
 		ops.Event{
 			AggregateType: "sla_targets",
-			AggregateID:   t.ID,
+			AggregateID:   slaTargets.ID,
 			Type:          "SlaTargetsSaved",
-			Payload:       map[string]any{"planType": t.PlanType},
+			Payload:       map[string]any{"planType": slaTargets.PlanType},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "sla.saveTargets",
 			TargetKind:      "sla_targets",
-			TargetID:        t.ID.String(),
-			NextVersion:     &t.Version,
+			TargetID:        slaTargets.ID.String(),
+			NextVersion:     &slaTargets.Version,
 			PreviousVersion: nil,
 			Reason:          "",
 			Result:          "",
@@ -1220,7 +1232,7 @@ func (m Partners) saveTargets(
 		},
 	)
 
-	return t, nil
+	return slaTargets, nil
 }
 
 // targetFor returns the SLA target for a plan type at a job's creation (IR131 item 4).
@@ -1243,21 +1255,21 @@ func targetFor(all []SlaTargets, plan string, at time.Time) SlaTargets {
 // the saved rows that start later, earliest first (IR236).
 func targetViews(all []SlaTargets, now time.Time) []TargetView {
 	out := []TargetView{}
-	view := func(t SlaTargets, state string) TargetView {
-		v := TargetView{
-			PlanType:               t.PlanType,
-			ResponseHours:          t.ResponseHours,
-			ArrivalInWindowPercent: t.ArrivalInWindowPercent,
-			FirstTimeFixPercent:    t.FirstTimeFixPercent,
-			Version:                t.Version,
+	view := func(slaTargets SlaTargets, state string) TargetView {
+		targetView := TargetView{
+			PlanType:               slaTargets.PlanType,
+			ResponseHours:          slaTargets.ResponseHours,
+			ArrivalInWindowPercent: slaTargets.ArrivalInWindowPercent,
+			FirstTimeFixPercent:    slaTargets.FirstTimeFixPercent,
+			Version:                slaTargets.Version,
 			State:                  state, EffectiveFrom: nil,
 		}
 		if state != "default" {
-			e := t.EffectiveFrom
-			v.EffectiveFrom = &e
+			e := slaTargets.EffectiveFrom
+			targetView.EffectiveFrom = &e
 		}
 
-		return v
+		return targetView
 	}
 
 	for _, plan := range planTypes {
@@ -1367,7 +1379,7 @@ type tally struct {
 }
 
 func (t *tally) metrics() Metrics {
-	m := Metrics{
+	metrics := Metrics{
 		ResponseWithinTarget: pct(t.respOK, t.respN),
 		ArrivalInWindow:      pct(t.arrOK, t.arrN),
 		FirstTimeFix:         pct(t.ftfOK, t.ftfN),
@@ -1376,10 +1388,10 @@ func (t *tally) metrics() Metrics {
 	}
 	if t.rated > 0 {
 		v := math.Round(float64(t.stars)*10/float64(t.rated)) / 10
-		m.AverageRating = &v
+		metrics.AverageRating = &v
 	}
 
-	return m
+	return metrics
 }
 
 func durationText(d time.Duration) string {
@@ -1418,22 +1430,22 @@ func durationText(d time.Duration) string {
 //	@Router			/v1/sla/scorecard [get]
 func (m Partners) scorecard(
 	ctx context.Context,
-	c *ops.Call,
-	in *ScorecardInput,
+	call *ops.Call,
+	input *ScorecardInput,
 ) (Scorecard, error) {
-	extra, args := "TRUE", []any{in.Period.From, in.Period.To}
-	if in.ContractorOrgID != nil {
-		extra, args = "j.contractor_org_id = $3", append(args, *in.ContractorOrgID)
+	extra, args := "TRUE", []any{input.Period.From, input.Period.To}
+	if input.ContractorOrgID != nil {
+		extra, args = "j.contractor_org_id = $3", append(args, *input.ContractorOrgID)
 	}
 
-	jobs, err := jobMetrics(ctx, c, extra, args)
+	jobs, err := jobMetrics(ctx, call, extra, args)
 	if err != nil {
 		return Scorecard{}, err
 	}
 
 	var targets []SlaTargets
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT plan_type, response_hours, arrival_in_window_percent::float8, first_time_fix_percent::float8, effective_from,
 			version FROM maintenance.sla_targets`,
@@ -1443,15 +1455,15 @@ func (m Partners) scorecard(
 	}
 
 	for rows.Next() {
-		var t SlaTargets
+		var slaTargets SlaTargets
 
 		err := rows.Scan(
-			&t.PlanType,
-			&t.ResponseHours,
-			&t.ArrivalInWindowPercent,
-			&t.FirstTimeFixPercent,
-			&t.EffectiveFrom,
-			&t.Version,
+			&slaTargets.PlanType,
+			&slaTargets.ResponseHours,
+			&slaTargets.ArrivalInWindowPercent,
+			&slaTargets.FirstTimeFixPercent,
+			&slaTargets.EffectiveFrom,
+			&slaTargets.Version,
 		)
 		if err != nil {
 			rows.Close()
@@ -1459,7 +1471,7 @@ func (m Partners) scorecard(
 			return Scorecard{}, apperr.Wrap(err, "select maintenance.sla_targets")
 		}
 
-		targets = append(targets, t)
+		targets = append(targets, slaTargets)
 	}
 
 	rows.Close()
@@ -1474,19 +1486,19 @@ func (m Partners) scorecard(
 		orgs = append(orgs, j.customerOrg)
 	}
 
-	profiles, err := m.Customers.CustomerProfiles(ctx, c, orgs)
+	profiles, err := m.Customers.CustomerProfiles(ctx, call, orgs)
 	if err != nil {
 		return Scorecard{}, apperr.Wrap(err, "maintenance.CustomerProfiles.CustomerProfiles")
 	}
 
 	out := Scorecard{
-		Period:          in.Period,
-		ContractorOrgID: in.ContractorOrgID,
+		Period:          input.Period,
+		ContractorOrgID: input.ContractorOrgID,
 		Customers:       []CustomerMetrics{},
 		Breaches:        []Breach{},
 		Targets: targetViews(
 			targets,
-			c.Now,
+			call.Now,
 		),
 		Totals: Metrics{
 			ResponseWithinTarget: nil,
@@ -1581,7 +1593,7 @@ func (m Partners) scorecard(
 			}
 		case j.cancelledAt != nil && j.cancelledAt.Sub(j.createdAt) <= limit:
 			// cancelled before its response was due: neither within the target nor a miss (IR291)
-		case c.Now.Sub(j.createdAt) > limit:
+		case call.Now.Sub(j.createdAt) > limit:
 			for _, t := range []*tally{total, per[cust]} {
 				t.respN++
 			}
@@ -1654,7 +1666,7 @@ func (m Partners) scorecard(
 			}
 		}
 
-		if j.status != "completed" && j.status != "cancelled" && c.Now.After(j.dueAt) {
+		if j.status != "completed" && j.status != "cancelled" && call.Now.After(j.dueAt) {
 			for _, t := range []*tally{total, per[cust]} {
 				t.overdue++
 			}
@@ -1677,15 +1689,15 @@ func (m Partners) scorecard(
 
 	for _, cust := range order {
 		t := per[cust]
-		mm := t.metrics()
+		metrics := t.metrics()
 		out.Customers = append(
 			out.Customers,
 			CustomerMetrics{
-				Metrics:    mm,
+				Metrics:    metrics,
 				CustomerID: cust,
 				PlanType:   planOf[cust],
 				JobCount:   t.jobs,
-				Status:     customerStatus(mm, targetFor(targets, planOf[cust], c.Now)),
+				Status:     customerStatus(metrics, targetFor(targets, planOf[cust], call.Now)),
 			},
 		)
 	}
@@ -1706,7 +1718,7 @@ func (m Partners) scorecard(
 // share is held to 100 %, arrival in window and first-time fix to the plan's targets. A share at or above its target
 // is on track; up to 10 points below is at risk, more than 10 below — or any open overdue job — is breached. A share
 // without jobs to measure says nothing.
-func customerStatus(m Metrics, tgt SlaTargets) string {
+func customerStatus(metrics Metrics, tgt SlaTargets) string {
 	status := "on_track"
 	check := func(v *float64, target float64) {
 		if v == nil || *v >= target {
@@ -1719,11 +1731,11 @@ func customerStatus(m Metrics, tgt SlaTargets) string {
 			status = "at_risk"
 		}
 	}
-	check(m.ResponseWithinTarget, 100)
-	check(m.ArrivalInWindow, tgt.ArrivalInWindowPercent)
-	check(m.FirstTimeFix, tgt.FirstTimeFixPercent)
+	check(metrics.ResponseWithinTarget, 100)
+	check(metrics.ArrivalInWindow, tgt.ArrivalInWindowPercent)
+	check(metrics.FirstTimeFix, tgt.FirstTimeFixPercent)
 
-	if m.OpenOverdue > 0 {
+	if metrics.OpenOverdue > 0 {
 		status = "breached"
 	}
 
@@ -1731,12 +1743,12 @@ func customerStatus(m Metrics, tgt SlaTargets) string {
 }
 
 // RegisterPartners binds the IR131 operations.
-func RegisterPartners(r *ops.Registry, m Partners) {
-	ops.Register(r, "contractors.list", m.list)
-	ops.Register(r, "contractors.save", m.save)
-	ops.Register(r, "contractors.setOfferStatus", m.setOfferStatus)
-	ops.Register(r, "rateCards.save", m.saveRateCard)
-	ops.Register(r, "rateCards.list", m.listRateCards)
-	ops.Register(r, "sla.saveTargets", m.saveTargets)
-	ops.Register(r, "sla.scorecard", m.scorecard)
+func RegisterPartners(reg *ops.Registry, m Partners) {
+	ops.Register(reg, "contractors.list", m.list)
+	ops.Register(reg, "contractors.save", m.save)
+	ops.Register(reg, "contractors.setOfferStatus", m.setOfferStatus)
+	ops.Register(reg, "rateCards.save", m.saveRateCard)
+	ops.Register(reg, "rateCards.list", m.listRateCards)
+	ops.Register(reg, "sla.saveTargets", m.saveTargets)
+	ops.Register(reg, "sla.scorecard", m.scorecard)
 }

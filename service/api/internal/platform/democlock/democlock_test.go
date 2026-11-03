@@ -22,14 +22,14 @@ func scratch(t *testing.T) *pgxpool.Pool {
 		admin = "postgres://postgres:local@localhost:5432/postgres?sslmode=disable"
 	}
 
-	ac, err := pgx.Connect(ctx, admin)
+	conn, err := pgx.Connect(ctx, admin)
 	if err != nil {
 		t.Skip("postgres not available:", err)
 	}
 
 	const name = "ac_democlock_test"
 	for _, q := range []string{"DROP DATABASE IF EXISTS " + name + " WITH (FORCE)", "CREATE DATABASE " + name} {
-		_, err := ac.Exec(ctx, q)
+		_, err := conn.Exec(ctx, q)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -38,12 +38,12 @@ func scratch(t *testing.T) *pgxpool.Pool {
 	cfg, _ := pgxpool.ParseConfig(admin)
 	cfg.ConnConfig.Database = name
 
-	p, err := pgxpool.NewWithConfig(ctx, cfg)
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, execErr := p.Exec(
+	_, execErr := pool.Exec(
 		ctx,
 		`CREATE SCHEMA platform; CREATE TABLE platform.demo_clock (id boolean PRIMARY KEY DEFAULT true CHECK (id), offset_ms
 			bigint NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`,
@@ -53,22 +53,22 @@ func scratch(t *testing.T) *pgxpool.Pool {
 	}
 
 	t.Cleanup(func() {
-		p.Close()
-		ac.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)") //nolint:errcheck
-		ac.Close(ctx)
+		pool.Close()
+		conn.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)") //nolint:errcheck
+		conn.Close(ctx)
 	})
 
-	return p
+	return pool
 }
 
 func TestSharedAcrossProcessesAndRestarts(t *testing.T) {
 	ctx := context.Background()
-	p := scratch(t)
+	pool := scratch(t)
 	wall := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
 	base := func() time.Time { return wall }
 	start := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
 
-	api, err := Open(ctx, p, base, start)
+	api, err := Open(ctx, pool, base, start)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestSharedAcrossProcessesAndRestarts(t *testing.T) {
 		t.Fatal(advanceErr)
 	}
 
-	worker, err := Open(ctx, p, base, start)
+	worker, err := Open(ctx, pool, base, start)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestSharedAcrossProcessesAndRestarts(t *testing.T) {
 		t.Fatalf("worker %v, want %v", got, want)
 	}
 	// a restarted API never moves the clock back to the scenario start
-	again, err := Open(ctx, p, base, start)
+	again, err := Open(ctx, pool, base, start)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,45 +119,45 @@ func TestSharedAcrossProcessesAndRestarts(t *testing.T) {
 
 func TestNowKeepsOffsetWhenDatabaseFails(t *testing.T) {
 	ctx := context.Background()
-	p := scratch(t)
+	pool := scratch(t)
 	wall := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
 
-	c, err := Open(ctx, p, func() time.Time { return wall }, time.Time{})
+	clock, err := Open(ctx, pool, func() time.Time { return wall }, time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, execErr := p.Exec(ctx, `UPDATE platform.demo_clock SET offset_ms = 60000`)
+	_, execErr := pool.Exec(ctx, `UPDATE platform.demo_clock SET offset_ms = 60000`)
 	if execErr != nil {
 		t.Fatal(execErr)
 	}
 
-	p.Close()
+	pool.Close()
 
 	wall = wall.Add(5 * time.Second)
-	if got := c.Now(); !got.Equal(wall) {
+	if got := clock.Now(); !got.Equal(wall) {
 		t.Fatalf("Now = %v, want the cached zero offset %v", got, wall)
 	}
 }
 
 func TestMissingRowKeepsOffset(t *testing.T) {
 	ctx := context.Background()
-	p := scratch(t)
+	pool := scratch(t)
 	wall := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
 	start := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
 
-	c, err := Open(ctx, p, func() time.Time { return wall }, start)
+	clock, err := Open(ctx, pool, func() time.Time { return wall }, start)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, execErr := p.Exec(ctx, `DELETE FROM platform.demo_clock`)
+	_, execErr := pool.Exec(ctx, `DELETE FROM platform.demo_clock`)
 	if execErr != nil {
 		t.Fatal(execErr)
 	}
 
 	wall = wall.Add(5 * time.Second)
-	if got := c.Now(); !got.Equal(start.Add(5 * time.Second)) {
+	if got := clock.Now(); !got.Equal(start.Add(5 * time.Second)) {
 		t.Fatalf("Now = %v", got)
 	}
 }

@@ -17,16 +17,16 @@ func blobJSON(name, mime string, data []byte, size int) string {
 }
 
 func TestAttachmentsAndSignOff(t *testing.T) {
-	s := server(t)
-	job := assignedNow(t, s)
-	write(s, &techInt, "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 2)
-	_, m := write(s, &techInt, "jobs.saveDraft", draftBody(job, "normal", nil), 0)
-	rep := data(m)["id"].(string)
+	srv := server(t)
+	job := assignedNow(t, srv)
+	write(srv, &techInt, "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 2)
+	_, res := write(srv, &techInt, "jobs.saveDraft", draftBody(job, "normal", nil), 0)
+	rep := data(res)["id"].(string)
 	img, jpg := tinyPNG(t), tinyJPEG(t)
 	flood := pngHeader(50000, 50000) // 2.5 gigapixels declared in a few dozen bytes (IR389)
 	add := func(file string, v int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&techInt,
 			"attachments.add",
 			`{"jobId":"`+job+`","reportId":"`+rep+`","file":`+file+`}`,
@@ -69,7 +69,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&techInt,
 		"attachments.add",
 		`{"jobId":"`+job+`","reportId":"`+uuid.NewString()+`","file":`+blobJSON(
@@ -83,12 +83,12 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		t.Error("other report")
 	}
 
-	code, m := add(blobJSON(" leak.png ", "image/png", img, len(img)), 1)
-	if code != 200 || data(m)["status"] != "ready" || data(m)["name"] != "leak.png" {
-		t.Fatalf("add: %d %v", code, m)
+	code, res := add(blobJSON(" leak.png ", "image/png", img, len(img)), 1)
+	if code != 200 || data(res)["status"] != "ready" || data(res)["name"] != "leak.png" {
+		t.Fatalf("add: %d %v", code, res)
 	}
 
-	att := data(m)["id"].(string)
+	att := data(res)["id"].(string)
 	// the draft moved to version 2; link the photo as evidence
 	body := strings.Replace(
 		draftBody(
@@ -101,12 +101,12 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		1,
 	)
 
-	code, m = write(s, &techInt, "jobs.saveDraft", body, 2)
-	if code != 200 || len(data(m)["attachmentRefs"].([]any)) != 1 {
-		t.Fatalf("draft with attachment: %d %v", code, m)
+	code, res = write(srv, &techInt, "jobs.saveDraft", body, 2)
+	if code != 200 || len(data(res)["attachmentRefs"].([]any)) != 1 {
+		t.Fatalf("draft with attachment: %d %v", code, res)
 	}
 	// the finding keeps its linked photo (InspectionItem.evidenceIds, IR352)
-	for _, it := range data(m)["items"].([]any) {
+	for _, it := range data(res)["items"].([]any) {
 		if x := it.(map[string]any); x["componentKey"] == "filter" {
 			if ev, _ := x["evidenceIds"].([]any); len(ev) != 1 || ev[0] != att {
 				t.Errorf("filter evidence: %v", x["evidenceIds"])
@@ -116,7 +116,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	// sign-off
 	sign := func(extra string, v, rv int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&techInt,
 			"reports.signOff",
 			`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":`+itoa(
@@ -149,16 +149,16 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		t.Error("signOff of an old version")
 	}
 
-	code, m = sign(`,"signature":`+sig, 3, 3)
+	code, res = sign(`,"signature":`+sig, 3, 3)
 
-	so, _ := data(m)["signOff"].(map[string]any)
+	so, _ := data(res)["signOff"].(map[string]any)
 	if code != 200 || so["signerName"] != "Aisha" || so["signatureAttachmentId"] == nil ||
 		so["reportVersion"].(float64) != 3 ||
-		data(m)["version"].(float64) != 3 {
-		t.Fatalf("signOff: %d %v", code, m)
+		data(res)["version"].(float64) != 3 {
+		t.Fatalf("signOff: %d %v", code, res)
 	}
 
-	if code, m := sign(
+	if code, resp := sign(
 		`,"signature":null,"absentReason":"Customer out","sitePhoto":`+blobJSON(
 			"door.jpg",
 			"image/jpeg",
@@ -168,13 +168,13 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		3,
 		3,
 	); code != 200 ||
-		data(m)["signOff"].(map[string]any)["sitePhotoAttachmentId"] == nil {
-		t.Fatalf("absent sign-off: %d %v", code, m)
+		data(resp)["signOff"].(map[string]any)["sitePhotoAttachmentId"] == nil {
+		t.Fatalf("absent sign-off: %d %v", code, resp)
 	}
 	// getContent
 	get := func(a *actor, v int) (int, map[string]any) {
 		return post(
-			s,
+			srv,
 			a,
 			"attachments.getContent",
 			`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":`+itoa(
@@ -183,10 +183,10 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		)
 	}
 
-	code, m = get(&techInt, 3)
-	if code != 200 || data(m)["bytes"] != base64.StdEncoding.EncodeToString(img) ||
-		data(m)["mime"] != "image/png" {
-		t.Fatalf("getContent: %d %v", code, m)
+	code, res = get(&techInt, 3)
+	if code != 200 || data(res)["bytes"] != base64.StdEncoding.EncodeToString(img) ||
+		data(res)["mime"] != "image/png" {
+		t.Fatalf("getContent: %d %v", code, res)
 	}
 
 	if code, _ := get(&customerA, 3); code != 404 {
@@ -194,7 +194,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	}
 
 	if code, _ := post(
-		s,
+		srv,
 		&hq,
 		"attachments.getContent",
 		`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":3,"attachmentId":"`+uuid.NewString()+`"}`,
@@ -202,14 +202,14 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		t.Error("unknown attachment")
 	}
 	// saving the draft clears the sign-off
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&techInt,
 		"jobs.saveDraft",
 		body,
 		3,
 	); code != 200 ||
-		data(m)["signOff"] != nil {
+		data(resp)["signOff"] != nil {
 		t.Fatal("saveDraft clears the sign-off")
 	}
 	// limit of 10 per report

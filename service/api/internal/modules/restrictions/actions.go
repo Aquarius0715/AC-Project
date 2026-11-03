@@ -25,18 +25,18 @@ type ExceptionInput struct {
 
 // Validate implements ops.Validator.
 func (in *ExceptionInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fe["restrictionId"] = "error.required"
+		fieldErrs["restrictionId"] = "error.required"
 	}
 
 	if in.Until.IsZero() {
-		fe["until"] = "error.required"
+		fieldErrs["until"] = "error.required"
 	}
 
-	trimReason(&in.Reason, "reason", fe)
+	trimReason(&in.Reason, "reason", fieldErrs)
 
-	return fe
+	return fieldErrs
 }
 
 // deferRestriction serves restrictions.defer.
@@ -104,16 +104,16 @@ func (m Restrictions) deferRestriction(
 func (m Restrictions) exempt(
 	ctx context.Context,
 	c *ops.Call,
-	in *ExceptionInput,
+	input *ExceptionInput,
 ) (Restriction, error) {
 	return m.except(
 		ctx,
 		c,
-		in,
+		input,
 		"restrictions.exempt",
 		`exception_until = $2, updated_at = $3, exception_reason = $4`,
-		in.Until,
-		in.Reason,
+		input.Until,
+		input.Reason,
 	)
 }
 
@@ -122,64 +122,64 @@ func (m Restrictions) exempt(
 // records the period. Expiry never reapplies automatically (D03).
 func (m Restrictions) except(
 	ctx context.Context,
-	c *ops.Call,
-	in *ExceptionInput,
+	call *ops.Call,
+	input *ExceptionInput,
 	action, set string,
 	args ...any,
 ) (Restriction, error) {
-	if !in.Until.After(c.Now) || in.Until.After(c.Now.Add(MaxException)) {
+	if !input.Until.After(call.Now) || input.Until.After(call.Now.Add(MaxException)) {
 		return Restriction{}, apperr.Fields(map[string]string{"until": "errors.until_range"})
 	}
 
-	x, err := lockCurrent(ctx, c, in.RestrictionID)
+	restriction, err := lockCurrent(ctx, call, input.RestrictionID)
 	if err != nil {
-		return x, err
+		return restriction, err
 	}
 
-	if x.State == "released" || x.State == "cancelled" {
-		return x, apperr.E(apperr.Conflict, "errors.restriction_state")
+	if restriction.State == "released" || restriction.State == "cancelled" {
+		return restriction, apperr.E(apperr.Conflict, "errors.restriction_state")
 	}
 
-	args = append([]any{x.ID, args[0], c.Now}, args[1:]...)
+	args = append([]any{restriction.ID, args[0], call.Now}, args[1:]...)
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions SET `+set+`, version = version + 1 WHERE id = $1`,
 		args...)
 	if execErr != nil {
-		return x, apperr.Wrap(execErr, "update restrictions.restrictions")
+		return restriction, apperr.Wrap(execErr, "update restrictions.restrictions")
 	}
 
-	next := x.Version + 1
-	if x.State == "requested" || x.State == "applied" {
-		err := m.RequestRelease(ctx, c, x.ID, "exception")
+	next := restriction.Version + 1
+	if restriction.State == "requested" || restriction.State == "applied" {
+		err := m.RequestRelease(ctx, call, restriction.ID, "exception")
 		if err != nil {
-			return x, err
+			return restriction, err
 		}
 
 		next++
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "restriction",
-			AggregateID:   x.ID,
+			AggregateID:   restriction.ID,
 			Type:          "RestrictionExceptionRecorded",
-			Payload:       map[string]any{"action": action, "until": in.Until},
+			Payload:       map[string]any{"action": action, "until": input.Until},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          action,
 			TargetKind:      "restriction",
-			TargetID:        x.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			TargetID:        restriction.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next,
-			Reason:          in.Reason, Result: "", Before: nil, After: nil,
+			Reason:          input.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return load(ctx, c, x.ID, false)
+	return load(ctx, call, restriction.ID, false)
 }
 
 // ReleaseInput is restrictions.release input.
@@ -230,52 +230,52 @@ func exempted(x Restriction, now time.Time) bool {
 //	@Router			/v1/restrictions/{restrictionId}/release [post]
 func (m Restrictions) release(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	in *ReleaseInput,
 ) (Restriction, error) {
-	x, err := load(ctx, c, in.RestrictionID, true)
+	restriction, err := load(ctx, call, in.RestrictionID, true)
 	if err != nil {
-		return x, err
+		return restriction, err
 	}
 
-	switch x.State {
+	switch restriction.State {
 	case "release_requested": // IR35: idempotent
-		return x, nil
+		return restriction, nil
 	case "requested", "applied":
 	default:
-		return x, apperr.E(apperr.Conflict, "errors.restriction_state")
+		return restriction, apperr.E(apperr.Conflict, "errors.restriction_state")
 	}
 
-	if x.Version != *c.ExpectedVersion {
-		return x, apperr.E(apperr.Conflict, "error.versionConflict")
+	if restriction.Version != *call.ExpectedVersion {
+		return restriction, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	paid, err := causesPaid(ctx, c, x.ID)
+	paid, err := causesPaid(ctx, call, restriction.ID)
 	if err != nil {
-		return x, err
+		return restriction, err
 	}
 
-	if !paid && !exempted(x, c.Now) {
-		return x, apperr.E(apperr.Forbidden, "errors.restriction_release_unpaid")
+	if !paid && !exempted(restriction, call.Now) {
+		return restriction, apperr.E(apperr.Forbidden, "errors.restriction_release_unpaid")
 	}
 
-	requestReleaseErr := m.RequestRelease(ctx, c, x.ID, "manual")
+	requestReleaseErr := m.RequestRelease(ctx, call, restriction.ID, "manual")
 	if requestReleaseErr != nil {
-		return x, requestReleaseErr
+		return restriction, requestReleaseErr
 	}
 
-	next := x.Version + 1
-	c.Audit(
+	next := restriction.Version + 1
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "restrictions.release",
 			TargetKind:      "restriction",
-			TargetID:        x.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			TargetID:        restriction.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return load(ctx, c, x.ID, false)
+	return load(ctx, call, restriction.ID, false)
 }
 
 // OverrideInput is restrictions.override input.
@@ -286,14 +286,14 @@ type OverrideInput struct {
 
 // Validate implements ops.Validator.
 func (in *OverrideInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fe["restrictionId"] = "error.required"
+		fieldErrs["restrictionId"] = "error.required"
 	}
 
-	trimReason(&in.Reason, "reason", fe)
+	trimReason(&in.Reason, "reason", fieldErrs)
 
-	return fe
+	return fieldErrs
 }
 
 // override is the forced release (IR35 ③): requested/applied → release_requested with source=override; invoices
@@ -327,50 +327,50 @@ func (in *OverrideInput) Validate() map[string]string {
 //	@Router			/v1/restrictions/{restrictionId}/override [post]
 func (m Restrictions) override(
 	ctx context.Context,
-	c *ops.Call,
-	in *OverrideInput,
+	call *ops.Call,
+	input *OverrideInput,
 ) (ReleaseView, error) {
-	x, err := load(ctx, c, in.RestrictionID, true)
+	restriction, err := load(ctx, call, input.RestrictionID, true)
 	if err != nil {
 		return ReleaseView{}, err
 	}
 
-	switch x.State {
+	switch restriction.State {
 	case "release_requested":
-		return releaseView(x), nil
+		return releaseView(restriction), nil
 	case "requested", "applied":
 	default:
 		return ReleaseView{}, apperr.E(apperr.Conflict, "errors.restriction_state")
 	}
 
-	if x.Version != *c.ExpectedVersion {
+	if restriction.Version != *call.ExpectedVersion {
 		return ReleaseView{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	requestReleaseErr := m.RequestRelease(ctx, c, x.ID, "override")
+	requestReleaseErr := m.RequestRelease(ctx, call, restriction.ID, "override")
 	if requestReleaseErr != nil {
 		return ReleaseView{}, requestReleaseErr
 	}
 
-	next := x.Version + 1
-	c.Audit(
+	next := restriction.Version + 1
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "restrictions.override",
 			TargetKind:      "restriction",
-			TargetID:        x.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			TargetID:        restriction.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next,
-			Reason:          in.Reason, Result: "", Before: nil, After: nil,
+			Reason:          input.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
-	x, err = load(ctx, c, x.ID, false)
+	restriction, err = load(ctx, call, restriction.ID, false)
 
-	return releaseView(x), err
+	return releaseView(restriction), err
 }
 
 // overrideOnlyAllowed applies IR03: callers without restriction.write may reconcile / retry(release) only a
 // release_requested restriction whose release intent is an override.
-func overrideOnlyAllowed(c *ops.Call, x Restriction) bool {
+func overrideOnlyAllowed(c *ops.Call, restriction Restriction) bool {
 	if c.Principal.Permissions["restriction.write"] {
 		return true
 	}
@@ -379,13 +379,13 @@ func overrideOnlyAllowed(c *ops.Call, x Restriction) bool {
 		Source string `json:"source"`
 	}
 
-	_ = json.Unmarshal(x.ReleaseIntent, &ri)
-	if (x.State == "released" || x.State == "cancelled") &&
-		unresolvedCase(x) { // IR03: terminal recovery
+	_ = json.Unmarshal(restriction.ReleaseIntent, &ri)
+	if (restriction.State == "released" || restriction.State == "cancelled") &&
+		unresolvedCase(restriction) { // IR03: terminal recovery
 		return true
 	}
 
-	return x.State == "release_requested" && ri.Source == "override"
+	return restriction.State == "release_requested" && ri.Source == "override"
 }
 
 func unresolvedCase(x Restriction) bool {
@@ -401,18 +401,18 @@ func unresolvedCase(x Restriction) bool {
 	return false
 }
 
-func unitsOf(x Restriction, ids []uuid.UUID) ([]Unit, error) {
+func unitsOf(restriction Restriction, ids []uuid.UUID) ([]Unit, error) {
 	out := []Unit{}
 
 	for _, id := range ids {
-		i := slices.IndexFunc(x.PerUnit, func(u Unit) bool { return u.UnitID == id })
-		if i < 0 {
+		idx := slices.IndexFunc(restriction.PerUnit, func(u Unit) bool { return u.UnitID == id })
+		if idx < 0 {
 			return nil, apperr.Fields(
 				map[string]string{"unitIds": "errors.unit_not_in_restriction"},
 			)
 		}
 
-		out = append(out, x.PerUnit[i])
+		out = append(out, restriction.PerUnit[idx])
 	}
 
 	return out, nil
@@ -426,16 +426,16 @@ type ReconcileInput struct {
 
 // Validate implements ops.Validator.
 func (in *ReconcileInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fe["restrictionId"] = "error.required"
+		fieldErrs["restrictionId"] = "error.required"
 	}
 
 	if !uniqueIDs(in.UnitIDs) {
-		fe["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // observation is the unit's current restriction observation (ACUnit.observedRestriction).
@@ -474,25 +474,31 @@ type observation struct {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/restrictions/{restrictionId}/reconcile [post]
-func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileInput) (any, error) {
-	x, err := lockCurrent(ctx, c, in.RestrictionID)
+func (m Restrictions) reconcile(
+	ctx context.Context,
+	c *ops.Call,
+	input *ReconcileInput,
+) (any, error) {
+	restriction, err := lockCurrent(ctx, c, input.RestrictionID)
 	if err != nil {
 		return nil, err
 	}
 
-	if !overrideOnlyAllowed(c, x) {
+	if !overrideOnlyAllowed(c, restriction) {
 		return nil, apperr.E(apperr.Forbidden, "error.forbidden")
 	}
 
-	if x.State == "released" || x.State == "cancelled" { // SR26 recovery of a terminal restriction
-		return m.reconcileTerminal(ctx, c, x, in.UnitIDs)
+	if restriction.State == "released" ||
+		restriction.State == "cancelled" { // SR26 recovery of a terminal restriction
+		return m.reconcileTerminal(ctx, c, restriction, input.UnitIDs)
 	}
 
-	if x.State != "requested" && x.State != "applied" && x.State != "release_requested" {
+	if restriction.State != "requested" && restriction.State != "applied" &&
+		restriction.State != "release_requested" {
 		return nil, apperr.E(apperr.Conflict, "errors.restriction_state")
 	}
 
-	targets, err := unitsOf(x, in.UnitIDs)
+	targets, err := unitsOf(restriction, input.UnitIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -500,20 +506,20 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 	remove, _ := json.Marshal(
 		map[string]any{
 			"kind":          "remove_restriction",
-			"restrictionId": x.ID,
-			"rulesVersion":  x.RulesVersion,
+			"restrictionId": restriction.ID,
+			"rulesVersion":  restriction.RulesVersion,
 		},
 	)
 
-	for _, u := range targets {
-		if u.ApplyState != "sent_unknown" {
+	for _, unit := range targets {
+		if unit.ApplyState != "sent_unknown" {
 			return nil, apperr.Fields(map[string]string{"unitIds": "errors.reconcile_not_needed"})
 		}
 
 		var open bool
 
 		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1
-			AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).
+			AND unit_id = $2 AND status = 'requested')`, restriction.ID, unit.UnitID).
 			Scan(&open)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select restrictions.restriction_commands")
@@ -523,7 +529,7 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 			return nil, apperr.E(apperr.Conflict, "errors.command_pending")
 		}
 
-		_, conn, power, bound, err := m.Devices.BoundDevice(ctx, c, u.UnitID)
+		_, conn, power, bound, err := m.Devices.BoundDevice(ctx, c, unit.UnitID)
 		if err != nil {
 			return nil, apperr.Wrap(err, "restrictions.Devices.BoundDevice")
 		}
@@ -532,7 +538,7 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 			return nil, apperr.E(apperr.Offline, "errors.device_offline")
 		}
 
-		raw, at, err := m.Units.Observation(ctx, c, u.UnitID) // equipment's observation (IR194)
+		raw, at, err := m.Units.Observation(ctx, c, unit.UnitID) // equipment's observation (IR194)
 		if err != nil {
 			return nil, apperr.Wrap(err, "restrictions.Units.Observation")
 		}
@@ -546,14 +552,14 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 			_ = json.Unmarshal(raw, &o)
 		}
 
-		releasing := u.ReleaseState == "waiting_reconcile"
+		releasing := unit.ReleaseState == "waiting_reconcile"
 		set := func(sql string, args ...any) error {
 			_, err := c.Tx.Exec(
 				ctx,
 				`UPDATE restrictions.restriction_units SET
 					`+sql+`, observed_at = $3, pending_reason = NULL WHERE restriction_id `+
 					`= $1 AND unit_id = $2`,
-				append([]any{x.ID, u.UnitID, c.Now}, args...)...)
+				append([]any{restriction.ID, unit.UnitID, c.Now}, args...)...)
 
 			return apperr.Wrap(err, "update restrictions.restriction_units")
 		}
@@ -567,14 +573,14 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 			} else {
 				err = set(`apply_state = 'not_applied', observed_restriction = NULL`)
 			}
-		case *o.RestrictionID == x.ID && o.RulesVersion == x.RulesVersion:
+		case *o.RestrictionID == restriction.ID && o.RulesVersion == restriction.RulesVersion:
 			err = set(`apply_state = 'applied', observed_restriction = $4`, raw)
 			if err != nil {
 				return nil, err
 			}
 
 			if releasing {
-				cmd, delivered, _, err := m.send(ctx, c, x.ID, u.UnitID, remove)
+				cmd, delivered, _, err := m.send(ctx, c, restriction.ID, unit.UnitID, remove)
 				if err != nil {
 					return nil, err
 				}
@@ -606,31 +612,31 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 		state = CASE WHEN r.state = 'requested' AND NOT EXISTS (SELECT 1 FROM restrictions.restriction_units ru WHERE
 		ru.restriction_id = r.id AND ru.apply_state <> 'applied')
 			THEN 'applied' ELSE r.state END WHERE r.id = $1`,
-		x.ID,
+		restriction.ID,
 		c.Now,
 	)
 	if execErr != nil {
 		return nil, apperr.Wrap(execErr, "update restrictions.restrictions")
 	}
 
-	finishReleaseErr := finishRelease(ctx, c.Tx, x.ID, c.Now)
+	finishReleaseErr := finishRelease(ctx, c.Tx, restriction.ID, c.Now)
 	if finishReleaseErr != nil {
 		return nil, finishReleaseErr
 	}
 
-	next := x.Version + 1
+	next := restriction.Version + 1
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "restrictions.reconcile",
 			TargetKind:      "restriction",
-			TargetID:        x.ID.String(),
+			TargetID:        restriction.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
-	x, err = load(ctx, c, x.ID, false)
+	restriction, err = load(ctx, c, restriction.ID, false)
 
-	return project(c, x), err
+	return project(c, restriction), err
 }
 
 // RetryInput is restrictions.retry input.
@@ -644,26 +650,26 @@ type RetryInput struct {
 
 // Validate implements ops.Validator.
 func (in *RetryInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.RestrictionID == uuid.Nil {
-		fe["restrictionId"] = "error.required"
+		fieldErrs["restrictionId"] = "error.required"
 	}
 
 	if !uniqueIDs(in.UnitIDs) {
-		fe["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = "error.invalid"
 	}
 
 	if in.Phase != "apply" && in.Phase != "release" {
-		fe["phase"] = "error.invalid"
+		fieldErrs["phase"] = "error.invalid"
 	}
 
 	if strings.TrimSpace(in.ConfirmedRulesVersion) == "" {
-		fe["confirmedRulesVersion"] = "error.required"
+		fieldErrs["confirmedRulesVersion"] = "error.required"
 	}
 
-	trimReason(&in.Reason, "reason", fe)
+	trimReason(&in.Reason, "reason", fieldErrs)
 
-	return fe
+	return fieldErrs
 }
 
 // retry re-sends apply or remove Commands for selected units (D03). Units that already succeeded are returned
@@ -697,86 +703,86 @@ func (in *RetryInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/restrictions/{restrictionId}/retry [post]
-func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (any, error) {
-	x, err := lockCurrent(ctx, c, in.RestrictionID)
+func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput) (any, error) {
+	restriction, err := lockCurrent(ctx, c, input.RestrictionID)
 	if err != nil {
 		return nil, err
 	}
 
-	if in.Phase == "apply" && !c.Principal.Permissions["restriction.write"] ||
-		in.Phase == "release" && !overrideOnlyAllowed(c, x) {
+	if input.Phase == "apply" && !c.Principal.Permissions["restriction.write"] ||
+		input.Phase == "release" && !overrideOnlyAllowed(c, restriction) {
 		return nil, apperr.E(apperr.Forbidden, "error.forbidden")
 	}
 
-	if in.ConfirmedRulesVersion != x.RulesVersion {
+	if input.ConfirmedRulesVersion != restriction.RulesVersion {
 		return nil, apperr.Fields(
 			map[string]string{"confirmedRulesVersion": "errors.rules_version_mismatch"},
 		)
 	}
 
-	targets, err := unitsOf(x, in.UnitIDs)
+	targets, err := unitsOf(restriction, input.UnitIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	if in.Phase == "apply" {
-		if x.State != "requested" {
+	if input.Phase == "apply" {
+		if restriction.State != "requested" {
 			return nil, apperr.E(apperr.Conflict, "errors.restriction_state")
 		}
 
-		paid, err := causesPaid(ctx, c, x.ID)
+		paid, err := causesPaid(ctx, c, restriction.ID)
 		if err != nil {
 			return nil, err
 		}
 
-		if paid || exempted(x, c.Now) {
+		if paid || exempted(restriction, c.Now) {
 			return nil, apperr.E(apperr.Conflict, "errors.restriction_not_applicable")
 		}
-	} else if x.State != "release_requested" {
+	} else if restriction.State != "release_requested" {
 		return nil, apperr.E(apperr.Conflict, "errors.restriction_state")
 	}
 
 	action, _ := json.Marshal(
 		map[string]any{
 			"kind":          "apply_restriction",
-			"restrictionId": x.ID,
-			"rulesVersion":  x.RulesVersion,
-			"policy":        x.Policy,
+			"restrictionId": restriction.ID,
+			"rulesVersion":  restriction.RulesVersion,
+			"policy":        restriction.Policy,
 		},
 	)
-	if in.Phase == "release" {
+	if input.Phase == "release" {
 		action, _ = json.Marshal(
 			map[string]any{
 				"kind":          "remove_restriction",
-				"restrictionId": x.ID,
-				"rulesVersion":  x.RulesVersion,
+				"restrictionId": restriction.ID,
+				"rulesVersion":  restriction.RulesVersion,
 			},
 		)
 	}
 
 	changed := false
 
-	for _, u := range targets {
+	for _, unit := range targets {
 		var open bool
 
 		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1
-			AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).
+			AND unit_id = $2 AND status = 'requested')`, restriction.ID, unit.UnitID).
 			Scan(&open)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select restrictions.restriction_commands")
 		}
 
-		if in.Phase == "apply" {
+		if input.Phase == "apply" {
 			switch {
-			case u.ApplyState == "applied":
+			case unit.ApplyState == "applied":
 				continue
-			case u.ApplyState == "sent_unknown":
+			case unit.ApplyState == "sent_unknown":
 				return nil, apperr.E(apperr.Conflict, "errors.reconcile_required")
 			case open:
 				return nil, apperr.E(apperr.Conflict, "errors.command_pending")
 			}
 
-			cmd, delivered, reason, err := m.send(ctx, c, x.ID, u.UnitID, action)
+			cmd, delivered, reason, err := m.send(ctx, c, restriction.ID, unit.UnitID, action)
 			if err != nil {
 				return nil, err
 			}
@@ -791,8 +797,8 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 				`UPDATE restrictions.restriction_units SET apply_state = $3, apply_command_ids = apply_command_ids || $4::uuid,
 					pending_reason = $5
 				WHERE restriction_id = $1 AND unit_id = $2`,
-				x.ID,
-				u.UnitID,
+				restriction.ID,
+				unit.UnitID,
 				state,
 				cmd,
 				reason,
@@ -807,17 +813,17 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 		}
 
 		switch {
-		case u.ReleaseState == "released" || u.ReleaseState == "not_required":
+		case unit.ReleaseState == "released" || unit.ReleaseState == "not_required":
 			continue
-		case u.ReleaseState == "waiting_reconcile":
+		case unit.ReleaseState == "waiting_reconcile":
 			return nil, apperr.E(apperr.Conflict, "errors.reconcile_required")
-		case u.ReleaseState == "requested" || open:
+		case unit.ReleaseState == "requested" || open:
 			return nil, apperr.E(apperr.Conflict, "errors.command_pending")
-		case u.ApplyState != "applied":
+		case unit.ApplyState != "applied":
 			return nil, apperr.E(apperr.Conflict, "errors.reconcile_required")
 		}
 
-		cmd, delivered, _, err := m.send(ctx, c, x.ID, u.UnitID, action)
+		cmd, delivered, _, err := m.send(ctx, c, restriction.ID, unit.UnitID, action)
 		if err != nil {
 			return nil, err
 		}
@@ -831,8 +837,8 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 			`UPDATE restrictions.restriction_units SET release_state = 'requested', release_command_ids = release_command_ids ||
 				$3::uuid, pending_reason = NULL
 			WHERE restriction_id = $1 AND unit_id = $2`,
-			x.ID,
-			u.UnitID,
+			restriction.ID,
+			unit.UnitID,
 			cmd,
 		)
 		if execErr != nil {
@@ -843,41 +849,41 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 	}
 
 	if !changed { // every target already succeeded: existing result, no resend
-		return project(c, x), nil
+		return project(c, restriction), nil
 	}
 
 	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions SET version = version + 1, updated_at = $2 WHERE id = $1`,
-		x.ID,
+		restriction.ID,
 		c.Now,
 	)
 	if execErr != nil {
 		return nil, apperr.Wrap(execErr, "update restrictions.restrictions")
 	}
 
-	next := x.Version + 1
+	next := restriction.Version + 1
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "restrictions.retry",
 			TargetKind:      "restriction",
-			TargetID:        x.ID.String(),
+			TargetID:        restriction.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &next,
-			Reason:          in.Reason, Result: "", Before: nil, After: nil,
+			Reason:          input.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
-	x, err = load(ctx, c, x.ID, false)
+	restriction, err = load(ctx, c, restriction.ID, false)
 
-	return project(c, x), err
+	return project(c, restriction), err
 }
 
 // RegisterActions binds the exception, release and recovery operations.
-func RegisterActions(r *ops.Registry, m Restrictions) {
-	ops.Register(r, "restrictions.defer", m.deferRestriction)
-	ops.Register(r, "restrictions.exempt", m.exempt)
-	ops.Register(r, "restrictions.release", m.release)
-	ops.Register(r, "restrictions.override", m.override)
-	ops.Register(r, "restrictions.reconcile", m.reconcile)
-	ops.Register(r, "restrictions.retry", m.retry)
+func RegisterActions(reg *ops.Registry, m Restrictions) {
+	ops.Register(reg, "restrictions.defer", m.deferRestriction)
+	ops.Register(reg, "restrictions.exempt", m.exempt)
+	ops.Register(reg, "restrictions.release", m.release)
+	ops.Register(reg, "restrictions.override", m.override)
+	ops.Register(reg, "restrictions.reconcile", m.reconcile)
+	ops.Register(reg, "restrictions.retry", m.retry)
 }

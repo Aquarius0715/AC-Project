@@ -89,28 +89,30 @@ type Module struct {
 // deviceScope limits devices to the caller (D01): admins the tenant; clients devices bound to their organization;
 // everyone else their own unbound registrations (D05) and devices on units in the unitscope (IR169; lists in
 // Equipment mode, single reads in List mode followed by unitscope.Gate, IR49(b)).
-func deviceScope(c *ops.Call, args *[]any, mode unitscope.Mode) string {
-	p := c.Principal
+func deviceScope(call *ops.Call, args *[]any, mode unitscope.Mode) string {
+	principal := call.Principal
 	add := func(v any) string {
 		*args = append(*args, v)
 
 		return fmt.Sprintf("$%d", len(*args))
 	}
 
-	switch p.Role {
+	switch principal.Role {
 	case "admin":
 		return "TRUE"
 	case "client":
 		return "EXISTS (SELECT 1 FROM devices.device_bindings b WHERE b.device_id = d.id AND b.unbound_at IS NULL AND " +
 			"b.customer_org_id = " + add(
-			p.OrgID,
+			principal.OrgID,
 		) + ")"
 	}
 
-	own := "(d.unit_id IS NULL AND d.created_by_membership_id = " + add(p.MembershipID) + ")"
+	own := "(d.unit_id IS NULL AND d.created_by_membership_id = " + add(
+		principal.MembershipID,
+	) + ")"
 
 	return "(" + own + " OR (d.unit_id IS NOT NULL AND " + unitscope.SQL(
-		c,
+		call,
 		args,
 		"d.unit_id",
 		mode,
@@ -119,7 +121,7 @@ func deviceScope(c *ops.Call, args *[]any, mode unitscope.Mode) string {
 
 func (m *Module) load(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	where string,
 	args []any,
 	order string,
@@ -127,13 +129,13 @@ func (m *Module) load(
 ) ([]Device, int, error) {
 	var total int
 
-	err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM devices.devices d WHERE "+where, args...).
+	err := call.Tx.QueryRow(ctx, "SELECT count(*) FROM devices.devices d WHERE "+where, args...).
 		Scan(&total)
 	if err != nil {
 		return nil, 0, apperr.Wrap(err, "select devices.devices")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM devices.devices d WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
@@ -151,24 +153,24 @@ func (m *Module) load(
 	var out []Device
 
 	for rows.Next() {
-		var d Device
+		var device Device
 
 		err := rows.Scan(
-			&d.ID,
-			&d.TenantID,
-			&d.Version,
-			&d.CreatedAt,
-			&d.UpdatedAt,
-			&d.BindingID,
-			&d.UnitID,
-			&d.TargetUnitID,
-			&d.CreatedByMembershipID,
-			&d.Serial,
-			&d.Connection,
-			&d.LastSeenAt,
-			&d.FirmwareVersion,
-			&d.PowerSignal,
-			&d.Tamper,
+			&device.ID,
+			&device.TenantID,
+			&device.Version,
+			&device.CreatedAt,
+			&device.UpdatedAt,
+			&device.BindingID,
+			&device.UnitID,
+			&device.TargetUnitID,
+			&device.CreatedByMembershipID,
+			&device.Serial,
+			&device.Connection,
+			&device.LastSeenAt,
+			&device.FirmwareVersion,
+			&device.PowerSignal,
+			&device.Tamper,
 		)
 		if err != nil {
 			rows.Close()
@@ -176,8 +178,8 @@ func (m *Module) load(
 			return nil, 0, apperr.Wrap(err, "select devices.devices")
 		}
 
-		d.Sensors = []Sensor{}
-		out = append(out, d)
+		device.Sensors = []Sensor{}
+		out = append(out, device)
 	}
 
 	rows.Close()
@@ -196,7 +198,7 @@ func (m *Module) load(
 		ids[i], at[out[i].ID] = out[i].ID, i
 	}
 
-	srows, err := c.Tx.Query(
+	srows, err := call.Tx.Query(
 		ctx,
 		`SELECT boundary_id, id, device_id, metric, unit, stale_after_seconds, calibrated_at FROM devices.sensors
 		WHERE device_id = ANY($1) ORDER BY device_id, metric`,
@@ -207,16 +209,16 @@ func (m *Module) load(
 	}
 
 	for srows.Next() {
-		var s Sensor
+		var sensor Sensor
 
 		err := srows.Scan(
-			&s.BoundaryID,
-			&s.ID,
-			&s.DeviceID,
-			&s.Metric,
-			&s.Unit,
-			&s.StaleAfterSeconds,
-			&s.CalibratedAt,
+			&sensor.BoundaryID,
+			&sensor.ID,
+			&sensor.DeviceID,
+			&sensor.Metric,
+			&sensor.Unit,
+			&sensor.StaleAfterSeconds,
+			&sensor.CalibratedAt,
 		)
 		if err != nil {
 			srows.Close()
@@ -224,8 +226,8 @@ func (m *Module) load(
 			return nil, 0, apperr.Wrap(err, "select devices.sensors")
 		}
 
-		if i, ok := at[s.DeviceID]; ok {
-			out[i].Sensors = append(out[i].Sensors, s)
+		if i, ok := at[sensor.DeviceID]; ok {
+			out[i].Sensors = append(out[i].Sensors, sensor)
 		}
 	}
 
@@ -270,16 +272,16 @@ func (m *Module) load(
 //	@Router			/v1/devices [get]
 func (m *Module) list(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[Device], error) {
 	var f struct {
 		UnitID *uuid.UUID `json:"unitId,omitempty"`
 		Status *string    `json:"status,omitempty"`
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil {
@@ -290,7 +292,7 @@ func (m *Module) list(
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{"id": "d.id", "createdAt": "d.created_at", "updatedAt": "d.updated_at"},
 		"d.id ASC",
 	)
@@ -298,14 +300,14 @@ func (m *Module) list(
 		return paging.Page[Device]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Device]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var args []any
 
-	conds := []string{deviceScope(c, &args, unitscope.Equipment)}
+	conds := []string{deviceScope(call, &args, unitscope.Equipment)}
 	if f.UnitID != nil {
 		args = append(args, *f.UnitID)
 		conds = append(conds, fmt.Sprintf("d.unit_id = $%d", len(args)))
@@ -326,12 +328,12 @@ func (m *Module) list(
 
 	items, total, err := m.load(
 		ctx,
-		c,
+		call,
 		strings.Join(conds, " AND "),
 		args,
 		order,
-		w.Limit,
-		w.Offset,
+		window.Limit,
+		window.Offset,
 	)
 	if err != nil {
 		return paging.Page[Device]{}, err
@@ -343,9 +345,9 @@ func (m *Module) list(
 
 	return paging.Page[Device]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
@@ -387,25 +389,25 @@ func (in *IDInput) Validate() map[string]string {
 //	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/devices/{id} [get]
-func (m *Module) get(ctx context.Context, c *ops.Call, in *IDInput) (DeviceDetail, error) {
+func (m *Module) get(ctx context.Context, call *ops.Call, in *IDInput) (DeviceDetail, error) {
 	args := []any{in.ID}
 
-	d, err := m.detail(ctx, c, "d.id = $1 AND "+deviceScope(c, &args, unitscope.List), args)
+	d, err := m.detail(ctx, call, "d.id = $1 AND "+deviceScope(call, &args, unitscope.List), args)
 	if err != nil || d.UnitID == nil {
 		return d, err
 	}
 
-	return d, apperr.Wrap(unitscope.Gate(ctx, c, []uuid.UUID{*d.UnitID}), "unitscope.Gate")
+	return d, apperr.Wrap(unitscope.Gate(ctx, call, []uuid.UUID{*d.UnitID}), "unitscope.Gate")
 }
 
 // detail loads one device with calibration references and its active operation.
 func (m *Module) detail(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	where string,
 	args []any,
 ) (DeviceDetail, error) {
-	items, _, err := m.load(ctx, c, where, args, "d.id", 1, 0)
+	items, _, err := m.load(ctx, call, where, args, "d.id", 1, 0)
 	if err != nil {
 		return DeviceDetail{}, err
 	}
@@ -414,13 +416,13 @@ func (m *Module) detail(
 		return DeviceDetail{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	d := DeviceDetail{Device: items[0], CalibrationRefs: nil, ActiveOperation: nil}
-	d.CalibrationRefs = []uuid.UUID{}
+	deviceDetail := DeviceDetail{Device: items[0], CalibrationRefs: nil, ActiveOperation: nil}
+	deviceDetail.CalibrationRefs = []uuid.UUID{}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT id FROM devices.calibration_records WHERE device_id = $1 ORDER BY created_at DESC, id`,
-		d.ID,
+		deviceDetail.ID,
 	)
 	if err != nil {
 		return DeviceDetail{}, apperr.Wrap(err, "select devices.calibration_records")
@@ -436,7 +438,7 @@ func (m *Module) detail(
 			return DeviceDetail{}, apperr.Wrap(err, "select devices.calibration_records")
 		}
 
-		d.CalibrationRefs = append(d.CalibrationRefs, id)
+		deviceDetail.CalibrationRefs = append(deviceDetail.CalibrationRefs, id)
 	}
 
 	rows.Close()
@@ -448,24 +450,24 @@ func (m *Module) detail(
 
 	var op []byte
 
-	err = c.Tx.QueryRow(ctx, `SELECT to_jsonb(o) FROM (SELECT id, tenant_id AS "tenantId", version, created_at AS
+	err = call.Tx.QueryRow(ctx, `SELECT to_jsonb(o) FROM (SELECT id, tenant_id AS "tenantId", version, created_at AS
 		"createdAt", updated_at AS "updatedAt",
 		device_id AS "deviceId", unit_id AS "unitId", job_id AS "jobId", kind, status, target_version AS "targetVersion",
 		failure_code AS "failureCode",
 		started_at AS "startedAt", finished_at AS "finishedAt", expires_at AS "expiresAt"
 		FROM devices.device_operations WHERE device_id = $1 AND status IN ('queued','running') ORDER BY created_at DESC LIMIT
-		1) o`, d.ID).
+		1) o`, deviceDetail.ID).
 		Scan(&op)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return DeviceDetail{}, apperr.Wrap(err, "select devices.device_operations")
 	}
 
-	d.ActiveOperation = json.RawMessage("null")
+	deviceDetail.ActiveOperation = json.RawMessage("null")
 	if len(op) > 0 {
-		d.ActiveOperation = op
+		deviceDetail.ActiveOperation = op
 	}
 
-	return d, nil
+	return deviceDetail, nil
 }
 
 var serialRe = regexp.MustCompile(`^[A-Z0-9-]{3,64}$`)
@@ -480,36 +482,36 @@ type RegisterInput struct {
 
 // Validate implements ops.Validator (DD-T11: serial 3–64 letters, digits or hyphens after trim + upper-case).
 func (in *RegisterInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 
 	in.Serial = strings.ToUpper(strings.TrimSpace(in.Serial))
 	if !serialRe.MatchString(in.Serial) {
-		fe["serial"] = "error.serialFormat"
+		fieldErrs["serial"] = "error.serialFormat"
 	}
 
 	if in.SensorTypes == nil {
-		fe["sensorTypes"] = "error.required"
+		fieldErrs["sensorTypes"] = "error.required"
 	}
 
 	if !uniqueIn(in.SensorTypes, nil) {
-		fe["sensorTypes"] = "error.duplicate"
+		fieldErrs["sensorTypes"] = "error.duplicate"
 	}
 
 	if in.UnitID == uuid.Nil {
-		fe["unitId"] = "error.required"
+		fieldErrs["unitId"] = "error.required"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // technicianGate applies IR94 to technician writes that carry jobId.
 func (m *Module) technicianGate(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	jobID *uuid.UUID,
 	unit uuid.UUID,
 ) error {
-	if c.Principal.Role != "technician" {
+	if call.Principal.Role != "technician" {
 		return nil
 	}
 
@@ -518,7 +520,7 @@ func (m *Module) technicianGate(
 	}
 
 	return apperr.Wrap(
-		m.Access.TechnicianJob(ctx, c, *jobID, unit),
+		m.Access.TechnicianJob(ctx, call, *jobID, unit),
 		"devices.TechAccess.TechnicianJob",
 	)
 }
@@ -557,15 +559,15 @@ func (m *Module) register(ctx context.Context, c *ops.Call, in *RegisterInput) (
 // registerDetail is register answering the device with its detail (IR392: the write itself answers Device).
 func (m *Module) registerDetail(
 	ctx context.Context,
-	c *ops.Call,
-	in *RegisterInput,
+	call *ops.Call,
+	input *RegisterInput,
 ) (DeviceDetail, error) {
-	err := m.technicianGate(ctx, c, in.JobID, in.UnitID)
+	err := m.technicianGate(ctx, call, input.JobID, input.UnitID)
 	if err != nil {
 		return DeviceDetail{}, err
 	}
 
-	u, ok, err := m.Units.UnitInfo(ctx, c, in.UnitID)
+	unitInfo, ok, err := m.Units.UnitInfo(ctx, call, input.UnitID)
 	if err != nil {
 		return DeviceDetail{}, apperr.Wrap(err, "devices.Units.UnitInfo")
 	}
@@ -576,8 +578,8 @@ func (m *Module) registerDetail(
 
 	var sensorsRaw []byte
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT sensors FROM devices.capabilities WHERE id = $1 AND version =
-		$2`, u.ModelID, u.CapabilityVersion).
+	scanErr := call.Tx.QueryRow(ctx, `SELECT sensors FROM devices.capabilities WHERE id = $1 AND version =
+		$2`, unitInfo.ModelID, unitInfo.CapabilityVersion).
 		Scan(&sensorsRaw)
 	if scanErr != nil {
 		return DeviceDetail{}, apperr.Wrap(scanErr, "select devices.capabilities")
@@ -592,7 +594,7 @@ func (m *Module) registerDetail(
 		byMetric[s.Metric] = s
 	}
 
-	for _, mt := range in.SensorTypes {
+	for _, mt := range input.SensorTypes {
 		if _, ok := byMetric[mt]; !ok {
 			return DeviceDetail{}, apperr.Fields(
 				map[string]string{"sensorTypes": "error.notInCapability"},
@@ -602,7 +604,8 @@ func (m *Module) registerDetail(
 
 	var dup bool
 
-	scanErr = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.devices WHERE upper(serial) = $1)`, in.Serial).
+	scanErr = call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.devices WHERE upper(serial) =
+		$1)`, input.Serial).
 		Scan(&dup)
 	if scanErr != nil {
 		return DeviceDetail{}, apperr.Wrap(scanErr, "select devices.devices")
@@ -617,31 +620,31 @@ func (m *Module) registerDetail(
 	// D05: register reserves targetUnitId; unitId stays null until devices.bind
 	id := uuid.Must(uuid.NewV7())
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, 'v1')`,
 		id,
-		in.Serial,
-		in.UnitID,
-		c.Principal.MembershipID,
+		input.Serial,
+		input.UnitID,
+		call.Principal.MembershipID,
 	)
 	if execErr != nil {
 		return DeviceDetail{}, apperr.Wrap(execErr, "insert devices.devices")
 	}
 
-	for _, mt := range in.SensorTypes {
-		s := byMetric[mt]
+	for _, mt := range input.SensorTypes {
+		sensorSpec := byMetric[mt]
 
-		_, err := c.Tx.Exec(
+		_, err := call.Tx.Exec(
 			ctx,
 			`INSERT INTO devices.sensors (tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
 			id,
-			s.Metric,
-			s.Unit,
-			s.BoundaryID,
-			s.StaleAfterSeconds,
+			sensorSpec.Metric,
+			sensorSpec.Unit,
+			sensorSpec.BoundaryID,
+			sensorSpec.StaleAfterSeconds,
 		)
 		if err != nil {
 			return DeviceDetail{}, apperr.Wrap(err, "insert devices.sensors")
@@ -650,15 +653,15 @@ func (m *Module) registerDetail(
 
 	one := 1
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "device",
 			AggregateID:   id,
 			Type:          "DeviceRegistered",
-			Payload:       map[string]any{"targetUnitId": in.UnitID},
+			Payload:       map[string]any{"targetUnitId": input.UnitID},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "devices.register",
 			TargetKind:      "device",
@@ -674,31 +677,31 @@ func (m *Module) registerDetail(
 
 	return m.detail(
 		ctx,
-		c,
+		call,
 		"d.id = $1",
 		[]any{id},
 	) // own write result; read scope applies to later reads
 }
 
 // RegisterDevices binds the device operations.
-func RegisterDevices(r *ops.Registry, m *Module) {
-	if m.Access == nil {
-		m.Access = maintenance.Access{}
+func RegisterDevices(r *ops.Registry, module *Module) {
+	if module.Access == nil {
+		module.Access = maintenance.Access{}
 	}
 
-	if m.UnitAccess == nil {
-		m.UnitAccess = maintenance.Access{}
+	if module.UnitAccess == nil {
+		module.UnitAccess = maintenance.Access{}
 	}
 
-	ops.Register(r, "devices.list", m.list)
-	ops.Register(r, "devices.get", m.get)
-	ops.Register(r, "devices.register", m.register)
-	ops.Register(r, "devices.bind", m.bind)
-	ops.Register(r, "devices.check", m.check)
-	ops.Register(r, "devices.updateFirmware", m.updateFirmware)
-	ops.Register(r, "devices.calibrate", m.calibrate)
-	ops.Register(r, "devices.operations", m.operations)
-	ops.Register(r, "devices.calibrations", m.calibrations)
-	ops.Register(r, "devices.events", m.events)
-	ops.Register(r, "devices.addResponseNote", m.addResponseNote)
+	ops.Register(r, "devices.list", module.list)
+	ops.Register(r, "devices.get", module.get)
+	ops.Register(r, "devices.register", module.register)
+	ops.Register(r, "devices.bind", module.bind)
+	ops.Register(r, "devices.check", module.check)
+	ops.Register(r, "devices.updateFirmware", module.updateFirmware)
+	ops.Register(r, "devices.calibrate", module.calibrate)
+	ops.Register(r, "devices.operations", module.operations)
+	ops.Register(r, "devices.calibrations", module.calibrations)
+	ops.Register(r, "devices.events", module.events)
+	ops.Register(r, "devices.addResponseNote", module.addResponseNote)
 }

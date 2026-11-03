@@ -51,15 +51,15 @@ func TestTelemetryBatchShape(t *testing.T) {
 		t.Fatalf("%d measurements, want %d", len(ms), len(Sensors))
 	}
 
-	for i, x := range ms {
+	for idx, x := range ms {
 		row := x.(map[string]any)
 		for _, k := range []string{"sensorId", "metric", "value", "unit", "observedAt", "sequence"} {
 			if _, ok := row[k]; !ok {
-				t.Errorf("measurement %d lacks %s", i, k)
+				t.Errorf("measurement %d lacks %s", idx, k)
 			}
 		}
 
-		s := Sensors[i]
+		s := Sensors[idx]
 
 		v := row["value"].(float64)
 		if math.Abs(v-s.Base) > s.Swing+0.01 {
@@ -132,10 +132,10 @@ func TestHeartbeatCarriesFirmware(t *testing.T) {
 // TestAcknowledgeAppliesAndExpires: a set-temperature command in time is applied and acknowledged with the new
 // setpoint; a command past its expiry is not applied and the module keeps its setpoint; an unknown kind is unsupported.
 func TestAcknowledgeAppliesAndExpires(t *testing.T) {
-	m := NewModule(tenant, device, "v1", 1)
+	module := NewModule(tenant, device, "v1", 1)
 	now := time.Date(2026, 10, 13, 2, 0, 0, 0, time.UTC)
 	ack := func(cmd string, at time.Time) map[string]any {
-		raw, _, err := m.Acknowledge([]byte(cmd), at)
+		raw, _, err := module.Acknowledge([]byte(cmd), at)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -172,7 +172,7 @@ func TestAcknowledgeAppliesAndExpires(t *testing.T) {
 		t.Fatalf("unsupported: %v", a)
 	}
 
-	_, _, err := m.Acknowledge([]byte(`not json`), now)
+	_, _, err := module.Acknowledge([]byte(`not json`), now)
 	if err == nil {
 		t.Error("a malformed command is accepted")
 	}
@@ -193,14 +193,14 @@ func TestCommandAndAckTopics(t *testing.T) {
 // TestAcknowledgeRefusesMalformedAndKeepsUnknownKinds: a command that is not JSON is an error and changes nothing; a
 // command of an unknown kind is answered unsupported with the setpoint unchanged.
 func TestAcknowledgeRefusesMalformedAndKeepsUnknownKinds(t *testing.T) {
-	m := NewModule(tenant, device, "v1", 1)
+	module := NewModule(tenant, device, "v1", 1)
 
-	_, _, err := m.Acknowledge([]byte(`{"commandId":`), time.Now())
+	_, _, err := module.Acknowledge([]byte(`{"commandId":`), time.Now())
 	if err == nil {
 		t.Error("a malformed command is accepted")
 	}
 
-	raw, _, err := m.Acknowledge(
+	raw, _, err := module.Acknowledge(
 		[]byte(`{"commandId":"c9","kind":"reboot","expiresAt":"2030-01-01T00:00:00Z"}`),
 		time.Now(),
 	)

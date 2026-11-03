@@ -9,10 +9,10 @@ import (
 )
 
 func TestVoiceAndExport(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	say := func(a *actor, text, locale, extra string) (int, map[string]any) {
 		return post(
-			s,
+			srv,
 			a,
 			"voice.resolveIntent",
 			`{"text":"`+text+`","locale":"`+locale+`"`+extra+`}`,
@@ -20,29 +20,29 @@ func TestVoiceAndExport(t *testing.T) {
 	}
 	bedroomA := seed.ID("unit-online-rto").String()
 
-	code, m := say(&customerA, "  Temperature BEDROOM ", "en", "")
-	if code != 200 || data(m)["kind"] != "temperature" || data(m)["unitId"] != bedroomA {
-		t.Fatalf("temperature: %d %v", code, m)
+	code, res := say(&customerA, "  Temperature BEDROOM ", "en", "")
+	if code != 200 || data(res)["kind"] != "temperature" || data(res)["unitId"] != bedroomA {
+		t.Fatalf("temperature: %d %v", code, res)
 	}
 
-	if _, ok := data(m)["measurement"]; !ok {
+	if _, ok := data(res)["measurement"]; !ok {
 		t.Error("measurement key present (object or null)")
 	}
 
-	code, m = say(&customerA, "set living room to 24 degrees", "en", "")
-	if code != 200 || data(m)["kind"] != "change" || data(m)["celsius"].(float64) != 24 ||
-		data(m)["expectedVersion"] == nil ||
-		data(m)["unitId"] != seed.ID("unit-non-rto").String() {
-		t.Fatalf("change: %d %v", code, m)
+	code, res = say(&customerA, "set living room to 24 degrees", "en", "")
+	if code != 200 || data(res)["kind"] != "change" || data(res)["celsius"].(float64) != 24 ||
+		data(res)["expectedVersion"] == nil ||
+		data(res)["unitId"] != seed.ID("unit-non-rto").String() {
+		t.Fatalf("change: %d %v", code, res)
 	}
 
-	if _, m := say(
+	if _, resp := say(
 		&customerA,
 		"tetapkan living room kepada 25 darjah",
 		"ms",
 		"",
-	); data(m)["kind"] != "change" {
-		t.Errorf("ms change: %v", m)
+	); data(resp)["kind"] != "change" {
+		t.Errorf("ms change: %v", resp)
 	}
 
 	for text, kind := range map[string]string{
@@ -54,38 +54,39 @@ func TestVoiceAndExport(t *testing.T) {
 		}
 	}
 
-	if _, m := say(
+	if _, resp := say(
 		&customerA,
 		"bantuan",
 		"ms",
 		"",
-	); data(m)["kind"] != "help" ||
-		data(m)["messageKey"] != "voice.help" {
-		t.Errorf("bantuan: %v", m)
+	); data(resp)["kind"] != "help" ||
+		data(resp)["messageKey"] != "voice.help" {
+		t.Errorf("bantuan: %v", resp)
 	}
 
 	if _, m := say(&customerA, "help", "ms", ""); data(m)["kind"] != "unsupported" {
 		t.Error("English help in Malay grammar")
 	}
 	// HQ sees both customers' bedrooms → candidates, then a selection
-	code, m = say(&hq, "temperature bedroom", "en", "")
-	if code != 200 || data(m)["kind"] != "candidates" || len(data(m)["candidates"].([]any)) < 2 {
-		t.Fatalf("candidates: %d %v", code, m)
+	code, res = say(&hq, "temperature bedroom", "en", "")
+	if code != 200 || data(res)["kind"] != "candidates" ||
+		len(data(res)["candidates"].([]any)) < 2 {
+		t.Fatalf("candidates: %d %v", code, res)
 	}
 
-	label := data(m)["candidates"].([]any)[0].(map[string]any)["pathLabel"].(string)
+	label := data(res)["candidates"].([]any)[0].(map[string]any)["pathLabel"].(string)
 	if label == "" {
 		t.Error("path label")
 	}
 
-	if _, m := say(
+	if _, resp := say(
 		&hq,
 		"temperature bedroom",
 		"en",
 		`,"selectedUnitId":"`+bedroomA+`"`,
-	); data(m)["kind"] != "temperature" ||
-		data(m)["unitId"] != bedroomA {
-		t.Errorf("selected: %v", m)
+	); data(resp)["kind"] != "temperature" ||
+		data(resp)["unitId"] != bedroomA {
+		t.Errorf("selected: %v", resp)
 	}
 
 	if code, _ := say(
@@ -101,14 +102,14 @@ func TestVoiceAndExport(t *testing.T) {
 		t.Errorf("blank text: %d %s", code, fields(m))
 	}
 
-	if code, m := say(
+	if code, resp := say(
 		&customerA,
 		"help",
 		"jp",
 		"",
 	); code != 422 ||
-		fields(m) != "locale=error.invalid" {
-		t.Errorf("bad locale: %d %s", code, fields(m))
+		fields(resp) != "locale=error.invalid" {
+		t.Errorf("bad locale: %d %s", code, fields(resp))
 	}
 
 	if code, _ := say(&contrA, "help", "en", ""); code != 403 {
@@ -118,7 +119,7 @@ func TestVoiceAndExport(t *testing.T) {
 	// monthly export
 	exp := func(a *actor, month, props, sections, format string) (int, map[string]any) {
 		return post(
-			s,
+			srv,
 			a,
 			"energy.exportReport",
 			`{"month":"`+month+`","propertyIds":[`+props+`],"sections":[`+sections+`],"format":"`+format+`"}`,
@@ -127,20 +128,20 @@ func TestVoiceAndExport(t *testing.T) {
 	homeA := `"` + seed.ID("property-home-a").String() + `"`
 	all := `"energy_cost","month_comparison","co2_offsets","alerts_maintenance"`
 
-	code, m = exp(&customerA, "2026-08", homeA, all, "csv")
-	if code != 200 || data(m)["fileName"] != "energy-report-2026-08.csv" ||
-		data(m)["mime"] != "text/csv" ||
-		data(m)["size"].(float64) <= 0 {
-		t.Fatalf("export: %d %v", code, m)
+	code, res = exp(&customerA, "2026-08", homeA, all, "csv")
+	if code != 200 || data(res)["fileName"] != "energy-report-2026-08.csv" ||
+		data(res)["mime"] != "text/csv" ||
+		data(res)["size"].(float64) <= 0 {
+		t.Fatalf("export: %d %v", code, res)
 	}
 
-	if _, m := exp(
+	if _, resp := exp(
 		&customerA,
 		"2026-08",
 		homeA,
 		`"energy_cost"`,
 		"pdf",
-	); data(m)["mime"] != "application/pdf" {
+	); data(resp)["mime"] != "application/pdf" {
 		t.Error("pdf export")
 	}
 

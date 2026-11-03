@@ -44,12 +44,12 @@ func TestConcurrentAlertOpening(t *testing.T) {
 	})
 
 	begin := func(conn *pgx.Conn) pgx.Tx {
-		tx, err := conn.Begin(ctx)
+		txn, err := conn.Begin(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		_, execErr := tx.Exec(
+		_, execErr := txn.Exec(
 			ctx,
 			`SELECT set_config('app.tenant_id', $1, true)`,
 			tenant.String(),
@@ -58,9 +58,9 @@ func TestConcurrentAlertOpening(t *testing.T) {
 			t.Fatal(execErr)
 		}
 
-		return tx
+		return txn
 	}
-	at := clock
+	when := clock
 	tx1 := begin(c1)
 
 	first, err := monitoring.Alerts{
@@ -73,7 +73,7 @@ func TestConcurrentAlertOpening(t *testing.T) {
 		unit,
 		org,
 		"race 1",
-		at,
+		when,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +98,7 @@ func TestConcurrentAlertOpening(t *testing.T) {
 			unit,
 			org,
 			"race 2",
-			at,
+			when,
 		)
 		if err == nil {
 			err = tx2.Commit(ctx)

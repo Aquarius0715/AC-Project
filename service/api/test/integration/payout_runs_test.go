@@ -14,10 +14,10 @@ import (
 // September clock), once per month. A later tick regenerates nothing, and a run after HQ approved the statement
 // leaves it as it is.
 func TestMonthlyPayoutDrafts(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	ctx := context.Background()
 	tenant, org := seed.ID("tenant-a"), uuid.New() // a contractor of its own, without a rate card
-	at := time.Date(2026, 8, 20, 3, 0, 0, 0, time.UTC)
+	when := time.Date(2026, 8, 20, 3, 0, 0, 0, time.UTC)
 	job, rep := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
@@ -26,10 +26,10 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 		VALUES ($1,$2,$3,$4,'reactive','completed','client_request',tstzrange($5,$6),$6,$7,$6)`,
 		job,
 		tenant,
-		newUnit(t, s, "Monthly payout AC"),
+		newUnit(t, srv, "Monthly payout AC"),
 		seed.ID("org-customer-b"),
-		at.Add(-2*time.Hour),
-		at,
+		when.Add(-2*time.Hour),
+		when,
 		org,
 	)
 	owner(
@@ -40,7 +40,7 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 		tenant,
 		job,
 		uuid.New(),
-		at,
+		when,
 	)
 	t.Cleanup(func() { // later tests' payout lists stay as they were
 		owner(
@@ -71,7 +71,7 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 
 		tick++
 
-		_, err := schedTick(ctx, s, clock.Add(time.Duration(tick)*time.Minute))
+		_, err := schedTick(ctx, srv, clock.Add(time.Duration(tick)*time.Minute))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -94,16 +94,16 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 		)
 
 		out := make([]statement, n)
-		for i := range out {
+		for idx := range out {
 			ownerScan(
 				t,
 				`SELECT s.id::text, s.status, (SELECT count(*) FROM billing.payout_lines l WHERE l.statement_id = s.id) FROM
 					billing.payout_statements s
 				WHERE s.contractor_org_id = $1 AND s.period = '2026-08' ORDER BY s.created_at, s.id OFFSET $2 LIMIT 1`,
-				[]any{org, i},
-				&out[i].id,
-				&out[i].status,
-				&out[i].lines,
+				[]any{org, idx},
+				&out[idx].id,
+				&out[idx].status,
+				&out[idx].lines,
 			)
 		}
 
@@ -147,14 +147,14 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 	var v int
 	ownerScan(t, `SELECT version FROM billing.payout_statements WHERE id = $1`, []any{draft}, &v)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"payouts.transition",
 		`{"statementId":"`+draft+`","action":"approve"}`,
 		v,
 	); code != 200 {
-		t.Fatalf("approve: %d %v", code, m)
+		t.Fatalf("approve: %d %v", code, res)
 	}
 
 	rerun()

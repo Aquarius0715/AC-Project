@@ -14,12 +14,12 @@ func TestCapabilityVersionRollsBackWhenThePreviousVersionCannotBeRetired(t *test
 	s := server(t)
 	model := "FI-" + uuid.NewString()[:8]
 
-	code, m := write(s, &hq, "capabilities.save", capBody("", model, ""), 0)
-	if code != 200 || ver(m) != 1 {
-		t.Fatalf("create: %d %v", code, m)
+	code, res := write(s, &hq, "capabilities.save", capBody("", model, ""), 0)
+	if code != 200 || ver(res) != 1 {
+		t.Fatalf("create: %d %v", code, res)
 	}
 
-	id := data(m)["id"].(string)
+	id := data(res)["id"].(string)
 
 	versions := func() (int, int) {
 		var n, top int
@@ -43,9 +43,9 @@ func TestCapabilityVersionRollsBackWhenThePreviousVersionCannotBeRetired(t *test
 		1,
 	)
 
-	code, m = write(broken, &hq, "capabilities.save", body, 1)
+	code, res = write(broken, &hq, "capabilities.save", body, 1)
 	if code < 500 {
-		t.Fatalf("new version with a failing retire: %d %v, want a server error", code, m)
+		t.Fatalf("new version with a failing retire: %d %v, want a server error", code, res)
 	}
 
 	if n2, top2 := versions(); n2 != n || top2 != top {

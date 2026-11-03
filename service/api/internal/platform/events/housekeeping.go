@@ -30,11 +30,11 @@ type Swept struct{ Outbox, Processed, Failures, IdempotencyKeys int64 }
 //   - idempotency keys past their expiry, tenant by tenant (the table has row-level security).
 func Housekeep(
 	ctx context.Context,
-	m ops.Runner,
+	runner ops.Runner,
 	now time.Time,
 	consumers []*Consumer,
 ) (Swept, error) {
-	var s Swept
+	var swept Swept
 
 	var names, types []string // one row per (consumer, subscribed type)
 
@@ -44,8 +44,8 @@ func Housekeep(
 		}
 	}
 
-	err := m.Run(ctx, false, nil, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `DELETE FROM platform.outbox o WHERE o.occurred_at < $1
+	err := runner.Run(ctx, false, nil, func(txn pgx.Tx) error {
+		tag, err := txn.Exec(ctx, `DELETE FROM platform.outbox o WHERE o.occurred_at < $1
 			AND NOT EXISTS (SELECT 1 FROM unnest($2::text[], $3::text[]) AS sub(consumer, event_type)
 				WHERE sub.event_type = o.event_type
 				  AND NOT EXISTS (SELECT 1 FROM platform.processed_events p WHERE p.consumer = sub.consumer AND p.event_id =
@@ -55,9 +55,9 @@ func Housekeep(
 			return apperr.Wrap(err, "delete platform.outbox")
 		}
 
-		s.Outbox = tag.RowsAffected()
+		swept.Outbox = tag.RowsAffected()
 
-		tag, err = tx.Exec(
+		tag, err = txn.Exec(
 			ctx,
 			`DELETE FROM platform.processed_events p WHERE p.processed_at < $1
 			AND NOT EXISTS (SELECT 1 FROM platform.outbox o WHERE o.id = p.event_id)`,
@@ -67,9 +67,9 @@ func Housekeep(
 			return apperr.Wrap(err, "delete platform.processed_events")
 		}
 
-		s.Processed = tag.RowsAffected()
+		swept.Processed = tag.RowsAffected()
 
-		tag, err = tx.Exec(
+		tag, err = txn.Exec(
 			ctx,
 			`DELETE FROM platform.event_failures f WHERE NOT EXISTS (SELECT 1 FROM platform.outbox o WHERE o.id = f.event_id)`,
 		)
@@ -77,17 +77,17 @@ func Housekeep(
 			return apperr.Wrap(err, "delete platform.event_failures")
 		}
 
-		s.Failures = tag.RowsAffected()
+		swept.Failures = tag.RowsAffected()
 
 		return nil
 	})
 	if err != nil {
-		return s, apperr.Wrap(err, "ops.Runner.Run")
+		return swept, apperr.Wrap(err, "ops.Runner.Run")
 	}
 
 	var tenants []uuid.UUID
 
-	runErr := m.Run(ctx, true, nil, func(tx pgx.Tx) error {
+	runErr := runner.Run(ctx, true, nil, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 		if err != nil {
 			return apperr.Wrap(err, "select platform.tenants")
@@ -98,11 +98,11 @@ func Housekeep(
 		return apperr.Wrap(err, "select platform.tenants")
 	})
 	if runErr != nil {
-		return s, apperr.Wrap(runErr, "ops.Runner.Run")
+		return swept, apperr.Wrap(runErr, "ops.Runner.Run")
 	}
 
 	for _, t := range tenants {
-		err := m.Run(
+		err := runner.Run(
 			ctx,
 			false,
 			&ops.Principal{
@@ -123,15 +123,15 @@ func Housekeep(
 					`DELETE FROM platform.idempotency_keys WHERE expires_at < $1`,
 					now,
 				)
-				s.IdempotencyKeys += tag.RowsAffected()
+				swept.IdempotencyKeys += tag.RowsAffected()
 
 				return apperr.Wrap(err, "delete platform.idempotency_keys")
 			},
 		)
 		if err != nil {
-			return s, apperr.Wrap(err, "ops.Runner.Run")
+			return swept, apperr.Wrap(err, "ops.Runner.Run")
 		}
 	}
 
-	return s, nil
+	return swept, nil
 }

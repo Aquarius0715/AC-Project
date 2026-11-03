@@ -20,7 +20,7 @@ func TestWindow(t *testing.T) {
 	}
 
 	now := time.Date(2026, 10, 11, 9, 0, 15, 0, time.UTC)
-	w := &Window{
+	window := &Window{
 		Store:  store,
 		Limit:  3,
 		Window: time.Minute,
@@ -30,18 +30,18 @@ func TestWindow(t *testing.T) {
 
 	ctx := context.Background()
 	for i := 1; i <= 3; i++ {
-		wait, err := w.Allow(ctx, "t1:m1")
+		wait, err := window.Allow(ctx, "t1:m1")
 		if err != nil || wait != 0 {
 			t.Fatalf("write %d: wait %d %v", i, wait, err)
 		}
 	}
 	// the fourth in the minute waits until the window ends (45 s after 09:00:15)
-	wait, allowErr := w.Allow(ctx, "t1:m1")
+	wait, allowErr := window.Allow(ctx, "t1:m1")
 	if allowErr != nil || wait != 45 {
 		t.Fatalf("over the limit: wait %d %v", wait, allowErr)
 	}
 	// another caller has its own count
-	if wait, _ := w.Allow(ctx, "t1:m2"); wait != 0 {
+	if wait, _ := window.Allow(ctx, "t1:m2"); wait != 0 {
 		t.Errorf("another membership waits %d", wait)
 	}
 	// a second instance on the same store sees the same count
@@ -64,23 +64,23 @@ func TestWindow(t *testing.T) {
 	// the next minute starts a new window
 	now = now.Add(time.Minute)
 
-	if wait, _ := w.Allow(ctx, "t1:m1"); wait != 0 {
+	if wait, _ := window.Allow(ctx, "t1:m1"); wait != 0 {
 		t.Errorf("next minute waits %d", wait)
 	}
 	// at the very end of a window the wait is at least one second
 	now = time.Date(2026, 10, 11, 9, 2, 59, 999_000_000, time.UTC)
 
 	for range 3 {
-		_, _ = w.Allow(ctx, "t1:m3")
+		_, _ = window.Allow(ctx, "t1:m3")
 	}
 
-	if wait, _ := w.Allow(ctx, "t1:m3"); wait != 1 {
+	if wait, _ := window.Allow(ctx, "t1:m3"); wait != 1 {
 		t.Errorf("last instant: wait %d", wait)
 	}
 	// an unreachable store is an error: the caller decides (the Core API fails open)
 	mr.Close()
 
-	_, allowErr = w.Allow(ctx, "t1:m1")
+	_, allowErr = window.Allow(ctx, "t1:m1")
 	if allowErr == nil {
 		t.Error("closed store: no error")
 	}

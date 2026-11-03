@@ -126,19 +126,19 @@ func notificationMail(
 
 	subject := oneLine(fmt.Sprintf(format, name))
 
-	var b strings.Builder
-	b.WriteString(subject)
+	var builder strings.Builder
+	builder.WriteString(subject)
 
 	for _, k := range []string{"status", "reason", "message"} {
 		if v, ok := params[k].(string); ok && v != "" {
-			fmt.Fprintf(&b, "\n%s: %s", strings.ToUpper(k[:1])+k[1:], v)
+			fmt.Fprintf(&builder, "\n%s: %s", strings.ToUpper(k[:1])+k[1:], v)
 		}
 	}
 
-	fmt.Fprintf(&b, "\n\nOpen the app: %s/notifications", apps.of(role))
-	b.WriteString(footer)
+	fmt.Fprintf(&builder, "\n\nOpen the app: %s/notifications", apps.of(role))
+	builder.WriteString(footer)
 
-	return subject, b.String()
+	return subject, builder.String()
 }
 
 // oneLine keeps a subject on one line: a name with a line break (a unit or organization name) must not fail the send.
@@ -159,8 +159,8 @@ const retryDue = `%[1]s.attempts < $1 AND %[1]s.%[2]s <= $3::timestamptz - inter
 // maxAttempts. It answers how many were sent. A new account's set-up e-mail is the identity provider's (IR461, IR479).
 func Deliver(
 	ctx context.Context,
-	tx pgx.Tx,
-	s Sender,
+	txn pgx.Tx,
+	sender Sender,
 	apps Apps,
 	now time.Time,
 	limit int,
@@ -175,7 +175,7 @@ func Deliver(
 		ended         bool // the recipient's membership has ended: the e-mail is suppressed, not sent
 	}
 
-	rows, err := tx.Query(
+	rows, err := txn.Query(
 		ctx,
 		`SELECT n.id, u.email::text, n.template_key, m.role, n.params, COALESCE(d.attempts, 0), m.valid_until IS NOT NULL AND
 			m.valid_until <= $3
@@ -244,7 +244,7 @@ func Deliver(
 		case p.ended: // a disabled or removed account gets no more e-mails (recorded, never retried)
 			state, reason = "suppressed", new("membership ended")
 		default:
-			msgID, err = s.Send(ctx, p.to, subject, body)
+			msgID, err = sender.Send(ctx, p.to, subject, body)
 			if err != nil {
 				state, reason = "failed", new(err.Error())
 			} else {
@@ -252,7 +252,7 @@ func Deliver(
 			}
 		}
 
-		_, execErr := tx.Exec(
+		_, execErr := txn.Exec(
 			ctx,
 			`INSERT INTO notify.deliveries (tenant_id, notification_id, channel, state, provider_message_id, failure_reason,
 				attempts, updated_at)
@@ -278,15 +278,15 @@ func Deliver(
 // DeliverAll runs Deliver for every tenant, each in its own transaction with the tenant set (row-level security).
 func DeliverAll(
 	ctx context.Context,
-	m *db.TxManager,
-	s Sender,
+	txm *db.TxManager,
+	sender Sender,
 	apps Apps,
 	now time.Time,
 	limit int,
 ) (int, error) {
 	var tenants []uuid.UUID
 
-	rows, err := m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
+	rows, err := txm.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 	if err != nil {
 		return 0, apperr.Wrap(err, "select platform.tenants")
 	}
@@ -314,7 +314,7 @@ func DeliverAll(
 	total := 0
 
 	for _, t := range tenants {
-		err := m.Run(
+		err := txm.Run(
 			ctx,
 			false,
 			&ops.Principal{
@@ -330,7 +330,7 @@ func DeliverAll(
 				SessionsRevokedAt: nil,
 			},
 			func(tx pgx.Tx) error {
-				n, err := Deliver(ctx, tx, s, apps, now, limit)
+				n, err := Deliver(ctx, tx, sender, apps, now, limit)
 				total += n
 
 				return err
@@ -349,7 +349,7 @@ const Retention = 2 * 365 * 24 * time.Hour
 
 // Sweep deletes, in the tenant of tx, the notifications older than Retention with their deliveries. It answers how
 // many rows went.
-func Sweep(ctx context.Context, tx pgx.Tx, now time.Time) (int64, error) {
+func Sweep(ctx context.Context, txn pgx.Tx, now time.Time) (int64, error) {
 	cut := now.Add(-Retention)
 
 	var n int64
@@ -358,7 +358,7 @@ func Sweep(ctx context.Context, tx pgx.Tx, now time.Time) (int64, error) {
 		`DELETE FROM notify.deliveries d USING notify.notifications x WHERE x.id = d.notification_id AND x.occurred_at < $1`,
 		`DELETE FROM notify.notifications WHERE occurred_at < $1`,
 	} {
-		tag, err := tx.Exec(ctx, q, cut)
+		tag, err := txn.Exec(ctx, q, cut)
 		if err != nil {
 			return n, apperr.Wrap(err, "exec (Sweep)")
 		}
@@ -370,10 +370,10 @@ func Sweep(ctx context.Context, tx pgx.Tx, now time.Time) (int64, error) {
 }
 
 // SweepAll runs Sweep for every tenant, each in its own transaction with the tenant set (row-level security).
-func SweepAll(ctx context.Context, m *db.TxManager, now time.Time) (int64, error) {
+func SweepAll(ctx context.Context, txm *db.TxManager, now time.Time) (int64, error) {
 	var tenants []uuid.UUID
 
-	rows, err := m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
+	rows, err := txm.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 	if err != nil {
 		return 0, apperr.Wrap(err, "select platform.tenants")
 	}
@@ -386,7 +386,7 @@ func SweepAll(ctx context.Context, m *db.TxManager, now time.Time) (int64, error
 	var total int64
 
 	for _, t := range tenants {
-		err := m.Run(
+		err := txm.Run(
 			ctx,
 			false,
 			&ops.Principal{

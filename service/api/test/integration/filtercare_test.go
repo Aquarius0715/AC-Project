@@ -10,15 +10,15 @@ import (
 )
 
 func TestFilterCare(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	tenant := seed.ID("tenant-a")
 	owner(
 		t,
 		`DELETE FROM maintenance.filter_care_settings WHERE customer_id = $1`,
 		seed.ID("cust-b"),
 	)
-	u := newUnit(t, s, "Filter AC")
-	owner(t, `UPDATE assets.units SET connection = 'online' WHERE id = $1`, u)
+	unit := newUnit(t, srv, "Filter AC")
+	owner(t, `UPDATE assets.units SET connection = 'online' WHERE id = $1`, unit)
 
 	dev, sensor := uuid.NewString(), uuid.NewString()
 	owner(
@@ -28,7 +28,7 @@ func TestFilterCare(t *testing.T) {
 		dev,
 		tenant,
 		"FC-"+dev[:8],
-		u,
+		unit,
 		seed.ID("hq-operator"),
 	)
 	owner(
@@ -47,7 +47,7 @@ func TestFilterCare(t *testing.T) {
 				origin, quality, received_at, event_id)
 			VALUES ($1,$2,$3,'power',$4,$5,$6,'kW','measured','valid',$4,$7)`,
 			tenant,
-			u,
+			unit,
 			sensor,
 			clock.Add(-ago),
 			seq,
@@ -59,7 +59,7 @@ func TestFilterCare(t *testing.T) {
 	reading(10*time.Hour, 0, 2)    // off
 
 	statusOf := func(a *actor) map[string]any {
-		_, m := post(s, a, "filterCare.list", `{"filters":{"unitId":"`+u+`"}}`)
+		_, m := post(srv, a, "filterCare.list", `{"filters":{"unitId":"`+unit+`"}}`)
 		if len(items(m)) != 1 {
 			t.Fatalf("list: %v", m)
 		}
@@ -89,44 +89,44 @@ func TestFilterCare(t *testing.T) {
 		"whatsapp":      `{"thresholdHours":null,"fallbackDays":30,"recipients":"owners","channels":["inApp","whatsapp"]}`,
 		"bad recipient": `{"thresholdHours":null,"fallbackDays":30,"recipients":"everyone","channels":["inApp"]}`,
 	} {
-		code, m := write(s, &customerB, "filterCare.saveSettings", b, 0)
+		code, m := write(srv, &customerB, "filterCare.saveSettings", b, 0)
 		refusal(t, name, code, m, want[name])
 	}
 	// IR238: the settings read back — the defaults (version 0) before the first save
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerB,
 		"filterCare.getSettings",
 		`{}`,
-	); code != 200 || data(m)["version"].(float64) != 0 || data(m)["thresholdHours"] != nil ||
-		data(m)["fallbackDays"].(float64) != 30 ||
-		data(m)["recipients"] != "owners" {
-		t.Fatalf("default settings: %d %v", code, m)
+	); code != 200 || data(res)["version"].(float64) != 0 || data(res)["thresholdHours"] != nil ||
+		data(res)["fallbackDays"].(float64) != 30 ||
+		data(res)["recipients"] != "owners" {
+		t.Fatalf("default settings: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"filterCare.saveSettings",
 		`{"thresholdHours":100,"fallbackDays":14,"recipients":"all_users","channels":["inApp","email"]}`,
 		0,
 	); code != 200 ||
-		data(m)["version"].(float64) != 1 {
-		t.Fatalf("save settings: %d %v", code, m)
+		data(res)["version"].(float64) != 1 {
+		t.Fatalf("save settings: %d %v", code, res)
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&customerB,
 		"filterCare.getSettings",
 		`{}`,
-	); data(m)["version"].(float64) != 1 || data(m)["thresholdHours"].(float64) != 100 ||
-		data(m)["recipients"] != "all_users" ||
-		len(data(m)["channels"].([]any)) != 2 {
-		t.Fatalf("saved settings: %v", m)
+	); data(res)["version"].(float64) != 1 || data(res)["thresholdHours"].(float64) != 100 ||
+		data(res)["recipients"] != "all_users" ||
+		len(data(res)["channels"].([]any)) != 2 {
+		t.Fatalf("saved settings: %v", res)
 	}
 
-	if code, _ := post(s, &techInt, "filterCare.getSettings", `{}`); code != 403 {
+	if code, _ := post(srv, &techInt, "filterCare.getSettings", `{}`); code != 403 {
 		t.Error("a technician reads the customer's settings")
 	}
 
@@ -144,7 +144,7 @@ func TestFilterCare(t *testing.T) {
 	)
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerB,
 		"filterCare.saveSettings",
 		`{"thresholdHours":null,"fallbackDays":30,"recipients":"owners","channels":["inApp"]}`,
@@ -160,25 +160,25 @@ func TestFilterCare(t *testing.T) {
 	)
 	// mark cleaned → the counter restarts at 0 h: the reading in force (off since 10 h) has not run since (IR238)
 	if code, _ := write(
-		s,
+		srv,
 		&customerA,
 		"filterCare.markCleaned",
-		`{"unitId":"`+u+`"}`,
+		`{"unitId":"`+unit+`"}`,
 		0,
 	); code != 404 {
 		t.Error("other customer marks cleaned")
 	}
 
-	code, m := write(s, &customerB, "filterCare.markCleaned", `{"unitId":"`+u+`"}`, 0)
-	if code != 200 || data(m)["lastCleanedBy"] != "customer" || data(m)["status"] != "ok" ||
-		data(m)["runHoursSinceCleaning"] != float64(0) {
-		t.Fatalf("mark cleaned: %d %v", code, m)
+	code, resp := write(srv, &customerB, "filterCare.markCleaned", `{"unitId":"`+unit+`"}`, 0)
+	if code != 200 || data(resp)["lastCleanedBy"] != "customer" || data(resp)["status"] != "ok" ||
+		data(resp)["runHoursSinceCleaning"] != float64(0) {
+		t.Fatalf("mark cleaned: %d %v", code, resp)
 	}
 	// a cleaning while the AC was running: the reading in force counts from the cleaning (100 h → 10 h ago = 90 of 100 h)
 	owner(
 		t,
 		`UPDATE maintenance.filter_cleanings SET cleaned_at = $2 WHERE unit_id = $1`,
-		u,
+		unit,
 		clock.Add(-100*time.Hour),
 	)
 
@@ -192,7 +192,7 @@ func TestFilterCare(t *testing.T) {
 	owner(
 		t,
 		`UPDATE maintenance.filter_cleanings SET cleaned_at = $2 WHERE unit_id = $1`,
-		u,
+		unit,
 		clock.Add(-12*24*time.Hour),
 	)
 
@@ -203,7 +203,7 @@ func TestFilterCare(t *testing.T) {
 		t.Fatalf("run time since an older cleaning: %v", st)
 	}
 
-	owner(t, `UPDATE assets.units SET connection = 'offline' WHERE id = $1`, u)
+	owner(t, `UPDATE assets.units SET connection = 'offline' WHERE id = $1`, unit)
 
 	if st := statusOf(
 		&customerB,
@@ -212,7 +212,7 @@ func TestFilterCare(t *testing.T) {
 		t.Fatalf("fallback days: %v", st)
 	}
 
-	owner(t, `UPDATE assets.units SET connection = 'online' WHERE id = $1`, u)
+	owner(t, `UPDATE assets.units SET connection = 'online' WHERE id = $1`, unit)
 	// a technician cleaning (accepted report, filter normal) is newer
 	job := uuid.NewString()
 	owner(
@@ -222,7 +222,7 @@ func TestFilterCare(t *testing.T) {
 		VALUES ($1,$2,$3,$4,'preventive','completed','client_request',tstzrange($5,$6),$6,$6)`,
 		job,
 		tenant,
-		u,
+		unit,
 		seed.ID("org-customer-b"),
 		clock.Add(-3*time.Hour),
 		clock.Add(-2*time.Hour),
@@ -244,35 +244,35 @@ func TestFilterCare(t *testing.T) {
 		t.Fatalf("technician cleaning: %v", st)
 	}
 	// offline without a cleaning date → unknown
-	u2 := newUnit(t, s, "Filter AC 2")
+	u2 := newUnit(t, srv, "Filter AC 2")
 
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&customerB,
 		"filterCare.list",
 		`{"filters":{"unitId":"`+u2+`","status":"unknown"}}`,
 	)
-	if len(items(m)) != 1 || items(m)[0]["runHoursSinceCleaning"] != nil {
-		t.Fatalf("unknown: %v", m)
+	if len(items(resp)) != 1 || items(resp)[0]["runHoursSinceCleaning"] != nil {
+		t.Fatalf("unknown: %v", resp)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerA,
 		"filterCare.list",
-		`{"filters":{"unitId":"`+u+`"}}`,
+		`{"filters":{"unitId":"`+unit+`"}}`,
 	); code != 200 ||
-		len(items(m)) != 0 {
+		len(items(res)) != 0 {
 		t.Error("customer-a sees customer-b's unit")
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&customerB,
 		"filterCare.list",
 		`{"sort":{"field":"status","direction":"desc"},"limit":100}`,
 	); len(
-		items(m),
+		items(res),
 	) < 2 {
 		t.Error("sorted list")
 	}
@@ -285,20 +285,20 @@ func TestFilterCare(t *testing.T) {
 
 	for _, b := range []string{`{"filters":{"status":"dirty"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"runHours",` +
 		`"direction":"asc"}}`} {
-		code, m := post(s, &customerB, "filterCare.list", b)
+		code, m := post(srv, &customerB, "filterCare.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
 	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, u2)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"filterCare.markCleaned",
 		`{"unitId":"`+u2+`"}`,
 		0,
 	); code != 422 ||
-		fields(m) != "unitId=error.unitArchived" {
-		t.Errorf("archived unit: %d %s", code, fields(m))
+		fields(res) != "unitId=error.unitArchived" {
+		t.Errorf("archived unit: %d %s", code, fields(res))
 	}
 }

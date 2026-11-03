@@ -14,14 +14,14 @@ import (
 // no scope none at all. The seed technicians hold unit scopes only, so the property and organization branches and the
 // empty scope had no test (IR381).
 func TestInternalTechnicianScopeKinds(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	as := func(name string, scopes map[string]string) actor {
-		id := seed.ID(name)
+		uuid := seed.ID(name)
 		owner(
 			t,
 			`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from)
 			VALUES ($1,$2,$3,$4,'technician','internal',$5) ON CONFLICT DO NOTHING`,
-			id,
+			uuid,
 			seed.ID("tenant-a"),
 			seed.ID("user-tech-internal-a"),
 			seed.ID("org-operator-a"),
@@ -29,7 +29,7 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 		)
 		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
 			SELECT tenant_id, $1, permission FROM identity.membership_permissions WHERE membership_id = $2 ON CONFLICT DO
-			NOTHING`, id, seed.ID("tech-internal-a"))
+			NOTHING`, uuid, seed.ID("tech-internal-a"))
 
 		for kind, ref := range scopes {
 			owner(
@@ -37,16 +37,16 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 				`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO
 					NOTHING`,
 				seed.ID("tenant-a"),
-				id,
+				uuid,
 				kind,
 				seed.ID(ref),
 			)
 		}
 
 		t.Cleanup(func() {
-			owner(t, `DELETE FROM identity.membership_scopes WHERE membership_id = $1`, id)
-			owner(t, `DELETE FROM identity.membership_permissions WHERE membership_id = $1`, id)
-			owner(t, `DELETE FROM identity.memberships WHERE id = $1`, id)
+			owner(t, `DELETE FROM identity.membership_scopes WHERE membership_id = $1`, uuid)
+			owner(t, `DELETE FROM identity.membership_permissions WHERE membership_id = $1`, uuid)
+			owner(t, `DELETE FROM identity.memberships WHERE id = $1`, uuid)
 		})
 
 		return actor{
@@ -73,18 +73,18 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 	}
 
 	listed := func(a actor) string {
-		code, m := post(
-			s,
+		code, res := post(
+			srv,
 			&a,
 			"units.list",
 			`{"limit":100,"filters":{"unitIds":[`+strings.Join(ids, ",")+`]}}`,
 		)
 		if code != 200 {
-			t.Fatalf("units.list as %s: %d %v", a.membership, code, m)
+			t.Fatalf("units.list as %s: %d %v", a.membership, code, res)
 		}
 
 		var got []string
-		for _, it := range items(m) {
+		for _, it := range items(res) {
 			got = append(got, name[it["id"].(string)])
 		}
 
@@ -113,7 +113,7 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 	}
 	// one unit outside the scope is NOT_FOUND, one inside is read
 	if code, _ := post(
-		s,
+		srv,
 		&property,
 		"units.get",
 		`{"id":"`+seed.ID("unit-offline-rto").String()+`"}`,
@@ -121,17 +121,17 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 		t.Errorf("a unit of another property: %d", code)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&property,
 		"units.get",
 		`{"id":"`+seed.ID("unit-online-rto").String()+`"}`,
 	); code != 200 {
-		t.Errorf("a unit of the scoped property: %d %v", code, m)
+		t.Errorf("a unit of the scoped property: %d %v", code, res)
 	}
 
 	if code, _ := post(
-		s,
+		srv,
 		&none,
 		"units.get",
 		`{"id":"`+seed.ID("unit-online-rto").String()+`"}`,

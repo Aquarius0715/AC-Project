@@ -38,13 +38,13 @@ var (
 
 // ParseAction decodes a UnitAction strictly: exactly the fields of its kind (error key "error.invalid").
 func ParseAction(raw json.RawMessage) (UnitAction, bool) {
-	var a UnitAction
+	var unitAction UnitAction
 
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 
-	if len(raw) == 0 || dec.Decode(&a) != nil {
-		return a, false
+	if len(raw) == 0 || dec.Decode(&unitAction) != nil {
+		return unitAction, false
 	}
 
 	set := func(b bool) int {
@@ -56,57 +56,62 @@ func ParseAction(raw json.RawMessage) (UnitAction, bool) {
 	}
 
 	n := set(
-		a.Power != nil,
+		unitAction.Power != nil,
 	) + set(
-		a.Celsius != nil,
+		unitAction.Celsius != nil,
 	) + set(
-		a.Mode != nil,
+		unitAction.Mode != nil,
 	) + set(
-		a.FanLevel != nil,
+		unitAction.FanLevel != nil,
 	) + set(
-		a.Level != nil,
+		unitAction.Level != nil,
 	)
-	switch a.Kind {
+	switch unitAction.Kind {
 	case "set_power":
-		return a, n == 1 && a.Power != nil
+		return unitAction, n == 1 && unitAction.Power != nil
 	case "set_temperature":
-		return a, n == 1 && a.Celsius != nil && !math.IsNaN(*a.Celsius) &&
-			!math.IsInf(*a.Celsius, 0)
+		return unitAction, n == 1 && unitAction.Celsius != nil &&
+			!math.IsNaN(*unitAction.Celsius) &&
+			!math.IsInf(*unitAction.Celsius, 0)
 	case "set_mode":
-		return a, n == 1 && a.Mode != nil && slices.Contains(modes, *a.Mode)
+		return unitAction, n == 1 && unitAction.Mode != nil &&
+			slices.Contains(modes, *unitAction.Mode)
 	case "set_fan":
-		return a, n == 1 && a.FanLevel != nil && slices.Contains(fans, *a.FanLevel)
+		return unitAction, n == 1 && unitAction.FanLevel != nil &&
+			slices.Contains(fans, *unitAction.FanLevel)
 	case "ventilate":
-		return a, n == 1 && a.Level != nil && slices.Contains(fans, *a.Level)
+		return unitAction, n == 1 && unitAction.Level != nil &&
+			slices.Contains(fans, *unitAction.Level)
 	}
 
-	return a, false
+	return unitAction, false
 }
 
 // Supports reports whether a unit with these capabilities accepts the action (DD-C03: temperature on min/max/step,
 // modes and fan levels from the model's lists, ventilation only on ventilation models).
-func (a UnitAction) Supports(c Caps) bool {
+func (a UnitAction) Supports(caps Caps) bool {
 	switch a.Kind {
 	case "set_power":
-		return c.Control
+		return caps.Control
 	case "set_temperature":
-		if !c.Control || !c.HasTemperature || *a.Celsius < c.TempMin || *a.Celsius > c.TempMax {
+		if !caps.Control || !caps.HasTemperature || *a.Celsius < caps.TempMin ||
+			*a.Celsius > caps.TempMax {
 			return false
 		}
 
-		if c.TempStep > 0 {
-			k := (*a.Celsius - c.TempMin) / c.TempStep
+		if caps.TempStep > 0 {
+			k := (*a.Celsius - caps.TempMin) / caps.TempStep
 
 			return math.Abs(k-math.Round(k)) < 1e-9
 		}
 
 		return true
 	case "set_mode":
-		return c.Control && c.ModeControl && slices.Contains(c.Modes, *a.Mode)
+		return caps.Control && caps.ModeControl && slices.Contains(caps.Modes, *a.Mode)
 	case "set_fan":
-		return c.Control && c.FanControl && slices.Contains(c.FanLevels, *a.FanLevel)
+		return caps.Control && caps.FanControl && slices.Contains(caps.FanLevels, *a.FanLevel)
 	case "ventilate":
-		return c.Ventilation && slices.Contains(c.VentilationLevels, *a.Level)
+		return caps.Ventilation && slices.Contains(caps.VentilationLevels, *a.Level)
 	}
 
 	return false

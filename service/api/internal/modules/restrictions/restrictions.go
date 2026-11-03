@@ -159,51 +159,51 @@ const cols = `r.id, r.tenant_id, r.version, r.created_at, r.updated_at, r.recove
 
 func scan(row pgx.Row) (Restriction, error) {
 	var (
-		x        Restriction
-		until    *time.Time
-		exReason *string
-		intent   []byte
+		restriction Restriction
+		until       *time.Time
+		exReason    *string
+		intent      []byte
 	)
 
 	err := row.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.UpdatedAt,
-		&x.RecoveryCases,
-		&x.NoticeNotificationIDs,
-		&x.ContractID,
-		&x.ContractVersion,
-		&x.RulesVersion,
-		&x.NoticeAt,
-		&x.ExecuteAfter,
-		&x.Reason,
-		&x.Policy,
-		&x.State,
+		&restriction.ID,
+		&restriction.TenantID,
+		&restriction.Version,
+		&restriction.CreatedAt,
+		&restriction.UpdatedAt,
+		&restriction.RecoveryCases,
+		&restriction.NoticeNotificationIDs,
+		&restriction.ContractID,
+		&restriction.ContractVersion,
+		&restriction.RulesVersion,
+		&restriction.NoticeAt,
+		&restriction.ExecuteAfter,
+		&restriction.Reason,
+		&restriction.Policy,
+		&restriction.State,
 		&until,
 		&exReason,
-		&x.GraceUntil,
+		&restriction.GraceUntil,
 		&intent,
-		&x.customerID,
-		&x.customerOrg,
-		&x.CauseInvoiceIDs,
+		&restriction.customerID,
+		&restriction.customerOrg,
+		&restriction.CauseInvoiceIDs,
 	)
 	if until != nil {
-		x.Exception = &Exception{Until: *until, Reason: exReason}
+		restriction.Exception = &Exception{Until: *until, Reason: exReason}
 	}
 
-	x.ReleaseIntent = json.RawMessage("null")
+	restriction.ReleaseIntent = json.RawMessage("null")
 	if len(intent) > 0 {
-		x.ReleaseIntent = intent
+		restriction.ReleaseIntent = intent
 	}
 
-	return x, apperr.Wrap(err, "scan (scan)")
+	return restriction, apperr.Wrap(err, "scan (scan)")
 }
 
 // decorate loads per-unit state and the audit events.
-func decorate(ctx context.Context, c *ops.Call, x *Restriction) error {
-	rows, err := c.Tx.Query(
+func decorate(ctx context.Context, call *ops.Call, x *Restriction) error {
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT unit_id, apply_state, release_state, apply_command_ids, release_command_ids, observed_restriction,
 			observed_at, evidence_id, pending_reason
@@ -218,20 +218,20 @@ func decorate(ctx context.Context, c *ops.Call, x *Restriction) error {
 
 	for rows.Next() {
 		var (
-			u   Unit
-			obs []byte
+			unit Unit
+			obs  []byte
 		)
 
 		err := rows.Scan(
-			&u.UnitID,
-			&u.ApplyState,
-			&u.ReleaseState,
-			&u.ApplyCommandIDs,
-			&u.ReleaseCommandIDs,
+			&unit.UnitID,
+			&unit.ApplyState,
+			&unit.ReleaseState,
+			&unit.ApplyCommandIDs,
+			&unit.ReleaseCommandIDs,
 			&obs,
-			&u.ObservedAt,
-			&u.EvidenceID,
-			&u.PendingReason,
+			&unit.ObservedAt,
+			&unit.EvidenceID,
+			&unit.PendingReason,
 		)
 		if err != nil {
 			rows.Close()
@@ -239,13 +239,13 @@ func decorate(ctx context.Context, c *ops.Call, x *Restriction) error {
 			return apperr.Wrap(err, "select restrictions.restriction_units")
 		}
 
-		u.ObservedRestriction = json.RawMessage("null")
+		unit.ObservedRestriction = json.RawMessage("null")
 		if len(obs) > 0 {
-			u.ObservedRestriction = obs
+			unit.ObservedRestriction = obs
 		}
 
-		x.PerUnit = append(x.PerUnit, u)
-		x.UnitIDs = append(x.UnitIDs, u.UnitID)
+		x.PerUnit = append(x.PerUnit, unit)
+		x.UnitIDs = append(x.UnitIDs, unit.UnitID)
 	}
 
 	rows.Close()
@@ -255,7 +255,12 @@ func decorate(ctx context.Context, c *ops.Call, x *Restriction) error {
 		return apperr.Wrap(rowsErr, "select restrictions.restriction_units")
 	}
 
-	hist, err := audit.History(ctx, c, "restriction", x.ID.String()) // identity's audit log (IR196)
+	hist, err := audit.History(
+		ctx,
+		call,
+		"restriction",
+		x.ID.String(),
+	) // identity's audit log (IR196)
 	if err != nil {
 		return apperr.Wrap(err, "audit.History")
 	}
@@ -283,54 +288,54 @@ var stateEvents = map[string]string{
 }
 
 // maskForClient applies the client RestrictionDetail projection (IR42).
-func maskForClient(x *Restriction) {
+func maskForClient(restriction *Restriction) {
 	events := []Event{}
 
-	for _, e := range x.Events {
-		if _, ok := stateEvents[e.Action]; !ok || e.Result != "success" {
+	for _, event := range restriction.Events {
+		if _, ok := stateEvents[event.Action]; !ok || event.Result != "success" {
 			continue
 		}
 
-		e.ActorID, e.ActorName, e.ActorRoleAtTime, e.Reason = "masked", nil, "admin", nil
-		e.MaskedBefore, e.MaskedAfter = map[string]*string{}, map[string]*string{}
-		events = append(events, e)
+		event.ActorID, event.ActorName, event.ActorRoleAtTime, event.Reason = "masked", nil, "admin", nil
+		event.MaskedBefore, event.MaskedAfter = map[string]*string{}, map[string]*string{}
+		events = append(events, event)
 	}
 
-	x.Events = events
-	if x.Exception != nil {
-		x.Exception.Reason = nil
+	restriction.Events = events
+	if restriction.Exception != nil {
+		restriction.Exception.Reason = nil
 	}
 
-	if len(x.ReleaseIntent) > 0 && string(x.ReleaseIntent) != "null" {
+	if len(restriction.ReleaseIntent) > 0 && string(restriction.ReleaseIntent) != "null" {
 		var ri map[string]any
-		if json.Unmarshal(x.ReleaseIntent, &ri) == nil {
+		if json.Unmarshal(restriction.ReleaseIntent, &ri) == nil {
 			ri["actorMembershipId"] = "masked"
-			x.ReleaseIntent, _ = json.Marshal(ri)
+			restriction.ReleaseIntent, _ = json.Marshal(ri)
 		}
 	}
 }
 
-func releaseView(x Restriction) ReleaseView {
+func releaseView(restriction Restriction) ReleaseView {
 	intent := json.RawMessage("null")
 
 	var ri map[string]any
-	if json.Unmarshal(x.ReleaseIntent, &ri) == nil && ri != nil {
+	if json.Unmarshal(restriction.ReleaseIntent, &ri) == nil && ri != nil {
 		intent, _ = json.Marshal(map[string]any{"source": ri["source"], "at": ri["at"]})
 	}
 
 	return ReleaseView{
-		ID:            x.ID,
-		Version:       x.Version,
-		CreatedAt:     x.CreatedAt,
-		UpdatedAt:     x.UpdatedAt,
-		UnitIDs:       x.UnitIDs,
-		RulesVersion:  x.RulesVersion,
-		Policy:        x.Policy,
-		State:         x.State,
-		PerUnit:       x.PerUnit,
-		RecoveryCases: x.RecoveryCases,
-		NoticeAt:      x.NoticeAt,
-		ExecuteAfter:  x.ExecuteAfter,
+		ID:            restriction.ID,
+		Version:       restriction.Version,
+		CreatedAt:     restriction.CreatedAt,
+		UpdatedAt:     restriction.UpdatedAt,
+		UnitIDs:       restriction.UnitIDs,
+		RulesVersion:  restriction.RulesVersion,
+		Policy:        restriction.Policy,
+		State:         restriction.State,
+		PerUnit:       restriction.PerUnit,
+		RecoveryCases: restriction.RecoveryCases,
+		NoticeAt:      restriction.NoticeAt,
+		ExecuteAfter:  restriction.ExecuteAfter,
 		Projection:    "release",
 		ReleaseIntent: intent,
 	}
@@ -343,13 +348,13 @@ func fullReader(c *ops.Call) bool {
 }
 
 // project returns the RestrictionRead the caller may receive (IR03 / IR42).
-func project(c *ops.Call, x Restriction) any {
+func project(call *ops.Call, x Restriction) any {
 	switch {
-	case c.Principal.Role == "client":
+	case call.Principal.Role == "client":
 		maskForClient(&x)
 
 		return x
-	case fullReader(c):
+	case fullReader(call):
 		return x
 	default:
 		return releaseView(x)
@@ -362,16 +367,16 @@ func load(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Restrictio
 		q += " FOR UPDATE OF r"
 	}
 
-	x, err := scan(c.Tx.QueryRow(ctx, q, id))
+	restriction, err := scan(c.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return x, apperr.E(apperr.NotFound, "error.notFound")
+		return restriction, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	if err != nil {
-		return x, err
+		return restriction, err
 	}
 
-	return x, decorate(ctx, c, &x)
+	return restriction, decorate(ctx, c, &restriction)
 }
 
 // GetInput is restrictions.get input.
@@ -412,13 +417,13 @@ func (in *GetInput) Validate() map[string]string {
 //	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/restrictions/{id} [get]
-func (m Restrictions) get(ctx context.Context, c *ops.Call, in *GetInput) (any, error) {
-	x, err := load(ctx, c, in.ID, false)
+func (m Restrictions) get(ctx context.Context, call *ops.Call, in *GetInput) (any, error) {
+	x, err := load(ctx, call, in.ID, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return project(c, x), nil
+	return project(call, x), nil
 }
 
 var states = []string{
@@ -438,12 +443,12 @@ type listFilter struct {
 
 func (m Restrictions) query(
 	ctx context.Context,
-	c *ops.Call,
-	in paging.Query,
+	call *ops.Call,
+	query paging.Query,
 	f listFilter,
 ) ([]Restriction, *string, int, int, error) {
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{
 			"id":           "r.id",
 			"createdAt":    "r.created_at",
@@ -457,9 +462,9 @@ func (m Restrictions) query(
 		return nil, nil, 0, 0, apperr.Wrap(err, "paging.OrderBy")
 	}
 	// the cursor binds the filter (SR14)
-	w, err := paging.Resolve(in, struct {
+	window, err := paging.Resolve(query, struct {
 		F listFilter `json:"f"`
-	}{f}, c.Principal.ScopeVersion, 1)
+	}{f}, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return nil, nil, 0, 0, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -494,21 +499,21 @@ func (m Restrictions) query(
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM restrictions.restrictions r WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM restrictions.restrictions r WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return nil, nil, 0, 0, apperr.Wrap(scanErr, "select restrictions.restrictions")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM restrictions.restrictions r WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			cols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -518,14 +523,14 @@ func (m Restrictions) query(
 	out := []Restriction{}
 
 	for rows.Next() {
-		x, err := scan(rows)
+		restriction, err := scan(rows)
 		if err != nil {
 			rows.Close()
 
 			return nil, nil, 0, 0, err
 		}
 
-		out = append(out, x)
+		out = append(out, restriction)
 	}
 
 	rows.Close()
@@ -536,13 +541,13 @@ func (m Restrictions) query(
 	}
 
 	for i := range out {
-		err := decorate(ctx, c, &out[i])
+		err := decorate(ctx, call, &out[i])
 		if err != nil {
 			return nil, nil, 0, 0, err
 		}
 	}
 
-	return out, w.Next(total), total, w.Snapshot, nil
+	return out, window.Next(total), total, window.Snapshot, nil
 }
 
 func decodeFilter(raw json.RawMessage, f *listFilter) error {
@@ -592,28 +597,28 @@ func decodeFilter(raw json.RawMessage, f *listFilter) error {
 //	@Router			/v1/restrictions [get]
 func (m Restrictions) list(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[any], error) {
 	var f listFilter
 
-	err := decodeFilter(in.Filters, &f)
+	err := decodeFilter(query.Filters, &f)
 	if err != nil {
 		return paging.Page[any]{}, err
 	}
 
-	if !fullReader(c) && (f.ContractID != nil || f.InvoiceID != nil) {
+	if !fullReader(call) && (f.ContractID != nil || f.InvoiceID != nil) {
 		return paging.Page[any]{}, apperr.E(apperr.Forbidden, "error.forbidden")
 	}
 
-	xs, next, total, snap, err := m.query(ctx, c, *in, f)
+	xs, next, total, snap, err := m.query(ctx, call, *query, f)
 	if err != nil {
 		return paging.Page[any]{}, err
 	}
 
 	items := make([]any, len(xs))
 	for i, x := range xs {
-		items[i] = project(c, x)
+		items[i] = project(call, x)
 	}
 
 	return paging.Page[any]{
@@ -670,16 +675,16 @@ func (in *ForInvoiceInput) Validate() map[string]string {
 //	@Router			/v1/invoices/{invoiceId}/restrictions [get]
 func (m Restrictions) forInvoice(
 	ctx context.Context,
-	c *ops.Call,
-	in *ForInvoiceInput,
+	call *ops.Call,
+	input *ForInvoiceInput,
 ) (paging.Page[Restriction], error) {
 	var org uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `SELECT k.customer_org_id FROM billing.invoices i JOIN billing.contracts k ON k.id =
-		i.contract_id AND k.version = i.contract_version WHERE i.id = $1`, in.InvoiceID).
+	err := call.Tx.QueryRow(ctx, `SELECT k.customer_org_id FROM billing.invoices i JOIN billing.contracts k ON k.id =
+		i.contract_id AND k.version = i.contract_version WHERE i.id = $1`, input.InvoiceID).
 		Scan(&org)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && c.Principal.Role == "client" && org != c.Principal.OrgID) {
+		(err == nil && call.Principal.Role == "client" && org != call.Principal.OrgID) {
 		return paging.Page[Restriction]{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
@@ -689,20 +694,20 @@ func (m Restrictions) forInvoice(
 
 	var f listFilter
 
-	decodeFilterErr := decodeFilter(in.Query.Filters, &f)
+	decodeFilterErr := decodeFilter(input.Query.Filters, &f)
 	if decodeFilterErr != nil {
 		return paging.Page[Restriction]{}, decodeFilterErr
 	}
 	// query catalog: input.invoiceId (the REST path) => causeInvoiceIds contains; contractId => contractId; status =>
 	// state. invoiceId is no filter of this read: the REST binding refuses it as error.notAllowed
-	f.InvoiceID = &in.InvoiceID
+	f.InvoiceID = &input.InvoiceID
 
-	xs, next, total, snap, err := m.query(ctx, c, in.Query, f)
+	xs, next, total, snap, err := m.query(ctx, call, input.Query, f)
 	if err != nil {
 		return paging.Page[Restriction]{}, err
 	}
 
-	if c.Principal.Role == "client" {
+	if call.Principal.Role == "client" {
 		for i := range xs {
 			maskForClient(&xs[i])
 		}
@@ -717,12 +722,12 @@ func (m Restrictions) forInvoice(
 }
 
 // Register binds the restriction operations.
-func Register(r *ops.Registry, m Restrictions) {
-	ops.Register(r, "restrictions.get", m.get)
-	ops.Register(r, "restrictions.list", m.list)
-	ops.Register(r, "restrictions.forInvoice", m.forInvoice)
-	ops.Register(r, "restrictions.schedule", m.schedule)
-	ops.Register(r, "restrictions.execute", m.execute)
-	ops.Register(r, "restrictions.cancel", m.cancel)
-	RegisterActions(r, m)
+func Register(reg *ops.Registry, m Restrictions) {
+	ops.Register(reg, "restrictions.get", m.get)
+	ops.Register(reg, "restrictions.list", m.list)
+	ops.Register(reg, "restrictions.forInvoice", m.forInvoice)
+	ops.Register(reg, "restrictions.schedule", m.schedule)
+	ops.Register(reg, "restrictions.execute", m.execute)
+	ops.Register(reg, "restrictions.cancel", m.cancel)
+	RegisterActions(reg, m)
 }

@@ -156,7 +156,7 @@ var deniedKinds = map[string]string{
 // deniedTarget is the target a refused write asked for: the input's id under the kind of the operation's resource,
 // else its <kind>Id, else the first other …Id field that holds a UUID, named by that field (propertyId: property).
 // An input without one records the resource's kind and "—". No other input value is kept.
-func deniedTarget(op string, in any) (string, string) {
+func deniedTarget(op string, input any) (string, string) {
 	res, _, _ := strings.Cut(op, ".")
 
 	kind := deniedKinds[op]
@@ -168,7 +168,7 @@ func deniedTarget(op string, in any) (string, string) {
 		kind = res
 	}
 
-	raw, _ := json.Marshal(in)
+	raw, _ := json.Marshal(input)
 
 	var m map[string]any
 
@@ -210,19 +210,19 @@ func deniedTarget(op string, in any) (string, string) {
 // recordDenied writes the audit entry of a write refused for permission (FORBIDDEN) or scope (NOT_FOUND), at most one
 // per actor and operation a minute (DenyLimit), so a flood of attempts cannot fill the log (IR603). A failure here is
 // logged and never answered: the caller gets the refusal.
-func (r *Registry) recordDenied(ctx context.Context, c *Call, op string, in any, err error) {
-	dr, ok := r.Rec.(DeniedRecorder)
+func (r *Registry) recordDenied(ctx context.Context, call *Call, op string, in any, err error) {
+	deniedRecorder, ok := r.Rec.(DeniedRecorder)
 
-	de := apperr.From(err)
-	if !ok || r.DB == nil || c.Principal == nil ||
-		(de.Code != apperr.Forbidden && de.Code != apperr.NotFound) {
+	domainErr := apperr.From(err)
+	if !ok || r.DB == nil || call.Principal == nil ||
+		(domainErr.Code != apperr.Forbidden && domainErr.Code != apperr.NotFound) {
 		return
 	}
 
 	if r.DenyLimit != nil {
 		wait, lerr := r.DenyLimit.Allow(
 			ctx,
-			c.Principal.TenantID.String()+":"+c.Principal.UserID.String()+":"+op,
+			call.Principal.TenantID.String()+":"+call.Principal.UserID.String()+":"+op,
 		)
 		if lerr == nil &&
 			wait > 0 {
@@ -232,24 +232,24 @@ func (r *Registry) recordDenied(ctx context.Context, c *Call, op string, in any,
 
 	kind, id := deniedTarget(op, in)
 
-	rerr := r.DB.Run(ctx, false, c.Principal, func(tx pgx.Tx) error {
-		if tx != nil {
-			_, err := tx.Exec(
+	rerr := r.DB.Run(ctx, false, call.Principal, func(txn pgx.Tx) error {
+		if txn != nil {
+			_, err := txn.Exec(
 				ctx,
 				`SELECT set_config('app.now', $1, true)`,
-				c.Now.UTC().Format(time.RFC3339Nano),
+				call.Now.UTC().Format(time.RFC3339Nano),
 			)
 			if err != nil {
 				return apperr.Wrap(err, "select set_config")
 			}
 		}
 
-		return dr.RecordDenied(
+		return deniedRecorder.RecordDenied(
 			ctx,
-			tx,
-			c,
+			txn,
+			call,
 			op,
-			Denial{TargetKind: kind, TargetID: id, Reason: de.MessageKey},
+			Denial{TargetKind: kind, TargetID: id, Reason: domainErr.MessageKey},
 		)
 	})
 	if rerr != nil {
@@ -337,16 +337,16 @@ func NewRegistry() *Registry {
 // Register binds a typed handler to a catalog operation. It panics on unknown or duplicate names so the catalog and
 // the code cannot drift.
 func Register[I any, O any](
-	r *Registry,
+	reg *Registry,
 	name string,
 	h func(context.Context, *Call, *I) (O, error),
 ) {
-	spec, ok := r.specs[name]
+	spec, ok := reg.specs[name]
 	if !ok {
 		panic("ops: operation not in catalog: " + name)
 	}
 
-	if _, dup := r.ops[name]; dup {
+	if _, dup := reg.ops[name]; dup {
 		panic("ops: duplicate handler: " + name)
 	}
 
@@ -355,7 +355,7 @@ func Register[I any, O any](
 		panic(err)
 	}
 
-	r.ops[name] = &Operation{
+	reg.ops[name] = &Operation{
 		Spec:     spec,
 		Expr:     expr,
 		NewInput: func() any { return new(I) },
@@ -419,22 +419,22 @@ func fail(_ *echo.Context, err error, corr string) error {
 }
 
 // branchMatches evaluates a write-version-catalog branch against the decoded input.
-func branchMatches(branch string, in map[string]any) bool {
+func branchMatches(branch string, input map[string]any) bool {
 	switch {
 	case branch == "all":
 		return true
 	case strings.HasSuffix(branch, " present"):
-		v, ok := in[strings.TrimSuffix(branch, " present")]
+		v, ok := input[strings.TrimSuffix(branch, " present")]
 
 		return ok && v != nil
 	case strings.HasSuffix(branch, " omitted"):
-		v, ok := in[strings.TrimSuffix(branch, " omitted")]
+		v, ok := input[strings.TrimSuffix(branch, " omitted")]
 
 		return !ok || v == nil
 	case strings.Contains(branch, "="):
 		field, vals, _ := strings.Cut(branch, "=")
 
-		got, _ := in[field].(string)
+		got, _ := input[field].(string)
 		for _, v := range strings.Split(vals, "|") {
 			if v == got {
 				return true
@@ -447,14 +447,14 @@ func branchMatches(branch string, in map[string]any) bool {
 
 // expectedVersion applies the write version catalog: a required version must be a positive integer header,
 // an omitted one must be absent (VALIDATION otherwise, write version catalog conflict_behavior).
-func expectedVersion(s Spec, body []byte, header string) (*int, error) {
-	var in map[string]any
+func expectedVersion(spec Spec, body []byte, header string) (*int, error) {
+	var input map[string]any
 
-	_ = json.Unmarshal(body, &in)
+	_ = json.Unmarshal(body, &input)
 	rule := ""
 
-	for _, v := range s.Versions {
-		if branchMatches(v.Branch, in) {
+	for _, v := range spec.Versions {
+		if branchMatches(v.Branch, input) {
 			rule = v.Rule
 
 			break
@@ -526,8 +526,8 @@ func readBody(c *echo.Context, operation string) ([]byte, error) {
 
 // run is the pipeline every route of an operation shares: decode and validate the JSON input, authorize, claim the
 // Idempotency-Key, check the expected version, run the handler in one transaction and write the ServiceResult.
-func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string) error {
-	ctx := c.Request().Context()
+func (r *Registry) run(ectx *echo.Context, op *Operation, body []byte, corr string) error {
+	ctx := ectx.Request().Context()
 	name := op.Spec.Name
 
 	if r.BeforeDispatch != nil {
@@ -538,32 +538,32 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 		body = []byte("{}")
 	}
 
-	in := op.NewInput()
+	input := op.NewInput()
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
 
-	err := dec.Decode(in)
+	err := dec.Decode(input)
 	if err != nil {
-		return fail(c, apperr.Fields(map[string]string{"_": "error.malformedInput"}), corr)
+		return fail(ectx, apperr.Fields(map[string]string{"_": "error.malformedInput"}), corr)
 	}
 
-	if v, ok := in.(Validator); ok {
+	if v, ok := input.(Validator); ok {
 		if fe := v.Validate(); len(fe) > 0 {
-			return fail(c, apperr.Fields(fe), corr)
+			return fail(ectx, apperr.Fields(fe), corr)
 		}
 	}
 
-	p := PrincipalFrom(ctx)
+	principal := PrincipalFrom(ctx)
 
 	var ap *authz.Principal
-	if p != nil {
-		ap = &p.Principal
+	if principal != nil {
+		ap = &principal.Principal
 	}
 
 	cands := op.Expr.Candidates(ap)
 	if len(cands) == 0 {
-		if p == nil {
-			return fail(c, apperr.E(apperr.Unauthenticated, "error.unauthenticated"), corr)
+		if principal == nil {
+			return fail(ectx, apperr.E(apperr.Unauthenticated, "error.unauthenticated"), corr)
 		}
 
 		denied := apperr.E(apperr.Forbidden, "error.forbidden")
@@ -571,7 +571,7 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 			r.recordDenied(
 				ctx,
 				&Call{
-					Principal:       p,
+					Principal:       principal,
 					Now:             r.Clock(),
 					CorrelationID:   corr,
 					Tx:              nil,
@@ -583,36 +583,39 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 					Audits:          nil,
 				},
 				name,
-				in,
+				input,
 				denied,
 			)
 		}
 
-		return fail(c, denied, corr)
+		return fail(ectx, denied, corr)
 	}
 
-	key := c.Request().Header.Get("Idempotency-Key")
+	key := ectx.Request().Header.Get("Idempotency-Key")
 
 	write := op.Spec.Mode == Write
 	if write {
 		if len(key) < 8 || len(key) > 128 { // platform.idempotency_keys CHECK (8–128)
 			return fail(
-				c,
+				ectx,
 				apperr.Fields(map[string]string{"Idempotency-Key": "error.required"}),
 				corr,
 			)
 		}
 		// the writes of one membership per minute, counted across instances and services (IR375). A store that does not
 		// answer lets the write through: the edge limits still hold, and a sign-in session is never blocked by the cache.
-		if r.Limit != nil && p != nil {
-			wait, err := r.Limit.Allow(ctx, p.TenantID.String()+":"+p.MembershipID.String())
+		if r.Limit != nil && principal != nil {
+			wait, err := r.Limit.Allow(
+				ctx,
+				principal.TenantID.String()+":"+principal.MembershipID.String(),
+			)
 			if err != nil {
 				slog.WarnContext(ctx, "ops: write limit not checked", "err", err)
 			} else if wait > 0 {
-				c.Response().Header().Set("Retry-After", strconv.Itoa(wait))
+				ectx.Response().Header().Set("Retry-After", strconv.Itoa(wait))
 
 				return fail(
-					c,
+					ectx,
 					apperr.E(apperr.RateLimited, "error.rateLimited").RetryAfter(wait),
 					corr,
 				)
@@ -622,29 +625,29 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 		if r.Idem != nil {
 			sum := sha256.Sum256(append([]byte(name+"\n"), body...))
 
-			stored, err := r.Idem.Begin(ctx, p, name, key, hex.EncodeToString(sum[:]))
+			stored, err := r.Idem.Begin(ctx, principal, name, key, hex.EncodeToString(sum[:]))
 			if err != nil {
-				return fail(c, err, corr)
+				return fail(ectx, err, corr)
 			}
 
 			if stored != nil {
-				return apperr.Wrap(c.JSONBlob(http.StatusOK, stored), "echo.Context.JSONBlob")
+				return apperr.Wrap(ectx.JSONBlob(http.StatusOK, stored), "echo.Context.JSONBlob")
 			}
 		}
 	}
 
-	ev, err := expectedVersion(op.Spec, body, c.Request().Header.Get("X-Expected-Version"))
+	ev, err := expectedVersion(op.Spec, body, ectx.Request().Header.Get("X-Expected-Version"))
 	if err != nil {
 		if write && r.Idem != nil {
-			r.Idem.Abort(ctx, p, name, key)
+			r.Idem.Abort(ctx, principal, name, key)
 		}
 
-		return fail(c, err, corr)
+		return fail(ectx, err, corr)
 	}
 
-	bearer, _ := strings.CutPrefix(c.Request().Header.Get(echo.HeaderAuthorization), "Bearer ")
+	bearer, _ := strings.CutPrefix(ectx.Request().Header.Get(echo.HeaderAuthorization), "Bearer ")
 	call := &Call{
-		Principal:       p,
+		Principal:       principal,
 		Now:             r.Clock(),
 		CorrelationID:   corr,
 		Candidates:      cands,
@@ -658,11 +661,11 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 		cursor int64
 	)
 
-	err = r.DB.Run(ctx, !write, p, func(tx pgx.Tx) error {
-		call.Tx = r.txFor(tx)
+	err = r.DB.Run(ctx, !write, principal, func(txn pgx.Tx) error {
+		call.Tx = r.txFor(txn)
 		// business time of this transaction for SQL defaults and platform.app_now() (IR157)
-		if tx != nil {
-			_, err := tx.Exec(
+		if txn != nil {
+			_, err := txn.Exec(
 				ctx,
 				`SELECT set_config('app.now', $1, true)`,
 				call.Now.UTC().Format(time.RFC3339Nano),
@@ -674,35 +677,35 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 
 		var herr error
 
-		out, herr = op.Handle(ctx, call, in)
+		out, herr = op.Handle(ctx, call, input)
 		if herr != nil {
 			return herr
 		}
 
 		if write && r.Rec != nil {
-			err := r.Rec.Record(ctx, tx, call, name)
+			err := r.Rec.Record(ctx, txn, call, name)
 			if err != nil {
 				return apperr.Wrap(err, "ops.Recorder.Record")
 			}
 		}
 
-		if tx != nil &&
-			p != nil { // Meta.eventCursor: the tenant's event position of this snapshot (D07)
-			return tx.QueryRow(ctx, `SELECT count(*) FROM platform.outbox`).Scan(&cursor)
+		if txn != nil &&
+			principal != nil { // Meta.eventCursor: the tenant's event position of this snapshot (D07)
+			return txn.QueryRow(ctx, `SELECT count(*) FROM platform.outbox`).Scan(&cursor)
 		}
 
 		return nil
 	})
 	if err != nil {
 		if write && r.Idem != nil {
-			r.Idem.Abort(ctx, p, name, key)
+			r.Idem.Abort(ctx, principal, name, key)
 		}
 
 		if write {
-			r.recordDenied(ctx, call, name, in, err)
+			r.recordDenied(ctx, call, name, input, err)
 		}
 
-		return fail(c, err, corr)
+		return fail(ectx, err, corr)
 	}
 
 	resp, err := json.Marshal(
@@ -717,13 +720,13 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 		},
 	)
 	if err != nil {
-		return fail(c, fmt.Errorf("encode: %w", err), corr)
+		return fail(ectx, fmt.Errorf("encode: %w", err), corr)
 	}
 
 	if write && r.Idem != nil {
-		err := r.Idem.Complete(ctx, p, name, key, resp)
+		err := r.Idem.Complete(ctx, principal, name, key, resp)
 		if err != nil {
-			return fail(c, err, corr)
+			return fail(ectx, err, corr)
 		}
 	}
 
@@ -731,7 +734,7 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 		r.AfterCommit(ctx)
 	}
 
-	return apperr.Wrap(c.JSONBlob(http.StatusOK, resp), "echo.Context.JSONBlob")
+	return apperr.Wrap(ectx.JSONBlob(http.StatusOK, resp), "echo.Context.JSONBlob")
 }
 
 // txFor is the transaction a call runs in: tx itself unless WrapTx is set.

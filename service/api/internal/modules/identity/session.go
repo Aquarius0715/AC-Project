@@ -70,11 +70,11 @@ func Register(r *ops.Registry) {
 //	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/session [get]
-func sessionGet(ctx context.Context, c *ops.Call, _ *struct{}) (Session, error) {
-	p := c.Principal
+func sessionGet(ctx context.Context, call *ops.Call, _ *struct{}) (Session, error) {
+	principal := call.Principal
 
-	perms := make([]string, 0, len(p.Permissions))
-	for k, ok := range p.Permissions {
+	perms := make([]string, 0, len(principal.Permissions))
+	for k, ok := range principal.Permissions {
 		if ok {
 			perms = append(perms, k)
 		}
@@ -83,46 +83,47 @@ func sessionGet(ctx context.Context, c *ops.Call, _ *struct{}) (Session, error) 
 	sort.Strings(perms)
 
 	var clientRole *string
-	if p.Role == "client" && p.ClientRole != "" {
-		clientRole = &p.ClientRole
+	if principal.Role == "client" && principal.ClientRole != "" {
+		clientRole = &principal.ClientRole
 	}
 
 	out := Session{
-		TenantID:       p.TenantID,
-		MembershipID:   p.MembershipID,
-		ScopeVersion:   p.ScopeVersion,
-		UserID:         p.UserID,
-		OrganizationID: p.OrgID,
-		Role:           p.Role,
+		TenantID:       principal.TenantID,
+		MembershipID:   principal.MembershipID,
+		ScopeVersion:   principal.ScopeVersion,
+		UserID:         principal.UserID,
+		OrganizationID: principal.OrgID,
+		Role:           principal.Role,
 		ClientRole:     clientRole,
 		Permissions:    perms,
 		Generation:     1,
 		ViewEpoch:      0,
-		IssuedAt:       c.Now,
-		ExpiresAt: c.Now.Add(
+		IssuedAt:       call.Now,
+		ExpiresAt: call.Now.Add(
 			SessionTTL,
 		),
 		DisplayName:      "",
 		OrganizationName: "",
 		CustomerID:       nil,
 	}
-	if c.Tx == nil { // a registry without a database (unit tests): no names
+	if call.Tx == nil { // a registry without a database (unit tests): no names
 		return out, nil
 	}
 
-	err := c.Tx.QueryRow(ctx, `SELECT u.display_name, o.name FROM identity.memberships m JOIN identity.users u ON u.id =
+	err := call.Tx.QueryRow(ctx, `SELECT u.display_name, o.name FROM identity.memberships m JOIN identity.users u ON u.id =
 		m.user_id
-		JOIN identity.organizations o ON o.id = m.organization_id WHERE m.id = $1`, p.MembershipID).
+		JOIN identity.organizations o ON o.id = m.organization_id WHERE m.id = $1`, principal.MembershipID).
 		Scan(&out.DisplayName, &out.OrganizationName)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = nil
 	}
 
-	if err == nil && p.Role == "client" { // identity's reference copy of the customers (IR188)
+	if err == nil &&
+		principal.Role == "client" { // identity's reference copy of the customers (IR188)
 		var id uuid.UUID
-		switch e := c.Tx.QueryRow(ctx, `SELECT c.id FROM notify.ref_customers c JOIN identity.memberships m ON
+		switch e := call.Tx.QueryRow(ctx, `SELECT c.id FROM notify.ref_customers c JOIN identity.memberships m ON
 			m.organization_id = c.organization_id WHERE m.id = $1`,
-			p.MembershipID).Scan(&id); {
+			principal.MembershipID).Scan(&id); {
 		case e == nil:
 			out.CustomerID = &id
 		case !errors.Is(e, pgx.ErrNoRows):

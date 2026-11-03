@@ -62,9 +62,9 @@ func raceRefused(
 
 	codes := make(chan int, len(writes))
 
-	var wg sync.WaitGroup
+	var group sync.WaitGroup
 	for _, w := range writes {
-		wg.Go(func() {
+		group.Go(func() {
 			code, m := w()
 			if code == 409 && m["messageKey"] != want {
 				t.Errorf("round %d: refused for another reason: %v", round, m)
@@ -74,7 +74,7 @@ func raceRefused(
 		})
 	}
 
-	wg.Wait()
+	group.Wait()
 	close(codes)
 
 	got := map[int]int{}
@@ -101,7 +101,7 @@ func raceRefused(
 // moment. Each change alone keeps an owner, so without waiting for each other both passed and left none. The customer's
 // other active owners (the seed's, and any another test added) are switched off for the test.
 func TestLastOwnerAtOnce(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	cust := seed.ID("cust-b")
 
 	var active []string
@@ -149,7 +149,7 @@ func TestLastOwnerAtOnce(t *testing.T) {
 		race(t, round, "errors.last_owner",
 			func() (int, map[string]any) {
 				return write(
-					s,
+					srv,
 					&hq,
 					"clientUsers.save",
 					`{"id":"`+a+`","customerId":"`+cust.String()+`","email":"owner-`+a[:8]+`@example.com","clientRole":"member",`+
@@ -159,7 +159,7 @@ func TestLastOwnerAtOnce(t *testing.T) {
 			},
 			func() (int, map[string]any) {
 				return write(
-					s,
+					srv,
 					&hq,
 					"clientUsers.remove",
 					`{"id":"`+b+`","reason":"left the company"}`,
@@ -179,7 +179,7 @@ func TestLastOwnerAtOnce(t *testing.T) {
 // left none. The company's other active contractor accounts (the caller's own, and any another test added) are
 // switched off for the test.
 func TestLastContractorAtOnce(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	org := seed.ID("org-contractor-a")
 
 	var active []string
@@ -227,7 +227,7 @@ func TestLastContractorAtOnce(t *testing.T) {
 		race(t, round, "errors.last_contractor",
 			func() (int, map[string]any) {
 				return write(
-					s,
+					srv,
 					&contrA,
 					"partnerUsers.save",
 					`{"id":"`+a+`","email":"boss-`+a[:8]+`@example.com","partnerRole":"contractor","status":"disabled","reason":"on `+
@@ -237,7 +237,7 @@ func TestLastContractorAtOnce(t *testing.T) {
 			},
 			func() (int, map[string]any) {
 				return write(
-					s,
+					srv,
 					&contrA,
 					"partnerUsers.remove",
 					`{"id":"`+b+`","reason":"left the company"}`,
@@ -277,13 +277,13 @@ func identityAdmins(t *testing.T) {
 // adminSave is the members.save body that keeps an HQ membership as listed, with edit applied, and its version.
 func adminSave(
 	t *testing.T,
-	s *apiserver.Server,
+	srv *apiserver.Server,
 	id string,
 	edit func(map[string]any),
 ) (string, int) {
 	t.Helper()
 
-	_, m := post(s, &hq, "members.list", `{"filters":{"role":"admin"},"limit":100}`)
+	_, m := post(srv, &hq, "members.list", `{"filters":{"role":"admin"},"limit":100}`)
 	for _, it := range items(m) {
 		if it["id"] != id {
 			continue
@@ -333,20 +333,20 @@ func withoutIdentityWrite(b map[string]any) {
 // at the same moment. Each caller stays a holder in its own change, so without waiting for each other both passed and
 // left no one who can manage access. The tenant's other holders lose the permission for the test.
 func TestLastIdentityAdminAtOnce(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	identityAdmins(t)
 
 	op, rm := seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()
 	for round := range 5 {
-		opBody, opVer := adminSave(t, s, op, withoutIdentityWrite)
-		rmBody, rmVer := adminSave(t, s, rm, withoutIdentityWrite)
+		opBody, opVer := adminSave(t, srv, op, withoutIdentityWrite)
+		rmBody, rmVer := adminSave(t, srv, rm, withoutIdentityWrite)
 		raceRefused(
 			t,
 			round,
 			"errors.last_identity_admin",
 			true, // each caller is one of the two: the second may have lost its right already
-			func() (int, map[string]any) { return write(s, &hq, "members.save", rmBody, rmVer) },
-			func() (int, map[string]any) { return write(s, &restrMgr, "members.save", opBody, opVer) },
+			func() (int, map[string]any) { return write(srv, &hq, "members.save", rmBody, rmVer) },
+			func() (int, map[string]any) { return write(srv, &restrMgr, "members.save", opBody, opVer) },
 		)
 
 		var holders int
@@ -371,17 +371,17 @@ func TestLastIdentityAdminAtOnce(t *testing.T) {
 // TestLastIdentityAdminStartLater (IR472): the last identity.write holder cannot move its own start later — it would
 // stop being valid now, like ending it; another holder can.
 func TestLastIdentityAdminStartLater(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	identityAdmins(t)
 
-	op, rm := seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()
+	operation, rm := seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()
 
 	var opFrom, rmFrom time.Time
 	ownerScan(
 		t,
 		`SELECT (SELECT valid_from FROM identity.memberships WHERE id = $1), (SELECT valid_from FROM identity.memberships
 			WHERE id = $2)`,
-		[]any{op, rm},
+		[]any{operation, rm},
 		&opFrom,
 		&rmFrom,
 	)
@@ -390,7 +390,7 @@ func TestLastIdentityAdminStartLater(t *testing.T) {
 			t,
 			`UPDATE identity.memberships SET valid_from = CASE id WHEN $1 THEN $2::timestamptz ELSE $4::timestamptz END WHERE id
 				IN ($1, $3)`,
-			op,
+			operation,
 			opFrom,
 			rm,
 			rmFrom,
@@ -404,16 +404,16 @@ func TestLastIdentityAdminStartLater(t *testing.T) {
 
 	later := func(b map[string]any) { b["validFrom"] = clock.Add(time.Hour).Format(time.RFC3339) }
 
-	body, v := adminSave(t, s, op, later)
-	if code, m := write(
-		s,
+	body, v := adminSave(t, srv, operation, later)
+	if code, res := write(
+		srv,
 		&hq,
 		"members.save",
 		body,
 		v,
 	); code != 409 ||
-		m["messageKey"] != "errors.last_identity_admin" {
-		t.Fatalf("the last holder starts later: %d %v", code, m)
+		res["messageKey"] != "errors.last_identity_admin" {
+		t.Fatalf("the last holder starts later: %d %v", code, res)
 	}
 
 	owner(
@@ -423,8 +423,8 @@ func TestLastIdentityAdminStartLater(t *testing.T) {
 		rm,
 	)
 
-	body, v = adminSave(t, s, rm, later)
-	if code, m := write(s, &hq, "members.save", body, v); code != 200 {
+	body, v = adminSave(t, srv, rm, later)
+	if code, m := write(srv, &hq, "members.save", body, v); code != 200 {
 		t.Fatalf("another holder starts later: %d %v", code, m)
 	}
 }

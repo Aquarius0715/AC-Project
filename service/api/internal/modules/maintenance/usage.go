@@ -89,31 +89,31 @@ func (Usage) OrgActive(ctx context.Context, c *ops.Call, org uuid.UUID) (bool, e
 	return out, apperr.Wrap(err, "delegate maintenance.orgActive")
 }
 
-func registerUsage(r *ops.Registry) {
-	ops.RegisterQuery(r, ops.DomainMaintenance, QueryUnitInUse, unitInUse)
-	ops.RegisterQuery(r, ops.DomainMaintenance, QueryClaimableJobs, claimableJobs)
-	ops.RegisterQuery(r, ops.DomainMaintenance, QueryUnitActive, unitActive)
-	ops.RegisterQuery(r, ops.DomainMaintenance, QueryOrgActive, orgActive)
-	ops.RegisterQuery(r, ops.DomainMaintenance, QueryTechnicianBooked, technicianBooked)
-	ops.RegisterQuery(r, ops.DomainMaintenance, QueryBookedTechnicians, bookedTechnicians)
+func registerUsage(reg *ops.Registry) {
+	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryUnitInUse, unitInUse)
+	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryClaimableJobs, claimableJobs)
+	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryUnitActive, unitActive)
+	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryOrgActive, orgActive)
+	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryTechnicianBooked, technicianBooked)
+	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryBookedTechnicians, bookedTechnicians)
 }
 
 func bookedTechnicians(
 	ctx context.Context,
-	c *ops.Call,
-	in *MembershipsInput,
+	call *ops.Call,
+	input *MembershipsInput,
 ) ([]uuid.UUID, error) {
 	out := []uuid.UUID{}
-	if len(in.MembershipIDs) == 0 {
+	if len(input.MembershipIDs) == 0 {
 		return out, nil
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT DISTINCT technician_membership_id FROM maintenance.assignments
 		WHERE technician_membership_id = ANY($1) AND status = 'active' AND valid_until > $2`,
-		in.MembershipIDs,
-		c.Now,
+		input.MembershipIDs,
+		call.Now,
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select maintenance.assignments")
@@ -147,7 +147,7 @@ func unitInUse(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 func claimableJobs(
 	ctx context.Context,
 	c *ops.Call,
-	in *UnitsInput,
+	input *UnitsInput,
 ) (map[uuid.UUID]map[uuid.UUID]time.Time, error) {
 	out := map[uuid.UUID]map[uuid.UUID]time.Time{}
 
@@ -157,7 +157,7 @@ func claimableJobs(
 		AND j.completed_at IS NOT NULL AND EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state
 		= 'accepted' AND jsonb_array_length(r.parts) > 0)
 		AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(j.warranty_claims) w WHERE w->>'state' = 'filed')`,
-		in.UnitIDs,
+		input.UnitIDs,
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select maintenance.jobs")
@@ -167,10 +167,10 @@ func claimableJobs(
 	for rows.Next() {
 		var (
 			u, j uuid.UUID
-			at   time.Time
+			when time.Time
 		)
 
-		err := rows.Scan(&u, &j, &at)
+		err := rows.Scan(&u, &j, &when)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select maintenance.jobs")
 		}
@@ -179,7 +179,7 @@ func claimableJobs(
 			out[u] = map[uuid.UUID]time.Time{}
 		}
 
-		out[u][j] = at
+		out[u][j] = when
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select maintenance.jobs")

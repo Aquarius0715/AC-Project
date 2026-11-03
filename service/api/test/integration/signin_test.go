@@ -16,7 +16,7 @@ import (
 // a later sign-in moves it — directly on identity (session.get) and through another service, whose principal comes
 // from identity-api in cluster mode (units.list).
 func TestLastSignIn(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	ctx := context.Background()
 
 	owner, err := pgx.Connect(ctx, testDB("postgres"))
@@ -61,7 +61,7 @@ func TestLastSignIn(t *testing.T) {
 		t.Helper()
 
 		body := map[string]string{"session.get": `{}`, "units.list": `{"limit":1}`}[op]
-		if code, m := post(s, a, op, body); code != 200 {
+		if code, m := post(srv, a, op, body); code != 200 {
 			t.Fatalf("%s: %d %v", op, code, m)
 		}
 	}
@@ -74,7 +74,7 @@ func TestLastSignIn(t *testing.T) {
 		t.Fatalf("first sign-in: last %v, auth_time %v", last, auth)
 	}
 
-	_, m := post(s, &customerA, "clientUsers.list", `{"limit":100}`)
+	_, m := post(srv, &customerA, "clientUsers.list", `{"limit":100}`)
 	shown := ""
 
 	for _, it := range items(m) {

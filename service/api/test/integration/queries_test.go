@@ -102,7 +102,7 @@ func TestNotificationsAcrossServices(t *testing.T) {
 	cl := newCluster(t)
 	identitySrv, billingSrv := cl.srv[ops.DomainIdentity], cl.srv[ops.DomainBilling]
 
-	code, m := write(
+	code, res := write(
 		billingSrv,
 		&customerB,
 		"inquiries.create",
@@ -110,10 +110,10 @@ func TestNotificationsAcrossServices(t *testing.T) {
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("create on billing-api: %d %v", code, m)
+		t.Fatalf("create on billing-api: %d %v", code, res)
 	}
 
-	id := data(m)["id"].(string)
+	id := data(res)["id"].(string)
 
 	count := func() (n int) {
 		ownerScan(
@@ -159,24 +159,24 @@ func TestDirectoryAcrossServices(t *testing.T) {
 		14,
 	) + `}`
 
-	code, m := write(maint, &contrA, "certificates.submit", body, 0)
+	code, res := write(maint, &contrA, "certificates.submit", body, 0)
 	if code != 200 {
-		t.Fatalf("submit on maintenance-api: %d %v", code, m)
+		t.Fatalf("submit on maintenance-api: %d %v", code, res)
 	}
 
 	if code, m := write(maint, &contrB, "certificates.submit", body, 0); code != 404 {
 		t.Fatalf("another contractor's technician (identity.technician over HTTP): %d %v", code, m)
 	}
 
-	cert := data(m)["id"].(string)
-	if code, m := write(
+	cert := data(res)["id"].(string)
+	if code, resp := write(
 		maint,
 		&hq,
 		"certificates.verify",
 		`{"certificateId":"`+cert+`","decision":"approve"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("verify on maintenance-api: %d %v", code, m)
+		t.Fatalf("verify on maintenance-api: %d %v", code, resp)
 	}
 
 	err := identitySrv.DrainEvents(t.Context())

@@ -36,7 +36,7 @@ func Open(
 	base func() time.Time,
 	start time.Time,
 ) (*Clock, error) {
-	c := &Clock{pool: pool, base: base, mu: sync.Mutex{}, offset: 0, loadedAt: time.Time{}}
+	clock := &Clock{pool: pool, base: base, mu: sync.Mutex{}, offset: 0, loadedAt: time.Time{}}
 
 	off := time.Duration(0)
 	if !start.IsZero() {
@@ -52,12 +52,12 @@ func Open(
 		return nil, apperr.Wrap(err, "insert platform.demo_clock")
 	}
 
-	err = c.load(ctx)
+	err = clock.load(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return c, nil
+	return clock, nil
 }
 
 func (c *Clock) load(ctx context.Context) error {

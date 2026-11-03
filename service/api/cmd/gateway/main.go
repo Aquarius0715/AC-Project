@@ -77,7 +77,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	sc := echo.StartConfig{
+	startConfig := echo.StartConfig{
 		Address:          addr,
 		HideBanner:       true,
 		HidePort:         true,
@@ -91,7 +91,7 @@ func main() {
 		BeforeServeFunc:  nil,
 	}
 
-	startErr := sc.Start(
+	startErr := startConfig.Start(
 		ctx,
 		gateway.New(targets, logger),
 	)

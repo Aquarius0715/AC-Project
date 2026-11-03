@@ -87,16 +87,16 @@ func (c *Consumer) retryWait(e Event) time.Duration {
 
 // failed records a failed attempt; on the last one the event is dead-lettered (skipped from now on). It answers
 // whether the event is dead.
-func (c *Consumer) failed(ctx context.Context, e Event, cause error) (bool, error) {
+func (c *Consumer) failed(ctx context.Context, event Event, cause error) (bool, error) {
 	dead := false
-	err := c.DB.Run(ctx, false, nil, func(tx pgx.Tx) error {
+	err := c.DB.Run(ctx, false, nil, func(txn pgx.Tx) error {
 		var attempts int
 
-		scanErr := tx.QueryRow(ctx, `INSERT INTO platform.event_failures (consumer, event_id, attempts, last_error,
+		scanErr := txn.QueryRow(ctx, `INSERT INTO platform.event_failures (consumer, event_id, attempts, last_error,
 			last_attempt_at) VALUES ($1, $2, 1, $3, $4)
 			ON CONFLICT (consumer, event_id) DO UPDATE SET attempts = platform.event_failures.attempts + 1, last_error =
 			EXCLUDED.last_error, last_attempt_at = EXCLUDED.last_attempt_at
-			RETURNING attempts`, c.Name, e.ID, cause.Error(), c.now()).
+			RETURNING attempts`, c.Name, event.ID, cause.Error(), c.now()).
 			Scan(&attempts)
 		if scanErr != nil {
 			return apperr.Wrap(scanErr, "insert platform.event_failures")
@@ -108,22 +108,22 @@ func (c *Consumer) failed(ctx context.Context, e Event, cause error) (bool, erro
 
 		dead = true
 
-		_, execErr := tx.Exec(
+		_, execErr := txn.Exec(
 			ctx,
 			`UPDATE platform.event_failures SET dead_at = $3 WHERE consumer = $1 AND event_id = $2`,
 			c.Name,
-			e.ID,
+			event.ID,
 			c.now(),
 		)
 		if execErr != nil {
 			return apperr.Wrap(execErr, "update platform.event_failures")
 		}
 
-		_, err := tx.Exec(
+		_, err := txn.Exec(
 			ctx,
 			`INSERT INTO platform.processed_events (consumer, event_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
 			c.Name,
-			e.ID,
+			event.ID,
 		)
 
 		return apperr.Wrap(err, "insert platform.processed_events")
@@ -162,28 +162,34 @@ func (c *Consumer) Drain(ctx context.Context) (int, error) {
 			return applied, nil
 		}
 
-		for _, e := range pending {
-			if c.retryWait(e) > 0 {
+		for _, event := range pending {
+			if c.retryWait(event) > 0 {
 				return applied, nil // its retry is not due: the events after it wait too
 			}
 
-			done, err := c.apply(ctx, e)
+			done, err := c.apply(ctx, event)
 			if err != nil {
-				dead, ferr := c.failed(ctx, e, err)
+				dead, ferr := c.failed(ctx, event, err)
 				if ferr != nil {
 					return applied, errors.Join(err, ferr)
 				}
 
 				if !dead {
-					return applied, fmt.Errorf("events: %s %s %s: %w", c.Name, e.Type, e.ID, err)
+					return applied, fmt.Errorf(
+						"events: %s %s %s: %w",
+						c.Name,
+						event.Type,
+						event.ID,
+						err,
+					)
 				}
 
 				if c.Logf != nil {
 					c.Logf(
 						"consumer %s: dead-lettered %s %s after %d attempts: %v",
 						c.Name,
-						e.Type,
-						e.ID,
+						event.Type,
+						event.ID,
 						MaxAttempts,
 						err,
 					)
@@ -228,26 +234,26 @@ func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Ev
 		defer rows.Close()
 
 		for rows.Next() {
-			var e Event
+			var event Event
 
 			err := rows.Scan(
-				&e.ID,
-				&e.Seq,
-				&e.TenantID,
-				&e.AggregateType,
-				&e.AggregateID,
-				&e.Type,
-				&e.Payload,
-				&e.CorrelationID,
-				&e.OccurredAt,
-				&e.failures,
-				&e.lastFailure,
+				&event.ID,
+				&event.Seq,
+				&event.TenantID,
+				&event.AggregateType,
+				&event.AggregateID,
+				&event.Type,
+				&event.Payload,
+				&event.CorrelationID,
+				&event.OccurredAt,
+				&event.failures,
+				&event.lastFailure,
 			)
 			if err != nil {
 				return apperr.Wrap(err, "select platform.outbox")
 			}
 
-			out = append(out, e)
+			out = append(out, event)
 		}
 
 		return rows.Err()
@@ -258,13 +264,13 @@ func (c *Consumer) pending(ctx context.Context, types []string, limit int) ([]Ev
 
 // apply runs the handler and records the event as processed in one transaction; false when another poll got there
 // first.
-func (c *Consumer) apply(ctx context.Context, e Event) (bool, error) {
+func (c *Consumer) apply(ctx context.Context, event Event) (bool, error) {
 	done := false
 	err := c.DB.Run(
 		ctx,
 		false,
 		&ops.Principal{
-			TenantID:          e.TenantID,
+			TenantID:          event.TenantID,
 			Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
 			MembershipID:      uuid.UUID{},
 			UserID:            uuid.UUID{},
@@ -275,12 +281,12 @@ func (c *Consumer) apply(ctx context.Context, e Event) (bool, error) {
 			Timezone:          "",
 			SessionsRevokedAt: nil,
 		},
-		func(tx pgx.Tx) error {
-			tag, err := tx.Exec(
+		func(txn pgx.Tx) error {
+			tag, err := txn.Exec(
 				ctx,
 				`INSERT INTO platform.processed_events (consumer, event_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
 				c.Name,
-				e.ID,
+				event.ID,
 			)
 			if err != nil {
 				return apperr.Wrap(err, "insert platform.processed_events")
@@ -290,16 +296,16 @@ func (c *Consumer) apply(ctx context.Context, e Event) (bool, error) {
 				return nil // already applied
 			}
 			// the business time of the event (IR157): handlers' SQL defaults use the producer's clock
-			_, execErr := tx.Exec(
+			_, execErr := txn.Exec(
 				ctx,
 				`SELECT set_config('app.now', $1, true)`,
-				e.OccurredAt.UTC().Format(time.RFC3339Nano),
+				event.OccurredAt.UTC().Format(time.RFC3339Nano),
 			)
 			if execErr != nil {
 				return apperr.Wrap(execErr, "select set_config")
 			}
 
-			handlersErr := c.Handlers[e.Type](ctx, tx, e)
+			handlersErr := c.Handlers[event.Type](ctx, txn, event)
 			if handlersErr != nil {
 				return handlersErr
 			}
@@ -315,8 +321,8 @@ func (c *Consumer) apply(ctx context.Context, e Event) (bool, error) {
 
 // Run polls until ctx ends. A failure that repeats is logged once a minute, and the recovery once (IR429).
 func (c *Consumer) Run(ctx context.Context, every time.Duration) {
-	t := time.NewTicker(every)
-	defer t.Stop()
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
 
 	rep := &logging.Repeats{Logf: c.Logf, Every: 0, Now: nil}
 	for {
@@ -330,7 +336,7 @@ func (c *Consumer) Run(ctx context.Context, every time.Duration) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.C:
+		case <-ticker.C:
 		}
 	}
 }

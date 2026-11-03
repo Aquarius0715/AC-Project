@@ -92,7 +92,7 @@ func TestSubmitErrors(t *testing.T) {
 			State:              "",
 		}
 	}
-	if fe := submitErrors(
+	if fieldErrs := submitErrors(
 		&Report{
 			Items:              valid().Items,
 			WorkText:           valid().WorkText,
@@ -118,9 +118,9 @@ func TestSubmitErrors(t *testing.T) {
 		components,
 		now,
 	); len(
-		fe,
+		fieldErrs,
 	) != 0 {
-		t.Fatalf("a complete draft: %v", fe)
+		t.Fatalf("a complete draft: %v", fieldErrs)
 	}
 
 	for name, c := range map[string]struct {

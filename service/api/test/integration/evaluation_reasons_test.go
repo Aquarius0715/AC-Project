@@ -14,55 +14,55 @@ import (
 // (owner_forbidden) and a location rule whose owner's consent is gone (consent_revoked). Each rule is removed before
 // the next so the decision names its reason.
 func TestAutomationDecideReasons(t *testing.T) {
-	s := server(t)
-	u := boundUnit(t, s, "online")
+	srv := server(t)
+	unit := boundUnit(t, srv, "online")
 	at := clock.Format(time.RFC3339)
 	rule := func(cond, action string) (string, int) {
 		t.Helper()
 
-		code, m := write(
-			s,
+		code, res := write(
+			srv,
 			&customerB,
 			"automations.save",
 			`{"name":"reason",`+
-				`"unitIds":["`+u+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event",`+
+				`"unitIds":["`+unit+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event",`+
 				`"condition":`+cond+`,"action":`+action+`}`,
 			0,
 		)
 		if code != 200 {
-			t.Fatalf("rule: %d %v", code, m)
+			t.Fatalf("rule: %d %v", code, res)
 		}
 
-		return data(m)["id"].(string), ver(m)
+		return data(res)["id"].(string), ver(res)
 	}
 	remove := func(id string, v int) {
 		t.Helper()
 
-		if code, m := write(
-			s,
+		if code, res := write(
+			srv,
 			&customerB,
 			"automations.delete",
 			`{"id":"`+id+`"}`,
 			v,
 		); code != 200 {
-			t.Fatalf("delete rule: %d %v", code, m)
+			t.Fatalf("delete rule: %d %v", code, res)
 		}
 	}
 	reason := func(facts string) string {
 		t.Helper()
 
-		code, m := post(
-			s,
+		code, res := post(
+			srv,
 			&customerB,
 			"automations.simulate",
-			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+at+`","unitIds":["`+u+`"],"facts":[`+facts+
+			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+at+`","unitIds":["`+unit+`"],"facts":[`+facts+
 				`],"phase":"condition"}`,
 		)
 		if code != 200 {
-			t.Fatalf("simulate: %d %v", code, m)
+			t.Fatalf("simulate: %d %v", code, res)
 		}
 
-		d := data(m)["results"].([]any)[0].(map[string]any)
+		d := data(res)["results"].([]any)[0].(map[string]any)
 		if d["decision"] != "suppressed" {
 			t.Fatalf("decision %v", d)
 		}
@@ -72,7 +72,7 @@ func TestAutomationDecideReasons(t *testing.T) {
 		return r
 	}
 	fact := func(metric, value, unitName string) string {
-		return `{"unitId":"` + u + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unitName +
+		return `{"unitId":"` + unit + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unitName +
 			`","observedAt":"` + at + `","quality":"valid"}`
 	}
 	occupied := fact("occupied", "true", "boolean")
@@ -114,16 +114,16 @@ func TestAutomationDecideReasons(t *testing.T) {
 	remove(id, v)
 
 	// consent_revoked: a location rule saved with consent whose consent row was flipped without the withdrawal event
-	_, c := post(s, &customerB, "consents.get", `{"purpose":"location_automation"}`)
+	_, c := post(srv, &customerB, "consents.get", `{"purpose":"location_automation"}`)
 	if data(c)["granted"] != true {
-		if code, m := write(
-			s,
+		if code, res := write(
+			srv,
 			&customerB,
 			"consents.update",
 			`{"purpose":"location_automation","granted":true}`,
 			ver(c),
 		); code != 200 {
-			t.Fatalf("consent: %d %v", code, m)
+			t.Fatalf("consent: %d %v", code, res)
 		}
 	}
 

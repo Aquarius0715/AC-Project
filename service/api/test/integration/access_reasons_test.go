@@ -14,20 +14,26 @@ import (
 // technician with the unit in scope but no assignment, an assignment that has not started, or one whose window
 // ended is FORBIDDEN with the reason; inside the window the history is readable.
 func TestTechnicianUnitAccessReasons(t *testing.T) {
-	s := server(t)
-	u := newUnit(t, s, "Access AC")
-	_, m := write(
-		s,
+	srv := server(t)
+	unit := newUnit(t, srv, "Access AC")
+	_, res := write(
+		srv,
 		&hq,
 		"devices.register",
-		`{"serial":"AX-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+u+`"}`,
+		`{"serial":"AX-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+unit+`"}`,
 		0,
 	)
-	dev := data(m)["id"].(string)
-	write(s, &hq, "devices.bind", `{"deviceId":"`+dev+`","unitId":"`+u+`","reason":"install"}`, 1)
+	dev := data(res)["id"].(string)
+	write(
+		srv,
+		&hq,
+		"devices.bind",
+		`{"deviceId":"`+dev+`","unitId":"`+unit+`","reason":"install"}`,
+		1,
+	)
 
 	events := func(a *actor) (int, string) {
-		code, m := post(s, a, "devices.events", `{"id":"`+dev+`","query":{}}`)
+		code, m := post(srv, a, "devices.events", `{"id":"`+dev+`","query":{}}`)
 		key, _ := m["messageKey"].(string)
 
 		return code, key
@@ -41,7 +47,7 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 		`DELETE FROM maintenance.assignments WHERE technician_membership_id = $1 AND job_id IN (SELECT id FROM
 			maintenance.jobs WHERE unit_id = $2)`,
 		seed.ID("tech-internal-a"),
-		u,
+		unit,
 	)
 	owner(
 		t,
@@ -49,26 +55,33 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 			DO NOTHING`,
 		seed.ID("tenant-a"),
 		seed.ID("tech-internal-a"),
-		u,
+		unit,
 	)
 
 	if code, key := events(&techInt); code != 403 || key != "errors.assignment_required" {
 		t.Errorf("internal technician in scope without an assignment: %d %s", code, key)
 	}
 
-	job := assign(t, u, "tech-internal-a", clock.Add(time.Hour), clock.Add(2*time.Hour), "active")
+	job := assign(
+		t,
+		unit,
+		"tech-internal-a",
+		clock.Add(time.Hour),
+		clock.Add(2*time.Hour),
+		"active",
+	)
 	if code, key := events(&techInt); code != 403 || key != "errors.assignment_not_started" {
 		t.Errorf("assignment starting later: %d %s", code, key)
 	}
 
-	revokeOthers := func(from, to time.Time) { // other tests' assignments must not overlap (assignments_no_overlap)
+	revokeOthers := func(from, until time.Time) { // other tests' assignments must not overlap (assignments_no_overlap)
 		owner(
 			t,
 			`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
 				scheduled && tstzrange($2, $3) AND job_id <> $4`,
 			seed.ID("tech-internal-a"),
 			from,
-			to,
+			until,
 			job,
 		)
 	}

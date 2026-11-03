@@ -18,31 +18,31 @@ import (
 // D03 per-unit release evaluation once in the same transition (IR35, IR96). The caller checks the state.
 func (m Restrictions) RequestRelease(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	id uuid.UUID,
 	source string,
 ) error {
 	intent, _ := json.Marshal(
 		map[string]any{
 			"source":            source,
-			"at":                c.Now,
-			"actorMembershipId": c.Principal.MembershipID,
+			"at":                call.Now,
+			"actorMembershipId": call.Principal.MembershipID,
 		},
 	)
 
-	_, err := c.Tx.Exec(
+	_, err := call.Tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions SET state = 'release_requested', release_intent = $2, version = version + 1,
 			updated_at = $3 WHERE id = $1`,
 		id,
 		intent,
-		c.Now,
+		call.Now,
 	)
 	if err != nil {
 		return apperr.Wrap(err, "update restrictions.restrictions")
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "restriction",
 			AggregateID:   id,
@@ -51,20 +51,20 @@ func (m Restrictions) RequestRelease(
 		},
 	)
 
-	return m.evaluateRelease(ctx, c, id)
+	return m.evaluateRelease(ctx, call, id)
 }
 
 // evaluateRelease applies the D03 release table to every unit still at releaseState=none.
-func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.UUID) error {
+func (m Restrictions) evaluateRelease(ctx context.Context, call *ops.Call, id uuid.UUID) error {
 	var rules string
 
-	err := c.Tx.QueryRow(ctx, `SELECT rules_version FROM restrictions.restrictions WHERE id = $1`, id).
+	err := call.Tx.QueryRow(ctx, `SELECT rules_version FROM restrictions.restrictions WHERE id = $1`, id).
 		Scan(&rules)
 	if err != nil {
 		return apperr.Wrap(err, "select restrictions.restrictions")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT unit_id, apply_state FROM restrictions.restriction_units WHERE restriction_id = $1 AND release_state = 'none'
 			ORDER BY unit_id`,
@@ -107,7 +107,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 
 	for _, u := range units {
 		set := func(sql string, args ...any) error {
-			_, err := c.Tx.Exec(
+			_, err := call.Tx.Exec(
 				ctx,
 				`UPDATE restrictions.restriction_units SET `+sql+` WHERE restriction_id = $1 AND unit_id = $2`,
 				append([]any{id, u.unit}, args...)...)
@@ -121,8 +121,8 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 
 			publishErr := events.Publish(
 				ctx,
-				c.Tx,
-				c.Principal.TenantID,
+				call.Tx,
+				call.Principal.TenantID,
 				"restriction",
 				id,
 				events.RestrictionCommandsCancelled,
@@ -132,13 +132,13 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 				return apperr.Wrap(publishErr, "events.Publish")
 			}
 
-			_, execErr := c.Tx.Exec(
+			_, execErr := call.Tx.Exec(
 				ctx,
 				`UPDATE restrictions.restriction_commands SET status = 'cancelled', updated_at = $3
 				WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested' AND NOT delivered`,
 				id,
 				unit,
-				c.Now,
+				call.Now,
 			)
 			if execErr != nil { // same rule as equipment
 				return apperr.Wrap(execErr, "update restrictions.restriction_commands")
@@ -158,7 +158,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 				reason    *string
 			)
 
-			cmd, delivered, reason, err = m.send(ctx, c, id, u.unit, remove)
+			cmd, delivered, reason, err = m.send(ctx, call, id, u.unit, remove)
 			if err != nil {
 				return err
 			}
@@ -171,8 +171,8 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 			} else { // offline applied units wait for retry(phase=release); the undelivered intent is cancelled
 				publishErr := events.Publish(
 					ctx,
-					c.Tx,
-					c.Principal.TenantID,
+					call.Tx,
+					call.Principal.TenantID,
 					"restriction",
 					id,
 					events.RestrictionCommandsCancelled,
@@ -186,12 +186,12 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 					return apperr.Wrap(publishErr, "events.Publish")
 				}
 
-				_, execErr := c.Tx.Exec(
+				_, execErr := call.Tx.Exec(
 					ctx,
 					`UPDATE restrictions.restriction_commands SET status = 'cancelled', updated_at = $2 WHERE command_id = $1 AND
 						status = 'requested'`,
 					cmd,
-					c.Now,
+					call.Now,
 				)
 				if execErr != nil {
 					return apperr.Wrap(execErr, "update restrictions.restriction_commands")
@@ -206,7 +206,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 		}
 	}
 
-	return finishRelease(ctx, c.Tx, id, c.Now)
+	return finishRelease(ctx, call.Tx, id, call.Now)
 }
 
 // finishRelease sets a release_requested restriction released once every unit is released / not_required (D03).
@@ -227,7 +227,7 @@ func finishRelease(ctx context.Context, tx pgx.Tx, id uuid.UUID, now time.Time) 
 // CommandAcknowledged applies a timely acknowledgement of a restriction Command (control.Acknowledge): apply →
 // applyState=applied with the observed restriction (aggregate applied once every unit is applied, only from
 // requested); remove → releaseState=released with no observed restriction (aggregate released per D03).
-func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.Time) error {
+func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, when time.Time) error {
 	var (
 		restriction, unit uuid.UUID
 		kind              string
@@ -261,7 +261,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 			restriction,
 			unit,
 			command,
-			at,
+			when,
 		)
 		if err != nil ||
 			terminal {
@@ -278,7 +278,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 			FROM restrictions.restrictions r WHERE r.id = ru.restriction_id AND ru.restriction_id = $1 AND ru.unit_id = $2`,
 			restriction,
 			unit,
-			at,
+			when,
 		)
 		if execErr != nil {
 			return apperr.Wrap(execErr, "update restrictions.restriction_units")
@@ -314,7 +314,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 				THEN 'applied' ELSE r.state END
 			WHERE r.id = $1`,
 			restriction,
-			at,
+			when,
 		)
 
 		return apperr.Wrap(err, "update restrictions.restrictions")
@@ -327,7 +327,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 		WHERE restriction_id = $1 AND unit_id = $2`,
 		restriction,
 		unit,
-		at,
+		when,
 	)
 	if execErr != nil {
 		return apperr.Wrap(execErr, "update restrictions.restriction_units")
@@ -354,7 +354,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 			END
 		WHERE r.id = $1`,
 		restriction,
-		at,
+		when,
 	)
 
 	return apperr.Wrap(err, "update restrictions.restrictions")
@@ -363,17 +363,17 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 // CommandsEnded applies D03 to restriction Commands that expired or failed: a remove that did not succeed sets
 // releaseState=failed (aggregate stays release_requested); a rejected apply sets applyState=not_applied. Expired
 // apply intents keep their state (not_sent: definitive non-delivery; sent_unknown: reconcile required).
-func CommandsEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now time.Time) error {
+func CommandsEnded(ctx context.Context, txn pgx.Tx, commands []uuid.UUID, now time.Time) error {
 	if len(commands) == 0 {
 		return nil
 	}
 
-	recoveryEndedErr := recoveryEnded(ctx, tx, commands, now)
+	recoveryEndedErr := recoveryEnded(ctx, txn, commands, now)
 	if recoveryEndedErr != nil {
 		return recoveryEndedErr
 	}
 
-	_, execErr := tx.Exec(
+	_, execErr := txn.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions r SET version = version + 1, updated_at = $2
 		WHERE r.id IN (SELECT restriction_id FROM restrictions.restriction_commands WHERE command_id = ANY($1))`,
@@ -384,7 +384,7 @@ func CommandsEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now tim
 		return apperr.Wrap(execErr, "update restrictions.restrictions")
 	}
 
-	_, execErr = tx.Exec(
+	_, execErr = txn.Exec(
 		ctx,
 		`UPDATE restrictions.restriction_units ru SET release_state = 'failed'
 		FROM restrictions.restriction_commands k WHERE k.command_id = ANY($1) AND k.kind = 'remove_restriction'
@@ -395,10 +395,14 @@ func CommandsEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now tim
 		return apperr.Wrap(execErr, "update restrictions.restriction_units")
 	}
 
-	_, err := tx.Exec(ctx, `UPDATE restrictions.restriction_units ru SET apply_state = 'not_applied'
+	_, err := txn.Exec(
+		ctx,
+		`UPDATE restrictions.restriction_units ru SET apply_state = 'not_applied'
 		FROM restrictions.restriction_commands k WHERE k.command_id = ANY($1) AND k.kind = 'apply_restriction' AND k.status =
 		'failed'
-		  AND ru.restriction_id = k.restriction_id AND ru.unit_id = k.unit_id AND ru.apply_state = 'sent_unknown'`, commands)
+		  AND ru.restriction_id = k.restriction_id AND ru.unit_id = k.unit_id AND ru.apply_state = 'sent_unknown'`,
+		commands,
+	)
 
 	return apperr.Wrap(err, "update restrictions.restriction_units")
 }

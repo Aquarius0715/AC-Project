@@ -25,40 +25,40 @@ const requestTimeout = 30 * time.Second
 // turns every returned error into the DomainError body of service-contracts.ts.
 func newEcho(
 	reg *ops.Registry,
-	m *db.TxManager,
-	a *auth.Authenticator,
+	txm *db.TxManager,
+	authenticator *auth.Authenticator,
 	logger *slog.Logger,
 	internalToken string,
 	servesIdentity bool,
 ) (*echo.Echo, error) {
-	e := echo.New()
+	app := echo.New()
 	if logger != nil {
-		e.Logger = logger
+		app.Logger = logger
 	}
 
-	e.HTTPErrorHandler = ops.HTTPErrorHandler
-	e.Use(middleware.Recover())
-	e.Use(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
+	app.HTTPErrorHandler = ops.HTTPErrorHandler
+	app.Use(middleware.Recover())
+	app.Use(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
 		Generator:        func() string { return uuid.Must(uuid.NewV7()).String() }, // correlation IDs are UUIDv7 (D07)
 		Skipper:          nil,
 		RequestIDHandler: nil,
 		TargetHeader:     "",
 	}))
-	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+	app.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:    true,
 		LogMethod:    true,
 		LogURI:       true,
 		LogRequestID: true,
 		LogLatency:   true,
 		HandleError:  true,
-		LogValuesFunc: func(c *echo.Context, v middleware.RequestLoggerValues) error {
+		LogValuesFunc: func(ectx *echo.Context, v middleware.RequestLoggerValues) error {
 			level := slog.LevelInfo
 			if v.Status >= http.StatusInternalServerError {
 				level = slog.LevelError
 			}
 
-			e.Logger.LogAttrs(
-				c.Request().Context(),
+			app.Logger.LogAttrs(
+				ectx.Request().Context(),
 				level,
 				"request",
 				slog.String("method", v.Method),
@@ -88,35 +88,35 @@ func newEcho(
 		LogQueryParams:   nil,
 		LogFormValues:    nil,
 	}))
-	e.Use(middleware.ContextTimeout(requestTimeout))
+	app.Use(middleware.ContextTimeout(requestTimeout))
 
-	e.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
-	e.GET("/readyz", func(c *echo.Context) error {
-		err := m.Writer.Ping(c.Request().Context())
+	app.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
+	app.GET("/readyz", func(ectx *echo.Context) error {
+		err := txm.Writer.Ping(ectx.Request().Context())
 		if err != nil {
 			return apperr.E(apperr.Unavailable, "error.unavailable")
 		}
 
-		return c.NoContent(http.StatusOK)
+		return ectx.NoContent(http.StatusOK)
 	})
 
 	if internalToken != "" && servesIdentity {
-		e.GET(
+		app.GET(
 			auth.PrincipalPath,
-			principalHandler(a, internalToken),
+			principalHandler(authenticator, internalToken),
 		) // IR181 step 1; not routed by the gateway
 	}
 
 	if internalToken != "" { // internal queries between the services (IR190, IR195); not routed by the gateway
-		e.Group("/internal/v1", a.Middleware()).
+		app.Group("/internal/v1", authenticator.Middleware()).
 			POST("/queries/:query", reg.ServeQuery(internalToken))
-		e.POST(
+		app.POST(
 			ops.SystemQueryPath,
 			reg.ServeSystemQuery(internalToken),
 		) // worker calls without a user
 	}
 
-	v1 := e.Group("/v1", a.Middleware())
+	v1 := app.Group("/v1", authenticator.Middleware())
 
 	err := reg.MountREST(
 		v1,
@@ -125,36 +125,42 @@ func newEcho(
 		return nil, apperr.Wrap(err, "ops.Registry.MountREST")
 	}
 
-	return e, nil
+	return app, nil
 }
 
 // principalHandler is identity-api's internal principal endpoint: it resolves a token subject's membership from the
 // identity tables for the other services (RemoteSource) and records the token's sign-in time when given (IR268).
 // Callers authenticate with the shared INTERNAL_API_TOKEN.
-func principalHandler(a *auth.Authenticator, token string) echo.HandlerFunc {
-	return func(c *echo.Context) error {
-		got, _ := strings.CutPrefix(c.Request().Header.Get(echo.HeaderAuthorization), "Bearer ")
+func principalHandler(authenticator *auth.Authenticator, token string) echo.HandlerFunc {
+	return func(ectx *echo.Context) error {
+		got, _ := strings.CutPrefix(ectx.Request().Header.Get(echo.HeaderAuthorization), "Bearer ")
 		if subtle.ConstantTimeCompare([]byte(got), []byte(token)) != 1 {
 			return apperr.E(apperr.Unauthenticated, "error.unauthenticated")
 		}
 
-		q := c.QueryParams()
-		tenant, err1 := uuid.Parse(q.Get("tenant"))
-		membership, err2 := uuid.Parse(q.Get("membership"))
+		params := ectx.QueryParams()
+		tenant, err1 := uuid.Parse(params.Get("tenant"))
+		membership, err2 := uuid.Parse(params.Get("membership"))
 
 		var (
 			signedIn time.Time
 			err3     error
 		)
-		if raw := q.Get("signedIn"); raw != "" {
+		if raw := params.Get("signedIn"); raw != "" {
 			signedIn, err3 = time.Parse(time.RFC3339, raw)
 		}
 
-		if err1 != nil || err2 != nil || err3 != nil || q.Get("subject") == "" {
+		if err1 != nil || err2 != nil || err3 != nil || params.Get("subject") == "" {
 			return apperr.Fields(map[string]string{"_": "error.malformedInput"})
 		}
 
-		p, err := a.Principal(c.Request().Context(), q.Get("subject"), tenant, membership, signedIn)
+		principal, err := authenticator.Principal(
+			ectx.Request().Context(),
+			params.Get("subject"),
+			tenant,
+			membership,
+			signedIn,
+		)
 		if err != nil {
 			de := apperr.From(err)
 			if de.Code == apperr.NotFound {
@@ -164,6 +170,6 @@ func principalHandler(a *auth.Authenticator, token string) echo.HandlerFunc {
 			return apperr.Wrap(err, "auth.Authenticator.Principal")
 		}
 
-		return c.JSON(http.StatusOK, auth.ToDTO(p))
+		return ectx.JSON(http.StatusOK, auth.ToDTO(principal))
 	}
 }

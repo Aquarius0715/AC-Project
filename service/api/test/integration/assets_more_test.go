@@ -117,7 +117,7 @@ func newPolicy(t *testing.T, customer, kind string) string {
 }
 
 func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	pA, pA2, pB := newPolicy(
 		t,
 		"cust-a",
@@ -133,11 +133,11 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 	)
 	def := newPolicy(t, "cust-a", "default_alert")
 	unit := seed.ID("unit-non-rto").String()
-	_, m := post(s, &customerA, "units.get", `{"id":"`+unit+`"}`)
-	v := ver(m)
+	_, resp := post(srv, &customerA, "units.get", `{"id":"`+unit+`"}`)
+	v := ver(resp)
 	set := func(a *actor, ids string, version int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			a,
 			"units.setAlertPolicies",
 			`{"unitId":"`+unit+`","alertPolicyIds":[`+ids+`]}`,
@@ -145,9 +145,9 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		)
 	}
 
-	code, m := set(&customerA, `"`+pA+`","`+pA2+`"`, v)
-	if code != 200 || len(data(m)["alertPolicyIds"].([]any)) != 2 {
-		t.Fatalf("attach: %d %v", code, m)
+	code, resp := set(&customerA, `"`+pA+`","`+pA2+`"`, v)
+	if code != 200 || len(data(resp)["alertPolicyIds"].([]any)) != 2 {
+		t.Fatalf("attach: %d %v", code, resp)
 	}
 
 	v++
@@ -199,8 +199,8 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 	// delete: a fresh unit without contracts, jobs or IoT is deleted; a unit with a device binding is CONFLICT
 	prop, model := seed.ID("property-home-a").String(), seed.ID("ventilation-demo").String()
 	mk := func() string {
-		code, m := write(
-			s,
+		code, res := write(
+			srv,
 			&hq,
 			"units.save",
 			`{"customerOrgId":"`+seed.ID("org-customer-a").
@@ -211,15 +211,15 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 			0,
 		)
 		if code != 200 {
-			t.Fatalf("unit: %d %v", code, m)
+			t.Fatalf("unit: %d %v", code, res)
 		}
 
-		return data(m)["id"].(string)
+		return data(res)["id"].(string)
 	}
 
 	u1 := mk()
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"units.delete",
 		`{"id":"`+u1+`","reason":"created by mistake"}`,
@@ -228,23 +228,23 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		t.Error("stale delete")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"units.delete",
 		`{"id":"`+u1+`","reason":"created by mistake"}`,
 		1,
 	); code != 200 ||
-		data(m)["deleted"] != true {
-		t.Fatalf("delete: %d %v", code, m)
+		data(res)["deleted"] != true {
+		t.Fatalf("delete: %d %v", code, res)
 	}
 
-	if code, _ := post(s, &hq, "units.get", `{"id":"`+u1+`"}`); code != 404 {
+	if code, _ := post(srv, &hq, "units.get", `{"id":"`+u1+`"}`); code != 404 {
 		t.Error("deleted unit is gone")
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"units.delete",
 		`{"id":"`+u1+`","reason":"again"}`,
@@ -276,19 +276,19 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		seed.ID("hq-operator"),
 	)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"units.delete",
 		`{"id":"`+u2+`","reason":"x"}`,
 		1,
 	); code != 409 ||
-		m["messageKey"] != "error.unitInUse" {
-		t.Fatalf("unit with IoT history must not be deleted: %d %v", code, m)
+		res["messageKey"] != "error.unitInUse" {
+		t.Fatalf("unit with IoT history must not be deleted: %d %v", code, res)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerA,
 		"units.delete",
 		`{"id":"`+u2+`","reason":"x"}`,
@@ -299,16 +299,16 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 }
 
 func TestOrganizations(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 
-	code, m := post(
-		s,
+	code, resp := post(
+		srv,
 		&hq,
 		"organizations.list",
 		`{"filters":{"kind":"customer","status":"active"}}`,
 	)
-	if code != 200 || len(items(m)) < 2 {
-		t.Fatalf("list: %d %v", code, m)
+	if code != 200 || len(items(resp)) < 2 {
+		t.Fatalf("list: %d %v", code, resp)
 	}
 
 	want := map[string]string{ // the field each case is refused for
@@ -322,76 +322,76 @@ func TestOrganizations(t *testing.T) {
 		`{"filters":{"kind":"x"}}`, `{"filters":{"status":"x"}}`, `{"filters":{"y":1}}`,
 		`{"sort":{"field":"name","direction":"asc"}}`,
 	} {
-		code, m := post(s, &hq, "organizations.list", f)
+		code, m := post(srv, &hq, "organizations.list", f)
 		refusal(t, f, code, m, want[f])
 	}
 
-	if code, _ := post(s, &customerA, "organizations.list", `{}`); code != 403 {
+	if code, _ := post(srv, &customerA, "organizations.list", `{}`); code != 403 {
 		t.Error("client cannot list organizations")
 	}
 
 	suffix := uuid.NewString()[:6]
 
-	code, m = write(
-		s,
+	code, resp = write(
+		srv,
 		&hq,
 		"organizations.save",
 		`{"name":"Chong Family Office `+suffix+`","kind":"customer","status":"active"}`,
 		0,
 	)
-	if code != 200 || ver(m) != 1 {
-		t.Fatalf("create: %d %v", code, m)
+	if code != 200 || ver(resp) != 1 {
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := data(m)["id"].(string)
+	id := data(resp)["id"].(string)
 	// a second customer with the same billing name (trimmed, case-insensitive) is CONFLICT; other kinds may share it
 	// (IR208)
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"organizations.save",
 		`{"name":" chong family office `+suffix+`","kind":"customer","status":"active"}`,
 		0,
 	); code != 409 ||
-		m["messageKey"] != "error.duplicateName" {
-		t.Errorf("duplicate billing name: %d %v", code, m)
+		res["messageKey"] != "error.duplicateName" {
+		t.Errorf("duplicate billing name: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"organizations.save",
 		`{"id":"`+id+`","name":"Demo Customer A","kind":"customer","status":"active"}`,
 		1,
 	); code != 409 ||
-		m["messageKey"] != "error.duplicateName" {
-		t.Errorf("rename to another customer's name: %d %v", code, m)
+		res["messageKey"] != "error.duplicateName" {
+		t.Errorf("rename to another customer's name: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"organizations.save",
 		`{"id":"`+id+`","name":"Chong Office `+suffix+`","kind":"customer","status":"inactive"}`,
 		1,
 	); code != 200 ||
-		data(m)["status"] != "inactive" {
+		data(res)["status"] != "inactive" {
 		t.Fatalf("update: %d", code)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"organizations.save",
 		`{"id":"`+id+`","name":"x","kind":"contractor","status":"active"}`,
 		2,
 	); code != 422 ||
-		fields(m) != "kind=error.immutable" {
-		t.Errorf("kind is immutable: %d %s", code, fields(m))
+		fields(res) != "kind=error.immutable" {
+		t.Errorf("kind is immutable: %d %s", code, fields(res))
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"organizations.save",
 		`{"id":"`+id+`","name":"x","kind":"customer","status":"active"}`,
@@ -401,7 +401,7 @@ func TestOrganizations(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"organizations.save",
 		`{"id":"`+uuid.NewString()+`","name":"x","kind":"customer","status":"active"}`,
@@ -410,15 +410,15 @@ func TestOrganizations(t *testing.T) {
 		t.Error("unknown organization")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"organizations.save",
 		`{"name":"","kind":"bank","status":"maybe"}`,
 		0,
 	); code != 422 ||
-		fields(m) != "kind=error.invalid,name=error.length,status=error.invalid" {
-		t.Errorf("validation: %d %s", code, fields(m))
+		fields(res) != "kind=error.invalid,name=error.length,status=error.invalid" {
+		t.Errorf("validation: %d %s", code, fields(res))
 	}
 }
 

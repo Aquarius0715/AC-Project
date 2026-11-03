@@ -12,21 +12,21 @@ import (
 )
 
 func TestFirmwareCampaigns(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	model := seed.ID("ventilation-demo").String()
 
 	var devs []string
 
 	for range 3 {
-		u := newUnit(t, s, "FW AC")
-		_, m := write(
-			s,
+		u := newUnit(t, srv, "FW AC")
+		_, res := write(
+			srv,
 			&hq,
 			"devices.register",
 			`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+u+`"}`,
 			0,
 		)
-		devs = append(devs, `"`+data(m)["id"].(string)+`"`)
+		devs = append(devs, `"`+data(res)["id"].(string)+`"`)
 	}
 
 	start := clock.Add(48 * time.Hour).Format(time.RFC3339)
@@ -50,22 +50,23 @@ func TestFirmwareCampaigns(t *testing.T) {
 		return "{" + strings.Join(parts, ",") + "}"
 	}
 
-	code, m := write(s, &hq, "firmwareCampaigns.schedule", body(nil), 0)
-	if code != 200 || data(m)["state"] != "scheduled" || len(data(m)["results"].([]any)) != 3 ||
-		!strings.HasPrefix(data(m)["checksum"].(string), "sha256:") ||
-		data(m)["createdByMembershipId"] != seed.ID("hq-operator").
+	code, resp := write(srv, &hq, "firmwareCampaigns.schedule", body(nil), 0)
+	if code != 200 || data(resp)["state"] != "scheduled" ||
+		len(data(resp)["results"].([]any)) != 3 ||
+		!strings.HasPrefix(data(resp)["checksum"].(string), "sha256:") ||
+		data(resp)["createdByMembershipId"] != seed.ID("hq-operator").
 			String() { // who scheduled it (Figma 04-9 "Created", IR344)
-		t.Fatalf("schedule: %d %v", code, m)
+		t.Fatalf("schedule: %d %v", code, resp)
 	}
 
-	camp := data(m)["id"].(string)
-	if data(m)["progress"].(map[string]any)["pending"].(float64) != 3 {
+	camp := data(resp)["id"].(string)
+	if data(resp)["progress"].(map[string]any)["pending"].(float64) != 3 {
 		t.Fatal("progress")
 	}
 	// a device with an unresolved tamper, and one on a unit of another model (cap-split-std, SPL-100)
-	tu := newUnit(t, s, "FW AC")
+	tu := newUnit(t, srv, "FW AC")
 	_, tm := write(
-		s,
+		srv,
 		&hq,
 		"devices.register",
 		`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+tu+`"}`,
@@ -75,7 +76,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 	owner(t, `UPDATE devices.devices SET tamper = 'detected' WHERE id = $1`, tampered)
 
 	_, om := write(
-		s,
+		srv,
 		&hq,
 		"units.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
@@ -89,7 +90,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 	)
 
 	_, od := write(
-		s,
+		srv,
 		&hq,
 		"devices.register",
 		`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+data(om)["id"].(string)+`"}`,
@@ -99,15 +100,15 @@ func TestFirmwareCampaigns(t *testing.T) {
 		"tampered device": {tampered, "error.tamperUnresolved"},
 		"other model":     {data(od)["id"].(string), "error.otherModel"},
 	} {
-		if code, m := write(
-			s,
+		if code, res := write(
+			srv,
 			&hq,
 			"firmwareCampaigns.schedule",
 			body(map[string]string{"deviceIds": `["` + c.device + `"]`}),
 			0,
 		); code != 422 ||
-			m["fieldErrors"].(map[string]any)["deviceIds"] != c.key {
-			t.Errorf("%s: %d %v", name, code, m)
+			res["fieldErrors"].(map[string]any)["deviceIds"] != c.key {
+			t.Errorf("%s: %d %v", name, code, res)
 		}
 	}
 
@@ -124,7 +125,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 		"unknown model":       {"modelId": `"` + seed.ID("ventilation-demo-b").String() + `"`},
 	}
 	for name, e := range bad {
-		code, m := write(s, &hq, "firmwareCampaigns.schedule", body(e), 0)
+		code, res := write(srv, &hq, "firmwareCampaigns.schedule", body(e), 0)
 		if name == "unknown model" { // not a VALIDATION: the model is NOT_FOUND
 			if code != 404 {
 				t.Errorf("%s: %d", name, code)
@@ -133,7 +134,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 			continue
 		}
 
-		refusal(t, name, code, m, map[string]string{
+		refusal(t, name, code, res, map[string]string{
 			"start < 24 h": "startAt=error.atLeast24h", "waves not ascending": "waves[1]=error.ascending",
 			"waves end < 100": "waves=error.mustEndAt100",
 			"auto pause 60":   "autoPauseFailurePercent=error.range", "bad window": "window=error.invalid",
@@ -143,28 +144,28 @@ func TestFirmwareCampaigns(t *testing.T) {
 		}[name])
 	}
 	// list / get
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"firmwareCampaigns.list",
 		`{"filters":{"modelId":"`+model+`","status":"scheduled"},"limit":100}`,
 	); code != 200 ||
-		len(items(m)) == 0 {
+		len(items(res)) == 0 {
 		t.Fatalf("list: %d", code)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"firmwareCampaigns.list",
 		`{"filters":{"status":"x"}}`,
 	); code != 422 ||
-		fields(m) != "filters.status=error.invalid" {
-		t.Errorf("bad status: %d %s", code, fields(m))
+		fields(res) != "filters.status=error.invalid" {
+		t.Errorf("bad status: %d %s", code, fields(res))
 	}
 
 	if code, _ := post(
-		s,
+		srv,
 		&hq,
 		"firmwareCampaigns.get",
 		`{"id":"`+uuid.NewString()+`"}`,
@@ -172,13 +173,13 @@ func TestFirmwareCampaigns(t *testing.T) {
 		t.Error("unknown campaign")
 	}
 
-	if code, _ := post(s, &customerA, "firmwareCampaigns.list", `{}`); code != 403 {
+	if code, _ := post(srv, &customerA, "firmwareCampaigns.list", `{}`); code != 403 {
 		t.Error("client")
 	}
 	// control transitions
 	ctl := func(action, extra string, v int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&hq,
 			"firmwareCampaigns.control",
 			`{"campaignId":"`+camp+`","action":"`+action+`"`+extra+`}`,
@@ -215,13 +216,13 @@ func TestFirmwareCampaigns(t *testing.T) {
 		strings.Trim(devs[0], `"`),
 	)
 
-	if code, m := ctl(
+	if code, res := ctl(
 		"retry_device",
 		`,"deviceId":`+devs[0],
 		3,
 	); code != 200 ||
-		data(m)["progress"].(map[string]any)["failed"].(float64) != 0 {
-		t.Fatalf("retry: %d %v", code, m)
+		data(res)["progress"].(map[string]any)["failed"].(float64) != 0 {
+		t.Fatalf("retry: %d %v", code, res)
 	}
 
 	if code, m := ctl("abort", "", 4); code != 422 || fields(m) != "reason=error.length" {
@@ -250,7 +251,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"firmwareCampaigns.control",
 		`{"campaignId":"`+uuid.NewString()+`","action":"pause"}`,

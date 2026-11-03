@@ -22,7 +22,11 @@ type JobCounts struct {
 // Offer projections (contractors); among current summary rows scheduled = accepted+assigned, inProgress =
 // in_progress, active = accepted+assigned+in_progress, review = submitted (D07), overdue = dueAt < now while not
 // completed/cancelled, assigned = rows with an active Assignment.
-func (m Jobs) CountJobs(ctx context.Context, c *ops.Call, raw json.RawMessage) (JobCounts, error) {
+func (m Jobs) CountJobs(
+	ctx context.Context,
+	call *ops.Call,
+	raw json.RawMessage,
+) (JobCounts, error) {
 	var f listFilters
 
 	if len(raw) > 0 && string(raw) != "null" {
@@ -39,12 +43,12 @@ func (m Jobs) CountJobs(ctx context.Context, c *ops.Call, raw json.RawMessage) (
 		return JobCounts{}, err
 	}
 
-	items, err := m.collect(ctx, c, &f)
+	items, err := m.collect(ctx, call, &f)
 	if err != nil {
 		return JobCounts{}, err
 	}
 
-	var n JobCounts
+	var jobCounts JobCounts
 
 	seen := map[uuid.UUID]bool{}
 
@@ -52,7 +56,7 @@ func (m Jobs) CountJobs(ctx context.Context, c *ops.Call, raw json.RawMessage) (
 		switch x := it.item.(type) {
 		case OfferSummary:
 			if x.Status == "offered" {
-				n.Offer++
+				jobCounts.Offer++
 			}
 		case Summary:
 			if x.Status == "completed" || x.Status == "cancelled" {
@@ -61,29 +65,29 @@ func (m Jobs) CountJobs(ctx context.Context, c *ops.Call, raw json.RawMessage) (
 
 			switch x.Status { // D07 / SR KPI definitions
 			case "accepted", "assigned":
-				n.Active++
-				n.Scheduled++
+				jobCounts.Active++
+				jobCounts.Scheduled++
 			case "in_progress":
-				n.Active++
-				n.InProgress++
+				jobCounts.Active++
+				jobCounts.InProgress++
 			case "submitted":
-				n.Review++
+				jobCounts.Review++
 			}
 
-			if x.DueAt.Before(c.Now) {
-				n.Overdue++
+			if x.DueAt.Before(call.Now) {
+				jobCounts.Overdue++
 			}
 
 			if x.AssignmentID != nil {
-				n.Assigned++
+				jobCounts.Assigned++
 			}
 
 			if !seen[x.UnitID] {
 				seen[x.UnitID] = true
-				n.Units = append(n.Units, x.UnitID)
+				jobCounts.Units = append(jobCounts.Units, x.UnitID)
 			}
 		}
 	}
 
-	return n, nil
+	return jobCounts, nil
 }

@@ -13,34 +13,34 @@ import (
 // submission of a stale job version or of a job not in progress, the time on site without the ended pauses, and the
 // reads of a report through another job.
 func TestWorkReportEdges(t *testing.T) {
-	s := server(t)
-	job := assignedNow(t, s) // version 2
+	srv := server(t)
+	job := assignedNow(t, srv) // version 2
 	now := clock.Format(time.RFC3339)
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&techInt,
 		"jobs.submit",
 		`{"jobId":"`+job+`","reportVersion":1}`,
 		2,
 	); code != 409 ||
-		m["messageKey"] != "error.invalidState" {
-		t.Errorf("submit before the start: %d %v", code, m)
+		resp["messageKey"] != "error.invalidState" {
+		t.Errorf("submit before the start: %d %v", code, resp)
 	}
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&techInt,
 		"jobs.start",
 		`{"jobId":"`+job+`","startConfirmed":true}`,
 		2,
 	); code != 200 {
-		t.Fatalf("start: %d %v", code, m)
+		t.Fatalf("start: %d %v", code, resp)
 	}
 
 	unknown := uuid.NewString()
 	if code, _ := write(
-		s,
+		srv,
 		&techInt,
 		"jobs.saveDraft",
 		draftBody(unknown, "", nil),
@@ -50,7 +50,7 @@ func TestWorkReportEdges(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&techInt,
 		"jobs.submit",
 		`{"jobId":"`+unknown+`","reportVersion":1}`,
@@ -59,35 +59,35 @@ func TestWorkReportEdges(t *testing.T) {
 		t.Errorf("submit of an unknown job: %d", code)
 	}
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&techInt,
 		"jobs.submit",
 		`{"jobId":"`+job+`","reportVersion":1}`,
 		2,
 	); code != 409 ||
-		m["messageKey"] != "error.versionConflict" {
-		t.Errorf("submit of a stale job version: %d %v", code, m)
+		resp["messageKey"] != "error.versionConflict" {
+		t.Errorf("submit of a stale job version: %d %v", code, resp)
 	}
 
-	code, m := write(s, &techInt, "jobs.saveDraft", draftBody(job, "", nil), 0)
+	code, res := write(srv, &techInt, "jobs.saveDraft", draftBody(job, "", nil), 0)
 	if code != 200 {
-		t.Fatalf("first draft: %d %v", code, m)
+		t.Fatalf("first draft: %d %v", code, res)
 	}
 
-	rep := data(m)["id"].(string)
+	rep := data(res)["id"].(string)
 
 	elsewhere := `[{"componentGroup":"indoor","componentKey":"filter","result":null,"reason":null,` +
 		`"evidenceIds":["` + uuid.NewString() + `"]}]`
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&techInt,
 		"jobs.saveDraft",
 		draftBody(job, "", map[string]string{"reportId": `"` + rep + `"`, "items": elsewhere}),
 		1,
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["items"] != "error.otherReportAttachment" {
-		t.Errorf("an item citing another report's attachment: %d %v", code, m)
+		resp["fieldErrors"].(map[string]any)["items"] != "error.otherReportAttachment" {
+		t.Errorf("an item citing another report's attachment: %d %v", code, resp)
 	}
 	// an empty reason is no reason; a measurement saved again by its ID keeps it and counts a version
 	body := strings.Replace(
@@ -101,29 +101,29 @@ func TestWorkReportEdges(t *testing.T) {
 		1,
 	)
 
-	code, m = write(s, &techInt, "jobs.saveDraft", body, 1)
+	code, res = write(srv, &techInt, "jobs.saveDraft", body, 1)
 	if code != 200 {
-		t.Fatalf("second draft: %d %v", code, m)
+		t.Fatalf("second draft: %d %v", code, res)
 	}
 
-	for _, it := range data(m)["items"].([]any) {
+	for _, it := range data(res)["items"].([]any) {
 		if it := it.(map[string]any); it["componentKey"] == "filter" && it["reason"] != nil {
 			t.Errorf("empty reason kept: %v", it)
 		}
 	}
 
-	first := data(m)["measurements"].([]any)[0].(map[string]any)
+	first := data(res)["measurements"].([]any)[0].(map[string]any)
 
-	code, m = write(s, &techInt, "jobs.saveDraft", draftBody(job, "normal", map[string]string{
+	code, res = write(srv, &techInt, "jobs.saveDraft", draftBody(job, "normal", map[string]string{
 		"reportId": `"` + rep + `"`,
 		"measurements": `[{"id":"` + first["id"].(string) + `","componentKey":"filter","metric":"temperature","value":21,` +
 			`"unit":"°C","observedAt":"` + now + `"}]`,
 	}), 2)
 	if code != 200 {
-		t.Fatalf("third draft: %d %v", code, m)
+		t.Fatalf("third draft: %d %v", code, res)
 	}
 
-	if again := data(m)["measurements"].([]any)[0].(map[string]any); again["id"] != first["id"] ||
+	if again := data(res)["measurements"].([]any)[0].(map[string]any); again["id"] != first["id"] ||
 		again["version"].(float64) != 2 ||
 		again["value"].(float64) != 21 ||
 		again["createdAt"] != first["createdAt"] {
@@ -159,19 +159,19 @@ func TestWorkReportEdges(t *testing.T) {
 		)
 	}
 
-	code, m = write(s, &techInt, "jobs.submit", `{"jobId":"`+job+`","reportVersion":3}`, 3)
+	code, res = write(srv, &techInt, "jobs.submit", `{"jobId":"`+job+`","reportVersion":3}`, 3)
 	if code != 200 {
-		t.Fatalf("submit: %d %v", code, m)
+		t.Fatalf("submit: %d %v", code, res)
 	}
 
-	if tos := data(m)["timeOnSite"].(map[string]any); tos["onSiteMinutes"].(float64) != 25 ||
+	if tos := data(res)["timeOnSite"].(map[string]any); tos["onSiteMinutes"].(float64) != 25 ||
 		tos["pauses"].([]any)[1].(map[string]any)["to"] == nil {
 		t.Errorf("time on site without the pauses: %v", tos)
 	}
 
 	// the report is read through its own job only; reviewing a job that does not exist says so
 	if code, _ := post(
-		s,
+		srv,
 		&hq,
 		"reports.get",
 		`{"jobId":"`+unknown+`","reportId":"`+rep+`","reportVersion":3}`,
@@ -179,9 +179,9 @@ func TestWorkReportEdges(t *testing.T) {
 		t.Errorf("report through an unknown job: %d", code)
 	}
 
-	other := assignedNow(t, s)
+	other := assignedNow(t, srv)
 	if code, _ := post(
-		s,
+		srv,
 		&hq,
 		"reports.get",
 		`{"jobId":"`+other+`","reportId":"`+rep+`","reportVersion":3}`,
@@ -190,7 +190,7 @@ func TestWorkReportEdges(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"jobs.review",
 		`{"jobId":"`+unknown+`","reportVersion":3,"decision":"accept","reviewMode":"normal"}`,

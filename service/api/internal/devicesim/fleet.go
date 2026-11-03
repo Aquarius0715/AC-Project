@@ -82,19 +82,19 @@ var (
 func MockFleet() (Fleet, error) { return parseFleet(fleetJSON) }
 
 func parseFleet(raw []byte) (Fleet, error) {
-	var f Fleet
+	var fleet Fleet
 
-	err := json.Unmarshal(raw, &f)
+	err := json.Unmarshal(raw, &fleet)
 	if err != nil {
-		return f, fmt.Errorf("fleet: %w", err)
+		return fleet, fmt.Errorf("fleet: %w", err)
 	}
 
 	rooms := map[string]bool{}
 
-	for _, fl := range f.Floors {
+	for _, fl := range fleet.Floors {
 		for _, r := range fl.Rooms {
 			if r.Key == "" || rooms[r.Key] || r.Key == fl.Key {
-				return f, fmt.Errorf("fleet: room key %q is empty or repeated", r.Key)
+				return fleet, fmt.Errorf("fleet: room key %q is empty or repeated", r.Key)
 			}
 
 			rooms[r.Key] = true
@@ -103,27 +103,31 @@ func parseFleet(raw []byte) (Fleet, error) {
 
 	seen := map[string]bool{}
 
-	for _, p := range f.Patterns {
+	for _, pattern := range fleet.Patterns {
 		switch {
-		case p.Key == "" || seen[p.Key]:
-			return f, fmt.Errorf("fleet: pattern key %q is empty or repeated", p.Key)
-		case !telemetryKinds[p.Telemetry] || !commandKinds[p.Commands]:
-			return f, fmt.Errorf(
+		case pattern.Key == "" || seen[pattern.Key]:
+			return fleet, fmt.Errorf("fleet: pattern key %q is empty or repeated", pattern.Key)
+		case !telemetryKinds[pattern.Telemetry] || !commandKinds[pattern.Commands]:
+			return fleet, fmt.Errorf(
 				"fleet: pattern %s has an unknown behaviour (%q, %q)",
-				p.Key,
-				p.Telemetry,
-				p.Commands,
+				pattern.Key,
+				pattern.Telemetry,
+				pattern.Commands,
 			)
-		case len(rooms) > 0 && !rooms[p.Room]:
-			return f, fmt.Errorf("fleet: pattern %s is in no known room (%q)", p.Key, p.Room)
-		case p.NoDevice && (p.Telemetry != "" || p.Commands != ""):
-			return f, fmt.Errorf("fleet: pattern %s has no module but a behaviour", p.Key)
+		case len(rooms) > 0 && !rooms[pattern.Room]:
+			return fleet, fmt.Errorf(
+				"fleet: pattern %s is in no known room (%q)",
+				pattern.Key,
+				pattern.Room,
+			)
+		case pattern.NoDevice && (pattern.Telemetry != "" || pattern.Commands != ""):
+			return fleet, fmt.Errorf("fleet: pattern %s has no module but a behaviour", pattern.Key)
 		}
 
-		seen[p.Key] = true
+		seen[pattern.Key] = true
 	}
 
-	return f, nil
+	return fleet, nil
 }
 
 // FirmwareOf is the firmware a pattern's module reports (the fleet's unless the pattern names another).

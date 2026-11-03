@@ -16,27 +16,27 @@ import (
 // restriction commands advance the restriction state in billing.
 func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
-		events.CommandAcknowledged: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
-			var p events.Commands
+		events.CommandAcknowledged: func(ctx context.Context, txn pgx.Tx, e events.Event) error {
+			var commands events.Commands
 
-			err := e.Decode(&p)
+			err := e.Decode(&commands)
 			if err != nil {
 				return apperr.Wrap(err, "events.Event.Decode")
 			}
 
-			_, err = tx.Exec(
+			_, err = txn.Exec(
 				ctx,
 				`UPDATE restrictions.restriction_commands SET status = 'acknowledged', updated_at = $2 WHERE command_id = ANY($1)
 					AND status = 'requested'`,
-				p.CommandIDs,
-				p.At,
+				commands.CommandIDs,
+				commands.At,
 			)
 			if err != nil {
 				return apperr.Wrap(err, "update restrictions.restriction_commands")
 			}
 
-			for _, id := range p.CommandIDs {
-				err := CommandAcknowledged(ctx, tx, id, p.At)
+			for _, id := range commands.CommandIDs {
+				err := CommandAcknowledged(ctx, txn, id, commands.At)
 				if err != nil {
 					return err
 				}
@@ -44,7 +44,7 @@ func EventHandlers() map[string]events.Handler {
 
 			return nil
 		},
-		events.UnitRestrictionObserved: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
+		events.UnitRestrictionObserved: func(ctx context.Context, txn pgx.Tx, e events.Event) error {
 			var p events.Observation
 
 			decodeErr := e.Decode(&p)
@@ -67,38 +67,38 @@ func EventHandlers() map[string]events.Handler {
 				}
 			}
 
-			_, err := Observe(ctx, tx, p.At, p.UnitID, observed, p.EventID)
+			_, err := Observe(ctx, txn, p.At, p.UnitID, observed, p.EventID)
 
 			return err
 		},
-		events.CommandsEnded: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
-			var p events.Commands
+		events.CommandsEnded: func(ctx context.Context, txn pgx.Tx, e events.Event) error {
+			var commands events.Commands
 
-			err := e.Decode(&p)
+			err := e.Decode(&commands)
 			if err != nil {
 				return apperr.Wrap(err, "events.Event.Decode")
 			}
 
-			for _, id := range p.CommandIDs { // billing's record takes equipment's final status (IR194)
-				status := p.Statuses[id]
+			for _, id := range commands.CommandIDs { // billing's record takes equipment's final status (IR194)
+				status := commands.Statuses[id]
 				if status != "failed" && status != "cancelled" {
 					status = "expired"
 				}
 
-				_, err := tx.Exec(
+				_, err := txn.Exec(
 					ctx,
 					`UPDATE restrictions.restriction_commands SET status = $2, updated_at = $3 WHERE command_id = $1 AND status =
 						'requested'`,
 					id,
 					status,
-					p.At,
+					commands.At,
 				)
 				if err != nil {
 					return apperr.Wrap(err, "update restrictions.restriction_commands")
 				}
 			}
 
-			return CommandsEnded(ctx, tx, p.CommandIDs, p.At)
+			return CommandsEnded(ctx, txn, commands.CommandIDs, commands.At)
 		},
 	}
 }

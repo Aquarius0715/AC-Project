@@ -32,43 +32,43 @@ type Conditions struct {
 	OrganizationID  uuid.UUID   `json:"organizationId"`
 }
 
-func (in *Conditions) check(fe map[string]string, prefix string) {
+func (in *Conditions) check(fieldErrs map[string]string, prefix string) {
 	if CheckRange(in.From, in.To) != nil {
-		fe[prefix+"from"] = "errors.energy_range"
+		fieldErrs[prefix+"from"] = "errors.energy_range"
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fe[prefix+"unitIds"] = "error.invalid"
+			fieldErrs[prefix+"unitIds"] = "error.invalid"
 		}
 
 		seen[u] = true
 	}
 
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 100 {
-		fe[prefix+"unitIds"] = "error.invalid"
+		fieldErrs[prefix+"unitIds"] = "error.invalid"
 	}
 
 	if in.BaselineID == uuid.Nil || in.BaselineVersion < 1 {
-		fe[prefix+"baselineId"] = "error.required"
+		fieldErrs[prefix+"baselineId"] = "error.required"
 	}
 
 	if in.FactorID == uuid.Nil || in.FactorVersion < 1 {
-		fe[prefix+"factorId"] = "error.required"
+		fieldErrs[prefix+"factorId"] = "error.required"
 	}
 
 	if !slices.Contains(boundaries, in.BoundaryID) {
-		fe[prefix+"boundaryId"] = "error.invalid"
+		fieldErrs[prefix+"boundaryId"] = "error.invalid"
 	}
 
 	in.Boundary = strings.TrimSpace(in.Boundary)
 	if n := utf8.RuneCountInString(in.Boundary); n < 1 || n > 500 {
-		fe[prefix+"boundary"] = "error.length"
+		fieldErrs[prefix+"boundary"] = "error.length"
 	}
 
 	if in.OrganizationID == uuid.Nil {
-		fe[prefix+"organizationId"] = "error.required"
+		fieldErrs[prefix+"organizationId"] = "error.required"
 	}
 }
 
@@ -124,10 +124,10 @@ type Preview struct {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/mrv/preview [get]
-func preview(ctx context.Context, c *ops.Call, in *Conditions) (Preview, error) {
+func preview(ctx context.Context, c *ops.Call, input *Conditions) (Preview, error) {
 	var kind string
 
-	err := c.Tx.QueryRow(ctx, `SELECT kind FROM energy.ref_organizations WHERE id = $1`, in.OrganizationID).
+	err := c.Tx.QueryRow(ctx, `SELECT kind FROM energy.ref_organizations WHERE id = $1`, input.OrganizationID).
 		Scan(&kind)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && kind != "customer") {
 		return Preview{}, apperr.Fields(map[string]string{"organizationId": "error.invalid"})
@@ -140,40 +140,40 @@ func preview(ctx context.Context, c *ops.Call, in *Conditions) (Preview, error) 
 	var inOrg int
 
 	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND
-		NOT archived`, in.UnitIDs, in.OrganizationID).
+		NOT archived`, input.UnitIDs, input.OrganizationID).
 		Scan(&inOrg)
 	if scanErr != nil {
 		return Preview{}, apperr.Wrap(scanErr, "select energy.ref_units")
 	}
 
-	if inOrg != len(in.UnitIDs) {
+	if inOrg != len(input.UnitIDs) {
 		return Preview{}, apperr.Fields(
 			map[string]string{"unitIds": "errors.units_outside_organization"},
 		)
 	}
 
-	b, err := LoadBaseline(ctx, c, in.BaselineID, &in.BaselineVersion)
+	baseline, err := LoadBaseline(ctx, c, input.BaselineID, &input.BaselineVersion)
 	if err != nil {
 		return Preview{}, err
 	}
 
-	f, err := LoadFactor(ctx, c, in.FactorID, &in.FactorVersion)
+	f, err := LoadFactor(ctx, c, input.FactorID, &input.FactorVersion)
 	if err != nil {
 		return Preview{}, err
 	}
 
-	s, n, err := Compute(ctx, c, in.UnitIDs, in.From, in.To, &f, &b)
+	s, n, err := Compute(ctx, c, input.UnitIDs, input.From, input.To, &f, &baseline)
 	if err != nil {
 		return Preview{}, err
 	}
 
-	incomplete := in.BoundaryID != Boundary || b.BoundaryID != in.BoundaryID ||
+	incomplete := input.BoundaryID != Boundary || baseline.BoundaryID != input.BoundaryID ||
 		n.ExpectedSlots == 0 ||
 		n.ValidSlots < n.ExpectedSlots ||
-		!Comparable(&b, in.UnitIDs, in.From, in.To, n)
+		!Comparable(&baseline, input.UnitIDs, input.From, input.To, n)
 
 	return Preview{
-		Conditions: *in,
+		Conditions: *input,
 		Summary:    s,
 		Incomplete: incomplete,
 		Scope:      "scope_2",
@@ -216,58 +216,58 @@ const reportCols = `r.id, r.tenant_id, r.version, (SELECT min(created_at) FROM e
 
 func scanReport(row pgx.Row) (Report, error) {
 	var (
-		x         Report
+		report    Report
 		cond, res []byte
 	)
 
 	err := row.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.UpdatedAt,
+		&report.ID,
+		&report.TenantID,
+		&report.Version,
+		&report.CreatedAt,
+		&report.UpdatedAt,
 		&cond,
 		&res,
-		&x.Status,
-		&x.EvidenceIDs,
+		&report.Status,
+		&report.EvidenceIDs,
 	)
 	if err != nil {
-		return x, apperr.Wrap(err, "scan (scanReport)")
+		return report, apperr.Wrap(err, "scan (scanReport)")
 	}
 
 	var st stored
 
-	_ = json.Unmarshal(cond, &x.Conditions)
+	_ = json.Unmarshal(cond, &report.Conditions)
 	_ = json.Unmarshal(res, &st)
-	x.Summary, x.Incomplete, x.Scope, x.IsDemo = st.Summary, st.Incomplete, "scope_2", true
+	report.Summary, report.Incomplete, report.Scope, report.IsDemo = st.Summary, st.Incomplete, "scope_2", true
 
-	return x, nil
+	return report, nil
 }
 
-func reviews(ctx context.Context, c *ops.Call, x *Report) error {
+func reviews(ctx context.Context, c *ops.Call, report *Report) error {
 	rows, err := c.Tx.Query(
 		ctx,
 		`SELECT user_id, report_version, comment, reviewed_at FROM energy.mrv_reviews WHERE report_id = $1 AND report_version
 			< $2 ORDER BY reviewed_at, id`,
-		x.ID,
-		x.Version,
+		report.ID,
+		report.Version,
 	)
 	if err != nil {
 		return apperr.Wrap(err, "select energy.mrv_reviews")
 	}
 	defer rows.Close()
 
-	x.ReviewHistory = []Review{}
+	report.ReviewHistory = []Review{}
 
 	for rows.Next() {
-		var r Review
+		var review Review
 
-		err := rows.Scan(&r.UserID, &r.ReportVersion, &r.Comment, &r.At)
+		err := rows.Scan(&review.UserID, &review.ReportVersion, &review.Comment, &review.At)
 		if err != nil {
 			return apperr.Wrap(err, "select energy.mrv_reviews")
 		}
 
-		x.ReviewHistory = append(x.ReviewHistory, r)
+		report.ReviewHistory = append(report.ReviewHistory, review)
 	}
 
 	return apperr.Wrap(rows.Err(), "select energy.mrv_reviews")
@@ -290,21 +290,21 @@ func latestVersion(ctx context.Context, c *ops.Call, id uuid.UUID) (int, error) 
 }
 
 // LoadReport returns a report version (latest when version is nil).
-func LoadReport(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) (Report, error) {
+func LoadReport(ctx context.Context, call *ops.Call, id uuid.UUID, version *int) (Report, error) {
 	v := 0
 	if version != nil {
 		v = *version
 	} else {
 		var err error
 
-		v, err = latestVersion(ctx, c, id)
+		v, err = latestVersion(ctx, call, id)
 		if err != nil {
 			return Report{}, err
 		}
 	}
 
-	x, err := scanReport(
-		c.Tx.QueryRow(
+	report, err := scanReport(
+		call.Tx.QueryRow(
 			ctx,
 			"SELECT "+reportCols+" FROM energy.mrv_reports r WHERE r.id = $1 AND r.version = $2",
 			id,
@@ -312,14 +312,14 @@ func LoadReport(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) (R
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return x, apperr.E(apperr.NotFound, "error.notFound")
+		return report, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	if err != nil {
-		return x, err
+		return report, err
 	}
 
-	return x, reviews(ctx, c, &x)
+	return report, reviews(ctx, call, &report)
 }
 
 // GetInput is mrv.get input.
@@ -367,35 +367,35 @@ func getReport(ctx context.Context, c *ops.Call, in *GetInput) (Report, error) {
 
 func pageReports(
 	ctx context.Context,
-	c *ops.Call,
-	q paging.Query,
+	call *ops.Call,
+	query paging.Query,
 	f any,
 	where string,
 	args []any,
 	order string,
 ) (paging.Page[Report], error) {
-	w, err := paging.Resolve(q, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Report]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.mrv_reports r WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.mrv_reports r WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Report]{}, apperr.Wrap(scanErr, "select energy.mrv_reports")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM energy.mrv_reports r WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			reportCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -405,14 +405,14 @@ func pageReports(
 	items := []Report{}
 
 	for rows.Next() {
-		x, err := scanReport(rows)
+		report, err := scanReport(rows)
 		if err != nil {
 			rows.Close()
 
 			return paging.Page[Report]{}, err
 		}
 
-		items = append(items, x)
+		items = append(items, report)
 	}
 
 	rows.Close()
@@ -423,7 +423,7 @@ func pageReports(
 	}
 
 	for i := range items {
-		err := reviews(ctx, c, &items[i])
+		err := reviews(ctx, call, &items[i])
 		if err != nil {
 			return paging.Page[Report]{}, err
 		}
@@ -431,9 +431,9 @@ func pageReports(
 
 	return paging.Page[Report]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
@@ -468,7 +468,11 @@ func pageReports(
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/mrv [get]
-func listReports(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Report], error) {
+func listReports(
+	ctx context.Context,
+	call *ops.Call,
+	in *paging.Query,
+) (paging.Page[Report], error) {
 	var f struct {
 		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
 		UnitID         *uuid.UUID `json:"unitId,omitempty"`
@@ -535,7 +539,7 @@ func listReports(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		conds = append(conds, "lower(r.period) < "+add(*f.To))
 	}
 
-	return pageReports(ctx, c, *in, f, strings.Join(conds, " AND "), args, order)
+	return pageReports(ctx, call, *in, f, strings.Join(conds, " AND "), args, order)
 }
 
 // VersionsInput is mrv.versions input.
@@ -579,15 +583,15 @@ func (in *VersionsInput) Validate() map[string]string {
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/mrv/{id}/versions [get]
-func versions(ctx context.Context, c *ops.Call, in *VersionsInput) (paging.Page[Report], error) {
-	if in.Query.HasFilters() { // no filters (query catalog)
+func versions(ctx context.Context, c *ops.Call, input *VersionsInput) (paging.Page[Report], error) {
+	if input.Query.HasFilters() { // no filters (query catalog)
 		return paging.Page[Report]{}, apperr.Fields(
 			map[string]string{"query.filters": "error.invalid"},
 		)
 	}
 
 	order, err := paging.OrderBy(
-		in.Query.Sort,
+		input.Query.Sort,
 		map[string]string{"version": "r.version"},
 		"r.version ASC",
 	)
@@ -595,12 +599,12 @@ func versions(ctx context.Context, c *ops.Call, in *VersionsInput) (paging.Page[
 		return paging.Page[Report]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	_, latestVersionErr := latestVersion(ctx, c, in.ID)
+	_, latestVersionErr := latestVersion(ctx, c, input.ID)
 	if latestVersionErr != nil {
 		return paging.Page[Report]{}, latestVersionErr
 	}
 
-	return pageReports(ctx, c, in.Query, in.ID, "r.id = $1", []any{in.ID}, order)
+	return pageReports(ctx, c, input.Query, input.ID, "r.id = $1", []any{input.ID}, order)
 }
 
 // SaveInput is mrv.saveDraft input.
@@ -612,28 +616,28 @@ type SaveInput struct {
 
 // Validate implements ops.Validator.
 func (in *SaveInput) Validate() map[string]string {
-	fe := map[string]string{}
-	in.Conditions.check(fe, "conditions.")
+	fieldErrs := map[string]string{}
+	in.Conditions.check(fieldErrs, "conditions.")
 
 	seen := map[uuid.UUID]bool{}
 	for _, e := range in.EvidenceIDs {
 		if e == uuid.Nil || seen[e] {
-			fe["evidenceIds"] = "error.invalid"
+			fieldErrs["evidenceIds"] = "error.invalid"
 		}
 
 		seen[e] = true
 	}
 
 	if in.EvidenceIDs == nil || len(in.EvidenceIDs) > 20 {
-		fe["evidenceIds"] = "error.invalid"
+		fieldErrs["evidenceIds"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 func insertReport(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	id uuid.UUID,
 	version int,
 	p Preview,
@@ -642,7 +646,7 @@ func insertReport(
 ) error {
 	cond, _ := json.Marshal(p.Conditions)
 	res, _ := json.Marshal(stored{Summary: p.Summary, Incomplete: p.Incomplete})
-	_, err := c.Tx.Exec(
+	_, err := call.Tx.Exec(
 		ctx,
 		`INSERT INTO energy.mrv_reports (id, version, tenant_id, organization_id, period, status, conditions, results,
 			evidence_ids, created_by, created_at)
@@ -656,8 +660,8 @@ func insertReport(
 		cond,
 		res,
 		evidence,
-		c.Principal.MembershipID,
-		c.Now,
+		call.Principal.MembershipID,
+		call.Now,
 	)
 
 	return apperr.Wrap(err, "insert energy.mrv_reports")
@@ -688,11 +692,11 @@ func insertReport(
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/mrv [post]
-func saveDraft(ctx context.Context, c *ops.Call, in *SaveInput) (Report, error) {
+func saveDraft(ctx context.Context, c *ops.Call, input *SaveInput) (Report, error) {
 	id, version := uuid.New(), 1
 
-	if in.ID != nil {
-		latest, err := latestVersion(ctx, c, *in.ID)
+	if input.ID != nil {
+		latest, err := latestVersion(ctx, c, *input.ID)
 		if err != nil {
 			return Report{}, err
 		}
@@ -701,27 +705,27 @@ func saveDraft(ctx context.Context, c *ops.Call, in *SaveInput) (Report, error) 
 			return Report{}, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
 
-		id, version = *in.ID, latest+1
+		id, version = *input.ID, latest+1
 	}
 
 	var found int
 
-	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_attachments WHERE id = ANY($1)`, in.EvidenceIDs).
+	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_attachments WHERE id = ANY($1)`, input.EvidenceIDs).
 		Scan(&found)
 	if err != nil {
 		return Report{}, apperr.Wrap(err, "select energy.ref_attachments")
 	}
 
-	if found != len(in.EvidenceIDs) {
+	if found != len(input.EvidenceIDs) {
 		return Report{}, apperr.Fields(map[string]string{"evidenceIds": "errors.evidence_unknown"})
 	}
 
-	p, err := preview(ctx, c, &in.Conditions)
+	p, err := preview(ctx, c, &input.Conditions)
 	if err != nil {
 		return Report{}, err
 	}
 
-	insertReportErr := insertReport(ctx, c, id, version, p, "draft", in.EvidenceIDs)
+	insertReportErr := insertReport(ctx, c, id, version, p, "draft", input.EvidenceIDs)
 	if insertReportErr != nil {
 		return Report{}, insertReportErr
 	}
@@ -748,21 +752,21 @@ type ReviewInput struct {
 
 // Validate implements ops.Validator.
 func (in *ReviewInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.ReportID == uuid.Nil {
-		fe["reportId"] = "error.required"
+		fieldErrs["reportId"] = "error.required"
 	}
 
 	if in.ReportVersion < 1 {
-		fe["reportVersion"] = "error.required"
+		fieldErrs["reportVersion"] = "error.required"
 	}
 
 	in.ReviewComment = strings.TrimSpace(in.ReviewComment)
 	if n := utf8.RuneCountInString(in.ReviewComment); n < 1 || n > 1000 {
-		fe["reviewComment"] = "error.length"
+		fieldErrs["reviewComment"] = "error.length"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // recordReview records a demo review of the latest version (SR09): reportVersion and the expected version must both
@@ -794,78 +798,86 @@ func (in *ReviewInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/mrv/{reportId}/review [post]
-func recordReview(ctx context.Context, c *ops.Call, in *ReviewInput) (Report, error) {
-	latest, err := latestVersion(ctx, c, in.ReportID)
+func recordReview(ctx context.Context, call *ops.Call, in *ReviewInput) (Report, error) {
+	latest, err := latestVersion(ctx, call, in.ReportID)
 	if err != nil {
 		return Report{}, err
 	}
 
-	if latest != in.ReportVersion || latest != *c.ExpectedVersion {
+	if latest != in.ReportVersion || latest != *call.ExpectedVersion {
 		return Report{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	x, err := LoadReport(ctx, c, in.ReportID, &latest)
+	report, err := LoadReport(ctx, call, in.ReportID, &latest)
 	if err != nil {
-		return x, err
+		return report, err
 	}
 
-	if x.Incomplete {
-		return x, apperr.E(apperr.Conflict, "errors.mrv_incomplete")
+	if report.Incomplete {
+		return report, apperr.E(apperr.Conflict, "errors.mrv_incomplete")
 	}
 
-	if x.Status == "demo_reviewed" {
-		return x, apperr.E(apperr.Conflict, "errors.mrv_already_reviewed")
+	if report.Status == "demo_reviewed" {
+		return report, apperr.E(apperr.Conflict, "errors.mrv_already_reviewed")
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`INSERT INTO energy.mrv_reviews (tenant_id, report_id, report_version, user_id, comment, reviewed_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
-		x.ID,
+		report.ID,
 		latest,
-		c.Principal.UserID,
+		call.Principal.UserID,
 		in.ReviewComment,
-		c.Now,
+		call.Now,
 	)
 	if execErr != nil {
-		return x, apperr.Wrap(execErr, "insert energy.mrv_reviews")
+		return report, apperr.Wrap(execErr, "insert energy.mrv_reviews")
 	}
 
 	next := latest + 1
 
 	p := Preview{
-		Conditions: x.Conditions,
-		Summary:    x.Summary,
-		Incomplete: x.Incomplete,
+		Conditions: report.Conditions,
+		Summary:    report.Summary,
+		Incomplete: report.Incomplete,
 		Scope:      "",
 		IsDemo:     false,
 	}
 
-	insertReportErr := insertReport(ctx, c, x.ID, next, p, "demo_reviewed", x.EvidenceIDs)
+	insertReportErr := insertReport(
+		ctx,
+		call,
+		report.ID,
+		next,
+		p,
+		"demo_reviewed",
+		report.EvidenceIDs,
+	)
 	if insertReportErr != nil {
-		return x, insertReportErr
+		return report, insertReportErr
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "mrv.recordReview",
 			TargetKind:      "mrv_report",
-			TargetID:        x.ID.String(),
+			TargetID:        report.ID.String(),
 			PreviousVersion: &latest,
 			NextVersion:     &next,
 			Reason:          in.ReviewComment, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return LoadReport(ctx, c, x.ID, &next)
+	return LoadReport(ctx, call, report.ID, &next)
 }
 
 // RegisterMRV binds mrv.*.
-func RegisterMRV(r *ops.Registry) {
-	ops.Register(r, "mrv.preview", preview)
-	ops.Register(r, "mrv.get", getReport)
-	ops.Register(r, "mrv.list", listReports)
-	ops.Register(r, "mrv.versions", versions)
-	ops.Register(r, "mrv.saveDraft", saveDraft)
-	ops.Register(r, "mrv.recordReview", recordReview)
+func RegisterMRV(reg *ops.Registry) {
+	ops.Register(reg, "mrv.preview", preview)
+	ops.Register(reg, "mrv.get", getReport)
+	ops.Register(reg, "mrv.list", listReports)
+	ops.Register(reg, "mrv.versions", versions)
+	ops.Register(reg, "mrv.saveDraft", saveDraft)
+	ops.Register(reg, "mrv.recordReview", recordReview)
 }

@@ -71,19 +71,25 @@ type Window struct {
 }
 
 // Resolve validates limit and cursor. conditions is the normalized filter+sort representation of the request.
-func Resolve(q Query, conditions any, scopeVersion, snapshot int) (Window, error) {
-	w := Window{Limit: DefaultLimit, Snapshot: snapshot, scope: scopeVersion, Offset: 0, hash: ""}
-	if q.Limit != nil {
-		if *q.Limit < 1 || *q.Limit > MaxLimit {
-			return w, apperr.Fields(map[string]string{"limit": "error.range"})
+func Resolve(query Query, conditions any, scopeVersion, snapshot int) (Window, error) {
+	window := Window{
+		Limit:    DefaultLimit,
+		Snapshot: snapshot,
+		scope:    scopeVersion,
+		Offset:   0,
+		hash:     "",
+	}
+	if query.Limit != nil {
+		if *query.Limit < 1 || *query.Limit > MaxLimit {
+			return window, apperr.Fields(map[string]string{"limit": "error.range"})
 		}
 
-		w.Limit = *q.Limit
+		window.Limit = *query.Limit
 	}
 
-	if q.Sort != nil {
-		if q.Sort.Direction != "asc" && q.Sort.Direction != "desc" {
-			return w, apperr.Fields(map[string]string{"sort.direction": "error.invalid"})
+	if query.Sort != nil {
+		if query.Sort.Direction != "asc" && query.Sort.Direction != "desc" {
+			return window, apperr.Fields(map[string]string{"sort.direction": "error.invalid"})
 		}
 	}
 
@@ -91,32 +97,32 @@ func Resolve(q Query, conditions any, scopeVersion, snapshot int) (Window, error
 		C any       `json:"c"`
 		S *SortSpec `json:"s"`
 		L int       `json:"l"`
-	}{conditions, q.Sort, w.Limit})
+	}{conditions, query.Sort, window.Limit})
 	sum := sha256.Sum256(b)
 
-	w.hash = hex.EncodeToString(sum[:8])
-	if q.Cursor == nil || *q.Cursor == "" {
-		return w, nil
+	window.hash = hex.EncodeToString(sum[:8])
+	if query.Cursor == nil || *query.Cursor == "" {
+		return window, nil
 	}
 
-	raw, err := base64.RawURLEncoding.DecodeString(*q.Cursor)
+	raw, err := base64.RawURLEncoding.DecodeString(*query.Cursor)
 
 	var c cursor
 	if err != nil || json.Unmarshal(raw, &c) != nil || c.Offset < 0 {
-		return w, apperr.Fields(map[string]string{"cursor": "error.invalid"})
+		return window, apperr.Fields(map[string]string{"cursor": "error.invalid"})
 	}
 
-	if c.Hash != w.hash {
-		return w, apperr.Fields(map[string]string{"cursor": "error.queryChanged"})
+	if c.Hash != window.hash {
+		return window, apperr.Fields(map[string]string{"cursor": "error.queryChanged"})
 	}
 
 	if c.Scope != scopeVersion || c.Snapshot != snapshot {
-		return w, apperr.E(apperr.Conflict, "error.cursorExpired")
+		return window, apperr.E(apperr.Conflict, "error.cursorExpired")
 	}
 
-	w.Offset = c.Offset
+	window.Offset = c.Offset
 
-	return w, nil
+	return window, nil
 }
 
 // Next returns the cursor for the following page or nil at the end.
@@ -134,22 +140,22 @@ func (w Window) Next(total int) *string {
 }
 
 // OrderBy maps a sort to SQL with the id tie-break; allowed maps API fields to SQL columns.
-func OrderBy(s *SortSpec, allowed map[string]string, def string) (string, error) {
-	if s == nil {
+func OrderBy(sortSpec *SortSpec, allowed map[string]string, def string) (string, error) {
+	if sortSpec == nil {
 		return def, nil
 	}
 
-	col, ok := allowed[s.Field]
+	col, ok := allowed[sortSpec.Field]
 	if !ok {
 		return "", apperr.Fields(map[string]string{"sort.field": "error.invalid"})
 	}
 
-	dir, err := Direction(s)
+	dir, err := Direction(sortSpec)
 	if err != nil {
 		return "", err
 	}
 
-	if s.Field == "id" {
+	if sortSpec.Field == "id" {
 		return col + " " + dir, nil
 	}
 
@@ -187,17 +193,17 @@ func Contains(search string) string {
 // SortSlice orders in-memory items by the requested sort: keys compares two items per allowed field (like
 // strings.Compare); ties fall back to the "id" comparator when there is one. A nil sort keeps the current order; a
 // field outside keys is VALIDATION.
-func SortSlice[T any](items []T, s *SortSpec, keys map[string]func(a, b T) int) error {
-	if s == nil {
+func SortSlice[T any](items []T, sortSpec *SortSpec, keys map[string]func(a, b T) int) error {
+	if sortSpec == nil {
 		return nil
 	}
 
-	cmp, ok := keys[s.Field]
+	cmp, ok := keys[sortSpec.Field]
 	if !ok {
 		return apperr.Fields(map[string]string{"sort.field": "error.invalid"})
 	}
 
-	if s.Direction != "asc" && s.Direction != "desc" {
+	if sortSpec.Direction != "asc" && sortSpec.Direction != "desc" {
 		return apperr.Fields(map[string]string{"sort.direction": "error.invalid"})
 	}
 
@@ -205,11 +211,11 @@ func SortSlice[T any](items []T, s *SortSpec, keys map[string]func(a, b T) int) 
 
 	slices.SortStableFunc(items, func(a, b T) int {
 		c := cmp(a, b)
-		if s.Direction == "desc" {
+		if sortSpec.Direction == "desc" {
 			c = -c
 		}
 
-		if c == 0 && id != nil && s.Field != "id" {
+		if c == 0 && id != nil && sortSpec.Field != "id" {
 			c = id(a, b)
 		}
 

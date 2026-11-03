@@ -15,7 +15,7 @@ import (
 // ops.Call.Emit, which the recorder turns into the same rows.
 func Publish(
 	ctx context.Context,
-	tx pgx.Tx,
+	txn pgx.Tx,
 	tenant uuid.UUID,
 	aggregateType string,
 	aggregateID uuid.UUID,
@@ -27,7 +27,7 @@ func Publish(
 		return apperr.Wrap(err, "json.Marshal")
 	}
 
-	_, err = tx.Exec(
+	_, err = txn.Exec(
 		ctx,
 		`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
 		VALUES ($1, $2, $3, $4, $5, COALESCE(NULLIF(current_setting('app.correlation_id', true), ''), 'event'))`,

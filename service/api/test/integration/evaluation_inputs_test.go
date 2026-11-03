@@ -11,8 +11,8 @@ import (
 // TestEvaluationInputValidation covers the D02 / IR16 input rules of automations.simulate: ids, the tick, the unit
 // list and every fact shape.
 func TestEvaluationInputValidation(t *testing.T) {
-	s := server(t)
-	u := boundUnit(t, s, "online")
+	srv := server(t)
+	unitID := boundUnit(t, srv, "online")
 	at := clock.Format(time.RFC3339)
 	fact := func(unit, metric, value, unitName, quality string) string {
 		return `{"unitId":"` + unit + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unitName +
@@ -22,7 +22,7 @@ func TestEvaluationInputValidation(t *testing.T) {
 		f := map[string]string{
 			"eventId":    `"` + uuid.NewString() + `"`,
 			"occurredAt": `"` + at + `"`,
-			"unitIds":    `["` + u + `"]`,
+			"unitIds":    `["` + unitID + `"]`,
 			"facts":      "[]",
 			"phase":      `"condition"`,
 		}
@@ -57,47 +57,50 @@ func TestEvaluationInputValidation(t *testing.T) {
 		"phase unknown":      {map[string]string{"phase": `"nightly"`}, "phase"},
 		"no units":           {map[string]string{"unitIds": "[]"}, "unitIds"},
 		"too many units":     {map[string]string{"unitIds": "[" + strings.Join(many, ",") + "]"}, "unitIds"},
-		"duplicate units":    {map[string]string{"unitIds": `["` + u + `","` + u + `"]`}, "unitIds"},
+		"duplicate units":    {map[string]string{"unitIds": `["` + unitID + `","` + unitID + `"]`}, "unitIds"},
 		"number as text": {
-			map[string]string{"facts": "[" + fact(u, "temperature", `"hot"`, "°C", "valid") + "]"},
+			map[string]string{"facts": "[" + fact(unitID, "temperature", `"hot"`, "°C", "valid") + "]"},
 			"facts",
 		},
-		"boolean as number": {map[string]string{"facts": "[" + fact(u, "occupied", "1", "boolean", "valid") + "]"}, "facts"},
+		"boolean as number": {
+			map[string]string{"facts": "[" + fact(unitID, "occupied", "1", "boolean", "valid") + "]"},
+			"facts",
+		},
 		"location event": {
-			map[string]string{"facts": "[" + fact(u, "location", `"home"`, "event", "valid") + "]"},
+			map[string]string{"facts": "[" + fact(unitID, "location", `"home"`, "event", "valid") + "]"},
 			"facts",
 		},
-		"unknown metric": {map[string]string{"facts": "[" + fact(u, "noise", "1", "dB", "valid") + "]"}, "facts"},
-		"wrong unit":     {map[string]string{"facts": "[" + fact(u, "temperature", "25", "K", "valid") + "]"}, "facts"},
-		"bad quality":    {map[string]string{"facts": "[" + fact(u, "temperature", "25", "°C", "good") + "]"}, "facts"},
+		"unknown metric": {map[string]string{"facts": "[" + fact(unitID, "noise", "1", "dB", "valid") + "]"}, "facts"},
+		"wrong unit":     {map[string]string{"facts": "[" + fact(unitID, "temperature", "25", "K", "valid") + "]"}, "facts"},
+		"bad quality":    {map[string]string{"facts": "[" + fact(unitID, "temperature", "25", "°C", "good") + "]"}, "facts"},
 		"fact of other unit": {
 			map[string]string{"facts": "[" + fact(uuid.NewString(), "temperature", "25", "°C", "valid") + "]"}, "facts",
 		},
 		"duplicate fact": {
-			map[string]string{"facts": "[" + fact(u, "temperature", "25", "°C", "valid") + "," +
-				fact(u, "temperature", "26", "°C", "valid") + "]"}, "facts",
+			map[string]string{"facts": "[" + fact(unitID, "temperature", "25", "°C", "valid") + "," +
+				fact(unitID, "temperature", "26", "°C", "valid") + "]"}, "facts",
 		},
 	} {
-		code, m := post(s, &customerB, "automations.simulate", body(c.fields))
+		code, m := post(srv, &customerB, "automations.simulate", body(c.fields))
 		if code != 422 || m["fieldErrors"].(map[string]any)[c.field] == nil {
 			t.Errorf("%s: %d %v", name, code, m)
 		}
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerB,
 		"automations.simulate",
 		body(
 			map[string]string{
 				"facts": "[" + fact(
-					u,
+					unitID,
 					"temperature",
 					"null",
 					"°C",
 					"missing",
 				) + "," + fact(
-					u,
+					unitID,
 					"location",
 					`"arrival"`,
 					"event",
@@ -106,11 +109,11 @@ func TestEvaluationInputValidation(t *testing.T) {
 			},
 		),
 	); code != 200 {
-		t.Fatalf("null and location facts are valid: %d %v", code, m)
+		t.Fatalf("null and location facts are valid: %d %v", code, res)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerB,
 		"automations.simulate",
 		body(
@@ -119,8 +122,8 @@ func TestEvaluationInputValidation(t *testing.T) {
 			},
 		),
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["occurredAt"] != "errors.not_current_tick" {
-		t.Fatalf("simulate outside the current tick: %d %v", code, m)
+		res["fieldErrors"].(map[string]any)["occurredAt"] != "errors.not_current_tick" {
+		t.Fatalf("simulate outside the current tick: %d %v", code, res)
 	}
 }
 
@@ -128,99 +131,100 @@ func TestEvaluationInputValidation(t *testing.T) {
 // stored result, a reused eventId with other input is CONFLICT, another eventId with the same input in the same tick
 // reuses the result, other input in the same tick is CONFLICT, and a past tick is VALIDATION.
 func TestEvaluationFireReplay(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	owner(t, `DELETE FROM control.evaluation_events`)
 
-	u := boundUnit(t, s, "online")
-	if code, m := write(
-		s,
+	unit := boundUnit(t, srv, "online")
+	if code, res := write(
+		srv,
 		&customerB,
 		"automations.save",
 		`{"name":"replay",`+
-			`"unitIds":["`+u+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event",`+
+			`"unitIds":["`+unit+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event",`+
 			`"condition":{"type":"occupancy","occupied":true},"action":{"kind":"set_temperature","celsius":24}}`,
 		0,
 	); code != 200 {
-		t.Fatalf("rule: %d %v", code, m)
+		t.Fatalf("rule: %d %v", code, res)
 	}
 
 	at := clock.Format(time.RFC3339)
 	input := func(event, occupied, occurred string) string {
-		return `{"eventId":"` + event + `","occurredAt":"` + occurred + `","unitIds":["` + u + `"],"facts":[{"unitId":"` + u +
+		return `{"eventId":"` + event + `","occurredAt":"` + occurred + `","unitIds":["` + unit + `"],"facts":[{"unitId":"` +
+			unit +
 			`","metric":"occupied","value":` + occupied + `,"unit":"boolean","observedAt":"` + at +
 			`","quality":"valid"}],"phase":"condition"}`
 	}
 	decision := func(m map[string]any) map[string]any { return data(m)["results"].([]any)[0].(map[string]any) }
 	e1 := uuid.NewString()
 
-	code, first := write(s, &customerB, "automations.fire", input(e1, "true", at), 0)
+	code, first := write(srv, &customerB, "automations.fire", input(e1, "true", at), 0)
 	if code != 200 || decision(first)["decision"] != "requested" ||
 		decision(first)["commandId"] == nil {
 		t.Fatalf("first fire: %d %v", code, first)
 	}
 
 	cmd := decision(first)["commandId"]
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"automations.fire",
 		input(e1, "true", at),
 		0,
 	); code != 200 ||
-		decision(m)["commandId"] != cmd {
-		t.Fatalf("repeated eventId returns the stored result: %d %v", code, m)
+		decision(res)["commandId"] != cmd {
+		t.Fatalf("repeated eventId returns the stored result: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"automations.fire",
 		input(e1, "false", at),
 		0,
 	); code != 409 ||
-		m["messageKey"] != "errors.event_reused" {
-		t.Fatalf("eventId reused with other input: %d %v", code, m)
+		res["messageKey"] != "errors.event_reused" {
+		t.Fatalf("eventId reused with other input: %d %v", code, res)
 	}
 
 	e2 := uuid.NewString()
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"automations.fire",
 		input(e2, "true", at),
 		0,
-	); code != 200 || data(m)["eventId"] != e2 ||
-		decision(m)["commandId"] != cmd {
-		t.Fatalf("same input in the same tick reuses the result: %d %v", code, m)
+	); code != 200 || data(res)["eventId"] != e2 ||
+		decision(res)["commandId"] != cmd {
+		t.Fatalf("same input in the same tick reuses the result: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"automations.fire",
 		input(uuid.NewString(), "false", at),
 		0,
 	); code != 409 ||
-		m["messageKey"] != "errors.tick_already_evaluated" {
-		t.Fatalf("other input in the same tick: %d %v", code, m)
+		res["messageKey"] != "errors.tick_already_evaluated" {
+		t.Fatalf("other input in the same tick: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"automations.fire",
 		input(uuid.NewString(), "true", clock.Add(-time.Minute).Format(time.RFC3339)),
 		0,
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["occurredAt"] != "errors.not_current_tick" {
-		t.Fatalf("a past tick: %d %v", code, m)
+		res["fieldErrors"].(map[string]any)["occurredAt"] != "errors.not_current_tick" {
+		t.Fatalf("a past tick: %d %v", code, res)
 	}
 
 	var commands int
 	ownerScan(
 		t,
 		`SELECT count(*) FROM control.commands WHERE unit_id = $1 AND source = 'automation'`,
-		[]any{u},
+		[]any{unit},
 		&commands,
 	)
 

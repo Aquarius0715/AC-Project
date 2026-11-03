@@ -11,7 +11,7 @@ import (
 // delegation: the read is NOT_FOUND, so neither the job nor its assignment reason (why the other technician could not
 // do it) leaks (maintenance jobs.get; the object is out of scope, D01).
 func TestOtherTechnicianCannotReadAJob(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	unit := seed.ID("unit-non-rto").String()
 	from, until := clock.Add(30*time.Hour), clock.Add(32*time.Hour)
 	job := assign(t, unit, "tech-external-b", from, until, "revoked")
@@ -21,7 +21,7 @@ func TestOtherTechnicianCannotReadAJob(t *testing.T) {
 		job,
 	)
 
-	code, m := post(s, &techA, "jobs.get", `{"jobId":"`+job+`"}`)
+	code, m := post(srv, &techA, "jobs.get", `{"jobId":"`+job+`"}`)
 	if code != 404 || m["messageKey"] != "error.notFound" {
 		t.Fatalf("another technician reads a job: %d %v, want 404 NOT_FOUND", code, m)
 	}

@@ -40,11 +40,11 @@ func TestWriteLimit(t *testing.T) {
 			}
 		})
 	}
-	s := limited(&ratelimit.Memory{})
+	srv := limited(&ratelimit.Memory{})
 
 	prefs := `{"locale":"ms","timezone":"Asia/Singapore","monthlyReportEmail":true}`
 	for i := 1; i <= 3; i++ {
-		if code, m := write(s, &customerB, "preferences.update", prefs, 0); code != 200 {
+		if code, m := write(srv, &customerB, "preferences.update", prefs, 0); code != 200 {
 			t.Fatalf("write %d: %d %v", i, code, m)
 		}
 	}
@@ -59,46 +59,46 @@ func TestWriteLimit(t *testing.T) {
 	req.Header.Set("Idempotency-Key", "test-"+uuid.NewString())
 	req.Header.Set("X-Expected-Version", "1")
 
-	w := httptest.NewRecorder()
-	s.Echo.ServeHTTP(w, req)
+	rec := httptest.NewRecorder()
+	srv.Echo.ServeHTTP(rec, req)
 
-	if w.Code != 429 || w.Header().Get("Retry-After") != "40" {
+	if rec.Code != 429 || rec.Header().Get("Retry-After") != "40" {
 		t.Fatalf(
 			"over the limit: %d Retry-After=%q %s",
-			w.Code,
-			w.Header().Get("Retry-After"),
-			w.Body.String(),
+			rec.Code,
+			rec.Header().Get("Retry-After"),
+			rec.Body.String(),
 		)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"preferences.update",
 		prefs,
 		0,
-	); code != 429 || m["code"] != "RATE_LIMITED" || m["messageKey"] != "error.rateLimited" ||
-		m["retryAfterSeconds"] != float64(40) {
-		t.Errorf("RATE_LIMITED body: %d %v", code, m)
+	); code != 429 || res["code"] != "RATE_LIMITED" || res["messageKey"] != "error.rateLimited" ||
+		res["retryAfterSeconds"] != float64(40) {
+		t.Errorf("RATE_LIMITED body: %d %v", code, res)
 	}
 	// reads and other members go on
-	if code, _ := post(s, &customerB, "session.get", `{}`); code != 200 {
+	if code, _ := post(srv, &customerB, "session.get", `{}`); code != 200 {
 		t.Errorf("read while limited: %d", code)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerA,
 		"preferences.update",
 		`{"locale":"en","timezone":"Asia/Kuala_Lumpur","monthlyReportEmail":true}`,
 		0,
 	); code != 200 {
-		t.Errorf("another member: %d %v", code, m)
+		t.Errorf("another member: %d %v", code, res)
 	}
 	// the next minute is a new window
 	now = now.Add(time.Minute)
 
-	if code, m := write(s, &customerB, "preferences.update", prefs, 0); code != 200 {
+	if code, m := write(srv, &customerB, "preferences.update", prefs, 0); code != 200 {
 		t.Errorf("next minute: %d %v", code, m)
 	}
 	// a counter store that does not answer lets writes through (the edge limits still hold)

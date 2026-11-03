@@ -18,21 +18,21 @@ import (
 // sequence, which a restored names to bring the device back online; after it no open fault and the newer sequence.
 // A request without the token, without a device or for an unknown one is refused.
 func TestConnectionFaultForTheGateway(t *testing.T) {
-	s := serverWith(t, true)
-	cl := newCluster(t)
-	u := boundUnit(t, s, "online")
+	srv := serverWith(t, true)
+	cluster := newCluster(t)
+	unit := boundUnit(t, srv, "online")
 
 	var device, binding string
 	ownerScan(
 		t,
 		`SELECT id::text, binding_id::text FROM devices.devices WHERE unit_id = $1`,
-		[]any{u},
+		[]any{unit},
 		&device,
 		&binding,
 	)
 
 	_, sess := post(
-		s,
+		srv,
 		&customerB,
 		"session.get",
 		`{}`,
@@ -42,7 +42,7 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 	ask := func(token, input string) (int, map[string]any) {
 		req, _ := http.NewRequest(
 			http.MethodPost,
-			cl.urls[ops.DomainEquipment]+"/internal/v1/system/queries/devices.connectionFault",
+			cluster.urls[ops.DomainEquipment]+"/internal/v1/system/queries/devices.connectionFault",
 			strings.NewReader(input),
 		)
 		req.Header.Set("Content-Type", "application/json")
@@ -80,8 +80,8 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 	trigger := func(body string) {
 		t.Helper()
 
-		if code, m := write(
-			s,
+		if code, res := write(
+			srv,
 			&customerB,
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+now.Format(
@@ -90,7 +90,7 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 				`"deviceId":"`+device+`","bindingId":"`+binding+`",`+body+`}`,
 			0,
 		); code != 200 {
-			t.Fatalf("device trigger %s: %d %v", body, code, m)
+			t.Fatalf("device trigger %s: %d %v", body, code, res)
 		}
 	}
 	connection := func() string {

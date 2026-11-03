@@ -20,8 +20,8 @@ import (
 // released at once, as completion releases assignments (DEC-73): the job goes back to the contractor (accepted) or,
 // for HQ's own delivery, to requested, keeping its agreed visit, and the people who assign get a job_update notice so
 // they choose another technician. A job already started keeps its assignment for HQ to handle.
-func (m Jobs) ReleaseEndedAccess(ctx context.Context, c *ops.Call) (int, error) {
-	rows, err := c.Tx.Query(
+func (m Jobs) ReleaseEndedAccess(ctx context.Context, call *ops.Call) (int, error) {
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT a.id, a.job_id, j.contractor_org_id FROM maintenance.assignments a
 		JOIN maintenance.jobs j ON j.id = a.job_id AND j.assignment_id = a.id AND j.status = 'assigned'
@@ -43,7 +43,7 @@ func (m Jobs) ReleaseEndedAccess(ctx context.Context, c *ops.Call) (int, error) 
 	}
 
 	for _, e := range list {
-		err := releaseAssignment(ctx, c, e, accessEnded)
+		err := releaseAssignment(ctx, call, e, accessEnded)
 		if err != nil {
 			return 0, err
 		}
@@ -58,13 +58,13 @@ func (m Jobs) ReleaseEndedAccess(ctx context.Context, c *ops.Call) (int, error) 
 // check of every assignment) is released like an ended access (IR439).
 func releaseQualificationEnded(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	units ServiceUnits,
 	membership uuid.UUID,
 	code string,
 	from, until time.Time,
 ) error {
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT a.id, a.job_id, j.contractor_org_id, j.unit_id FROM maintenance.assignments a
 		JOIN maintenance.jobs j ON j.id = a.job_id AND j.assignment_id = a.id AND j.status = 'assigned'
@@ -94,7 +94,7 @@ func releaseQualificationEnded(
 	}
 
 	for _, e := range list {
-		_, _, scope, err := units.UnitService(ctx, c, e.unit)
+		_, _, scope, err := units.UnitService(ctx, call, e.unit)
 		if err != nil {
 			return apperr.Wrap(err, "maintenance.ServiceUnits.UnitService")
 		}
@@ -103,7 +103,7 @@ func releaseQualificationEnded(
 			continue
 		}
 
-		releaseAssignmentErr := releaseAssignment(ctx, c, e.released, qualificationEnded)
+		releaseAssignmentErr := releaseAssignment(ctx, call, e.released, qualificationEnded)
 		if releaseAssignmentErr != nil {
 			return releaseAssignmentErr
 		}
@@ -139,13 +139,13 @@ var (
 
 // releaseAssignment revokes the assignment and returns its job to be assigned again with its agreed visit (IR439):
 // accepted for a contractor's job, requested for HQ's own delivery. The job's assigners get a job_update notice.
-func releaseAssignment(ctx context.Context, c *ops.Call, e released, why releaseCause) error {
-	_, err := c.Tx.Exec(
+func releaseAssignment(ctx context.Context, call *ops.Call, e released, why releaseCause) error {
+	_, err := call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.assignments SET status = 'revoked', reason = $3, version = version + 1, updated_at = $2 WHERE id =
 			$1`,
 		e.assignment,
-		c.Now,
+		call.Now,
 		why.reason,
 	)
 	if err != nil {
@@ -157,13 +157,13 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 		status = "accepted" // the contractor assigns again on its accepted offer
 	}
 
-	_, err = c.Tx.Exec(
+	_, err = call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET status = $2, assignment_id = NULL, scheduled_slot = NULL, version = version + 1,
 			updated_at = $3 WHERE id = $1`,
 		e.job,
 		status,
-		c.Now,
+		call.Now,
 	)
 	if err != nil {
 		return apperr.Wrap(err, "update maintenance.jobs")
@@ -171,7 +171,7 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 
 	err = (Jobs{Units: nil, Severity: nil, HQOrg: nil, Sites: nil, Blobs: nil}).event(
 		ctx,
-		c,
+		call,
 		e.job,
 		why.event,
 		nil,
@@ -180,7 +180,7 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 		return err
 	}
 
-	in := identity.MembersInput{
+	input := identity.MembersInput{
 		Role:           "admin",
 		Permission:     "job.write",
 		IDs:            nil,
@@ -188,20 +188,20 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 		ClientRole:     "",
 	}
 	if e.contractor != nil {
-		in = identity.MembersInput{
+		input = identity.MembersInput{
 			Role:           "contractor",
 			OrganizationID: e.contractor,
 			Permission:     "partner.assign", IDs: nil, ClientRole: "",
 		}
 	}
 
-	recipients, err := identity.Members(ctx, c, in)
+	recipients, err := identity.Members(ctx, call, input)
 	if err != nil {
 		return apperr.Wrap(err, "identity.Members")
 	}
 
 	for _, r := range recipients {
-		_, err := (notify.Store{}).Create(ctx, c, notify.New{
+		_, err := (notify.Store{}).Create(ctx, call, notify.New{
 			RecipientMembershipID: r,
 			Type:                  "job_update",
 			TemplateKey:           "job_update",
@@ -220,7 +220,7 @@ func releaseAssignment(ctx context.Context, c *ops.Call, e released, why release
 		}
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "jobs.releaseAssignment",
 			TargetKind:      "job",

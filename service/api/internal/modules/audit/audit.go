@@ -90,8 +90,8 @@ type Filter struct {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/audit [get]
-func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View], error) {
-	var f Filter
+func list(ctx context.Context, call *ops.Call, in *paging.Query) (paging.Page[View], error) {
+	var filter Filter
 
 	bad := apperr.Fields(map[string]string{"filters": "error.invalid"})
 	if len(in.Filters) == 0 {
@@ -103,25 +103,26 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 	dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 	dec.DisallowUnknownFields()
 
-	if dec.Decode(&f) != nil ||
-		(f.Result != nil && !slices.Contains([]string{"success", "denied", "failed", "pending"}, *f.Result)) {
+	if dec.Decode(&filter) != nil ||
+		(filter.Result != nil && !slices.Contains([]string{"success", "denied", "failed", "pending"}, *filter.Result)) {
 		return paging.Page[View]{}, bad
 	}
 
-	if f.From == nil || f.To == nil { // the period is required: name the end that is missing
-		fe := map[string]string{}
-		if f.From == nil {
-			fe["filters.from"] = "error.required"
+	if filter.From == nil ||
+		filter.To == nil { // the period is required: name the end that is missing
+		fieldErrs := map[string]string{}
+		if filter.From == nil {
+			fieldErrs["filters.from"] = "error.required"
 		}
 
-		if f.To == nil {
-			fe["filters.to"] = "error.required"
+		if filter.To == nil {
+			fieldErrs["filters.to"] = "error.required"
 		}
 
-		return paging.Page[View]{}, apperr.Fields(fe)
+		return paging.Page[View]{}, apperr.Fields(fieldErrs)
 	}
 
-	if !f.From.Before(*f.To) || f.To.Sub(*f.From) > 366*24*time.Hour {
+	if !filter.From.Before(*filter.To) || filter.To.Sub(*filter.From) > 366*24*time.Hour {
 		return paging.Page[View]{}, apperr.Fields(
 			map[string]string{"filters.to": "errors.period_range"},
 		)
@@ -141,12 +142,12 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 		return paging.Page[View]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*in, filter, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[View]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	args := []any{*f.From, *f.To}
+	args := []any{*filter.From, *filter.To}
 	add := func(v any) string {
 		args = append(args, v)
 
@@ -155,9 +156,9 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 	conds := []string{"a.occurred_at >= $1", "a.occurred_at < $2"}
 
 	for col, v := range map[string]*string{
-		"a.actor_id": f.ActorID, "a.target_kind": f.TargetKind, "a.target_id": f.TargetID,
-		"a.correlation_id": f.CorrelationID,
-		"a.result":         f.Result, "a.action": f.Action,
+		"a.actor_id": filter.ActorID, "a.target_kind": filter.TargetKind, "a.target_id": filter.TargetID,
+		"a.correlation_id": filter.CorrelationID,
+		"a.result":         filter.Result, "a.action": filter.Action,
 	} {
 		if v != nil {
 			conds = append(conds, col+" = "+add(*v))
@@ -168,13 +169,13 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM audit.audit_log a WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM audit.audit_log a WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[View]{}, apperr.Wrap(scanErr, "select audit.audit_log")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			`SELECT a.id, a.tenant_id, a.actor_id, u.display_name, a.actor_role_at_time, a.action, a.target_kind, a.target_id,
@@ -183,8 +184,8 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 		`+actorJoin+` WHERE %s ORDER BY %s LIMIT %d OFFSET %d`,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -196,35 +197,35 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 
 	for rows.Next() {
 		var (
-			x        View
+			view     View
 			kind, id string
 		)
 
 		err := rows.Scan(
-			&x.ID,
-			&x.TenantID,
-			&x.ActorID,
-			&x.ActorName,
-			&x.ActorRoleAtTime,
-			&x.Action,
+			&view.ID,
+			&view.TenantID,
+			&view.ActorID,
+			&view.ActorName,
+			&view.ActorRoleAtTime,
+			&view.Action,
 			&kind,
 			&id,
-			&x.PreviousVersion,
-			&x.NextVersion,
-			&x.OccurredAt,
-			&x.CorrelationID,
-			&x.Result,
-			&x.MaskedBefore,
-			&x.MaskedAfter,
-			&x.Reason,
+			&view.PreviousVersion,
+			&view.NextVersion,
+			&view.OccurredAt,
+			&view.CorrelationID,
+			&view.Result,
+			&view.MaskedBefore,
+			&view.MaskedAfter,
+			&view.Reason,
 		)
 		if err != nil {
 			return paging.Page[View]{}, apperr.Wrap(err, "select audit.audit_log")
 		}
 
-		x.Version, x.CreatedAt, x.UpdatedAt = 1, x.OccurredAt, x.OccurredAt
-		x.TargetRef = map[string]string{"kind": kind, "id": id}
-		items = append(items, x)
+		view.Version, view.CreatedAt, view.UpdatedAt = 1, view.OccurredAt, view.OccurredAt
+		view.TargetRef = map[string]string{"kind": kind, "id": id}
+		items = append(items, view)
 	}
 
 	rowsErr := rows.Err()
@@ -234,9 +235,9 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 
 	return paging.Page[View]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 

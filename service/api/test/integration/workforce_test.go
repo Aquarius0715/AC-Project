@@ -11,7 +11,7 @@ import (
 )
 
 func TestEligibleCapacityUnavailability(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	tech := seed.ID("tech-internal-a")
 	owner(
 		t,
@@ -31,21 +31,21 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 	t.Cleanup(clean)
 
 	unit := seed.ID("unit-non-rto").String()
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, m := write(
-		s,
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, resp := write(
+		srv,
 		&hq,
 		"jobs.create",
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	job := data(m)["id"].(string)
+	job := data(resp)["id"].(string)
 	elig := func(a *actor, start, end int) (int, map[string]any) {
 		return post(
-			s,
+			srv,
 			a,
 			"members.eligible",
-			`{"jobId":"`+job+`","startAt":"`+ts(start)+`","endAt":"`+ts(end)+`","query":{}}`,
+			`{"jobId":"`+job+`","startAt":"`+stamp(start)+`","endAt":"`+stamp(end)+`","query":{}}`,
 		)
 	}
 
@@ -58,13 +58,13 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 
 		return false
 	}
-	if code, m := elig(
+	if code, res := elig(
 		&hq,
 		25,
 		27,
-	); code != 200 || !has(m, tech) ||
-		has(m, seed.ID("tech-external-a")) {
-		t.Fatalf("eligible: %d %v", code, m)
+	); code != 200 || !has(res, tech) ||
+		has(res, seed.ID("tech-external-a")) {
+		t.Fatalf("eligible: %d %v", code, res)
 	}
 
 	if _, m := elig(&hq, 24*20, 24*20+2); has(m, tech) {
@@ -80,12 +80,12 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 	}
 	// capacity: 2026-09-14 is a Monday; 09:00–17:00 KL = 01:00–09:00 UTC
 	write(
-		s,
+		srv,
 		&hq,
 		"jobs.assign",
-		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+ts(
+		`{"jobId":"`+job+`","technicianMembershipId":"`+tech.String()+`","startAt":"`+stamp(
 			25,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			27,
 		)+`"}`,
 		1,
@@ -99,7 +99,7 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 	)
 
 	capOf := func(a *actor, date string) map[string]any {
-		_, m := post(s, a, "members.capacity", `{"date":"`+date+`","query":{"limit":100}}`)
+		_, m := post(srv, a, "members.capacity", `{"date":"`+date+`","query":{"limit":100}}`)
 		for _, it := range items(m) {
 			if it["membershipId"] == tech.String() {
 				return it
@@ -124,14 +124,14 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 		t.Fatalf("sunday: %v", c)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"members.capacity",
 		`{"date":"14-09-2026","query":{}}`,
 	); code != 422 ||
-		fields(m) != "date=error.invalid" {
-		t.Errorf("bad date: %d %s", code, fields(m))
+		fields(res) != "date=error.invalid" {
+		t.Errorf("bad date: %d %s", code, fields(res))
 	}
 
 	if c := capOf(&contrA, "2026-09-14"); c != nil {
@@ -149,12 +149,12 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 		"32 days":        `{"membershipId":"` + tech.String() + `","from":"2026-09-01","to":"2026-10-03","type":"sick"}`,
 		"bad type":       `{"membershipId":"` + tech.String() + `","from":"2026-09-14","to":"2026-09-14","type":"holiday"}`,
 	} {
-		code, m := write(s, &hq, "members.setUnavailability", b, 0)
+		code, m := write(srv, &hq, "members.setUnavailability", b, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&contrA,
 		"members.setUnavailability",
 		`{"membershipId":"`+tech.String()+`","from":"2026-09-14","to":"2026-09-14","type":"sick"}`,
@@ -163,16 +163,16 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 		t.Error("contractor sets another organization's technician")
 	}
 
-	code, m := write(
-		s,
+	code, resp := write(
+		srv,
 		&hq,
 		"members.setUnavailability",
 		`{"membershipId":"`+tech.String()+`","from":"2026-09-14","to":"2026-09-15","type":"training","note":" course "}`,
 		0,
 	)
-	if code != 200 || len(data(m)["conflictingAssignmentIds"].([]any)) != 1 ||
-		data(m)["note"] != "course" {
-		t.Fatalf("unavailability: %d %v", code, m)
+	if code != 200 || len(data(resp)["conflictingAssignmentIds"].([]any)) != 1 ||
+		data(resp)["note"] != "course" {
+		t.Fatalf("unavailability: %d %v", code, resp)
 	}
 
 	if c := capOf(
@@ -183,29 +183,30 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 		t.Fatalf("capacity while unavailable: %v", c)
 	}
 
-	_, m = write(
-		s,
+	_, resp = write(
+		srv,
 		&hq,
 		"jobs.create",
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
 
-	job = data(m)["id"].(string)
+	job = data(resp)["id"].(string)
+
 	if _, m := elig(&hq, 25, 27); has(m, tech) {
 		t.Error("unavailable technician is not eligible")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"members.setUnavailability",
 		`{"membershipId":null,"from":"2026-09-20","to":"2026-09-20","type":"public_holiday","note":"   "}`,
 		0,
 	); code != 200 ||
-		data(m)["organizationId"] != seed.ID("org-contractor-a").String() ||
-		data(m)["note"] != nil {
-		t.Fatalf("organization-wide: %d %v", code, m)
+		data(res)["organizationId"] != seed.ID("org-contractor-a").String() ||
+		data(res)["note"] != nil {
+		t.Fatalf("organization-wide: %d %v", code, res)
 	}
 }
 
@@ -214,7 +215,7 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 // from its first day the row goes, from a later day the earlier days stay (version + 1) — never a day before today,
 // with the row's version, and only within the caller's company (IR612). The clock's day is Monday 2026-09-14.
 func TestUnavailabilityListAndClear(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	tech, orgA := seed.ID("tech-external-a"), seed.ID("org-contractor-a")
 	clean := func() { owner(t, `DELETE FROM maintenance.unavailability WHERE organization_id = $1`, orgA) }
 	clean()
@@ -223,7 +224,7 @@ func TestUnavailabilityListAndClear(t *testing.T) {
 	set := func(body string) string {
 		t.Helper()
 
-		code, m := write(s, &contrA, "members.setUnavailability", body, 0)
+		code, m := write(srv, &contrA, "members.setUnavailability", body, 0)
 		if code != 200 || ver(m) != 1 {
 			t.Fatalf("set %s: %d %v", body, code, m)
 		}
@@ -245,14 +246,14 @@ func TestUnavailabilityListAndClear(t *testing.T) {
 	ids := func(a *actor, query string) []string {
 		t.Helper()
 
-		code, m := post(s, a, "members.unavailability", query)
+		code, res := post(srv, a, "members.unavailability", query)
 		if code != 200 {
-			t.Fatalf("list %s: %d %v", query, code, m)
+			t.Fatalf("list %s: %d %v", query, code, res)
 		}
 
 		out := []string{}
 
-		for _, it := range items(m) {
+		for _, it := range items(res) {
 			if it["organizationId"] == orgA.String() {
 				out = append(out, it["id"].(string))
 			}
@@ -304,19 +305,19 @@ func TestUnavailabilityListAndClear(t *testing.T) {
 		),
 	)
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&contrA,
 		"members.unavailability",
 		`{"filters":{"type":"sick"}}`,
 	); code != 422 ||
-		fields(m) != "type=error.notAllowed" {
-		t.Errorf("a filter outside the catalog: %d %s", code, fields(m))
+		fields(res) != "type=error.notAllowed" {
+		t.Errorf("a filter outside the catalog: %d %s", code, fields(res))
 	}
 
 	clear := func(a *actor, id, from string, version int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			a,
 			"members.clearUnavailability",
 			`{"id":"`+id+`","from":"`+from+`"}`,
@@ -340,40 +341,40 @@ func TestUnavailabilityListAndClear(t *testing.T) {
 		refusal(t, name, code, m, "from=error.range")
 	}
 
-	code, m := clear(&contrA, leave, "2026-09-17", 1)
+	code, resp := clear(&contrA, leave, "2026-09-17", 1)
 
-	r, _ := data(m)["remaining"].(map[string]any)
+	r, _ := data(resp)["remaining"].(map[string]any)
 	if code != 200 || r == nil || r["from"] != "2026-09-16" || r["to"] != "2026-09-16" ||
 		r["version"].(float64) != 2 {
-		t.Fatalf("a new last day: %d %v", code, m)
+		t.Fatalf("a new last day: %d %v", code, resp)
 	}
 
 	if code, _ := clear(&contrA, leave, "2026-09-16", 1); code != 409 {
 		t.Errorf("the version before the change: %d", code)
 	}
 
-	if code, m := clear(
+	if code, res := clear(
 		&contrA,
 		leave,
 		"2026-09-16",
 		2,
 	); code != 200 ||
-		data(m)["remaining"] != nil {
-		t.Fatalf("from its first day: %d %v", code, m)
+		data(res)["remaining"] != nil {
+		t.Fatalf("from its first day: %d %v", code, res)
 	}
 
 	if code, _ := clear(&contrA, leave, "2026-09-16", 3); code != 404 {
 		t.Errorf("a removed row: %d", code)
 	}
 	// a row that started before today keeps its past days: cleared from today, it ends yesterday and leaves the list
-	code, m = clear(&contrA, sick, "2026-09-10", 1)
-	refusal(t, "its past first day", code, m, "from=error.range")
+	code, resp = clear(&contrA, sick, "2026-09-10", 1)
+	refusal(t, "its past first day", code, resp, "from=error.range")
 
-	code, m = clear(&contrA, sick, "2026-09-14", 1)
-	if r, _ := data(m)["remaining"].(map[string]any); code != 200 || r == nil ||
+	code, resp = clear(&contrA, sick, "2026-09-14", 1)
+	if r, _ := data(resp)["remaining"].(map[string]any); code != 200 || r == nil ||
 		r["from"] != "2026-09-10" ||
 		r["to"] != "2026-09-13" {
-		t.Fatalf("from today: %d %v", code, m)
+		t.Fatalf("from today: %d %v", code, resp)
 	}
 
 	same("after the clears", ids(&contrA, `{"limit":100}`), holiday)

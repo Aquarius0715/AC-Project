@@ -163,7 +163,7 @@ func (k *Keycloak) do(ctx context.Context, method, path string, body any) (*http
 		return nil, err
 	}
 
-	var rd *strings.Reader
+	var reader *strings.Reader
 
 	if body != nil {
 		raw, err := json.Marshal(body)
@@ -171,12 +171,12 @@ func (k *Keycloak) do(ctx context.Context, method, path string, body any) (*http
 			return nil, apperr.Wrap(err, "json.Marshal")
 		}
 
-		rd = strings.NewReader(string(raw))
+		reader = strings.NewReader(string(raw))
 	} else {
-		rd = strings.NewReader("")
+		reader = strings.NewReader("")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, k.AdminURL+path, rd)
+	req, err := http.NewRequestWithContext(ctx, method, k.AdminURL+path, reader)
 	if err != nil {
 		return nil, apperr.Wrap(err, "http.NewRequestWithContext")
 	}
@@ -212,20 +212,20 @@ func (a Account) claims() map[string][]string {
 // CreateAccount creates the person's user (enabled, e-mail not yet verified) with the claim attributes and returns
 // its subject. An account that exists for the e-mail already is updated with the attributes and returned, so a
 // retried provisioning is one account.
-func (k *Keycloak) CreateAccount(ctx context.Context, a Account) (string, error) {
-	if a.Email == "" {
+func (k *Keycloak) CreateAccount(ctx context.Context, account Account) (string, error) {
+	if account.Email == "" {
 		return "", errors.New("idp: no e-mail")
 	}
 
 	user := map[string]any{
-		"username":      a.Email,
-		"email":         a.Email,
-		"firstName":     a.DisplayName,
+		"username":      account.Email,
+		"email":         account.Email,
+		"firstName":     account.DisplayName,
 		"enabled":       true,
 		"emailVerified": false,
-		"attributes":    a.claims(),
+		"attributes":    account.claims(),
 	}
-	if a.Role == "admin" { // HQ signs in with two steps (IR468)
+	if account.Role == "admin" { // HQ signs in with two steps (IR468)
 		user["requiredActions"] = []string{"CONFIGURE_TOTP"}
 	}
 
@@ -244,12 +244,12 @@ func (k *Keycloak) CreateAccount(ctx context.Context, a Account) (string, error)
 
 		return "", errors.New("idp: no user location")
 	case http.StatusConflict:
-		id, err := k.findByEmail(ctx, a.Email)
+		id, err := k.findByEmail(ctx, account.Email)
 		if err != nil {
 			return "", err
 		}
 
-		return id, k.UpdateAccount(ctx, id, a)
+		return id, k.UpdateAccount(ctx, id, account)
 	}
 
 	return "", fmt.Errorf("idp: create user answered %d", res.StatusCode)
@@ -259,7 +259,7 @@ func (k *Keycloak) CreateAccount(ctx context.Context, a Account) (string, error)
 // attributes change, the name is the one given, and the account is on. The whole user is read and written back: with
 // the realm's user profile an update replaces the profile — a field left out, the e-mail too, would be cleared — and
 // the attribute map (IR463).
-func (k *Keycloak) UpdateAccount(ctx context.Context, subject string, a Account) error {
+func (k *Keycloak) UpdateAccount(ctx context.Context, subject string, account Account) error {
 	res, err := k.do(ctx, http.MethodGet, "/users/"+url.PathEscape(subject), nil)
 	if err != nil {
 		return err
@@ -286,11 +286,11 @@ func (k *Keycloak) UpdateAccount(ctx context.Context, subject string, a Account)
 		attrs = map[string]any{}
 	}
 
-	for key, v := range a.claims() {
+	for key, v := range account.claims() {
 		attrs[key] = v
 	}
 
-	user["attributes"], user["firstName"], user["enabled"] = attrs, a.DisplayName, true
+	user["attributes"], user["firstName"], user["enabled"] = attrs, account.DisplayName, true
 
 	upd, err := k.do(ctx, http.MethodPut, "/users/"+url.PathEscape(subject), user)
 	if err != nil {
@@ -334,10 +334,10 @@ func (k *Keycloak) findByEmail(ctx context.Context, email string) (string, error
 // SendSetup e-mails the person a link to set their password (and verify the e-mail) that returns to their app. An HQ
 // account (role admin) without a one-time-code device also sets one up there: HQ signs in with two steps, and the
 // realm asks for the code only once a device is configured (IR468).
-func (k *Keycloak) SendSetup(ctx context.Context, subject string, a Account) error {
+func (k *Keycloak) SendSetup(ctx context.Context, subject string, account Account) error {
 	actions := []string{"UPDATE_PASSWORD", "VERIFY_EMAIL"}
 
-	if a.Role == "admin" {
+	if account.Role == "admin" {
 		has, err := k.hasOTP(ctx, subject)
 		if err != nil {
 			return err
@@ -348,16 +348,16 @@ func (k *Keycloak) SendSetup(ctx context.Context, subject string, a Account) err
 		}
 	}
 
-	q := url.Values{
-		"client_id":    {a.ClientID},
-		"redirect_uri": {a.RedirectURI},
+	params := url.Values{
+		"client_id":    {account.ClientID},
+		"redirect_uri": {account.RedirectURI},
 		"lifespan":     {"259200"},
 	} // 3 days
 
 	res, err := k.do(
 		ctx,
 		http.MethodPut,
-		"/users/"+url.PathEscape(subject)+"/execute-actions-email?"+q.Encode(),
+		"/users/"+url.PathEscape(subject)+"/execute-actions-email?"+params.Encode(),
 		actions,
 	)
 	if err != nil {

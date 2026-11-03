@@ -44,31 +44,31 @@ const BusinessNowHeader = "X-Business-Now"
 
 // RegisterQuery binds an internal query owned by domain.
 func RegisterQuery[I any, O any](
-	r *Registry,
+	reg *Registry,
 	domain, name string,
 	h func(context.Context, *Call, *I) (O, error),
 ) {
-	if r.queries == nil {
-		r.queries = map[string]query{}
+	if reg.queries == nil {
+		reg.queries = map[string]query{}
 	}
 
-	r.queries[name] = query{
+	reg.queries[name] = query{
 		domain: domain,
-		handle: func(ctx context.Context, c *Call, raw json.RawMessage) (any, error) {
-			in := new(I)
+		handle: func(ctx context.Context, call *Call, raw json.RawMessage) (any, error) {
+			input := new(I)
 
-			err := json.Unmarshal(raw, in)
+			err := json.Unmarshal(raw, input)
 			if err != nil {
 				return nil, apperr.Fields(map[string]string{"_": "error.malformedInput"})
 			}
 			// an input that validates itself is checked here too, as the operations' inputs are (IR431)
-			if v, ok := any(in).(Validator); ok {
+			if v, ok := any(input).(Validator); ok {
 				if fe := v.Validate(); len(fe) > 0 {
 					return nil, apperr.Fields(fe)
 				}
 			}
 
-			return h(ctx, c, in)
+			return h(ctx, call, input)
 		},
 	}
 }
@@ -79,16 +79,16 @@ func RegisterQuery[I any, O any](
 // name of the owner's domain.
 func Delegate[I any, O any](
 	ctx context.Context,
-	c *Call,
+	call *Call,
 	name string,
-	in I,
+	input I,
 	local func(context.Context, *Call, *I) (O, error),
 ) (O, error) {
-	if c.Queries == nil {
-		return local(ctx, c, &in)
+	if call.Queries == nil {
+		return local(ctx, call, &input)
 	}
 
-	return Ask[O](ctx, c.Queries, c, name, in)
+	return Ask[O](ctx, call.Queries, call, name, input)
 }
 
 // Query runs the internal query name for the call (modules use it; the registry comes with the call).
@@ -97,13 +97,13 @@ func Query[O any](ctx context.Context, c *Call, name string, in any) (O, error) 
 }
 
 // Ask runs the internal query name for the caller and decodes its result.
-func Ask[O any](ctx context.Context, r *Registry, c *Call, name string, in any) (O, error) {
+func Ask[O any](ctx context.Context, reg *Registry, c *Call, name string, in any) (O, error) {
 	var out O
-	if r == nil {
+	if reg == nil {
 		return out, fmt.Errorf("ops: query %s outside a request", name)
 	}
 
-	q, ok := r.queries[name]
+	q, ok := reg.queries[name]
 	if !ok {
 		return out, fmt.Errorf("ops: unknown query %s", name)
 	}
@@ -114,7 +114,7 @@ func Ask[O any](ctx context.Context, r *Registry, c *Call, name string, in any) 
 	}
 
 	var res any
-	if r.domains == nil || r.domains[q.domain] {
+	if reg.domains == nil || reg.domains[q.domain] {
 		res, err = q.handle(ctx, c, raw)
 		if err != nil {
 			return out, err
@@ -132,11 +132,11 @@ func Ask[O any](ctx context.Context, r *Registry, c *Call, name string, in any) 
 		return out, apperr.Wrap(json.Unmarshal(b, &out), "json.Unmarshal")
 	}
 
-	if r.Remote == nil {
+	if reg.Remote == nil {
 		return out, apperr.E(apperr.Unavailable, "error.unavailable")
 	}
 
-	body, err := r.Remote.Query(ctx, c, q.domain, name, raw)
+	body, err := reg.Remote.Query(ctx, c, q.domain, name, raw)
 	if err != nil {
 		return out, apperr.Wrap(err, "ops.QueryTransport.Query")
 	}
@@ -164,17 +164,17 @@ type HTTPQueries struct {
 // Query implements QueryTransport.
 func (h *HTTPQueries) Query(
 	ctx context.Context,
-	c *Call,
+	call *Call,
 	domain, name string,
-	in json.RawMessage,
+	input json.RawMessage,
 ) (json.RawMessage, error) {
 	base := h.Targets[domain]
-	if base == nil || c.Principal == nil {
+	if base == nil || call.Principal == nil {
 		return nil, apperr.E(apperr.Unavailable, "error.unavailable")
 	}
 
 	path := "/internal/v1/queries/" // the caller's user and membership
-	if c.Bearer == "" {
+	if call.Bearer == "" {
 		path = "/internal/v1/system/queries/" // no user: a worker of the tenant (IR195)
 	}
 
@@ -182,7 +182,7 @@ func (h *HTTPQueries) Query(
 		ctx,
 		http.MethodPost,
 		strings.TrimSuffix(base.String(), "/")+path+url.PathEscape(name),
-		bytes.NewReader(in),
+		bytes.NewReader(input),
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "http.NewRequestWithContext")
@@ -191,17 +191,17 @@ func (h *HTTPQueries) Query(
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	req.Header.Set(
 		"X-Tenant-Id",
-		c.Principal.TenantID.String(),
+		call.Principal.TenantID.String(),
 	) // the same tenant (and membership) context as the caller
 
-	if c.Bearer != "" {
-		req.Header.Set(echo.HeaderAuthorization, "Bearer "+c.Bearer)
-		req.Header.Set("X-Membership-Id", c.Principal.MembershipID.String())
+	if call.Bearer != "" {
+		req.Header.Set(echo.HeaderAuthorization, "Bearer "+call.Bearer)
+		req.Header.Set("X-Membership-Id", call.Principal.MembershipID.String())
 	}
 
 	req.Header.Set(InternalTokenHeader, h.Token)
-	req.Header.Set(echo.HeaderXRequestID, c.CorrelationID)
-	req.Header.Set(BusinessNowHeader, c.Now.UTC().Format(time.RFC3339Nano))
+	req.Header.Set(echo.HeaderXRequestID, call.CorrelationID)
+	req.Header.Set(BusinessNowHeader, call.Now.UTC().Format(time.RFC3339Nano))
 
 	client := h.Client
 	if client == nil {
@@ -225,15 +225,15 @@ func (h *HTTPQueries) Query(
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		de := &apperr.DomainError{
+		domainErr := &apperr.DomainError{
 			Code:              "",
 			MessageKey:        "",
 			FieldErrors:       nil,
 			CorrelationID:     "",
 			RetryAfterSeconds: nil,
 		}
-		if json.Unmarshal(body, de) == nil && de.Code != "" {
-			return nil, de
+		if json.Unmarshal(body, domainErr) == nil && domainErr.Code != "" {
+			return nil, domainErr
 		}
 
 		return nil, apperr.E(apperr.Unavailable, "error.unavailable")
@@ -265,14 +265,14 @@ func (r *Registry) ServeQuery(token string) echo.HandlerFunc {
 // and the query runs with the system principal of the X-Tenant-Id tenant (IR195; the domain schedulers' jobs read the
 // tenant's units, IR239).
 func (r *Registry) ServeSystemQuery(token string) echo.HandlerFunc {
-	return func(c *echo.Context) error {
-		tenant, err := uuid.Parse(c.Request().Header.Get("X-Tenant-Id"))
+	return func(ectx *echo.Context) error {
+		tenant, err := uuid.Parse(ectx.Request().Header.Get("X-Tenant-Id"))
 		if err != nil {
 			return apperr.E(apperr.Unauthenticated, "error.unauthenticated")
 		}
 
 		return r.serveQuery(
-			c,
+			ectx,
 			token,
 			&Principal{
 				Principal: authz.Principal{
@@ -295,25 +295,25 @@ func (r *Registry) ServeSystemQuery(token string) echo.HandlerFunc {
 	}
 }
 
-func (r *Registry) serveQuery(c *echo.Context, token string, p *Principal, bearer string) error {
+func (r *Registry) serveQuery(ectx *echo.Context, token string, p *Principal, bearer string) error {
 	if token == "" ||
 		subtle.ConstantTimeCompare(
-			[]byte(c.Request().Header.Get(InternalTokenHeader)),
+			[]byte(ectx.Request().Header.Get(InternalTokenHeader)),
 			[]byte(token),
 		) != 1 {
 		return apperr.E(apperr.Unauthenticated, "error.unauthenticated")
 	}
 
-	name := c.Param("query")
+	name := ectx.Param("query")
 
 	q, ok := r.queries[name]
 	if !ok || (r.domains != nil && !r.domains[q.domain]) {
 		return apperr.E(apperr.NotFound, "error.unknownOperation")
 	}
 
-	ctx := c.Request().Context()
+	ctx := ectx.Request().Context()
 
-	raw, err := io.ReadAll(io.LimitReader(c.Request().Body, 1<<20))
+	raw, err := io.ReadAll(io.LimitReader(ectx.Request().Body, 1<<20))
 	if err != nil {
 		return apperr.E(apperr.Validation, "error.bodyTooLarge")
 	}
@@ -322,7 +322,7 @@ func (r *Registry) serveQuery(c *echo.Context, token string, p *Principal, beare
 
 	t, parseErr := time.Parse(
 		time.RFC3339Nano,
-		c.Request().Header.Get(BusinessNowHeader),
+		ectx.Request().Header.Get(BusinessNowHeader),
 	)
 	if parseErr == nil {
 		now = t
@@ -331,7 +331,7 @@ func (r *Registry) serveQuery(c *echo.Context, token string, p *Principal, beare
 	call := &Call{
 		Principal:     p,
 		Now:           now,
-		CorrelationID: c.Response().Header().Get(echo.HeaderXRequestID),
+		CorrelationID: ectx.Response().Header().Get(echo.HeaderXRequestID),
 		Bearer:        bearer,
 		Queries:       r, Tx: nil, ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil,
 	}
@@ -363,5 +363,5 @@ func (r *Registry) serveQuery(c *echo.Context, token string, p *Principal, beare
 		return apperr.Wrap(err, "ops.Runner.Run")
 	}
 
-	return apperr.Wrap(c.JSON(http.StatusOK, map[string]any{"data": out}), "echo.Context.JSON")
+	return apperr.Wrap(ectx.JSON(http.StatusOK, map[string]any{"data": out}), "echo.Context.JSON")
 }

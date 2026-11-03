@@ -64,12 +64,12 @@ func (s devState) current(c *ops.Call) error {
 }
 
 // exclusive applies D05 on a unit: no queued/running DeviceOperation for its device and no in-flight control work.
-func (m *Module) exclusive(ctx context.Context, c *ops.Call, unit uuid.UUID) error {
+func (m *Module) exclusive(ctx context.Context, call *ops.Call, unit uuid.UUID) error {
 	var busy bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND status IN
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND status IN
 		('queued','running') AND expires_at > $2)`,
-		unit, c.Now).
+		unit, call.Now).
 		Scan(&busy)
 	if err != nil {
 		return apperr.Wrap(err, "select devices.device_operations")
@@ -80,7 +80,7 @@ func (m *Module) exclusive(ctx context.Context, c *ops.Call, unit uuid.UUID) err
 			break
 		}
 
-		b, err := x.UnitBusy(ctx, c, unit)
+		b, err := x.UnitBusy(ctx, call, unit)
 		if err != nil {
 			return apperr.Wrap(err, "devices.Exclusion.UnitBusy")
 		}
@@ -117,20 +117,20 @@ type BindInput struct {
 
 // Validate implements ops.Validator.
 func (in *BindInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.DeviceID == uuid.Nil {
-		fe["deviceId"] = "error.required"
+		fieldErrs["deviceId"] = "error.required"
 	}
 
 	if in.UnitID == uuid.Nil {
-		fe["unitId"] = "error.required"
+		fieldErrs["unitId"] = "error.required"
 	}
 
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fe["reason"] = "error.length"
+		fieldErrs["reason"] = "error.length"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // bind attaches the device to a unit (D05): both units in scope, reason, exclusion on both units, no unresolved
@@ -168,26 +168,30 @@ func (m *Module) bind(ctx context.Context, c *ops.Call, in *BindInput) (Device, 
 }
 
 // bindDetail is bind answering the device with its detail (IR392: the write itself answers Device).
-func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (DeviceDetail, error) {
-	err := m.technicianGate(ctx, c, in.JobID, in.UnitID)
+func (m *Module) bindDetail(
+	ctx context.Context,
+	call *ops.Call,
+	in *BindInput,
+) (DeviceDetail, error) {
+	err := m.technicianGate(ctx, call, in.JobID, in.UnitID)
 	if err != nil {
 		return DeviceDetail{}, err
 	}
 
-	s, err := lockDevice(ctx, c, in.DeviceID)
+	s, err := lockDevice(ctx, call, in.DeviceID)
 	if err != nil {
 		return DeviceDetail{}, err
 	}
 	// a technician moves a bound device only from a unit of an assignment of theirs as well: the unit it leaves is in
 	// scope too, and DD-T11 rejects an unauthorized rebinding (IR366)
-	if s.unit != nil && *s.unit != in.UnitID && c.Principal.Role == "technician" {
-		err := m.UnitAccess.TechnicianUnit(ctx, c, *s.unit, false, false)
+	if s.unit != nil && *s.unit != in.UnitID && call.Principal.Role == "technician" {
+		err := m.UnitAccess.TechnicianUnit(ctx, call, *s.unit, false, false)
 		if err != nil {
 			return DeviceDetail{}, apperr.Wrap(err, "devices.TechUnitAccess.TechnicianUnit")
 		}
 	}
 
-	currentErr := s.current(c)
+	currentErr := s.current(call)
 	if currentErr != nil {
 		return DeviceDetail{}, currentErr
 	}
@@ -200,7 +204,7 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 		return DeviceDetail{}, apperr.E(apperr.Conflict, "error.tamperUnresolved")
 	}
 
-	u, ok, err := m.Units.UnitInfo(ctx, c, in.UnitID)
+	unitInfo, ok, err := m.Units.UnitInfo(ctx, call, in.UnitID)
 	if err != nil {
 		return DeviceDetail{}, apperr.Wrap(err, "devices.Units.UnitInfo")
 	}
@@ -215,7 +219,7 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 	}
 
 	for _, unit := range units {
-		err := m.exclusive(ctx, c, unit)
+		err := m.exclusive(ctx, call, unit)
 		if err != nil {
 			return DeviceDetail{}, err
 		}
@@ -223,7 +227,8 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 
 	var taken bool
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_bindings WHERE unit_id = $1 AND unbound_at
+	scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_bindings WHERE unit_id = $1 AND
+		unbound_at
 		IS NULL)`, in.UnitID).
 		Scan(&taken)
 	if scanErr != nil {
@@ -235,18 +240,18 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 	}
 
 	if s.unit != nil {
-		_, err := c.Tx.Exec(
+		_, err := call.Tx.Exec(
 			ctx,
 			`UPDATE devices.device_bindings SET unbound_at = $2, reason = $3 WHERE device_id = $1 AND unbound_at IS NULL`,
 			in.DeviceID,
-			c.Now,
+			call.Now,
 			in.Reason,
 		)
 		if err != nil {
 			return DeviceDetail{}, apperr.Wrap(err, "update devices.device_bindings")
 		}
 		// new binding → new sensor IDs; the old sensors are detached (device_id kept for history) by re-keying
-		_, err = c.Tx.Exec(
+		_, err = call.Tx.Exec(
 			ctx,
 			`UPDATE devices.sensors SET id = gen_random_uuid(), calibrated_at = NULL WHERE device_id = $1 AND NOT EXISTS
 			(SELECT 1 FROM devices.calibration_records r WHERE r.sensor_id = devices.sensors.id)`,
@@ -259,7 +264,7 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 
 	binding := uuid.Must(uuid.NewV7())
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason,
 			actor_membership_id)
@@ -267,10 +272,10 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 		binding,
 		in.DeviceID,
 		in.UnitID,
-		u.OrgID,
-		c.Now,
+		unitInfo.OrgID,
+		call.Now,
 		in.Reason,
-		c.Principal.MembershipID,
+		call.Principal.MembershipID,
 	)
 	if execErr != nil {
 		return DeviceDetail{}, apperr.Wrap(execErr, "insert devices.device_bindings")
@@ -278,7 +283,8 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 
 	var v int
 
-	scanErr = c.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = $2, binding_id = $3, target_unit_id = $2, version =
+	scanErr = call.Tx.QueryRow(ctx, `UPDATE devices.devices SET unit_id = $2, binding_id = $3, target_unit_id = $2, version
+		=
 		version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, in.DeviceID, in.UnitID, binding).
 		Scan(&v)
@@ -286,7 +292,7 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 		return DeviceDetail{}, apperr.Wrap(scanErr, "update devices.devices")
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "device",
 			AggregateID:   in.DeviceID,
@@ -294,18 +300,18 @@ func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (De
 			Payload:       map[string]any{"unitId": in.UnitID, "previousUnitId": s.unit},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "devices.bind",
 			TargetKind:      "device",
 			TargetID:        in.DeviceID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &v,
 			Reason:          in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return m.detail(ctx, c, "d.id = $1", []any{in.DeviceID})
+	return m.detail(ctx, call, "d.id = $1", []any{in.DeviceID})
 }
 
 // ---- check / firmware ----
@@ -335,39 +341,39 @@ const opCols = `o.id, o.tenant_id, o.version, o.created_at, o.updated_at, b.id, 
 	o.failure_code, o.started_at, o.finished_at, o.expires_at`
 
 func scanOp(r pgx.Row) (DeviceOperation, error) {
-	var o DeviceOperation
+	var deviceOperation DeviceOperation
 
 	err := r.Scan(
-		&o.ID,
-		&o.TenantID,
-		&o.Version,
-		&o.CreatedAt,
-		&o.UpdatedAt,
-		&o.BindingID,
-		&o.UnitIDAtOccurrence,
-		&o.CustomerOrgIDAtOccurrence,
-		&o.DeviceID,
-		&o.Kind,
-		&o.Status,
-		&o.TargetVersion,
-		&o.FailureCode,
-		&o.StartedAt,
-		&o.FinishedAt,
-		&o.ExpiresAt,
+		&deviceOperation.ID,
+		&deviceOperation.TenantID,
+		&deviceOperation.Version,
+		&deviceOperation.CreatedAt,
+		&deviceOperation.UpdatedAt,
+		&deviceOperation.BindingID,
+		&deviceOperation.UnitIDAtOccurrence,
+		&deviceOperation.CustomerOrgIDAtOccurrence,
+		&deviceOperation.DeviceID,
+		&deviceOperation.Kind,
+		&deviceOperation.Status,
+		&deviceOperation.TargetVersion,
+		&deviceOperation.FailureCode,
+		&deviceOperation.StartedAt,
+		&deviceOperation.FinishedAt,
+		&deviceOperation.ExpiresAt,
 	)
 
-	return o, apperr.Wrap(err, "scan (scanOp)")
+	return deviceOperation, apperr.Wrap(err, "scan (scanOp)")
 }
 
 func (m *Module) startOperation(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	device uuid.UUID,
 	jobID *uuid.UUID,
 	kind string,
 	target *string,
 ) (DeviceOperation, error) {
-	s, err := lockDevice(ctx, c, device)
+	s, err := lockDevice(ctx, call, device)
 	if err != nil {
 		return DeviceOperation{}, err
 	}
@@ -376,26 +382,26 @@ func (m *Module) startOperation(
 		return DeviceOperation{}, apperr.E(apperr.Conflict, "error.deviceNotBound")
 	}
 
-	technicianGateErr := m.technicianGate(ctx, c, jobID, *s.unit)
+	technicianGateErr := m.technicianGate(ctx, call, jobID, *s.unit)
 	if technicianGateErr != nil {
 		return DeviceOperation{}, technicianGateErr
 	}
 
-	currentErr := s.current(c)
+	currentErr := s.current(call)
 	if currentErr != nil {
 		return DeviceOperation{}, currentErr
 	}
 
 	if kind == "firmware" {
-		u, _, err := m.Units.UnitInfo(ctx, c, *s.unit)
+		unitInfo, _, err := m.Units.UnitInfo(ctx, call, *s.unit)
 		if err != nil {
 			return DeviceOperation{}, apperr.Wrap(err, "devices.Units.UnitInfo")
 		}
 
 		var candidates []string
 
-		scanErr := c.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.capabilities WHERE id = $1 AND version =
-			$2`, u.ModelID, u.CapabilityVersion).
+		scanErr := call.Tx.QueryRow(ctx, `SELECT firmware_candidates FROM devices.capabilities WHERE id = $1 AND version =
+			$2`, unitInfo.ModelID, unitInfo.CapabilityVersion).
 			Scan(&candidates)
 		if scanErr != nil {
 			return DeviceOperation{}, apperr.Wrap(scanErr, "select devices.capabilities")
@@ -415,14 +421,14 @@ func (m *Module) startOperation(
 		}
 	}
 
-	exclusiveErr := m.exclusive(ctx, c, *s.unit)
+	exclusiveErr := m.exclusive(ctx, call, *s.unit)
 	if exclusiveErr != nil {
 		return DeviceOperation{}, exclusiveErr
 	}
 
 	id := uuid.Must(uuid.NewV7())
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, job_id, kind, status, target_version,
 			expires_at, actor_membership_id)
@@ -433,19 +439,19 @@ func (m *Module) startOperation(
 		jobID,
 		kind,
 		target,
-		c.Now.Add(operationTTL),
-		c.Principal.MembershipID,
+		call.Now.Add(operationTTL),
+		call.Principal.MembershipID,
 	)
 	if execErr != nil {
 		return DeviceOperation{}, apperr.Wrap(execErr, "insert devices.device_operations")
 	}
 
-	v, err := bumpDevice(ctx, c, device)
+	v, err := bumpDevice(ctx, call, device)
 	if err != nil {
 		return DeviceOperation{}, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "device",
 			AggregateID:   device,
@@ -453,11 +459,11 @@ func (m *Module) startOperation(
 			Payload:       map[string]any{"operationId": id, "kind": kind},
 		},
 	)
-	c.Audit(ops.AuditEntry{
+	call.Audit(ops.AuditEntry{
 		Action:          "devices." + map[string]string{"check": "check", "firmware": "updateFirmware"}[kind],
 		TargetKind:      "device",
 		TargetID:        device.String(),
-		PreviousVersion: c.ExpectedVersion,
+		PreviousVersion: call.ExpectedVersion,
 		NextVersion:     &v,
 		Reason:          "",
 		Result:          "",
@@ -466,7 +472,7 @@ func (m *Module) startOperation(
 	})
 
 	return scanOp(
-		c.Tx.QueryRow(
+		call.Tx.QueryRow(
 			ctx,
 			`SELECT `+opCols+` FROM devices.device_operations o LEFT JOIN devices.device_bindings b ON b.device_id = o.device_id
 				AND b.unbound_at IS NULL WHERE o.id = $1`,
@@ -538,16 +544,16 @@ type FirmwareInput struct {
 
 // Validate implements ops.Validator.
 func (in *FirmwareInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.DeviceID == uuid.Nil {
-		fe["deviceId"] = "error.required"
+		fieldErrs["deviceId"] = "error.required"
 	}
 
 	if n := utf8.RuneCountInString(in.FirmwareVersion); n < 1 || n > 64 {
-		fe["firmwareVersion"] = "error.required"
+		fieldErrs["firmwareVersion"] = "error.required"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // updateFirmware serves devices.updateFirmware.
@@ -624,30 +630,30 @@ type CalibrateInput struct {
 
 // Validate implements ops.Validator (DD-T11).
 func (in *CalibrateInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.DeviceID == uuid.Nil {
-		fe["deviceId"] = "error.required"
+		fieldErrs["deviceId"] = "error.required"
 	}
 
 	if in.SensorID == uuid.Nil {
-		fe["sensorId"] = "error.required"
+		fieldErrs["sensorId"] = "error.required"
 	}
 
 	if metricUnit[in.Metric] == "" || metricUnit[in.Metric] != in.Unit {
-		fe["unit"] = "error.unitMismatch"
+		fieldErrs["unit"] = "error.unitMismatch"
 	}
 
 	for k, v := range map[string]float64{"referenceValue": in.ReferenceValue, "measuredValue": in.MeasuredValue} {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
-			fe[k] = "error.invalid"
+			fieldErrs[k] = "error.invalid"
 		}
 	}
 
 	if in.CalibratedAt.IsZero() {
-		fe["calibratedAt"] = "error.required"
+		fieldErrs["calibratedAt"] = "error.required"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // calibrate serves devices.calibrate.
@@ -679,14 +685,14 @@ func (in *CalibrateInput) Validate() map[string]string {
 //	@Router			/v1/devices/{deviceId}/calibrations [post]
 func (m *Module) calibrate(
 	ctx context.Context,
-	c *ops.Call,
-	in *CalibrateInput,
+	call *ops.Call,
+	input *CalibrateInput,
 ) (CalibrationRecord, error) {
-	if in.CalibratedAt.After(c.Now) {
+	if input.CalibratedAt.After(call.Now) {
 		return CalibrationRecord{}, apperr.Fields(map[string]string{"calibratedAt": "error.future"})
 	}
 
-	s, err := lockDevice(ctx, c, in.DeviceID)
+	s, err := lockDevice(ctx, call, input.DeviceID)
 	if err != nil {
 		return CalibrationRecord{}, err
 	}
@@ -695,20 +701,20 @@ func (m *Module) calibrate(
 		return CalibrationRecord{}, apperr.E(apperr.Conflict, "error.deviceNotBound")
 	}
 
-	technicianGateErr := m.technicianGate(ctx, c, in.JobID, *s.unit)
+	technicianGateErr := m.technicianGate(ctx, call, input.JobID, *s.unit)
 	if technicianGateErr != nil {
 		return CalibrationRecord{}, technicianGateErr
 	}
 
-	currentErr := s.current(c)
+	currentErr := s.current(call)
 	if currentErr != nil {
 		return CalibrationRecord{}, currentErr
 	}
 
 	var metric, unit string
 
-	err = c.Tx.QueryRow(ctx, `SELECT metric, unit FROM devices.sensors WHERE id = $1 AND device_id =
-		$2`, in.SensorID, in.DeviceID).
+	err = call.Tx.QueryRow(ctx, `SELECT metric, unit FROM devices.sensors WHERE id = $1 AND device_id =
+		$2`, input.SensorID, input.DeviceID).
 		Scan(&metric, &unit)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return CalibrationRecord{}, apperr.Fields(
@@ -720,73 +726,73 @@ func (m *Module) calibrate(
 		return CalibrationRecord{}, apperr.Wrap(err, "select devices.sensors")
 	}
 
-	if metric != in.Metric || unit != in.Unit {
+	if metric != input.Metric || unit != input.Unit {
 		return CalibrationRecord{}, apperr.Fields(
 			map[string]string{"metric": "error.sensorMismatch"},
 		)
 	}
 
-	exclusiveErr := m.exclusive(ctx, c, *s.unit)
+	exclusiveErr := m.exclusive(ctx, call, *s.unit)
 	if exclusiveErr != nil {
 		return CalibrationRecord{}, exclusiveErr
 	}
 
 	id := uuid.Must(uuid.NewV7())
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.calibration_records (id, tenant_id, device_id, sensor_id, metric, unit, reference_value,
 			measured_value, calibrated_at, actor_id, job_id)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 		id,
-		in.DeviceID,
-		in.SensorID,
-		in.Metric,
-		in.Unit,
-		in.ReferenceValue,
-		in.MeasuredValue,
-		in.CalibratedAt,
-		c.Principal.UserID,
-		in.JobID,
+		input.DeviceID,
+		input.SensorID,
+		input.Metric,
+		input.Unit,
+		input.ReferenceValue,
+		input.MeasuredValue,
+		input.CalibratedAt,
+		call.Principal.UserID,
+		input.JobID,
 	)
 	if execErr != nil {
 		return CalibrationRecord{}, apperr.Wrap(execErr, "insert devices.calibration_records")
 	}
 
-	_, execErr = c.Tx.Exec(
+	_, execErr = call.Tx.Exec(
 		ctx,
 		`UPDATE devices.sensors SET calibrated_at = $2 WHERE id = $1`,
-		in.SensorID,
-		in.CalibratedAt,
+		input.SensorID,
+		input.CalibratedAt,
 	)
 	if execErr != nil {
 		return CalibrationRecord{}, apperr.Wrap(execErr, "update devices.sensors")
 	}
 
-	v, err := bumpDevice(ctx, c, in.DeviceID)
+	v, err := bumpDevice(ctx, call, input.DeviceID)
 	if err != nil {
 		return CalibrationRecord{}, err
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "devices.calibrate",
 			TargetKind:      "device",
-			TargetID:        in.DeviceID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			TargetID:        input.DeviceID.String(),
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &v, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "device",
-			AggregateID:   in.DeviceID,
+			AggregateID:   input.DeviceID,
 			Type:          "DeviceCalibrated",
 			Payload:       nil,
 		},
 	)
 
-	return m.calibration(ctx, c, id)
+	return m.calibration(ctx, call, id)
 }
 
 const calCols = `r.id, r.tenant_id, r.created_at, r.created_at, b.id, b.unit_id, b.customer_org_id, r.device_id, ` +
@@ -794,28 +800,28 @@ const calCols = `r.id, r.tenant_id, r.created_at, r.created_at, b.id, b.unit_id,
 	r.reference_value, r.measured_value, r.calibrated_at, r.actor_id`
 
 func scanCal(row pgx.Row) (CalibrationRecord, error) {
-	var x CalibrationRecord
+	var calibrationRecord CalibrationRecord
 
 	err := row.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.CreatedAt,
-		&x.UpdatedAt,
-		&x.BindingID,
-		&x.UnitIDAtOccurrence,
-		&x.CustomerOrgIDAtOccurrence,
-		&x.DeviceID,
-		&x.SensorID,
-		&x.Metric,
-		&x.Unit,
-		&x.ReferenceValue,
-		&x.MeasuredValue,
-		&x.CalibratedAt,
-		&x.ActorID,
+		&calibrationRecord.ID,
+		&calibrationRecord.TenantID,
+		&calibrationRecord.CreatedAt,
+		&calibrationRecord.UpdatedAt,
+		&calibrationRecord.BindingID,
+		&calibrationRecord.UnitIDAtOccurrence,
+		&calibrationRecord.CustomerOrgIDAtOccurrence,
+		&calibrationRecord.DeviceID,
+		&calibrationRecord.SensorID,
+		&calibrationRecord.Metric,
+		&calibrationRecord.Unit,
+		&calibrationRecord.ReferenceValue,
+		&calibrationRecord.MeasuredValue,
+		&calibrationRecord.CalibratedAt,
+		&calibrationRecord.ActorID,
 	)
-	x.Version, x.IsDemo = 1, true
+	calibrationRecord.Version, calibrationRecord.IsDemo = 1, true
 
-	return x, apperr.Wrap(err, "scan (scanCal)")
+	return calibrationRecord, apperr.Wrap(err, "scan (scanCal)")
 }
 
 // calibration rows carry the binding at their time (SR24).

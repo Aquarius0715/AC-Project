@@ -56,10 +56,10 @@ func TestChanges(t *testing.T) {
 
 	kl := time.FixedZone("MYT", 8*3600)
 
-	at := time.Date(2026, 9, 1, 8, 0, 0, 0, kl)
+	when := time.Date(2026, 9, 1, 8, 0, 0, 0, kl)
 	if b, _ := Changes(
 		map[string]any{"when": time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)},
-		map[string]any{"when": &at},
+		map[string]any{"when": &when},
 	); len(
 		b,
 	) != 0 {
@@ -69,7 +69,7 @@ func TestChanges(t *testing.T) {
 	var none *time.Time
 	if b, a := Changes(
 		map[string]any{"when": none},
-		map[string]any{"when": &at},
+		map[string]any{"when": &when},
 	); b["when"] != nil ||
 		*a["when"] != "2026-09-01T00:00:00Z" {
 		t.Errorf("nil time → set: %v → %v", b, a)

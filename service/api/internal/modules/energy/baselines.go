@@ -48,31 +48,31 @@ const baselineCols = `b.id, b.tenant_id, b.version, (SELECT min(created_at) FROM
 	b.method, b.baseline_kwh, b.quality, b.boundary_id, b.boundary, b.assumptions, b.source`
 
 func scanBaseline(r pgx.Row) (Baseline, error) {
-	var x Baseline
+	var baseline Baseline
 
 	err := r.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.UpdatedAt,
-		&x.UnitIDs,
-		&x.Period.From,
-		&x.Period.To,
-		&x.Method,
-		&x.BaselineKWh,
-		&x.Quality,
-		&x.BoundaryID,
-		&x.Boundary,
-		&x.Assumptions,
-		&x.Source,
+		&baseline.ID,
+		&baseline.TenantID,
+		&baseline.Version,
+		&baseline.CreatedAt,
+		&baseline.UpdatedAt,
+		&baseline.UnitIDs,
+		&baseline.Period.From,
+		&baseline.Period.To,
+		&baseline.Method,
+		&baseline.BaselineKWh,
+		&baseline.Quality,
+		&baseline.BoundaryID,
+		&baseline.Boundary,
+		&baseline.Assumptions,
+		&baseline.Source,
 	)
 	slices.SortFunc(
-		x.UnitIDs,
+		baseline.UnitIDs,
 		func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) },
 	)
 
-	return x, apperr.Wrap(err, "scan (scanBaseline)")
+	return baseline, apperr.Wrap(err, "scan (scanBaseline)")
 }
 
 // clientUnits restricts clients to baselines whose units all belong to their organization (IR90).
@@ -91,7 +91,12 @@ func clientUnits(c *ops.Call, args *[]any) string {
 }
 
 // LoadBaseline returns a readable baseline version (current when version is nil).
-func LoadBaseline(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) (Baseline, error) {
+func LoadBaseline(
+	ctx context.Context,
+	call *ops.Call,
+	id uuid.UUID,
+	version *int,
+) (Baseline, error) {
 	args := []any{id}
 	q := "SELECT " + baselineCols + " FROM energy.baselines b WHERE b.id = $1 AND "
 
@@ -102,9 +107,9 @@ func LoadBaseline(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) 
 		q += "b.is_current"
 	}
 
-	q += " AND " + clientUnits(c, &args)
+	q += " AND " + clientUnits(call, &args)
 
-	x, err := scanBaseline(c.Tx.QueryRow(ctx, q, args...))
+	x, err := scanBaseline(call.Tx.QueryRow(ctx, q, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return x, apperr.E(apperr.NotFound, "error.notFound")
 	}
@@ -150,8 +155,8 @@ func LoadBaseline(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) 
 //	@Router			/v1/baselines [get]
 func listBaselines(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[Baseline], error) {
 	var f struct {
 		UnitID     *uuid.UUID   `json:"unitId,omitempty"`
@@ -164,8 +169,8 @@ func listBaselines(
 		BoundaryID *string      `json:"boundaryId,omitempty"`
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil || (f.Method != nil && !slices.Contains(methods, *f.Method)) ||
@@ -183,7 +188,7 @@ func listBaselines(
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{
 			"id":         "b.id",
 			"createdAt":  "b.created_at",
@@ -196,7 +201,7 @@ func listBaselines(
 		return paging.Page[Baseline]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Baseline]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -208,7 +213,7 @@ func listBaselines(
 		return fmt.Sprintf("$%d", len(args))
 	}
 
-	conds := []string{"b.is_current", clientUnits(c, &args)}
+	conds := []string{"b.is_current", clientUnits(call, &args)}
 	if f.UnitID != nil {
 		conds = append(conds, add(*f.UnitID)+" = ANY(b.unit_ids)")
 	}
@@ -256,21 +261,21 @@ func listBaselines(
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.baselines b WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM energy.baselines b WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Baseline]{}, apperr.Wrap(scanErr, "select energy.baselines")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM energy.baselines b WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			baselineCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -296,9 +301,9 @@ func listBaselines(
 
 	return paging.Page[Baseline]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
@@ -322,33 +327,33 @@ type BaselineInput struct {
 
 // Validate implements ops.Validator (DD-A13, SR29, IR11).
 func (in *BaselineInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fe["unitIds"] = "error.invalid"
+			fieldErrs["unitIds"] = "error.invalid"
 		}
 
 		seen[u] = true
 	}
 
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 100 {
-		fe["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = "error.invalid"
 	}
 
 	if CheckRange(in.Period.From, in.Period.To) != nil {
-		fe["period"] = "errors.energy_range"
+		fieldErrs["period"] = "errors.energy_range"
 	}
 
 	if !slices.Contains(boundaries, in.BoundaryID) {
-		fe["boundaryId"] = "error.invalid"
+		fieldErrs["boundaryId"] = "error.invalid"
 	}
 
 	text := func(k string, s *string, max int) {
 		*s = strings.TrimSpace(*s)
 		if n := utf8.RuneCountInString(*s); n < 1 || n > max {
-			fe[k] = "error.length"
+			fieldErrs[k] = "error.length"
 		}
 	}
 	text("boundary", &in.Boundary, 500)
@@ -359,21 +364,21 @@ func (in *BaselineInput) Validate() map[string]string {
 	case "demo_fixed":
 		if in.BaselineKWh == nil || math.IsNaN(*in.BaselineKWh) || math.IsInf(*in.BaselineKWh, 0) ||
 			*in.BaselineKWh < 0 {
-			fe["baselineKWh"] = "error.range"
+			fieldErrs["baselineKWh"] = "error.range"
 		}
 	case "demo_period_comparison":
 		if in.BaselineKWh != nil {
-			fe["baselineKWh"] = "error.notAllowed"
+			fieldErrs["baselineKWh"] = "error.notAllowed"
 		}
 
 		if in.BoundaryID != Boundary {
-			fe["boundaryId"] = "errors.boundary_not_measurable"
+			fieldErrs["boundaryId"] = "errors.boundary_not_measurable"
 		}
 	default:
-		fe["method"] = "error.invalid"
+		fieldErrs["method"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 type measuredQuality struct {
@@ -417,23 +422,23 @@ const modeledQuality = `{"kind":"modeled","coverage":null,"expectedSlots":null,"
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/baselines [post]
-func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline, error) {
+func saveBaseline(ctx context.Context, c *ops.Call, input *BaselineInput) (Baseline, error) {
 	var known int
 
-	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).
+	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, input.UnitIDs).
 		Scan(&known)
 	if err != nil {
 		return Baseline{}, apperr.Wrap(err, "select energy.ref_units")
 	}
 
-	if known != len(in.UnitIDs) {
+	if known != len(input.UnitIDs) {
 		return Baseline{}, apperr.Fields(map[string]string{"unitIds": "errors.unit_unknown"})
 	}
 
 	id, version := uuid.New(), 1
 
-	if in.ID != nil {
-		cur, err := LoadBaseline(ctx, c, *in.ID, nil)
+	if input.ID != nil {
+		cur, err := LoadBaseline(ctx, c, *input.ID, nil)
 		if err != nil {
 			return cur, err
 		}
@@ -445,21 +450,21 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 		id, version = cur.ID, cur.Version+1
 	}
 
-	quality, value := []byte(modeledQuality), in.BaselineKWh
-	if in.Method == "demo_period_comparison" {
-		n, err := Integrate(ctx, c, in.UnitIDs, in.Period.From, in.Period.To)
+	quality, value := []byte(modeledQuality), input.BaselineKWh
+	if input.Method == "demo_period_comparison" {
+		integration, err := Integrate(ctx, c, input.UnitIDs, input.Period.From, input.Period.To)
 		if err != nil {
 			return Baseline{}, err
 		}
 
 		q := measuredQuality{
 			Kind:          "measured",
-			ExpectedSlots: n.ExpectedSlots,
-			ValidSlots:    n.ValidSlots,
+			ExpectedSlots: integration.ExpectedSlots,
+			ValidSlots:    integration.ValidSlots,
 			Coverage: float64(
-				n.ValidSlots,
+				integration.ValidSlots,
 			) / float64(
-				n.ExpectedSlots,
+				integration.ExpectedSlots,
 			),
 			SourceSnapshot: *new(struct {
 				Generation  int       `json:"generation"`
@@ -477,7 +482,7 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 		}
 
 		quality, _ = json.Marshal(q)
-		value = Float(n.KWh)
+		value = Float(integration.KWh)
 	}
 
 	if version > 1 {
@@ -499,16 +504,16 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 		$14)`,
 		id,
 		version,
-		in.UnitIDs,
-		in.Period.From,
-		in.Period.To,
-		in.Method,
+		input.UnitIDs,
+		input.Period.From,
+		input.Period.To,
+		input.Method,
 		value,
 		quality,
-		in.BoundaryID,
-		in.Boundary,
-		in.Assumptions,
-		in.Source,
+		input.BoundaryID,
+		input.Boundary,
+		input.Assumptions,
+		input.Source,
 		c.Principal.MembershipID,
 		c.Now,
 	)
@@ -530,13 +535,13 @@ func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline
 }
 
 // Register binds factors.* and baselines.*.
-func Register(r *ops.Registry) {
-	ops.Register(r, "factors.list", listFactors)
-	ops.Register(r, "factors.save", saveFactor)
-	ops.Register(r, "baselines.list", listBaselines)
-	ops.Register(r, "baselines.save", saveBaseline)
-	ops.Register(r, "energy.summary", summary)
-	ops.Register(r, "energy.exportReport", exportReport)
+func Register(reg *ops.Registry) {
+	ops.Register(reg, "factors.list", listFactors)
+	ops.Register(reg, "factors.save", saveFactor)
+	ops.Register(reg, "baselines.list", listBaselines)
+	ops.Register(reg, "baselines.save", saveBaseline)
+	ops.Register(reg, "energy.summary", summary)
+	ops.Register(reg, "energy.exportReport", exportReport)
 }
 
 func jsonUnmarshal(

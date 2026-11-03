@@ -58,23 +58,23 @@ func TestRESTRoutesResolve(t *testing.T) {
 
 	routes := 0
 
-	for _, s := range ops.Catalog {
-		for _, rt := range s.Routes {
+	for _, spec := range ops.Catalog {
+		for _, route := range spec.Routes {
 			routes++
 
-			path := rt.Path
-			for range ops.PathParams(rt.Path) {
+			path := route.Path
+			for range ops.PathParams(route.Path) {
 				path = path[:strings.Index(path, "{")] + uuid.NewString() + path[strings.Index(path, "}")+1:]
 			}
 
-			c := srv.Echo.NewContext(
-				httptest.NewRequest(rt.Method, path, nil),
+			ectx := srv.Echo.NewContext(
+				httptest.NewRequest(route.Method, path, nil),
 				httptest.NewRecorder(),
 			)
-			srv.Echo.Router().Route(c)
+			srv.Echo.Router().Route(ectx)
 
-			if got := c.RouteInfo().Name; got != s.Name {
-				t.Errorf("%s %s resolves to %q, want %s", rt.Method, path, got, s.Name)
+			if got := ectx.RouteInfo().Name; got != spec.Name {
+				t.Errorf("%s %s resolves to %q, want %s", route.Method, path, got, spec.Name)
 			}
 		}
 	}

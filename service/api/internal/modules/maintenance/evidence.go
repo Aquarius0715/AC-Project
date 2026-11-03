@@ -33,7 +33,7 @@ type ListAttachmentsInput struct {
 
 // Validate implements ops.Validator: 1–500 distinct units and a period [from, to) of at most 366 days.
 func (in *ListAttachmentsInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	seen := map[uuid.UUID]bool{}
 
 	ok := len(in.UnitIDs) >= 1 && len(in.UnitIDs) <= 500
@@ -43,19 +43,19 @@ func (in *ListAttachmentsInput) Validate() map[string]string {
 	}
 
 	if !ok {
-		fe["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = "error.invalid"
 	}
 
 	switch {
 	case in.From.IsZero():
-		fe["from"] = "error.required"
+		fieldErrs["from"] = "error.required"
 	case in.To.IsZero():
-		fe["to"] = "error.required"
+		fieldErrs["to"] = "error.required"
 	case !in.To.After(in.From) || in.To.Sub(in.From) > 366*24*time.Hour:
-		fe["to"] = "error.range"
+		fieldErrs["to"] = "error.range"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // list returns the ready attachments of accepted work reports on the units, uploaded in [from, to): the evidence an MRV
@@ -91,15 +91,15 @@ func (in *ListAttachmentsInput) Validate() map[string]string {
 //	@Router			/v1/attachments [get]
 func (m Files) list(
 	ctx context.Context,
-	c *ops.Call,
-	in *ListAttachmentsInput,
+	call *ops.Call,
+	input *ListAttachmentsInput,
 ) (paging.Page[EvidenceAttachment], error) {
-	err := paging.NoFilters(in.Query, "query.filters")
+	err := paging.NoFilters(input.Query, "query.filters")
 	if err != nil {
 		return paging.Page[EvidenceAttachment]{}, apperr.Wrap(err, "paging.NoFilters")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT a.id, a.tenant_id, a.created_at, a.updated_at, a.job_id, a.report_id, a.name, a.mime, a.size_bytes, a.status,
 			j.unit_id, r.accepted_at
@@ -107,9 +107,9 @@ func (m Files) list(
 		JOIN maintenance.work_reports r ON r.id = a.report_id AND r.state = 'accepted'
 		JOIN maintenance.jobs j ON j.id = a.job_id
 		WHERE a.status = 'ready' AND j.unit_id = ANY($1) AND a.created_at >= $2 AND a.created_at < $3`,
-		in.UnitIDs,
-		in.From,
-		in.To,
+		input.UnitIDs,
+		input.From,
+		input.To,
 	)
 	if err != nil {
 		return paging.Page[EvidenceAttachment]{}, apperr.Wrap(err, "select maintenance.attachments")
@@ -118,21 +118,21 @@ func (m Files) list(
 	all := []EvidenceAttachment{}
 
 	for rows.Next() {
-		var a EvidenceAttachment
+		var evidenceAttachment EvidenceAttachment
 
 		err := rows.Scan(
-			&a.ID,
-			&a.TenantID,
-			&a.CreatedAt,
-			&a.UpdatedAt,
-			&a.JobID,
-			&a.ReportID,
-			&a.Name,
-			&a.Mime,
-			&a.Size,
-			&a.Status,
-			&a.UnitID,
-			&a.AcceptedAt,
+			&evidenceAttachment.ID,
+			&evidenceAttachment.TenantID,
+			&evidenceAttachment.CreatedAt,
+			&evidenceAttachment.UpdatedAt,
+			&evidenceAttachment.JobID,
+			&evidenceAttachment.ReportID,
+			&evidenceAttachment.Name,
+			&evidenceAttachment.Mime,
+			&evidenceAttachment.Size,
+			&evidenceAttachment.Status,
+			&evidenceAttachment.UnitID,
+			&evidenceAttachment.AcceptedAt,
 		)
 		if err != nil {
 			rows.Close()
@@ -143,8 +143,8 @@ func (m Files) list(
 			)
 		}
 
-		a.Version, a.BlobID = 1, a.ID
-		all = append(all, a)
+		evidenceAttachment.Version, evidenceAttachment.BlobID = 1, evidenceAttachment.ID
+		all = append(all, evidenceAttachment)
 	}
 
 	rows.Close()
@@ -157,7 +157,7 @@ func (m Files) list(
 		)
 	}
 
-	sort := in.Query.Sort
+	sort := input.Query.Sort
 	if sort == nil {
 		sort = &paging.SortSpec{Field: "createdAt", Direction: "desc"}
 	}
@@ -173,23 +173,23 @@ func (m Files) list(
 		return paging.Page[EvidenceAttachment]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
 	}
 
-	w, err := paging.Resolve(in.Query, struct {
+	window, err := paging.Resolve(input.Query, struct {
 		U    []uuid.UUID
 		F, T time.Time
-	}{in.UnitIDs, in.From, in.To}, c.Principal.ScopeVersion, 1)
+	}{input.UnitIDs, input.From, input.To}, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[EvidenceAttachment]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	items := []EvidenceAttachment{}
-	for i := w.Offset; i < len(all) && i < w.Offset+w.Limit; i++ {
+	for i := window.Offset; i < len(all) && i < window.Offset+window.Limit; i++ {
 		items = append(items, all[i])
 	}
 
 	return paging.Page[EvidenceAttachment]{
 		Items:           items,
-		NextCursor:      w.Next(len(all)),
+		NextCursor:      window.Next(len(all)),
 		Total:           len(all),
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }

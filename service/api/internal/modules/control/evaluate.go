@@ -87,71 +87,71 @@ var factSpec = map[string]struct {
 
 // Validate implements ops.Validator (D02 / IR16 / IR21).
 func (in *EvaluationInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.EventID == uuid.Nil {
-		fe["eventId"] = "error.required"
+		fieldErrs["eventId"] = "error.required"
 	}
 
 	if in.OccurredAt.IsZero() {
-		fe["occurredAt"] = "error.required"
+		fieldErrs["occurredAt"] = "error.required"
 	}
 
 	if in.Phase != "schedule_start" && in.Phase != "schedule_end" && in.Phase != "condition" {
-		fe["phase"] = "error.invalid"
+		fieldErrs["phase"] = "error.invalid"
 	}
 
 	units := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || units[u] {
-			fe["unitIds"] = "error.invalid"
+			fieldErrs["unitIds"] = "error.invalid"
 		}
 
 		units[u] = true
 	}
 
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 100 {
-		fe["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = "error.invalid"
 	}
 
 	seen := map[string]bool{}
 
-	for _, f := range in.Facts {
-		spec, ok := factSpec[f.Metric]
+	for _, fact := range in.Facts {
+		spec, ok := factSpec[fact.Metric]
 
-		key := f.UnitID.String() + "/" + f.Metric
-		if !ok || f.Unit != spec.unit || !units[f.UnitID] || seen[key] ||
-			(f.Quality != "valid" && f.Quality != "missing" && f.Quality != "stale" && f.Quality != "suspect") {
-			fe["facts"] = "error.invalid"
+		key := fact.UnitID.String() + "/" + fact.Metric
+		if !ok || fact.Unit != spec.unit || !units[fact.UnitID] || seen[key] ||
+			(fact.Quality != "valid" && fact.Quality != "missing" && fact.Quality != "stale" && fact.Quality != "suspect") {
+			fieldErrs["facts"] = "error.invalid"
 
 			continue
 		}
 
 		seen[key] = true
 
-		if string(f.Value) == "null" {
+		if string(fact.Value) == "null" {
 			continue
 		}
 
 		switch spec.kind {
 		case "number":
 			var v float64
-			if json.Unmarshal(f.Value, &v) != nil || math.IsNaN(v) || math.IsInf(v, 0) {
-				fe["facts"] = "error.invalid"
+			if json.Unmarshal(fact.Value, &v) != nil || math.IsNaN(v) || math.IsInf(v, 0) {
+				fieldErrs["facts"] = "error.invalid"
 			}
 		case "boolean":
 			var v bool
-			if json.Unmarshal(f.Value, &v) != nil {
-				fe["facts"] = "error.invalid"
+			if json.Unmarshal(fact.Value, &v) != nil {
+				fieldErrs["facts"] = "error.invalid"
 			}
 		default:
 			var v string
-			if json.Unmarshal(f.Value, &v) != nil || (v != "arrival" && v != "departure") {
-				fe["facts"] = "error.invalid"
+			if json.Unmarshal(fact.Value, &v) != nil || (v != "arrival" && v != "departure") {
+				fieldErrs["facts"] = "error.invalid"
 			}
 		}
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // Decision is Decision / the FireResult row.
@@ -209,7 +209,7 @@ func extrasMatch(
 	raw json.RawMessage,
 	unit uuid.UUID,
 	facts map[string]Fact,
-	at time.Time,
+	when time.Time,
 	tz string,
 ) string {
 	var xs []json.RawMessage
@@ -217,20 +217,20 @@ func extrasMatch(
 		return ""
 	}
 
-	for _, x := range xs {
+	for _, rawMessage := range xs {
 		var w struct {
 			Type     string `json:"type"`
 			Weekdays []int  `json:"weekdays"`
 		}
 
-		_ = json.Unmarshal(x, &w)
+		_ = json.Unmarshal(rawMessage, &w)
 		if w.Type == "weekday" {
 			loc, err := time.LoadLocation(tz)
 			if err != nil {
 				return "no_match"
 			}
 
-			wd := int(at.In(loc).Weekday())
+			wd := int(when.In(loc).Weekday())
 			if wd == 0 {
 				wd = 7
 			}
@@ -242,7 +242,7 @@ func extrasMatch(
 			continue
 		}
 
-		if why := match(x, unit, facts, at, tz); why != "" {
+		if why := match(rawMessage, unit, facts, when, tz); why != "" {
 			return why
 		}
 	}
@@ -264,19 +264,19 @@ func factState(
 	metric string,
 	now time.Time,
 ) (json.RawMessage, string) {
-	f, ok := facts[unit.String()+"/"+metric]
-	if !ok || string(f.Value) == "null" || f.ObservedAt.After(now) ||
-		(f.Quality != "valid" && f.Quality != "stale") {
+	fact, ok := facts[unit.String()+"/"+metric]
+	if !ok || string(fact.Value) == "null" || fact.ObservedAt.After(now) ||
+		(fact.Quality != "valid" && fact.Quality != "stale") {
 		return nil, "missing_data"
 	}
 
 	spec := factSpec[metric]
-	if f.Quality == "stale" || (metric != "location" && now.Sub(f.ObservedAt) > spec.ttl) ||
-		(metric == "location" && !f.ObservedAt.Truncate(time.Minute).Equal(now.Truncate(time.Minute))) {
+	if fact.Quality == "stale" || (metric != "location" && now.Sub(fact.ObservedAt) > spec.ttl) ||
+		(metric == "location" && !fact.ObservedAt.Truncate(time.Minute).Equal(now.Truncate(time.Minute))) {
 		return nil, "stale"
 	}
 
-	return f.Value, ""
+	return fact.Value, ""
 }
 
 func compare(op string, a, b float64) bool {
@@ -297,7 +297,7 @@ func match(
 	raw json.RawMessage,
 	unit uuid.UUID,
 	facts map[string]Fact,
-	at time.Time,
+	when time.Time,
 	tz string,
 ) string {
 	var c struct {
@@ -312,14 +312,14 @@ func match(
 
 	_ = json.Unmarshal(raw, &c)
 	boolFact := func(metric string, want bool) string {
-		v, why := factState(facts, unit, metric, at)
+		rawMessage, why := factState(facts, unit, metric, when)
 		if why != "" {
 			return why
 		}
 
 		var b bool
 
-		_ = json.Unmarshal(v, &b)
+		_ = json.Unmarshal(rawMessage, &b)
 		if b == want {
 			return ""
 		}
@@ -327,14 +327,14 @@ func match(
 		return "no_match"
 	}
 	numFact := func(metric string) string {
-		v, why := factState(facts, unit, metric, at)
+		rawMessage, why := factState(facts, unit, metric, when)
 		if why != "" {
 			return why
 		}
 
 		var x float64
 
-		_ = json.Unmarshal(v, &x)
+		_ = json.Unmarshal(rawMessage, &x)
 		if compare(*c.Operator, x, *c.Value) {
 			return ""
 		}
@@ -348,14 +348,14 @@ func match(
 	case "peak":
 		return boolFact("peak", *c.Active)
 	case "location":
-		v, why := factState(facts, unit, "location", at)
+		rawMessage, why := factState(facts, unit, "location", when)
 		if why != "" {
 			return why
 		}
 
 		var e string
 
-		_ = json.Unmarshal(v, &e)
+		_ = json.Unmarshal(rawMessage, &e)
 		if e == *c.Event {
 			return ""
 		}
@@ -363,7 +363,7 @@ func match(
 		return "no_match"
 	case "pattern": // IR52: local time of occurredAt equals localTime
 		loc, err := time.LoadLocation(tz)
-		if err != nil || at.In(loc).Format("15:04") != *c.LocalTime {
+		if err != nil || when.In(loc).Format("15:04") != *c.LocalTime {
 			return "no_match"
 		}
 
@@ -383,7 +383,7 @@ func match(
 // rules, same organization) or automation.policy.write (HQ policies).
 func ownerValid(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	owner uuid.UUID,
 	hq bool,
 	org uuid.UUID,
@@ -393,28 +393,28 @@ func ownerValid(
 		perm = "automation.policy.write"
 	}
 
-	f := identity.MembersInput{
+	membersInput := identity.MembersInput{
 		IDs:        []uuid.UUID{owner},
 		Permission: perm, Role: "", OrganizationID: nil, ClientRole: "",
 	} // identity's memberships (IR194)
 	if !hq {
-		f.OrganizationID = &org
+		membersInput.OrganizationID = &org
 	}
 
-	ids, err := identity.Members(ctx, c, f)
+	ids, err := identity.Members(ctx, call, membersInput)
 
 	return len(ids) == 1, apperr.Wrap(err, "identity.Members")
 }
 
 func (m Automations) candidates(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
-	in *EvaluationInput,
+	input *EvaluationInput,
 ) ([]candidate, error) {
 	var out []candidate
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT p.id, p.priority, p.enabled, p.owner_membership_id, p.action, p.condition, p.timezone FROM
 			control.automation_policies p
@@ -454,14 +454,14 @@ func (m Automations) candidates(
 			return nil, apperr.Wrap(err, "select control.automation_policies")
 		}
 
-		if in.Phase == "condition" {
+		if input.Phase == "condition" {
 			out = append(out, x)
 		}
 	}
 
 	rows.Close()
 
-	rows, err = c.Tx.Query(
+	rows, err = call.Tx.Query(
 		ctx,
 		`SELECT a.id, a.priority, a.enabled, a.owner_membership_id, a.kind, a.definition, a.timezone FROM control.automations
 			a
@@ -511,19 +511,19 @@ func (m Automations) candidates(
 		x.extras = d.OnlyIf
 
 		switch {
-		case kind == "event" && in.Phase == "condition":
+		case kind == "event" && input.Phase == "condition":
 			x.cond, x.action = d.Condition, d.Action
-		case kind == "schedule" && in.Phase != "condition": // due when an occurrence of this phase is at the tick
+		case kind == "schedule" && input.Phase != "condition": // due when an occurrence of this phase is at the tick
 			loc, err := time.LoadLocation(x.tz)
 			if err != nil {
 				continue
 			}
 
-			occ, _ := occurrences(d, loc, in.OccurredAt.In(loc).AddDate(0, 0, -1), 3)
+			occ, _ := occurrences(d, loc, input.OccurredAt.In(loc).AddDate(0, 0, -1), 3)
 			due := false
 
 			for _, o := range occ {
-				if o.Phase == in.Phase && o.At.Equal(in.OccurredAt.Truncate(time.Minute)) {
+				if o.Phase == input.Phase && o.At.Equal(input.OccurredAt.Truncate(time.Minute)) {
 					due, x.action = true, o.Action
 				}
 			}
@@ -546,12 +546,12 @@ func (m Automations) candidates(
 // candidates that could not run are returned with their reasons (the run log of IR215).
 func (m Automations) decide(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
-	in *EvaluationInput,
+	input *EvaluationInput,
 	facts map[string]Fact,
 ) (Decision, *candidate, []skip, error) {
-	cands, err := m.candidates(ctx, c, unit, in)
+	cands, err := m.candidates(ctx, call, unit, input)
 	if err != nil {
 		return Decision{}, nil, nil, err
 	}
@@ -568,20 +568,20 @@ func (m Automations) decide(
 		return cands[i].id.String() < cands[j].id.String()
 	})
 
-	t, found, err := m.Units.Target(ctx, c, unit)
+	target, found, err := m.Units.Target(ctx, call, unit)
 	if err != nil {
 		return Decision{}, nil, nil, apperr.Wrap(err, "control.Units.Target")
 	}
 
-	if in.Phase == "schedule_end" &&
+	if input.Phase == "schedule_end" &&
 		slices.ContainsFunc(cands, func(x candidate) bool { return x.enabled }) {
 		// a schedule that starts on the unit in the same minute wins over the end (IR326 item 4, IR504): when its
 		// start would run, the end is not sent and each enabled end rule records superseded. A start that would not
 		// run (owner, restriction, capability, offline …) leaves the end as before.
-		start := *in
+		start := *input
 		start.Phase = "schedule_start"
 
-		sd, _, _, err := m.decide(ctx, c, unit, &start, facts)
+		sd, _, _, err := m.decide(ctx, call, unit, &start, facts)
 		if err != nil {
 			return Decision{}, nil, nil, err
 		}
@@ -626,17 +626,17 @@ func (m Automations) decide(
 		switch {
 		case !x.enabled:
 			reason = "disabled"
-		case x.cond != nil && match(x.cond, unit, facts, in.OccurredAt, x.tz) != "":
-			reason = match(x.cond, unit, facts, in.OccurredAt, x.tz)
+		case x.cond != nil && match(x.cond, unit, facts, input.OccurredAt, x.tz) != "":
+			reason = match(x.cond, unit, facts, input.OccurredAt, x.tz)
 			_, present := facts[unit.String()+"/"+conditionMetric(x.cond)] // its own data arrived, but missing or stale
 			own = present && (reason == "missing_data" || reason == "stale")
 		default:
 			own = true
-			reason = extrasMatch(x.extras, unit, facts, in.OccurredAt, x.tz)
+			reason = extrasMatch(x.extras, unit, facts, input.OccurredAt, x.tz)
 		}
 
 		if reason == "" {
-			ok, err := ownerValid(ctx, c, x.owner, x.hq, t.OrgID)
+			ok, err := ownerValid(ctx, call, x.owner, x.hq, target.OrgID)
 			if err != nil {
 				return Decision{}, nil, nil, err
 			}
@@ -647,7 +647,7 @@ func (m Automations) decide(
 		}
 
 		if reason == "" && cond.Type == "location" {
-			granted, err := identity.ConsentGranted(ctx, c, x.owner, "location_automation")
+			granted, err := identity.ConsentGranted(ctx, call, x.owner, "location_automation")
 			if err != nil {
 				return Decision{}, nil, nil, apperr.Wrap(err, "identity.ConsentGranted")
 			}
@@ -658,30 +658,30 @@ func (m Automations) decide(
 		}
 
 		if reason == "" {
-			a, ok := ParseAction(x.action)
+			unitAction, ok := ParseAction(x.action)
 			switch {
-			case !ok || !found || !a.Supports(t.Caps):
+			case !ok || !found || !unitAction.Supports(target.Caps):
 				reason = "invalid_capability"
 			default:
-				policy, err := m.Cmd.Restrictions.UnitPolicy(ctx, c, unit)
+				policy, err := m.Cmd.Restrictions.UnitPolicy(ctx, call, unit)
 				if err != nil {
 					return Decision{}, nil, nil, apperr.Wrap(err, "control.Restrictions.UnitPolicy")
 				}
 
-				if !Allowed(a, policy) {
+				if !Allowed(unitAction, policy) {
 					reason = "restricted"
 				} else {
-					_, err := m.Cmd.ready(ctx, c, unit)
+					_, err := m.Cmd.ready(ctx, call, unit)
 					if err != nil {
-						var de *apperr.DomainError
-						if errors.As(err, &de) &&
-							de.MessageKey == "errors.reconciliation_required" {
+						var domainErr *apperr.DomainError
+						if errors.As(err, &domainErr) &&
+							domainErr.MessageKey == "errors.reconciliation_required" {
 							reason = "reconciliation_required"
-						} else if errors.As(err, &de) &&
-							de.Code == apperr.Conflict {
+						} else if errors.As(err, &domainErr) &&
+							domainErr.Code == apperr.Conflict {
 							reason = "busy"
-						} else if errors.As(err, &de) &&
-							de.Code == apperr.Offline {
+						} else if errors.As(err, &domainErr) &&
+							domainErr.Code == apperr.Offline {
 							reason = "offline"
 						} else {
 							return Decision{}, nil, nil, err
@@ -751,15 +751,15 @@ func (m Automations) decide(
 func (m Automations) prepare(
 	ctx context.Context,
 	c *ops.Call,
-	in *EvaluationInput,
+	input *EvaluationInput,
 ) (map[string]Fact, error) {
-	err := m.targets(ctx, c, in)
+	err := m.targets(ctx, c, input)
 	if err != nil {
 		return nil, err
 	}
 
 	facts := map[string]Fact{}
-	for _, f := range in.Facts {
+	for _, f := range input.Facts {
 		facts[f.UnitID.String()+"/"+f.Metric] = f
 	}
 
@@ -768,14 +768,14 @@ func (m Automations) prepare(
 
 // targets checks that the caller may evaluate every target unit: one outside the tenant, or a client's unit of another
 // customer, is NOT_FOUND (D02).
-func (m Automations) targets(ctx context.Context, c *ops.Call, in *EvaluationInput) error {
+func (m Automations) targets(ctx context.Context, call *ops.Call, in *EvaluationInput) error {
 	for _, u := range in.UnitIDs {
-		t, found, err := m.Units.Target(ctx, c, u)
+		t, found, err := m.Units.Target(ctx, call, u)
 		if err != nil {
 			return apperr.Wrap(err, "control.Units.Target")
 		}
 
-		if !found || (c.Principal.Role == "client" && t.OrgID != c.Principal.OrgID) {
+		if !found || (call.Principal.Role == "client" && t.OrgID != call.Principal.OrgID) {
 			return apperr.E(apperr.NotFound, "error.notFound")
 		}
 	}
@@ -787,28 +787,28 @@ func (m Automations) targets(ctx context.Context, c *ops.Call, in *EvaluationInp
 // occurrence has the same trigger for the scheduler and a UI fire, IR54) and notify adds the alert-policy decisions.
 func (m Automations) evaluate(
 	ctx context.Context,
-	c *ops.Call,
-	in *EvaluationInput,
+	call *ops.Call,
+	input *EvaluationInput,
 	fire, notify bool,
 ) (Result, error) {
-	facts, err := m.prepare(ctx, c, in)
+	facts, err := m.prepare(ctx, call, input)
 	if err != nil {
 		return Result{}, err
 	}
 
-	units := append([]uuid.UUID{}, in.UnitIDs...)
+	units := append([]uuid.UUID{}, input.UnitIDs...)
 	sort.Slice(units, func(i, j int) bool { return units[i].String() < units[j].String() })
 
-	out := Result{EventID: in.EventID, Results: []Decision{}, Notifications: []json.RawMessage{}}
+	out := Result{EventID: input.EventID, Results: []Decision{}, Notifications: []json.RawMessage{}}
 	for _, u := range units {
-		d, win, skips, err := m.decide(ctx, c, u, in, facts)
+		decision, win, skips, err := m.decide(ctx, call, u, input, facts)
 		if err != nil {
 			return Result{}, err
 		}
 
-		ref := in.EventID.String() + "/" + in.Phase
-		if in.Phase != "condition" {
-			ref = scheduleRef(in.Phase, in.OccurredAt)
+		ref := input.EventID.String() + "/" + input.Phase
+		if input.Phase != "condition" {
+			ref = scheduleRef(input.Phase, input.OccurredAt)
 		}
 
 		if fire { // the run log keeps why a rule could not run (IR215: missing data, consent, restriction, offline …)
@@ -817,7 +817,7 @@ func (m Automations) evaluate(
 					continue
 				}
 
-				_, err := c.Tx.Exec(
+				_, err := call.Tx.Exec(
 					ctx,
 					`INSERT INTO control.automation_runs (tenant_id, rule_kind, rule_id, unit_id, trigger_ref, outcome, skip_reason,
 						occurred_at)
@@ -827,7 +827,7 @@ func (m Automations) evaluate(
 					u,
 					ref,
 					sk.reason,
-					in.OccurredAt,
+					input.OccurredAt,
 				)
 				if err != nil {
 					return Result{}, apperr.Wrap(err, "insert control.automation_runs")
@@ -838,24 +838,24 @@ func (m Automations) evaluate(
 		if fire && win != nil {
 			var earlier uuid.UUID
 
-			err := c.Tx.QueryRow(ctx, `SELECT command_id FROM control.automation_runs WHERE rule_id = $1 AND unit_id = $2 AND
+			err := call.Tx.QueryRow(ctx, `SELECT command_id FROM control.automation_runs WHERE rule_id = $1 AND unit_id = $2 AND
 				trigger_ref = $3 AND command_id IS NOT NULL`,
 				win.id, u, ref).
 				Scan(&earlier)
 			switch {
 			case err == nil: // this trigger already ran for the rule and unit
-				d.Decision, d.CommandID = "requested", &earlier
+				decision.Decision, decision.CommandID = "requested", &earlier
 			case !errors.Is(err, pgx.ErrNoRows):
 				return Result{}, apperr.Wrap(err, "select control.automation_runs")
 			default:
-				id, err := m.automationCommand(ctx, c, u, win, in)
+				id, err := m.automationCommand(ctx, call, u, win, input)
 				if err != nil {
 					return Result{}, err
 				}
 
-				d.Decision, d.CommandID, d.fresh = "requested", &id, true
+				decision.Decision, decision.CommandID, decision.fresh = "requested", &id, true
 
-				_, execErr := c.Tx.Exec(
+				_, execErr := call.Tx.Exec(
 					ctx,
 					`INSERT INTO control.automation_runs (tenant_id, rule_kind, rule_id, unit_id, trigger_ref, outcome, command_id,
 						occurred_at)
@@ -868,7 +868,7 @@ func (m Automations) evaluate(
 					u,
 					ref,
 					id,
-					in.OccurredAt,
+					input.OccurredAt,
 				)
 				if execErr != nil {
 					return Result{}, apperr.Wrap(execErr, "insert control.automation_runs")
@@ -878,9 +878,17 @@ func (m Automations) evaluate(
 
 		if notify &&
 			m.Notifier != nil { // notification results are independent of the control decision (SR21/SR25)
-			factsJSON, _ := json.Marshal(in.Facts)
+			factsJSON, _ := json.Marshal(input.Facts)
 
-			ns, err := m.Notifier.Evaluate(ctx, c, u, factsJSON, in.OccurredAt, in.EventID, fire)
+			ns, err := m.Notifier.Evaluate(
+				ctx,
+				call,
+				u,
+				factsJSON,
+				input.OccurredAt,
+				input.EventID,
+				fire,
+			)
 			if err != nil {
 				return Result{}, apperr.Wrap(err, "control.Notifier.Evaluate")
 			}
@@ -896,15 +904,16 @@ func (m Automations) evaluate(
 				matched = matched || x.Decision != "suppressed"
 			}
 
-			if matched && d.Decision == "suppressed" && d.Reason != nil && *d.Reason == "no_match" {
+			if matched && decision.Decision == "suppressed" && decision.Reason != nil &&
+				*decision.Reason == "no_match" {
 				r := "no_control_action"
-				d.Reason = &r
+				decision.Reason = &r
 			}
 
 			out.Notifications = append(out.Notifications, ns...)
 		}
 
-		out.Results = append(out.Results, d)
+		out.Results = append(out.Results, decision)
 	}
 
 	return out, nil
@@ -913,26 +922,26 @@ func (m Automations) evaluate(
 // automationCommand creates the winner's Command (source automation, actor = rule owner).
 func (m Automations) automationCommand(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
 	win *candidate,
 	in *EvaluationInput,
 ) (uuid.UUID, error) {
-	dev, err := m.Cmd.ready(ctx, c, unit)
+	dev, err := m.Cmd.ready(ctx, call, unit)
 	if err != nil {
 		return uuid.Nil, err
 	}
 
 	var id uuid.UUID
 
-	err = c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source,
+	err = call.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source,
 		action, status, delivery, requested_at, sent_at, expires_at,
 		correlation_id, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'automation', $4,
 		'requested', 'not_sent', $5, NULL, $6, $7, $5, $5) RETURNING id`,
-		unit, dev, win.owner, []byte(win.action), c.Now, c.Now.Add(CommandTTL), c.CorrelationID).
+		unit, dev, win.owner, []byte(win.action), call.Now, call.Now.Add(CommandTTL), call.CorrelationID).
 		Scan(&id)
 	if err == nil {
-		c.Emit(
+		call.Emit(
 			ops.Event{
 				AggregateType: "command",
 				AggregateID:   id,
@@ -983,15 +992,15 @@ func checkTick(c *ops.Call, in *EvaluationInput) error {
 //	@Router			/v1/automations/simulate [post]
 func (m Automations) simulate(
 	ctx context.Context,
-	c *ops.Call,
-	in *EvaluationInput,
+	call *ops.Call,
+	input *EvaluationInput,
 ) (Result, error) {
-	err := checkTick(c, in)
+	err := checkTick(call, input)
 	if err != nil {
 		return Result{}, err
 	}
 
-	return m.evaluate(ctx, c, in, false, true)
+	return m.evaluate(ctx, call, input, false, true)
 }
 
 // fire evaluates and creates Commands (D02): a repeated tenant/eventId/phase returns the stored result (checked
@@ -1021,10 +1030,14 @@ func (m Automations) simulate(
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/automations/fire [post]
-func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput) (Result, error) {
+func (m Automations) fire(
+	ctx context.Context,
+	c *ops.Call,
+	input *EvaluationInput,
+) (Result, error) {
 	// the target units first: a stored result is returned only after authorization (IR21), and a caller outside the
 	// units' scope gets NOT_FOUND, not the result of another caller's identical input or a tick CONFLICT (IR366)
-	targetsErr := m.targets(ctx, c, in)
+	targetsErr := m.targets(ctx, c, input)
 	if targetsErr != nil {
 		return Result{}, targetsErr
 	}
@@ -1033,7 +1046,7 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 		O time.Time
 		U []uuid.UUID
 		F []Fact
-	}{in.OccurredAt.UTC(), in.UnitIDs, in.Facts})
+	}{input.OccurredAt.UTC(), input.UnitIDs, input.Facts})
 	sum := sha256.Sum256(norm)
 	hash := hex.EncodeToString(sum[:])
 
@@ -1043,7 +1056,7 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 	)
 
 	err := c.Tx.QueryRow(ctx, `SELECT input_hash, result FROM control.evaluation_events WHERE event_id = $1 AND phase =
-		$2`, in.EventID, in.Phase).
+		$2`, input.EventID, input.Phase).
 		Scan(&storedHash, &stored)
 	if err == nil {
 		if storedHash != hash {
@@ -1061,7 +1074,7 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 		return Result{}, apperr.Wrap(err, "select control.evaluation_events")
 	}
 
-	checkTickErr := checkTick(c, in)
+	checkTickErr := checkTick(c, input)
 	if checkTickErr != nil {
 		return Result{}, checkTickErr
 	}
@@ -1070,17 +1083,17 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 
 	err = c.Tx.QueryRow(ctx, `SELECT input_hash, result, phase FROM control.evaluation_events WHERE date_trunc('minute',
 		occurred_at) = date_trunc('minute', $1::timestamptz)
-		ORDER BY created_at LIMIT 1`, in.OccurredAt).
+		ORDER BY created_at LIMIT 1`, input.OccurredAt).
 		Scan(&storedHash, &stored, &storedPhase)
 	if err == nil {
-		if storedHash != hash || storedPhase != in.Phase {
+		if storedHash != hash || storedPhase != input.Phase {
 			return Result{}, apperr.E(apperr.Conflict, "errors.tick_already_evaluated")
 		}
 
 		var r Result
 
 		_ = json.Unmarshal(stored, &r)
-		r.EventID = in.EventID
+		r.EventID = input.EventID
 
 		return r, nil
 	}
@@ -1089,34 +1102,34 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 		return Result{}, apperr.Wrap(err, "select control.evaluation_events")
 	}
 
-	r, err := m.evaluate(ctx, c, in, true, true)
+	result, err := m.evaluate(ctx, c, input, true, true)
 	if err != nil {
-		return r, err
+		return result, err
 	}
 
-	raw, _ := json.Marshal(r)
+	raw, _ := json.Marshal(result)
 
 	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO control.evaluation_events (tenant_id, event_id, phase, occurred_at, input_hash, result) VALUES
 			(current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
-		in.EventID,
-		in.Phase,
-		in.OccurredAt,
+		input.EventID,
+		input.Phase,
+		input.OccurredAt,
 		hash,
 		raw,
 	)
 	if execErr != nil {
-		return r, apperr.Wrap(execErr, "insert control.evaluation_events")
+		return result, apperr.Wrap(execErr, "insert control.evaluation_events")
 	}
 
 	c.Audit(
 		ops.AuditEntry{
 			Action:     "automations.fire",
 			TargetKind: "evaluation",
-			TargetID:   in.EventID.String(),
+			TargetID:   input.EventID.String(),
 			Reason: strings.ToLower(
-				in.Phase,
+				input.Phase,
 			),
 			PreviousVersion: nil,
 			NextVersion:     nil,
@@ -1126,7 +1139,7 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 		},
 	)
 
-	return r, nil
+	return result, nil
 }
 
 // Notify evaluates only the alert policies of the units against facts a device gateway reports (DemoTrigger
@@ -1135,10 +1148,10 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 // (the gateway reports every minute beside the UI's fire). It returns the notification outcomes.
 func (m Automations) Notify(
 	ctx context.Context,
-	c *ops.Call,
-	in *EvaluationInput,
+	call *ops.Call,
+	input *EvaluationInput,
 ) ([]json.RawMessage, error) {
-	_, err := m.prepare(ctx, c, in)
+	_, err := m.prepare(ctx, call, input)
 	if err != nil {
 		return nil, err
 	}
@@ -1148,12 +1161,12 @@ func (m Automations) Notify(
 		return out, nil
 	}
 
-	units := append([]uuid.UUID{}, in.UnitIDs...)
+	units := append([]uuid.UUID{}, input.UnitIDs...)
 	sort.Slice(units, func(i, j int) bool { return units[i].String() < units[j].String() })
 
-	facts, _ := json.Marshal(in.Facts)
+	facts, _ := json.Marshal(input.Facts)
 	for _, u := range units {
-		ns, err := m.Notifier.Evaluate(ctx, c, u, facts, in.OccurredAt, in.EventID, true)
+		ns, err := m.Notifier.Evaluate(ctx, call, u, facts, input.OccurredAt, input.EventID, true)
 		if err != nil {
 			return nil, apperr.Wrap(err, "control.Notifier.Evaluate")
 		}

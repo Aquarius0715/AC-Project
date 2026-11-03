@@ -24,9 +24,9 @@ func newUser(t *testing.T) string {
 }
 
 func TestMembersSave(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	user := newUser(t)
-	op, contractor, customer := seed.ID("org-operator-a").
+	operation, contractor, customer := seed.ID("org-operator-a").
 		String(),
 		seed.ID("org-contractor-a").
 			String(),
@@ -38,7 +38,7 @@ func TestMembersSave(t *testing.T) {
 	body := func(f map[string]string) string {
 		base := map[string]string{
 			"userId":         `"` + user + `"`,
-			"organizationId": `"` + op + `"`,
+			"organizationId": `"` + operation + `"`,
 			"role":           `"technician"`,
 			"employment":     `"internal"`,
 			"permissions":    `["alert.read"]`,
@@ -48,14 +48,14 @@ func TestMembersSave(t *testing.T) {
 			"reason":         `"onboarding"`,
 		}
 
-		for k, v := range f {
+		for key, v := range f {
 			if v == "" {
-				delete(base, k)
+				delete(base, key)
 
 				continue
 			}
 
-			base[k] = v
+			base[key] = v
 		}
 
 		parts := []string{}
@@ -117,7 +117,7 @@ func TestMembersSave(t *testing.T) {
 		"unknown user":           {map[string]string{"userId": `"` + uuid.NewString() + `"`}, 404},
 		"unknown organization":   {map[string]string{"organizationId": `"` + uuid.NewString() + `"`}, 404},
 	} {
-		code, m := write(s, &hq, "members.save", body(tc.f), 0)
+		code, m := write(srv, &hq, "members.save", body(tc.f), 0)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
 		} else if code != tc.code {
@@ -125,16 +125,17 @@ func TestMembersSave(t *testing.T) {
 		}
 	}
 
-	code, m := write(s, &hq, "members.save", body(nil), 0)
-	if code != 200 || data(m)["role"] != "technician" || len(data(m)["scopes"].([]any)) != 1 ||
-		data(m)["scopeVersion"].(float64) != 1 {
-		t.Fatalf("create: %d %v", code, m)
+	code, resp := write(srv, &hq, "members.save", body(nil), 0)
+	if code != 200 || data(resp)["role"] != "technician" ||
+		len(data(resp)["scopes"].([]any)) != 1 ||
+		data(resp)["scopeVersion"].(float64) != 1 {
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := data(m)["id"].(string)
+	id := data(resp)["id"].(string)
 	// update: permissions change bumps scopeVersion; role is fixed
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"members.save",
 		body(
@@ -146,13 +147,13 @@ func TestMembersSave(t *testing.T) {
 		),
 		1,
 	); code != 200 ||
-		data(m)["scopeVersion"].(float64) != 2 ||
-		data(m)["version"].(float64) != 2 {
-		t.Fatalf("update: %d %v", code, m)
+		data(res)["scopeVersion"].(float64) != 2 ||
+		data(res)["version"].(float64) != 2 {
+		t.Fatalf("update: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"members.save",
 		body(
@@ -164,12 +165,12 @@ func TestMembersSave(t *testing.T) {
 		),
 		2,
 	); code != 200 ||
-		data(m)["scopeVersion"].(float64) != 2 {
-		t.Fatalf("same permissions keep scopeVersion: %d %v", code, m)
+		data(res)["scopeVersion"].(float64) != 2 {
+		t.Fatalf("same permissions keep scopeVersion: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"members.save",
 		body(
@@ -183,12 +184,12 @@ func TestMembersSave(t *testing.T) {
 		),
 		3,
 	); code != 422 ||
-		fields(m) != "role=errors.membership_fixed" {
-		t.Errorf("role fixed: %d %s", code, fields(m))
+		fields(res) != "role=errors.membership_fixed" {
+		t.Errorf("role fixed: %d %s", code, fields(res))
 	}
 	// a technician may also be scoped to a whole property (the identity copy of the property, IR186)
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"members.save",
 		body(
@@ -203,13 +204,13 @@ func TestMembersSave(t *testing.T) {
 		),
 		3,
 	); code != 200 ||
-		data(m)["scopes"].([]any)[0].(map[string]any)["kind"] != "property" ||
-		data(m)["scopeVersion"].(float64) != 3 {
-		t.Fatalf("property scope: %d %v", code, m)
+		data(res)["scopes"].([]any)[0].(map[string]any)["kind"] != "property" ||
+		data(res)["scopeVersion"].(float64) != 3 {
+		t.Fatalf("property scope: %d %v", code, res)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"members.save",
 		body(map[string]string{"id": `"` + id + `"`}),
@@ -218,22 +219,22 @@ func TestMembersSave(t *testing.T) {
 		t.Error("stale membership version")
 	}
 	// client memberships get clientRole=member and the initial consent
-	code, m = write(s, &hq, "members.save", body(map[string]string{
+	code, resp = write(srv, &hq, "members.save", body(map[string]string{
 		"organizationId": `"` + customer + `"`,
 		"role":           `"client"`,
 		"employment":     "null",
 		"permissions":    `[]`,
 		"scopes":         `[{"kind":"organization","id":"` + customer + `"}]`,
 	}), 0)
-	if code != 200 || data(m)["clientRole"] != "member" {
-		t.Fatalf("client: %d %v", code, m)
+	if code != 200 || data(resp)["clientRole"] != "member" {
+		t.Fatalf("client: %d %v", code, resp)
 	}
 
 	var consents int
 	ownerScan(
 		t,
 		`SELECT count(*) FROM identity.consents WHERE membership_id = $1 AND granted = false`,
-		[]any{data(m)["id"]},
+		[]any{data(resp)["id"]},
 		&consents,
 	)
 
@@ -241,16 +242,16 @@ func TestMembersSave(t *testing.T) {
 		t.Error("initial consent")
 	}
 
-	if code, _ := write(s, &customerA, "members.save", body(nil), 0); code != 403 {
+	if code, _ := write(srv, &customerA, "members.save", body(nil), 0); code != 403 {
 		t.Error("client manages members")
 	}
 
 	// self promotion and the last identity.write holder
-	_, m = post(s, &hq, "members.list", `{"filters":{"role":"admin"},"limit":100}`)
+	_, resp = post(srv, &hq, "members.list", `{"filters":{"role":"admin"},"limit":100}`)
 
 	var me map[string]any
 
-	for _, it := range items(m) {
+	for _, it := range items(resp) {
 		if it["id"] == seed.ID("hq-operator").String() {
 			me = it
 		}
@@ -258,7 +259,7 @@ func TestMembersSave(t *testing.T) {
 
 	perms, _ := json.Marshal(me["permissions"])
 	selfBody := func(p string) string {
-		return `{"id":"` + me["id"].(string) + `","userId":"` + me["userId"].(string) + `","organizationId":"` + op +
+		return `{"id":"` + me["id"].(string) + `","userId":"` + me["userId"].(string) + `","organizationId":"` + operation +
 			`","role":"admin","employment":null,"permissions":` + p +
 			`,"scopes":[{"kind":"tenant","id":"` + seed.ID("tenant-a").
 			String() +
@@ -267,7 +268,7 @@ func TestMembersSave(t *testing.T) {
 
 	withOverride := strings.Replace(string(perms), `[`, `["restriction.override",`, 1)
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"members.save",
 		selfBody(withOverride),
@@ -307,65 +308,65 @@ func TestMembersSave(t *testing.T) {
 		``,
 		1,
 	)
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"members.save",
 		selfBody(withoutIdentity),
 		int(me["version"].(float64)),
 	); code != 409 {
-		t.Errorf("last identity.write holder: %d %v", code, m)
+		t.Errorf("last identity.write holder: %d %v", code, res)
 	}
 }
 
 func TestMembersList(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 
-	_, m := post(s, &hq, "members.list", `{"limit":100}`)
-	for _, it := range items(m) {
+	_, resp := post(srv, &hq, "members.list", `{"limit":100}`)
+	for _, it := range items(resp) {
 		if it["role"] == "client" {
 			t.Fatal("clients excluded by default")
 		}
 	}
 	// IR172: every membership carries its user's display name (contractors list their technicians by name)
-	_, m = post(s, &contrA, "members.list", `{"limit":100}`)
-	if len(items(m)) == 0 {
+	_, resp = post(srv, &contrA, "members.list", `{"limit":100}`)
+	if len(items(resp)) == 0 {
 		t.Fatal("contractor sees its technicians")
 	}
 
-	for _, it := range items(m) {
+	for _, it := range items(resp) {
 		if name, _ := it["displayName"].(string); name == "" {
 			t.Fatalf("displayName missing: %v", it["id"])
 		}
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"members.list",
 		`{"filters":{"role":"client"},"limit":100}`,
 	); len(
-		items(m),
+		items(res),
 	) < 2 {
 		t.Error("role=client")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"members.list",
 		`{"filters":{"activeOnly":false,"organizationId":"`+uuid.NewString()+`"}}`,
 	); code != 200 ||
-		len(items(m)) != 0 {
+		len(items(res)) != 0 {
 		t.Error("filters")
 	}
 
-	_, m = post(s, &contrA, "members.list", `{"limit":100}`)
-	if len(items(m)) == 0 {
+	_, resp = post(srv, &contrA, "members.list", `{"limit":100}`)
+	if len(items(resp)) == 0 {
 		t.Fatal("contractor sees its technicians")
 	}
 
-	for _, it := range items(m) {
+	for _, it := range items(resp) {
 		if it["role"] != "technician" ||
 			it["organizationId"] != seed.ID("org-contractor-a").String() ||
 			len(it["permissions"].([]any)) != 0 ||
@@ -382,11 +383,11 @@ func TestMembersList(t *testing.T) {
 
 	for _, b := range []string{`{"filters":{"role":"guest"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"name",` +
 		`"direction":"asc"}}`} {
-		code, m := post(s, &hq, "members.list", b)
+		code, m := post(srv, &hq, "members.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
-	if code, _ := post(s, &customerA, "members.list", `{}`); code != 403 {
+	if code, _ := post(srv, &customerA, "members.list", `{}`); code != 403 {
 		t.Error("client lists members")
 	}
 }
@@ -395,7 +396,7 @@ func TestMembersList(t *testing.T) {
 // a page of members in one query per table; each member still gets only its own, and each revoked grant keeps its own
 // revocation time.
 func TestMembersListCarriesEachMembersOwn(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 
 	var a, b string
 	ownerScan(
@@ -449,15 +450,15 @@ func TestMembersListCarriesEachMembersOwn(t *testing.T) {
 		)
 	})
 
-	_, m := post(
-		s,
+	_, res := post(
+		srv,
 		&hq,
 		"members.list",
 		`{"filters":{"role":"technician","activeOnly":false},"limit":100}`,
 	)
 	grants := map[string]map[string]string{} // member → test grant code → revokedAt
 
-	for _, it := range items(m) {
+	for _, it := range items(res) {
 		id := it["id"].(string)
 		for _, q := range it["qualifications"].([]any) {
 			g := q.(map[string]any)

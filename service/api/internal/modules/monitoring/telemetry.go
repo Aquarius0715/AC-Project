@@ -76,8 +76,8 @@ const measurementCols = `m.event_id, m.tenant_id, m.received_at, m.boundary_id, 
 	`m.unit_id, m.sensor_id, m.metric, m.value,
 	m.unit, m.observed_at, m.origin, m.quality, m.sequence`
 
-func scanMeasurement(r pgx.Row) (Measurement, error) {
-	x := Measurement{
+func scanMeasurement(row pgx.Row) (Measurement, error) {
+	measurement := Measurement{
 		Version:       1,
 		IsDemo:        true,
 		ID:            uuid.UUID{},
@@ -99,26 +99,28 @@ func scanMeasurement(r pgx.Row) (Measurement, error) {
 		Sequence:      0,
 		EventID:       uuid.UUID{},
 	}
-	err := r.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.ReceivedAt,
-		&x.BoundaryID,
-		&x.QualityReason,
-		&x.RawUnit,
-		&x.UnitID,
-		&x.SensorID,
-		&x.Metric,
-		&x.Value,
-		&x.Unit,
-		&x.ObservedAt,
-		&x.Origin,
-		&x.Quality,
-		&x.Sequence,
+	err := row.Scan(
+		&measurement.ID,
+		&measurement.TenantID,
+		&measurement.ReceivedAt,
+		&measurement.BoundaryID,
+		&measurement.QualityReason,
+		&measurement.RawUnit,
+		&measurement.UnitID,
+		&measurement.SensorID,
+		&measurement.Metric,
+		&measurement.Value,
+		&measurement.Unit,
+		&measurement.ObservedAt,
+		&measurement.Origin,
+		&measurement.Quality,
+		&measurement.Sequence,
 	)
-	x.EventID, x.CreatedAt, x.UpdatedAt = x.ID, x.ReceivedAt, x.ReceivedAt
+	measurement.EventID = measurement.ID
+	measurement.CreatedAt = measurement.ReceivedAt
+	measurement.UpdatedAt = measurement.ReceivedAt
 
-	return x, apperr.Wrap(err, "scan (scanMeasurement)")
+	return measurement, apperr.Wrap(err, "scan (scanMeasurement)")
 }
 
 var metrics = map[string]bool{
@@ -137,8 +139,8 @@ var metrics = map[string]bool{
 const maxSeriesRange = 35 * 24 * time.Hour
 
 // readableUnits checks that every unit is readable by the caller (NOT_FOUND otherwise, D01).
-func (m Telemetry) readableUnits(ctx context.Context, c *ops.Call, units []uuid.UUID) error {
-	vis, err := m.Units.VisibleUnits(ctx, c, units)
+func (m Telemetry) readableUnits(ctx context.Context, call *ops.Call, units []uuid.UUID) error {
+	vis, err := m.Units.VisibleUnits(ctx, call, units)
 	if err != nil {
 		return apperr.Wrap(err, "monitoring.TelemetryUnits.VisibleUnits")
 	}
@@ -148,7 +150,7 @@ func (m Telemetry) readableUnits(ctx context.Context, c *ops.Call, units []uuid.
 	}
 
 	return apperr.Wrap(
-		unitscope.Gate(ctx, c, units),
+		unitscope.Gate(ctx, call, units),
 		"unitscope.Gate",
 	) // IR49(b): external technicians wait for the work window
 }
@@ -172,48 +174,48 @@ type SeriesInput struct {
 // maxBuckets bounds one bucketed series (a 35-day period in 60-minute buckets is 840).
 const maxBuckets = 1000
 
-func validRange(from, to time.Time, max time.Duration, fe map[string]string) {
+func validRange(from, until time.Time, max time.Duration, fe map[string]string) {
 	switch {
 	case from.IsZero():
 		fe["from"] = "error.required"
-	case to.IsZero():
+	case until.IsZero():
 		fe["to"] = "error.required"
-	case !from.Before(to):
+	case !from.Before(until):
 		fe["to"] = "error.range"
-	case max > 0 && to.Sub(from) > max:
+	case max > 0 && until.Sub(from) > max:
 		fe["to"] = "error.rangeTooLong"
 	}
 }
 
 // Validate implements ops.Validator (IR121 item 2).
 func (in *SeriesInput) Validate() map[string]string {
-	fe := map[string]string{}
-	validRange(in.From, in.To, maxSeriesRange, fe)
+	fieldErrs := map[string]string{}
+	validRange(in.From, in.To, maxSeriesRange, fieldErrs)
 
 	if (in.UnitIDs == nil) == (in.SpaceID == nil) {
-		fe["unitIds"] = "error.exactlyOneTarget"
+		fieldErrs["unitIds"] = "error.exactlyOneTarget"
 	} else if in.UnitIDs != nil && (len(in.UnitIDs) < 1 || len(in.UnitIDs) > 20 || hasDup(in.UnitIDs)) {
-		fe["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = "error.invalid"
 	}
 
 	if !metrics[in.Metric] {
-		fe["metric"] = "error.invalid"
+		fieldErrs["metric"] = "error.invalid"
 	}
 
 	if len(in.Query.Filters) > 0 && string(in.Query.Filters) != "{}" &&
 		string(in.Query.Filters) != "null" {
-		fe["query.filters"] = "error.invalid"
+		fieldErrs["query.filters"] = "error.invalid"
 	}
 
 	if b := in.BucketMinutes; b != nil {
 		if *b != 5 && *b != 60 {
-			fe["bucketMinutes"] = "error.invalid"
-		} else if fe["to"] == "" && in.To.Sub(in.From) > time.Duration(maxBuckets)*time.Duration(*b)*time.Minute {
-			fe["bucketMinutes"] = "error.range"
+			fieldErrs["bucketMinutes"] = "error.invalid"
+		} else if fieldErrs["to"] == "" && in.To.Sub(in.From) > time.Duration(maxBuckets)*time.Duration(*b)*time.Minute {
+			fieldErrs["bucketMinutes"] = "error.range"
 		}
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // AllergenObservation is AllergenObservation of service-contracts.ts.
@@ -281,12 +283,12 @@ type AirSeries struct {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/telemetry/series [get]
-func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (AirSeries, error) {
+func (m Telemetry) series(ctx context.Context, call *ops.Call, in *SeriesInput) (AirSeries, error) {
 	units := in.UnitIDs
 	if in.SpaceID != nil {
 		var err error
 
-		units, err = m.Units.UnitsInSpace(ctx, c, *in.SpaceID)
+		units, err = m.Units.UnitsInSpace(ctx, call, *in.SpaceID)
 		if err != nil {
 			return AirSeries{}, apperr.Wrap(err, "monitoring.TelemetryUnits.UnitsInSpace")
 		}
@@ -295,7 +297,7 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 			return AirSeries{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
 	} else {
-		err := m.readableUnits(ctx, c, units)
+		err := m.readableUnits(ctx, call, units)
 		if err != nil {
 			return AirSeries{}, err
 		}
@@ -310,12 +312,12 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 		dir = "DESC"
 	}
 
-	w, err := paging.Resolve(in.Query, struct {
+	window, err := paging.Resolve(in.Query, struct {
 		From, To time.Time
 		Units    []uuid.UUID
 		Metric   string
 		Sensor   *uuid.UUID
-	}{in.From, in.To, units, in.Metric, in.SensorID}, c.Principal.ScopeVersion, 1)
+	}{in.From, in.To, units, in.Metric, in.SensorID}, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return AirSeries{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -330,7 +332,7 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.measurements m WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.measurements m WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return AirSeries{}, apperr.Wrap(scanErr, "select monitoring.measurements")
@@ -339,7 +341,7 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 	if in.BucketMinutes != nil { // the whole period in averages, every bucket present (IR605)
 		buckets, err := bucketed(
 			ctx,
-			c,
+			call,
 			where,
 			args,
 			in.From,
@@ -353,12 +355,12 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 		out := AirSeries{
 			Items:           []Measurement{},
 			Total:           total,
-			SnapshotVersion: w.Snapshot,
+			SnapshotVersion: window.Snapshot,
 			Buckets:         buckets, NextCursor: nil, AllergenObservation: nil,
 		}
 
 		if len(units) == 1 {
-			a, err := allergen(ctx, c, units[0])
+			a, err := allergen(ctx, call, units[0])
 			if err != nil {
 				return out, err
 			}
@@ -369,7 +371,7 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 		return out, nil
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM monitoring.measurements m WHERE %s ORDER BY m.observed_at %s, m.sensor_id ASC, m.event_id ASC "+
@@ -377,8 +379,8 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 			measurementCols,
 			where,
 			dir,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -388,14 +390,14 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 	items := []Measurement{}
 
 	for rows.Next() {
-		x, err := scanMeasurement(rows)
+		measurement, err := scanMeasurement(rows)
 		if err != nil {
 			rows.Close()
 
 			return AirSeries{}, err
 		}
 
-		items = append(items, x)
+		items = append(items, measurement)
 	}
 
 	rows.Close()
@@ -407,13 +409,13 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 
 	out := AirSeries{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot, AllergenObservation: nil, Buckets: nil,
+		SnapshotVersion: window.Snapshot, AllergenObservation: nil, Buckets: nil,
 	}
 
 	if len(units) == 1 {
-		a, err := allergen(ctx, c, units[0])
+		a, err := allergen(ctx, call, units[0])
 		if err != nil {
 			return out, err
 		}
@@ -429,10 +431,10 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 // and missing readings are left out, as the charts leave them out.
 func bucketed(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	where string,
 	args []any,
-	from, to time.Time,
+	from, until time.Time,
 	size time.Duration,
 ) ([]SeriesBucket, error) {
 	q := fmt.Sprintf(`SELECT date_bin(make_interval(secs => $%d), m.observed_at, $3) AS b,
@@ -440,7 +442,7 @@ func bucketed(
 		AND m.value IS NOT NULL)
 		FROM monitoring.measurements m WHERE %s GROUP BY b`, len(args)+1, where)
 
-	rows, err := c.Tx.Query(ctx, q, append(append([]any{}, args...), size.Seconds())...)
+	rows, err := call.Tx.Query(ctx, q, append(append([]any{}, args...), size.Seconds())...)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select monitoring.measurements")
 	}
@@ -448,16 +450,16 @@ func bucketed(
 	got := map[int64]SeriesBucket{}
 
 	for rows.Next() {
-		var b SeriesBucket
+		var seriesBucket SeriesBucket
 
-		err := rows.Scan(&b.Start, &b.Value, &b.Count)
+		err := rows.Scan(&seriesBucket.Start, &seriesBucket.Value, &seriesBucket.Count)
 		if err != nil {
 			rows.Close()
 
 			return nil, apperr.Wrap(err, "select monitoring.measurements")
 		}
 
-		got[b.Start.UnixMilli()] = b
+		got[seriesBucket.Start.UnixMilli()] = seriesBucket
 	}
 
 	rows.Close()
@@ -469,18 +471,18 @@ func bucketed(
 
 	out := []SeriesBucket{}
 
-	for at := from; at.Before(to); at = at.Add(size) {
-		b, ok := got[at.UnixMilli()]
+	for when := from; when.Before(until); when = when.Add(size) {
+		seriesBucket, ok := got[when.UnixMilli()]
 		if !ok {
-			b = SeriesBucket{Start: at, Value: nil, Count: 0}
+			seriesBucket = SeriesBucket{Start: when, Value: nil, Count: 0}
 		}
 
-		b.Start = at.UTC()
-		if b.Count == 0 {
-			b.Value = nil
+		seriesBucket.Start = when.UTC()
+		if seriesBucket.Count == 0 {
+			seriesBucket.Value = nil
 		}
 
-		out = append(out, b)
+		out = append(out, seriesBucket)
 	}
 
 	return out, nil
@@ -488,12 +490,14 @@ func bucketed(
 
 // allergen returns the DEC-57 observation of one unit (not_measured without a row; unsupported clears all fields).
 func allergen(ctx context.Context, c *ops.Call, unit uuid.UUID) (AllergenObservation, error) {
-	var a AllergenObservation
+	var allergenObservation AllergenObservation
 
 	err := c.Tx.QueryRow(ctx, `SELECT availability, substance, value, unit, source_label, observed_at, evidence_text FROM
 		monitoring.allergen_observations
 		WHERE unit_id = $1 ORDER BY observed_at DESC NULLS LAST, created_at DESC, id ASC LIMIT 1`, unit).
-		Scan(&a.Availability, &a.Substance, &a.Value, &a.Unit, &a.SourceLabel, &a.ObservedAt, &a.EvidenceText)
+		Scan(&allergenObservation.Availability, &allergenObservation.Substance, &allergenObservation.Value,
+			&allergenObservation.Unit, &allergenObservation.SourceLabel, &allergenObservation.ObservedAt,
+			&allergenObservation.EvidenceText)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return AllergenObservation{
 			Availability: "not_measured",
@@ -506,8 +510,8 @@ func allergen(ctx context.Context, c *ops.Call, unit uuid.UUID) (AllergenObserva
 		}, nil
 	}
 
-	if a.Availability == "unsupported" {
-		a = AllergenObservation{
+	if allergenObservation.Availability == "unsupported" {
+		allergenObservation = AllergenObservation{
 			Availability: "unsupported",
 			Substance:    nil,
 			Value:        nil,
@@ -518,7 +522,7 @@ func allergen(ctx context.Context, c *ops.Call, unit uuid.UUID) (AllergenObserva
 		}
 	}
 
-	return a, apperr.Wrap(err, "select monitoring.allergen_observations")
+	return allergenObservation, apperr.Wrap(err, "select monitoring.allergen_observations")
 }
 
 // ---- telemetry.summary ----
@@ -533,18 +537,18 @@ type SummaryInput struct {
 
 // Validate implements ops.Validator (IR121 item 3).
 func (in *SummaryInput) Validate() map[string]string {
-	fe := map[string]string{}
-	validRange(in.From, in.To, 0, fe)
+	fieldErrs := map[string]string{}
+	validRange(in.From, in.To, 0, fieldErrs)
 
 	if len(in.UnitIDs) < 1 || len(in.UnitIDs) > 100 || hasDup(in.UnitIDs) {
-		fe["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = "error.invalid"
 	}
 
 	if in.Metric != nil && !metrics[*in.Metric] {
-		fe["metric"] = "error.invalid"
+		fieldErrs["metric"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // TelemetrySummary is TelemetrySummary of service-contracts.ts.
@@ -583,23 +587,23 @@ type TelemetrySummary struct {
 //	@Router			/v1/telemetry/summary [get]
 func (m Telemetry) summary(
 	ctx context.Context,
-	c *ops.Call,
-	in *SummaryInput,
+	call *ops.Call,
+	input *SummaryInput,
 ) (TelemetrySummary, error) {
-	err := m.readableUnits(ctx, c, in.UnitIDs)
+	err := m.readableUnits(ctx, call, input.UnitIDs)
 	if err != nil {
 		return TelemetrySummary{}, err
 	}
 
-	args := []any{in.UnitIDs, in.From, in.To}
+	args := []any{input.UnitIDs, input.From, input.To}
 	where := "m.unit_id = ANY($1) AND m.observed_at >= $2 AND m.observed_at < $3"
 
-	if in.Metric != nil {
-		args = append(args, *in.Metric)
+	if input.Metric != nil {
+		args = append(args, *input.Metric)
 		where += " AND m.metric = $4"
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT `+measurementCols+` FROM (SELECT DISTINCT ON (m.unit_id, m.metric) m.* FROM monitoring.measurements m WHERE
 			`+where+`
@@ -610,7 +614,7 @@ func (m Telemetry) summary(
 	}
 	defer rows.Close()
 
-	out := TelemetrySummary{Measurements: []Measurement{}, AsOf: c.Now, Energy: nil}
+	out := TelemetrySummary{Measurements: []Measurement{}, AsOf: call.Now, Energy: nil}
 
 	for rows.Next() {
 		x, err := scanMeasurement(rows)
@@ -654,24 +658,24 @@ const ventCols = `v.id, v.tenant_id, v.version, v.created_at, v.updated_at, v.sp
 	v.logged_by_membership_id, v.logged_at`
 
 func scanVent(r pgx.Row) (VentilationLog, error) {
-	var v VentilationLog
+	var ventilationLog VentilationLog
 
 	err := r.Scan(
-		&v.ID,
-		&v.TenantID,
-		&v.Version,
-		&v.CreatedAt,
-		&v.UpdatedAt,
-		&v.SpaceID,
-		&v.UnitID,
-		&v.Method,
-		&v.DurationMinutes,
-		&v.CO2AtLog,
-		&v.LoggedByMembershipID,
-		&v.LoggedAt,
+		&ventilationLog.ID,
+		&ventilationLog.TenantID,
+		&ventilationLog.Version,
+		&ventilationLog.CreatedAt,
+		&ventilationLog.UpdatedAt,
+		&ventilationLog.SpaceID,
+		&ventilationLog.UnitID,
+		&ventilationLog.Method,
+		&ventilationLog.DurationMinutes,
+		&ventilationLog.CO2AtLog,
+		&ventilationLog.LoggedByMembershipID,
+		&ventilationLog.LoggedAt,
 	)
 
-	return v, apperr.Wrap(err, "scan (scanVent)")
+	return ventilationLog, apperr.Wrap(err, "scan (scanVent)")
 }
 
 var ventMethods = map[string]bool{
@@ -691,20 +695,20 @@ type VentLogInput struct {
 
 // Validate implements ops.Validator (IR110: 1–240 minutes).
 func (in *VentLogInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.SpaceID == uuid.Nil {
-		fe["spaceId"] = "error.required"
+		fieldErrs["spaceId"] = "error.required"
 	}
 
 	if !ventMethods[in.Method] {
-		fe["method"] = "error.invalid"
+		fieldErrs["method"] = "error.invalid"
 	}
 
 	if in.DurationMinutes < 1 || in.DurationMinutes > 240 {
-		fe["durationMinutes"] = "error.range"
+		fieldErrs["durationMinutes"] = "error.range"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // log serves ventilation.log.
@@ -733,24 +737,28 @@ func (in *VentLogInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/ventilation [post]
-func (m Telemetry) log(ctx context.Context, c *ops.Call, in *VentLogInput) (VentilationLog, error) {
-	org, spaceUnits, found, err := m.Units.SpaceInfo(ctx, c, in.SpaceID)
+func (m Telemetry) log(
+	ctx context.Context,
+	call *ops.Call,
+	in *VentLogInput,
+) (VentilationLog, error) {
+	org, spaceUnits, found, err := m.Units.SpaceInfo(ctx, call, in.SpaceID)
 	if err != nil {
 		return VentilationLog{}, apperr.Wrap(err, "monitoring.TelemetryUnits.SpaceInfo")
 	}
 
-	if !found || org != c.Principal.OrgID {
+	if !found || org != call.Principal.OrgID {
 		return VentilationLog{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	src := spaceUnits
 
 	if in.UnitID != nil {
-		in := *in.UnitID
+		input := *in.UnitID
 
 		ok := false
 		for _, u := range spaceUnits {
-			ok = ok || u == in
+			ok = ok || u == input
 		}
 
 		if !ok {
@@ -759,16 +767,16 @@ func (m Telemetry) log(ctx context.Context, c *ops.Call, in *VentLogInput) (Vent
 			)
 		}
 
-		src = []uuid.UUID{in}
+		src = []uuid.UUID{input}
 	}
 
-	co2, err := m.currentCO2(ctx, c, src)
+	co2, err := m.currentCO2(ctx, call, src)
 	if err != nil {
 		return VentilationLog{}, err
 	}
 
-	v, err := scanVent(
-		c.Tx.QueryRow(
+	ventilationLog, err := scanVent(
+		call.Tx.QueryRow(
 			ctx,
 			`INSERT INTO monitoring.ventilation_logs AS v (tenant_id, space_id, unit_id, method, duration_minutes, co2_at_log,
 		logged_by_membership_id, logged_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7)
@@ -778,28 +786,28 @@ func (m Telemetry) log(ctx context.Context, c *ops.Call, in *VentLogInput) (Vent
 			in.Method,
 			in.DurationMinutes,
 			co2,
-			c.Principal.MembershipID,
-			c.Now,
+			call.Principal.MembershipID,
+			call.Now,
 		),
 	)
 	if err != nil {
-		return v, err
+		return ventilationLog, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "ventilation_log",
-			AggregateID:   v.ID,
+			AggregateID:   ventilationLog.ID,
 			Type:          "VentilationLogged",
-			Payload:       map[string]any{"spaceId": v.SpaceID},
+			Payload:       map[string]any{"spaceId": ventilationLog.SpaceID},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "ventilation.log",
 			TargetKind:      "ventilation_log",
-			TargetID:        v.ID.String(),
-			NextVersion:     &v.Version,
+			TargetID:        ventilationLog.ID.String(),
+			NextVersion:     &ventilationLog.Version,
 			PreviousVersion: nil,
 			Reason:          "",
 			Result:          "",
@@ -808,7 +816,7 @@ func (m Telemetry) log(ctx context.Context, c *ops.Call, in *VentLogInput) (Vent
 		},
 	)
 
-	return v, nil
+	return ventilationLog, nil
 }
 
 // currentCO2 is co2AtLog (IR110, IR213): among the units' latest CO₂ readings (LatestMeasurements, read-time
@@ -869,8 +877,8 @@ func (m Telemetry) currentCO2(
 //	@Router			/v1/ventilation [get]
 func (m Telemetry) list(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[VentilationLog], error) {
 	var f struct {
 		SpaceID *uuid.UUID `json:"spaceId,omitempty"`
@@ -879,8 +887,8 @@ func (m Telemetry) list(
 		To      *time.Time `json:"to,omitempty"`
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
 		err := dec.Decode(&f)
@@ -898,7 +906,7 @@ func (m Telemetry) list(
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{"id": "v.id", "createdAt": "v.created_at"},
 		"v.created_at DESC, v.id ASC",
 	)
@@ -906,7 +914,7 @@ func (m Telemetry) list(
 		return paging.Page[VentilationLog]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[VentilationLog]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -921,10 +929,10 @@ func (m Telemetry) list(
 
 	var conds []string
 
-	switch c.Principal.Role {
+	switch call.Principal.Role {
 	case "admin":
 	case "client":
-		spaces, err := m.Units.SpacesOfOrg(ctx, c, c.Principal.OrgID)
+		spaces, err := m.Units.SpacesOfOrg(ctx, call, call.Principal.OrgID)
 		if err != nil {
 			return paging.Page[VentilationLog]{}, apperr.Wrap(
 				err,
@@ -934,7 +942,7 @@ func (m Telemetry) list(
 
 		conds = append(conds, "v.space_id = ANY("+add(spaces)+")")
 	default:
-		units, err := m.Units.ScopedUnits(ctx, c)
+		units, err := m.Units.ScopedUnits(ctx, call)
 		if err != nil {
 			return paging.Page[VentilationLog]{}, apperr.Wrap(
 				err,
@@ -942,7 +950,7 @@ func (m Telemetry) list(
 			)
 		}
 
-		spaces, err := m.Units.SpacesOfUnits(ctx, c, units)
+		spaces, err := m.Units.SpacesOfUnits(ctx, call, units)
 		if err != nil {
 			return paging.Page[VentilationLog]{}, apperr.Wrap(
 				err,
@@ -979,7 +987,7 @@ func (m Telemetry) list(
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.ventilation_logs v WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.ventilation_logs v WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[VentilationLog]{}, apperr.Wrap(
@@ -988,15 +996,15 @@ func (m Telemetry) list(
 		)
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM monitoring.ventilation_logs v WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			ventCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -1017,9 +1025,9 @@ func (m Telemetry) list(
 
 	return paging.Page[VentilationLog]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, apperr.Wrap(rows.Err(), "select monitoring.ventilation_logs")
 }
 
@@ -1045,16 +1053,16 @@ type SensorLimits interface {
 // within its sensor's stale limit (D07). Units without a reading are absent; a reading without its sensor is not fresh.
 func (m Telemetry) PowerMeasured(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	units []uuid.UUID,
 ) (map[uuid.UUID]bool, error) {
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT DISTINCT ON (m.unit_id) m.unit_id, m.sensor_id, m.origin, m.quality, m.value, m.observed_at
 		FROM monitoring.measurements m WHERE m.unit_id = ANY($1) AND m.metric = 'power' AND m.observed_at <= $2
 		ORDER BY m.unit_id, m.observed_at DESC, m.sequence DESC, m.event_id ASC`,
 		units,
-		c.Now,
+		call.Now,
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select monitoring.measurements")
@@ -1096,7 +1104,7 @@ func (m Telemetry) PowerMeasured(
 		return nil, apperr.Wrap(rowsErr, "select monitoring.measurements")
 	}
 
-	limits, err := m.Sensors.StaleAfter(ctx, c, sensors)
+	limits, err := m.Sensors.StaleAfter(ctx, call, sensors)
 	if err != nil {
 		return nil, apperr.Wrap(err, "monitoring.SensorLimits.StaleAfter")
 	}
@@ -1105,7 +1113,7 @@ func (m Telemetry) PowerMeasured(
 
 	for _, r := range rs {
 		limit, known := limits[r.sensor]
-		out[r.unit] = r.ok && known && c.Now.Sub(r.at) <= limit
+		out[r.unit] = r.ok && known && call.Now.Sub(r.at) <= limit
 	}
 
 	return out, nil
@@ -1131,7 +1139,7 @@ var metricOrder = []string{
 // returned with quality=stale (D07: missing→suspect→stale→valid); history in telemetry.series keeps the stored quality.
 func (m Telemetry) LatestMeasurements(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	units []uuid.UUID,
 ) (map[uuid.UUID][]Measurement, error) {
 	out := map[uuid.UUID][]Measurement{}
@@ -1139,7 +1147,7 @@ func (m Telemetry) LatestMeasurements(
 		return out, nil
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT x.* FROM unnest($1::uuid[]) AS u(id) CROSS JOIN unnest($3::text[]) AS k(metric)
 		CROSS JOIN LATERAL (SELECT
@@ -1147,7 +1155,7 @@ func (m Telemetry) LatestMeasurements(
 			k.metric AND m.observed_at <= $2
 		ORDER BY m.observed_at DESC, m.sequence DESC, m.event_id ASC LIMIT 1) x ORDER BY x.unit_id, x.metric`,
 		units,
-		c.Now,
+		call.Now,
 		metricOrder,
 	)
 	if err != nil {
@@ -1160,14 +1168,14 @@ func (m Telemetry) LatestMeasurements(
 	)
 
 	for rows.Next() {
-		x, err := scanMeasurement(rows)
+		measurement, err := scanMeasurement(rows)
 		if err != nil {
 			rows.Close()
 
 			return nil, err
 		}
 
-		all, sensors = append(all, x), append(sensors, x.SensorID)
+		all, sensors = append(all, measurement), append(sensors, measurement.SensorID)
 	}
 
 	rows.Close()
@@ -1177,18 +1185,18 @@ func (m Telemetry) LatestMeasurements(
 		return nil, apperr.Wrap(rowsErr, "select unnest")
 	}
 
-	limits, err := m.Sensors.StaleAfter(ctx, c, sensors)
+	limits, err := m.Sensors.StaleAfter(ctx, call, sensors)
 	if err != nil {
 		return nil, apperr.Wrap(err, "monitoring.SensorLimits.StaleAfter")
 	}
 
-	for _, x := range all {
-		if limit, known := limits[x.SensorID]; x.Quality == "valid" &&
-			(!known || c.Now.Sub(x.ObservedAt) > limit) {
-			x.Quality = "stale"
+	for _, measurement := range all {
+		if limit, known := limits[measurement.SensorID]; measurement.Quality == "valid" &&
+			(!known || call.Now.Sub(measurement.ObservedAt) > limit) {
+			measurement.Quality = "stale"
 		}
 
-		out[x.UnitID] = append(out[x.UnitID], x)
+		out[measurement.UnitID] = append(out[measurement.UnitID], measurement)
 	}
 
 	return out, nil
@@ -1199,14 +1207,14 @@ func (m Telemetry) LatestMeasurements(
 // `since`, so a unit with power readings but none running since then has 0 h (IR238); nil without any power reading.
 func (m Telemetry) RunHours(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
 	since *time.Time,
 ) (*float64, error) {
 	const cols = `SELECT sensor_id, observed_at, sequence, value, origin, quality FROM monitoring.measurements WHERE
 		unit_id = $1 AND metric = 'power' AND observed_at <= $2`
 
-	q, args := cols, []any{unit, c.Now}
+	q, args := cols, []any{unit, call.Now}
 	if since != nil {
 		q = `(` + cols + ` AND observed_at <= $3 ORDER BY observed_at DESC, sequence DESC LIMIT 1) UNION ALL
 			(` + cols + ` AND observed_at > $3)`
@@ -1214,7 +1222,7 @@ func (m Telemetry) RunHours(
 		args = append(args, *since)
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT sensor_id, observed_at, value, origin, quality FROM (`+q+`) r ORDER BY observed_at, sequence`,
 		args...)
@@ -1258,7 +1266,7 @@ func (m Telemetry) RunHours(
 		return nil, apperr.Wrap(rowsErr, "select sensor_id")
 	}
 
-	limits, err := m.Sensors.StaleAfter(ctx, c, sensors)
+	limits, err := m.Sensors.StaleAfter(ctx, call, sensors)
 	if err != nil {
 		return nil, apperr.Wrap(err, "monitoring.SensorLimits.StaleAfter")
 	}
@@ -1270,7 +1278,7 @@ func (m Telemetry) RunHours(
 			continue
 		}
 
-		end := c.Now
+		end := call.Now
 		if i+1 < len(rs) {
 			end = rs[i+1].at
 		}
@@ -1302,7 +1310,7 @@ func LatestMeasurement(
 	unit uuid.UUID,
 	metric string,
 ) (*Measurement, error) {
-	x, err := scanMeasurement(
+	measurement, err := scanMeasurement(
 		c.Tx.QueryRow(
 			ctx,
 			`SELECT `+measurementCols+` FROM monitoring.measurements m WHERE m.unit_id = $1 AND m.metric = $2
@@ -1315,5 +1323,5 @@ func LatestMeasurement(
 		return nil, nil
 	}
 
-	return &x, err
+	return &measurement, err
 }

@@ -16,8 +16,8 @@ func poweredUnit(t *testing.T, name string, onAgo, offAgo time.Duration) string 
 	t.Helper()
 
 	tenant := seed.ID("tenant-a")
-	u := newUnit(t, lastServer, name)
-	owner(t, `UPDATE assets.units SET connection = 'online' WHERE id = $1`, u)
+	unit := newUnit(t, lastServer, name)
+	owner(t, `UPDATE assets.units SET connection = 'online' WHERE id = $1`, unit)
 
 	dev, sensor := uuid.NewString(), uuid.NewString()
 	owner(
@@ -27,7 +27,7 @@ func poweredUnit(t *testing.T, name string, onAgo, offAgo time.Duration) string 
 		dev,
 		tenant,
 		"FR-"+dev[:8],
-		u,
+		unit,
 		seed.ID("hq-operator"),
 	)
 	owner(
@@ -49,7 +49,7 @@ func poweredUnit(t *testing.T, name string, onAgo, offAgo time.Duration) string 
 				origin, quality, received_at, event_id)
 			VALUES ($1,$2,$3,'power',$4,$5,$6,'kW','measured','valid',$4,$7)`,
 			tenant,
-			u,
+			unit,
 			sensor,
 			clock.Add(-r.ago),
 			i+1,
@@ -58,7 +58,7 @@ func poweredUnit(t *testing.T, name string, onAgo, offAgo time.Duration) string 
 		)
 	}
 
-	return u
+	return unit
 }
 
 // IR134 item 5 / IR239 / BR-C18: the maintenance scheduler reminds once per cleaning cycle — a maintenance Alert
@@ -66,7 +66,7 @@ func poweredUnit(t *testing.T, name string, onAgo, offAgo time.Duration) string 
 // settings; Mark cleaned resolves it at once, a technician cleaning at the next evaluation; no recipient leaves a
 // no_recipient DeliveryFailure on the Alert.
 func TestFilterReminders(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	ctx := context.Background()
 	tenant, org := seed.ID("tenant-a"), seed.ID("org-customer-b")
 	evaluate := func(at time.Time) {
@@ -74,7 +74,7 @@ func TestFilterReminders(t *testing.T) {
 		t.Helper()
 		owner(t, `DELETE FROM maintenance.filter_reminder_watermarks WHERE tenant_id = $1`, tenant)
 
-		_, err := schedTick(ctx, s, at)
+		_, err := schedTick(ctx, srv, at)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -85,32 +85,32 @@ func TestFilterReminders(t *testing.T) {
 		failures                                        int
 	}
 
-	alertsOf := func(u string) []alert {
+	alertsOf := func(unitID string) []alert {
 		t.Helper()
 
 		var n int
 		ownerScan(
 			t,
 			`SELECT count(*) FROM monitoring.alerts WHERE unit_id = $1 AND type = 'maintenance'`,
-			[]any{u},
+			[]any{unitID},
 			&n,
 		)
 
 		out := make([]alert, n)
-		for i := range out {
+		for idx := range out {
 			ownerScan(
 				t,
 				`SELECT id::text, status, severity, coalesce(rule_key, ''), evidence_text, coalesce(resolution_reason, ''),
 					jsonb_array_length(delivery_failures)
 				FROM monitoring.alerts WHERE unit_id = $1 AND type = 'maintenance' ORDER BY created_at, id OFFSET $2 LIMIT 1`,
-				[]any{u, i},
-				&out[i].id,
-				&out[i].status,
-				&out[i].severity,
-				&out[i].ruleKey,
-				&out[i].evidence,
-				&out[i].reason,
-				&out[i].failures,
+				[]any{unitID, idx},
+				&out[idx].id,
+				&out[idx].status,
+				&out[idx].severity,
+				&out[idx].ruleKey,
+				&out[idx].evidence,
+				&out[idx].reason,
+				&out[idx].failures,
 			)
 		}
 
@@ -134,7 +134,7 @@ func TestFilterReminders(t *testing.T) {
 	settings := func(body string) {
 		t.Helper()
 
-		if code, m := write(s, &customerB, "filterCare.saveSettings", body, 0); code != 200 {
+		if code, m := write(srv, &customerB, "filterCare.saveSettings", body, 0); code != 200 {
 			t.Fatalf("settings: %d %v", code, m)
 		}
 	}
@@ -146,11 +146,11 @@ func TestFilterReminders(t *testing.T) {
 	)
 	settings(`{"thresholdHours":100,"fallbackDays":30,"recipients":"owners","channels":["inApp"]}`)
 
-	u := poweredUnit(t, "Reminder AC", 210*time.Hour, 10*time.Hour) // 200 h, never cleaned
+	unit := poweredUnit(t, "Reminder AC", 210*time.Hour, 10*time.Hour) // 200 h, never cleaned
 
 	var units []string
 
-	units = append(units, u)
+	units = append(units, unit)
 
 	t.Cleanup(func() { // later tests see neither the units nor their open reminders
 		owner(
@@ -166,7 +166,7 @@ func TestFilterReminders(t *testing.T) {
 	// overdue → one reminder: the Alert opens and the owner gets one in-app notification
 	evaluate(clock.Add(time.Minute))
 
-	as := alertsOf(u)
+	as := alertsOf(unit)
 	if len(as) != 1 || as[0].status != "open" || as[0].severity != "normal" ||
 		as[0].ruleKey != "filter_cleaning" ||
 		as[0].evidence != "Cleaning due (200 h of run time, no cleaning recorded). Not a fault." ||
@@ -191,21 +191,21 @@ func TestFilterReminders(t *testing.T) {
 		t.Errorf("recipient %s", to)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerB,
 		"alerts.list",
-		`{"filters":{"unitId":"`+u+`"}}`,
-	); code != 200 || len(items(m)) != 1 ||
-		items(m)[0]["type"] != "maintenance" {
-		t.Fatalf("alerts.list: %d %v", code, m)
+		`{"filters":{"unitId":"`+unit+`"}}`,
+	); code != 200 || len(items(res)) != 1 ||
+		items(res)[0]["type"] != "maintenance" {
+		t.Fatalf("alerts.list: %d %v", code, res)
 	}
 
 	var audits int
 	ownerScan(
 		t,
 		`SELECT count(*) FROM audit.audit_log WHERE action = 'filterCare.remind' AND target_id = $1`,
-		[]any{u},
+		[]any{unit},
 		&audits,
 	)
 
@@ -213,14 +213,14 @@ func TestFilterReminders(t *testing.T) {
 		t.Errorf("audit: %d", audits)
 	}
 	// the same cycle is reminded once; within 15 minutes nothing is evaluated
-	_, err := schedTick(ctx, s, clock.Add(5*time.Minute))
+	_, err := schedTick(ctx, srv, clock.Add(5*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	evaluate(clock.Add(20 * time.Minute))
 
-	if as := alertsOf(u); len(as) != 1 {
+	if as := alertsOf(unit); len(as) != 1 {
 		t.Fatalf("repeated: %+v", as)
 	}
 
@@ -229,19 +229,19 @@ func TestFilterReminders(t *testing.T) {
 	}
 
 	// Mark cleaned ends the cycle and resolves the Alert at once
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"filterCare.markCleaned",
-		`{"unitId":"`+u+`"}`,
+		`{"unitId":"`+unit+`"}`,
 		0,
 	); code != 200 {
-		t.Fatalf("mark cleaned: %d %v", code, m)
+		t.Fatalf("mark cleaned: %d %v", code, res)
 	}
 
 	drainEvents(t)
 
-	if as := alertsOf(u); as[0].status != "resolved" || as[0].reason != "filter cleaned" {
+	if as := alertsOf(unit); as[0].status != "resolved" || as[0].reason != "filter cleaned" {
 		t.Fatalf("resolved: %+v", as)
 	}
 
@@ -270,13 +270,13 @@ func TestFilterReminders(t *testing.T) {
 	owner(
 		t,
 		`UPDATE maintenance.filter_cleanings SET cleaned_at = $2 WHERE unit_id = $1`,
-		u,
+		unit,
 		clock.Add(-150*time.Hour),
 	)
-	at := clock.Add(30 * time.Minute)
-	evaluate(at)
+	when := clock.Add(30 * time.Minute)
+	evaluate(when)
 
-	as = alertsOf(u)
+	as = alertsOf(unit)
 	if len(as) != 2 || as[1].status != "open" ||
 		as[1].evidence != "Cleaning due (140 h of run time since the last cleaning). Not a fault." {
 		t.Fatalf("second cycle: %+v", as)
@@ -287,7 +287,7 @@ func TestFilterReminders(t *testing.T) {
 		t,
 		`SELECT count(*) FROM identity.memberships WHERE organization_id = $1 AND role = 'client' AND valid_from <= $2 AND
 			(valid_until IS NULL OR valid_until > $2)`,
-		[]any{org, at},
+		[]any{org, when},
 		&clients,
 	)
 
@@ -313,7 +313,7 @@ func TestFilterReminders(t *testing.T) {
 		VALUES ($1,$2,$3,$4,'preventive','completed','client_request',tstzrange($5,$6),$6,$6)`,
 		job,
 		tenant,
-		u,
+		unit,
 		org,
 		clock.Add(-2*time.Hour),
 		clock.Add(-time.Hour),
@@ -330,7 +330,7 @@ func TestFilterReminders(t *testing.T) {
 	evaluate(clock.Add(45 * time.Minute))
 
 	if as := alertsOf(
-		u,
+		unit,
 	); len(as) != 2 || as[1].status != "resolved" ||
 		as[1].reason != "filter cleaned" {
 		t.Fatalf("technician cleaning: %+v", as)
@@ -339,7 +339,7 @@ func TestFilterReminders(t *testing.T) {
 	// no recipient (no owner left): the Alert opens with a no_recipient DeliveryFailure and no notification
 	settings(`{"thresholdHours":null,"fallbackDays":30,"recipients":"owners","channels":["inApp"]}`)
 
-	offline := newUnit(t, s, "Offline reminder AC")
+	offline := newUnit(t, srv, "Offline reminder AC")
 	units = append(units, offline)
 	owner(
 		t,

@@ -13,7 +13,7 @@ func TestRepeats(t *testing.T) {
 	var lines []string
 
 	now := time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC)
-	r := &Repeats{
+	repeats := &Repeats{
 		Logf:     func(f string, a ...any) { lines = append(lines, fmt.Sprintf(f, a...)) },
 		Now:      func() time.Time { return now },
 		Every:    0,
@@ -22,20 +22,20 @@ func TestRepeats(t *testing.T) {
 		loggedAt: time.Time{},
 		repeated: 0,
 	}
-	r.OK("tick") // nothing failed yet: nothing to say
+	repeats.OK("tick") // nothing failed yet: nothing to say
 
 	for range 30 {
-		r.Failed("tick failed: db down")
+		repeats.Failed("tick failed: db down")
 
 		now = now.Add(time.Second)
 	}
 
 	now = now.Add(31 * time.Second)
 
-	r.Failed("tick failed: db down")
-	r.Failed("tick failed: other")
-	r.OK("tick")
-	r.OK("tick")
+	repeats.Failed("tick failed: db down")
+	repeats.Failed("tick failed: other")
+	repeats.OK("tick")
+	repeats.OK("tick")
 
 	want := []string{
 		"tick failed: db down",

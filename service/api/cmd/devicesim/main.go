@@ -82,19 +82,21 @@ func main() {
 			log.Fatal(err)
 		}
 
-		for _, p := range fleet.Patterns {
-			if p.NoDevice {
+		for _, pattern := range fleet.Patterns {
+			if pattern.NoDevice {
 				continue
 			}
 
-			id := seed.ID(devicesim.DeviceName(p)).String()
-			powerOff := p.PowerSignal == "off" || (p.State.Power != nil && !*p.State.Power)
-			m := devicesim.NewModule(*tenant, id, fleet.FirmwareOf(p), seedOf(id)).
-				Behave(p.Telemetry, p.Commands, powerOff).
-				Reports(p.State.Power, p.State.Celsius, p.State.Mode, p.State.FanLevel)
+			id := seed.ID(devicesim.DeviceName(pattern)).String()
+			powerOff := pattern.PowerSignal == "off" ||
+				(pattern.State.Power != nil && !*pattern.State.Power)
+			m := devicesim.NewModule(*tenant, id, fleet.FirmwareOf(pattern), seedOf(id)).
+				Behave(pattern.Telemetry, pattern.Commands, powerOff).
+				Reports(pattern.State.Power, pattern.State.Celsius, pattern.State.Mode, pattern.State.FanLevel)
+
 				// the fleet's units show their state live
 			modules = append(modules, m)
-			beats[m] = p.Connection == "online"
+			beats[m] = pattern.Connection == "online"
 		}
 	}
 	// the subscriptions are made on every connect: a clean session loses them when the broker restarts
@@ -131,10 +133,10 @@ func main() {
 
 			return
 		case now := <-telemetry.C:
-			for _, m := range modules {
-				raw, err := m.Telemetry(now)
+			for _, module := range modules {
+				raw, err := module.Telemetry(now)
 				if err != nil {
-					log.Printf("telemetry %s: %v", m.DeviceID, err)
+					log.Printf("telemetry %s: %v", module.DeviceID, err)
 
 					continue
 				}
@@ -143,22 +145,22 @@ func main() {
 					continue
 				}
 
-				publish(client, m.TelemetryTopic(), raw)
+				publish(client, module.TelemetryTopic(), raw)
 			}
 		case now := <-heartbeat.C:
-			for _, m := range modules {
-				if !beats[m] {
+			for _, module := range modules {
+				if !beats[module] {
 					continue
 				}
 
-				raw, err := m.Beat(now)
+				raw, err := module.Beat(now)
 				if err != nil {
-					log.Printf("heartbeat %s: %v", m.DeviceID, err)
+					log.Printf("heartbeat %s: %v", module.DeviceID, err)
 
 					continue
 				}
 
-				publish(client, m.HeartbeatTopic(), raw)
+				publish(client, module.HeartbeatTopic(), raw)
 			}
 		}
 	}
@@ -190,14 +192,14 @@ func clientTag(tenant string) string {
 func fixtureModule(tenant, name, firmware string) (*devicesim.Module, bool) {
 	id := seed.ID(name).String()
 
-	m := devicesim.NewModule(tenant, id, firmware, seedOf(id)).Only(sensorsOf(name)...)
+	module := devicesim.NewModule(tenant, id, firmware, seedOf(id)).Only(sensorsOf(name)...)
 	for _, l := range iotbridge.Links {
 		if l.Device == name && l.Connection != "online" {
-			return m.Behave("silent", "ignore", false), false
+			return module.Behave("silent", "ignore", false), false
 		}
 	}
 
-	return m, true
+	return module, true
 }
 
 // sensorsOf names the sensors a fixture device has (its bridge link), so it reports only those.
@@ -247,37 +249,37 @@ func envOr(key, def string) string {
 // command topic and answers on the acknowledgement topic (QoS 1, as the design says). A subscription that fails is
 // logged, and the next reconnect tries again.
 func subscribe(client mqtt.Client, modules []*devicesim.Module) {
-	for _, m := range modules {
-		tok := client.Subscribe(m.KeptTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
-			err := m.Restore(msg.Payload())
+	for _, module := range modules {
+		tok := client.Subscribe(module.KeptTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
+			err := module.Restore(msg.Payload())
 			if err != nil {
-				log.Printf("kept %s: %v", m.DeviceID, err)
+				log.Printf("kept %s: %v", module.DeviceID, err)
 			}
 		})
 		if tok.Wait() && tok.Error() != nil {
-			log.Printf("subscribe %s: %v", m.KeptTopic(), tok.Error())
+			log.Printf("subscribe %s: %v", module.KeptTopic(), tok.Error())
 		}
 	}
 
-	for _, m := range modules {
-		tok := client.Subscribe(m.CommandTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
-			raw, sendAt, err := m.Acknowledge(msg.Payload(), time.Now())
+	for _, module := range modules {
+		tok := client.Subscribe(module.CommandTopic(), 1, func(_ mqtt.Client, msg mqtt.Message) {
+			raw, sendAt, err := module.Acknowledge(msg.Payload(), time.Now())
 			if err != nil {
-				log.Printf("command %s: %v", m.DeviceID, err)
+				log.Printf("command %s: %v", module.DeviceID, err)
 
 				return
 			}
 
-			kept, keepErr := m.Keep()
+			kept, keepErr := module.Keep()
 			if keepErr == nil { // retained, so the next start reads it back
 				if tok := client.Publish(
-					m.KeptTopic(),
+					module.KeptTopic(),
 					1,
 					true,
 					kept,
 				); tok.Wait() &&
 					tok.Error() != nil {
-					log.Printf("publish %s: %v", m.KeptTopic(), tok.Error())
+					log.Printf("publish %s: %v", module.KeptTopic(), tok.Error())
 				}
 			}
 
@@ -288,15 +290,15 @@ func subscribe(client mqtt.Client, modules []*devicesim.Module) {
 			if wait := time.Until(
 				sendAt,
 			); wait > 0 { // the pattern answers after the command expired
-				time.AfterFunc(wait, func() { publish(client, m.AckTopic(), raw) })
+				time.AfterFunc(wait, func() { publish(client, module.AckTopic(), raw) })
 
 				return
 			}
 
-			publish(client, m.AckTopic(), raw)
+			publish(client, module.AckTopic(), raw)
 		})
 		if tok.Wait() && tok.Error() != nil {
-			log.Printf("subscribe %s: %v", m.CommandTopic(), tok.Error())
+			log.Printf("subscribe %s: %v", module.CommandTopic(), tok.Error())
 		}
 	}
 }

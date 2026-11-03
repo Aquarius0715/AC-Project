@@ -19,16 +19,16 @@ func TestStatusMapping(t *testing.T) {
 		Validation: 422, Unauthenticated: 401, Forbidden: 403, NotFound: 404, Conflict: 409,
 		Offline: 409, Timeout: 504, RateLimited: 429, Unavailable: 503,
 	}
-	for _, c := range Codes {
-		if got := E(c, "k").HTTPStatus(); got != want[c] {
-			t.Errorf("%s: got %d want %d", c, got, want[c])
+	for _, code := range Codes {
+		if got := E(code, "k").HTTPStatus(); got != want[code] {
+			t.Errorf("%s: got %d want %d", code, got, want[code])
 		}
 
 		if got := E(
-			c,
+			code,
 			"k",
-		).StatusCode(); got != want[c] { // what Echo's error handler and the request log read
-			t.Errorf("%s: StatusCode %d want %d", c, got, want[c])
+		).StatusCode(); got != want[code] { // what Echo's error handler and the request log read
+			t.Errorf("%s: StatusCode %d want %d", code, got, want[code])
 		}
 	}
 }
@@ -356,14 +356,14 @@ func TestFrom(t *testing.T) {
 }
 
 func TestFieldsAndError(t *testing.T) {
-	e := Fields(map[string]string{"name": "error.required"})
-	if e.Code != Validation || e.FieldErrors["name"] != "error.required" ||
-		e.HTTPStatus() != http.StatusUnprocessableEntity {
+	domainError := Fields(map[string]string{"name": "error.required"})
+	if domainError.Code != Validation || domainError.FieldErrors["name"] != "error.required" ||
+		domainError.HTTPStatus() != http.StatusUnprocessableEntity {
 		t.Fatal("Fields")
 	}
 
-	if e.Error() != "VALIDATION: error.validation" {
-		t.Fatal(e.Error())
+	if domainError.Error() != "VALIDATION: error.validation" {
+		t.Fatal(domainError.Error())
 	}
 }
 

@@ -48,12 +48,12 @@ func RegisterQueries(r *ops.Registry) {
 
 func connectionFault(
 	ctx context.Context,
-	c *ops.Call,
-	in *ConnectionFaultInput,
+	call *ops.Call,
+	input *ConnectionFaultInput,
 ) (ConnectionFault, error) {
 	var out ConnectionFault
 
-	err := c.Tx.QueryRow(ctx, `SELECT binding_id FROM devices.devices WHERE id = $1`, in.DeviceID).
+	err := call.Tx.QueryRow(ctx, `SELECT binding_id FROM devices.devices WHERE id = $1`, input.DeviceID).
 		Scan(&out.BindingID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return out, apperr.E(apperr.NotFound, "error.notFound")
@@ -63,9 +63,9 @@ func connectionFault(
 		return out, apperr.Wrap(err, "select devices.devices")
 	}
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) FROM devices.device_events WHERE device_id = $1 AND
+	scanErr := call.Tx.QueryRow(ctx, `SELECT COALESCE(max(sequence), 0) FROM devices.device_events WHERE device_id = $1 AND
 		binding_id IS NOT DISTINCT FROM $2
-		AND axis = 'connection'`, in.DeviceID, out.BindingID).
+		AND axis = 'connection'`, input.DeviceID, out.BindingID).
 		Scan(&out.Sequence)
 	if scanErr != nil {
 		return out, apperr.Wrap(scanErr, "select devices.device_events")
@@ -76,9 +76,10 @@ func connectionFault(
 		restored *time.Time
 	)
 
-	err = c.Tx.QueryRow(ctx, `SELECT id, restored_at FROM devices.device_events WHERE device_id = $1 AND binding_id IS NOT
+	err = call.Tx.QueryRow(ctx, `SELECT id, restored_at FROM devices.device_events WHERE device_id = $1 AND binding_id IS
+		NOT
 		DISTINCT FROM $2
-		AND axis = 'connection' AND event_type <> 'restored' ORDER BY sequence DESC LIMIT 1`, in.DeviceID, out.BindingID).
+		AND axis = 'connection' AND event_type <> 'restored' ORDER BY sequence DESC LIMIT 1`, input.DeviceID, out.BindingID).
 		Scan(&id, &restored)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):

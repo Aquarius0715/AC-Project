@@ -14,7 +14,7 @@ import (
 func TestOIDCVerifier(t *testing.T) {
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)
 	other, _ := rsa.GenerateKey(rand.Reader, 2048)
-	v := &OIDCVerifier{
+	oidcVerifier := &OIDCVerifier{
 		Issuer: "http://localhost:8081/realms/ac", Audiences: []string{"ac-web", "ac-admin-web"},
 		Keyfunc: func(*jwt.Token) (any, error) { return &key.PublicKey, nil }, AdminClient: "",
 	}
@@ -26,7 +26,7 @@ func TestOIDCVerifier(t *testing.T) {
 
 	base := func() jwt.MapClaims {
 		return jwt.MapClaims{
-			"iss": v.Issuer,
+			"iss": oidcVerifier.Issuer,
 			"sub": "user-1",
 			"azp": "ac-web",
 			"typ": "Bearer",
@@ -34,27 +34,28 @@ func TestOIDCVerifier(t *testing.T) {
 		}
 	}
 
-	id, err := v.Verify(
+	identity, err := oidcVerifier.Verify(
 		context.Background(),
 		sign(key, base()),
 	)
-	if err != nil || id.Subject != "user-1" || !id.SignedIn.IsZero() || id.Client != "ac-web" ||
-		id.AdminApp {
-		t.Fatalf("valid token: %+v %v", id, err)
+	if err != nil || identity.Subject != "user-1" || !identity.SignedIn.IsZero() ||
+		identity.Client != "ac-web" ||
+		identity.AdminApp {
+		t.Fatalf("valid token: %+v %v", identity, err)
 	}
 	// IR510: the token names its app; HQ's app is the admin client (Keycloak azp, Cognito client_id)
-	v.AdminClient = "ac-admin-web"
+	oidcVerifier.AdminClient = "ac-admin-web"
 
-	for name, c := range map[string]jwt.MapClaims{
+	for name, mapClaims := range map[string]jwt.MapClaims{
 		"azp":       {"azp": "ac-admin-web"},
 		"client_id": {"client_id": "ac-admin-web", "token_use": "access"},
 	} {
 		claims := base()
 		delete(claims, "azp")
 
-		maps.Copy(claims, c)
+		maps.Copy(claims, mapClaims)
 
-		id, err := v.Verify(
+		id, err := oidcVerifier.Verify(
 			context.Background(),
 			sign(key, claims),
 		)
@@ -78,24 +79,24 @@ func TestOIDCVerifier(t *testing.T) {
 
 	c["auth_time"] = signedIn.Unix()
 
-	id, err = v.Verify(
+	identity, err = oidcVerifier.Verify(
 		context.Background(),
 		sign(key, c),
 	)
 	if err != nil ||
-		!id.SignedIn.Equal(signedIn) {
-		t.Fatalf("auth_time: %+v %v", id, err)
+		!identity.SignedIn.Equal(signedIn) {
+		t.Fatalf("auth_time: %+v %v", identity, err)
 	}
 
 	c["auth_time"] = "yesterday"
 
-	id, err = v.Verify(
+	identity, err = oidcVerifier.Verify(
 		context.Background(),
 		sign(key, c),
 	)
 	if err != nil ||
-		!id.SignedIn.IsZero() {
-		t.Fatalf("a non-numeric auth_time gives no sign-in time: %+v %v", id, err)
+		!identity.SignedIn.IsZero() {
+		t.Fatalf("a non-numeric auth_time gives no sign-in time: %+v %v", identity, err)
 	}
 
 	c = base()
@@ -103,7 +104,7 @@ func TestOIDCVerifier(t *testing.T) {
 
 	c["aud"] = "ac-admin-web"
 
-	_, err = v.Verify(context.Background(), sign(key, c))
+	_, err = oidcVerifier.Verify(context.Background(), sign(key, c))
 	if err != nil {
 		t.Fatalf("aud claim: %v", err)
 	}
@@ -113,7 +114,7 @@ func TestOIDCVerifier(t *testing.T) {
 
 	c["token_use"] = "access"
 
-	_, err = v.Verify(context.Background(), sign(key, c))
+	_, err = oidcVerifier.Verify(context.Background(), sign(key, c))
 	if err != nil {
 		t.Fatalf("Cognito access token: %v", err)
 	}
@@ -153,20 +154,20 @@ func TestOIDCVerifier(t *testing.T) {
 
 	bad["no token type"] = c
 	for name, cl := range bad {
-		_, err := v.Verify(context.Background(), sign(key, cl))
+		_, err := oidcVerifier.Verify(context.Background(), sign(key, cl))
 		if err == nil {
 			t.Errorf("%s must fail", name)
 		}
 	}
 
-	_, err = v.Verify(context.Background(), sign(other, base()))
+	_, err = oidcVerifier.Verify(context.Background(), sign(other, base()))
 	if err == nil {
 		t.Error("wrong key must fail")
 	}
 
 	hs, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, base()).SignedString([]byte("secret"))
 
-	_, err = v.Verify(context.Background(), hs)
+	_, err = oidcVerifier.Verify(context.Background(), hs)
 	if err == nil {
 		t.Error("HS256 must be rejected")
 	}

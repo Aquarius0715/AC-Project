@@ -36,7 +36,7 @@ func conflict(key string) error { return apperr.E(apperr.Conflict, key) }
 // versionedUpdate turns "no row updated" into NOT_FOUND (target missing / out of scope) or CONFLICT (version moved).
 func versionedUpdate(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	table string,
 	id uuid.UUID,
 	err error,
@@ -47,7 +47,7 @@ func versionedUpdate(
 
 	var exists bool
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1)", id).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1)", id).
 		Scan(&exists)
 	if scanErr != nil {
 		return apperr.Wrap(scanErr, "select exists")
@@ -81,23 +81,23 @@ const propertyCols = `id, tenant_id, version, created_at, updated_at, customer_o
 	`access_instructions, archived`
 
 func scanProperty(row pgx.Row) (Property, error) {
-	var p Property
+	var property Property
 
 	err := row.Scan(
-		&p.ID,
-		&p.TenantID,
-		&p.Version,
-		&p.CreatedAt,
-		&p.UpdatedAt,
-		&p.CustomerOrgID,
-		&p.Kind,
-		&p.Name,
-		&p.Address,
-		&p.AccessInstructions,
-		&p.Archived,
+		&property.ID,
+		&property.TenantID,
+		&property.Version,
+		&property.CreatedAt,
+		&property.UpdatedAt,
+		&property.CustomerOrgID,
+		&property.Kind,
+		&property.Name,
+		&property.Address,
+		&property.AccessInstructions,
+		&property.Archived,
 	)
 
-	return p, apperr.Wrap(err, "scan (scanProperty)")
+	return property, apperr.Wrap(err, "scan (scanProperty)")
 }
 
 // PropertySave is properties.save input.
@@ -112,30 +112,30 @@ type PropertySave struct {
 
 // Validate implements ops.Validator (DD-A02 field table).
 func (in *PropertySave) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 
 	in.Name = strings.TrimSpace(in.Name) // 1–120 characters after trim, as in locations.rename
 	if in.CustomerOrgID == uuid.Nil {
-		fe["customerOrgId"] = "error.required"
+		fieldErrs["customerOrgId"] = "error.required"
 	}
 
 	if in.Kind != "home" && in.Kind != "office" {
-		fe["kind"] = "error.invalid"
+		fieldErrs["kind"] = "error.invalid"
 	}
 
 	if !strLen(in.Name, 1, 120) {
-		fe["name"] = "error.length"
+		fieldErrs["name"] = "error.length"
 	}
 
 	if in.Address != nil && !strLen(*in.Address, 0, 500) {
-		fe["address"] = "error.length"
+		fieldErrs["address"] = "error.length"
 	}
 
 	if in.AccessInstructions != nil && !strLen(*in.AccessInstructions, 0, 1000) {
-		fe["accessInstructions"] = "error.length"
+		fieldErrs["accessInstructions"] = "error.length"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 func (m *Module) customerActive(ctx context.Context, c *ops.Call, org uuid.UUID) error {
@@ -229,40 +229,40 @@ func siblingName(ctx context.Context, c *ops.Call, kind string, id uuid.UUID) er
 //	@Router			/v1/properties [post]
 func (m *Module) propertiesSave(
 	ctx context.Context,
-	c *ops.Call,
-	in *PropertySave,
+	call *ops.Call,
+	input *PropertySave,
 ) (Property, error) {
-	if in.ID == nil {
-		err := m.customerActive(ctx, c, in.CustomerOrgID)
+	if input.ID == nil {
+		err := m.customerActive(ctx, call, input.CustomerOrgID)
 		if err != nil {
 			return Property{}, err
 		}
 
 		id := uuid.Must(uuid.NewV7())
 
-		p, err := scanProperty(
-			c.Tx.QueryRow(
+		property, err := scanProperty(
+			call.Tx.QueryRow(
 				ctx,
 				`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, access_instructions)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6) RETURNING `+propertyCols,
 				id,
-				in.CustomerOrgID,
-				in.Kind,
-				in.Name,
-				in.Address,
-				in.AccessInstructions,
+				input.CustomerOrgID,
+				input.Kind,
+				input.Name,
+				input.Address,
+				input.AccessInstructions,
 			),
 		)
 		if err != nil {
 			return Property{}, dupSibling(err)
 		}
 
-		siblingNameErr := siblingName(ctx, c, "property", id)
+		siblingNameErr := siblingName(ctx, call, "property", id)
 		if siblingNameErr != nil {
 			return Property{}, siblingNameErr
 		}
 
-		c.Emit(
+		call.Emit(
 			ops.Event{
 				AggregateType: "property",
 				AggregateID:   id,
@@ -270,12 +270,12 @@ func (m *Module) propertiesSave(
 				Payload:       nil,
 			},
 		)
-		c.Audit(
+		call.Audit(
 			ops.AuditEntry{
 				Action:          "properties.save",
 				TargetKind:      "property",
 				TargetID:        id.String(),
-				NextVersion:     &p.Version,
+				NextVersion:     &property.Version,
 				PreviousVersion: nil,
 				Reason:          "",
 				Result:          "",
@@ -284,34 +284,34 @@ func (m *Module) propertiesSave(
 			},
 		)
 
-		return p, nil
+		return property, nil
 	}
 
 	p, err := scanProperty(
-		c.Tx.QueryRow(
+		call.Tx.QueryRow(
 			ctx,
 			`UPDATE assets.properties SET kind=$3, name=$4, address=$5, access_instructions=$6,
 		version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 AND version = $2 AND customer_org_id = $7 AND NOT archived RETURNING `+propertyCols,
-			*in.ID,
-			*c.ExpectedVersion,
-			in.Kind,
-			in.Name,
-			in.Address,
-			in.AccessInstructions,
-			in.CustomerOrgID,
+			*input.ID,
+			*call.ExpectedVersion,
+			input.Kind,
+			input.Name,
+			input.Address,
+			input.AccessInstructions,
+			input.CustomerOrgID,
 		),
 	)
 	if err != nil {
-		return Property{}, versionedUpdate(ctx, c, "assets.properties", *in.ID, err)
+		return Property{}, versionedUpdate(ctx, call, "assets.properties", *input.ID, err)
 	}
 
-	siblingNameErr := siblingName(ctx, c, "property", p.ID)
+	siblingNameErr := siblingName(ctx, call, "property", p.ID)
 	if siblingNameErr != nil {
 		return Property{}, siblingNameErr
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "property",
 			AggregateID:   p.ID,
@@ -319,12 +319,12 @@ func (m *Module) propertiesSave(
 			Payload:       nil,
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "properties.save",
 			TargetKind:      "property",
 			TargetID:        p.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &p.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
@@ -351,22 +351,22 @@ type Space struct {
 const spaceCols = `id, tenant_id, version, created_at, updated_at, property_id, parent_space_id, kind, name, archived`
 
 func scanSpace(row pgx.Row) (Space, error) {
-	var s Space
+	var space Space
 
 	err := row.Scan(
-		&s.ID,
-		&s.TenantID,
-		&s.Version,
-		&s.CreatedAt,
-		&s.UpdatedAt,
-		&s.PropertyID,
-		&s.ParentSpaceID,
-		&s.Kind,
-		&s.Name,
-		&s.Archived,
+		&space.ID,
+		&space.TenantID,
+		&space.Version,
+		&space.CreatedAt,
+		&space.UpdatedAt,
+		&space.PropertyID,
+		&space.ParentSpaceID,
+		&space.Kind,
+		&space.Name,
+		&space.Archived,
 	)
 
-	return s, apperr.Wrap(err, "scan (scanSpace)")
+	return space, apperr.Wrap(err, "scan (scanSpace)")
 }
 
 // SpaceSave is spaces.save input.
@@ -382,26 +382,26 @@ var spaceKinds = map[string]bool{"area": true, "floor": true, "room": true, "spa
 
 // Validate implements ops.Validator.
 func (in *SpaceSave) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 
 	in.Name = strings.TrimSpace(in.Name)
 	if in.PropertyID == uuid.Nil {
-		fe["propertyId"] = "error.required"
+		fieldErrs["propertyId"] = "error.required"
 	}
 
 	if !spaceKinds[in.Kind] {
-		fe["kind"] = "error.invalid"
+		fieldErrs["kind"] = "error.invalid"
 	}
 
 	if !strLen(in.Name, 1, 120) {
-		fe["name"] = "error.length"
+		fieldErrs["name"] = "error.length"
 	}
 
 	if in.ID != nil && in.ParentSpaceID != nil && *in.ID == *in.ParentSpaceID {
-		fe["parentSpaceId"] = "error.cycle"
+		fieldErrs["parentSpaceId"] = "error.cycle"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // activeProperty requires an active property, read with a share lock: an archive of it waits, or is waited for and seen
@@ -420,7 +420,7 @@ func (m *Module) activeProperty(ctx context.Context, c *ops.Call, id uuid.UUID) 
 // of its own descendants (no hierarchy cycles).
 func (m *Module) checkParent(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	self *uuid.UUID,
 	property uuid.UUID,
 	parent *uuid.UUID,
@@ -429,7 +429,7 @@ func (m *Module) checkParent(
 		return nil
 	}
 
-	err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived FOR
+	err := call.Tx.QueryRow(ctx, `SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived FOR
 		SHARE`, *parent, property).
 		Scan(new(int))
 
@@ -448,7 +448,7 @@ func (m *Module) checkParent(
 
 	var cycle bool
 
-	scanErr := c.Tx.QueryRow(ctx, `WITH RECURSIVE d AS (SELECT id FROM assets.spaces WHERE parent_space_id = $1
+	scanErr := call.Tx.QueryRow(ctx, `WITH RECURSIVE d AS (SELECT id FROM assets.spaces WHERE parent_space_id = $1
 		UNION ALL SELECT s.id FROM assets.spaces s JOIN d ON s.parent_space_id = d.id) SELECT EXISTS (SELECT 1 FROM d WHERE id
 		= $2)`, *self, *parent).
 		Scan(&cycle)
@@ -487,18 +487,18 @@ func (m *Module) checkParent(
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/spaces [post]
-func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Space, error) {
-	err := m.activeProperty(ctx, c, in.PropertyID)
+func (m *Module) spacesSave(ctx context.Context, c *ops.Call, input *SpaceSave) (Space, error) {
+	err := m.activeProperty(ctx, c, input.PropertyID)
 	if err != nil {
 		return Space{}, err
 	}
 
-	err = m.checkParent(ctx, c, in.ID, in.PropertyID, in.ParentSpaceID)
+	err = m.checkParent(ctx, c, input.ID, input.PropertyID, input.ParentSpaceID)
 	if err != nil {
 		return Space{}, err
 	}
 
-	if in.ID == nil {
+	if input.ID == nil {
 		id := uuid.Must(uuid.NewV7())
 
 		s, err := scanSpace(
@@ -507,10 +507,10 @@ func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Sp
 				`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5) RETURNING `+spaceCols,
 				id,
-				in.PropertyID,
-				in.ParentSpaceID,
-				in.Kind,
-				in.Name,
+				input.PropertyID,
+				input.ParentSpaceID,
+				input.Kind,
+				input.Name,
 			),
 		)
 		if err != nil {
@@ -547,43 +547,48 @@ func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Sp
 		return s, nil
 	}
 
-	s, err := scanSpace(
+	space, err := scanSpace(
 		c.Tx.QueryRow(
 			ctx,
 			`UPDATE assets.spaces SET parent_space_id=$3, kind=$4, name=$5, version = version + 1, updated_at =
 				platform.app_now()
 		WHERE id = $1 AND version = $2 AND property_id = $6 AND NOT archived RETURNING `+spaceCols,
-			*in.ID,
+			*input.ID,
 			*c.ExpectedVersion,
-			in.ParentSpaceID,
-			in.Kind,
-			in.Name,
-			in.PropertyID,
+			input.ParentSpaceID,
+			input.Kind,
+			input.Name,
+			input.PropertyID,
 		),
 	)
 	if err != nil {
-		return Space{}, versionedUpdate(ctx, c, "assets.spaces", *in.ID, err)
+		return Space{}, versionedUpdate(ctx, c, "assets.spaces", *input.ID, err)
 	}
 
-	siblingNameErr := siblingName(ctx, c, "space", s.ID)
+	siblingNameErr := siblingName(ctx, c, "space", space.ID)
 	if siblingNameErr != nil {
 		return Space{}, siblingNameErr
 	}
 
 	c.Emit(
-		ops.Event{AggregateType: "space", AggregateID: s.ID, Type: "LocationChanged", Payload: nil},
+		ops.Event{
+			AggregateType: "space",
+			AggregateID:   space.ID,
+			Type:          "LocationChanged",
+			Payload:       nil,
+		},
 	)
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "spaces.save",
 			TargetKind:      "space",
-			TargetID:        s.ID.String(),
+			TargetID:        space.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &s.Version, Reason: "", Result: "", Before: nil, After: nil,
+			NextVersion:     &space.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return s, nil
+	return space, nil
 }
 
 // ---- units ----
@@ -610,27 +615,27 @@ var scopes = map[string]bool{"indoor": true, "outdoor": true, "electrical": true
 
 // Validate implements ops.Validator.
 func (in *UnitSave) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 
 	in.DisplayName = strings.TrimSpace(in.DisplayName)
 	if in.CustomerOrgID == uuid.Nil {
-		fe["customerOrgId"] = "error.required"
+		fieldErrs["customerOrgId"] = "error.required"
 	}
 
 	if in.PropertyID == uuid.Nil {
-		fe["propertyId"] = "error.required"
+		fieldErrs["propertyId"] = "error.required"
 	}
 
 	if in.ModelID == uuid.Nil {
-		fe["modelId"] = "error.required"
+		fieldErrs["modelId"] = "error.required"
 	}
 
 	if in.Type != "split" {
-		fe["type"] = "error.invalid"
+		fieldErrs["type"] = "error.invalid"
 	}
 
 	if !strLen(in.DisplayName, 1, 120) {
-		fe["displayName"] = "error.length"
+		fieldErrs["displayName"] = "error.length"
 	}
 
 	if len(in.WarrantyEndsAt) > 0 {
@@ -640,9 +645,9 @@ func (in *UnitSave) Validate() map[string]string {
 
 			err := json.Unmarshal(in.WarrantyEndsAt, &t)
 			if err != nil {
-				fe["warrantyEndsAt"] = "error.invalid"
+				fieldErrs["warrantyEndsAt"] = "error.invalid"
 			} else if in.InstalledAt != nil && t.Before(*in.InstalledAt) {
-				fe["warrantyEndsAt"] = "error.range" // a warranty cannot end before the installation
+				fieldErrs["warrantyEndsAt"] = "error.range" // a warranty cannot end before the installation
 			} else {
 				in.warranty = &t
 			}
@@ -652,21 +657,21 @@ func (in *UnitSave) Validate() map[string]string {
 	seen := map[string]bool{}
 	for _, s := range in.ServiceScope {
 		if !scopes[s] || seen[s] {
-			fe["serviceScope"] = "error.invalid"
+			fieldErrs["serviceScope"] = "error.invalid"
 		}
 
 		seen[s] = true
 	}
 
 	if len(in.ServiceScope) == 0 {
-		fe["serviceScope"] = "error.required"
+		fieldErrs["serviceScope"] = "error.required"
 	}
 
 	if in.ChangeReason != nil && !strLen(*in.ChangeReason, 1, 1000) {
-		fe["changeReason"] = "error.length"
+		fieldErrs["changeReason"] = "error.length"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // unitsSave serves units.save.
@@ -701,15 +706,15 @@ func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (ACUn
 }
 
 // unitsSaveUnit is unitsSave answering the unit with its summary fields.
-func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (Unit, error) {
-	if in.InstalledAt != nil && in.InstalledAt.After(c.Now) {
+func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, input *UnitSave) (Unit, error) {
+	if input.InstalledAt != nil && input.InstalledAt.After(c.Now) {
 		return Unit{}, apperr.Fields(map[string]string{"installedAt": "error.future"})
 	}
 
 	var propOrg uuid.UUID
 	// the property and the space are read with a share lock: their archive waits, or is waited for and seen (IR478)
 	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.properties WHERE id = $1 AND NOT archived FOR
-		SHARE`, in.PropertyID).
+		SHARE`, input.PropertyID).
 		Scan(&propOrg)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Unit{}, notFound()
@@ -719,13 +724,13 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		return Unit{}, apperr.Wrap(err, "select assets.properties")
 	}
 
-	if propOrg != in.CustomerOrgID {
+	if propOrg != input.CustomerOrgID {
 		return Unit{}, apperr.Fields(map[string]string{"propertyId": "error.otherCustomer"})
 	}
 
-	if in.SpaceID != nil {
+	if input.SpaceID != nil {
 		err := c.Tx.QueryRow(ctx, `SELECT 1 FROM assets.spaces WHERE id = $1 AND property_id = $2 AND NOT archived FOR
-			SHARE`, *in.SpaceID, in.PropertyID).
+			SHARE`, *input.SpaceID, input.PropertyID).
 			Scan(new(int))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Unit{}, apperr.Fields(map[string]string{"spaceId": "error.otherProperty"})
@@ -736,7 +741,7 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		}
 	}
 
-	capVer, ok, err := m.Models.CurrentVersion(ctx, c, in.ModelID)
+	capVer, ok, err := m.Models.CurrentVersion(ctx, c, input.ModelID)
 	if err != nil {
 		return Unit{}, apperr.Wrap(err, "assets.Models.CurrentVersion")
 	}
@@ -745,8 +750,8 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		return Unit{}, apperr.Fields(map[string]string{"modelId": "error.unknownModel"})
 	}
 
-	if in.ID == nil {
-		err := m.customerActive(ctx, c, in.CustomerOrgID)
+	if input.ID == nil {
+		err := m.customerActive(ctx, c, input.CustomerOrgID)
 		if err != nil {
 			return Unit{}, err
 		}
@@ -759,16 +764,16 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 				installed_at, service_scope, capability_version, warranty_ends_at)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
 			id,
-			in.CustomerOrgID,
-			in.PropertyID,
-			in.SpaceID,
-			in.DisplayName,
-			in.ModelID,
-			in.Type,
-			in.InstalledAt,
-			in.ServiceScope,
+			input.CustomerOrgID,
+			input.PropertyID,
+			input.SpaceID,
+			input.DisplayName,
+			input.ModelID,
+			input.Type,
+			input.InstalledAt,
+			input.ServiceScope,
 			capVer,
-			in.warranty,
+			input.warranty,
 		)
 		if err != nil {
 			return Unit{}, apperr.Wrap(err, "insert assets.units")
@@ -811,7 +816,7 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 
 	err = c.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, installed_at, service_scope,
 		warranty_ends_at FROM assets.units WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
-		*in.ID, in.CustomerOrgID).
+		*input.ID, input.CustomerOrgID).
 		Scan(&curProp, &curSpace, &curName, &curModel, &curInstalled, &curScope, &curWarranty)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Unit{}, notFound()
@@ -821,24 +826,24 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		return Unit{}, apperr.Wrap(err, "select assets.units")
 	}
 
-	moved := curProp != in.PropertyID || (curSpace == nil) != (in.SpaceID == nil) ||
-		(curSpace != nil && in.SpaceID != nil && *curSpace != *in.SpaceID)
+	moved := curProp != input.PropertyID || (curSpace == nil) != (input.SpaceID == nil) ||
+		(curSpace != nil && input.SpaceID != nil && *curSpace != *input.SpaceID)
 	reason := ""
 
 	if moved {
-		if in.ChangeReason == nil {
+		if input.ChangeReason == nil {
 			return Unit{}, apperr.Fields(map[string]string{"changeReason": "error.required"})
 		}
 
-		reason = *in.ChangeReason
+		reason = *input.ChangeReason
 	}
 
 	warranty := curWarranty
-	if in.warrantySet {
-		warranty = in.warranty
+	if input.warrantySet {
+		warranty = input.warranty
 	}
 
-	if warranty != nil && in.InstalledAt != nil && warranty.Before(*in.InstalledAt) {
+	if warranty != nil && input.InstalledAt != nil && warranty.Before(*input.InstalledAt) {
 		return Unit{}, apperr.Fields(map[string]string{"warrantyEndsAt": "error.range"})
 	}
 
@@ -848,19 +853,22 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		installed_at=$7, service_scope=$8,
 		capability_version=$9, warranty_ends_at=$10, version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 AND version = $2 AND NOT archived RETURNING version`,
-		*in.ID, *c.ExpectedVersion, in.PropertyID, in.SpaceID, in.DisplayName, in.ModelID, in.InstalledAt, in.ServiceScope,
+		*input.ID, *c.ExpectedVersion, input.PropertyID, input.SpaceID, input.DisplayName, input.ModelID, input.InstalledAt,
+		input.ServiceScope,
 		capVer, warranty).
 		Scan(&v)
 	if err != nil {
-		return Unit{}, versionedUpdate(ctx, c, "assets.units", *in.ID, err)
+		return Unit{}, versionedUpdate(ctx, c, "assets.units", *input.ID, err)
 	}
 
-	siblingNameErr := siblingName(ctx, c, "unit", *in.ID)
+	siblingNameErr := siblingName(ctx, c, "unit", *input.ID)
 	if siblingNameErr != nil {
 		return Unit{}, siblingNameErr
 	}
 
-	c.Emit(ops.Event{AggregateType: "unit", AggregateID: *in.ID, Type: "UnitChanged", Payload: nil})
+	c.Emit(
+		ops.Event{AggregateType: "unit", AggregateID: *input.ID, Type: "UnitChanged", Payload: nil},
+	)
 	// before/after keep the original location and values in the history (DD-A02 step 3)
 	before, after := ops.Changes(
 		map[string]any{
@@ -873,12 +881,12 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 			"warrantyEndsAt": curWarranty,
 		},
 		map[string]any{
-			"propertyId":     in.PropertyID,
-			"spaceId":        in.SpaceID,
-			"displayName":    in.DisplayName,
-			"modelId":        in.ModelID,
-			"installedAt":    in.InstalledAt,
-			"serviceScope":   in.ServiceScope,
+			"propertyId":     input.PropertyID,
+			"spaceId":        input.SpaceID,
+			"displayName":    input.DisplayName,
+			"modelId":        input.ModelID,
+			"installedAt":    input.InstalledAt,
+			"serviceScope":   input.ServiceScope,
 			"warrantyEndsAt": warranty,
 		},
 	)
@@ -886,7 +894,7 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		ops.AuditEntry{
 			Action:          "units.save",
 			TargetKind:      "unit",
-			TargetID:        in.ID.String(),
+			TargetID:        input.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &v,
 			Reason:          reason,
@@ -895,7 +903,7 @@ func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (
 		},
 	)
 
-	return m.load(ctx, c, *in.ID)
+	return m.load(ctx, c, *input.ID)
 }
 
 func (m *Module) load(ctx context.Context, c *ops.Call, id uuid.UUID) (Unit, error) {
@@ -921,16 +929,16 @@ type ArchiveInput struct {
 
 // Validate implements ops.Validator.
 func (in *ArchiveInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.ID == uuid.Nil {
-		fe["id"] = "error.required"
+		fieldErrs["id"] = "error.required"
 	}
 
 	if !strLen(in.Reason, 1, 1000) {
-		fe["reason"] = "error.length"
+		fieldErrs["reason"] = "error.length"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // ArchivedResource is ArchivedResource of service-contracts.ts.
@@ -968,8 +976,8 @@ type ArchivedResource struct {
 //	@Router			/v1/properties/{id}/archive [post]
 func (m *Module) propertiesArchive(
 	ctx context.Context,
-	c *ops.Call,
-	in *ArchiveInput,
+	call *ops.Call,
+	input *ArchiveInput,
 ) (ArchivedResource, error) {
 	return m.archive(
 		"property",
@@ -978,8 +986,8 @@ func (m *Module) propertiesArchive(
 			assets.spaces WHERE property_id = $1 AND NOT archived)`,
 	)(
 		ctx,
-		c,
-		in,
+		call,
+		input,
 	)
 }
 
@@ -1011,8 +1019,8 @@ func (m *Module) propertiesArchive(
 //	@Router			/v1/spaces/{id}/archive [post]
 func (m *Module) spacesArchive(
 	ctx context.Context,
-	c *ops.Call,
-	in *ArchiveInput,
+	call *ops.Call,
+	input *ArchiveInput,
 ) (ArchivedResource, error) {
 	return m.archive(
 		"space",
@@ -1021,21 +1029,21 @@ func (m *Module) spacesArchive(
 			assets.spaces WHERE parent_space_id = $1 AND NOT archived)`,
 	)(
 		ctx,
-		c,
-		in,
+		call,
+		input,
 	)
 }
 
 func (m *Module) archive(
 	kind, table, busySQL string,
 ) func(context.Context, *ops.Call, *ArchiveInput) (ArchivedResource, error) {
-	return func(ctx context.Context, c *ops.Call, in *ArchiveInput) (ArchivedResource, error) {
+	return func(ctx context.Context, c *ops.Call, input *ArchiveInput) (ArchivedResource, error) {
 		// the row is locked before the check for active children: a unit or space added at the same moment reads its
 		// parent with a share lock, so one of the two waits and then sees the other (IR478)
 		_, execErr := c.Tx.Exec(
 			ctx,
 			"SELECT 1 FROM "+table+" WHERE id = $1 FOR UPDATE",
-			in.ID,
+			input.ID,
 		)
 		if execErr != nil {
 			return ArchivedResource{}, apperr.Wrap(execErr, "select (archive)")
@@ -1044,7 +1052,7 @@ func (m *Module) archive(
 		if busySQL != "" {
 			var busy bool
 
-			err := c.Tx.QueryRow(ctx, busySQL, in.ID).Scan(&busy)
+			err := c.Tx.QueryRow(ctx, busySQL, input.ID).Scan(&busy)
 			if err != nil {
 				return ArchivedResource{}, apperr.Wrap(err, "queryrow (archive)")
 			}
@@ -1058,10 +1066,10 @@ func (m *Module) archive(
 
 		err := c.Tx.QueryRow(ctx, "UPDATE "+table+` SET archived = true, version = version + 1, updated_at =
 			platform.app_now()
-			WHERE id = $1 AND version = $2 AND NOT archived RETURNING version`, in.ID, *c.ExpectedVersion).
+			WHERE id = $1 AND version = $2 AND NOT archived RETURNING version`, input.ID, *c.ExpectedVersion).
 			Scan(&v)
 		if err != nil {
-			return ArchivedResource{}, versionedUpdate(ctx, c, table, in.ID, err)
+			return ArchivedResource{}, versionedUpdate(ctx, c, table, input.ID, err)
 		}
 
 		typ := "LocationChanged"
@@ -1069,19 +1077,19 @@ func (m *Module) archive(
 			typ = "UnitChanged"
 		}
 
-		c.Emit(ops.Event{AggregateType: kind, AggregateID: in.ID, Type: typ, Payload: nil})
+		c.Emit(ops.Event{AggregateType: kind, AggregateID: input.ID, Type: typ, Payload: nil})
 		c.Audit(
 			ops.AuditEntry{
 				Action:          kind + "s.archive",
 				TargetKind:      kind,
-				TargetID:        in.ID.String(),
+				TargetID:        input.ID.String(),
 				PreviousVersion: c.ExpectedVersion,
 				NextVersion:     &v,
-				Reason:          in.Reason, Result: "", Before: nil, After: nil,
+				Reason:          input.Reason, Result: "", Before: nil, After: nil,
 			},
 		)
 
-		return ArchivedResource{ID: in.ID, Version: v, Archived: true}, nil
+		return ArchivedResource{ID: input.ID, Version: v, Archived: true}, nil
 	}
 }
 
@@ -1089,11 +1097,11 @@ func (m *Module) archive(
 // capabilities.save, DD-A04 step 3); returns the number of units changed.
 func (m *Module) MoveToCapabilityVersion(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	modelID uuid.UUID,
 	version int,
 ) (int, error) {
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`UPDATE assets.units SET capability_version = $2, version = version + 1, updated_at = platform.app_now()
 		WHERE model_id = $1 AND capability_version <> $2 RETURNING id`,
@@ -1115,7 +1123,9 @@ func (m *Module) MoveToCapabilityVersion(
 			return n, apperr.Wrap(err, "update assets.units")
 		}
 
-		c.Emit(ops.Event{AggregateType: "unit", AggregateID: id, Type: "UnitChanged", Payload: nil})
+		call.Emit(
+			ops.Event{AggregateType: "unit", AggregateID: id, Type: "UnitChanged", Payload: nil},
+		)
 
 		n++
 	}
@@ -1129,16 +1139,16 @@ func (m *Module) UnitInfo(
 	c *ops.Call,
 	unit uuid.UUID,
 ) (devices.UnitInfo, bool, error) {
-	var u devices.UnitInfo
+	var unitInfo devices.UnitInfo
 
 	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id, property_id, model_id, capability_version FROM assets.units WHERE id
 		= $1 AND NOT archived`, unit).
-		Scan(&u.OrgID, &u.PropertyID, &u.ModelID, &u.CapabilityVersion)
+		Scan(&unitInfo.OrgID, &unitInfo.PropertyID, &unitInfo.ModelID, &unitInfo.CapabilityVersion)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return u, false, nil
+		return unitInfo, false, nil
 	}
 
-	return u, err == nil, apperr.Wrap(err, "select assets.units")
+	return unitInfo, err == nil, apperr.Wrap(err, "select assets.units")
 }
 
 // unitsArchive applies D05: an active job, device binding or operation, restriction, command / run or unexpired
@@ -1170,11 +1180,11 @@ func (m *Module) UnitInfo(
 //	@Router			/v1/units/{id}/archive [post]
 func (m *Module) unitsArchive(
 	ctx context.Context,
-	c *ops.Call,
-	in *ArchiveInput,
+	call *ops.Call,
+	input *ArchiveInput,
 ) (ArchivedResource, error) {
 	for _, a := range m.Active {
-		busy, err := a.UnitActive(ctx, c, in.ID)
+		busy, err := a.UnitActive(ctx, call, input.ID)
 		if err != nil {
 			return ArchivedResource{}, apperr.Wrap(err, "assets.UnitActivity.UnitActive")
 		}
@@ -1184,7 +1194,7 @@ func (m *Module) unitsArchive(
 		}
 	}
 
-	return m.archive("unit", "assets.units", "")(ctx, c, in)
+	return m.archive("unit", "assets.units", "")(ctx, call, input)
 }
 
 // UnitsOfProperty lists the units of a property (Monitoring propertyId filters).
@@ -1298,8 +1308,8 @@ func (m *Module) PoliciesOfUnits(
 
 // DetachPolicy removes an alert policy from every unit and bumps the version of each changed unit (policies.delete,
 // IR108).
-func (m *Module) DetachPolicy(ctx context.Context, c *ops.Call, policy uuid.UUID) error {
-	rows, err := c.Tx.Query(
+func (m *Module) DetachPolicy(ctx context.Context, call *ops.Call, policy uuid.UUID) error {
+	rows, err := call.Tx.Query(
 		ctx,
 		`DELETE FROM assets.unit_alert_policies WHERE policy_id = $1 RETURNING unit_id`,
 		policy,
@@ -1334,7 +1344,7 @@ func (m *Module) DetachPolicy(ctx context.Context, c *ops.Call, policy uuid.UUID
 		return nil
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE assets.units SET version = version + 1, updated_at = platform.app_now() WHERE id = ANY($1)`,
 		units,
@@ -1344,7 +1354,9 @@ func (m *Module) DetachPolicy(ctx context.Context, c *ops.Call, policy uuid.UUID
 	}
 
 	for _, u := range units {
-		c.Emit(ops.Event{AggregateType: "unit", AggregateID: u, Type: "UnitChanged", Payload: nil})
+		call.Emit(
+			ops.Event{AggregateType: "unit", AggregateID: u, Type: "UnitChanged", Payload: nil},
+		)
 	}
 
 	return nil
@@ -1402,7 +1414,7 @@ func (m *Module) CustomerOfOrg(
 // CustomerState returns the organization of a customer and whether it is active.
 func (m *Module) CustomerState(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	customer uuid.UUID,
 ) (uuid.UUID, bool, bool, error) {
 	var (
@@ -1410,7 +1422,7 @@ func (m *Module) CustomerState(
 		status string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT organization_id, status FROM assets.customers WHERE id = $1`, customer).
+	err := call.Tx.QueryRow(ctx, `SELECT organization_id, status FROM assets.customers WHERE id = $1`, customer).
 		Scan(&org, &status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return org, false, false, nil
@@ -1475,12 +1487,12 @@ func (m *Module) unitIDs(
 // SpaceInfo returns the customer organization of a space and the units placed directly in it.
 func (m *Module) SpaceInfo(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	space uuid.UUID,
 ) (uuid.UUID, []uuid.UUID, bool, error) {
 	var org uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `SELECT p.customer_org_id FROM assets.spaces s JOIN assets.properties p ON p.id =
+	err := call.Tx.QueryRow(ctx, `SELECT p.customer_org_id FROM assets.spaces s JOIN assets.properties p ON p.id =
 		s.property_id WHERE s.id = $1`, space).
 		Scan(&org)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -1491,7 +1503,7 @@ func (m *Module) SpaceInfo(
 		return org, nil, false, apperr.Wrap(err, "select assets.spaces")
 	}
 
-	units, err := m.unitIDs(ctx, c, "u.space_id = $1", []any{space})
+	units, err := m.unitIDs(ctx, call, "u.space_id = $1", []any{space})
 
 	return org, units, true, err
 }
@@ -1567,7 +1579,7 @@ func (m *Module) SpacesOfOrg(ctx context.Context, c *ops.Call, org uuid.UUID) ([
 // UnitState returns the customer organization of a unit and whether it is archived (Maintenance job intake).
 func (m *Module) UnitState(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
 ) (uuid.UUID, bool, bool, error) {
 	var (
@@ -1575,7 +1587,7 @@ func (m *Module) UnitState(
 		archived bool
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id, archived FROM assets.units WHERE id = $1`, unit).
+	err := call.Tx.QueryRow(ctx, `SELECT customer_org_id, archived FROM assets.units WHERE id = $1`, unit).
 		Scan(&org, &archived)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return org, false, false, nil
@@ -1587,7 +1599,7 @@ func (m *Module) UnitState(
 // UnitService returns the organization, property and service scope of a unit (Maintenance qualification checks).
 func (m *Module) UnitService(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
 ) (uuid.UUID, uuid.UUID, []string, error) {
 	var (
@@ -1595,7 +1607,8 @@ func (m *Module) UnitService(
 		scope     []string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id, property_id, service_scope FROM assets.units WHERE id = $1`, unit).
+	err := call.Tx.QueryRow(ctx, `SELECT customer_org_id, property_id, service_scope FROM assets.units WHERE id =
+		$1`, unit).
 		Scan(&org, &prop, &scope)
 
 	return org, prop, scope, apperr.Wrap(err, "select assets.units")
@@ -1604,7 +1617,7 @@ func (m *Module) UnitService(
 // SiteAddress returns the IR25 installation address of a unit (null for blank) and the unit's service scope.
 func (m *Module) SiteAddress(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
 ) (*string, []string, error) {
 	var (
@@ -1612,7 +1625,7 @@ func (m *Module) SiteAddress(
 		scope []string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT NULLIF(btrim(p.address), ''), u.service_scope FROM assets.units u JOIN
+	err := call.Tx.QueryRow(ctx, `SELECT NULLIF(btrim(p.address), ''), u.service_scope FROM assets.units u JOIN
 		assets.properties p ON p.id = u.property_id WHERE u.id = $1`, unit).
 		Scan(&addr, &scope)
 
@@ -1673,11 +1686,11 @@ func (m *Module) CustomerProfiles(
 // filters.
 func (m *Module) BriefUnits(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	customer, property, space, unit *uuid.UUID,
 ) ([]ops.UnitBrief, error) {
 	args := []any{}
-	where := "NOT u.archived AND " + scopeSQL(c, &args)
+	where := "NOT u.archived AND " + scopeSQL(call, &args)
 
 	add := func(v any) string {
 		args = append(args, v)
@@ -1702,7 +1715,7 @@ func (m *Module) BriefUnits(
 		where += " AND u.id = " + add(*unit)
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		"SELECT u.id, u.customer_org_id, u.connection FROM assets.units u WHERE "+where+" ORDER BY u.id",
 		args...)
@@ -1714,14 +1727,14 @@ func (m *Module) BriefUnits(
 	var out []ops.UnitBrief
 
 	for rows.Next() {
-		var b ops.UnitBrief
+		var unitBrief ops.UnitBrief
 
-		err := rows.Scan(&b.ID, &b.OrgID, &b.Connection)
+		err := rows.Scan(&unitBrief.ID, &unitBrief.OrgID, &unitBrief.Connection)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select assets.units")
 		}
 
-		out = append(out, b)
+		out = append(out, unitBrief)
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select assets.units")

@@ -33,8 +33,8 @@ func (QrAccess) QrAssignment(
 	return r.Assigned, r.JobID, apperr.Wrap(err, "delegate maintenance.qrAssignment")
 }
 
-func qrAssignment(ctx context.Context, c *ops.Call, in *UnitInput) (QrAssignmentResult, error) {
-	var r QrAssignmentResult
+func qrAssignment(ctx context.Context, c *ops.Call, input *UnitInput) (QrAssignmentResult, error) {
+	var qrAssignmentResult QrAssignmentResult
 
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id =
 		a.job_id
@@ -43,8 +43,8 @@ func qrAssignment(ctx context.Context, c *ops.Call, in *UnitInput) (QrAssignment
 			WHERE j.unit_id = $1 AND a.technician_membership_id = $2 AND a.status = 'active' AND j.status IN ('assigned',
 			'in_progress','on_hold','rework_requested')
 			  AND upper(a.scheduled) > $3 ORDER BY upper(a.scheduled), j.id LIMIT
-			  1)`, in.UnitID, c.Principal.MembershipID, c.Now).
-		Scan(&r.Assigned, &r.JobID)
+			  1)`, input.UnitID, c.Principal.MembershipID, c.Now).
+		Scan(&qrAssignmentResult.Assigned, &qrAssignmentResult.JobID)
 
-	return r, apperr.Wrap(err, "select maintenance.assignments")
+	return qrAssignmentResult, apperr.Wrap(err, "select maintenance.assignments")
 }

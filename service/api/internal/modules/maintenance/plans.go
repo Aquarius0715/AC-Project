@@ -51,8 +51,8 @@ type Plan struct {
 const planCols = `p.id, p.tenant_id, p.version, p.created_at, p.updated_at, p.unit_id, p.interval_months, ` +
 	`p.anchor_day, p.next_due_at`
 
-func scanPlan(r pgx.Row) (Plan, error) {
-	p := Plan{
+func scanPlan(row pgx.Row) (Plan, error) {
+	plan := Plan{
 		Timezone:             "UTC",
 		Recurrence:           Recurrence{Kind: "monthly", IntervalMonths: 0},
 		ID:                   uuid.UUID{},
@@ -65,23 +65,23 @@ func scanPlan(r pgx.Row) (Plan, error) {
 		NextDueAt:            time.Time{},
 		GeneratedOccurrences: nil,
 	}
-	err := r.Scan(
-		&p.ID,
-		&p.TenantID,
-		&p.Version,
-		&p.CreatedAt,
-		&p.UpdatedAt,
-		&p.UnitID,
-		&p.Recurrence.IntervalMonths,
-		&p.AnchorDay,
-		&p.NextDueAt,
+	err := row.Scan(
+		&plan.ID,
+		&plan.TenantID,
+		&plan.Version,
+		&plan.CreatedAt,
+		&plan.UpdatedAt,
+		&plan.UnitID,
+		&plan.Recurrence.IntervalMonths,
+		&plan.AnchorDay,
+		&plan.NextDueAt,
 	)
 
-	return p, apperr.Wrap(err, "scan (scanPlan)")
+	return plan, apperr.Wrap(err, "scan (scanPlan)")
 }
 
 // occurrences reads the jobs generated for the plans in one query, not one per plan (IR497).
-func (m Plans) occurrences(ctx context.Context, c *ops.Call, ps []Plan) error {
+func (m Plans) occurrences(ctx context.Context, call *ops.Call, ps []Plan) error {
 	if len(ps) == 0 {
 		return nil
 	}
@@ -92,7 +92,7 @@ func (m Plans) occurrences(ctx context.Context, c *ops.Call, ps []Plan) error {
 		ids[i], at[ps[i].ID] = ps[i].ID, i
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT plan_id, occurrence_at, id FROM maintenance.jobs WHERE plan_id = ANY($1) ORDER BY plan_id, occurrence_at`,
 		ids,
@@ -103,11 +103,11 @@ func (m Plans) occurrences(ctx context.Context, c *ops.Call, ps []Plan) error {
 
 	for rows.Next() {
 		var (
-			plan uuid.UUID
-			o    Occurrence
+			plan       uuid.UUID
+			occurrence Occurrence
 		)
 
-		err := rows.Scan(&plan, &o.OccurrenceAt, &o.JobID)
+		err := rows.Scan(&plan, &occurrence.OccurrenceAt, &occurrence.JobID)
 		if err != nil {
 			rows.Close()
 
@@ -115,7 +115,7 @@ func (m Plans) occurrences(ctx context.Context, c *ops.Call, ps []Plan) error {
 		}
 
 		if i, ok := at[plan]; ok {
-			ps[i].GeneratedOccurrences = append(ps[i].GeneratedOccurrences, o)
+			ps[i].GeneratedOccurrences = append(ps[i].GeneratedOccurrences, occurrence)
 		}
 	}
 
@@ -130,16 +130,16 @@ func (m Plans) load(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (
 		q += " FOR UPDATE"
 	}
 
-	p, err := scanPlan(c.Tx.QueryRow(ctx, q, id))
+	plan, err := scanPlan(c.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return p, apperr.E(apperr.NotFound, "error.notFound")
+		return plan, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	if err != nil {
-		return p, err
+		return plan, err
 	}
 
-	ps := []Plan{p}
+	ps := []Plan{plan}
 	err = m.occurrences(ctx, c, ps)
 
 	return ps[0], err
@@ -235,7 +235,11 @@ func (m Plans) get(ctx context.Context, c *ops.Call, in *IDInput) (Plan, error) 
 //	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/plans [get]
-func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Plan], error) {
+func (m Plans) list(
+	ctx context.Context,
+	call *ops.Call,
+	in *paging.Query,
+) (paging.Page[Plan], error) {
 	var f struct {
 		UnitID     *uuid.UUID `json:"unitId,omitempty"`
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
@@ -260,7 +264,7 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 		return paging.Page[Plan]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*in, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Plan]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -279,7 +283,7 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 	}
 
 	if f.CustomerID != nil {
-		org, ok, err := m.Jobs.Units.OrgOfCustomer(ctx, c, *f.CustomerID)
+		org, ok, err := m.Jobs.Units.OrgOfCustomer(ctx, call, *f.CustomerID)
 		if err != nil {
 			return paging.Page[Plan]{}, apperr.Wrap(err, "maintenance.JobUnits.OrgOfCustomer")
 		}
@@ -288,7 +292,7 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 			org = uuid.Nil
 		}
 
-		units, err := m.Jobs.Units.UnitsOfOrg(ctx, c, org)
+		units, err := m.Jobs.Units.UnitsOfOrg(ctx, call, org)
 		if err != nil {
 			return paging.Page[Plan]{}, apperr.Wrap(err, "maintenance.JobUnits.UnitsOfOrg")
 		}
@@ -297,7 +301,7 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 	}
 
 	if f.PropertyID != nil {
-		units, err := m.Jobs.Units.UnitsOfProperty(ctx, c, *f.PropertyID)
+		units, err := m.Jobs.Units.UnitsOfProperty(ctx, call, *f.PropertyID)
 		if err != nil {
 			return paging.Page[Plan]{}, apperr.Wrap(err, "maintenance.JobUnits.UnitsOfProperty")
 		}
@@ -309,21 +313,21 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.plans p WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.plans p WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Plan]{}, apperr.Wrap(scanErr, "select maintenance.plans")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM maintenance.plans p WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			planCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -333,14 +337,14 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 	items := []Plan{}
 
 	for rows.Next() {
-		p, err := scanPlan(rows)
+		plan, err := scanPlan(rows)
 		if err != nil {
 			rows.Close()
 
 			return paging.Page[Plan]{}, err
 		}
 
-		items = append(items, p)
+		items = append(items, plan)
 	}
 
 	rows.Close()
@@ -350,16 +354,16 @@ func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.
 		return paging.Page[Plan]{}, apperr.Wrap(rowsErr, "select maintenance.plans")
 	}
 
-	occurrencesErr := m.occurrences(ctx, c, items)
+	occurrencesErr := m.occurrences(ctx, call, items)
 	if occurrencesErr != nil {
 		return paging.Page[Plan]{}, occurrencesErr
 	}
 
 	return paging.Page[Plan]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
@@ -375,21 +379,21 @@ type PlanSaveInput struct {
 
 // Validate implements ops.Validator.
 func (in *PlanSaveInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.UnitID == uuid.Nil {
-		fe["unitId"] = "error.required"
+		fieldErrs["unitId"] = "error.required"
 	}
 
 	if in.Recurrence.Kind != "monthly" || in.Recurrence.IntervalMonths < 1 ||
 		in.Recurrence.IntervalMonths > 12 {
-		fe["recurrence"] = "error.invalid"
+		fieldErrs["recurrence"] = "error.invalid"
 	}
 
 	if in.NextDueAt.IsZero() {
-		fe["nextDueAt"] = "error.required"
+		fieldErrs["nextDueAt"] = "error.required"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // save serves plans.save.
@@ -416,12 +420,12 @@ func (in *PlanSaveInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/plans [post]
-func (m Plans) save(ctx context.Context, c *ops.Call, in *PlanSaveInput) (Plan, error) {
-	if !in.NextDueAt.After(c.Now) {
+func (m Plans) save(ctx context.Context, call *ops.Call, in *PlanSaveInput) (Plan, error) {
+	if !in.NextDueAt.After(call.Now) {
 		return Plan{}, apperr.Fields(map[string]string{"nextDueAt": "error.past"})
 	}
 
-	_, archived, found, err := m.Jobs.Units.UnitState(ctx, c, in.UnitID)
+	_, archived, found, err := m.Jobs.Units.UnitState(ctx, call, in.UnitID)
 	if err != nil {
 		return Plan{}, apperr.Wrap(err, "maintenance.JobUnits.UnitState")
 	}
@@ -441,56 +445,56 @@ func (m Plans) save(ctx context.Context, c *ops.Call, in *PlanSaveInput) (Plan, 
 	event := "PlanCreated"
 
 	if in.ID == nil {
-		err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.plans (tenant_id, unit_id, interval_months, anchor_day,
+		err := call.Tx.QueryRow(ctx, `INSERT INTO maintenance.plans (tenant_id, unit_id, interval_months, anchor_day,
 			next_due_at, created_at, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $5) RETURNING
-			id`, in.UnitID, in.Recurrence.IntervalMonths, next.Day(), next, c.Now).
+			id`, in.UnitID, in.Recurrence.IntervalMonths, next.Day(), next, call.Now).
 			Scan(&id)
 		if err != nil {
 			return Plan{}, apperr.Wrap(err, "insert maintenance.plans")
 		}
 	} else {
-		p, err := m.load(ctx, c, *in.ID, true)
+		plan, err := m.load(ctx, call, *in.ID, true)
 		if err != nil {
-			return p, err
+			return plan, err
 		}
 
-		if p.UnitID != in.UnitID {
-			return p, apperr.Fields(map[string]string{"unitId": "error.unitFixed"})
+		if plan.UnitID != in.UnitID {
+			return plan, apperr.Fields(map[string]string{"unitId": "error.unitFixed"})
 		}
 
-		if p.Version != *c.ExpectedVersion {
-			return p, apperr.E(apperr.Conflict, "error.versionConflict")
+		if plan.Version != *call.ExpectedVersion {
+			return plan, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
 
-		anchor := p.AnchorDay
-		if !p.NextDueAt.Equal(next) {
+		anchor := plan.AnchorDay
+		if !plan.NextDueAt.Equal(next) {
 			anchor = next.Day()
 		}
 
-		_, execErr := c.Tx.Exec(
+		_, execErr := call.Tx.Exec(
 			ctx,
 			`UPDATE maintenance.plans SET interval_months = $2, anchor_day = $3, next_due_at = $4, version = version + 1,
 				updated_at = $5 WHERE id = $1`,
-			p.ID,
+			plan.ID,
 			in.Recurrence.IntervalMonths,
 			anchor,
 			next,
-			c.Now,
+			call.Now,
 		)
 		if execErr != nil {
-			return p, apperr.Wrap(execErr, "update maintenance.plans")
+			return plan, apperr.Wrap(execErr, "update maintenance.plans")
 		}
 
-		id, event = p.ID, "PlanChanged"
+		id, event = plan.ID, "PlanChanged"
 	}
 
-	p, err := m.load(ctx, c, id, false)
+	p, err := m.load(ctx, call, id, false)
 	if err != nil {
 		return p, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "plan",
 			AggregateID:   id,
@@ -498,12 +502,12 @@ func (m Plans) save(ctx context.Context, c *ops.Call, in *PlanSaveInput) (Plan, 
 			Payload:       map[string]any{"unitId": p.UnitID},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "plans.save",
 			TargetKind:      "plan",
 			TargetID:        id.String(),
-			PreviousVersion: c.ExpectedVersion,
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &p.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
@@ -521,16 +525,16 @@ type GenerateInput struct {
 
 // Validate implements ops.Validator.
 func (in *GenerateInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.ID == uuid.Nil {
-		fe["id"] = "error.required"
+		fieldErrs["id"] = "error.required"
 	}
 
 	if in.OccurrenceDate.IsZero() {
-		fe["occurrenceDate"] = "error.required"
+		fieldErrs["occurrenceDate"] = "error.required"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // generateNext serves plans.generateNext.
@@ -568,31 +572,35 @@ func (m Plans) generateNext(
 }
 
 // generateNextJob is generateNext answering the job with its detail extras.
-func (m Plans) generateNextJob(ctx context.Context, c *ops.Call, in *GenerateInput) (Job, error) {
-	p, err := m.load(ctx, c, in.ID, true)
+func (m Plans) generateNextJob(
+	ctx context.Context,
+	c *ops.Call,
+	input *GenerateInput,
+) (Job, error) {
+	plan, err := m.load(ctx, c, input.ID, true)
 	if err != nil {
 		return Job{}, err
 	}
 
-	if p.Version != *c.ExpectedVersion {
+	if plan.Version != *c.ExpectedVersion {
 		return Job{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if !in.OccurrenceDate.Equal(p.NextDueAt) {
+	if !input.OccurrenceDate.Equal(plan.NextDueAt) {
 		return Job{}, apperr.E(apperr.Conflict, "errors.occurrence_mismatch")
 	}
 
-	if !in.OccurrenceDate.After(c.Now) {
+	if !input.OccurrenceDate.After(c.Now) {
 		return Job{}, apperr.E(apperr.Conflict, "errors.next_date_past")
 	}
 
-	for _, o := range p.GeneratedOccurrences {
-		if o.OccurrenceAt.Equal(in.OccurrenceDate) {
+	for _, o := range plan.GeneratedOccurrences {
+		if o.OccurrenceAt.Equal(input.OccurrenceDate) {
 			return Job{}, apperr.E(apperr.Conflict, "errors.occurrence_generated")
 		}
 	}
 
-	org, archived, found, err := m.Jobs.Units.UnitState(ctx, c, p.UnitID)
+	org, archived, found, err := m.Jobs.Units.UnitState(ctx, c, plan.UnitID)
 	if err != nil {
 		return Job{}, apperr.Wrap(err, "maintenance.JobUnits.UnitState")
 	}
@@ -601,7 +609,7 @@ func (m Plans) generateNextJob(ctx context.Context, c *ops.Call, in *GenerateInp
 		return Job{}, apperr.E(apperr.Conflict, "error.unitArchived")
 	}
 
-	start := in.OccurrenceDate.UTC()
+	start := input.OccurrenceDate.UTC()
 
 	var id uuid.UUID
 
@@ -609,18 +617,18 @@ func (m Plans) generateNextJob(ctx context.Context, c *ops.Call, in *GenerateInp
 		occurrence_at, type, status, origin, symptom, requested_slot,
 		preferred_slots, due_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'periodic', 'requested',
 		'periodic_plan', 'Scheduled periodic maintenance',
-		tstzrange($4, $5), '[]', $5) RETURNING id`, p.UnitID, org, p.ID, start, start.Add(time.Hour)).
+		tstzrange($4, $5), '[]', $5) RETURNING id`, plan.UnitID, org, plan.ID, start, start.Add(time.Hour)).
 		Scan(&id)
 	if scanErr != nil {
 		return Job{}, apperr.Wrap(scanErr, "insert maintenance.jobs")
 	}
 
-	next := NextOccurrence(start, p.Recurrence.IntervalMonths, p.AnchorDay)
+	next := NextOccurrence(start, plan.Recurrence.IntervalMonths, plan.AnchorDay)
 
 	_, execErr := c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.plans SET next_due_at = $2, version = version + 1, updated_at = $3 WHERE id = $1`,
-		p.ID,
+		plan.ID,
 		next,
 		c.Now,
 	)
@@ -633,16 +641,16 @@ func (m Plans) generateNextJob(ctx context.Context, c *ops.Call, in *GenerateInp
 		return Job{}, eventErr
 	}
 
-	j, err := m.Jobs.detail(ctx, c, id)
+	job, err := m.Jobs.detail(ctx, c, id)
 	if err != nil {
-		return j, err
+		return job, err
 	}
 
-	nv := p.Version + 1
+	nv := plan.Version + 1
 	c.Emit(
 		ops.Event{
 			AggregateType: "plan",
-			AggregateID:   p.ID,
+			AggregateID:   plan.ID,
 			Type:          "PlanOccurrenceGenerated",
 			Payload:       map[string]any{"jobId": id, "occurrenceAt": start},
 		},
@@ -651,13 +659,13 @@ func (m Plans) generateNextJob(ctx context.Context, c *ops.Call, in *GenerateInp
 		ops.AuditEntry{
 			Action:          "plans.generateNext",
 			TargetKind:      "plan",
-			TargetID:        p.ID.String(),
+			TargetID:        plan.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &nv, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return j, nil
+	return job, nil
 }
 
 // RegisterPlans binds the plan operations.

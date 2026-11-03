@@ -26,13 +26,13 @@ func TestLiveSiteSeeds(t *testing.T) {
 	}
 	defer conn.Close(ctx)
 
-	tx, err := conn.Begin(ctx)
+	txn, err := conn.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback(ctx) //nolint:errcheck // the test never commits
+	defer txn.Rollback(ctx) //nolint:errcheck // the test never commits
 
-	applyLiveErr := seed.ApplyLive(ctx, tx, clock)
+	applyLiveErr := seed.ApplyLive(ctx, txn, clock)
 	if applyLiveErr != nil {
 		t.Fatalf("apply: %v", applyLiveErr)
 	}
@@ -41,7 +41,7 @@ func TestLiveSiteSeeds(t *testing.T) {
 	count := func(sql string, args ...any) int {
 		var n int
 
-		err := tx.QueryRow(ctx, sql, args...).Scan(&n)
+		err := txn.QueryRow(ctx, sql, args...).Scan(&n)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -114,7 +114,7 @@ func TestLiveSiteSeeds(t *testing.T) {
 		manufacturer, model                             string
 	)
 
-	scanErr := tx.QueryRow(ctx, `SELECT control, mode_control, fan_control, temperature IS NULL, manufacturer, model FROM
+	scanErr := txn.QueryRow(ctx, `SELECT control, mode_control, fan_control, temperature IS NULL, manufacturer, model FROM
 		devices.capabilities WHERE id = $1 AND is_current`,
 		seed.ID(s.Capability),
 	).
@@ -166,7 +166,8 @@ func TestLiveSiteSeeds(t *testing.T) {
 	read := func() {
 		t.Helper()
 
-		err := tx.QueryRow(ctx, `SELECT d.connection, d.last_seen_at, u.connection, u.last_seen_at FROM devices.devices d JOIN
+		err := txn.QueryRow(ctx, `SELECT d.connection, d.last_seen_at, u.connection, u.last_seen_at FROM devices.devices d
+			JOIN
 			assets.units u ON u.id = d.unit_id
 			WHERE d.id = $1`, seed.ID(s.Device)).
 			Scan(&devConn, &devSeen, &unitConn, &unitSeen)
@@ -197,15 +198,15 @@ func TestLiveSiteSeeds(t *testing.T) {
 		t.Errorf("the module is not serial %s", s.Serial)
 	}
 
-	for _, x := range s.Sensors {
+	for _, liveSensor := range s.Sensors {
 		if c := count(
 			`SELECT count(*) FROM devices.sensors WHERE id = $1 AND device_id = $2 AND metric = $3 AND unit = $4`,
-			seed.ID(x.Name),
+			seed.ID(liveSensor.Name),
 			seed.ID(s.Device),
-			x.Metric,
-			x.Unit,
+			liveSensor.Metric,
+			liveSensor.Unit,
 		); c != 1 {
-			t.Errorf("sensor %s missing", x.Name)
+			t.Errorf("sensor %s missing", liveSensor.Name)
 		}
 	}
 
@@ -226,7 +227,7 @@ func TestLiveSiteSeeds(t *testing.T) {
 	}
 
 	// the module went offline since: the next start keeps that and adds nothing
-	_, execErr := tx.Exec(
+	_, execErr := txn.Exec(
 		ctx,
 		`UPDATE devices.devices SET connection = 'offline' WHERE id = $1`,
 		seed.ID(s.Device),
@@ -235,7 +236,7 @@ func TestLiveSiteSeeds(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
-	_, execErr = tx.Exec(
+	_, execErr = txn.Exec(
 		ctx,
 		`UPDATE assets.units SET connection = 'offline' WHERE id = $1`,
 		seed.ID(s.Unit),
@@ -244,7 +245,7 @@ func TestLiveSiteSeeds(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
-	applyLiveErr = seed.ApplyLive(ctx, tx, clock.Add(time.Hour))
+	applyLiveErr = seed.ApplyLive(ctx, txn, clock.Add(time.Hour))
 	if applyLiveErr != nil {
 		t.Fatalf("second apply: %v", applyLiveErr)
 	}
@@ -308,13 +309,13 @@ func TestLiveSiteRefusesATakenAddress(t *testing.T) {
 	}
 	defer conn.Close(ctx)
 
-	tx, err := conn.Begin(ctx)
+	txn, err := conn.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback(ctx) //nolint:errcheck // the test never commits
+	defer txn.Rollback(ctx) //nolint:errcheck // the test never commits
 
-	_, execErr := tx.Exec(
+	_, execErr := txn.Exec(
 		ctx,
 		`INSERT INTO identity.users (email, display_name) VALUES ($1, 'Someone else')`,
 		seed.LiveSite.Owner.Email,
@@ -323,7 +324,7 @@ func TestLiveSiteRefusesATakenAddress(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
-	applyLiveErr := seed.ApplyLive(ctx, tx, clock)
+	applyLiveErr := seed.ApplyLive(ctx, txn, clock)
 	if applyLiveErr == nil {
 		t.Fatal("the seed took an address another person holds")
 	}

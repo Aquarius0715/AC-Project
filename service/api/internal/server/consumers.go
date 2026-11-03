@@ -22,7 +22,7 @@ import (
 // name is stable: it is the de-duplication key in platform.processed_events (IR183).
 // ender ends a user's sessions at the identity provider when HQ signs them out everywhere (nil: none, IR386).
 func consumers(
-	m *db.TxManager,
+	txm *db.TxManager,
 	domains []string,
 	provider identity.Provider,
 	apps identity.AccountApps,
@@ -33,18 +33,18 @@ func consumers(
 
 	add := func(domain, name string, handlers map[string]events.Handler) *events.Consumer {
 		if serves(domain) && len(handlers) > 0 {
-			c := &events.Consumer{
+			consumer := &events.Consumer{
 				Name:      name,
-				DB:        m,
+				DB:        txm,
 				Handlers:  handlers,
 				Batch:     0,
 				Logf:      nil,
 				Now:       nil,
 				SplitFrom: "",
 			}
-			out = append(out, c)
+			out = append(out, consumer)
 
-			return c
+			return consumer
 		}
 
 		return nil

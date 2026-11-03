@@ -25,7 +25,7 @@ import (
 // filter never widens the caller's scope. The catalog check keeps the table complete: each operation with a role
 // other than admin is either called here or named with the reason it takes no foreign target.
 func TestForeignTargets(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	id := func(k string) string { return seed.ID(k).String() }
 	at := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	img := tinyPNG(t)
@@ -75,37 +75,37 @@ func TestForeignTargets(t *testing.T) {
 	)
 	policyA := newPolicy(t, "cust-a", "alert")
 
-	code, m := write(s, &customerA, "automations.save", scheduleRule(unitA, nil), 0)
+	code, resp := write(srv, &customerA, "automations.save", scheduleRule(unitA, nil), 0)
 	if code != 200 {
-		t.Fatalf("customer A's automation: %d %v", code, m)
+		t.Fatalf("customer A's automation: %d %v", code, resp)
 	}
 
-	autoA := data(m)["id"].(string)
+	autoA := data(resp)["id"].(string)
 
-	code, m = write(
-		s,
+	code, resp = write(
+		srv,
 		&customerA,
 		"offsets.preview",
 		`{"purpose":"Offset September usage","amountKg":12.5,"period":{`+period+`},"unitIds":["`+unitA+`"]}`,
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("customer A's quote: %d %v", code, m)
+		t.Fatalf("customer A's quote: %d %v", code, resp)
 	}
 
-	quoteA := data(m)["id"].(string)
-	done := completedJob(t, s) // customer A's completed job
+	quoteA := data(resp)["id"].(string)
+	done := completedJob(t, srv) // customer A's completed job
 
 	// work in progress on customer A's unit: assigned to the internal technician, started, with a draft report
-	jobW, unitW := assignedNow(t, s), id("unit-non-rto")
-	write(s, &techInt, "jobs.start", `{"jobId":"`+jobW+`","startConfirmed":true}`, 2)
+	jobW, unitW := assignedNow(t, srv), id("unit-non-rto")
+	write(srv, &techInt, "jobs.start", `{"jobId":"`+jobW+`","startConfirmed":true}`, 2)
 
-	code, m = write(s, &techInt, "jobs.saveDraft", draftBody(jobW, "normal", nil), 0)
+	code, resp = write(srv, &techInt, "jobs.saveDraft", draftBody(jobW, "normal", nil), 0)
 	if code != 200 {
-		t.Fatalf("draft report: %d %v", code, m)
+		t.Fatalf("draft report: %d %v", code, resp)
 	}
 
-	repW := data(m)["id"].(string)
+	repW := data(resp)["id"].(string)
 	runW := uuid.NewString()
 	owner(
 		t,
@@ -131,8 +131,8 @@ func TestForeignTargets(t *testing.T) {
 		"tech-external-a",
 	)
 
-	code, m = write(
-		s,
+	code, resp = write(
+		srv,
 		&contrA,
 		"certificates.submit",
 		`{"membershipId":"`+techExtA+`","code":"demo_outdoor","name":"Outdoor AC","number":"N-IDOR","issuedAt":"`+
@@ -144,23 +144,23 @@ func TestForeignTargets(t *testing.T) {
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("contractor A's certificate: %d %v", code, m)
+		t.Fatalf("contractor A's certificate: %d %v", code, resp)
 	}
 
-	certA := data(m)["id"].(string)
+	certA := data(resp)["id"].(string)
 
-	code, m = write(
-		s,
+	code, resp = write(
+		srv,
 		&contrA,
 		"members.setUnavailability",
 		`{"membershipId":"`+techExtA+`","from":"2026-09-20","to":"2026-09-21","type":"training"}`,
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("contractor A's unavailable days: %d %v", code, m)
+		t.Fatalf("contractor A's unavailable days: %d %v", code, resp)
 	}
 
-	unavA := data(m)["id"].(string)
+	unavA := data(resp)["id"].(string)
 
 	t.Cleanup(func() { owner(t, `DELETE FROM maintenance.unavailability WHERE id = $1`, unavA) })
 
@@ -695,27 +695,27 @@ func TestForeignTargets(t *testing.T) {
 
 		var (
 			code int
-			m    map[string]any
+			res  map[string]any
 		)
 		if spec.Mode == ops.Write {
-			code, m = write(s, c.who, c.op, c.body, c.version)
+			code, res = write(srv, c.who, c.op, c.body, c.version)
 		} else {
-			code, m = post(s, c.who, c.op, c.body)
+			code, res = post(srv, c.who, c.op, c.body)
 		}
 
 		if code != 403 && code != 404 {
-			t.Errorf("%s as %s: %d %v", c.op, c.who.membership, code, m)
+			t.Errorf("%s as %s: %d %v", c.op, c.who.membership, code, res)
 		}
 		// the scope is checked before the expected version: a stale version gets the same refusal, so the answer
 		// never tells that the record exists
 		if spec.Mode == ops.Write && c.version > 0 {
-			if code, m := write(s, c.who, c.op, c.body, 97); code != 403 && code != 404 {
+			if code, reply := write(srv, c.who, c.op, c.body, 97); code != 403 && code != 404 {
 				t.Errorf(
 					"%s as %s with a stale version: %d %v",
 					c.op,
 					c.who.membership,
 					code,
-					m["messageKey"],
+					reply["messageKey"],
 				)
 			}
 		}
@@ -971,18 +971,18 @@ func TestForeignTargets(t *testing.T) {
 	for _, l := range lists {
 		called[l.op] = true
 
-		code, m := post(s, l.who, l.op, l.body)
+		code, res := post(srv, l.who, l.op, l.body)
 		if code == 403 || code == 404 {
 			continue
 		}
 
 		if code != 200 {
-			t.Errorf("%s as %s: %d %v", l.op, l.who.membership, code, m)
+			t.Errorf("%s as %s: %d %v", l.op, l.who.membership, code, res)
 
 			continue
 		}
 
-		for _, row := range items(m) {
+		for _, row := range items(res) {
 			b, _ := json.Marshal(row)
 			for _, f := range l.foreign {
 				if strings.Contains(string(b), f) {
@@ -994,20 +994,20 @@ func TestForeignTargets(t *testing.T) {
 	// a summary filtered to foreign units counts nothing
 	called["summaries.get"] = true
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerB,
 		"summaries.get",
 		`{"kind":"customer","filters":{"unitIds":["`+unitA+`"]}}`,
 	); code == 200 {
-		for k, v := range data(m) {
+		for k, v := range data(res) {
 			if n, ok := v.(float64); ok && n != 0 {
 				t.Errorf("summaries.get as customer-b counts %s=%v of customer A's unit", k, n)
 			}
 		}
 	} else if code != 403 &&
 		code != 404 {
-		t.Errorf("summaries.get as customer-b: %d %v", code, m)
+		t.Errorf("summaries.get as customer-b: %d %v", code, res)
 	}
 
 	// marking all read skips another member's notification, the same as an unknown ID, and leaves it as it is (IR379)
@@ -1016,15 +1016,15 @@ func TestForeignTargets(t *testing.T) {
 	var before, after *time.Time
 	ownerScan(t, `SELECT read_at FROM notify.notifications WHERE id = $1`, []any{notifA}, &before)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"notifications.markAllRead",
 		`{"ids":["`+notifA+`"]}`,
 		0,
-	); code != 200 || len(data(m)["markedIds"].([]any)) != 0 ||
-		len(data(m)["skippedIds"].([]any)) != 1 {
-		t.Errorf("notifications.markAllRead as customer-b: %d %v", code, m)
+	); code != 200 || len(data(res)["markedIds"].([]any)) != 0 ||
+		len(data(res)["skippedIds"].([]any)) != 1 {
+		t.Errorf("notifications.markAllRead as customer-b: %d %v", code, res)
 	}
 
 	ownerScan(t, `SELECT read_at FROM notify.notifications WHERE id = $1`, []any{notifA}, &after)
@@ -1058,13 +1058,13 @@ func TestForeignTargets(t *testing.T) {
 	}
 
 	for _, spec := range ops.Catalog {
-		e, err := authz.Parse(spec.Authorization)
+		expr, err := authz.Parse(spec.Authorization)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		nonAdmin := false
-		for _, a := range e.Alternatives {
+		for _, a := range expr.Alternatives {
 			nonAdmin = nonAdmin || a.Role != "admin"
 		}
 
@@ -1091,17 +1091,17 @@ func TestForeignTargets(t *testing.T) {
 // in their scope too, through an assignment whose work window contains now (DD-T11 rejects an unauthorized rebinding,
 // IR366). An unbound device needs no second unit.
 func TestTechnicianRebind(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	device := func(unit string) string {
-		_, m := write(
-			s,
+		_, res := write(
+			srv,
 			&hq,
 			"devices.register",
 			`{"serial":"AX-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+unit+`"}`,
 			0,
 		)
 
-		return data(m)["id"].(string)
+		return data(res)["id"].(string)
 	}
 	unitOf := func(dev string) string {
 		var u *string
@@ -1115,14 +1115,14 @@ func TestTechnicianRebind(t *testing.T) {
 	}
 	bind := func(dev, unit, job string, v int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&techB,
 			"devices.bind",
 			`{"deviceId":"`+dev+`","unitId":"`+unit+`","jobId":"`+job+`","reason":"Swap"}`,
 			v,
 		)
 	}
-	target := newUnit(t, s, "Rebind target")
+	target := newUnit(t, srv, "Rebind target")
 	job := assign(
 		t,
 		target,
@@ -1140,10 +1140,10 @@ func TestTechnicianRebind(t *testing.T) {
 	})
 
 	// a device on a unit outside the technician's assignments stays where it is
-	away := newUnit(t, s, "Rebind away")
+	away := newUnit(t, srv, "Rebind away")
 	foreign := device(away)
 	write(
-		s,
+		srv,
 		&hq,
 		"devices.bind",
 		`{"deviceId":"`+foreign+`","unitId":"`+away+`","reason":"install"}`,
@@ -1161,10 +1161,10 @@ func TestTechnicianRebind(t *testing.T) {
 	}
 
 	// a device on a unit of another assignment of theirs, inside its work window, moves
-	source := newUnit(t, s, "Rebind source")
+	source := newUnit(t, srv, "Rebind source")
 	ours := device(source)
 	write(
-		s,
+		srv,
 		&hq,
 		"devices.bind",
 		`{"deviceId":"`+ours+`","unitId":"`+source+`","reason":"install"}`,
@@ -1206,7 +1206,7 @@ func TestTechnicianRebind(t *testing.T) {
 	}
 
 	// an unbound device needs only the target unit
-	fresh := newUnit(t, s, "Rebind fresh")
+	fresh := newUnit(t, srv, "Rebind fresh")
 	freshJob := uuid.NewString()
 	owner(
 		t,
@@ -1243,7 +1243,7 @@ func TestTechnicianRebind(t *testing.T) {
 // CONFLICT (IR21, IR366). Customer B repeating customer A's evaluation gets NOT_FOUND, never A's result: the same
 // event, the same input under another event, or other facts in the same tick.
 func TestFireAuthorizesFirst(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	owner(t, `DELETE FROM control.evaluation_events`) // the test clock stands still: a fresh tick
 
 	unitA, now := seed.ID("unit-online-rto").String(), clock.Format(time.RFC3339)
@@ -1253,7 +1253,7 @@ func TestFireAuthorizesFirst(t *testing.T) {
 	}
 
 	event := uuid.NewString()
-	if code, m := write(s, &customerA, "automations.fire", body(event, ""), 0); code != 200 {
+	if code, m := write(srv, &customerA, "automations.fire", body(event, ""), 0); code != 200 {
 		t.Fatalf("customer A's evaluation: %d %v", code, m)
 	}
 
@@ -1264,19 +1264,19 @@ func TestFireAuthorizesFirst(t *testing.T) {
 		"the same input, another event":  body(uuid.NewString(), ""),
 		"other facts in the same minute": body(uuid.NewString(), occupied),
 	} {
-		if code, m := write(s, &customerB, "automations.fire", b, 0); code != 404 {
+		if code, m := write(srv, &customerB, "automations.fire", b, 0); code != 404 {
 			t.Errorf("%s: %d %v", name, code, m)
 		}
 	}
 	// customer A's own retry still gets the stored result
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerA,
 		"automations.fire",
 		body(event, ""),
 		0,
 	); code != 200 ||
-		data(m)["eventId"] != event {
-		t.Errorf("customer A's retry: %d %v", code, m)
+		data(res)["eventId"] != event {
+		t.Errorf("customer A's retry: %d %v", code, res)
 	}
 }

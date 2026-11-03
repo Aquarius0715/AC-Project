@@ -18,15 +18,15 @@ import (
 // field sorts both ways and an unknown one is VALIDATION. It keeps the allowlists of the design and the handlers the
 // same.
 func TestQueryCatalogFilters(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 
-	f, err := os.Open("../../../../docs/02-design/query-catalog.csv")
+	file, err := os.Open("../../../../docs/02-design/query-catalog.csv")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer file.Close()
 
-	rows, err := csv.NewReader(f).ReadAll()
+	rows, err := csv.NewReader(file).ReadAll()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestQueryCatalogFilters(t *testing.T) {
 			String()
 	alert := newAlert(
 		t,
-		newUnit(t, s, "Query catalog AC"),
+		newUnit(t, srv, "Query catalog AC"),
 		seed.ID("org-customer-b").String(),
 		"warning",
 		clock.Add(-time.Hour),
@@ -180,24 +180,24 @@ func TestQueryCatalogFilters(t *testing.T) {
 	callers := []*actor{&hq, &restrMgr, &contrA, &techA, &customerA}
 
 	for _, row := range rows[1:] {
-		op := row[0]
+		operation := row[0]
 
-		wrap := input[op]
+		wrap := input[operation]
 		if wrap == nil {
 			wrap = func(q string) string { return q }
 		}
 
-		t.Run(op, func(t *testing.T) {
+		t.Run(operation, func(t *testing.T) {
 			var who *actor
 
 			for _, a := range callers {
 				if code, _ := post(
-					s,
+					srv,
 					a,
-					op,
-					wrap(query(op, "")),
+					operation,
+					wrap(query(operation, "")),
 				); code == 200 ||
-					(missingParent[op] && code == 404) {
+					(missingParent[operation] && code == 404) {
 					who = a
 
 					break
@@ -205,17 +205,17 @@ func TestQueryCatalogFilters(t *testing.T) {
 			}
 
 			if who == nil {
-				t.Fatalf("no actor can read %s", op)
+				t.Fatalf("no actor can read %s", operation)
 			}
 
-			if code, m := post(
-				s,
+			if code, res := post(
+				srv,
 				who,
-				op,
-				wrap(query(op, `"zzUnknown":1`)),
+				operation,
+				wrap(query(operation, `"zzUnknown":1`)),
 			); code != 422 ||
-				!filterError(m) {
-				t.Errorf("unknown filter key: %d %v", code, m)
+				!filterError(res) {
+				t.Errorf("unknown filter key: %d %v", code, res)
 			}
 
 			for key := range strings.SplitSeq(row[1], ",") {
@@ -223,7 +223,7 @@ func TestQueryCatalogFilters(t *testing.T) {
 					continue
 				}
 
-				v, ok := perOp[op][key]
+				v, ok := perOp[operation][key]
 				if !ok {
 					v, ok = sample[key]
 				}
@@ -239,28 +239,28 @@ func TestQueryCatalogFilters(t *testing.T) {
 					}
 				}
 
-				if code, m := post(
-					s,
+				if code, res := post(
+					srv,
 					who,
-					op,
-					wrap(query(op, `"`+key+`":`+v)),
+					operation,
+					wrap(query(operation, `"`+key+`":`+v)),
 				); code != 200 &&
-					(!missingParent[op] || code != 404) {
-					t.Errorf("filter %s=%s: %d %v", key, v, code, m)
+					(!missingParent[operation] || code != 404) {
+					t.Errorf("filter %s=%s: %d %v", key, v, code, res)
 				}
 			}
 
-			if op == "summaries.get" { // takes filters only, no Query
+			if operation == "summaries.get" { // takes filters only, no Query
 				return
 			}
 			// allowed_sort: each field sorts both ways; an unknown field is VALIDATION
 			sorted := func(field, dir string) (int, map[string]any) {
 				q := strings.TrimSuffix(
-					query(op, ""),
+					query(operation, ""),
 					"}",
 				) + `,"sort":{"field":"` + field + `","direction":"` + dir + `"}}`
 
-				return post(s, who, op, wrap(q))
+				return post(srv, who, operation, wrap(q))
 			}
 			for field := range strings.SplitSeq(row[2], ",") {
 				if field = strings.TrimSpace(field); field == "" {
@@ -272,7 +272,7 @@ func TestQueryCatalogFilters(t *testing.T) {
 						field,
 						dir,
 					); code != 200 &&
-						(!missingParent[op] || code != 404) {
+						(!missingParent[operation] || code != 404) {
 						t.Errorf("sort %s %s: %d %v", field, dir, code, m)
 					}
 				}

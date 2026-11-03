@@ -24,10 +24,10 @@ import (
 // account is created at once and listed as invited until its first sign-in), resends the set-up e-mail and removes the
 // account; another company's accounts are NOT_FOUND, and other roles are refused.
 func TestPartnerUsers(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	email := "tech-" + uuid.NewString()[:8] + "@example.com"
 	save := func(a *actor, body string, v int) (int, map[string]any) {
-		return write(s, a, "partnerUsers.save", body, v)
+		return write(srv, a, "partnerUsers.save", body, v)
 	}
 	access := `,"displayName":"New Tech","accessUntil":"` + clock.Add(30*24*time.Hour).
 		Format(time.RFC3339) +
@@ -50,17 +50,17 @@ func TestPartnerUsers(t *testing.T) {
 		refusal(t, name, code, m, want[name])
 	}
 
-	if code, m := save(
+	if code, res := save(
 		&contrA,
 		`{"email":"`+email+`","partnerRole":"technician","status":"active"`+access+`}`,
 		0,
 	); code != 422 ||
-		fields(m) != "status=error.notAllowed" {
-		t.Errorf("status on invite: %d %s", code, fields(m))
+		fields(res) != "status=error.notAllowed" {
+		t.Errorf("status on invite: %d %s", code, fields(res))
 	}
 
 	for _, a := range []*actor{&techA, &customerA, &hq} {
-		if code, _ := post(s, a, "partnerUsers.list", `{"limit":10}`); code != 403 {
+		if code, _ := post(srv, a, "partnerUsers.list", `{"limit":10}`); code != 403 {
 			t.Errorf("%s lists contractor users: %d", a.membership, code)
 		}
 
@@ -69,37 +69,39 @@ func TestPartnerUsers(t *testing.T) {
 		}
 	}
 
-	code, m := save(&contrA, invite, 0)
-	if code != 200 || data(m)["status"] != "invited" || data(m)["partnerRole"] != "technician" ||
-		data(m)["membershipId"] == nil ||
-		data(m)["organizationId"] != seed.ID("org-contractor-a").String() ||
-		data(m)["invitedByMembershipId"] != seed.ID("contractor-a").String() {
-		t.Fatalf("invite: %d %v", code, m)
+	code, resp := save(&contrA, invite, 0)
+	if code != 200 || data(resp)["status"] != "invited" ||
+		data(resp)["partnerRole"] != "technician" ||
+		data(resp)["membershipId"] == nil ||
+		data(resp)["organizationId"] != seed.ID("org-contractor-a").String() ||
+		data(resp)["invitedByMembershipId"] != seed.ID("contractor-a").String() {
+		t.Fatalf("invite: %d %v", code, resp)
 	}
 
-	id := data(m)["id"].(string)
-	if code, m := save(
+	id := data(resp)["id"].(string)
+
+	if code, res := save(
 		&contrA,
 		strings.Replace(invite, email, strings.ToUpper(email[:1])+email[1:], 1),
 		0,
 	); code != 422 ||
-		fields(m) != "email=errors.email_taken" {
-		t.Errorf("duplicate email (case-insensitive): %d %s", code, fields(m))
+		fields(res) != "email=errors.email_taken" {
+		t.Errorf("duplicate email (case-insensitive): %d %s", code, fields(res))
 	}
 
-	if code, m := save(
+	if code, res := save(
 		&contrB,
 		invite,
 		0,
 	); code != 422 ||
-		fields(m) != "email=errors.email_taken" { // one person, one account (IR461)
-		t.Errorf("same email at company B: %d %s", code, fields(m))
+		fields(res) != "email=errors.email_taken" { // one person, one account (IR461)
+		t.Errorf("same email at company B: %d %s", code, fields(res))
 	}
 
-	_, m = post(s, &contrA, "partnerUsers.list", `{"limit":100}`)
+	_, resp = post(srv, &contrA, "partnerUsers.list", `{"limit":100}`)
 	byMembership := map[string]map[string]any{}
 
-	for _, it := range items(m) {
+	for _, it := range items(resp) {
 		if it["organizationId"] != seed.ID("org-contractor-a").String() {
 			t.Fatalf("another company's account listed: %v", it)
 		}
@@ -114,44 +116,44 @@ func TestPartnerUsers(t *testing.T) {
 		tech == nil ||
 		tech["partnerRole"] != "technician" ||
 		tech["accessUntil"] == nil {
-		t.Fatalf("seed accounts listed: %v", m)
+		t.Fatalf("seed accounts listed: %v", resp)
 	}
 	// the seed technician holds an assigned job: the list marks it (IR432); the contractor is not a technician
 	if tech["booked"] != true || self["booked"] != false {
 		t.Errorf("booked: technician %v, contractor %v", tech["booked"], self["booked"])
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&contrA,
 		"partnerUsers.list",
 		`{"filters":{"status":"invited","partnerRole":"technician","search":"`+email[:12]+`"},"limit":100}`,
 	); len(
-		items(m),
+		items(res),
 	) != 1 {
-		t.Errorf("filtered list: %v", m)
+		t.Errorf("filtered list: %v", res)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&contrA,
 		"partnerUsers.list",
 		`{"filters":{"partnerRole":"owner"}}`,
 	); code != 422 ||
-		fields(m) != "filters=error.invalid" {
-		t.Errorf("bad role filter: %d %s", code, fields(m))
+		fields(res) != "filters=error.invalid" {
+		t.Errorf("bad role filter: %d %s", code, fields(res))
 	}
 	// resend: not sooner than 5 minutes after the last invitation e-mail (IR423), then queued again (IR418), pending
 	// invites of the own company
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.resendInvite",
 		`{"id":"`+id+`"}`,
 		0,
-	); code != 429 || m["messageKey"] != "errors.invite_recently_sent" ||
-		m["retryAfterSeconds"] != float64(300) {
-		t.Errorf("resend right after the invite: %d %v", code, m)
+	); code != 429 || res["messageKey"] != "errors.invite_recently_sent" ||
+		res["retryAfterSeconds"] != float64(300) {
+		t.Errorf("resend right after the invite: %d %v", code, res)
 	}
 
 	owner(
@@ -160,19 +162,19 @@ func TestPartnerUsers(t *testing.T) {
 		id,
 	)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.resendInvite",
 		`{"id":"`+id+`"}`,
 		0,
-	); code != 200 || data(m)["deliveryState"] != "queued" ||
-		data(m)["target"].(map[string]any)["kind"] != "partner_user" {
-		t.Fatalf("resend: %d %v", code, m)
+	); code != 200 || data(res)["deliveryState"] != "queued" ||
+		data(res)["target"].(map[string]any)["kind"] != "partner_user" {
+		t.Fatalf("resend: %d %v", code, res)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&contrA,
 		"partnerUsers.resendInvite",
 		`{"id":"`+tech["id"].(string)+`"}`,
@@ -182,7 +184,7 @@ func TestPartnerUsers(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&contrB,
 		"partnerUsers.resendInvite",
 		`{"id":"`+id+`"}`,
@@ -203,61 +205,61 @@ func TestPartnerUsers(t *testing.T) {
 			v,
 		)
 	}
-	if code, m := save(
+	if code, res := save(
 		&contrA,
 		`{"id":"`+id+`","email":"`+email+`","partnerRole":"contractor"}`,
 		1,
 	); code != 422 ||
-		fields(m) != "reason=error.required" {
-		t.Errorf("update without reason: %d %s", code, fields(m))
+		fields(res) != "reason=error.required" {
+		t.Errorf("update without reason: %d %s", code, fields(res))
 	}
 
-	if code, m := upd(
+	if code, res := upd(
 		id,
 		email,
 		"technician",
 		"active",
 		1,
 	); code != 409 ||
-		m["messageKey"] != "errors.invite_pending" {
-		t.Errorf("activate a pending invite: %d %v", code, m)
+		res["messageKey"] != "errors.invite_pending" {
+		t.Errorf("activate a pending invite: %d %v", code, res)
 	}
 
 	if code, _ := upd(id, email, "contractor", "", 5); code != 409 {
 		t.Error("stale version")
 	}
 
-	if code, m := upd(
+	if code, res := upd(
 		id,
 		"fixed-"+email,
 		"technician",
 		"",
 		1,
 	); code != 422 ||
-		fields(m) != "email=error.immutable" {
-		t.Errorf("change the e-mail: %d %s", code, fields(m))
+		fields(res) != "email=error.immutable" {
+		t.Errorf("change the e-mail: %d %s", code, fields(res))
 	}
 
-	if code, m := upd(
+	if code, res := upd(
 		id,
 		email,
 		"contractor",
 		"",
 		1,
 	); code != 422 ||
-		fields(m) != "partnerRole=error.immutable" {
-		t.Errorf("change the role: %d %s", code, fields(m))
+		fields(res) != "partnerRole=error.immutable" {
+		t.Errorf("change the role: %d %s", code, fields(res))
 	}
 
-	if code, m := upd(
+	if code, res := upd(
 		id,
 		email,
 		"technician",
 		"",
 		1,
-	); code != 200 || data(m)["status"] != "invited" ||
-		ver(m) != 2 {
-		t.Fatalf("save unchanged: %d %v", code, m)
+	); code != 200 || data(res)["status"] != "invited" ||
+		ver(res) != 2 {
+		t.Fatalf("save unchanged: %d %v", code, res)
 	}
 
 	if code, _ := save(
@@ -269,30 +271,30 @@ func TestPartnerUsers(t *testing.T) {
 	}
 	// the caller's own account is not changed here
 	sv := int(self["version"].(float64))
-	if code, m := upd(
+	if code, res := upd(
 		self["id"].(string),
 		self["email"].(string),
 		"contractor",
 		"disabled",
 		sv,
 	); code != 409 ||
-		m["messageKey"] != "errors.own_account" {
-		t.Errorf("disable the own account: %d %v", code, m)
+		res["messageKey"] != "errors.own_account" {
+		t.Errorf("disable the own account: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.remove",
 		`{"id":"`+self["id"].(string)+`","reason":"leaving"}`,
 		sv,
 	); code != 409 ||
-		m["messageKey"] != "errors.own_account" {
-		t.Errorf("remove the own account: %d %v", code, m)
+		res["messageKey"] != "errors.own_account" {
+		t.Errorf("remove the own account: %d %v", code, res)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&contrB,
 		"partnerUsers.remove",
 		`{"id":"`+id+`","reason":"x"}`,
@@ -301,19 +303,19 @@ func TestPartnerUsers(t *testing.T) {
 		t.Error("company B removes company A's invite")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.remove",
 		`{"id":"`+id+`","reason":"sent to the wrong person"}`,
 		2,
 	); code != 200 ||
-		data(m)["deleted"] != true {
-		t.Fatalf("remove: %d %v", code, m)
+		data(res)["deleted"] != true {
+		t.Fatalf("remove: %d %v", code, res)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&contrA,
 		"partnerUsers.remove",
 		`{"id":"`+id+`","reason":"again"}`,
@@ -327,7 +329,7 @@ func TestPartnerUsers(t *testing.T) {
 // it again brings that end back; an accepted account's email and role are fixed; the company keeps an active
 // contractor.
 func TestPartnerUserAccess(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	// the seed technician holds an active assignment: closing that account is refused (IR421)
 	var (
 		booked string
@@ -341,33 +343,33 @@ func TestPartnerUserAccess(t *testing.T) {
 		&bv,
 	)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.save",
 		`{"id":"`+booked+`","email":"tech-external-a@ac.local","partnerRole":"technician","status":"disabled","reason":"on `+
 			`leave"}`,
 		bv,
 	); code != 409 ||
-		m["messageKey"] != "errors.technician_booked" {
-		t.Errorf("disable a booked technician: %d %v", code, m)
+		res["messageKey"] != "errors.technician_booked" {
+		t.Errorf("disable a booked technician: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.remove",
 		`{"id":"`+booked+`","reason":"left"}`,
 		bv,
 	); code != 409 ||
-		m["messageKey"] != "errors.technician_booked" {
-		t.Errorf("remove a booked technician: %d %v", code, m)
+		res["messageKey"] != "errors.technician_booked" {
+		t.Errorf("remove a booked technician: %d %v", code, res)
 	}
 	// a technician without assignments
 	user := newUser(t)
 
-	code, m := write(
-		s,
+	code, resp := write(
+		srv,
 		&hq,
 		"members.save",
 		`{"userId":"`+user+`","organizationId":"`+seed.ID("org-contractor-a").
@@ -381,13 +383,13 @@ func TestPartnerUserAccess(t *testing.T) {
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("members.save: %d %v", code, m)
+		t.Fatalf("members.save: %d %v", code, resp)
 	}
 
-	membership := uuid.MustParse(data(m)["id"].(string))
+	membership := uuid.MustParse(data(resp)["id"].(string))
 	firstSignIn(
 		t,
-		s,
+		srv,
 		membership.String(),
 	) // HQ's first membership of the person is theirs once they sign in (IR462)
 
@@ -427,37 +429,37 @@ func TestPartnerUserAccess(t *testing.T) {
 
 	save := func(email, role, status string, v int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&contrA,
 			"partnerUsers.save",
 			`{"id":"`+id+`","email":"`+email+`","partnerRole":"`+role+`","status":"`+status+`","reason":"on leave"}`,
 			v,
 		)
 	}
-	if code, m := save(
+	if code, res := save(
 		"other@example.com",
 		"technician",
 		"active",
 		v,
 	); code != 422 ||
-		fields(m) != "email=error.immutable" {
-		t.Errorf("change an accepted email: %d %s", code, fields(m))
+		fields(res) != "email=error.immutable" {
+		t.Errorf("change an accepted email: %d %s", code, fields(res))
 	}
 
-	if code, m := save(
+	if code, res := save(
 		email,
 		"contractor",
 		"active",
 		v,
 	); code != 422 ||
-		fields(m) != "partnerRole=error.immutable" {
-		t.Errorf("change an accepted role: %d %s", code, fields(m))
+		fields(res) != "partnerRole=error.immutable" {
+		t.Errorf("change an accepted role: %d %s", code, fields(res))
 	}
 	// the same address in capitals is no change: the stored spelling stays
-	code, m = save(strings.ToUpper(email), "technician", "disabled", v)
-	if code != 200 || data(m)["status"] != "disabled" || data(m)["email"] != email ||
-		data(m)["accessUntil"] != until.UTC().Format(time.RFC3339) {
-		t.Fatalf("disable: %d %v", code, m)
+	code, resp = save(strings.ToUpper(email), "technician", "disabled", v)
+	if code != 200 || data(resp)["status"] != "disabled" || data(resp)["email"] != email ||
+		data(resp)["accessUntil"] != until.UTC().Format(time.RFC3339) {
+		t.Fatalf("disable: %d %v", code, resp)
 	}
 
 	var now time.Time
@@ -472,9 +474,9 @@ func TestPartnerUserAccess(t *testing.T) {
 		t.Errorf("membership after disabling: %v, want %v", now, clock)
 	}
 
-	code, m = save(email, "technician", "active", v+1)
-	if code != 200 || data(m)["status"] != "active" {
-		t.Fatalf("enable: %d %v", code, m)
+	code, resp = save(email, "technician", "active", v+1)
+	if code != 200 || data(resp)["status"] != "active" {
+		t.Fatalf("enable: %d %v", code, resp)
 	}
 
 	ownerScan(
@@ -499,14 +501,14 @@ func TestPartnerUserAccess(t *testing.T) {
 		clock.Add(-time.Minute),
 	)
 
-	if code, m := save(
+	if code, res := save(
 		email,
 		"technician",
 		"active",
 		v+3,
 	); code != 409 ||
-		m["messageKey"] != "errors.access_expired" {
-		t.Errorf("enable after the access end: %d %v", code, m)
+		res["messageKey"] != "errors.access_expired" {
+		t.Errorf("enable after the access end: %d %v", code, res)
 	}
 	// the last active contractor: another contractor account, with the company's other active contractor accounts
 	// (the caller's own, and any another test added) switched off for the test
@@ -552,15 +554,15 @@ func TestPartnerUserAccess(t *testing.T) {
 		owner(t, `DELETE FROM identity.partner_users WHERE id = $1`, other)
 	})
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.remove",
 		`{"id":"`+other+`","reason":"leaving"}`,
 		1,
 	); code != 409 ||
-		m["messageKey"] != "errors.last_contractor" {
-		t.Errorf("remove the last active contractor: %d %v", code, m)
+		res["messageKey"] != "errors.last_contractor" {
+		t.Errorf("remove the last active contractor: %d %v", code, res)
 	}
 }
 
@@ -581,7 +583,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		lost:       nil,
 		generation: 0,
 	}
-	s := serverCfg(
+	srv := serverCfg(
 		t,
 		func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains },
 	)
@@ -593,19 +595,19 @@ func TestPartnerAccountCreated(t *testing.T) {
 			time.RFC3339,
 		) + `"}`
 	}
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.save",
 		body(clock.Add(367*24*time.Hour)),
 		0,
 	); code != 422 ||
-		fields(m) != "accessUntil=error.range" {
-		t.Errorf("access beyond a year: %d %s", code, fields(m))
+		fields(res) != "accessUntil=error.range" {
+		t.Errorf("access beyond a year: %d %s", code, fields(res))
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.save",
 		`{"email":"`+email+`","partnerRole":"contractor","displayName":"Boss","accessUntil":"`+clock.Add(time.Hour).
@@ -613,19 +615,19 @@ func TestPartnerAccountCreated(t *testing.T) {
 			`"}`,
 		0,
 	); code != 422 ||
-		fields(m) != "accessUntil=error.notAllowed" {
-		t.Errorf("access end of a contractor account: %d %s", code, fields(m))
+		fields(res) != "accessUntil=error.notAllowed" {
+		t.Errorf("access end of a contractor account: %d %s", code, fields(res))
 	}
 
 	until := clock.Add(30 * 24 * time.Hour)
 
-	code, m := write(s, &contrA, "partnerUsers.save", body(until), 0)
-	if code != 200 || data(m)["status"] != "invited" || data(m)["membershipId"] == nil ||
-		data(m)["displayName"] != "Added Tech" {
-		t.Fatalf("add: %d %v", code, m)
+	code, resp := write(srv, &contrA, "partnerUsers.save", body(until), 0)
+	if code != 200 || data(resp)["status"] != "invited" || data(resp)["membershipId"] == nil ||
+		data(resp)["displayName"] != "Added Tech" {
+		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	id, membership := data(m)["id"].(string), data(m)["membershipId"].(string)
+	id, membership := data(resp)["id"].(string), data(resp)["membershipId"].(string)
 
 	var (
 		role, employment string
@@ -651,7 +653,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		t.Errorf("membership: %s %s %v perms %d scopes %d", role, employment, end, perms, scopes)
 	}
 
-	err := s.DrainEvents(context.Background())
+	err := srv.DrainEvents(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -684,7 +686,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		t.Errorf("subject stored: %q", sub)
 	}
 	// the first sign-in makes the account active
-	(&auth.Authenticator{DB: s.DB, Now: clockFunc, Verifier: nil, Source: nil}).RecordSignIn(
+	(&auth.Authenticator{DB: srv.DB, Now: clockFunc, Verifier: nil, Source: nil}).RecordSignIn(
 		context.Background(),
 		&ops.Principal{
 			TenantID: seed.ID("tenant-a"),
@@ -720,8 +722,8 @@ func TestPartnerAccountCreated(t *testing.T) {
 	}
 	// the access end moves (at most a year ahead)
 	later := clock.Add(200 * 24 * time.Hour)
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.save",
 		`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+later.Format(
@@ -729,7 +731,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		)+`","reason":"contract extended"}`,
 		v,
 	); code != 200 {
-		t.Fatalf("extend: %d %v", code, m)
+		t.Fatalf("extend: %d %v", code, res)
 	}
 
 	ownerScan(
@@ -743,17 +745,17 @@ func TestPartnerAccountCreated(t *testing.T) {
 		t.Errorf("access after the extension: %v", end)
 	}
 	// removed: the membership ends and the sign-in is turned off
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.remove",
 		`{"id":"`+id+`","reason":"left the company"}`,
 		v+1,
 	); code != 200 {
-		t.Fatalf("remove: %d %v", code, m)
+		t.Fatalf("remove: %d %v", code, res)
 	}
 
-	err = s.DrainEvents(context.Background())
+	err = srv.DrainEvents(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -765,7 +767,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 
 // firstSignIn is the person's first sign-in with the membership: a user HQ or the company added becomes active
 // (IR461, IR462).
-func firstSignIn(t *testing.T, s *apiserver.Server, membership string) {
+func firstSignIn(t *testing.T, srv *apiserver.Server, membership string) {
 	t.Helper()
 
 	var user string
@@ -775,7 +777,7 @@ func firstSignIn(t *testing.T, s *apiserver.Server, membership string) {
 		[]any{membership},
 		&user,
 	)
-	(&auth.Authenticator{DB: s.DB, Now: clockFunc, Verifier: nil, Source: nil}).RecordSignIn(
+	(&auth.Authenticator{DB: srv.DB, Now: clockFunc, Verifier: nil, Source: nil}).RecordSignIn(
 		context.Background(),
 		&ops.Principal{
 			TenantID: seed.ID("tenant-a"),
@@ -798,11 +800,11 @@ func firstSignIn(t *testing.T, s *apiserver.Server, membership string) {
 // TestPartnerResendAfterAccessEnd: no set-up e-mail goes to a technician whose access ended before they signed in; once
 // the contractor moves the end, it goes again (IR461).
 func TestPartnerResendAfterAccessEnd(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	email := "late-" + uuid.NewString()[:8] + "@example.com"
 
-	code, m := write(
-		s,
+	code, resp := write(
+		srv,
 		&contrA,
 		"partnerUsers.save",
 		`{"email":"`+email+`","partnerRole":"technician","displayName":"Late Tech","accessUntil":"`+clock.Add(24*time.Hour).
@@ -811,10 +813,10 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("add: %d %v", code, m)
+		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	id, membership := data(m)["id"].(string), data(m)["membershipId"].(string)
+	id, membership := data(resp)["id"].(string), data(resp)["membershipId"].(string)
 	owner(
 		t,
 		`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '2 days', valid_until = $2::timestamptz -
@@ -828,19 +830,19 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 		id,
 	) // past the 5-minute wait (IR423)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.resendInvite",
 		`{"id":"`+id+`"}`,
 		0,
 	); code != 409 ||
-		m["messageKey"] != "errors.access_expired" {
-		t.Errorf("resend after the access end: %d %v", code, m)
+		res["messageKey"] != "errors.access_expired" {
+		t.Errorf("resend after the access end: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.save",
 		`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+clock.Add(48*time.Hour).
@@ -848,24 +850,24 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 			`","reason":"starts later"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("move the access end: %d %v", code, m)
+		t.Fatalf("move the access end: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.resendInvite",
 		`{"id":"`+id+`"}`,
 		0,
 	); code != 200 {
-		t.Errorf("resend after the move: %d %v", code, m)
+		t.Errorf("resend after the move: %d %v", code, res)
 	}
 }
 
 // TestPartnerUserInputs: the inputs of partnerUsers.remove and resendInvite name their field, an invite takes no
 // reason, a removal needs the current version, and removing an account ends its membership now.
 func TestPartnerUserInputs(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	for name, c := range map[string]struct {
 		op, body, want string
 	}{
@@ -880,9 +882,9 @@ func TestPartnerUserInputs(t *testing.T) {
 		"reason on an invite": {"partnerUsers.save", `{"email":"x-` + uuid.NewString()[:8] + `@example.com",` +
 			`"partnerRole":"contractor","displayName":"X","reason":"why"}`, "reason=error.notAllowed"},
 	} {
-		code, m := write(s, &contrA, c.op, c.body, 1)
+		code, m := write(srv, &contrA, c.op, c.body, 1)
 		if c.op == "partnerUsers.resendInvite" || c.op == "partnerUsers.save" {
-			code, m = write(s, &contrA, c.op, c.body, 0)
+			code, m = write(srv, &contrA, c.op, c.body, 0)
 		}
 
 		refusal(t, name, code, m, c.want)
@@ -915,26 +917,26 @@ func TestPartnerUserInputs(t *testing.T) {
 		seed.ID("contractor-a"),
 	)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.remove",
 		`{"id":"`+id+`","reason":"left the company"}`,
 		2,
 	); code != 409 ||
-		m["messageKey"] != "error.versionConflict" {
-		t.Errorf("remove on a stale version: %d %v", code, m)
+		res["messageKey"] != "error.versionConflict" {
+		t.Errorf("remove on a stale version: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.remove",
 		`{"id":"`+id+`","reason":"left the company"}`,
 		1,
 	); code != 200 ||
-		data(m)["deleted"] != true {
-		t.Fatalf("remove: %d %v", code, m)
+		data(res)["deleted"] != true {
+		t.Fatalf("remove: %d %v", code, res)
 	}
 
 	var until time.Time
@@ -953,7 +955,7 @@ func TestPartnerUserInputs(t *testing.T) {
 // TestNotificationMailRetry (IR425): a failed e-mail notification keeps its reason and is retried a minute after the
 // failed attempt, not before; then it is sent and recorded. (Until IR479 the invitation e-mails showed this.)
 func TestNotificationMailRetry(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	membership, id, name := uuid.NewString(), uuid.NewString(), "Retry AC "+uuid.NewString()[:8]
 	owner(
 		t,
@@ -990,15 +992,15 @@ func TestNotificationMailRetry(t *testing.T) {
 
 		return
 	}
-	deliver := func(sender *fakeMail, at time.Time) int {
+	deliver := func(sender *fakeMail, when time.Time) int {
 		t.Helper()
 
 		_, err := notify.DeliverAll(
 			context.Background(),
-			s.DB,
+			srv.DB,
 			sender,
 			notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: ""},
-			at,
+			when,
 			500,
 		)
 		if err != nil {
@@ -1056,7 +1058,7 @@ func (f *fakeMail) Send(_ context.Context, to, subject, body string) (string, er
 // TestNotificationMail (IR418): an e-mail notification goes to the recipient's address; one whose recipient's
 // membership has ended is recorded as suppressed and never sent.
 func TestNotificationMail(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	note := func(membership string) string {
 		id := uuid.NewString()
 		owner(
@@ -1097,7 +1099,7 @@ func TestNotificationMail(t *testing.T) {
 
 	_, err := notify.DeliverAll(
 		context.Background(),
-		s.DB,
+		srv.DB,
 		sender,
 		notify.Apps{Customer: "http://c", Partner: "", Technician: "", Admin: ""},
 		clock,
@@ -1145,7 +1147,7 @@ func TestNotificationMail(t *testing.T) {
 		clock.Add(-notify.Retention-time.Hour),
 	)
 
-	_, err = notify.SweepAll(context.Background(), s.DB, clock)
+	_, err = notify.SweepAll(context.Background(), srv.DB, clock)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1173,7 +1175,7 @@ func TestNotificationMail(t *testing.T) {
 // TestDisabledAccountStaysClosed (IR420): HQ extending the membership of an account its contractor disabled does not
 // reopen it; the new end is kept and comes back when the contractor enables the account.
 func TestDisabledAccountStaysClosed(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	user := newUser(t)
 	from, until, later := clock.Add(-time.Hour).
 		Format(time.RFC3339),
@@ -1196,13 +1198,13 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 		) + `","reason":"contract"}`
 	}
 
-	code, m := write(s, &hq, "members.save", body("", until), 0)
+	code, m := write(srv, &hq, "members.save", body("", until), 0)
 	if code != 200 {
 		t.Fatalf("members.save: %d %v", code, m)
 	}
 
 	membership := data(m)["id"].(string)
-	firstSignIn(t, s, membership) // an active account (IR462)
+	firstSignIn(t, srv, membership) // an active account (IR462)
 
 	var (
 		account string
@@ -1218,14 +1220,14 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 	status := func(st string, v int) {
 		t.Helper()
 
-		if code, m := write(
-			s,
+		if code, res := write(
+			srv,
 			&contrA,
 			"partnerUsers.save",
 			`{"id":"`+account+`","email":"`+user+`@ac.local","partnerRole":"technician","status":"`+st+`","reason":"leave"}`,
 			v,
 		); code != 200 {
-			t.Fatalf("%s: %d %v", st, code, m)
+			t.Fatalf("%s: %d %v", st, code, res)
 		}
 	}
 	status("disabled", v)
@@ -1233,14 +1235,14 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 	var mv int
 	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &mv)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"members.save",
 		body(membership, later),
 		mv,
 	); code != 200 { // HQ extends the contract
-		t.Fatalf("extend: %d %v", code, m)
+		t.Fatalf("extend: %d %v", code, res)
 	}
 
 	var end time.Time
@@ -1277,24 +1279,24 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 // contractor still assigns them on its own accepted offer once HQ verified their qualification; another contractor
 // cannot.
 func TestContractorAddedTechnicianAssigned(t *testing.T) {
-	s := server(t)
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	srv := server(t)
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	email := "assign-" + uuid.NewString()[:8] + "@example.com"
 
-	code, m := write(
-		s,
+	code, resp := write(
+		srv,
 		&contrA,
 		"partnerUsers.save",
-		`{"email":"`+email+`","partnerRole":"technician","displayName":"Assignable","accessUntil":"`+ts(
+		`{"email":"`+email+`","partnerRole":"technician","displayName":"Assignable","accessUntil":"`+stamp(
 			24*60,
 		)+`"}`,
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("add: %d %v", code, m)
+		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	tech := data(m)["membershipId"].(string)
+	tech := data(resp)["membershipId"].(string)
 	// HQ verified the technician's certificates (the unit's service scope needs all three)
 	for _, code := range []string{"demo_indoor", "demo_outdoor", "demo_electrical"} {
 		owner(
@@ -1309,11 +1311,17 @@ func TestContractorAddedTechnicianAssigned(t *testing.T) {
 		)
 	}
 
-	_, m = write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	_, resp = write(
+		srv,
+		&customerA,
+		"jobs.create",
+		jobBody(seed.ID("unit-non-rto").String(), nil),
+		0,
+	)
 
-	job := data(m)["id"].(string)
-	if code, m := write(
-		s,
+	job := data(resp)["id"].(string)
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
@@ -1322,16 +1330,16 @@ func TestContractorAddedTechnicianAssigned(t *testing.T) {
 			49,
 			2,
 		)+
-			`,"offerExpiresAt":"`+ts(
+			`,"offerExpiresAt":"`+stamp(
 			12,
-		)+`","accessValidFrom":"`+ts(
+		)+`","accessValidFrom":"`+stamp(
 			0,
-		)+`","accessValidUntil":"`+ts(
+		)+`","accessValidUntil":"`+stamp(
 			100,
 		)+`","termsVersion":"t"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("offer: %d %v", code, m)
+		t.Fatalf("offer: %d %v", code, res)
 	}
 
 	var offer string
@@ -1342,27 +1350,27 @@ func TestContractorAddedTechnicianAssigned(t *testing.T) {
 		&offer,
 	)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"jobs.accept",
 		`{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`,
 		2,
 	); code != 200 {
-		t.Fatalf("accept: %d %v", code, m)
+		t.Fatalf("accept: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"jobs.assign",
-		`{"jobId":"`+job+`","technicianMembershipId":"`+tech+`","startAt":"`+ts(
+		`{"jobId":"`+job+`","technicianMembershipId":"`+tech+`","startAt":"`+stamp(
 			49,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			51,
 		)+`"}`,
 		3,
 	); code != 200 {
-		t.Fatalf("assign the added technician: %d %v", code, m)
+		t.Fatalf("assign the added technician: %d %v", code, res)
 	}
 }

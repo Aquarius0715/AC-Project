@@ -29,23 +29,23 @@ type TxManager struct {
 
 // Open connects both pools (the reader URL may equal the writer URL locally).
 func Open(ctx context.Context, writerURL, readerURL string) (*TxManager, error) {
-	w, err := newPool(ctx, writerURL)
+	pool, err := newPool(ctx, writerURL)
 	if err != nil {
 		return nil, err
 	}
 
 	if readerURL == "" || readerURL == writerURL {
-		return &TxManager{Writer: w, Reader: w}, nil
+		return &TxManager{Writer: pool, Reader: pool}, nil
 	}
 
 	r, err := newPool(ctx, readerURL)
 	if err != nil {
-		w.Close()
+		pool.Close()
 
 		return nil, err
 	}
 
-	return &TxManager{Writer: w, Reader: r}, nil
+	return &TxManager{Writer: pool, Reader: r}, nil
 }
 
 // Close closes the pools.
@@ -62,8 +62,8 @@ func (m *TxManager) Close() {
 func (m *TxManager) Run(
 	ctx context.Context,
 	readOnly bool,
-	p *ops.Principal,
-	fn func(pgx.Tx) error,
+	principal *ops.Principal,
+	callback func(pgx.Tx) error,
 ) error {
 	pool, opts := m.Writer, pgx.TxOptions{
 		IsoLevel:       pgx.ReadCommitted,
@@ -84,20 +84,20 @@ func (m *TxManager) Run(
 
 	var err error
 	for range 3 {
-		err = pgx.BeginTxFunc(ctx, pool, opts, func(tx pgx.Tx) error {
-			if p != nil {
-				_, err := tx.Exec(
+		err = pgx.BeginTxFunc(ctx, pool, opts, func(txn pgx.Tx) error {
+			if principal != nil {
+				_, err := txn.Exec(
 					ctx,
 					"SELECT set_config('app.tenant_id', $1, true), set_config('app.membership_id', $2, true)",
-					p.TenantID.String(),
-					p.MembershipID.String(),
+					principal.TenantID.String(),
+					principal.MembershipID.String(),
 				)
 				if err != nil {
 					return apperr.Wrap(err, "select set_config")
 				}
 			}
 
-			return fn(tx)
+			return callback(txn)
 		})
 
 		var pg *pgconn.PgError
@@ -124,10 +124,10 @@ func (s Idempotency) tx(ctx context.Context, p *ops.Principal, fn func(pgx.Tx) e
 // Begin claims a key or returns the stored response.
 func (s Idempotency) Begin(
 	ctx context.Context,
-	p *ops.Principal,
-	op, key, hash string,
+	principal *ops.Principal,
+	operation, key, hash string,
 ) (json.RawMessage, error) {
-	if p == nil {
+	if principal == nil {
 		return nil, nil // public demo operations are not keyed per membership
 	}
 
@@ -138,15 +138,15 @@ func (s Idempotency) Begin(
 
 	var stored json.RawMessage
 
-	err = s.tx(ctx, p, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(
+	err = s.tx(ctx, principal, func(txn pgx.Tx) error {
+		tag, err := txn.Exec(
 			ctx,
 			`INSERT INTO platform.idempotency_keys (tenant_id, membership_id, key, operation, request_hash, status)
 			VALUES ($1,$2,$3,$4,$5,'in_progress') ON CONFLICT DO NOTHING`,
-			p.TenantID,
-			p.MembershipID,
+			principal.TenantID,
+			principal.MembershipID,
 			key,
-			op,
+			operation,
 			h,
 		)
 		if err != nil {
@@ -164,31 +164,31 @@ func (s Idempotency) Begin(
 			expired       bool
 		)
 
-		scanErr := tx.QueryRow(ctx, `SELECT operation, request_hash, status, response, expires_at < platform.app_now() FROM
+		scanErr := txn.QueryRow(ctx, `SELECT operation, request_hash, status, response, expires_at < platform.app_now() FROM
 			platform.idempotency_keys
-			WHERE tenant_id=$1 AND membership_id=$2 AND key=$3 FOR UPDATE`, p.TenantID, p.MembershipID, key).
+			WHERE tenant_id=$1 AND membership_id=$2 AND key=$3 FOR UPDATE`, principal.TenantID, principal.MembershipID, key).
 			Scan(&gotOp, &gotHash, &status, &resp, &expired)
 		if scanErr != nil {
 			return apperr.Wrap(scanErr, "select platform.idempotency_keys")
 		}
 
 		if expired {
-			_, err := tx.Exec(
+			_, err := txn.Exec(
 				ctx,
 				`UPDATE platform.idempotency_keys SET operation=$4, request_hash=$5, status='in_progress', response=NULL,
 				created_at=platform.app_now(), expires_at=platform.app_now()+interval '24 hours' WHERE tenant_id=$1 AND
 				membership_id=$2 AND key=$3`,
-				p.TenantID,
-				p.MembershipID,
+				principal.TenantID,
+				principal.MembershipID,
 				key,
-				op,
+				operation,
 				h,
 			)
 
 			return apperr.Wrap(err, "update platform.idempotency_keys")
 		}
 
-		if gotOp != op || hex.EncodeToString(gotHash) != hash {
+		if gotOp != operation || hex.EncodeToString(gotHash) != hash {
 			return apperr.E(apperr.Conflict, "error.idempotencyKeyReused")
 		}
 
@@ -207,21 +207,21 @@ func (s Idempotency) Begin(
 // Complete stores the response.
 func (s Idempotency) Complete(
 	ctx context.Context,
-	p *ops.Principal,
+	principal *ops.Principal,
 	op, key string,
 	resp json.RawMessage,
 ) error {
-	if p == nil {
+	if principal == nil {
 		return nil
 	}
 
-	return s.tx(ctx, p, func(tx pgx.Tx) error {
+	return s.tx(ctx, principal, func(tx pgx.Tx) error {
 		_, err := tx.Exec(
 			ctx,
 			`UPDATE platform.idempotency_keys SET status='completed', http_status=200, response=$4
 			WHERE tenant_id=$1 AND membership_id=$2 AND key=$3`,
-			p.TenantID,
-			p.MembershipID,
+			principal.TenantID,
+			principal.MembershipID,
 			key,
 			resp,
 		)
@@ -231,17 +231,17 @@ func (s Idempotency) Complete(
 }
 
 // Abort releases a key after a failed attempt so the client may retry with the same key.
-func (s Idempotency) Abort(ctx context.Context, p *ops.Principal, op, key string) {
-	if p == nil {
+func (s Idempotency) Abort(ctx context.Context, principal *ops.Principal, op, key string) {
+	if principal == nil {
 		return
 	}
 
-	_ = s.tx(ctx, p, func(tx pgx.Tx) error {
+	_ = s.tx(ctx, principal, func(tx pgx.Tx) error {
 		_, err := tx.Exec(
 			ctx,
 			`DELETE FROM platform.idempotency_keys WHERE tenant_id=$1 AND membership_id=$2 AND key=$3 AND status='in_progress'`,
-			p.TenantID,
-			p.MembershipID,
+			principal.TenantID,
+			principal.MembershipID,
 			key,
 		)
 
@@ -256,89 +256,97 @@ type Recorder struct{}
 // operation, the target it asked for and the refusal's message key as the reason; no input values (IR603).
 func (Recorder) RecordDenied(
 	ctx context.Context,
-	tx pgx.Tx,
-	c *ops.Call,
-	op string,
-	d ops.Denial,
+	txn pgx.Tx,
+	call *ops.Call,
+	operation string,
+	denial ops.Denial,
 ) error {
-	p := c.Principal
+	principal := call.Principal
 	id := uuid.Must(uuid.NewV7())
 
 	var membership *uuid.UUID
 
-	if p.MembershipID != uuid.Nil {
-		m := p.MembershipID
+	if principal.MembershipID != uuid.Nil {
+		m := principal.MembershipID
 		membership = &m
 	}
 
 	return apperr.Wrap(
-		events.Publish(ctx, tx, p.TenantID, "audit", id, events.AuditRecorded, events.Audit{
-			ID:              id,
-			ActorID:         p.UserID.String(),
-			ActorRole:       p.Role,
-			MembershipID:    membership,
-			Action:          op,
-			TargetKind:      d.TargetKind,
-			TargetID:        d.TargetID,
-			OccurredAt:      c.Now,
-			CorrelationID:   c.CorrelationID,
-			Result:          "denied",
-			Reason:          d.Reason,
-			PreviousVersion: nil,
-			NextVersion:     nil,
-			MaskedBefore:    nil,
-			MaskedAfter:     nil,
-		}),
+		events.Publish(
+			ctx,
+			txn,
+			principal.TenantID,
+			"audit",
+			id,
+			events.AuditRecorded,
+			events.Audit{
+				ID:              id,
+				ActorID:         principal.UserID.String(),
+				ActorRole:       principal.Role,
+				MembershipID:    membership,
+				Action:          operation,
+				TargetKind:      denial.TargetKind,
+				TargetID:        denial.TargetID,
+				OccurredAt:      call.Now,
+				CorrelationID:   call.CorrelationID,
+				Result:          "denied",
+				Reason:          denial.Reason,
+				PreviousVersion: nil,
+				NextVersion:     nil,
+				MaskedBefore:    nil,
+				MaskedAfter:     nil,
+			},
+		),
 		"events.Publish",
 	)
 }
 
 // Record implements ops.Recorder.
-func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) error {
-	p := c.Principal
-	if p == nil {
+func (Recorder) Record(ctx context.Context, txn pgx.Tx, c *ops.Call, op string) error {
+	principal := c.Principal
+	if principal == nil {
 		return nil
 	}
 
-	for _, a := range c.Audits {
+	for _, auditEntry := range c.Audits {
 		// the audit log is identity's: published in this transaction, stored by its consumer (IR196)
 		id := uuid.Must(uuid.NewV7())
 
-		result := a.Result
+		result := auditEntry.Result
 		if result == "" {
 			result = "success"
 		}
 
 		var membership *uuid.UUID
 
-		if p.MembershipID != uuid.Nil {
-			m := p.MembershipID
+		if principal.MembershipID != uuid.Nil {
+			m := principal.MembershipID
 			membership = &m
 		}
 
 		err := events.Publish(
 			ctx,
-			tx,
-			p.TenantID,
+			txn,
+			principal.TenantID,
 			"audit",
 			id,
 			events.AuditRecorded,
 			events.Audit{
 				ID:              id,
-				ActorID:         p.UserID.String(),
-				ActorRole:       p.Role,
+				ActorID:         principal.UserID.String(),
+				ActorRole:       principal.Role,
 				MembershipID:    membership,
-				Action:          a.Action,
-				TargetKind:      a.TargetKind,
-				TargetID:        a.TargetID,
-				PreviousVersion: a.PreviousVersion,
-				NextVersion:     a.NextVersion,
+				Action:          auditEntry.Action,
+				TargetKind:      auditEntry.TargetKind,
+				TargetID:        auditEntry.TargetID,
+				PreviousVersion: auditEntry.PreviousVersion,
+				NextVersion:     auditEntry.NextVersion,
 				OccurredAt:      c.Now,
 				CorrelationID:   c.CorrelationID,
 				Result:          result,
-				Reason:          a.Reason,
-				MaskedBefore:    ops.Masked(a.Before),
-				MaskedAfter:     ops.Masked(a.After),
+				Reason:          auditEntry.Reason,
+				MaskedBefore:    ops.Masked(auditEntry.Before),
+				MaskedAfter:     ops.Masked(auditEntry.After),
 			},
 		)
 		if err != nil {
@@ -346,25 +354,25 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 		}
 	}
 
-	for _, e := range c.Events {
-		payload, err := json.Marshal(e.Payload)
+	for _, event := range c.Events {
+		payload, err := json.Marshal(event.Payload)
 		if err != nil {
 			return apperr.Wrap(err, "json.Marshal")
 		}
 
-		if e.Payload == nil {
+		if event.Payload == nil {
 			payload = []byte("{}")
 		}
 
-		_, execErr := tx.Exec(
+		_, execErr := txn.Exec(
 			ctx,
 			`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
 				occurred_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-			p.TenantID,
-			e.AggregateType,
-			e.AggregateID,
-			e.Type,
+			principal.TenantID,
+			event.AggregateType,
+			event.AggregateID,
+			event.Type,
 			payload,
 			c.CorrelationID,
 			c.Now,

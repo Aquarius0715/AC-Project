@@ -25,13 +25,17 @@ type Files struct {
 const MaxReportAttachments = 10
 
 // lockDraft checks the technician write table and returns the job's current draft locked for update.
-func (m Files) lockDraft(ctx context.Context, c *ops.Call, job, report uuid.UUID) (*Report, error) {
+func (m Files) lockDraft(
+	ctx context.Context,
+	call *ops.Call,
+	job, report uuid.UUID,
+) (*Report, error) {
 	var (
 		status string
 		unit   uuid.UUID
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT status, unit_id FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, job).
+	err := call.Tx.QueryRow(ctx, `SELECT status, unit_id FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, job).
 		Scan(&status, &unit)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.E(apperr.NotFound, "error.notFound")
@@ -41,12 +45,12 @@ func (m Files) lockDraft(ctx context.Context, c *ops.Call, job, report uuid.UUID
 		return nil, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
-	technicianJobErr := m.Reports.Access.TechnicianJob(ctx, c, job, unit)
+	technicianJobErr := m.Reports.Access.TechnicianJob(ctx, call, job, unit)
 	if technicianJobErr != nil {
 		return nil, technicianJobErr
 	}
 
-	draft, err := m.Reports.draftOf(ctx, c, job, true)
+	draft, err := m.Reports.draftOf(ctx, call, job, true)
 	if err != nil {
 		return nil, err
 	}
@@ -61,20 +65,20 @@ func (m Files) lockDraft(ctx context.Context, c *ops.Call, job, report uuid.UUID
 // store saves one file as a ready Attachment of the report and returns its ID.
 func (m Files) store(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	job, report uuid.UUID,
-	f BlobInput,
+	blobInput BlobInput,
 ) (uuid.UUID, error) {
 	id := uuid.New()
 
 	key := "jobs/" + job.String() + "/reports/" + report.String() + "/" + id.String()
 
-	putErr := m.Blobs.Put(ctx, key, f.Mime, f.Bytes)
+	putErr := m.Blobs.Put(ctx, key, blobInput.Mime, blobInput.Bytes)
 	if putErr != nil {
 		return id, apperr.Wrap(putErr, "blob.Store.Put")
 	}
 
-	_, err := c.Tx.Exec(
+	_, err := call.Tx.Exec(
 		ctx,
 		`INSERT INTO maintenance.attachments (id, tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status,
 			uploaded_by, created_at, updated_at)
@@ -83,11 +87,11 @@ func (m Files) store(
 		job,
 		report,
 		key,
-		strings.TrimSpace(f.Name),
-		f.Mime,
-		f.Size,
-		c.Principal.UserID,
-		c.Now,
+		strings.TrimSpace(blobInput.Name),
+		blobInput.Mime,
+		blobInput.Size,
+		call.Principal.UserID,
+		call.Now,
 	)
 
 	return id, apperr.Wrap(err, "insert maintenance.attachments")
@@ -104,16 +108,16 @@ type AddInput struct {
 
 // Validate implements ops.Validator.
 func (in *AddInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil || in.ReportID == uuid.Nil {
-		fe["reportId"] = "error.required"
+		fieldErrs["reportId"] = "error.required"
 	}
 
 	if !ValidBlob(in.File, 5<<20) {
-		fe["file"] = "error.invalidFile"
+		fieldErrs["file"] = "error.invalidFile"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // add serves attachments.add.
@@ -144,8 +148,8 @@ func (in *AddInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/reports/{reportId}/attachments [post]
-func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRef, error) {
-	draft, err := m.lockDraft(ctx, c, in.JobID, in.ReportID)
+func (m Files) add(ctx context.Context, c *ops.Call, input *AddInput) (AttachmentRef, error) {
+	draft, err := m.lockDraft(ctx, c, input.JobID, input.ReportID)
 	if err != nil {
 		return AttachmentRef{}, err
 	}
@@ -156,7 +160,7 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 
 	var n int
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.attachments WHERE report_id = $1`, in.ReportID).
+	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.attachments WHERE report_id = $1`, input.ReportID).
 		Scan(&n)
 	if scanErr != nil {
 		return AttachmentRef{}, apperr.Wrap(scanErr, "select maintenance.attachments")
@@ -166,7 +170,7 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 		return AttachmentRef{}, apperr.E(apperr.Conflict, "errors.too_many_attachments")
 	}
 
-	id, err := m.store(ctx, c, in.JobID, in.ReportID, in.File)
+	id, err := m.store(ctx, c, input.JobID, input.ReportID, input.File)
 	if err != nil {
 		return AttachmentRef{}, err
 	}
@@ -175,7 +179,7 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 		ctx,
 		`UPDATE maintenance.work_reports SET version = version + 1, sign_off = NULL, updated_at = $3 WHERE id = $1 AND version
 			= $2`,
-		in.ReportID,
+		input.ReportID,
 		draft.Version,
 		c.Now,
 	)
@@ -186,7 +190,7 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET draft_report_version = $2 WHERE id = $1`,
-		in.JobID,
+		input.JobID,
 		draft.Version+1,
 	)
 	if execErr != nil {
@@ -198,7 +202,7 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 	c.Emit(
 		ops.Event{
 			AggregateType: "report",
-			AggregateID:   in.ReportID,
+			AggregateID:   input.ReportID,
 			Type:          "AttachmentAdded",
 			Payload:       map[string]any{"attachmentId": id},
 		},
@@ -207,7 +211,7 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 		ops.AuditEntry{
 			Action:          "attachments.add",
 			TargetKind:      "report",
-			TargetID:        in.ReportID.String(),
+			TargetID:        input.ReportID.String(),
 			PreviousVersion: c.ExpectedVersion,
 			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
 		},
@@ -219,14 +223,14 @@ func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRe
 		Version:   1,
 		CreatedAt: c.Now,
 		UpdatedAt: c.Now,
-		JobID:     in.JobID,
-		ReportID:  in.ReportID,
+		JobID:     input.JobID,
+		ReportID:  input.ReportID,
 		BlobID:    id,
 		Name: strings.TrimSpace(
-			in.File.Name,
+			input.File.Name,
 		),
-		Mime:   in.File.Mime,
-		Size:   in.File.Size,
+		Mime:   input.File.Mime,
+		Size:   input.File.Size,
 		Status: "ready",
 	}, nil
 }
@@ -246,29 +250,29 @@ type SignOffInput struct {
 
 // Validate implements ops.Validator (IR111 / IR129 item 3).
 func (in *SignOffInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil || in.ReportID == uuid.Nil || in.ReportVersion < 1 {
-		fe["reportId"] = "error.required"
+		fieldErrs["reportId"] = "error.required"
 	}
 
-	trimmedReason(&in.SignerName, 120, "signerName", fe)
+	trimmedReason(&in.SignerName, 120, "signerName", fieldErrs)
 
 	switch {
 	case in.Signature != nil && in.AbsentReason == nil && in.SitePhoto == nil:
 		if in.Signature.Mime != "image/png" || !ValidBlob(*in.Signature, 5<<20) {
-			fe["signature"] = "error.invalidFile"
+			fieldErrs["signature"] = "error.invalidFile"
 		}
 	case in.Signature == nil && in.AbsentReason != nil && in.SitePhoto != nil:
-		trimmedReason(in.AbsentReason, 1000, "absentReason", fe)
+		trimmedReason(in.AbsentReason, 1000, "absentReason", fieldErrs)
 
 		if !ValidBlob(*in.SitePhoto, 5<<20) {
-			fe["sitePhoto"] = "error.invalidFile"
+			fieldErrs["sitePhoto"] = "error.invalidFile"
 		}
 	default:
-		fe["signature"] = "errors.signature_or_absence"
+		fieldErrs["signature"] = "errors.signature_or_absence"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // SignOff is SignOff of service-contracts.ts.
@@ -309,58 +313,58 @@ type SignOff struct {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/reports/{reportId}/sign-off [post]
-func (m Files) signOff(ctx context.Context, c *ops.Call, in *SignOffInput) (Report, error) {
-	draft, err := m.lockDraft(ctx, c, in.JobID, in.ReportID)
+func (m Files) signOff(ctx context.Context, call *ops.Call, in *SignOffInput) (Report, error) {
+	draft, err := m.lockDraft(ctx, call, in.JobID, in.ReportID)
 	if err != nil {
 		return Report{}, err
 	}
 
-	if draft.Version != *c.ExpectedVersion || draft.Version != in.ReportVersion {
+	if draft.Version != *call.ExpectedVersion || draft.Version != in.ReportVersion {
 		return Report{}, apperr.E(apperr.Conflict, "errors.report_version_changed")
 	}
 
-	so := SignOff{
+	signOff := SignOff{
 		SignerName:    in.SignerName,
-		SignedAt:      c.Now,
+		SignedAt:      call.Now,
 		AbsentReason:  in.AbsentReason,
 		ReportVersion: draft.Version, SignatureAttachmentID: nil, SitePhotoAttachmentID: nil,
 	}
 	if in.Signature != nil {
-		id, err := m.store(ctx, c, in.JobID, in.ReportID, *in.Signature)
+		id, err := m.store(ctx, call, in.JobID, in.ReportID, *in.Signature)
 		if err != nil {
 			return Report{}, err
 		}
 
-		so.SignatureAttachmentID = &id
+		signOff.SignatureAttachmentID = &id
 	} else {
-		id, err := m.store(ctx, c, in.JobID, in.ReportID, *in.SitePhoto)
+		id, err := m.store(ctx, call, in.JobID, in.ReportID, *in.SitePhoto)
 		if err != nil {
 			return Report{}, err
 		}
 
-		so.SitePhotoAttachmentID = &id
+		signOff.SitePhotoAttachmentID = &id
 	}
 
-	raw, _ := json.Marshal(so)
+	raw, _ := json.Marshal(signOff)
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.work_reports SET sign_off = $3, updated_at = $4 WHERE id = $1 AND version = $2`,
 		in.ReportID,
 		draft.Version,
 		raw,
-		c.Now,
+		call.Now,
 	)
 	if execErr != nil {
 		return Report{}, apperr.Wrap(execErr, "update maintenance.work_reports")
 	}
 
-	x, err := m.Reports.load(ctx, c, in.ReportID, draft.Version)
+	report, err := m.Reports.load(ctx, call, in.ReportID, draft.Version)
 	if err != nil {
-		return x, err
+		return report, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "report",
 			AggregateID:   in.ReportID,
@@ -368,17 +372,17 @@ func (m Files) signOff(ctx context.Context, c *ops.Call, in *SignOffInput) (Repo
 			Payload:       map[string]any{"reportVersion": draft.Version},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "reports.signOff",
 			TargetKind:      "report",
 			TargetID:        in.ReportID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &x.Version, Reason: "", Result: "", Before: nil, After: nil,
+			PreviousVersion: call.ExpectedVersion,
+			NextVersion:     &report.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return x, nil
+	return report, nil
 }
 
 // ---- attachments.getContent ----
@@ -436,10 +440,10 @@ type BlobOut struct {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/reports/{reportId}/attachments/{attachmentId}/content [get]
-func (m Files) content(ctx context.Context, c *ops.Call, in *ContentInput) (BlobOut, error) {
+func (m Files) content(ctx context.Context, call *ops.Call, in *ContentInput) (BlobOut, error) {
 	_, getErr := m.Reports.get(
 		ctx,
-		c,
+		call,
 		&GetReportInput{JobID: in.JobID, ReportID: in.ReportID, ReportVersion: in.ReportVersion},
 	)
 	if getErr != nil {
@@ -451,7 +455,7 @@ func (m Files) content(ctx context.Context, c *ops.Call, in *ContentInput) (Blob
 		out BlobOut
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT object_key, name, mime, size_bytes FROM maintenance.attachments WHERE id = $1 AND
+	err := call.Tx.QueryRow(ctx, `SELECT object_key, name, mime, size_bytes FROM maintenance.attachments WHERE id = $1 AND
 		report_id = $2 AND job_id = $3 AND status = 'ready'`,
 		in.AttachmentID, in.ReportID, in.JobID).
 		Scan(&key, &out.Name, &out.Mime, &out.Size)

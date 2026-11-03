@@ -27,21 +27,21 @@ func testDB(t *testing.T) *TxManager {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	m, err := Open(ctx, url, url)
+	txm, err := Open(ctx, url, url)
 	if err == nil {
-		err = m.Writer.Ping(ctx)
+		err = txm.Writer.Ping(ctx)
 	}
 
 	if err != nil {
 		t.Skip("database not available:", err)
 	}
 
-	t.Cleanup(m.Close)
+	t.Cleanup(txm.Close)
 
-	return m
+	return txm
 }
 
-func principal(t *testing.T, m *TxManager) *ops.Principal {
+func principal(t *testing.T, txm *TxManager) *ops.Principal {
 	t.Helper()
 
 	p := &ops.Principal{
@@ -61,7 +61,7 @@ func principal(t *testing.T, m *TxManager) *ops.Principal {
 
 	p.Role = "admin"
 
-	_, err := m.Writer.Exec(
+	_, err := txm.Writer.Exec(
 		context.Background(),
 		`INSERT INTO platform.tenants (id, name) VALUES ($1, 'test')`,
 		p.TenantID,
@@ -74,19 +74,19 @@ func principal(t *testing.T, m *TxManager) *ops.Principal {
 }
 
 func TestIdempotencyLifecycle(t *testing.T) {
-	m := testDB(t)
+	txm := testDB(t)
 	ctx := context.Background()
-	p := principal(t, m)
-	s := Idempotency{M: m}
+	p := principal(t, txm)
+	idempotency := Idempotency{M: txm}
 
 	key, hash := "key-"+uuid.NewString()[:8], "0a0b"
 
-	got, err := s.Begin(ctx, p, "units.save", key, hash)
+	got, err := idempotency.Begin(ctx, p, "units.save", key, hash)
 	if err != nil || got != nil {
 		t.Fatalf("first begin: %v %s", err, got)
 	}
 
-	_, err = s.Begin(
+	_, err = idempotency.Begin(
 		ctx,
 		p,
 		"units.save",
@@ -98,7 +98,7 @@ func TestIdempotencyLifecycle(t *testing.T) {
 		t.Fatalf("in progress must conflict with retryAfter: %v", err)
 	}
 
-	_, err = s.Begin(
+	_, err = idempotency.Begin(
 		ctx,
 		p,
 		"units.save",
@@ -111,26 +111,26 @@ func TestIdempotencyLifecycle(t *testing.T) {
 		t.Fatalf("other hash must conflict: %v", err)
 	}
 
-	err = s.Complete(ctx, p, "units.save", key, json.RawMessage(`{"data":1}`))
+	err = idempotency.Complete(ctx, p, "units.save", key, json.RawMessage(`{"data":1}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	got, err = s.Begin(ctx, p, "units.save", key, hash)
+	got, err = idempotency.Begin(ctx, p, "units.save", key, hash)
 	if err != nil || string(got) != `{"data": 1}` && string(got) != `{"data":1}` {
 		t.Fatalf("replay: %v %s", err, got)
 	}
 	// abort releases an in-progress key only
 	k2 := "key-" + uuid.NewString()[:8]
-	_, _ = s.Begin(ctx, p, "units.save", k2, hash)
-	s.Abort(ctx, p, "units.save", k2)
+	_, _ = idempotency.Begin(ctx, p, "units.save", k2, hash)
+	idempotency.Abort(ctx, p, "units.save", k2)
 
-	beginGot, beginErr := s.Begin(ctx, p, "units.save", k2, hash)
+	beginGot, beginErr := idempotency.Begin(ctx, p, "units.save", k2, hash)
 	if beginErr != nil || beginGot != nil {
 		t.Fatalf("after abort: %v", beginErr)
 	}
 	// expired keys are reusable (the keys are under the tenant's row-level security, IR377: edit them in its transaction)
-	runErr := m.Run(ctx, false, p, func(tx pgx.Tx) error {
+	runErr := txm.Run(ctx, false, p, func(tx pgx.Tx) error {
 		_, err := tx.Exec(
 			ctx,
 			`UPDATE platform.idempotency_keys SET expires_at = now() - interval '1 second' WHERE key=$1`,
@@ -143,36 +143,36 @@ func TestIdempotencyLifecycle(t *testing.T) {
 		t.Fatal(runErr)
 	}
 
-	beginGot, beginErr = s.Begin(ctx, p, "units.list", key, "aa")
+	beginGot, beginErr = idempotency.Begin(ctx, p, "units.list", key, "aa")
 	if beginErr != nil || beginGot != nil {
 		t.Fatalf("expired reuse: %v %s", beginErr, beginGot)
 	}
 	// bad hash and anonymous no-ops
-	_, beginErr = s.Begin(ctx, p, "x", "key-bad-hash", "zz")
+	_, beginErr = idempotency.Begin(ctx, p, "x", "key-bad-hash", "zz")
 	if beginErr == nil {
 		t.Fatal("bad hex must fail")
 	}
 
-	beginGot, beginErr = s.Begin(ctx, nil, "demo.reset", key, hash)
+	beginGot, beginErr = idempotency.Begin(ctx, nil, "demo.reset", key, hash)
 	if beginGot != nil || beginErr != nil {
 		t.Fatal("anonymous begin is a no-op")
 	}
 
-	if s.Complete(ctx, nil, "x", key, nil) != nil {
+	if idempotency.Complete(ctx, nil, "x", key, nil) != nil {
 		t.Fatal("anonymous complete is a no-op")
 	}
 
-	s.Abort(ctx, nil, "x", key)
+	idempotency.Abort(ctx, nil, "x", key)
 }
 
 func TestRecorderAndRLS(t *testing.T) {
-	m := testDB(t)
+	txm := testDB(t)
 	ctx := context.Background()
-	p := principal(t, m)
-	other := principal(t, m)
+	p := principal(t, txm)
+	other := principal(t, txm)
 	agg := uuid.Must(uuid.NewV7())
 	v := 2
-	c := &ops.Call{
+	call := &ops.Call{
 		Principal:       p,
 		Now:             time.Now().UTC(),
 		CorrelationID:   "corr-test-" + agg.String()[:8],
@@ -184,7 +184,7 @@ func TestRecorderAndRLS(t *testing.T) {
 		Events:          nil,
 		Audits:          nil,
 	}
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:      "units.save",
 			TargetKind:  "unit",
@@ -193,7 +193,7 @@ func TestRecorderAndRLS(t *testing.T) {
 			Reason:      "r", PreviousVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "unit",
 			AggregateID:   agg,
@@ -201,13 +201,15 @@ func TestRecorderAndRLS(t *testing.T) {
 			Payload:       map[string]int{"version": 2},
 		},
 	)
-	c.Emit(ops.Event{AggregateType: "unit", AggregateID: agg, Type: "UnitArchived", Payload: nil})
+	call.Emit(
+		ops.Event{AggregateType: "unit", AggregateID: agg, Type: "UnitArchived", Payload: nil},
+	)
 
-	runErr := m.Run(
+	runErr := txm.Run(
 		ctx,
 		false,
 		p,
-		func(tx pgx.Tx) error { return Recorder{}.Record(ctx, tx, c, "units.save") },
+		func(tx pgx.Tx) error { return Recorder{}.Record(ctx, tx, call, "units.save") },
 	)
 	if runErr != nil {
 		t.Fatal(runErr)
@@ -215,13 +217,14 @@ func TestRecorderAndRLS(t *testing.T) {
 
 	var n int
 
-	_ = m.Writer.QueryRow(ctx, `SELECT count(*) FROM platform.outbox WHERE aggregate_id=$1`, agg).
+	_ = txm.Writer.QueryRow(ctx, `SELECT count(*) FROM platform.outbox WHERE aggregate_id=$1`, agg).
 		Scan(&n)
 	if n != 2 {
 		t.Fatalf("outbox rows %d", n)
 	}
 	// the audit entry is published for identity's consumer in the same transaction (IR196)
-	_ = m.Writer.QueryRow(ctx, `SELECT count(*) FROM platform.outbox WHERE event_type = 'AuditRecorded' AND tenant_id = $1
+	_ = txm.Writer.QueryRow(ctx, `SELECT count(*) FROM platform.outbox WHERE event_type = 'AuditRecorded' AND tenant_id =
+		$1
 		AND payload->>'targetId' = $2
 		AND payload->>'action' = 'units.save' AND payload->>'reason' = 'r' AND (payload->>'nextVersion')::int =
 		2`, p.TenantID, agg.String()).
@@ -230,7 +233,7 @@ func TestRecorderAndRLS(t *testing.T) {
 		t.Fatalf("AuditRecorded events %d", n)
 	}
 	// row-level security on the audit log
-	runErr = m.Run(ctx, false, p, func(tx pgx.Tx) error {
+	runErr = txm.Run(ctx, false, p, func(tx pgx.Tx) error {
 		_, err := tx.Exec(
 			ctx,
 			`INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, occurred_at,
@@ -249,7 +252,7 @@ func TestRecorderAndRLS(t *testing.T) {
 	count := func(pp *ops.Principal) int {
 		var k int
 
-		err := m.Run(ctx, true, pp, func(tx pgx.Tx) error {
+		err := txm.Run(ctx, true, pp, func(tx pgx.Tx) error {
 			return tx.QueryRow(ctx, `SELECT count(*) FROM audit.audit_log WHERE target_id=$1`, agg.String()).
 				Scan(&k)
 		})
@@ -267,7 +270,7 @@ func TestRecorderAndRLS(t *testing.T) {
 		t.Fatal("RLS must hide another tenant's audit row")
 	}
 	// read-only transactions reject writes; anonymous recorder is a no-op
-	err := m.Run(ctx, true, p, func(tx pgx.Tx) error {
+	err := txm.Run(ctx, true, p, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `INSERT INTO platform.tenants (name) VALUES ('x')`)
 
 		return apperr.Wrap(err, "insert platform.tenants")
@@ -296,7 +299,7 @@ func TestRecorderAndRLS(t *testing.T) {
 		t.Fatal("anonymous record")
 	}
 	// audit log is append-only
-	err = m.Run(ctx, false, p, func(tx pgx.Tx) error {
+	err = txm.Run(ctx, false, p, func(tx pgx.Tx) error {
 		_, err := tx.Exec(
 			ctx,
 			`UPDATE audit.audit_log SET reason='x' WHERE target_id=$1`,
@@ -316,7 +319,7 @@ func TestOpenErrors(t *testing.T) {
 		t.Fatal("bad writer url")
 	}
 
-	m := testDB(t)
+	txm := testDB(t)
 
 	url := os.Getenv("AC_TEST_DATABASE_URL")
 	if url == "" {
@@ -335,5 +338,5 @@ func TestOpenErrors(t *testing.T) {
 
 	two.Close()
 
-	_ = m
+	_ = txm
 }

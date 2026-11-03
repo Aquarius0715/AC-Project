@@ -48,7 +48,7 @@ func TestConditionMetric(t *testing.T) {
 }
 
 // facts of one unit at 2026-09-14 09:00 Kuala Lumpur (01:00Z, a Monday).
-func testFacts(unit uuid.UUID, at time.Time) map[string]Fact {
+func testFacts(unit uuid.UUID, when time.Time) map[string]Fact {
 	f := func(metric, value, unitName string, observed time.Time) Fact {
 		return Fact{
 			UnitID:     unit,
@@ -69,34 +69,34 @@ func testFacts(unit uuid.UUID, at time.Time) map[string]Fact {
 			ObservedAt: time.Time{},
 			Quality:    "",
 		}, // overwritten below to keep the literal readable
-		unit.String() + "/tariff":   f("tariff", "0.6", "MYR_per_kWh", at),
-		unit.String() + "/solar":    f("solar", "3", "kW", at),
-		unit.String() + "/battery":  f("battery", "0.5", "kW", at),
-		unit.String() + "/location": f("location", `"arrival"`, "event", at),
+		unit.String() + "/tariff":   f("tariff", "0.6", "MYR_per_kWh", when),
+		unit.String() + "/solar":    f("solar", "3", "kW", when),
+		unit.String() + "/battery":  f("battery", "0.5", "kW", when),
+		unit.String() + "/location": f("location", `"arrival"`, "event", when),
 		unit.String() + "/weather_temperature": f(
 			"weather_temperature",
 			"31",
 			"°C",
-			at.Add(-10*time.Minute),
+			when.Add(-10*time.Minute),
 		), // within the 30-minute TTL
-		unit.String() + "/occupied": f("occupied", "true", "boolean", at),
+		unit.String() + "/occupied": f("occupied", "true", "boolean", when),
 	}
 }
 
 func TestMatchConditions(t *testing.T) {
 	unit := uuid.New()
-	at := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
-	facts := testFacts(unit, at)
+	when := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
+	facts := testFacts(unit, when)
 	facts[unit.String()+"/peak"] = Fact{
 		UnitID:     unit,
 		Metric:     "peak",
 		Value:      json.RawMessage("true"),
 		Unit:       "boolean",
-		ObservedAt: at,
+		ObservedAt: when,
 		Quality:    "valid",
 	}
 
-	m := func(cond string) string { return match(json.RawMessage(cond), unit, facts, at, kl) }
+	m := func(cond string) string { return match(json.RawMessage(cond), unit, facts, when, kl) }
 	for cond, want := range map[string]string{
 		`{"type":"peak","active":true}`: "", `{"type":"peak","active":false}`: "no_match",
 		`{"type":"occupancy","occupied":true}`: "", `{"type":"occupancy","occupied":false}`: "no_match",
@@ -120,7 +120,7 @@ func TestMatchConditions(t *testing.T) {
 		json.RawMessage(`{"type":"pattern","localTime":"09:00"}`),
 		unit,
 		facts,
-		at,
+		when,
 		"Mars/Olympus",
 	); got != "no_match" {
 		t.Errorf("unknown time zone: %q", got)
@@ -131,7 +131,7 @@ func TestMatchConditions(t *testing.T) {
 		json.RawMessage(`{"type":"peak","active":true}`),
 		other,
 		facts,
-		at,
+		when,
 		kl,
 	); got != "missing_data" {
 		t.Errorf("no fact for the unit: %q", got)
@@ -141,7 +141,7 @@ func TestMatchConditions(t *testing.T) {
 		json.RawMessage(`{"type":"location","event":"arrival"}`),
 		unit,
 		facts,
-		at.Add(2*time.Minute),
+		when.Add(2*time.Minute),
 		kl,
 	); got != "stale" {
 		t.Errorf("a location event of another minute is stale: %q", got)
@@ -151,7 +151,7 @@ func TestMatchConditions(t *testing.T) {
 		json.RawMessage(`{"type":"tariff","operator":"gte","value":0.5}`),
 		unit,
 		facts,
-		at.Add(10*time.Minute),
+		when.Add(10*time.Minute),
 		kl,
 	); got != "stale" {
 		t.Errorf("a tariff older than its TTL is stale: %q", got)

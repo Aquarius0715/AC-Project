@@ -16,7 +16,7 @@ import (
 // TestRequestedCommandsForTheGateway: the IoT gateway reads the commands waiting to be sent with the internal service
 // token and the tenant; a command leaves the list once it is reported sent, and a request without the token is refused.
 func TestRequestedCommandsForTheGateway(t *testing.T) {
-	cl := newCluster(t)
+	cluster := newCluster(t)
 	tenant := seed.ID("tenant-a").String()
 	unit := seed.ID("unit-online-rto")
 	device := seed.ID("device-online-rto")
@@ -39,7 +39,7 @@ func TestRequestedCommandsForTheGateway(t *testing.T) {
 	askBody := func(token, input string) (int, []map[string]any) {
 		req, _ := http.NewRequest(
 			http.MethodPost,
-			cl.urls[ops.DomainEquipment]+"/internal/v1/system/queries/control.requestedCommands",
+			cluster.urls[ops.DomainEquipment]+"/internal/v1/system/queries/control.requestedCommands",
 			strings.NewReader(input),
 		)
 		req.Header.Set("Content-Type", "application/json")

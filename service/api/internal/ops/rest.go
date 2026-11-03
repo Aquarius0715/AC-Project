@@ -78,58 +78,62 @@ func PathParams(p string) []string {
 }
 
 // NewBinding checks a route against its operation's input type.
-func NewBinding(op *Operation, rt Route) (*Binding, error) {
-	b := &Binding{Route: rt, Path: PathParams(rt.Path), Body: false, Params: nil, Opaque: nil}
+func NewBinding(operation *Operation, rt Route) (*Binding, error) {
+	binding := &Binding{Route: rt, Path: PathParams(rt.Path), Body: false, Params: nil, Opaque: nil}
 	switch rt.Method {
 	case http.MethodGet, http.MethodDelete:
 	case http.MethodPost, http.MethodPut, http.MethodPatch:
-		b.Body = true
+		binding.Body = true
 	default:
-		return nil, fmt.Errorf("ops: %s: method %s", op.Spec.Name, rt.Method)
+		return nil, fmt.Errorf("ops: %s: method %s", operation.Spec.Name, rt.Method)
 	}
 
-	if rt.Method == http.MethodGet && op.Spec.Mode != Read ||
-		rt.Method == http.MethodDelete && op.Spec.Mode != Write {
+	if rt.Method == http.MethodGet && operation.Spec.Mode != Read ||
+		rt.Method == http.MethodDelete && operation.Spec.Mode != Write {
 		return nil, fmt.Errorf(
 			"ops: %s: %s does not fit a %s",
-			op.Spec.Name,
+			operation.Spec.Name,
 			rt.Method,
-			op.Spec.Mode,
+			operation.Spec.Mode,
 		)
 	}
 
-	t := reflect.TypeOf(op.NewInput())
+	t := reflect.TypeOf(operation.NewInput())
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 
-	params, opaque, err := parameters(t, op.Spec.Filters)
+	params, opaque, err := parameters(t, operation.Spec.Filters)
 	if err != nil {
-		return nil, fmt.Errorf("ops: %s: %w", op.Spec.Name, err)
+		return nil, fmt.Errorf("ops: %s: %w", operation.Spec.Name, err)
 	}
 
-	b.Params, b.Opaque = params, opaque
-	for _, name := range append(slices.Clone(b.Path), rt.FixedField) {
+	binding.Params, binding.Opaque = params, opaque
+	for _, name := range append(slices.Clone(binding.Path), rt.FixedField) {
 		if name == "" {
 			continue
 		}
 
 		if p, ok := params[name]; !ok || p.List || p.Sort || slices.Contains(p.At, "filters") {
-			return nil, fmt.Errorf("ops: %s: %s is not a scalar input field", op.Spec.Name, name)
+			return nil, fmt.Errorf(
+				"ops: %s: %s is not a scalar input field",
+				operation.Spec.Name,
+				name,
+			)
 		}
 	}
 
-	if !b.Body && len(opaque) > 0 {
+	if !binding.Body && len(opaque) > 0 {
 		return nil, fmt.Errorf(
 			"ops: %s: %s %s cannot carry %s in a query string",
-			op.Spec.Name,
+			operation.Spec.Name,
 			rt.Method,
 			rt.Path,
 			strings.Join(opaque, ", "),
 		)
 	}
 
-	return b, nil
+	return binding, nil
 }
 
 // parameters lists the input fields a query string or path can name: scalars and lists of scalars by their JSON
@@ -144,34 +148,34 @@ func parameters(t reflect.Type, filters []string) (map[string]Param, []string, e
 		err               error
 	)
 
-	add := func(p Param) {
-		if _, dup := ps[p.Name]; dup && err == nil {
-			err = fmt.Errorf("parameter %s twice", p.Name)
+	add := func(param Param) {
+		if _, dup := ps[param.Name]; dup && err == nil {
+			err = fmt.Errorf("parameter %s twice", param.Name)
 		}
 
-		if p.Role == "" {
-			p.Role = "field"
+		if param.Role == "" {
+			param.Role = "field"
 		}
 
-		p.Order = len(ps)
-		ps[p.Name] = p
+		param.Order = len(ps)
+		ps[param.Name] = param
 	}
 
 	var walk func(t reflect.Type, at []string, prefix string, nested bool)
 
 	walk = func(t reflect.Type, at []string, prefix string, nested bool) {
-		for f := range t.Fields() {
-			if !f.IsExported() {
+		for structField := range t.Fields() {
+			if !structField.IsExported() {
 				continue
 			}
 
-			name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+			name, _, _ := strings.Cut(structField.Tag.Get("json"), ",")
 			if name == "-" {
 				continue
 			}
 
-			ft := deref(f.Type)
-			if f.Anonymous && name == "" {
+			ft := deref(structField.Type)
+			if structField.Anonymous && name == "" {
 				if ft == queryType {
 					queries = append(queries, at)
 				} else if ft.Kind() == reflect.Struct {
@@ -182,7 +186,7 @@ func parameters(t reflect.Type, filters []string) (map[string]Param, []string, e
 			}
 
 			if name == "" {
-				name = f.Name
+				name = structField.Name
 			}
 
 			key, here := prefix+name, append(slices.Clone(at), name)
@@ -457,10 +461,10 @@ func place(obj map[string]any, at []string, v any) bool {
 }
 
 // Input builds the operation input of a request on this route; body is the request body of POST, PUT and PATCH.
-func (b *Binding) Input(c *echo.Context, body []byte) ([]byte, error) {
+func (b *Binding) Input(ectx *echo.Context, body []byte) ([]byte, error) {
 	obj := map[string]any{}
-	fe := map[string]string{}
-	query := c.QueryParams()
+	fieldErrs := map[string]string{}
+	query := ectx.QueryParams()
 
 	if b.Body {
 		if len(bytes.TrimSpace(body)) > 0 {
@@ -474,20 +478,20 @@ func (b *Binding) Input(c *echo.Context, body []byte) ([]byte, error) {
 		}
 
 		for name := range query {
-			fe[name] = "error.notAllowed" // a body route reads its input from the body
+			fieldErrs[name] = "error.notAllowed" // a body route reads its input from the body
 		}
 	} else {
 		for name, values := range query {
 			p, ok := b.Params[name]
 			if !ok || slices.Contains(b.Path, name) || name == b.Route.FixedField {
-				fe[name] = "error.notAllowed"
+				fieldErrs[name] = "error.notAllowed"
 
 				continue
 			}
 
 			v, ok := p.value(values)
 			if !ok {
-				fe[name] = "error.invalid"
+				fieldErrs[name] = "error.invalid"
 			} else if v != nil {
 				place(obj, p.At, v)
 			}
@@ -495,7 +499,7 @@ func (b *Binding) Input(c *echo.Context, body []byte) ([]byte, error) {
 	}
 
 	for _, name := range b.Path {
-		raw, err := url.PathUnescape(c.Param(name))
+		raw, err := url.PathUnescape(ectx.Param(name))
 		if p := b.Params[name]; p.UUID && err == nil && raw != "" {
 			_, perr := uuid.Parse(
 				raw,
@@ -508,18 +512,18 @@ func (b *Binding) Input(c *echo.Context, body []byte) ([]byte, error) {
 		v, ok := convert(b.Params[name].Kind, raw)
 		switch {
 		case err != nil || raw == "" || !ok:
-			fe[name] = "error.invalid"
+			fieldErrs[name] = "error.invalid"
 		case !place(obj, b.Params[name].At, v):
-			fe[name] = "error.pathMismatch"
+			fieldErrs[name] = "error.pathMismatch"
 		}
 	}
 
 	if f := b.Route.FixedField; f != "" && !place(obj, b.Params[f].At, b.Route.FixedValue) {
-		fe[f] = "error.pathMismatch"
+		fieldErrs[f] = "error.pathMismatch"
 	}
 
-	if len(fe) > 0 {
-		return nil, apperr.Fields(fe)
+	if len(fieldErrs) > 0 {
+		return nil, apperr.Fields(fieldErrs)
 	}
 
 	out, err := json.Marshal(obj)
@@ -528,33 +532,33 @@ func (b *Binding) Input(c *echo.Context, body []byte) ([]byte, error) {
 }
 
 // MountREST registers the REST routes of the operations this process serves on the /v1 group (IR222).
-func (r *Registry) MountREST(g *echo.Group) error {
-	for _, op := range r.Operations() {
-		if !r.serves(op.Spec.Name) {
+func (r *Registry) MountREST(group *echo.Group) error {
+	for _, operation := range r.Operations() {
+		if !r.serves(operation.Spec.Name) {
 			continue
 		}
 
-		for _, rt := range op.Spec.Routes {
-			b, err := NewBinding(op, rt)
+		for _, route := range operation.Spec.Routes {
+			binding, err := NewBinding(operation, route)
 			if err != nil {
 				return err
 			}
 
-			path, ok := strings.CutPrefix(rt.Path, "/v1/")
+			path, ok := strings.CutPrefix(route.Path, "/v1/")
 			if !ok {
-				return fmt.Errorf("ops: %s: route %s outside /v1", op.Spec.Name, rt.Path)
+				return fmt.Errorf("ops: %s: route %s outside /v1", operation.Spec.Name, route.Path)
 			}
 
-			_, addRouteErr := g.AddRoute(
+			_, addRouteErr := group.AddRoute(
 				echo.Route{
-					Method:  rt.Method,
+					Method:  route.Method,
 					Path:    "/" + EchoPath(path),
-					Name:    op.Spec.Name,
-					Handler: r.restHandler(op, b), Middlewares: nil,
+					Name:    operation.Spec.Name,
+					Handler: r.restHandler(operation, binding), Middlewares: nil,
 				},
 			)
 			if addRouteErr != nil {
-				return fmt.Errorf("ops: %s: %w", op.Spec.Name, addRouteErr)
+				return fmt.Errorf("ops: %s: %w", operation.Spec.Name, addRouteErr)
 			}
 		}
 	}
@@ -562,26 +566,26 @@ func (r *Registry) MountREST(g *echo.Group) error {
 	return nil
 }
 
-func (r *Registry) restHandler(op *Operation, b *Binding) echo.HandlerFunc {
-	return func(c *echo.Context) error {
-		corr := correlationID(c)
+func (r *Registry) restHandler(op *Operation, binding *Binding) echo.HandlerFunc {
+	return func(ectx *echo.Context) error {
+		corr := correlationID(ectx)
 
 		var body []byte
 
-		if b.Body {
+		if binding.Body {
 			var err error
 
-			body, err = readBody(c, op.Spec.Name)
+			body, err = readBody(ectx, op.Spec.Name)
 			if err != nil {
-				return fail(c, err, corr)
+				return fail(ectx, err, corr)
 			}
 		}
 
-		in, err := b.Input(c, body)
+		in, err := binding.Input(ectx, body)
 		if err != nil {
-			return fail(c, err, corr)
+			return fail(ectx, err, corr)
 		}
 
-		return r.run(c, op, in, corr)
+		return r.run(ectx, op, in, corr)
 	}
 }

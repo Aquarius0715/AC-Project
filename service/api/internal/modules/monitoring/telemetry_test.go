@@ -16,8 +16,8 @@ import (
 func TestSeriesInputFilters(t *testing.T) {
 	from := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
 
-	in := func(filters string) *SeriesInput {
-		x := &SeriesInput{
+	input := func(filters string) *SeriesInput {
+		seriesInput := &SeriesInput{
 			From:          from,
 			To:            from.Add(time.Hour),
 			UnitIDs:       []uuid.UUID{uuid.New()},
@@ -28,7 +28,7 @@ func TestSeriesInputFilters(t *testing.T) {
 			Query:         paging.Query{Cursor: nil, Limit: nil, Sort: nil, Filters: nil},
 		}
 		if filters != "" {
-			x.Query = paging.Query{
+			seriesInput.Query = paging.Query{
 				Filters: json.RawMessage(filters),
 				Cursor:  nil,
 				Limit:   nil,
@@ -36,15 +36,15 @@ func TestSeriesInputFilters(t *testing.T) {
 			}
 		}
 
-		return x
+		return seriesInput
 	}
 	for _, ok := range []string{"", "{}", "null"} {
-		if fe := in(ok).Validate(); len(fe) != 0 {
+		if fe := input(ok).Validate(); len(fe) != 0 {
 			t.Errorf("filters %q: %v", ok, fe)
 		}
 	}
 
-	if fe := in(
+	if fe := input(
 		`{"unitId":"x"}`,
 	).Validate(); len(fe) != 1 ||
 		fe["query.filters"] != "error.invalid" {

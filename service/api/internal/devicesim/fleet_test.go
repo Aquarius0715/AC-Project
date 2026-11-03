@@ -6,40 +6,40 @@ import "testing"
 // power signal off, tamper detected, each telemetry problem the API flags, each way a module answers a command, the
 // three modes and fan levels, a unit switched off, a unit without a module and an archived unit.
 func TestMockFleetCoversEveryState(t *testing.T) {
-	f, err := MockFleet()
+	fleet, err := MockFleet()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	has := map[string]bool{}
-	for _, p := range f.Patterns {
-		has["connection="+p.Connection] = true
-		has["power="+p.PowerSignal] = true
-		has["tamper="+p.Tamper] = true
-		has["telemetry="+p.Telemetry] = true
+	for _, pattern := range fleet.Patterns {
+		has["connection="+pattern.Connection] = true
+		has["power="+pattern.PowerSignal] = true
+		has["tamper="+pattern.Tamper] = true
+		has["telemetry="+pattern.Telemetry] = true
 
-		has["commands="+p.Commands] = true
-		if p.State.Mode != nil {
-			has["mode="+*p.State.Mode] = true
+		has["commands="+pattern.Commands] = true
+		if pattern.State.Mode != nil {
+			has["mode="+*pattern.State.Mode] = true
 		}
 
-		if p.State.FanLevel != nil {
-			has["fan="+*p.State.FanLevel] = true
+		if pattern.State.FanLevel != nil {
+			has["fan="+*pattern.State.FanLevel] = true
 		}
 
-		if p.State.Power != nil && !*p.State.Power {
+		if pattern.State.Power != nil && !*pattern.State.Power {
 			has["switched off"] = true
 		}
 
-		if p.NoDevice {
+		if pattern.NoDevice {
 			has["no module"] = true
 		}
 
-		if p.Archived {
+		if pattern.Archived {
 			has["archived"] = true
 		}
 
-		if f.FirmwareOf(p) != f.Firmware {
+		if fleet.FirmwareOf(pattern) != fleet.Firmware {
 			has["other firmware"] = true
 		}
 	}
@@ -61,7 +61,7 @@ func TestMockFleetCoversEveryState(t *testing.T) {
 
 // TestFleetNames: each pattern's records have their own fixture-style names.
 func TestFleetNames(t *testing.T) {
-	p := Pattern{
+	pattern := Pattern{
 		Key:         "cool-on",
 		Name:        "",
 		Room:        "",
@@ -80,15 +80,15 @@ func TestFleetNames(t *testing.T) {
 		Telemetry: "",
 		Commands:  "",
 	}
-	if UnitName(p) != "unit-mock-cool-on" || DeviceName(p) != "device-mock-cool-on" ||
-		BindingName(p) != "binding-mock-cool-on" ||
-		SensorName(p, Sensors[0]) != "sensor-mock-cool-on-temperature" {
+	if UnitName(pattern) != "unit-mock-cool-on" || DeviceName(pattern) != "device-mock-cool-on" ||
+		BindingName(pattern) != "binding-mock-cool-on" ||
+		SensorName(pattern, Sensors[0]) != "sensor-mock-cool-on-temperature" {
 		t.Errorf(
 			"names %s %s %s %s",
-			UnitName(p),
-			DeviceName(p),
-			BindingName(p),
-			SensorName(p, Sensors[0]),
+			UnitName(pattern),
+			DeviceName(pattern),
+			BindingName(pattern),
+			SensorName(pattern, Sensors[0]),
 		)
 	}
 }
@@ -115,20 +115,20 @@ func TestFleetRefusesBadDefinitions(t *testing.T) {
 
 // TestEveryUnitIsInARoom: every pattern's unit is in a room of the fleet's floors, and the rooms hold the 20 units.
 func TestEveryUnitIsInARoom(t *testing.T) {
-	f, err := MockFleet()
+	fleet, err := MockFleet()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	rooms := map[string]int{}
 
-	for _, fl := range f.Floors {
+	for _, fl := range fleet.Floors {
 		for _, r := range fl.Rooms {
 			rooms[r.Key] = 0
 		}
 	}
 
-	for _, p := range f.Patterns {
+	for _, p := range fleet.Patterns {
 		if _, ok := rooms[p.Room]; !ok {
 			t.Errorf("%s is in no room (%q)", p.Key, p.Room)
 		}
@@ -136,7 +136,12 @@ func TestEveryUnitIsInARoom(t *testing.T) {
 		rooms[p.Room]++
 	}
 
-	if len(f.Floors) != 3 || len(rooms) != 10 || SpaceName("lab") != "space-mock-lab" {
-		t.Errorf("%d floors, %d rooms, space name %s", len(f.Floors), len(rooms), SpaceName("lab"))
+	if len(fleet.Floors) != 3 || len(rooms) != 10 || SpaceName("lab") != "space-mock-lab" {
+		t.Errorf(
+			"%d floors, %d rooms, space name %s",
+			len(fleet.Floors),
+			len(rooms),
+			SpaceName("lab"),
+		)
 	}
 }

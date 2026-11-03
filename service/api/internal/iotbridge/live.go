@@ -57,7 +57,7 @@ func LiveNode(topic string) string {
 // IR529), and the module's heartbeat comes last: a state report with no settings (the nodes report none), which the
 // API takes as heard only (IR528) and which keeps the unit's last seen time current. A node the bridge does not know is
 // an error; a message with nothing measured gives no triggers.
-func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) {
+func LiveTriggers(node string, payload []byte, when time.Time) ([]Trigger, error) {
 	fields, ok := LiveNodes[node]
 	if !ok {
 		return nil, fmt.Errorf("node %q is not a live-site node", node)
@@ -75,8 +75,8 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 
 		return v, ok
 	}
-	at = at.UTC()
-	slot := at.Truncate(time.Minute)
+	when = when.UTC()
+	slot := when.Truncate(time.Minute)
 
 	units := map[string]seed.LiveSensor{}
 	for _, s := range seed.LiveSite.Sensors {
@@ -85,23 +85,27 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 
 	var out []Trigger
 
-	for _, f := range fields {
-		g, ok := num(f.Gate)
+	for _, liveField := range fields {
+		g, ok := num(liveField.Gate)
 
-		v, has := num(f.Field)
+		v, has := num(liveField.Field)
 		if !ok || g == 0 || !has {
 			continue
 		}
 
-		s, ok := units[f.Sensor]
+		liveSensor, ok := units[liveField.Sensor]
 		if !ok {
-			return nil, fmt.Errorf("node %s: the live module has no sensor %s", node, f.Sensor)
+			return nil, fmt.Errorf(
+				"node %s: the live module has no sensor %s",
+				node,
+				liveField.Sensor,
+			)
 		}
 
-		value := v * f.Scale
+		value := v * liveField.Scale
 		event := uuid.NewSHA1(
 			seed.Namespace,
-			[]byte(fmt.Sprintf("live/%s/%s/%s", node, f.Field, slot.Format(time.RFC3339))),
+			[]byte(fmt.Sprintf("live/%s/%s/%s", node, liveField.Field, slot.Format(time.RFC3339))),
 		)
 		out = append(out, Trigger{
 			ScenarioID: Scenario,
@@ -112,12 +116,12 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 				UnitID: seed.ID(
 					seed.LiveSite.Unit,
 				),
-				SensorID:   seed.ID(s.Name),
-				Metric:     s.Metric,
+				SensorID:   seed.ID(liveSensor.Name),
+				Metric:     liveSensor.Metric,
 				Value:      &value,
-				Unit:       s.Unit,
+				Unit:       liveSensor.Unit,
 				ObservedAt: slot,
-				ReceivedAt: at,
+				ReceivedAt: when,
 				Origin:     "measured",
 				Quality:    "valid",
 				EventID:    event, Sequence: nil,
@@ -131,14 +135,14 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 	// the same readings as facts of the unit's alert policies (IR529): a rule over a threshold alerts and notifies
 	facts := make([]Fact, 0, len(out))
 	for _, tr := range out {
-		m := tr.Measurement
+		measurement := tr.Measurement
 		facts = append(
 			facts,
 			Fact{
-				UnitID:     m.UnitID,
-				Metric:     m.Metric,
-				Value:      *m.Value,
-				Unit:       m.Unit,
+				UnitID:     measurement.UnitID,
+				Metric:     measurement.Metric,
+				Value:      *measurement.Value,
+				Unit:       measurement.Unit,
 				ObservedAt: slot,
 				Quality:    "valid",
 			},
@@ -183,17 +187,17 @@ func LiveTriggers(node string, payload []byte, at time.Time) ([]Trigger, error) 
 }
 
 // liveEvaluation is a demo automation trigger of the live unit's facts, with an event ID from key.
-func liveEvaluation(key string, at time.Time, facts []Fact) Trigger {
+func liveEvaluation(key string, when time.Time, facts []Fact) Trigger {
 	event := uuid.NewSHA1(seed.Namespace, []byte(key))
 
 	return Trigger{
 		ScenarioID: Scenario,
 		EventID:    event,
-		OccurredAt: at,
+		OccurredAt: when,
 		EventType:  "automation",
 		Event: &Evaluation{
 			EventID:    event,
-			OccurredAt: at,
+			OccurredAt: when,
 			UnitIDs:    []uuid.UUID{seed.ID(seed.LiveSite.Unit)},
 			Facts:      facts,
 			Phase:      "condition",
@@ -246,7 +250,7 @@ type ConnectionFault struct {
 // naming the open fault, once every node is heard again. ok is false when the connection already matches, or while the
 // module is unbound. The sequence follows the API's newest on the axis, and the event IDs come from the binding and
 // sequence or the fault, so a repeat is one event.
-func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, at time.Time) (Trigger, bool) {
+func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, when time.Time) (Trigger, bool) {
 	if f.BindingID == nil {
 		return Trigger{
 			ScenarioID:  "",
@@ -267,9 +271,9 @@ func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, at time.Time) (
 
 	dev, seq := seed.ID(seed.LiveSite.Device), f.Sequence+1
 
-	tr := Trigger{
+	trigger := Trigger{
 		ScenarioID:  Scenario,
-		OccurredAt:  at.UTC(),
+		OccurredAt:  when.UTC(),
 		EventType:   "device",
 		DeviceID:    &dev,
 		BindingID:   f.BindingID,
@@ -284,15 +288,15 @@ func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, at time.Time) (
 	}
 	switch {
 	case f.FaultID == nil && gap >= LiveOfflineAfter:
-		tr.Kind = "communication_lost"
-		tr.EventID = uuid.NewSHA1(
+		trigger.Kind = "communication_lost"
+		trigger.EventID = uuid.NewSHA1(
 			seed.Namespace,
 			[]byte(fmt.Sprintf("live/lost/%s/%d", f.BindingID, seq)),
 		)
 	case f.FaultID != nil && gap < LiveOnlineWithin:
-		tr.Kind = "restored"
-		tr.Recovery = &Recovery{Axis: "connection", SourceEventID: *f.FaultID, Value: "online"}
-		tr.EventID = uuid.NewSHA1(seed.Namespace, []byte("live/restored/"+f.FaultID.String()))
+		trigger.Kind = "restored"
+		trigger.Recovery = &Recovery{Axis: "connection", SourceEventID: *f.FaultID, Value: "online"}
+		trigger.EventID = uuid.NewSHA1(seed.Namespace, []byte("live/restored/"+f.FaultID.String()))
 	default:
 		return Trigger{
 			ScenarioID:  "",
@@ -311,7 +315,7 @@ func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, at time.Time) (
 		}, false
 	}
 
-	return tr, true
+	return trigger, true
 }
 
 // LiveHeard keeps when each live node was last heard, for the heartbeat gap. A node not heard since the bridge started
@@ -441,19 +445,23 @@ func LiveCommand(
 // (infrared is one-way: the node answers nothing, so the acknowledgement means the broker took the command), then,
 // when the command sets more than its own action (COOL24), the module's state report with those settings at stateAt
 // (no later than the API's clock, which refuses a report from its future).
-func LiveSentTriggers(w Waiting, at, stateAt time.Time, state *devicesim.ReportedState) []Trigger {
-	at = at.UTC()
+func LiveSentTriggers(
+	w Waiting,
+	when, stateAt time.Time,
+	state *devicesim.ReportedState,
+) []Trigger {
+	when = when.UTC()
 	cmd, dev := w.ID, seed.ID(seed.LiveSite.Device)
 
 	out := []Trigger{
-		SentTrigger(w, at),
+		SentTrigger(w, when),
 		{
 			ScenarioID: Scenario,
 			EventID: uuid.NewSHA1(
 				seed.Namespace,
 				[]byte(fmt.Sprintf("%s/%s/command_ack", dev, cmd)),
 			),
-			OccurredAt:  at,
+			OccurredAt:  when,
 			EventType:   "command_ack",
 			CommandID:   &cmd,
 			Measurement: nil,
@@ -489,7 +497,7 @@ func LiveSentTriggers(w Waiting, at, stateAt time.Time, state *devicesim.Reporte
 
 // LiveRefusedTrigger fails a command the live module cannot carry out: an action the firmware does not take, or any
 // command while sending to the nodes is off (REAL_MQTT_COMMANDS).
-func LiveRefusedTrigger(w Waiting, at time.Time) Trigger {
+func LiveRefusedTrigger(w Waiting, when time.Time) Trigger {
 	cmd := w.ID
 
 	return Trigger{
@@ -498,7 +506,7 @@ func LiveRefusedTrigger(w Waiting, at time.Time) Trigger {
 			seed.Namespace,
 			[]byte(fmt.Sprintf("%s/%s/command_fail", seed.ID(seed.LiveSite.Device), cmd)),
 		),
-		OccurredAt:  at.UTC(),
+		OccurredAt:  when.UTC(),
 		EventType:   "command_fail",
 		CommandID:   &cmd,
 		Measurement: nil,

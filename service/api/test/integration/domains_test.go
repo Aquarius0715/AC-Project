@@ -10,21 +10,21 @@ import (
 // IR180: a business-domain service answers only its own operations; others are NOT_FOUND as if unknown, so a request
 // routed to the wrong service never runs. Data of other domains comes from their services (IR193).
 func TestDomainServiceServesOnlyItsOperations(t *testing.T) {
-	cl := newCluster(t)
+	cluster := newCluster(t)
 
-	billing := cl.srv[ops.DomainBilling]
+	billing := cluster.srv[ops.DomainBilling]
 	if code, m := post(billing, &customerA, "invoices.list", `{"limit":1}`); code != 200 {
 		t.Fatalf("billing-api invoices.list: %d %v", code, m)
 	}
 
-	if code, m := post(
+	if code, res := post(
 		billing,
 		&customerA,
 		"units.list",
 		`{"limit":1}`,
 	); code != 404 ||
-		m["messageKey"] != "error.unknownOperation" {
-		t.Fatalf("billing-api units.list: %d %v", code, m)
+		res["messageKey"] != "error.unknownOperation" {
+		t.Fatalf("billing-api units.list: %d %v", code, res)
 	}
 
 	two := serverCfg(t, func(c *apiserver.Config) {
@@ -33,9 +33,9 @@ func TestDomainServiceServesOnlyItsOperations(t *testing.T) {
 			ops.DomainBilling,
 		}, "test-internal"
 		c.ServiceURLs = map[string]string{
-			ops.DomainIdentity:    cl.urls[ops.DomainIdentity],
-			ops.DomainMaintenance: cl.urls[ops.DomainMaintenance],
-			ops.DomainEnergy:      cl.urls[ops.DomainEnergy],
+			ops.DomainIdentity:    cluster.urls[ops.DomainIdentity],
+			ops.DomainMaintenance: cluster.urls[ops.DomainMaintenance],
+			ops.DomainEnergy:      cluster.urls[ops.DomainEnergy],
 		}
 	})
 	if code, _ := post(two, &customerA, "units.list", `{"limit":1}`); code != 200 {

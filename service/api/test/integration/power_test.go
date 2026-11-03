@@ -12,15 +12,15 @@ import (
 // TestEffectivePowerSR27 covers the SR27 boundaries: freshness of observation and measurement, quality, origin,
 // null values, unknown sensors and no fallback to older valid rows.
 func TestEffectivePowerSR27(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	tenant := seed.ID("tenant-a")
 	power := func(u string) string {
-		_, m := post(s, &hq, "units.get", `{"id":"`+u+`"}`)
+		_, m := post(srv, &hq, "units.get", `{"id":"`+u+`"}`)
 
 		return data(m)["effectivePowerState"].(string)
 	}
 	setup := func(observedAgo time.Duration, connection string) (string, string) {
-		u := newUnit(t, s, "Power AC")
+		unit := newUnit(t, srv, "Power AC")
 		dev, sensor := uuid.NewString(), uuid.NewString()
 
 		owner(
@@ -28,7 +28,7 @@ func TestEffectivePowerSR27(t *testing.T) {
 			`UPDATE assets.units SET connection = $2, observed_state = jsonb_build_object('power', true, 'celsius', 25, 'mode',
 				'cool', 'fanLevel', 'mid', 'observedAt', $3::timestamptz)
 			WHERE id = $1`,
-			u,
+			unit,
 			connection,
 			clock.Add(-observedAgo),
 		)
@@ -39,7 +39,7 @@ func TestEffectivePowerSR27(t *testing.T) {
 			dev,
 			tenant,
 			"PW-"+dev[:8],
-			u,
+			unit,
 			seed.ID("hq-operator"),
 		)
 		owner(
@@ -51,16 +51,16 @@ func TestEffectivePowerSR27(t *testing.T) {
 			dev,
 		)
 
-		return u, sensor
+		return unit, sensor
 	}
-	reading := func(u, sensor string, ago time.Duration, seq int, origin, quality string, value any) {
+	reading := func(unit, sensor string, ago time.Duration, seq int, origin, quality string, value any) {
 		owner(
 			t,
 			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
 				origin, quality, received_at, event_id)
 			VALUES ($1,$2,$3,'power',$4,$5,$6,'kW',$7,$8,$4,$9)`,
 			tenant,
-			u,
+			unit,
 			sensor,
 			clock.Add(-ago),
 			seq,

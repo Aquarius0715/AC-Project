@@ -34,14 +34,14 @@ func TestPersonAddedAgain(t *testing.T) {
 		lost:       nil,
 		generation: 0,
 	}
-	s := serverCfg(
+	srv := serverCfg(
 		t,
 		func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains },
 	)
 	drain := func() {
 		t.Helper()
 
-		err := s.DrainEvents(context.Background())
+		err := srv.DrainEvents(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -54,7 +54,7 @@ func TestPersonAddedAgain(t *testing.T) {
 		}
 
 		return write(
-			s,
+			srv,
 			a,
 			"partnerUsers.save",
 			`{"email":"`+email+`","partnerRole":"`+role+`","displayName":"`+name+`"`+access+`}`,
@@ -66,14 +66,14 @@ func TestPersonAddedAgain(t *testing.T) {
 	remove := func(id, membership string) {
 		t.Helper()
 
-		if code, m := write(
-			s,
+		if code, res := write(
+			srv,
 			&contrA,
 			"partnerUsers.remove",
 			`{"id":"`+id+`","reason":"added with the wrong role"}`,
 			1,
 		); code != 200 {
-			t.Fatalf("remove: %d %v", code, m)
+			t.Fatalf("remove: %d %v", code, res)
 		}
 
 		drain()
@@ -94,12 +94,12 @@ func TestPersonAddedAgain(t *testing.T) {
 		)
 	}
 
-	code, m := add(&contrA, "technician", "First Name")
+	code, resp := add(&contrA, "technician", "First Name")
 	if code != 200 {
-		t.Fatalf("add: %d %v", code, m)
+		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	first, firstMembership := data(m)["id"].(string), data(m)["membershipId"].(string)
+	first, firstMembership := data(resp)["id"].(string), data(resp)["membershipId"].(string)
 
 	drain()
 
@@ -118,24 +118,25 @@ func TestPersonAddedAgain(t *testing.T) {
 	) // as if they had signed in
 
 	for name, a := range map[string]*actor{"the same company": &contrA, "another company": &contrB} {
-		if code, m := add(
+		if code, res := add(
 			a,
 			"contractor",
 			"X",
 		); code != 422 ||
-			fields(m) != "email=errors.email_taken" {
-			t.Errorf("%s while the person is a user: %d %s", name, code, fields(m))
+			fields(res) != "email=errors.email_taken" {
+			t.Errorf("%s while the person is a user: %d %s", name, code, fields(res))
 		}
 	}
 
 	remove(first, firstMembership)
 
-	code, m = add(&contrA, "contractor", "Second Name")
-	if code != 200 || data(m)["status"] != "invited" || data(m)["membershipId"] == firstMembership {
-		t.Fatalf("added again: %d %v", code, m)
+	code, resp = add(&contrA, "contractor", "Second Name")
+	if code != 200 || data(resp)["status"] != "invited" ||
+		data(resp)["membershipId"] == firstMembership {
+		t.Fatalf("added again: %d %v", code, resp)
 	}
 
-	again, membership := data(m)["id"].(string), data(m)["membershipId"].(string)
+	again, membership := data(resp)["id"].(string), data(resp)["membershipId"].(string)
 
 	var (
 		same, signIn string
@@ -171,8 +172,8 @@ func TestPersonAddedAgain(t *testing.T) {
 	// HQ gives the removed person a membership: the account signs in with it
 	remove(again, membership)
 
-	code, m = write(
-		s,
+	code, resp = write(
+		srv,
 		&hq,
 		"members.save",
 		`{"userId":"`+user+`","organizationId":"`+seed.ID("org-contractor-b").
@@ -189,10 +190,10 @@ func TestPersonAddedAgain(t *testing.T) {
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("HQ: %d %v", code, m)
+		t.Fatalf("HQ: %d %v", code, resp)
 	}
 
-	hqMembership := data(m)["id"].(string)
+	hqMembership := data(resp)["id"].(string)
 
 	drain()
 
@@ -212,7 +213,7 @@ func TestPersonAddedAgain(t *testing.T) {
 // TestPersonOfAnotherTenant (IR462): an address whose person signs in with another tenant's membership is
 // errors.email_taken, though their membership here has ended.
 func TestPersonOfAnotherTenant(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	email := "foreign-" + uuid.NewString()[:8] + "@example.com"
 	user, foreign, local := uuid.New(), uuid.New(), uuid.New()
 	owner(
@@ -248,8 +249,8 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 		owner(t, `DELETE FROM identity.users WHERE id = $1`, user)
 	})
 
-	code, m := write(
-		s,
+	code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.save",
 		`{"email":"`+email+`","partnerRole":"technician","displayName":"Foreign","accessUntil":"`+clock.Add(24*time.Hour).
@@ -257,8 +258,8 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 			`"}`,
 		0,
 	)
-	if code != 422 || fields(m) != "email=errors.email_taken" {
-		t.Errorf("another tenant's person: %d %s", code, fields(m))
+	if code != 422 || fields(res) != "email=errors.email_taken" {
+		t.Errorf("another tenant's person: %d %s", code, fields(res))
 	}
 }
 
@@ -277,7 +278,7 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 		lost:       nil,
 		generation: 0,
 	}
-	s := serverCfg(
+	srv := serverCfg(
 		t,
 		func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains },
 	)
@@ -327,17 +328,17 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 	set := func(status string, v int) {
 		t.Helper()
 
-		if code, m := write(
-			s,
+		if code, res := write(
+			srv,
 			&contrB,
 			"partnerUsers.save",
 			`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","status":"`+status+`","reason":"on leave"}`,
 			v,
 		); code != 200 {
-			t.Fatalf("%s: %d %v", status, code, m)
+			t.Fatalf("%s: %d %v", status, code, res)
 		}
 
-		err := s.DrainEvents(context.Background())
+		err := srv.DrainEvents(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -365,10 +366,10 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 // person, a new client membership with the new role. (Only a person whose account the provider opened for this tenant
 // is taken back, hence the provider and the drained events.)
 func TestClientAddedAgain(t *testing.T) {
-	s := serverCfg(
+	srv := serverCfg(
 		t,
-		func(c *apiserver.Config) {
-			c.IdentityProvider = &fakeIdP{
+		func(config *apiserver.Config) {
+			config.IdentityProvider = &fakeIdP{
 				mu:         sync.Mutex{},
 				subjects:   nil,
 				err:        nil,
@@ -380,14 +381,14 @@ func TestClientAddedAgain(t *testing.T) {
 				lost:       nil,
 				generation: 0,
 			}
-			c.Domains = ops.Domains
+			config.Domains = ops.Domains
 		},
 	)
 	cust := seed.ID("cust-b").String()
 	email := "client-again-" + uuid.NewString()[:8] + "@example.com"
 	add := func(role string) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&customerB,
 			"clientUsers.save",
 			`{"customerId":"`+cust+`","email":"`+email+`","clientRole":"`+role+`","displayName":"Client Again"}`,
@@ -395,26 +396,26 @@ func TestClientAddedAgain(t *testing.T) {
 		)
 	}
 
-	code, m := add("member")
+	code, res := add("member")
 	if code != 200 {
-		t.Fatalf("add: %d %v", code, m)
+		t.Fatalf("add: %d %v", code, res)
 	}
 
-	first := data(m)["membershipId"].(string)
+	first := data(res)["membershipId"].(string)
 
-	err := s.DrainEvents(context.Background())
+	err := srv.DrainEvents(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&customerB,
 		"clientUsers.remove",
-		`{"id":"`+data(m)["id"].(string)+`","reason":"should be an owner"}`,
+		`{"id":"`+data(res)["id"].(string)+`","reason":"should be an owner"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("remove: %d %v", code, m)
+		t.Fatalf("remove: %d %v", code, resp)
 	}
 	// the test clock stands still: the removal comes after the adding (see TestPersonAddedAgain)
 	owner(
@@ -424,12 +425,12 @@ func TestClientAddedAgain(t *testing.T) {
 		clock,
 	)
 
-	code, m = add("owner")
-	if code != 200 || data(m)["clientRole"] != "owner" {
-		t.Fatalf("added again: %d %v", code, m)
+	code, res = add("owner")
+	if code != 200 || data(res)["clientRole"] != "owner" {
+		t.Fatalf("added again: %d %v", code, res)
 	}
 
-	again := data(m)["membershipId"].(string)
+	again := data(res)["membershipId"].(string)
 
 	t.Cleanup(func() { // later tests count customer B's owners: this one ends before them
 		owner(
@@ -475,14 +476,14 @@ func TestAccountProviderTrouble(t *testing.T) {
 		lost:       nil,
 		generation: 0,
 	}
-	s := serverCfg(
+	srv := serverCfg(
 		t,
 		func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains },
 	)
 	drain := func() {
 		t.Helper()
 
-		err := s.DrainEvents(context.Background())
+		err := srv.DrainEvents(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -491,8 +492,8 @@ func TestAccountProviderTrouble(t *testing.T) {
 	add := func() (string, string) {
 		t.Helper()
 
-		code, m := write(
-			s,
+		code, res := write(
+			srv,
 			&contrA,
 			"partnerUsers.save",
 			`{"email":"`+email+`","partnerRole":"technician","displayName":"Trouble Tech",`+
@@ -502,10 +503,10 @@ func TestAccountProviderTrouble(t *testing.T) {
 			0,
 		)
 		if code != 200 {
-			t.Fatalf("add: %d %v", code, m)
+			t.Fatalf("add: %d %v", code, res)
 		}
 
-		return data(m)["id"].(string), data(m)["membershipId"].(string)
+		return data(res)["id"].(string), data(res)["membershipId"].(string)
 	}
 	account := func(membership string) (sub, signIn string) {
 		t.Helper()
@@ -537,14 +538,14 @@ func TestAccountProviderTrouble(t *testing.T) {
 		id,
 	) // past the 5-minute wait (IR423)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.resendInvite",
 		`{"id":"`+id+`"}`,
 		0,
 	); code != 200 {
-		t.Fatalf("resend: %d %v", code, m)
+		t.Fatalf("resend: %d %v", code, res)
 	}
 
 	drain()
@@ -554,14 +555,14 @@ func TestAccountProviderTrouble(t *testing.T) {
 	}
 
 	// removed, then added again while the provider no longer knows the account: a new one is opened
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"partnerUsers.remove",
 		`{"id":"`+id+`","reason":"left"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("remove: %d %v", code, m)
+		t.Fatalf("remove: %d %v", code, res)
 	}
 
 	drain()
@@ -588,7 +589,7 @@ func TestAccountProviderTrouble(t *testing.T) {
 // accounts to their organization in 24 hours — the next is RATE_LIMITED errors.too_many_accounts with the seconds until
 // the oldest of them is a day old; HQ is not limited.
 func TestAccountsPerOrgPerDay(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	filler := uuid.New()
 	owner(
 		t,
@@ -600,7 +601,7 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 	var ids []uuid.UUID
 
 	for _, org := range []string{"org-contractor-b", "org-customer-b"} {
-		for i := range identity.AccountsPerOrgPerDay { // ended memberships added 1 h to 1 h 29 min ago
+		for idx := range identity.AccountsPerOrgPerDay { // ended memberships added 1 h to 1 h 29 min ago
 			id := uuid.New()
 			ids = append(ids, id)
 
@@ -625,7 +626,7 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 					-3*time.Hour,
 				),
 				clock.Add(-2*time.Hour),
-				clock.Add(-time.Hour-time.Duration(i)*time.Minute),
+				clock.Add(-time.Hour-time.Duration(idx)*time.Minute),
 			)
 		}
 	}
@@ -636,8 +637,8 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 	})
 	// the wait runs until the oldest of the latest 30 is a day old: at most 23 h, as each of ours is an hour old or more
 	// (other tests may have added to contractor B since, which only shortens it)
-	code, m := write(
-		s,
+	code, res := write(
+		srv,
 		&contrB,
 		"partnerUsers.save",
 		`{"email":"cap-`+uuid.NewString()[:8]+`@example.com","partnerRole":"technician","displayName":"Cap Tech",`+
@@ -647,17 +648,17 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 		0,
 	)
 
-	wait, _ := m["retryAfterSeconds"].(float64)
-	if code != 429 || m["messageKey"] != "errors.too_many_accounts" || wait <= 0 ||
+	wait, _ := res["retryAfterSeconds"].(float64)
+	if code != 429 || res["messageKey"] != "errors.too_many_accounts" || wait <= 0 ||
 		wait > float64(23*time.Hour/time.Second) {
-		t.Errorf("contractor over the cap: %d %v", code, m)
+		t.Errorf("contractor over the cap: %d %v", code, res)
 	}
 
 	cust := seed.ID("cust-b").String()
 
 	add := func(a *actor) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			a,
 			"clientUsers.save",
 			`{"customerId":"`+cust+`","email":"cap-`+uuid.NewString()[:8]+`@example.com","clientRole":"member",`+
@@ -669,18 +670,18 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 		t.Errorf("customer owner over the cap: %d %v", code, m)
 	}
 
-	code, m = add(&hq)
+	code, res = add(&hq)
 	if code != 200 {
-		t.Fatalf("HQ is not limited: %d %v", code, m)
+		t.Fatalf("HQ is not limited: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&hq,
 		"clientUsers.remove",
-		`{"id":"`+data(m)["id"].(string)+`","reason":"cap test"}`,
+		`{"id":"`+data(res)["id"].(string)+`","reason":"cap test"}`,
 		1,
 	); code != 200 {
-		t.Errorf("remove: %d %v", code, m)
+		t.Errorf("remove: %d %v", code, resp)
 	}
 }

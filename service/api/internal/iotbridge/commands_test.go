@@ -13,38 +13,40 @@ import (
 // TestCommandMessageFromTheStoredAction: a stored set-temperature action becomes the module's command with its setpoint
 // and expiry; an action without a kind is refused; the sent report names the command.
 func TestCommandMessageFromTheStoredAction(t *testing.T) {
-	w := Waiting{
+	waiting := Waiting{
 		ID:        uuid.MustParse("9f67089f-44c9-5231-ba20-03d3b9a1be53"),
 		DeviceID:  DeviceID("device-online-rto"),
 		Action:    json.RawMessage(`{"kind":"set_temperature","celsius":26}`),
 		ExpiresAt: time.Date(2026, 10, 13, 3, 0, 0, 0, time.UTC), UnitID: uuid.UUID{},
 	}
 
-	cmd, err := CommandMessage(w, 0)
+	cmd, err := CommandMessage(waiting, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if cmd.CommandID != w.ID.String() || cmd.Kind != "set_temperature" || cmd.Setpoint == nil ||
+	if cmd.CommandID != waiting.ID.String() || cmd.Kind != "set_temperature" ||
+		cmd.Setpoint == nil ||
 		*cmd.Setpoint != 26 ||
-		!cmd.ExpiresAt.Equal(w.ExpiresAt) {
+		!cmd.ExpiresAt.Equal(waiting.ExpiresAt) {
 		t.Errorf("command %+v", cmd)
 	}
 
-	w.Action = json.RawMessage(`{"celsius":26}`)
+	waiting.Action = json.RawMessage(`{"celsius":26}`)
 
-	_, commandMessageErr := CommandMessage(w, 0)
+	_, commandMessageErr := CommandMessage(waiting, 0)
 	if commandMessageErr == nil {
 		t.Error("an action without a kind is accepted")
 	}
 
-	tr := SentTrigger(w, w.ExpiresAt)
-	if tr.EventType != "command_sent" || tr.CommandID == nil || *tr.CommandID != w.ID ||
-		tr.Measurement != nil {
-		t.Errorf("sent trigger %+v", tr)
+	trigger := SentTrigger(waiting, waiting.ExpiresAt)
+	if trigger.EventType != "command_sent" || trigger.CommandID == nil ||
+		*trigger.CommandID != waiting.ID ||
+		trigger.Measurement != nil {
+		t.Errorf("sent trigger %+v", trigger)
 	}
 
-	if SentTrigger(w, w.ExpiresAt).EventID != tr.EventID {
+	if SentTrigger(waiting, waiting.ExpiresAt).EventID != trigger.EventID {
 		t.Error("a repeated report has another event ID")
 	}
 }
@@ -62,7 +64,7 @@ func TestCommandTopicOfTheDevice(t *testing.T) {
 
 // TestCommandMessageRefusesBadActions: an action that is not JSON is refused with the command named.
 func TestCommandMessageRefusesBadActions(t *testing.T) {
-	w := Waiting{
+	waiting := Waiting{
 		ID:        uuid.New(),
 		Action:    json.RawMessage(`{"kind":`),
 		DeviceID:  uuid.UUID{},
@@ -70,7 +72,7 @@ func TestCommandMessageRefusesBadActions(t *testing.T) {
 		ExpiresAt: time.Time{},
 	}
 
-	_, err := CommandMessage(w, 0)
+	_, err := CommandMessage(waiting, 0)
 	if err == nil {
 		t.Error("an action that is not JSON is accepted")
 	}
@@ -81,13 +83,13 @@ func TestCommandMessageRefusesBadActions(t *testing.T) {
 func TestCommandExpiryOnTheDeviceClock(t *testing.T) {
 	scenario := time.Date(2026, 9, 14, 22, 0, 30, 0, time.UTC)
 	offset := -29 * 24 * time.Hour // scenario minus real
-	w := Waiting{
+	waiting := Waiting{
 		ID:        uuid.New(),
 		Action:    json.RawMessage(`{"kind":"set_temperature","celsius":26}`),
 		ExpiresAt: scenario, DeviceID: uuid.UUID{}, UnitID: uuid.UUID{},
 	}
 
-	cmd, err := CommandMessage(w, offset)
+	cmd, err := CommandMessage(waiting, offset)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,9 +105,9 @@ func TestCommandExpiryOnTheDeviceClock(t *testing.T) {
 func TestStateTriggerFromAHeartbeat(t *testing.T) {
 	on, c := true, 24.0
 	dev := DeviceID("device-mock-cool-on")
-	at := time.Date(2026, 9, 15, 1, 30, 0, 0, time.UTC)
+	when := time.Date(2026, 9, 15, 1, 30, 0, 0, time.UTC)
 
-	tr, err := StateTrigger(
+	trigger, err := StateTrigger(
 		devicesim.Heartbeat{
 			DeviceID: dev.String(),
 			State: &devicesim.ReportedState{
@@ -117,23 +119,24 @@ func TestStateTriggerFromAHeartbeat(t *testing.T) {
 			At:       time.Time{},
 			Firmware: "",
 		},
-		at,
+		when,
 	)
-	if err != nil || tr.EventType != "state" || tr.DeviceID == nil || *tr.DeviceID != dev ||
-		tr.State == nil ||
-		*tr.State.Celsius != 24 ||
-		!tr.OccurredAt.Equal(at) {
-		t.Fatalf("state trigger %+v err=%v", tr, err)
+	if err != nil || trigger.EventType != "state" || trigger.DeviceID == nil ||
+		*trigger.DeviceID != dev ||
+		trigger.State == nil ||
+		*trigger.State.Celsius != 24 ||
+		!trigger.OccurredAt.Equal(when) {
+		t.Fatalf("state trigger %+v err=%v", trigger, err)
 	}
 
-	tr, err = StateTrigger(
+	trigger, err = StateTrigger(
 		devicesim.Heartbeat{DeviceID: dev.String(), At: time.Time{}, Firmware: "", State: nil},
-		at,
+		when,
 	)
-	if err != nil || tr.EventType != "state" || tr.State == nil ||
-		*tr.State != (devicesim.ReportedState{Power: nil, Celsius: nil, Mode: nil, FanLevel: nil}) ||
-		!tr.OccurredAt.Equal(at) {
-		t.Errorf("a heartbeat without a state: %+v err=%v", tr, err)
+	if err != nil || trigger.EventType != "state" || trigger.State == nil ||
+		*trigger.State != (devicesim.ReportedState{Power: nil, Celsius: nil, Mode: nil, FanLevel: nil}) ||
+		!trigger.OccurredAt.Equal(when) {
+		t.Errorf("a heartbeat without a state: %+v err=%v", trigger, err)
 	}
 
 	_, stateTriggerErr := StateTrigger(
@@ -143,7 +146,7 @@ func TestStateTriggerFromAHeartbeat(t *testing.T) {
 			At:       time.Time{},
 			Firmware: "",
 		},
-		at,
+		when,
 	)
 	if stateTriggerErr == nil {
 		t.Error("a bad device ID is accepted")

@@ -93,14 +93,14 @@ func unitInUse(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 
 func activeContracts(
 	ctx context.Context,
-	c *ops.Call,
-	in *UnitsInput,
+	call *ops.Call,
+	input *UnitsInput,
 ) (map[uuid.UUID][]uuid.UUID, error) {
 	out := map[uuid.UUID][]uuid.UUID{}
 
-	rows, err := c.Tx.Query(ctx, `SELECT cu.unit_id, k.id FROM billing.contract_units cu
+	rows, err := call.Tx.Query(ctx, `SELECT cu.unit_id, k.id FROM billing.contract_units cu
 		JOIN billing.contracts k ON k.id = cu.contract_id AND k.version = cu.contract_version
-		WHERE k.is_current AND k.term @> $2::timestamptz AND cu.unit_id = ANY($1) ORDER BY k.id`, in.UnitIDs, c.Now)
+		WHERE k.is_current AND k.term @> $2::timestamptz AND cu.unit_id = ANY($1) ORDER BY k.id`, input.UnitIDs, call.Now)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select billing.contract_units")
 	}

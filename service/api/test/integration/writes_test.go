@@ -14,7 +14,7 @@ import (
 )
 
 func TestWritesGetResult(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	key := "wr-" + uuid.NewString()
 	req := httptest.NewRequest(
 		http.MethodPut,
@@ -27,15 +27,15 @@ func TestWritesGetResult(t *testing.T) {
 	req.Header.Set("X-Membership-Id", seed.ID(techB.membership).String())
 	req.Header.Set("Idempotency-Key", key)
 
-	w := httptest.NewRecorder()
-	s.Echo.ServeHTTP(w, req)
+	rec := httptest.NewRecorder()
+	srv.Echo.ServeHTTP(rec, req)
 
-	if w.Code != 200 {
-		t.Fatalf("write: %d %s", w.Code, w.Body.String())
+	if rec.Code != 200 {
+		t.Fatalf("write: %d %s", rec.Code, rec.Body.String())
 	}
 
 	get := func(a *actor, op, k string) (int, map[string]any) {
-		return post(s, a, "writes.getResult", `{"operation":"`+op+`","idempotencyKey":"`+k+`"}`)
+		return post(srv, a, "writes.getResult", `{"operation":"`+op+`","idempotencyKey":"`+k+`"}`)
 	}
 
 	code, m := get(&techB, "preferences.update", key)
@@ -57,22 +57,22 @@ func TestWritesGetResult(t *testing.T) {
 		}
 	}
 
-	if code, m := get(
+	if code, res := get(
 		&techB,
 		"no.such",
 		key,
 	); code != 422 ||
-		fields(m) != "operation=error.invalid" {
-		t.Errorf("unknown operation: %d %s", code, fields(m))
+		fields(res) != "operation=error.invalid" {
+		t.Errorf("unknown operation: %d %s", code, fields(res))
 	}
 
-	if code, m := get(
+	if code, res := get(
 		&techB,
 		"preferences.update",
 		"short",
 	); code != 422 ||
-		fields(m) != "idempotencyKey=error.invalid" {
-		t.Errorf("short key: %d %s", code, fields(m))
+		fields(res) != "idempotencyKey=error.invalid" {
+		t.Errorf("short key: %d %s", code, fields(res))
 	}
 
 	owner(t, `UPDATE platform.idempotency_keys SET status = 'in_progress' WHERE key = $1`, key)
@@ -88,52 +88,52 @@ func TestWritesGetResult(t *testing.T) {
 	)
 	req.Header.Set("Content-Type", "application/json")
 
-	w = httptest.NewRecorder()
-	s.Echo.ServeHTTP(w, req)
+	rec = httptest.NewRecorder()
+	srv.Echo.ServeHTTP(rec, req)
 
 	var r map[string]any
 
-	_ = json.Unmarshal(w.Body.Bytes(), &r)
-	if w.Code != 200 || data(r)["messageKey"] != "auth.reset_generic" {
-		t.Fatalf("reset preview: %d %s", w.Code, w.Body.String())
+	_ = json.Unmarshal(rec.Body.Bytes(), &r)
+	if rec.Code != 200 || data(r)["messageKey"] != "auth.reset_generic" {
+		t.Fatalf("reset preview: %d %s", rec.Code, rec.Body.String())
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		nil,
 		"auth.previewPasswordReset",
 		`{"demoEmail":"bad"}`,
 	); code != 422 ||
-		fields(m) != "demoEmail=error.invalid" {
-		t.Errorf("bad reset email: %d %s", code, fields(m))
+		fields(res) != "demoEmail=error.invalid" {
+		t.Errorf("bad reset email: %d %s", code, fields(res))
 	}
 }
 
 func TestResolveQr(t *testing.T) {
-	s := server(t)
-	u := boundUnit(t, s, "online")
+	srv := server(t)
+	unit := boundUnit(t, srv, "online")
 
 	var serial string
-	ownerScan(t, `SELECT serial FROM devices.devices WHERE unit_id = $1`, []any{u}, &serial)
+	ownerScan(t, `SELECT serial FROM devices.devices WHERE unit_id = $1`, []any{unit}, &serial)
 
 	qr := func(code string) (int, map[string]any) {
-		return post(s, &techB, "units.resolveQr", `{"code":"`+code+`"}`)
+		return post(srv, &techB, "units.resolveQr", `{"code":"`+code+`"}`)
 	}
-	if code, _ := qr(u); code != 404 {
+	if code, _ := qr(unit); code != 404 {
 		t.Error("unit outside assignments")
 	}
 
-	job := assign(t, u, "tech-external-b", clock.Add(-time.Hour), clock.Add(time.Hour), "active")
-	for _, c := range []string{u, "AC-UNIT:" + u, strings.ToLower(serial)} {
+	job := assign(t, unit, "tech-external-b", clock.Add(-time.Hour), clock.Add(time.Hour), "active")
+	for _, c := range []string{unit, "AC-UNIT:" + unit, strings.ToLower(serial)} {
 		code, m := qr(c)
-		if code != 200 || data(m)["unitId"] != u || data(m)["jobId"] != job {
+		if code != 200 || data(m)["unitId"] != unit || data(m)["jobId"] != job {
 			t.Errorf("%s: %d %v", c, code, m)
 		}
 	}
 
 	owner(t, `UPDATE maintenance.jobs SET status = 'completed' WHERE id = $1`, job)
 
-	if code, m := qr(u); code != 200 || data(m)["jobId"] != nil {
+	if code, m := qr(unit); code != 200 || data(m)["jobId"] != nil {
 		t.Errorf("no open job: %d %v", code, m)
 	}
 
@@ -145,7 +145,7 @@ func TestResolveQr(t *testing.T) {
 		t.Errorf("blank code: %d %s", code, fields(m))
 	}
 
-	if code, _ := post(s, &customerB, "units.resolveQr", `{"code":"`+u+`"}`); code != 403 {
+	if code, _ := post(srv, &customerB, "units.resolveQr", `{"code":"`+unit+`"}`); code != 403 {
 		t.Error("client resolves QR")
 	}
 }

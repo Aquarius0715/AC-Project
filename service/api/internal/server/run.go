@@ -53,25 +53,25 @@ func Main(service string, domains ...string) {
 		os.Exit(1)
 	}
 
-	v, err := auth.NewVerifierFromEnv(ctx)
+	verifier, err := auth.NewVerifierFromEnv(ctx)
 	if err != nil {
 		slog.Error("auth", "err", err)
 		os.Exit(1)
 	}
 
-	s, err := New(ctx, cfg, v)
+	srv, err := New(ctx, cfg, verifier)
 	if err != nil {
 		slog.Error("startup", "err", err)
 		os.Exit(1)
 	}
 	// graceful shutdown as in the Echo cookbook: StartConfig.Start returns once ctx is cancelled (SIGINT/SIGTERM)
 	// and in-flight requests have finished or GracefulTimeout has passed (ECS stopTimeout is 30 s)
-	for _, c := range s.Consumers { // event subscribers of this service (IR183)
+	for _, c := range srv.Consumers { // event subscribers of this service (IR183)
 		c.Logf = func(f string, a ...any) { logger.Warn(fmt.Sprintf(f, a...)) }
 		go c.Run(ctx, 250*time.Millisecond)
 	}
 
-	sc := echo.StartConfig{
+	startConfig := echo.StartConfig{
 		Address:          cfg.Addr,
 		HideBanner:       true,
 		HidePort:         true,
@@ -85,12 +85,12 @@ func Main(service string, domains ...string) {
 		BeforeServeFunc:  nil,
 	}
 
-	startErr := sc.Start(ctx, s.Echo)
+	startErr := startConfig.Start(ctx, srv.Echo)
 	if startErr != nil && !errors.Is(startErr, http.ErrServerClosed) {
 		slog.Error("serve", "err", startErr)
 	}
 
-	s.DB.Close()
+	srv.DB.Close()
 }
 
 // ConfigFromEnv reads the configuration of a domain service (or its worker, IR195) from the environment.
@@ -188,13 +188,13 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 			)
 		}
 
-		for i, k := range []string{"IDP_TOKEN_URL", "IDP_ADMIN_URL"} {
+		for i, key := range []string{"IDP_TOKEN_URL", "IDP_ADMIN_URL"} {
 			u, err := url.Parse(
 				v[i],
 			)
 			if err != nil || (u.Scheme != "http" && u.Scheme != "https") ||
 				u.Host == "" {
-				return cfg, fmt.Errorf("%s: not an http(s) URL", k)
+				return cfg, fmt.Errorf("%s: not an http(s) URL", key)
 			}
 		}
 

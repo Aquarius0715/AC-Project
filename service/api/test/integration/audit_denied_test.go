@@ -12,7 +12,7 @@ import (
 // operation and the target it asked for, the refusal as the reason — at most one per actor and operation a minute.
 // A refusal of the input (VALIDATION) and a refused read leave none.
 func TestDeniedWritesAudited(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	day := `"from":"` + clock.Add(-24*time.Hour).
 		Format(time.RFC3339) +
 		`","to":"` + clock.Add(time.Hour).
@@ -22,15 +22,15 @@ func TestDeniedWritesAudited(t *testing.T) {
 		t.Helper()
 		drainEvents(t)
 
-		_, m := post(
-			s,
+		_, res := post(
+			srv,
 			&hq,
 			"audit.list",
 			`{"filters":{`+day+`,"result":"denied","actorId":"`+actor+`"},"limit":100}`,
 		)
 		out := []map[string]any{}
 
-		for _, a := range items(m) {
+		for _, a := range items(res) {
 			if a["action"] == action {
 				out = append(out, a)
 			}
@@ -49,14 +49,14 @@ func TestDeniedWritesAudited(t *testing.T) {
 	minute := time.Now().Truncate(time.Minute)
 
 	for range 2 {
-		if code, m := write(
-			s,
+		if code, res := write(
+			srv,
 			&contrA,
 			"units.archive",
 			`{"id":"`+unit+`","reason":"probe"}`,
 			1,
 		); code != 403 {
-			t.Fatalf("a contractor archives a unit: %d %v", code, m)
+			t.Fatalf("a contractor archives a unit: %d %v", code, res)
 		}
 	}
 
@@ -86,17 +86,17 @@ func TestDeniedWritesAudited(t *testing.T) {
 	}
 
 	// scope: a contractor reviewing a job HQ keeps in-house (NOT_FOUND) — the job it asked for is the target
-	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
 
 	job := data(m)["id"].(string)
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"jobs.review",
 		`{"jobId":"`+job+`","reportVersion":1,"decision":"accept","reviewMode":"normal"}`,
 		1,
 	); code != 404 {
-		t.Fatalf("a contractor reviews an in-house job: %d %v", code, m)
+		t.Fatalf("a contractor reviews an in-house job: %d %v", code, res)
 	}
 
 	var target any
@@ -111,7 +111,7 @@ func TestDeniedWritesAudited(t *testing.T) {
 		t.Errorf("the scope refusal records the job asked for: %v", target)
 	}
 	// a refused read is not audited
-	if code, _ := post(s, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+	if code, _ := post(srv, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Errorf("a contractor reads an in-house job: %d", code)
 	}
 
@@ -119,7 +119,13 @@ func TestDeniedWritesAudited(t *testing.T) {
 		t.Errorf("a refused read left %d denied entries", n)
 	}
 	// the input's own refusal is not a denial
-	if code, _ := write(s, &hq, "units.archive", `{"id":"`+unit+`","reason":""}`, 1); code != 422 {
+	if code, _ := write(
+		srv,
+		&hq,
+		"units.archive",
+		`{"id":"`+unit+`","reason":""}`,
+		1,
+	); code != 422 {
 		t.Errorf("an archive without a reason: %d", code)
 	}
 

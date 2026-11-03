@@ -71,18 +71,18 @@ func TestSensorsOfAFixtureDevice(t *testing.T) {
 // fixture (Meeting room AC's) sends no readings, no heartbeats and no command answers; a device without sensors only
 // beats (IR613).
 func TestFixtureModulesPlayTheirConnection(t *testing.T) {
-	at := time.Date(2026, 9, 15, 1, 30, 0, 0, time.UTC)
+	when := time.Date(2026, 9, 15, 1, 30, 0, 0, time.UTC)
 
 	online, beats := fixtureModule("t", "device-online-rto", "v1")
 
-	raw, err := online.Telemetry(at)
+	raw, err := online.Telemetry(when)
 	if err != nil || raw == nil || !beats {
 		t.Errorf("online: %s %v beats=%v", raw, err, beats)
 	}
 
 	offline, beats := fixtureModule("t", "device-offline-rto", "v1")
 
-	raw, err = offline.Telemetry(at)
+	raw, err = offline.Telemetry(when)
 	if err != nil || raw != nil || beats {
 		t.Errorf("offline: %s %v beats=%v", raw, err, beats)
 	}
@@ -91,7 +91,7 @@ func TestFixtureModulesPlayTheirConnection(t *testing.T) {
 		`{"commandId":"c1","kind":"set_temperature","setpoint":25,"expiresAt":"2026-09-15T01:31:00Z"}`,
 	)
 
-	ack, _, err := offline.Acknowledge(cmd, at)
+	ack, _, err := offline.Acknowledge(cmd, when)
 	if err != nil || ack != nil {
 		t.Errorf("offline answers a command: %s %v", ack, err)
 	}
@@ -102,7 +102,7 @@ func TestFixtureModulesPlayTheirConnection(t *testing.T) {
 	// device-no-sensor (Bedroom AC B) has no sensors: its module only beats
 	bare, beats := fixtureModule("t", "device-no-sensor", "v1")
 
-	raw, err = bare.Telemetry(at)
+	raw, err = bare.Telemetry(when)
 	if err != nil || raw != nil || !beats {
 		t.Errorf("no sensors: %s %v beats=%v", raw, err, beats)
 	}

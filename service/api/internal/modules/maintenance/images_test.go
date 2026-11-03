@@ -14,27 +14,27 @@ import (
 func tinyPNG(t *testing.T) []byte {
 	t.Helper()
 
-	var b bytes.Buffer
+	var buf bytes.Buffer
 
-	err := png.Encode(&b, image.NewGray(image.Rect(0, 0, 1, 1)))
+	err := png.Encode(&buf, image.NewGray(image.Rect(0, 0, 1, 1)))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return b.Bytes()
+	return buf.Bytes()
 }
 
 func tinyJPEG(t *testing.T) []byte {
 	t.Helper()
 
-	var b bytes.Buffer
+	var buf bytes.Buffer
 
-	err := jpeg.Encode(&b, image.NewGray(image.Rect(0, 0, 1, 1)), nil)
+	err := jpeg.Encode(&buf, image.NewGray(image.Rect(0, 0, 1, 1)), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return b.Bytes()
+	return buf.Bytes()
 }
 
 // pngHeader is the PNG signature and an IHDR chunk declaring w×h gray pixels: all that a reader of the header sees.
@@ -51,13 +51,13 @@ func jpegSized(t *testing.T, w, h uint16) []byte {
 	t.Helper()
 	b := tinyJPEG(t)
 
-	i := bytes.Index(b, []byte{0xFF, 0xC0})
-	if i < 0 {
+	idx := bytes.Index(b, []byte{0xFF, 0xC0})
+	if idx < 0 {
 		t.Fatal("no SOF0 marker")
 	}
 
-	binary.BigEndian.PutUint16(b[i+5:], h)
-	binary.BigEndian.PutUint16(b[i+7:], w)
+	binary.BigEndian.PutUint16(b[idx+5:], h)
+	binary.BigEndian.PutUint16(b[idx+7:], w)
 
 	return b
 }

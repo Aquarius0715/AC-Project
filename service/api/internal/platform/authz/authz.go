@@ -58,57 +58,57 @@ type Expr struct {
 
 // Parse parses an authorization column value.
 func Parse(s string) (Expr, error) {
-	var e Expr
+	var expr Expr
 
 	main := s
 	if before, after, ok := strings.Cut(s, ";"); ok {
-		main, e.Remark = before, strings.TrimSpace(after)
+		main, expr.Remark = before, strings.TrimSpace(after)
 	}
 
 	for raw := range strings.SplitSeq(main, "|") {
 		alt := strings.TrimSpace(raw)
 		if alt == "" {
-			return e, fmt.Errorf("empty alternative in %q", s)
+			return expr, fmt.Errorf("empty alternative in %q", s)
 		}
 
 		parts := strings.Split(alt, ":")
 		if regexp.MustCompile(`^IR\d+$`).MatchString(parts[0]) {
-			e.Notes = append(e.Notes, alt)
+			expr.Notes = append(expr.Notes, alt)
 
 			continue
 		}
 
 		if !Roles[parts[0]] {
-			return e, fmt.Errorf("unknown role %q in %q", parts[0], s)
+			return expr, fmt.Errorf("unknown role %q in %q", parts[0], s)
 		}
 
-		a := Alternative{Role: parts[0], Permission: "", Predicates: nil}
+		alternative := Alternative{Role: parts[0], Permission: "", Predicates: nil}
 
 		rest := parts[1:]
 		if len(rest) > 0 && Permissions[rest[0]] {
-			a.Permission, rest = rest[0], rest[1:]
+			alternative.Permission, rest = rest[0], rest[1:]
 		}
 
 		for _, p := range rest {
 			if strings.Contains(p, ".") || !predicateRe.MatchString(p) {
-				return e, fmt.Errorf("bad permission or predicate %q in %q", p, s)
+				return expr, fmt.Errorf("bad permission or predicate %q in %q", p, s)
 			}
 
-			a.Predicates = append(a.Predicates, p)
+			alternative.Predicates = append(alternative.Predicates, p)
 		}
 
-		if a.Role == "admin" && a.Permission == "" {
-			return e, fmt.Errorf("admin alternative without permission in %q", s)
+		if alternative.Role == "admin" && alternative.Permission == "" {
+			return expr, fmt.Errorf("admin alternative without permission in %q", s)
 		}
 
-		e.Alternatives = append(e.Alternatives, a)
+		expr.Alternatives = append(expr.Alternatives, alternative)
 	}
 
-	if len(e.Alternatives) == 0 {
-		return e, fmt.Errorf("no granting alternative in %q", s)
+	if len(expr.Alternatives) == 0 {
+		return expr, fmt.Errorf("no granting alternative in %q", s)
 	}
 
-	return e, nil
+	return expr, nil
 }
 
 // Principal is the authenticated caller (selected Membership).
@@ -120,27 +120,27 @@ type Principal struct {
 
 // Candidates returns the alternatives whose role and permission the principal satisfies; predicates still have to
 // be checked by the handler. An empty result means FORBIDDEN.
-func (e Expr) Candidates(p *Principal) []Alternative {
+func (e Expr) Candidates(principal *Principal) []Alternative {
 	var out []Alternative
 
-	for _, a := range e.Alternatives {
-		switch a.Role {
+	for _, alternative := range e.Alternatives {
+		switch alternative.Role {
 		case "public":
 		case "authenticated":
-			if p == nil {
+			if principal == nil {
 				continue
 			}
 		default:
-			if p == nil || p.Role != a.Role {
+			if principal == nil || principal.Role != alternative.Role {
 				continue
 			}
 
-			if a.Permission != "" && !p.Permissions[a.Permission] {
+			if alternative.Permission != "" && !principal.Permissions[alternative.Permission] {
 				continue
 			}
 		}
 
-		out = append(out, a)
+		out = append(out, alternative)
 	}
 
 	return out

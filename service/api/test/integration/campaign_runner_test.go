@@ -18,21 +18,21 @@ import (
 // share pauses the campaign; after Retry and Resume it goes on. An unanswered install fails with TIMEOUT. Outside the
 // window nothing starts. The campaign completes when every wave passed and nothing is pending or installing.
 func TestFirmwareCampaignRunner(t *testing.T) {
-	s := serverWith(t, true)
+	srv := serverWith(t, true)
 	ctx := context.Background()
 
 	var units, devs []string
 
 	for range 6 {
-		u := boundUnit(t, s, "online")
+		u := boundUnit(t, srv, "online")
 
 		var d string
 		ownerScan(t, `SELECT id::text FROM devices.devices WHERE unit_id = $1`, []any{u}, &d)
 		units, devs = append(units, u), append(devs, d)
 	}
 
-	code, m := write(
-		s,
+	code, res := write(
+		srv,
 		&hq,
 		"firmwareCampaigns.schedule",
 		`{"modelId":"`+seed.ID("ventilation-demo").
@@ -49,10 +49,10 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("schedule: %d %v", code, m)
+		t.Fatalf("schedule: %d %v", code, res)
 	}
 
-	camp := data(m)["id"].(string)
+	camp := data(res)["id"].(string)
 
 	t.Cleanup(func() {
 		owner(
@@ -64,7 +64,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 
 	base, _ := time.Parse(
 		time.RFC3339Nano,
-		data(m)["createdAt"].(string),
+		data(res)["createdAt"].(string),
 	) // the server's business time
 	kl := time.FixedZone("MYT", 8*3600)
 	window := func(from, to int) { // the install window in whole Kuala Lumpur hours around base
@@ -79,13 +79,13 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	}
 	window(-1, 2)
 
-	at := time.Duration(0)
+	duration := time.Duration(0)
 	tick := func(d time.Duration) { // the next scheduler tick, d after the previous one
 		t.Helper()
 
-		at += d
+		duration += d
 
-		_, err := schedTick(ctx, s, base.Add(at))
+		_, err := schedTick(ctx, srv, base.Add(duration))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -97,15 +97,15 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		t.Helper()
 
 		out := make([]result, len(devs))
-		for i, d := range devs {
+		for idx, d := range devs {
 			ownerScan(
 				t,
 				`SELECT result, COALESCE(detail, ''), COALESCE(operation_id::text, '') FROM devices.firmware_campaign_devices WHERE
 					campaign_id = $1 AND device_id = $2`,
 				[]any{camp, d},
-				&out[i].status,
-				&out[i].key,
-				&out[i].op,
+				&out[idx].status,
+				&out[idx].key,
+				&out[idx].op,
 			)
 		}
 
@@ -136,17 +136,17 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	finish := func(i int, r string) { // the device's answer to its running install (demo.trigger operation)
 		t.Helper()
 
-		op := results()[i].op
-		if code, m := write(
-			s,
+		operation := results()[i].op
+		if code, resp := write(
+			srv,
 			&customerB,
 			"demo.trigger",
-			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+base.Add(at).
+			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+base.Add(duration).
 				Format(time.RFC3339Nano)+
-				`","eventType":"operation","operationId":"`+op+`","result":"`+r+`"}`,
+				`","eventType":"operation","operationId":"`+operation+`","result":"`+r+`"}`,
 			0,
 		); code != 200 {
-			t.Fatalf("finish %d: %d %v", i, code, m)
+			t.Fatalf("finish %d: %d %v", i, code, resp)
 		}
 	}
 	audits := func(action string) int {
@@ -171,14 +171,14 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 			&v,
 		)
 
-		if code, m := write(
-			s,
+		if code, resp := write(
+			srv,
 			&hq,
 			"firmwareCampaigns.control",
 			`{"campaignId":"`+camp+`","action":"`+action+`"`+extra+`}`,
 			v,
 		); code != 200 {
-			t.Fatalf("%s: %d %v", action, code, m)
+			t.Fatalf("%s: %d %v", action, code, resp)
 		}
 	}
 
@@ -205,7 +205,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		t,
 		`SELECT count(*) FROM identity.memberships WHERE organization_id = $1 AND role = 'client' AND valid_from <= $2 AND
 			(valid_until IS NULL OR valid_until > $2)`,
-		[]any{seed.ID("org-customer-b"), base.Add(at)},
+		[]any{seed.ID("org-customer-b"), base.Add(duration)},
 		&clients,
 	)
 
@@ -214,15 +214,15 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		t.Fatalf("notice: %d notices for %d clients, %s", notices, clients, st)
 	}
 
-	_, m = post(
-		s,
+	_, res = post(
+		srv,
 		&customerB,
 		"notifications.list",
 		`{"filters":{"type":"device_operation"},"limit":100}`,
 	)
 
 	seen := false
-	for _, it := range items(m) {
+	for _, it := range items(res) {
 		seen = seen || it["target"].(map[string]any)["id"] == units[0]
 	}
 
@@ -293,7 +293,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		t,
 		`UPDATE devices.device_operations SET status = 'failed', failure_code = 'TIMEOUT', finished_at = $2 WHERE id = $1`,
 		busy,
-		base.Add(at),
+		base.Add(duration),
 	)
 
 	for _, d := range devs[2:] {
@@ -356,14 +356,14 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		t.Fatalf("complete: %s %s", st, statuses())
 	}
 	// the campaign as HQ reads it: every result has its time
-	_, m = post(s, &hq, "firmwareCampaigns.get", `{"id":"`+camp+`"}`)
-	for _, r := range data(m)["results"].([]any) {
+	_, res = post(srv, &hq, "firmwareCampaigns.get", `{"id":"`+camp+`"}`)
+	for _, r := range data(res)["results"].([]any) {
 		if r.(map[string]any)["at"] == nil {
 			t.Errorf("result without a time: %v", r)
 		}
 	}
 
-	if p := data(m)["progress"].(map[string]any); p["succeeded"].(float64) != 6 {
+	if p := data(res)["progress"].(map[string]any); p["succeeded"].(float64) != 6 {
 		t.Errorf("progress: %v", p)
 	}
 }
@@ -372,22 +372,22 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 // command in flight (D05, control.Busy). A wave passes at exactly 95 % success, but the campaign completes only once
 // its last installing device finished.
 func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
-	s := serverWith(t, true)
+	srv := serverWith(t, true)
 	ctx := context.Background()
 	tenant := seed.ID("tenant-a")
 
 	var units, devs []string
 
 	for range 4 {
-		u := boundUnit(t, s, "online")
+		u := boundUnit(t, srv, "online")
 
 		var d string
 		ownerScan(t, `SELECT id::text FROM devices.devices WHERE unit_id = $1`, []any{u}, &d)
 		units, devs = append(units, u), append(devs, d)
 	}
 
-	code, m := write(
-		s,
+	code, res := write(
+		srv,
 		&hq,
 		"firmwareCampaigns.schedule",
 		`{"modelId":"`+seed.ID("ventilation-demo").
@@ -404,10 +404,10 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("schedule: %d %v", code, m)
+		t.Fatalf("schedule: %d %v", code, res)
 	}
 
-	camp := data(m)["id"].(string)
+	camp := data(res)["id"].(string)
 
 	t.Cleanup(func() {
 		owner(
@@ -417,7 +417,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		)
 	})
 
-	base, _ := time.Parse(time.RFC3339Nano, data(m)["createdAt"].(string))
+	base, _ := time.Parse(time.RFC3339Nano, data(res)["createdAt"].(string))
 	owner(
 		t,
 		`UPDATE devices.firmware_campaigns SET start_at = $2, notice_sent_at = $2 WHERE id = $1`,
@@ -428,7 +428,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 	owner(t, `UPDATE devices.devices SET unit_id = NULL WHERE id = $1`, devs[0])
 
 	_, om := write(
-		s,
+		srv,
 		&hq,
 		"units.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
@@ -466,7 +466,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		func() { owner(t, `UPDATE control.commands SET status = 'cancelled' WHERE id = $1`, cmd) },
 	)
 
-	_, err := schedTick(ctx, s, base.Add(time.Minute))
+	_, err := schedTick(ctx, srv, base.Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -494,7 +494,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 	}
 
 	// a wave of 20 with 19 succeeded passes 95 %; the campaign waits for the twentieth install, then completes
-	unit, model := newUnit(t, s, "Wave AC"), seed.ID("ventilation-demo")
+	unit, model := newUnit(t, srv, "Wave AC"), seed.ID("ventilation-demo")
 	big := uuid.NewString()
 	owner(
 		t,
@@ -515,8 +515,8 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		)
 	})
 
-	op := uuid.NewString()
-	for i := range 20 {
+	operation := uuid.NewString()
+	for idx := range 20 {
 		dev := uuid.NewString()
 		owner(
 			t,
@@ -529,7 +529,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 			seed.ID("hq-operator"),
 		)
 
-		if i < 19 {
+		if idx < 19 {
 			owner(
 				t,
 				`INSERT INTO devices.firmware_campaign_devices (campaign_id, device_id, tenant_id, wave, result, result_at) VALUES
@@ -547,7 +547,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 			t,
 			`INSERT INTO devices.device_operations (id, tenant_id, device_id, kind, status, target_version, campaign_id,
 				expires_at, started_at) VALUES ($1,$2,$3,'firmware','running','v2',$4,$5,$6)`,
-			op,
+			operation,
 			tenant,
 			dev,
 			big,
@@ -561,7 +561,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 			big,
 			dev,
 			tenant,
-			op,
+			operation,
 			base,
 		)
 	}
@@ -573,7 +573,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		return st
 	}
 
-	_, err = schedTick(ctx, s, base.Add(2*time.Minute))
+	_, err = schedTick(ctx, srv, base.Add(2*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -585,11 +585,11 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 	owner(
 		t,
 		`UPDATE devices.device_operations SET status = 'succeeded', finished_at = $2 WHERE id = $1`,
-		op,
+		operation,
 		base.Add(2*time.Minute),
 	)
 
-	_, err = schedTick(ctx, s, base.Add(3*time.Minute))
+	_, err = schedTick(ctx, srv, base.Add(3*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}

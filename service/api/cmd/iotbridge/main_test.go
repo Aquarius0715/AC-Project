@@ -20,16 +20,16 @@ import (
 func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 	id := uuid.New()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/internal/v1/system/queries/control.requestedCommands" ||
 			r.Header.Get(ops.InternalTokenHeader) != "tok" ||
 			r.Header.Get("X-Tenant-Id") != "t1" {
-			w.WriteHeader(http.StatusUnauthorized)
+			writer.WriteHeader(http.StatusUnauthorized)
 
 			return
 		}
 
-		_ = json.NewEncoder(w).
+		_ = json.NewEncoder(writer).
 			Encode(
 				map[string]any{
 					"data": []map[string]any{
@@ -45,14 +45,14 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
+	client := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
 
-	got, err := fetchWaiting(c, srv.URL, "tok", "t1")
+	got, err := fetchWaiting(client, srv.URL, "tok", "t1")
 	if err != nil || len(got) != 1 || got[0].ID != id {
 		t.Fatalf("waiting: %v %v", got, err)
 	}
 
-	_, fetchWaitingErr := fetchWaiting(c, srv.URL, "wrong", "t1")
+	_, fetchWaitingErr := fetchWaiting(client, srv.URL, "wrong", "t1")
 	if fetchWaitingErr == nil {
 		t.Error("a refused token is not an error")
 	}
@@ -64,12 +64,12 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 	)
 	defer bad.Close()
 
-	_, fetchWaitingErr = fetchWaiting(c, bad.URL, "tok", "t1")
+	_, fetchWaitingErr = fetchWaiting(client, bad.URL, "tok", "t1")
 	if fetchWaitingErr == nil {
 		t.Error("a bad answer is not an error")
 	}
 
-	_, fetchWaitingErr = fetchWaiting(c, "http://127.0.0.1:1", "tok", "t1")
+	_, fetchWaitingErr = fetchWaiting(client, "http://127.0.0.1:1", "tok", "t1")
 	if fetchWaitingErr == nil {
 		t.Error("a dead API is not an error")
 	}
@@ -80,14 +80,14 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
 	scenario := time.Date(2026, 9, 14, 22, 43, 0, 0, time.UTC)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/auth/password-reset-preview" {
-			w.WriteHeader(http.StatusNotFound)
+			writer.WriteHeader(http.StatusNotFound)
 
 			return
 		}
 
-		_ = json.NewEncoder(w).
+		_ = json.NewEncoder(writer).
 			Encode(map[string]any{"meta": map[string]any{"snapshotAt": scenario}})
 	}))
 	defer srv.Close()
@@ -142,9 +142,9 @@ func TestSendReportsRefusals(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
+	client := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
 
-	tr := iotbridge.Trigger{
+	trigger := iotbridge.Trigger{
 		EventID:     uuid.New(),
 		EventType:   "telemetry",
 		ScenarioID:  "",
@@ -160,17 +160,17 @@ func TestSendReportsRefusals(t *testing.T) {
 		Recovery:    nil,
 	}
 
-	err := send(c, srv.URL, tr)
+	err := send(client, srv.URL, trigger)
 	if err != nil {
 		t.Fatalf("accepted trigger: %v", err)
 	}
 
-	if key != tr.EventID.String() {
+	if key != trigger.EventID.String() {
 		t.Errorf("idempotency key %q, want the event ID", key)
 	}
 
 	err = send(
-		c,
+		client,
 		srv.URL,
 		iotbridge.Trigger{
 			EventID:     uuid.Nil,
@@ -192,7 +192,7 @@ func TestSendReportsRefusals(t *testing.T) {
 		t.Error("a refused trigger is not an error")
 	}
 
-	err = send(c, "http://127.0.0.1:1", tr)
+	err = send(client, "http://127.0.0.1:1", trigger)
 	if err == nil {
 		t.Error("a dead API is not an error")
 	}
@@ -201,7 +201,7 @@ func TestSendReportsRefusals(t *testing.T) {
 // TestSendCommandStopsBeforePublishingABadCommand: a command with no action kind is refused before anything is
 // published or reported sent.
 func TestSendCommandStopsBeforePublishingABadCommand(t *testing.T) {
-	w := iotbridge.Waiting{
+	waiting := iotbridge.Waiting{
 		ID:        uuid.New(),
 		Action:    json.RawMessage(`{"celsius":26}`),
 		ExpiresAt: time.Now().Add(time.Minute), DeviceID: uuid.UUID{}, UnitID: uuid.UUID{},
@@ -212,7 +212,7 @@ func TestSendCommandStopsBeforePublishingABadCommand(t *testing.T) {
 		&http.Client{Transport: nil, CheckRedirect: nil, Jar: nil, Timeout: 0},
 		"http://127.0.0.1:1",
 		uuid.New().String(),
-		w,
+		waiting,
 		0,
 	)
 	if err == nil {

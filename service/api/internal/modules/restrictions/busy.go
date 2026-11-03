@@ -56,13 +56,13 @@ func (Busy) UnitRestriction(
 	return out, apperr.Wrap(err, "delegate restrictions.unitRestriction")
 }
 
-func unitRestriction(ctx context.Context, c *ops.Call, in *UnitInput) (UnitRestriction, error) {
+func unitRestriction(ctx context.Context, c *ops.Call, input *UnitInput) (UnitRestriction, error) {
 	var r UnitRestriction
 
 	err := c.Tx.QueryRow(ctx, `SELECT r.state, r.policy FROM restrictions.restriction_units ru JOIN
 		restrictions.restrictions r ON r.id = ru.restriction_id
 		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested') ORDER BY r.created_at DESC LIMIT
-		1`, in.UnitID).
+		1`, input.UnitID).
 		Scan(&r.Phase, &r.Policy)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return UnitRestriction{Phase: "", Policy: nil, Found: false}, nil
@@ -188,12 +188,12 @@ func (Busy) ForInvoice(ctx context.Context, c *ops.Call, invoice uuid.UUID) ([]u
 // → cancelled and requested/applied → release_requested with a payment release intent. It returns the changed IDs.
 func (m Restrictions) OnInvoicePaid(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	invoice uuid.UUID,
 ) ([]uuid.UUID, error) {
 	// the restrictions citing the invoice are locked first, in ID order, so the payments of their other cause invoices
 	// wait for each other: two at once each saw the other invoice still unpaid and both left the restriction (IR476)
-	_, err := c.Tx.Exec(
+	_, err := call.Tx.Exec(
 		ctx,
 		`SELECT 1 FROM restrictions.restrictions r WHERE r.state IN ('scheduled','requested','applied')
 		AND EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri WHERE ri.restriction_id = r.id AND ri.invoice_id = $1)
@@ -204,7 +204,7 @@ func (m Restrictions) OnInvoicePaid(
 		return nil, apperr.Wrap(err, "select restrictions.restrictions")
 	}
 
-	rows, err := c.Tx.Query(ctx, `UPDATE restrictions.restrictions r SET
+	rows, err := call.Tx.Query(ctx, `UPDATE restrictions.restrictions r SET
 			state = CASE WHEN r.state = 'scheduled' THEN 'cancelled' ELSE 'release_requested' END,
 			release_intent = CASE WHEN r.state = 'scheduled' THEN r.release_intent ELSE jsonb_build_object('source', 'payment',
 			'at', $2::timestamptz, 'actorMembershipId', $3::uuid) END,
@@ -214,7 +214,7 @@ func (m Restrictions) OnInvoicePaid(
 		  $1)
 		  AND NOT EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri JOIN billing.invoices i ON i.id = ri.invoice_id
 			WHERE ri.restriction_id = r.id AND i.status <> 'paid')
-		RETURNING r.id`, invoice, c.Now, c.Principal.MembershipID)
+		RETURNING r.id`, invoice, call.Now, call.Principal.MembershipID)
 	if err != nil {
 		return nil, apperr.Wrap(err, "update restrictions.restrictions")
 	}
@@ -239,7 +239,7 @@ func (m Restrictions) OnInvoicePaid(
 	}
 
 	for _, id := range out {
-		c.Emit(
+		call.Emit(
 			ops.Event{
 				AggregateType: "restriction",
 				AggregateID:   id,
@@ -250,14 +250,14 @@ func (m Restrictions) OnInvoicePaid(
 
 		err := m.evaluateRelease(
 			ctx,
-			c,
+			call,
 			id,
 		)
 		if err != nil { // D03 release evaluation in the same transition (IR35 ①)
 			return nil, err
 		}
 
-		c.Audit(
+		call.Audit(
 			ops.AuditEntry{
 				Action:          "payments.release",
 				TargetKind:      "restriction",
@@ -283,13 +283,13 @@ func (Busy) UnitPolicy(ctx context.Context, c *ops.Call, unit uuid.UUID) ([]byte
 	return out, apperr.Wrap(err, "delegate restrictions.unitPolicy")
 }
 
-func unitPolicy(ctx context.Context, c *ops.Call, in *UnitInput) ([]byte, error) {
+func unitPolicy(ctx context.Context, c *ops.Call, input *UnitInput) ([]byte, error) {
 	var p []byte
 
 	err := c.Tx.QueryRow(ctx, `SELECT r.policy FROM restrictions.restriction_units ru JOIN restrictions.restrictions r ON
 		r.id = ru.restriction_id
 		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested') ORDER BY r.created_at DESC LIMIT
-		1`, in.UnitID).
+		1`, input.UnitID).
 		Scan(&p)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

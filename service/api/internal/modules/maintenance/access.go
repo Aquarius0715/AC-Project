@@ -58,13 +58,13 @@ func registerAccess(r *ops.Registry) {
 // TechnicianJob checks a technician write that names jobId (see technicianJob).
 func (Access) TechnicianJob(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	jobID uuid.UUID,
 	unit uuid.UUID,
 ) error {
 	_, err := ops.Delegate(
 		ctx,
-		c,
+		call,
 		QueryTechnicianJob,
 		TechnicianJobInput{JobID: jobID, UnitID: unit},
 		technicianJob,
@@ -76,14 +76,14 @@ func (Access) TechnicianJob(
 // TechnicianUnit checks a technician write without jobId (see technicianUnit).
 func (Access) TechnicianUnit(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
 	inScope bool,
 	internal bool,
 ) error {
 	_, err := ops.Delegate(
 		ctx,
-		c,
+		call,
 		QueryTechnicianUnit,
 		TechnicianUnitInput{UnitID: unit, InScope: inScope, Internal: internal},
 		technicianUnit,
@@ -120,10 +120,20 @@ func technicianJob(ctx context.Context, c *ops.Call, in *TechnicianJobInput) (st
 	return struct{}{}, checkTechnicianJob(ctx, c, in.JobID, in.UnitID)
 }
 
-func checkTechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit uuid.UUID) error {
-	rows, err := c.Tx.Query(ctx, `SELECT j.unit_id, a.status, a.valid_from, a.valid_until, j.status
+func checkTechnicianJob(
+	ctx context.Context,
+	call *ops.Call,
+	jobID uuid.UUID,
+	unit uuid.UUID,
+) error {
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT j.unit_id, a.status, a.valid_from, a.valid_until, j.status
 		FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id
-		WHERE a.job_id = $1 AND a.technician_membership_id = $2 ORDER BY a.created_at DESC`, jobID, c.Principal.MembershipID)
+		WHERE a.job_id = $1 AND a.technician_membership_id = $2 ORDER BY a.created_at DESC`,
+		jobID,
+		call.Principal.MembershipID,
+	)
 	if err != nil {
 		return apperr.Wrap(err, "select maintenance.assignments")
 	}
@@ -156,7 +166,7 @@ func checkTechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit 
 		return apperr.Wrap(rowsErr, "select maintenance.assignments")
 	}
 
-	now := c.Now
+	now := call.Now
 
 	var started bool
 
@@ -197,19 +207,19 @@ func technicianUnit(ctx context.Context, c *ops.Call, in *TechnicianUnitInput) (
 
 func checkTechnicianUnit(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
 	inScope bool,
 	internal bool,
 ) error {
 	var any, inWindow, notStarted bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT count(*) > 0,
+	err := call.Tx.QueryRow(ctx, `SELECT count(*) > 0,
 		COALESCE(bool_or(a.status = 'active' AND a.valid_from <= $3 AND $3 < a.valid_until), false),
 		COALESCE(bool_or(a.status = 'active' AND $3 < a.valid_from), false)
 		FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id
 		WHERE j.unit_id = $1 AND a.technician_membership_id =
-		$2`, unit, c.Principal.MembershipID, c.Now).Scan(&any, &inWindow, &notStarted)
+		$2`, unit, call.Principal.MembershipID, call.Now).Scan(&any, &inWindow, &notStarted)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return apperr.Wrap(err, "select maintenance.assignments")
 	}
@@ -237,15 +247,15 @@ func InScope(p *ops.Principal, unit, property, org uuid.UUID) bool {
 }
 
 func jobVersion(ctx context.Context, c *ops.Call, in *JobInput) (JobVersionResult, error) {
-	var r JobVersionResult
+	var jobVersionResult JobVersionResult
 
 	err := c.Tx.QueryRow(ctx, `SELECT version, unit_id FROM maintenance.jobs WHERE id = $1`, in.JobID).
-		Scan(&r.Version, &r.UnitID)
+		Scan(&jobVersionResult.Version, &jobVersionResult.UnitID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return JobVersionResult{Version: 0, UnitID: uuid.UUID{}, Found: false}, nil
 	}
 
-	r.Found = err == nil
+	jobVersionResult.Found = err == nil
 
-	return r, apperr.Wrap(err, "select maintenance.jobs")
+	return jobVersionResult, apperr.Wrap(err, "select maintenance.jobs")
 }

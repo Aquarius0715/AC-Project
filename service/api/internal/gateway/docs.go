@@ -57,20 +57,20 @@ const docsCSP = "default-src 'none'; script-src 'self' " + swaggerUIBundle + "; 
 
 // mountDocs serves the API description: GET /swagger.json (the document) and GET /docs (Swagger UI). The gateway is
 // the development and demo entry; production routes the catalog's paths at the load balancer without it.
-func mountDocs(e *echo.Echo) {
-	e.GET(
+func mountDocs(app *echo.Echo) {
+	app.GET(
 		"/swagger.json",
 		func(c *echo.Context) error { return c.JSONBlob(http.StatusOK, swagger) },
 	)
-	e.GET("/docs", func(c *echo.Context) error {
-		h := c.Response().Header()
+	app.GET("/docs", func(ectx *echo.Context) error {
+		h := ectx.Response().Header()
 		h.Set("Content-Security-Policy", docsCSP)
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
 
-		return c.HTML(http.StatusOK, swaggerUI)
+		return ectx.HTML(http.StatusOK, swaggerUI)
 	})
-	e.GET("/docs/init.js", func(c *echo.Context) error {
+	app.GET("/docs/init.js", func(c *echo.Context) error {
 		c.Response().Header().Set("X-Content-Type-Options", "nosniff")
 
 		return c.Blob(http.StatusOK, "text/javascript; charset=utf-8", []byte(swaggerInit))

@@ -21,13 +21,13 @@ func TestKeycloakEndSessions(t *testing.T) {
 
 	status := http.StatusNoContent
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch {
-		case r.URL.Path == "/realms/ac/protocol/openid-connect/token":
-			_ = r.ParseForm()
-			if r.Form.Get("grant_type") != "client_credentials" ||
-				r.Form.Get("client_id") != "svc" ||
-				r.Form.Get("client_secret") != "test-secret" {
+		case req.URL.Path == "/realms/ac/protocol/openid-connect/token":
+			_ = req.ParseForm()
+			if req.Form.Get("grant_type") != "client_credentials" ||
+				req.Form.Get("client_id") != "svc" ||
+				req.Form.Get("client_secret") != "test-secret" {
 				w.WriteHeader(http.StatusUnauthorized)
 
 				return
@@ -36,9 +36,9 @@ func TestKeycloakEndSessions(t *testing.T) {
 			tokens.Add(1)
 
 			_, _ = w.Write([]byte(`{"access_token":"admin-token","expires_in":300}`))
-		case strings.HasPrefix(r.URL.EscapedPath(), "/admin/realms/ac/users/"):
-			if r.Header.Get("Authorization") != "Bearer admin-token" ||
-				r.Method != http.MethodPost {
+		case strings.HasPrefix(req.URL.EscapedPath(), "/admin/realms/ac/users/"):
+			if req.Header.Get("Authorization") != "Bearer admin-token" ||
+				req.Method != http.MethodPost {
 				w.WriteHeader(http.StatusForbidden)
 
 				return
@@ -46,7 +46,7 @@ func TestKeycloakEndSessions(t *testing.T) {
 
 			logouts.Add(1)
 
-			paths = append(paths, r.URL.EscapedPath())
+			paths = append(paths, req.URL.EscapedPath())
 
 			w.WriteHeader(status)
 		default:
@@ -56,7 +56,7 @@ func TestKeycloakEndSessions(t *testing.T) {
 	defer srv.Close()
 
 	now := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
-	k := &Keycloak{
+	keycloak := &Keycloak{
 		TokenURL:     srv.URL + "/realms/ac/protocol/openid-connect/token",
 		AdminURL:     srv.URL + "/admin/realms/ac",
 		ClientID:     "svc",
@@ -70,12 +70,12 @@ func TestKeycloakEndSessions(t *testing.T) {
 
 	ctx := context.Background()
 
-	err := k.EndSessions(ctx, "09f7f651-9f19-5407-b222-8730fe8fd5c3")
+	err := keycloak.EndSessions(ctx, "09f7f651-9f19-5407-b222-8730fe8fd5c3")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = k.EndSessions(ctx, "../../clients/x")
+	err = keycloak.EndSessions(ctx, "../../clients/x")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,40 +94,40 @@ func TestKeycloakEndSessions(t *testing.T) {
 
 	status = http.StatusNotFound // a user the realm does not know
 
-	err = k.EndSessions(ctx, "unknown")
+	err = keycloak.EndSessions(ctx, "unknown")
 	if err != nil {
 		t.Errorf("unknown user: %v", err)
 	}
 
 	status = http.StatusUnauthorized // the token was ended early: the next call fetches a new one
 
-	err = k.EndSessions(ctx, "u-1")
+	err = keycloak.EndSessions(ctx, "u-1")
 	if err == nil {
 		t.Error("a refused token passes")
 	}
 
 	status = http.StatusNoContent
 
-	err = k.EndSessions(ctx, "u-1")
+	err = keycloak.EndSessions(ctx, "u-1")
 	if err != nil || tokens.Load() != 2 {
 		t.Errorf("after a refused token: %v, %d token requests", err, tokens.Load())
 	}
 
 	now = now.Add(5 * time.Minute) // expired: fetched again
 
-	err = k.EndSessions(ctx, "u-1")
+	err = keycloak.EndSessions(ctx, "u-1")
 	if err != nil || tokens.Load() != 3 {
 		t.Errorf("after expiry: %v, %d token requests", err, tokens.Load())
 	}
 
-	err = k.EndSessions(ctx, "")
+	err = keycloak.EndSessions(ctx, "")
 	if err == nil {
 		t.Error("no subject passes")
 	}
 
 	bad := &Keycloak{
-		TokenURL:     k.TokenURL,
-		AdminURL:     k.AdminURL,
+		TokenURL:     keycloak.TokenURL,
+		AdminURL:     keycloak.AdminURL,
 		ClientID:     "svc",
 		ClientSecret: "wrong",
 		Client:       nil,
@@ -143,8 +143,8 @@ func TestKeycloakEndSessions(t *testing.T) {
 	}
 	// the service's own HTTP client and the wall clock
 	own := &Keycloak{
-		TokenURL:     k.TokenURL,
-		AdminURL:     k.AdminURL,
+		TokenURL:     keycloak.TokenURL,
+		AdminURL:     keycloak.AdminURL,
 		ClientID:     "svc",
 		ClientSecret: "test-secret",
 		Client:       srv.Client(), Now: nil, mu: sync.Mutex{}, token: "", until: time.Time{},
@@ -160,17 +160,19 @@ func TestKeycloakEndSessions(t *testing.T) {
 // nothing.
 func TestKeycloakTokenAnswers(t *testing.T) {
 	for _, body := range []string{`{}`, `{"access_token":""}`, `not json`} {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.HasSuffix(r.URL.Path, "/token") {
-				_, _ = w.Write([]byte(body))
+		srv := httptest.NewServer(
+			http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
+				if strings.HasSuffix(r.URL.Path, "/token") {
+					_, _ = writer.Write([]byte(body))
 
-				return
-			}
+					return
+				}
 
-			w.WriteHeader(http.StatusNoContent)
-		}))
+				writer.WriteHeader(http.StatusNoContent)
+			}),
+		)
 
-		k := &Keycloak{
+		keycloak := &Keycloak{
 			TokenURL:     srv.URL + "/token",
 			AdminURL:     srv.URL + "/admin/realms/ac",
 			ClientID:     "svc",
@@ -182,7 +184,7 @@ func TestKeycloakTokenAnswers(t *testing.T) {
 			until:        time.Time{},
 		}
 
-		err := k.EndSessions(context.Background(), "u-1")
+		err := keycloak.EndSessions(context.Background(), "u-1")
 		if err == nil {
 			t.Errorf("token answer %s passes", body)
 		}

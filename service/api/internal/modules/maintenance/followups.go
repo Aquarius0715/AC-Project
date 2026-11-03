@@ -61,17 +61,17 @@ type jobState struct {
 	claims      []byte
 }
 
-func (m FollowUps) lock(ctx context.Context, c *ops.Call, id uuid.UUID) (jobState, error) {
+func (m FollowUps) lock(ctx context.Context, call *ops.Call, id uuid.UUID) (jobState, error) {
 	var (
 		s jobState
 		v int
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT status, customer_org_id, unit_id, completed_at, rating, follow_up_class,
+	err := call.Tx.QueryRow(ctx, `SELECT status, customer_org_id, unit_id, completed_at, rating, follow_up_class,
 		warranty_claims, version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, id).
 		Scan(&s.status, &s.org, &s.unit, &s.completedAt, &s.rating, &s.followUp, &s.claims, &v)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && c.Principal.Role == "client" && s.org != c.Principal.OrgID) {
+		(err == nil && call.Principal.Role == "client" && s.org != call.Principal.OrgID) {
 		return s, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
@@ -79,7 +79,7 @@ func (m FollowUps) lock(ctx context.Context, c *ops.Call, id uuid.UUID) (jobStat
 		return s, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
-	if v != *c.ExpectedVersion {
+	if v != *call.ExpectedVersion {
 		return s, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
@@ -88,7 +88,7 @@ func (m FollowUps) lock(ctx context.Context, c *ops.Call, id uuid.UUID) (jobStat
 
 func (m FollowUps) bump(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	id uuid.UUID,
 	set string,
 	args ...any,
@@ -97,7 +97,7 @@ func (m FollowUps) bump(
 		set += ", "
 	}
 
-	_, err := c.Tx.Exec(
+	_, err := call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET `+set+`version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		append([]any{id}, args...)...)
@@ -107,16 +107,16 @@ func (m FollowUps) bump(
 
 func (m FollowUps) done(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	id uuid.UUID,
-	action, op, event, reason string,
+	action, operation, event, reason string,
 ) (Job, error) {
-	err := m.Jobs.event(ctx, c, id, action, nil)
+	err := m.Jobs.event(ctx, call, id, action, nil)
 	if err != nil {
 		return Job{}, err
 	}
 
-	return m.Jobs.finish(ctx, c, id, op, event, reason)
+	return m.Jobs.finish(ctx, call, id, operation, event, reason)
 }
 
 // ---- jobs.rate ----
@@ -131,24 +131,24 @@ type RateInput struct {
 
 // Validate implements ops.Validator.
 func (in *RateInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fe["jobId"] = "error.required"
+		fieldErrs["jobId"] = "error.required"
 	}
 
 	if in.Stars < 1 || in.Stars > 5 {
-		fe["stars"] = "error.range"
+		fieldErrs["stars"] = "error.range"
 	}
 
 	seen := map[string]bool{}
 
 	if in.Tags == nil {
-		fe["tags"] = "error.required"
+		fieldErrs["tags"] = "error.required"
 	}
 
 	for _, t := range in.Tags {
 		if !slices.Contains(RatingTags, t) || seen[t] {
-			fe["tags"] = "error.invalid"
+			fieldErrs["tags"] = "error.invalid"
 		}
 
 		seen[t] = true
@@ -157,7 +157,7 @@ func (in *RateInput) Validate() map[string]string {
 	if in.Comment != nil {
 		*in.Comment = strings.TrimSpace(*in.Comment)
 		if utf8.RuneCountInString(*in.Comment) > 1000 {
-			fe["comment"] = "error.length"
+			fieldErrs["comment"] = "error.length"
 		}
 
 		if *in.Comment == "" {
@@ -165,7 +165,7 @@ func (in *RateInput) Validate() map[string]string {
 		}
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // rate serves jobs.rate.
@@ -200,8 +200,8 @@ func (m FollowUps) rate(ctx context.Context, c *ops.Call, in *RateInput) (Mainte
 }
 
 // rateJob is rate answering the job with its detail extras.
-func (m FollowUps) rateJob(ctx context.Context, c *ops.Call, in *RateInput) (Job, error) {
-	s, err := m.lock(ctx, c, in.JobID)
+func (m FollowUps) rateJob(ctx context.Context, call *ops.Call, in *RateInput) (Job, error) {
+	s, err := m.lock(ctx, call, in.JobID)
 	if err != nil {
 		return Job{}, err
 	}
@@ -210,12 +210,12 @@ func (m FollowUps) rateJob(ctx context.Context, c *ops.Call, in *RateInput) (Job
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
-	r := Rating{
+	rating := Rating{
 		Stars:         in.Stars,
 		Tags:          in.Tags,
 		Comment:       in.Comment,
-		RatedAt:       c.Now,
-		EditableUntil: c.Now.Add(7 * 24 * time.Hour),
+		RatedAt:       call.Now,
+		EditableUntil: call.Now.Add(7 * 24 * time.Hour),
 	}
 
 	first := len(s.rating) == 0 || string(s.rating) == "null"
@@ -227,28 +227,28 @@ func (m FollowUps) rateJob(ctx context.Context, c *ops.Call, in *RateInput) (Job
 			return Job{}, apperr.Wrap(err, "json.Unmarshal")
 		}
 
-		if !c.Now.Before(prev.EditableUntil) {
+		if !call.Now.Before(prev.EditableUntil) {
 			return Job{}, apperr.E(apperr.Conflict, "errors.rating_locked")
 		}
 
-		r.RatedAt, r.EditableUntil = prev.RatedAt, prev.EditableUntil
+		rating.RatedAt, rating.EditableUntil = prev.RatedAt, prev.EditableUntil
 	}
 
-	raw, _ := json.Marshal(r)
+	raw, _ := json.Marshal(rating)
 
 	bumpErr := m.bump(
 		ctx,
-		c,
+		call,
 		in.JobID,
 		"rating = $2, customer_confirmed_at = COALESCE(customer_confirmed_at, $3)",
 		raw,
-		c.Now,
+		call.Now,
 	)
 	if bumpErr != nil {
 		return Job{}, bumpErr
 	}
 
-	return m.done(ctx, c, in.JobID, "job.rated", "jobs.rate", "JobRated", "")
+	return m.done(ctx, call, in.JobID, "job.rated", "jobs.rate", "JobRated", "")
 }
 
 // ---- jobs.reportProblem ----
@@ -279,13 +279,14 @@ var problemCodes = map[string]bool{
 
 // ValidBlob checks one image upload (a valid name, JPEG/PNG whose bytes are that type, 1 byte – max bytes, size equal
 // to the payload, and a header within the pixel limits).
-func ValidBlob(b BlobInput, max int) bool {
-	return ValidFileName(b.Name) && (b.Mime == "image/jpeg" || b.Mime == "image/png") &&
-		b.Size == len(b.Bytes) &&
-		b.Size >= 1 &&
-		b.Size <= max &&
-		ContentMatches(b.Mime, b.Bytes) &&
-		ImageSizeOK(b.Mime, b.Bytes)
+func ValidBlob(blobInput BlobInput, max int) bool {
+	return ValidFileName(blobInput.Name) &&
+		(blobInput.Mime == "image/jpeg" || blobInput.Mime == "image/png") &&
+		blobInput.Size == len(blobInput.Bytes) &&
+		blobInput.Size >= 1 &&
+		blobInput.Size <= max &&
+		ContentMatches(blobInput.Mime, blobInput.Bytes) &&
+		ImageSizeOK(blobInput.Mime, blobInput.Bytes)
 }
 
 // The pixel limits of an uploaded image (IR389): at most 16,384 pixels a side and 50 megapixels, more than a phone
@@ -351,31 +352,31 @@ func ContentMatches(mime string, b []byte) bool {
 
 // Validate implements ops.Validator.
 func (in *ProblemInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fe["jobId"] = "error.required"
+		fieldErrs["jobId"] = "error.required"
 	}
 
 	if !problemCodes[in.ReasonCode] {
-		fe["reasonCode"] = "error.invalid"
+		fieldErrs["reasonCode"] = "error.invalid"
 	}
 
 	in.Details = strings.TrimSpace(in.Details)
 	if n := utf8.RuneCountInString(in.Details); n < 10 || n > 2000 {
-		fe["details"] = "error.length"
+		fieldErrs["details"] = "error.length"
 	}
 
 	if in.Photos == nil || len(in.Photos) > 5 {
-		fe["photos"] = "error.count"
+		fieldErrs["photos"] = "error.count"
 	}
 
 	for _, p := range in.Photos {
 		if !ValidBlob(p, 5<<20) {
-			fe["photos"] = "error.invalidFile"
+			fieldErrs["photos"] = "error.invalidFile"
 		}
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // reportProblem serves jobs.reportProblem.
@@ -416,16 +417,16 @@ func (m FollowUps) reportProblem(
 // reportProblemJob is reportProblem answering the job with its detail extras.
 func (m FollowUps) reportProblemJob(
 	ctx context.Context,
-	c *ops.Call,
-	in *ProblemInput,
+	call *ops.Call,
+	input *ProblemInput,
 ) (Job, error) {
-	s, err := m.lock(ctx, c, in.JobID)
+	s, err := m.lock(ctx, call, input.JobID)
 	if err != nil {
 		return Job{}, err
 	}
 
 	if s.status != "completed" || s.completedAt == nil ||
-		!c.Now.Before(s.completedAt.Add(7*24*time.Hour)) {
+		!call.Now.Before(s.completedAt.Add(7*24*time.Hour)) {
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
@@ -433,14 +434,14 @@ func (m FollowUps) reportProblemJob(
 
 	preferred := []Slot{}
 
-	if in.PreferredSlot != nil {
-		if !PreferredSlotsOK(c.Now, []Slot{*in.PreferredSlot}) {
+	if input.PreferredSlot != nil {
+		if !PreferredSlotsOK(call.Now, []Slot{*input.PreferredSlot}) {
 			return Job{}, apperr.Fields(map[string]string{"preferredSlot": "error.slotRules"})
 		}
 
-		requested, preferred = *in.PreferredSlot, []Slot{*in.PreferredSlot}
+		requested, preferred = *input.PreferredSlot, []Slot{*input.PreferredSlot}
 	} else {
-		y, mo, d := c.Now.In(kualaLumpur).Date()
+		y, mo, d := call.Now.In(kualaLumpur).Date()
 		start := time.Date(y, mo, d+1, 9, 0, 0, 0, kualaLumpur)
 		requested = Slot{start.UTC(), start.Add(3 * time.Hour).UTC()}
 	}
@@ -449,83 +450,91 @@ func (m FollowUps) reportProblemJob(
 
 	var id uuid.UUID
 
-	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin,
+	scanErr := call.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status,
+		origin,
 		symptom, requested_slot, preferred_slots,
 		preference_round, due_at, follow_up_of_job_id, follow_up_class) VALUES (current_setting('app.tenant_id')::uuid, $1,
 		$2, 'reactive', 'requested', 'client_request',
 		$3, tstzrange($4, $5), $6, 1, $5, $7, 'pending') RETURNING
-		id`, s.unit, s.org, in.Details, requested.StartAt, requested.EndAt, pref, in.JobID).
+		id`, s.unit, s.org, input.Details, requested.StartAt, requested.EndAt, pref, input.JobID).
 		Scan(&id)
 	if scanErr != nil {
 		return Job{}, apperr.Wrap(scanErr, "insert maintenance.jobs")
 	}
 
-	for _, p := range in.Photos {
+	for _, blobInput := range input.Photos {
 		aid := uuid.New()
 
 		key := "jobs/" + id.String() + "/" + aid.String()
 
-		err := m.Blobs.Put(ctx, key, p.Mime, p.Bytes)
+		err := m.Blobs.Put(ctx, key, blobInput.Mime, blobInput.Bytes)
 		if err != nil {
 			return Job{}, apperr.Wrap(err, "blob.Store.Put")
 		}
 
-		_, err = c.Tx.Exec(
+		_, err = call.Tx.Exec(
 			ctx,
 			`INSERT INTO maintenance.attachments (id, tenant_id, job_id, object_key, name, mime, size_bytes, status, uploaded_by)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, 'ready', $7)`,
 			aid,
 			id,
 			key,
-			strings.TrimSpace(p.Name),
-			p.Mime,
-			p.Size,
-			c.Principal.UserID,
+			strings.TrimSpace(blobInput.Name),
+			blobInput.Mime,
+			blobInput.Size,
+			call.Principal.UserID,
 		)
 		if err != nil {
 			return Job{}, apperr.Wrap(err, "insert maintenance.attachments")
 		}
 	}
 
-	eventErr := m.Jobs.event(ctx, c, id, "job.created", nil)
+	eventErr := m.Jobs.event(ctx, call, id, "job.created", nil)
 	if eventErr != nil {
 		return Job{}, eventErr
 	}
 
-	bumpErr := m.bump(ctx, c, in.JobID, "")
+	bumpErr := m.bump(ctx, call, input.JobID, "")
 	if bumpErr != nil {
 		return Job{}, bumpErr
 	}
 
-	eventErr = m.Jobs.event(ctx, c, in.JobID, "job.problem_reported", nil)
+	eventErr = m.Jobs.event(ctx, call, input.JobID, "job.problem_reported", nil)
 	if eventErr != nil {
 		return Job{}, eventErr
 	}
 
-	j, err := m.Jobs.detail(ctx, c, id)
+	job, err := m.Jobs.detail(ctx, call, id)
 	if err != nil {
-		return j, err
+		return job, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "job",
 			AggregateID:   id,
 			Type:          "JobCreated",
-			Payload:       map[string]any{"followUpOfJobId": in.JobID, "reasonCode": in.ReasonCode},
+			Payload: map[string]any{
+				"followUpOfJobId": input.JobID,
+				"reasonCode":      input.ReasonCode,
+			},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "jobs.reportProblem",
 			TargetKind:      "job",
-			TargetID:        in.JobID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			Reason:          in.ReasonCode, NextVersion: nil, Result: "", Before: nil, After: nil,
+			TargetID:        input.JobID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			Reason:          input.ReasonCode,
+			NextVersion:     nil,
+			Result:          "",
+			Before:          nil,
+			After:           nil,
 		},
 	)
 
-	return j, nil
+	return job, nil
 }
 
 // ---- jobs.classifyFollowUp ----
@@ -539,18 +548,18 @@ type ClassifyInput struct {
 
 // Validate implements ops.Validator.
 func (in *ClassifyInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fe["jobId"] = "error.required"
+		fieldErrs["jobId"] = "error.required"
 	}
 
 	if in.Classification != "rework" && in.Classification != "new_request" {
-		fe["classification"] = "error.invalid"
+		fieldErrs["classification"] = "error.invalid"
 	}
 
-	trimmedReason(&in.Reason, 1000, "reason", fe)
+	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
 
-	return fe
+	return fieldErrs
 }
 
 // classify serves jobs.classifyFollowUp.
@@ -589,8 +598,12 @@ func (m FollowUps) classify(
 }
 
 // classifyJob is classify answering the job with its detail extras.
-func (m FollowUps) classifyJob(ctx context.Context, c *ops.Call, in *ClassifyInput) (Job, error) {
-	s, err := m.lock(ctx, c, in.JobID)
+func (m FollowUps) classifyJob(
+	ctx context.Context,
+	c *ops.Call,
+	input *ClassifyInput,
+) (Job, error) {
+	s, err := m.lock(ctx, c, input.JobID)
 	if err != nil {
 		return Job{}, err
 	}
@@ -602,10 +615,10 @@ func (m FollowUps) classifyJob(ctx context.Context, c *ops.Call, in *ClassifyInp
 	bumpErr := m.bump(
 		ctx,
 		c,
-		in.JobID,
+		input.JobID,
 		"follow_up_class = $2, follow_up_reason = $3",
-		in.Classification,
-		in.Reason,
+		input.Classification,
+		input.Reason,
 	)
 	if bumpErr != nil {
 		return Job{}, bumpErr
@@ -614,11 +627,11 @@ func (m FollowUps) classifyJob(ctx context.Context, c *ops.Call, in *ClassifyInp
 	return m.done(
 		ctx,
 		c,
-		in.JobID,
+		input.JobID,
 		"job.follow_up_classified",
 		"jobs.classifyFollowUp",
 		"FollowUpClassified",
-		in.Reason,
+		input.Reason,
 	)
 }
 
@@ -641,30 +654,30 @@ type CostInput struct {
 
 // Validate implements ops.Validator.
 func (in *CostInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fe["jobId"] = "error.required"
+		fieldErrs["jobId"] = "error.required"
 	}
 
 	if in.CostLines == nil || len(in.CostLines) > 50 {
-		fe["costLines"] = "error.count"
+		fieldErrs["costLines"] = "error.count"
 	}
 
 	for i := range in.CostLines {
-		l := &in.CostLines[i]
-		l.Description = strings.TrimSpace(l.Description)
+		costLine := &in.CostLines[i]
+		costLine.Description = strings.TrimSpace(costLine.Description)
 
-		n := utf8.RuneCountInString(l.Description)
-		if l.AmountMinor < 0 || (l.Currency != "MYR" && l.Currency != "USD") ||
-			(l.Kind != "estimate" && l.Kind != "actual") ||
+		n := utf8.RuneCountInString(costLine.Description)
+		if costLine.AmountMinor < 0 || (costLine.Currency != "MYR" && costLine.Currency != "USD") ||
+			(costLine.Kind != "estimate" && costLine.Kind != "actual") ||
 			n < 1 ||
 			n > 200 ||
-			(l.Visibility != "internal" && l.Visibility != "customer") {
-			fe["costLines"] = "error.invalid"
+			(costLine.Visibility != "internal" && costLine.Visibility != "customer") {
+			fieldErrs["costLines"] = "error.invalid"
 		}
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // saveCost serves jobs.saveCost.
@@ -702,8 +715,8 @@ func (m FollowUps) saveCost(
 }
 
 // saveCostJob is saveCost answering the job with its detail extras.
-func (m FollowUps) saveCostJob(ctx context.Context, c *ops.Call, in *CostInput) (Job, error) {
-	s, err := m.lock(ctx, c, in.JobID)
+func (m FollowUps) saveCostJob(ctx context.Context, c *ops.Call, input *CostInput) (Job, error) {
+	s, err := m.lock(ctx, c, input.JobID)
 	if err != nil {
 		return Job{}, err
 	}
@@ -712,14 +725,14 @@ func (m FollowUps) saveCostJob(ctx context.Context, c *ops.Call, in *CostInput) 
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
-	raw, _ := json.Marshal(in.CostLines)
+	raw, _ := json.Marshal(input.CostLines)
 
-	bumpErr := m.bump(ctx, c, in.JobID, "costs = $2", raw)
+	bumpErr := m.bump(ctx, c, input.JobID, "costs = $2", raw)
 	if bumpErr != nil {
 		return Job{}, bumpErr
 	}
 
-	return m.done(ctx, c, in.JobID, "job.costs_saved", "jobs.saveCost", "JobCostsSaved", "")
+	return m.done(ctx, c, input.JobID, "job.costs_saved", "jobs.saveCost", "JobCostsSaved", "")
 }
 
 // ---- jobs.extendAccess ----
@@ -733,18 +746,18 @@ type ExtendInput struct {
 
 // Validate implements ops.Validator.
 func (in *ExtendInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fe["jobId"] = "error.required"
+		fieldErrs["jobId"] = "error.required"
 	}
 
 	if in.AccessValidUntil.IsZero() {
-		fe["accessValidUntil"] = "error.required"
+		fieldErrs["accessValidUntil"] = "error.required"
 	}
 
-	trimmedReason(&in.Reason, 1000, "reason", fe)
+	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
 
-	return fe
+	return fieldErrs
 }
 
 // extendAccess serves jobs.extendAccess.
@@ -782,8 +795,12 @@ func (m FollowUps) extendAccess(
 }
 
 // extendAccessJob is extendAccess answering the job with its detail extras.
-func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendInput) (Job, error) {
-	_, lockErr := m.lock(ctx, c, in.JobID)
+func (m FollowUps) extendAccessJob(
+	ctx context.Context,
+	c *ops.Call,
+	input *ExtendInput,
+) (Job, error) {
+	_, lockErr := m.lock(ctx, c, input.JobID)
 	if lockErr != nil {
 		return Job{}, lockErr
 	}
@@ -794,7 +811,7 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 	)
 
 	err := c.Tx.QueryRow(ctx, `SELECT id, access_valid_until, contractor_org_id FROM maintenance.offers WHERE job_id = $1
-		AND decision = 'accept' ORDER BY decided_at DESC LIMIT 1 FOR UPDATE`, in.JobID).
+		AND decision = 'accept' ORDER BY decided_at DESC LIMIT 1 FOR UPDATE`, input.JobID).
 		Scan(&offer, &until, &contractor)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Job{}, apperr.E(apperr.Conflict, "errors.no_accepted_offer")
@@ -804,7 +821,7 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 		return Job{}, apperr.Wrap(err, "select maintenance.offers")
 	}
 
-	if !in.AccessValidUntil.After(until) || !in.AccessValidUntil.After(c.Now) {
+	if !input.AccessValidUntil.After(until) || !input.AccessValidUntil.After(c.Now) {
 		return Job{}, apperr.Fields(map[string]string{"accessValidUntil": "error.mustExtend"})
 	}
 
@@ -813,7 +830,7 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 		`UPDATE maintenance.offers SET access_valid_until = $2, version = version + 1, updated_at = platform.app_now() WHERE
 			id = $1`,
 		offer,
-		in.AccessValidUntil,
+		input.AccessValidUntil,
 	)
 	if execErr != nil {
 		return Job{}, apperr.Wrap(execErr, "update maintenance.offers")
@@ -822,14 +839,14 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 	_, execErr = c.Tx.Exec(
 		ctx,
 		`DELETE FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'organization' AND owner_id = $2`,
-		in.JobID,
+		input.JobID,
 		contractor,
 	)
 	if execErr != nil {
 		return Job{}, apperr.Wrap(execErr, "delete maintenance.job_history_snapshots")
 	}
 
-	bumpErr := m.bump(ctx, c, in.JobID, "")
+	bumpErr := m.bump(ctx, c, input.JobID, "")
 	if bumpErr != nil {
 		return Job{}, bumpErr
 	}
@@ -837,11 +854,11 @@ func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendI
 	return m.done(
 		ctx,
 		c,
-		in.JobID,
+		input.JobID,
 		"offer.access_extended",
 		"jobs.extendAccess",
 		"AccessExtended",
-		in.Reason,
+		input.Reason,
 	)
 }
 
@@ -858,24 +875,24 @@ type ClaimInput struct {
 
 // Validate implements ops.Validator.
 func (in *ClaimInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fe["jobId"] = "error.required"
+		fieldErrs["jobId"] = "error.required"
 	}
 
-	trimmedReason(&in.PartLabel, 120, "partLabel", fe)
+	trimmedReason(&in.PartLabel, 120, "partLabel", fieldErrs)
 
 	if in.AmountMinor < 1 {
-		fe["amountMinor"] = "error.range"
+		fieldErrs["amountMinor"] = "error.range"
 	}
 
 	if in.Currency != "MYR" && in.Currency != "USD" {
-		fe["currency"] = "error.invalid"
+		fieldErrs["currency"] = "error.invalid"
 	}
 
-	trimmedReason(&in.Reason, 1000, "reason", fe)
+	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
 
-	return fe
+	return fieldErrs
 }
 
 // WarrantyClaim is WarrantyClaim of service-contracts.ts.
@@ -928,10 +945,10 @@ func (m FollowUps) recordWarrantyClaim(
 // recordWarrantyClaimJob is recordWarrantyClaim answering the job with its detail extras.
 func (m FollowUps) recordWarrantyClaimJob(
 	ctx context.Context,
-	c *ops.Call,
-	in *ClaimInput,
+	call *ops.Call,
+	input *ClaimInput,
 ) (Job, error) {
-	s, err := m.lock(ctx, c, in.JobID)
+	s, err := m.lock(ctx, call, input.JobID)
 	if err != nil {
 		return Job{}, err
 	}
@@ -940,7 +957,7 @@ func (m FollowUps) recordWarrantyClaimJob(
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
-	end, err := m.Warranty.WarrantyEnd(ctx, c, s.unit)
+	end, err := m.Warranty.WarrantyEnd(ctx, call, s.unit)
 	if err != nil {
 		return Job{}, apperr.Wrap(err, "maintenance.WarrantyUnits.WarrantyEnd")
 	}
@@ -957,35 +974,35 @@ func (m FollowUps) recordWarrantyClaimJob(
 		}
 	}
 
-	now := c.Now
+	now := call.Now
 	claims = append(
 		claims,
 		WarrantyClaim{
 			ID:          uuid.New(),
-			PartLabel:   in.PartLabel,
-			AmountMinor: in.AmountMinor,
-			Currency:    in.Currency,
+			PartLabel:   input.PartLabel,
+			AmountMinor: input.AmountMinor,
+			Currency:    input.Currency,
 			State:       "filed",
 			FiledAt:     &now,
-			Reason:      &in.Reason,
+			Reason:      &input.Reason,
 		},
 	)
 
 	raw, _ := json.Marshal(claims)
 
-	bumpErr := m.bump(ctx, c, in.JobID, "warranty_claims = $2", raw)
+	bumpErr := m.bump(ctx, call, input.JobID, "warranty_claims = $2", raw)
 	if bumpErr != nil {
 		return Job{}, bumpErr
 	}
 
 	return m.done(
 		ctx,
-		c,
-		in.JobID,
+		call,
+		input.JobID,
 		"job.warranty_claim_filed",
 		"jobs.recordWarrantyClaim",
 		"WarrantyClaimFiled",
-		in.Reason,
+		input.Reason,
 	)
 }
 
@@ -1004,11 +1021,11 @@ func ConfirmUnrated(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) 
 }
 
 // RegisterFollowUps binds the IR127 operations.
-func RegisterFollowUps(r *ops.Registry, m FollowUps) {
-	ops.Register(r, "jobs.rate", m.rate)
-	ops.Register(r, "jobs.reportProblem", m.reportProblem)
-	ops.Register(r, "jobs.classifyFollowUp", m.classify)
-	ops.Register(r, "jobs.saveCost", m.saveCost)
-	ops.Register(r, "jobs.extendAccess", m.extendAccess)
-	ops.Register(r, "jobs.recordWarrantyClaim", m.recordWarrantyClaim)
+func RegisterFollowUps(reg *ops.Registry, m FollowUps) {
+	ops.Register(reg, "jobs.rate", m.rate)
+	ops.Register(reg, "jobs.reportProblem", m.reportProblem)
+	ops.Register(reg, "jobs.classifyFollowUp", m.classify)
+	ops.Register(reg, "jobs.saveCost", m.saveCost)
+	ops.Register(reg, "jobs.extendAccess", m.extendAccess)
+	ops.Register(reg, "jobs.recordWarrantyClaim", m.recordWarrantyClaim)
 }

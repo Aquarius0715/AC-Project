@@ -22,14 +22,14 @@ func ownerConn(t *testing.T) *pgx.Conn {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	c, err := pgx.Connect(ctx, url)
+	conn, err := pgx.Connect(ctx, url)
 	if err != nil {
 		t.Skip("database not available:", err)
 	}
 
-	t.Cleanup(func() { c.Close(context.Background()) })
+	t.Cleanup(func() { conn.Close(context.Background()) })
 
-	return c
+	return conn
 }
 
 func TestIDDeterministic(t *testing.T) {
@@ -62,14 +62,14 @@ func TestLoadErrors(t *testing.T) {
 // Every demo actor has its own display name: screens list memberships by name (members.list displayName, IR172), so a
 // copied name shows two people as one (R293: the override-only actor was named "hq-operator").
 func TestActorNamesUnique(t *testing.T) {
-	f, err := Load(fixturePath)
+	fixture, err := Load(fixturePath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	seen := map[string]string{}
 
-	for _, a := range f.Actors {
+	for _, a := range fixture.Actors {
 		if a.DisplayName == "" {
 			t.Errorf("%s has no display name", a.MembershipID)
 		}
@@ -84,7 +84,7 @@ func TestActorNamesUnique(t *testing.T) {
 
 // Applies the fixture twice in a rolled-back transaction and checks the row counts.
 func TestApplyFixture(t *testing.T) {
-	f, err := Load(fixturePath)
+	fixture, err := Load(fixturePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,14 +92,14 @@ func TestApplyFixture(t *testing.T) {
 	c := ownerConn(t)
 	ctx := context.Background()
 
-	tx, err := c.Begin(ctx)
+	txn, err := c.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback(ctx)
+	defer txn.Rollback(ctx)
 
 	for i := range 2 {
-		err := Apply(ctx, tx, f)
+		err := Apply(ctx, txn, fixture)
 		if err != nil {
 			t.Fatalf("apply %d: %v", i, err)
 		}
@@ -116,38 +116,38 @@ func TestApplyFixture(t *testing.T) {
 
 	counts := map[string][]any{
 		"identity.memberships": ids(
-			len(f.Actors),
-			func(i int) string { return f.Actors[i].MembershipID },
+			len(fixture.Actors),
+			func(i int) string { return fixture.Actors[i].MembershipID },
 		),
 		"assets.customers": ids(
-			len(f.DemoSeed.Customers),
-			func(i int) string { return f.DemoSeed.Customers[i].ID },
+			len(fixture.DemoSeed.Customers),
+			func(i int) string { return fixture.DemoSeed.Customers[i].ID },
 		),
 		"assets.properties": ids(
-			len(f.DemoSeed.Properties),
-			func(i int) string { return f.DemoSeed.Properties[i].ID },
+			len(fixture.DemoSeed.Properties),
+			func(i int) string { return fixture.DemoSeed.Properties[i].ID },
 		),
 		"assets.spaces": ids(
-			len(f.DemoSeed.Spaces),
-			func(i int) string { return f.DemoSeed.Spaces[i].ID },
+			len(fixture.DemoSeed.Spaces),
+			func(i int) string { return fixture.DemoSeed.Spaces[i].ID },
 		),
 		"assets.units": ids(
-			len(f.DemoSeed.Units),
-			func(i int) string { return f.DemoSeed.Units[i].ID },
+			len(fixture.DemoSeed.Units),
+			func(i int) string { return fixture.DemoSeed.Units[i].ID },
 		),
 		"devices.capabilities": ids(
-			len(f.DemoSeed.Capabilities),
-			func(i int) string { return f.DemoSeed.Capabilities[i].ID },
+			len(fixture.DemoSeed.Capabilities),
+			func(i int) string { return fixture.DemoSeed.Capabilities[i].ID },
 		),
 		"maintenance.filter_cleanings": ids(
-			len(f.DemoSeed.FilterCleanings),
-			func(i int) string { return str(f.DemoSeed.FilterCleanings[i], "id") },
+			len(fixture.DemoSeed.FilterCleanings),
+			func(i int) string { return str(fixture.DemoSeed.FilterCleanings[i], "id") },
 		),
 	}
 	for table, want := range counts {
 		var got int
 
-		err := tx.QueryRow(ctx, "SELECT count(DISTINCT id) FROM "+table+" WHERE id = ANY($1::uuid[])", want).
+		err := txn.QueryRow(ctx, "SELECT count(DISTINCT id) FROM "+table+" WHERE id = ANY($1::uuid[])", want).
 			Scan(&got)
 		if err != nil {
 			t.Fatal(err)
@@ -160,7 +160,8 @@ func TestApplyFixture(t *testing.T) {
 
 	var perms int
 
-	_ = tx.QueryRow(ctx, `SELECT count(*) FROM identity.membership_permissions WHERE membership_id=$1`, ID("hq-operator")).
+	_ = txn.QueryRow(ctx, `SELECT count(*) FROM identity.membership_permissions WHERE
+		membership_id=$1`, ID("hq-operator")).
 		Scan(&perms)
 	if perms == 0 {
 		t.Error("hq-operator has no permissions")
@@ -168,7 +169,7 @@ func TestApplyFixture(t *testing.T) {
 
 	var name string
 
-	scanErr := tx.QueryRow(ctx, `SELECT display_name FROM assets.units WHERE id=$1`, ID("unit-online-rto")).
+	scanErr := txn.QueryRow(ctx, `SELECT display_name FROM assets.units WHERE id=$1`, ID("unit-online-rto")).
 		Scan(&name)
 	if scanErr != nil ||
 		name != "Bedroom AC" {
@@ -183,7 +184,7 @@ func TestApplyFixture(t *testing.T) {
 	} {
 		var later int
 
-		err := tx.QueryRow(ctx, "SELECT count(*) FROM "+table+" WHERE created_at <> $1", f.SeedCreatedAt).
+		err := txn.QueryRow(ctx, "SELECT count(*) FROM "+table+" WHERE created_at <> $1", fixture.SeedCreatedAt).
 			Scan(&later)
 		if err != nil ||
 			later != 0 {
@@ -193,10 +194,10 @@ func TestApplyFixture(t *testing.T) {
 
 	var now time.Time
 
-	scanErr = tx.QueryRow(ctx, `SELECT platform.app_now()`).
+	scanErr = txn.QueryRow(ctx, `SELECT platform.app_now()`).
 		Scan(&now)
 	if scanErr != nil ||
-		now.Equal(f.SeedCreatedAt) {
+		now.Equal(fixture.SeedCreatedAt) {
 		t.Errorf("app.now stays the seed time after Apply: %v %v", now, scanErr)
 	}
 }

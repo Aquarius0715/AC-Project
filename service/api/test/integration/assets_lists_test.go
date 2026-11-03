@@ -10,20 +10,20 @@ import (
 )
 
 func TestAssetLists(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	// customers: HQ only; inactive hidden by default
-	code, m := post(s, &hq, "customers.list", `{}`)
-	if code != 200 || len(items(m)) == 0 {
-		t.Fatalf("customers.list: %d %v", code, m)
+	code, resp := post(srv, &hq, "customers.list", `{}`)
+	if code != 200 || len(items(resp)) == 0 {
+		t.Fatalf("customers.list: %d %v", code, resp)
 	}
 
-	for _, c := range items(m) {
+	for _, c := range items(resp) {
 		if c["status"] != "active" {
 			t.Fatal("default list shows active customers only (IR40)")
 		}
 	}
 
-	if code, _ := post(s, &customerA, "customers.list", `{}`); code != 403 {
+	if code, _ := post(srv, &customerA, "customers.list", `{}`); code != 403 {
 		t.Fatalf("client cannot list customers: %d", code)
 	}
 
@@ -31,7 +31,7 @@ func TestAssetLists(t *testing.T) {
 		`{"filters":{"kind":"rto"}}`, `{"filters":{"status":"inactive"}}`,
 		`{"filters":{"organizationId":"` + seed.ID("org-customer-a").String() + `"}}`,
 	} {
-		if code, _ := post(s, &hq, "customers.list", f); code != 200 {
+		if code, _ := post(srv, &hq, "customers.list", f); code != 200 {
 			t.Errorf("%s: %d", f, code)
 		}
 	}
@@ -47,125 +47,125 @@ func TestAssetLists(t *testing.T) {
 		`{"filters":{"kind":"x"}}`, `{"filters":{"status":"x"}}`, `{"filters":{"x":1}}`,
 		`{"sort":{"field":"name","direction":"asc"}}`,
 	} {
-		code, m := post(s, &hq, "customers.list", f)
+		code, m := post(srv, &hq, "customers.list", f)
 		refusal(t, f, code, m, want[f])
 	}
 	// properties: client sees own only
-	_, m = post(s, &customerA, "properties.list", `{}`)
-	for _, p := range items(m) {
+	_, resp = post(srv, &customerA, "properties.list", `{}`)
+	for _, p := range items(resp) {
 		if p["customerOrgId"] != seed.ID("org-customer-a").String() {
 			t.Fatal("client sees another customer's property")
 		}
 	}
 
-	if len(items(m)) == 0 {
+	if len(items(resp)) == 0 {
 		t.Fatal("customer-a has properties")
 	}
 
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&hq,
 		"properties.list",
 		`{"filters":{"customerId":"`+seed.ID("cust-a").String()+`","kind":"home"}}`,
 	)
-	if len(items(m)) == 0 {
+	if len(items(resp)) == 0 {
 		t.Fatal("customerId + kind filter")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"properties.list",
 		`{"filters":{"kind":"castle"}}`,
 	); code != 422 ||
-		fields(m) != "filters.kind=error.invalid" {
-		t.Fatalf("bad kind: %d %s", code, fields(m))
+		fields(res) != "filters.kind=error.invalid" {
+		t.Fatalf("bad kind: %d %s", code, fields(res))
 	}
 	// spaces
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&customerA,
 		"spaces.list",
 		`{"filters":{"propertyId":"`+seed.ID("property-home-a").String()+`","kind":"room"}}`,
 	)
-	if len(items(m)) == 0 {
+	if len(items(resp)) == 0 {
 		t.Fatal("customer-a rooms in Home A")
 	}
 
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&customerB,
 		"spaces.list",
 		`{"filters":{"propertyId":"`+seed.ID("property-home-a").String()+`"}}`,
 	)
-	if len(items(m)) != 0 {
+	if len(items(resp)) != 0 {
 		t.Fatal("customer-b must not see Home A spaces")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"spaces.list",
 		`{"filters":{"kind":"x"}}`,
 	); code != 422 ||
-		fields(m) != "filters.kind=error.invalid" {
-		t.Fatalf("bad space kind: %d %s", code, fields(m))
+		fields(res) != "filters.kind=error.invalid" {
+		t.Fatalf("bad space kind: %d %s", code, fields(res))
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"spaces.list",
 		`{"limit":0}`,
 	); code != 422 ||
-		fields(m) != "limit=error.range" {
-		t.Fatalf("bad limit: %d %s", code, fields(m))
+		fields(res) != "limit=error.range" {
+		t.Fatalf("bad limit: %d %s", code, fields(res))
 	}
 }
 
 func TestCustomersSaveAndRename(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	org := uuid.NewString()
 	body := `{"name":"Test Co","organizationId":"` + org + `","serviceProfile":"general","status":"active"}`
 
-	code, m := write(s, &hq, "customers.save", body, 0)
-	if code != 200 || ver(m) != 1 {
-		t.Fatalf("customer create: %d %v", code, m)
+	code, resp := write(srv, &hq, "customers.save", body, 0)
+	if code != 200 || ver(resp) != 1 {
+		t.Fatalf("customer create: %d %v", code, resp)
 	}
 
-	id := data(m)["id"].(string)
+	id := data(resp)["id"].(string)
 
-	if code, _ := write(s, &hq, "customers.save", body, 0); code != 409 {
+	if code, _ := write(srv, &hq, "customers.save", body, 0); code != 409 {
 		t.Fatalf("one customer per organization: %d", code)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"customers.save",
 		`{"name":"","organizationId":"`+org+`","serviceProfile":"x","status":"y"}`,
 		0,
 	); code != 422 ||
-		fields(m) != "name=error.length,serviceProfile=error.invalid,status=error.invalid" {
-		t.Fatalf("customer validation: %d %s", code, fields(m))
+		fields(res) != "name=error.length,serviceProfile=error.invalid,status=error.invalid" {
+		t.Fatalf("customer validation: %d %s", code, fields(res))
 	}
 
 	upd := `{"id":"` + id + `","name":"Test Co 2",` +
 		`"organizationId":"` + org + `","serviceProfile":"energy",` +
 		`"status":"inactive"}`
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"customers.save",
 		upd,
 		1,
 	); code != 200 ||
-		data(m)["status"] != "inactive" {
+		data(res)["status"] != "inactive" {
 		t.Fatalf("customer update: %d", code)
 	}
 	// inactive customer cannot get new properties
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"properties.save",
 		`{"customerOrgId":"`+org+`","kind":"home","name":"x","address":null,"accessInstructions":null}`,
@@ -177,8 +177,8 @@ func TestCustomersSaveAndRename(t *testing.T) {
 	// rename: client owner renames own room, sibling uniqueness, other customer's target, stale version
 	pr := seed.ID("property-home-a").String()
 
-	code, m = write(
-		s,
+	code, resp = write(
+		srv,
 		&hq,
 		"spaces.save",
 		`{"propertyId":"`+pr+`","parentSpaceId":"`+seed.ID("floor-1").
@@ -190,22 +190,22 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		t.Fatalf("room: %d", code)
 	}
 
-	room := data(m)["id"].(string)
+	room := data(resp)["id"].(string)
 
 	newName := "Den " + uuid.NewString()[:6]
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerA,
 		"locations.rename",
 		`{"target":{"kind":"space","id":"`+room+`"},"name":"  `+newName+`  "}`,
 		1,
 	); code != 200 ||
-		data(m)["name"] != newName {
-		t.Fatalf("client rename: %d %v", code, m)
+		data(res)["name"] != newName {
+		t.Fatalf("client rename: %d %v", code, res)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerA,
 		"locations.rename",
 		`{"target":{"kind":"space","id":"`+room+`"},"name":"x"}`,
@@ -215,7 +215,7 @@ func TestCustomersSaveAndRename(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerB,
 		"locations.rename",
 		`{"target":{"kind":"space","id":"`+room+`"},"name":"x"}`,
@@ -224,8 +224,8 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		t.Fatal("other customer's space is NOT_FOUND")
 	}
 	// a sibling with the same name (case-insensitive) conflicts
-	_, m = write(
-		s,
+	_, resp = write(
+		srv,
 		&hq,
 		"spaces.save",
 		`{"propertyId":"`+pr+`","parentSpaceId":"`+seed.ID("floor-1").
@@ -234,9 +234,9 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		0,
 	)
 
-	sib := data(m)["id"].(string)
+	sib := data(resp)["id"].(string)
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"locations.rename",
 		`{"target":{"kind":"space","id":"`+sib+`"},"name":"`+strings.ToUpper(newName)+`"}`,
@@ -245,8 +245,8 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		t.Fatalf("duplicate sibling name: %d", code)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"locations.rename",
 		`{"target":{"kind":"unit","id":"`+seed.ID("unit-bedroom-2").
@@ -254,23 +254,23 @@ func TestCustomersSaveAndRename(t *testing.T) {
 			`"},"name":"Bedroom AC #2"}`,
 		0,
 	); code != 422 ||
-		fields(m) != "expectedVersion=error.required" {
-		t.Fatalf("missing version: %d %v", code, m)
+		fields(res) != "expectedVersion=error.required" {
+		t.Fatalf("missing version: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"locations.rename",
 		`{"target":{"kind":"garage","id":"`+room+`"},"name":"x"}`,
 		1,
 	); code != 422 ||
-		fields(m) != "target.kind=error.invalid" {
-		t.Fatalf("bad kind: %d %s", code, fields(m))
+		fields(res) != "target.kind=error.invalid" {
+		t.Fatalf("bad kind: %d %s", code, fields(res))
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"locations.rename",
 		`{"target":{"kind":"property","id":"`+uuid.NewString()+`"},"name":"x"}`,
@@ -280,8 +280,8 @@ func TestCustomersSaveAndRename(t *testing.T) {
 	}
 
 	// property and unit renames (HQ) and the result shapes
-	code, m = write(
-		s,
+	code, resp = write(
+		srv,
 		&hq,
 		"properties.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
@@ -293,22 +293,22 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		t.Fatalf("property: %d", code)
 	}
 
-	prop := data(m)["id"].(string)
+	prop := data(resp)["id"].(string)
 
 	office := "Office " + uuid.NewString()[:6]
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"locations.rename",
 		`{"target":{"kind":"property","id":"`+prop+`"},"name":"`+office+`"}`,
 		1,
 	); code != 200 ||
-		data(m)["name"] != office {
-		t.Fatalf("property rename: %d %v", code, m)
+		data(res)["name"] != office {
+		t.Fatalf("property rename: %d %v", code, res)
 	}
 
-	code, m = write(
-		s,
+	code, resp = write(
+		srv,
 		&hq,
 		"units.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
@@ -319,27 +319,27 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("unit: %d %v", code, m)
+		t.Fatalf("unit: %d %v", code, resp)
 	}
 
-	unit := data(m)["id"].(string)
-	if code, m := write(
-		s,
+	unit := data(resp)["id"].(string)
+	if code, res := write(
+		srv,
 		&customerB,
 		"locations.rename",
 		`{"target":{"kind":"unit","id":"`+unit+`"},"name":"Reception AC"}`,
 		1,
 	); code != 200 ||
-		data(m)["displayName"] != "Reception AC" { // unique: new property
-		t.Fatalf("client unit rename: %d %v", code, m)
+		data(res)["displayName"] != "Reception AC" { // unique: new property
+		t.Fatalf("client unit rename: %d %v", code, res)
 	}
 
-	if code, _ := write(s, &hq, "customers.save", upd, 1); code != 409 {
+	if code, _ := write(srv, &hq, "customers.save", upd, 1); code != 409 {
 		t.Fatal("customer stale version")
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"customers.save",
 		strings.Replace(upd, id, uuid.NewString(), 1),

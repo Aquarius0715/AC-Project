@@ -23,29 +23,29 @@ func inputFields(t reflect.Type, out map[string]bool) {
 		return
 	}
 
-	for f := range t.Fields() {
-		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+	for structField := range t.Fields() {
+		name, _, _ := strings.Cut(structField.Tag.Get("json"), ",")
 		if name == "-" {
 			continue
 		}
 
-		ft := f.Type
+		ft := structField.Type
 		for ft.Kind() == reflect.Pointer {
 			ft = ft.Elem()
 		}
 
-		if f.Anonymous && name == "" && ft.Kind() == reflect.Struct {
+		if structField.Anonymous && name == "" && ft.Kind() == reflect.Struct {
 			inputFields(ft, out)
 
 			continue
 		}
 
-		if !f.IsExported() {
+		if !structField.IsExported() {
 			continue
 		}
 
 		if name == "" {
-			name = f.Name
+			name = structField.Name
 		}
 
 		out[name] = true
@@ -58,7 +58,7 @@ func inputFields(t reflect.Type, out map[string]bool) {
 // VALIDATION, and a contract field the type lacks would refuse a request that follows the contract. Two operations may
 // share an input type only when their contract inputs are the same.
 func TestInputsMatchContract(t *testing.T) {
-	s := serverCfg(t, func(c *apiserver.Config) { c.Domains = ops.Domains })
+	srv := serverCfg(t, func(c *apiserver.Config) { c.Domains = ops.Domains })
 
 	raw, err := os.ReadFile("../../../web/shared/lib/contractInputs.gen.json")
 	if err != nil {
@@ -74,8 +74,8 @@ func TestInputsMatchContract(t *testing.T) {
 
 	registered := map[string]bool{}
 
-	for _, op := range s.Registry.Operations() {
-		name := op.Spec.Name
+	for _, operation := range srv.Registry.Operations() {
+		name := operation.Spec.Name
 		registered[name] = true
 
 		want, ok := contract[name]
@@ -86,7 +86,7 @@ func TestInputsMatchContract(t *testing.T) {
 		}
 
 		fields := map[string]bool{}
-		inputFields(reflect.TypeOf(op.NewInput()), fields)
+		inputFields(reflect.TypeOf(operation.NewInput()), fields)
 
 		var extra, missing []string
 
@@ -109,13 +109,13 @@ func TestInputsMatchContract(t *testing.T) {
 			t.Errorf(
 				"%s (%T) takes fields outside its contract input: %v",
 				name,
-				op.NewInput(),
+				operation.NewInput(),
 				extra,
 			)
 		}
 
 		if len(missing) > 0 {
-			t.Errorf("%s (%T) cannot read contract fields: %v", name, op.NewInput(), missing)
+			t.Errorf("%s (%T) cannot read contract fields: %v", name, operation.NewInput(), missing)
 		}
 	}
 

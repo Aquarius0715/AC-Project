@@ -13,11 +13,11 @@ import (
 // window and the accepted Offer's access window; equipment reads wait for the work window. Contractors see the
 // units of jobs with their own accepted Offer inside its access window.
 func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	unit := seed.ID("unit-other-customer").String()
 
 	listed := func(a *actor) bool {
-		_, m := post(s, a, "units.list", `{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`)
+		_, m := post(srv, a, "units.list", `{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`)
 
 		return len(items(m)) == 1
 	}
@@ -71,14 +71,14 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		t.Fatal("another contractor never sees it")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&techB,
 		"units.get",
 		`{"id":"`+unit+`"}`,
 	); code != 403 ||
-		m["messageKey"] != "errors.assignment_not_started" {
-		t.Fatalf("before the work window: %d %v", code, m)
+		res["messageKey"] != "errors.assignment_not_started" {
+		t.Fatalf("before the work window: %d %v", code, res)
 	}
 	// the unit list carries no telemetry before the work window (latestMeasurements is an equipment read, IR213)
 	owner(
@@ -94,7 +94,7 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	)
 
 	readings := func() int {
-		_, m := post(s, &techB, "units.list", `{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`)
+		_, m := post(srv, &techB, "units.list", `{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`)
 
 		return len(items(m)[0]["latestMeasurements"].([]any))
 	}
@@ -118,7 +118,7 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	)
 
 	alertListed := func() bool {
-		_, m := post(s, &techB, "alerts.list", `{"limit":100,"filters":{"unitId":"`+unit+`"}}`)
+		_, m := post(srv, &techB, "alerts.list", `{"limit":100,"filters":{"unitId":"`+unit+`"}}`)
 		for _, it := range items(m) {
 			if it["id"] == alert {
 				return true
@@ -131,14 +131,14 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		t.Fatal("alerts.list before the work window")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&techB,
 		"alerts.get",
 		`{"id":"`+alert+`"}`,
 	); code != 403 ||
-		m["messageKey"] != "errors.assignment_not_started" {
-		t.Fatalf("alerts.get before the work window: %d %v", code, m)
+		res["messageKey"] != "errors.assignment_not_started" {
+		t.Fatalf("alerts.get before the work window: %d %v", code, res)
 	}
 
 	series := `{"from":"` + clock.Add(-time.Hour).
@@ -146,21 +146,21 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		`","to":"` + clock.Format(
 		time.RFC3339,
 	) + `","unitIds":["` + unit + `"],"metric":"temperature","query":{}}`
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&techB,
 		"telemetry.series",
 		series,
 	); code != 403 ||
-		m["messageKey"] != "errors.assignment_not_started" {
-		t.Fatalf("telemetry before the work window: %d %v", code, m)
+		res["messageKey"] != "errors.assignment_not_started" {
+		t.Fatalf("telemetry before the work window: %d %v", code, res)
 	}
 
-	if code, _ := post(s, &contrA, "alerts.get", `{"id":"`+alert+`"}`); code != 200 {
+	if code, _ := post(srv, &contrA, "alerts.get", `{"id":"`+alert+`"}`); code != 200 {
 		t.Fatalf("contractor reads the alert of its accepted job: %d", code)
 	}
 
-	if code, _ := post(s, &contrA, "units.get", `{"id":"`+unit+`"}`); code != 200 {
+	if code, _ := post(srv, &contrA, "units.get", `{"id":"`+unit+`"}`); code != 200 {
 		t.Fatalf("contractor units.get: %d", code)
 	}
 	// work window running → equipment reads allowed; internal technicians never depend on assignments
@@ -181,7 +181,7 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		clock.Add(time.Hour),
 	)
 
-	if code, m := post(s, &techB, "units.get", `{"id":"`+unit+`"}`); code != 200 {
+	if code, m := post(srv, &techB, "units.get", `{"id":"`+unit+`"}`); code != 200 {
 		t.Fatalf("inside the work window: %d %v", code, m)
 	}
 
@@ -189,7 +189,7 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		t.Fatal("alerts.list inside the work window")
 	}
 
-	if code, _ := post(s, &techB, "telemetry.series", series); code != 200 {
+	if code, _ := post(srv, &techB, "telemetry.series", series); code != 200 {
 		t.Fatalf("telemetry inside the work window: %d", code)
 	}
 

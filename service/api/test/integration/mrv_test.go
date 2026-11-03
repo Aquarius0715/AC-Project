@@ -12,12 +12,12 @@ import (
 )
 
 func TestMRV(t *testing.T) {
-	s := server(t)
-	u, _ := isolatedUnit(t, s)
+	srv := server(t)
+	unit, _ := isolatedUnit(t, srv)
 	start := time.Date(2026, 9, 12, 8, 0, 0, 0, time.UTC)
 	powerSeries(
 		t,
-		u,
+		unit,
 		start,
 		"measured",
 		new(float64(60)),
@@ -26,16 +26,16 @@ func TestMRV(t *testing.T) {
 		new(float64(60)),
 		new(float64(60)),
 	)
-	_, m := write(
-		s,
+	_, resp := write(
+		srv,
 		&hq,
 		"baselines.save",
-		`{"unitIds":["`+u+`"],"period":{"from":"2026-08-01T00:00:00Z","to":"2026-08-01T00:05:00Z"},`+
+		`{"unitIds":["`+unit+`"],"period":{"from":"2026-08-01T00:00:00Z","to":"2026-08-01T00:05:00Z"},`+
 			`"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test",`+
 			`"method":"demo_fixed","baselineKWh":10}`,
 		0,
 	)
-	base := data(m)["id"].(string)
+	base := data(resp)["id"].(string)
 	org := seed.ID("org-customer-b").String()
 	cond := func(extra map[string]string) string {
 		f := map[string]string{
@@ -43,7 +43,7 @@ func TestMRV(t *testing.T) {
 				time.RFC3339,
 			) + `"`,
 			"to":              `"` + start.Add(5*time.Minute).Format(time.RFC3339) + `"`,
-			"unitIds":         `["` + u + `"]`,
+			"unitIds":         `["` + unit + `"]`,
 			"baselineId":      `"` + base + `"`,
 			"baselineVersion": "1",
 			"factorId":        `"` + seed.ID("factor-demo-2026").String() + `"`,
@@ -62,15 +62,15 @@ func TestMRV(t *testing.T) {
 		return "{" + strings.Join(parts, ",") + "}"
 	}
 
-	code, m := post(s, &hq, "mrv.preview", cond(nil))
-	if code != 200 || data(m)["incomplete"] != false || data(m)["scope"] != "scope_2" ||
-		data(m)["summary"].(map[string]any)["totals"].(map[string]any)["savedKWh"].(float64) != 5 ||
-		data(m)["summary"].(map[string]any)["totals"].(map[string]any)["emissionsKg"].(float64) != 2.5 {
-		t.Fatalf("preview: %d %v", code, m)
+	code, resp := post(srv, &hq, "mrv.preview", cond(nil))
+	if code != 200 || data(resp)["incomplete"] != false || data(resp)["scope"] != "scope_2" ||
+		data(resp)["summary"].(map[string]any)["totals"].(map[string]any)["savedKWh"].(float64) != 5 ||
+		data(resp)["summary"].(map[string]any)["totals"].(map[string]any)["emissionsKg"].(float64) != 2.5 {
+		t.Fatalf("preview: %d %v", code, resp)
 	}
 
 	if _, m := post(
-		s,
+		srv,
 		&hq,
 		"mrv.preview",
 		cond(map[string]string{"boundaryId": `"whole_building_electricity"`}),
@@ -96,7 +96,7 @@ func TestMRV(t *testing.T) {
 		"blank boundary":       {map[string]string{"boundary": `" "`}, 422},
 		"unaligned":            {map[string]string{"from": `"` + start.Add(time.Second).Format(time.RFC3339) + `"`}, 422},
 	} {
-		code, m := post(s, &hq, "mrv.preview", cond(tc.e))
+		code, m := post(srv, &hq, "mrv.preview", cond(tc.e))
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
 		} else if code != tc.code {
@@ -104,27 +104,34 @@ func TestMRV(t *testing.T) {
 		}
 	}
 	// drafts, review, versions
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"mrv.saveDraft",
 		`{"conditions":`+cond(nil)+`,"evidenceIds":["`+uuid.NewString()+`"]}`,
 		0,
 	); code != 422 ||
-		fields(m) != "evidenceIds=errors.evidence_unknown" {
-		t.Errorf("unknown evidence: %d %s", code, fields(m))
+		fields(res) != "evidenceIds=errors.evidence_unknown" {
+		t.Errorf("unknown evidence: %d %s", code, fields(res))
 	}
 
-	code, m = write(s, &hq, "mrv.saveDraft", `{"conditions":`+cond(nil)+`,"evidenceIds":[]}`, 0)
-	if code != 200 || data(m)["status"] != "draft" || ver(m) != 1 || data(m)["isDemo"] != true {
-		t.Fatalf("draft: %d %v", code, m)
+	code, resp = write(
+		srv,
+		&hq,
+		"mrv.saveDraft",
+		`{"conditions":`+cond(nil)+`,"evidenceIds":[]}`,
+		0,
+	)
+	if code != 200 || data(resp)["status"] != "draft" || ver(resp) != 1 ||
+		data(resp)["isDemo"] != true {
+		t.Fatalf("draft: %d %v", code, resp)
 	}
 
-	id := data(m)["id"].(string)
+	id := data(resp)["id"].(string)
 
 	review := func(rv, v int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&hq,
 			"mrv.recordReview",
 			`{"reportId":"`+id+`","reportVersion":`+itoa(
@@ -137,11 +144,11 @@ func TestMRV(t *testing.T) {
 		t.Error("review of a non-latest version")
 	}
 
-	code, m = review(1, 1)
-	if code != 200 || data(m)["status"] != "demo_reviewed" || ver(m) != 2 ||
-		len(data(m)["reviewHistory"].([]any)) != 1 ||
-		data(m)["reviewHistory"].([]any)[0].(map[string]any)["reportVersion"].(float64) != 1 {
-		t.Fatalf("review: %d %v", code, m)
+	code, resp = review(1, 1)
+	if code != 200 || data(resp)["status"] != "demo_reviewed" || ver(resp) != 2 ||
+		len(data(resp)["reviewHistory"].([]any)) != 1 ||
+		data(resp)["reviewHistory"].([]any)[0].(map[string]any)["reportVersion"].(float64) != 1 {
+		t.Fatalf("review: %d %v", code, resp)
 	}
 
 	if code, _ := review(2, 2); code != 409 {
@@ -149,7 +156,7 @@ func TestMRV(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"mrv.saveDraft",
 		`{"id":"`+id+`","conditions":`+cond(nil)+`,"evidenceIds":[]}`,
@@ -158,72 +165,72 @@ func TestMRV(t *testing.T) {
 		t.Error("stale draft")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"mrv.saveDraft",
 		`{"id":"`+id+`","conditions":`+cond(
 			map[string]string{"boundaryId": `"whole_building_electricity"`},
 		)+`,"evidenceIds":[]}`,
 		2,
-	); code != 200 || ver(m) != 3 ||
-		data(m)["incomplete"] != true {
-		t.Fatalf("new draft version: %d %v", code, m)
+	); code != 200 || ver(res) != 3 ||
+		data(res)["incomplete"] != true {
+		t.Fatalf("new draft version: %d %v", code, res)
 	}
 
 	if code, _ := review(3, 3); code != 409 {
 		t.Error("review of an incomplete version")
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"mrv.versions",
 		`{"id":"`+id+`","query":{}}`,
-	); len(items(m)) != 3 || items(m)[0]["version"].(float64) != 1 ||
-		items(m)[1]["status"] != "demo_reviewed" {
-		t.Errorf("versions: %v", m)
+	); len(items(res)) != 3 || items(res)[0]["version"].(float64) != 1 ||
+		items(res)[1]["status"] != "demo_reviewed" {
+		t.Errorf("versions: %v", res)
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"mrv.get",
 		`{"id":"`+id+`","reportVersion":1}`,
-	); data(m)["status"] != "draft" ||
-		len(data(m)["reviewHistory"].([]any)) != 0 {
-		t.Errorf("old version: %v", m)
+	); data(res)["status"] != "draft" ||
+		len(data(res)["reviewHistory"].([]any)) != 0 {
+		t.Errorf("old version: %v", res)
 	}
 
-	if _, m := post(s, &hq, "mrv.get", `{"id":"`+id+`"}`); ver(m) != 3 {
+	if _, m := post(srv, &hq, "mrv.get", `{"id":"`+id+`"}`); ver(m) != 3 {
 		t.Error("latest by default")
 	}
 
-	if code, _ := post(s, &hq, "mrv.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
+	if code, _ := post(srv, &hq, "mrv.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
 		t.Error("unknown report")
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"mrv.list",
-		`{"filters":{"organizationId":"`+org+`","unitId":"`+u+`","status":"draft"}}`,
-	); len(items(m)) != 1 ||
-		ver(map[string]any{"data": items(m)[0]}) != 3 {
-		t.Errorf("list: %v", m)
+		`{"filters":{"organizationId":"`+org+`","unitId":"`+unit+`","status":"draft"}}`,
+	); len(items(res)) != 1 ||
+		ver(map[string]any{"data": items(res)[0]}) != 3 {
+		t.Errorf("list: %v", res)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"mrv.list",
 		`{"filters":{"status":"reviewed"}}`,
 	); code != 422 ||
-		fields(m) != "filters=error.invalid" {
-		t.Errorf("bad status filter: %d %s", code, fields(m))
+		fields(res) != "filters=error.invalid" {
+		t.Errorf("bad status filter: %d %s", code, fields(res))
 	}
 
-	if code, _ := post(s, &customerB, "mrv.list", `{}`); code != 403 {
+	if code, _ := post(srv, &customerB, "mrv.list", `{}`); code != 403 {
 		t.Error("client MRV")
 	}
 }

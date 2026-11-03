@@ -9,23 +9,23 @@ import (
 // database rolls the transaction back (consents.update; the consent write fails). The consent is first revoked, since
 // a grant of a consent already in force writes nothing and would not reach the failing statement.
 func TestConsentChangeRollsBackWhenItCannotBeWritten(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	get := func() map[string]any {
-		_, m := post(s, &customerB, "consents.get", `{"purpose":"location_automation"}`)
+		_, m := post(srv, &customerB, "consents.get", `{"purpose":"location_automation"}`)
 
 		return m
 	}
 
 	before := get()
 	if data(before)["granted"] == true {
-		if code, m := write(
-			s,
+		if code, resp := write(
+			srv,
 			&customerB,
 			"consents.update",
 			`{"purpose":"location_automation","granted":false}`,
 			ver(before),
 		); code != 200 {
-			t.Fatalf("revoke before the test: %d %v", code, m)
+			t.Fatalf("revoke before the test: %d %v", code, resp)
 		}
 
 		before = get()
@@ -33,7 +33,7 @@ func TestConsentChangeRollsBackWhenItCannotBeWritten(t *testing.T) {
 
 	broken := injectAt(t, "UPDATE identity.consents SET granted = ")
 
-	code, m := write(
+	code, res := write(
 		broken,
 		&customerB,
 		"consents.update",
@@ -41,7 +41,7 @@ func TestConsentChangeRollsBackWhenItCannotBeWritten(t *testing.T) {
 		ver(before),
 	)
 	if code < 500 {
-		t.Fatalf("consent with a failing write: %d %v, want a server error", code, m)
+		t.Fatalf("consent with a failing write: %d %v, want a server error", code, res)
 	}
 
 	after := get()

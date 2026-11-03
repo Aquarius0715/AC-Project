@@ -57,53 +57,53 @@ const capCols = `id, tenant_id, version, created_at, created_at, manufacturer, m
 	`fan_control, temperature, modes, fan_levels,
 	ventilation, ventilation_levels, sensors, firmware_candidates`
 
-func scanCap(r pgx.Row) (Capability, error) {
+func scanCap(row pgx.Row) (Capability, error) {
 	var (
-		c             Capability
+		capability    Capability
 		temp, sensors []byte
 	)
 
-	err := r.Scan(
-		&c.ID,
-		&c.TenantID,
-		&c.Version,
-		&c.CreatedAt,
-		&c.UpdatedAt,
-		&c.Manufacturer,
-		&c.Model,
-		&c.Control,
-		&c.ModeControl,
-		&c.FanControl,
+	err := row.Scan(
+		&capability.ID,
+		&capability.TenantID,
+		&capability.Version,
+		&capability.CreatedAt,
+		&capability.UpdatedAt,
+		&capability.Manufacturer,
+		&capability.Model,
+		&capability.Control,
+		&capability.ModeControl,
+		&capability.FanControl,
 		&temp,
-		&c.Modes,
-		&c.FanLevels,
-		&c.Ventilation,
-		&c.VentilationLevels,
+		&capability.Modes,
+		&capability.FanLevels,
+		&capability.Ventilation,
+		&capability.VentilationLevels,
 		&sensors,
-		&c.FirmwareCandidates,
+		&capability.FirmwareCandidates,
 	)
 	if err != nil {
-		return c, apperr.Wrap(err, "scan (scanCap)")
+		return capability, apperr.Wrap(err, "scan (scanCap)")
 	}
 
 	if len(temp) > 0 {
-		c.Temperature = &TempRange{Min: 0, Max: 0, Step: 0}
+		capability.Temperature = &TempRange{Min: 0, Max: 0, Step: 0}
 
-		err := json.Unmarshal(temp, c.Temperature)
+		err := json.Unmarshal(temp, capability.Temperature)
 		if err != nil {
-			return c, apperr.Wrap(err, "json.Unmarshal")
+			return capability, apperr.Wrap(err, "json.Unmarshal")
 		}
 	}
 
-	c.Sensors = []SensorSpec{}
+	capability.Sensors = []SensorSpec{}
 	if len(sensors) > 0 {
-		err := json.Unmarshal(sensors, &c.Sensors)
+		err := json.Unmarshal(sensors, &capability.Sensors)
 		if err != nil {
-			return c, apperr.Wrap(err, "json.Unmarshal")
+			return capability, apperr.Wrap(err, "json.Unmarshal")
 		}
 	}
 
-	return c, nil
+	return capability, nil
 }
 
 // capabilitiesList serves capabilities.list.
@@ -134,17 +134,17 @@ func scanCap(r pgx.Row) (Capability, error) {
 //	@Router			/v1/capabilities [get]
 func capabilitiesList(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[Capability], error) {
-	if len(in.Filters) > 0 && string(in.Filters) != "{}" && string(in.Filters) != "null" {
+	if len(query.Filters) > 0 && string(query.Filters) != "{}" && string(query.Filters) != "null" {
 		return paging.Page[Capability]{}, apperr.Fields(
 			map[string]string{"filters": "error.invalid"},
 		) // query catalog: no filters
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{"id": "id", "createdAt": "created_at", "updatedAt": "created_at"},
 		"id ASC",
 	)
@@ -152,27 +152,27 @@ func capabilitiesList(
 		return paging.Page[Capability]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, nil, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, nil, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Capability]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM devices.capabilities WHERE is_current`).
+	scanErr := call.Tx.QueryRow(ctx, `SELECT count(*) FROM devices.capabilities WHERE is_current`).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Capability]{}, apperr.Wrap(scanErr, "select devices.capabilities")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			`SELECT %s FROM devices.capabilities WHERE is_current ORDER BY %s LIMIT %d OFFSET %d`,
 			capCols,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 	)
 	if err != nil {
@@ -193,9 +193,9 @@ func capabilitiesList(
 
 	return paging.Page[Capability]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, apperr.Wrap(rows.Err(), "select devices.capabilities")
 }
 
@@ -250,52 +250,52 @@ func uniqueIn(vals []string, allowed map[string]bool) bool {
 
 // Validate implements ops.Validator (DD-A04).
 func (in *CapabilitySave) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if n := utf8.RuneCountInString(in.Manufacturer); n < 1 || n > 120 {
-		fe["manufacturer"] = "error.length"
+		fieldErrs["manufacturer"] = "error.length"
 	}
 
 	if n := utf8.RuneCountInString(in.Model); n < 1 || n > 120 {
-		fe["model"] = "error.length"
+		fieldErrs["model"] = "error.length"
 	}
 
 	if t := in.Temperature; t != nil && (t.Min >= t.Max || t.Step <= 0 || t.Step > t.Max-t.Min) {
-		fe["temperature"] = "error.range"
+		fieldErrs["temperature"] = "error.range"
 	}
 
 	if !in.Control && (in.ModeControl || in.FanControl || in.Temperature != nil) {
-		fe["control"] = "error.controlRequired" // mode/fan/temperature control needs control=true
+		fieldErrs["control"] = "error.controlRequired" // mode/fan/temperature control needs control=true
 	}
 
 	if !uniqueIn(in.Modes, modes) || (in.ModeControl && len(in.Modes) == 0) {
-		fe["modes"] = "error.invalid"
+		fieldErrs["modes"] = "error.invalid"
 	}
 
 	if !uniqueIn(in.FanLevels, fans) || (in.FanControl && len(in.FanLevels) == 0) {
-		fe["fanLevels"] = "error.invalid"
+		fieldErrs["fanLevels"] = "error.invalid"
 	}
 
 	if !uniqueIn(in.VentilationLevels, fans) || (!in.Ventilation && len(in.VentilationLevels) > 0) {
-		fe["ventilationLevels"] = "error.invalid"
+		fieldErrs["ventilationLevels"] = "error.invalid"
 	}
 
 	seen := map[string]bool{}
 
-	for i, s := range in.Sensors {
-		k := fmt.Sprintf("sensors[%d]", i)
+	for i, sensorSpec := range in.Sensors {
+		key := fmt.Sprintf("sensors[%d]", i)
 
 		switch {
-		case metricUnit[s.Metric] == "" || seen[s.Metric]:
-			fe[k+".metric"] = "error.invalid"
-		case metricUnit[s.Metric] != s.Unit:
-			fe[k+".unit"] = "error.unitMismatch"
-		case s.StaleAfterSeconds < 10 || s.StaleAfterSeconds > 86400:
-			fe[k+".staleAfterSeconds"] = "error.range"
-		case s.BoundaryID != nil && (!boundaries[*s.BoundaryID] || s.Metric != "power"):
-			fe[k+".boundaryId"] = "error.invalid"
+		case metricUnit[sensorSpec.Metric] == "" || seen[sensorSpec.Metric]:
+			fieldErrs[key+".metric"] = "error.invalid"
+		case metricUnit[sensorSpec.Metric] != sensorSpec.Unit:
+			fieldErrs[key+".unit"] = "error.unitMismatch"
+		case sensorSpec.StaleAfterSeconds < 10 || sensorSpec.StaleAfterSeconds > 86400:
+			fieldErrs[key+".staleAfterSeconds"] = "error.range"
+		case sensorSpec.BoundaryID != nil && (!boundaries[*sensorSpec.BoundaryID] || sensorSpec.Metric != "power"):
+			fieldErrs[key+".boundaryId"] = "error.invalid"
 		}
 
-		seen[s.Metric] = true
+		seen[sensorSpec.Metric] = true
 	}
 	// a candidate is 1–32 characters once trimmed, and no two candidates are the same after trimming (the "+ Add version"
 	// rule of the Admin device model editor)
@@ -304,7 +304,7 @@ func (in *CapabilitySave) Validate() map[string]string {
 	for _, v := range in.FirmwareCandidates {
 		x := strings.TrimSpace(v)
 		if n := utf8.RuneCountInString(x); n < 1 || n > 32 || seenFirmware[x] {
-			fe["firmwareCandidates"] = "error.invalid"
+			fieldErrs["firmwareCandidates"] = "error.invalid"
 		}
 
 		seenFirmware[x] = true
@@ -312,13 +312,13 @@ func (in *CapabilitySave) Validate() map[string]string {
 
 	switch { // DD-A04: a change reason is required on update and not taken on create
 	case in.ID != nil && in.ChangeReason == nil:
-		fe["changeReason"] = "error.required"
+		fieldErrs["changeReason"] = "error.required"
 	case in.ChangeReason != nil &&
 		(utf8.RuneCountInString(strings.TrimSpace(*in.ChangeReason)) < 1 || utf8.RuneCountInString(*in.ChangeReason) > 1000):
-		fe["changeReason"] = "error.length"
+		fieldErrs["changeReason"] = "error.length"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // fields are the audited capability values (the before/after of capabilities.save).
@@ -386,21 +386,22 @@ func nz(a []string) []string {
 //	@Router			/v1/capabilities [post]
 func (m Capabilities) save(
 	ctx context.Context,
-	c *ops.Call,
-	in *CapabilitySave,
+	call *ops.Call,
+	input *CapabilitySave,
 ) (Capability, error) {
 	var temp any
-	if in.Temperature != nil {
-		temp, _ = json.Marshal(in.Temperature)
+	if input.Temperature != nil {
+		temp, _ = json.Marshal(input.Temperature)
 	}
 
-	sensors, _ := json.Marshal(append([]SensorSpec{}, in.Sensors...))
+	sensors, _ := json.Marshal(append([]SensorSpec{}, input.Sensors...))
 
 	var dup bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.capabilities WHERE is_current AND lower(manufacturer) =
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.capabilities WHERE is_current AND
+		lower(manufacturer) =
 		lower($1) AND lower(model) = lower($2)
-		AND ($3::uuid IS NULL OR id <> $3))`, in.Manufacturer, in.Model, in.ID).
+		AND ($3::uuid IS NULL OR id <> $3))`, input.Manufacturer, input.Model, input.ID).
 		Scan(&dup)
 	if err != nil {
 		return Capability{}, apperr.Wrap(err, "select devices.capabilities")
@@ -415,12 +416,12 @@ func (m Capabilities) save(
 
 	var before map[string]any
 
-	if in.ID != nil {
+	if input.ID != nil {
 		old, err := scanCap(
-			c.Tx.QueryRow(
+			call.Tx.QueryRow(
 				ctx,
 				`SELECT `+capCols+` FROM devices.capabilities WHERE id = $1 AND is_current FOR UPDATE`,
-				*in.ID,
+				*input.ID,
 			),
 		)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -434,28 +435,28 @@ func (m Capabilities) save(
 		cur := old.Version
 		before = old.fields()
 
-		if cur != *c.ExpectedVersion {
+		if cur != *call.ExpectedVersion {
 			return Capability{}, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
 
-		_, execErr := c.Tx.Exec(
+		_, execErr := call.Tx.Exec(
 			ctx,
 			`UPDATE devices.capabilities SET is_current = false WHERE id = $1 AND version = $2`,
-			*in.ID,
+			*input.ID,
 			cur,
 		)
 		if execErr != nil {
 			return Capability{}, apperr.Wrap(execErr, "update devices.capabilities")
 		}
 
-		id, version = *in.ID, cur+1
-		if in.ChangeReason != nil {
-			reason = *in.ChangeReason
+		id, version = *input.ID, cur+1
+		if input.ChangeReason != nil {
+			reason = *input.ChangeReason
 		}
 	}
 
-	x, err := scanCap(
-		c.Tx.QueryRow(
+	capability, err := scanCap(
+		call.Tx.QueryRow(
 			ctx,
 			`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control,
 				temperature,
@@ -464,18 +465,18 @@ func (m Capabilities) save(
 		`+capCols,
 			id,
 			version,
-			in.Manufacturer,
-			in.Model,
-			in.Control,
-			in.ModeControl,
-			in.FanControl,
+			input.Manufacturer,
+			input.Model,
+			input.Control,
+			input.ModeControl,
+			input.FanControl,
 			temp,
-			nz(in.Modes),
-			nz(in.FanLevels),
-			in.Ventilation,
-			nz(in.VentilationLevels),
+			nz(input.Modes),
+			nz(input.FanLevels),
+			input.Ventilation,
+			nz(input.VentilationLevels),
 			sensors,
-			nz(in.FirmwareCandidates),
+			nz(input.FirmwareCandidates),
 		),
 	)
 	if err != nil {
@@ -483,7 +484,7 @@ func (m Capabilities) save(
 	}
 
 	if version > 1 && m.Units != nil {
-		_, err := m.Units.MoveToCapabilityVersion(ctx, c, id, version)
+		_, err := m.Units.MoveToCapabilityVersion(ctx, call, id, version)
 		if err != nil {
 			return Capability{}, apperr.Wrap(
 				err,
@@ -499,7 +500,7 @@ func (m Capabilities) save(
 		prev = &p
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "capability",
 			AggregateID:   id,
@@ -508,8 +509,8 @@ func (m Capabilities) save(
 		},
 	)
 
-	b, a := ops.Changes(before, x.fields())
-	c.Audit(
+	b, a := ops.Changes(before, capability.fields())
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "capabilities.save",
 			TargetKind:      "capability",
@@ -522,7 +523,7 @@ func (m Capabilities) save(
 		},
 	)
 
-	return x, nil
+	return capability, nil
 }
 
 // Register binds the Devices operations implemented so far.
@@ -538,7 +539,7 @@ func LoadCapability(
 	id uuid.UUID,
 	version int,
 ) (Capability, bool, error) {
-	x, err := scanCap(
+	capability, err := scanCap(
 		c.Tx.QueryRow(
 			ctx,
 			`SELECT `+capCols+` FROM devices.capabilities WHERE id = $1 AND version = $2`,
@@ -547,8 +548,8 @@ func LoadCapability(
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return x, false, nil
+		return capability, false, nil
 	}
 
-	return x, err == nil, err
+	return capability, err == nil, err
 }

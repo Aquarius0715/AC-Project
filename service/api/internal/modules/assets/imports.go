@@ -100,32 +100,32 @@ type ImportPreviewInput struct {
 
 // Validate implements ops.Validator (DD-A18: property, unit_name, model_code mapping required).
 func (in *ImportPreviewInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.CustomerID == uuid.Nil {
-		fe["customerId"] = "error.required"
+		fieldErrs["customerId"] = "error.required"
 	}
 
 	if !strLen(in.FileName, 1, 200) {
-		fe["fileName"] = "error.length"
+		fieldErrs["fileName"] = "error.length"
 	}
 
 	if strings.TrimSpace(in.CSVText) == "" {
-		fe["csvText"] = "error.required"
+		fieldErrs["csvText"] = "error.required"
 	}
 
 	for k := range in.Mapping {
 		if !importColumns[k] {
-			fe["mapping."+k] = "error.unknownColumn"
+			fieldErrs["mapping."+k] = "error.unknownColumn"
 		}
 	}
 
 	for _, k := range []string{"property", "unit_name", "model_code"} {
 		if strings.TrimSpace(in.Mapping[k]) == "" {
-			fe["mapping."+k] = "error.required"
+			fieldErrs["mapping."+k] = "error.required"
 		}
 	}
 
-	return fe
+	return fieldErrs
 }
 
 func cell(rec []string, idx map[string]int, key string) *string {
@@ -174,15 +174,15 @@ type locKey struct {
 //	@Router			/v1/units/imports/preview [post]
 func (m *Module) unitsImportPreview(
 	ctx context.Context,
-	c *ops.Call,
-	in *ImportPreviewInput,
+	call *ops.Call,
+	input *ImportPreviewInput,
 ) (ImportPreview, error) {
 	var (
 		org    uuid.UUID
 		status string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT organization_id, status FROM assets.customers WHERE id = $1`, in.CustomerID).
+	err := call.Tx.QueryRow(ctx, `SELECT organization_id, status FROM assets.customers WHERE id = $1`, input.CustomerID).
 		Scan(&org, &status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ImportPreview{}, notFound()
@@ -196,17 +196,17 @@ func (m *Module) unitsImportPreview(
 		return ImportPreview{}, conflict("error.customerInactive")
 	}
 
-	r := csv.NewReader(strings.NewReader(strings.TrimPrefix(in.CSVText, "\ufeff")))
-	r.FieldsPerRecord = -1
+	reader := csv.NewReader(strings.NewReader(strings.TrimPrefix(input.CSVText, "\ufeff")))
+	reader.FieldsPerRecord = -1
 
-	header, err := r.Read()
+	header, err := reader.Read()
 	if err != nil {
 		return ImportPreview{}, apperr.Fields(map[string]string{"csvText": "error.malformedCsv"})
 	}
 
 	idx := map[string]int{}
 
-	for key, col := range in.Mapping {
+	for key, col := range input.Mapping {
 		found := false
 
 		for i, h := range header {
@@ -229,7 +229,7 @@ func (m *Module) unitsImportPreview(
 	serials := map[string]bool{}
 
 	for n := 1; ; n++ {
-		rec, err := r.Read()
+		rec, err := reader.Read()
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -305,7 +305,7 @@ func (m *Module) unitsImportPreview(
 		}
 
 		if row.Result != "error" {
-			err := c.Tx.QueryRow(ctx, `SELECT id FROM assets.properties WHERE customer_org_id = $1 AND NOT archived AND
+			err := call.Tx.QueryRow(ctx, `SELECT id FROM assets.properties WHERE customer_org_id = $1 AND NOT archived AND
 				lower(name) = lower($2) ORDER BY id LIMIT 1`,
 				org, row.PropertyName).
 				Scan(&row.PropertyID)
@@ -326,7 +326,7 @@ func (m *Module) unitsImportPreview(
 		}
 
 		if row.Result != "error" {
-			id, v, ok, err := m.Import.ByCode(ctx, c, row.ModelCode)
+			id, v, ok, err := m.Import.ByCode(ctx, call, row.ModelCode)
 			if err != nil {
 				return ImportPreview{}, apperr.Wrap(err, "assets.ImportModels.ByCode")
 			}
@@ -353,7 +353,7 @@ func (m *Module) unitsImportPreview(
 				*row.InstalledOn,
 				kualaLumpur,
 			); t.After(
-				c.Now,
+				call.Now,
 			) {
 				fail("error.future")
 			}
@@ -361,7 +361,7 @@ func (m *Module) unitsImportPreview(
 
 		if row.Result != "error" &&
 			row.Serial != nil { // the device must exist, be free and untampered; one row per serial
-			id, state, err := m.Import.SerialState(ctx, c, *row.Serial)
+			id, state, err := m.Import.SerialState(ctx, call, *row.Serial)
 			if err != nil {
 				return ImportPreview{}, apperr.Wrap(err, "assets.ImportModels.SerialState")
 			}
@@ -396,7 +396,7 @@ func (m *Module) unitsImportPreview(
 
 			var id uuid.UUID
 			// an existing location of any kind with this name under the parent is reused: names are unique per parent
-			err := c.Tx.QueryRow(ctx, `SELECT id FROM assets.spaces WHERE property_id = $1 AND parent_space_id IS NOT DISTINCT
+			err := call.Tx.QueryRow(ctx, `SELECT id FROM assets.spaces WHERE property_id = $1 AND parent_space_id IS NOT DISTINCT
 				FROM $2
 				AND NOT archived AND lower(name) = lower($3) ORDER BY id LIMIT 1`, row.PropertyID, parentSpace, *lvl.name).
 				Scan(&id)
@@ -422,7 +422,7 @@ func (m *Module) unitsImportPreview(
 
 			var exists bool
 
-			err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND space_id IS NOT
+			err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND space_id IS NOT
 				DISTINCT FROM $2
 				AND NOT archived AND lower(display_name) = lower($3))`, row.PropertyID, parentSpace, row.UnitName).
 				Scan(&exists)
@@ -444,37 +444,43 @@ func (m *Module) unitsImportPreview(
 		return ImportPreview{}, apperr.Fields(map[string]string{"csvText": "error.noRows"})
 	}
 
-	p := ImportPreview{
+	importPreview := ImportPreview{
 		PreviewID:  uuid.Must(uuid.NewV7()),
-		CustomerID: in.CustomerID,
-		FileName:   in.FileName,
-		ExpiresAt:  c.Now.Add(previewTTL), Rows: nil, ReadyCount: 0, WarningCount: 0, ErrorCount: 0,
+		CustomerID: input.CustomerID,
+		FileName:   input.FileName,
+		ExpiresAt: call.Now.Add(
+			previewTTL,
+		),
+		Rows:         nil,
+		ReadyCount:   0,
+		WarningCount: 0,
+		ErrorCount:   0,
 	}
 	for _, s := range stored {
-		p.Rows = append(p.Rows, s.ImportRow)
+		importPreview.Rows = append(importPreview.Rows, s.ImportRow)
 		switch s.Result {
 		case "ready":
-			p.ReadyCount++
+			importPreview.ReadyCount++
 		case "warning":
-			p.WarningCount++
+			importPreview.WarningCount++
 		default:
-			p.ErrorCount++
+			importPreview.ErrorCount++
 		}
 	}
 
 	rows, _ := json.Marshal(stored)
 	// the preview is not business data: stored outside the operation's read-only transaction
-	runErr := m.Store.Run(ctx, false, c.Principal, func(tx pgx.Tx) error {
+	runErr := m.Store.Run(ctx, false, call.Principal, func(tx pgx.Tx) error {
 		_, err := tx.Exec(
 			ctx,
 			`INSERT INTO assets.unit_import_previews (id, tenant_id, customer_id, membership_id, file_name, rows, expires_at)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6)`,
-			p.PreviewID,
-			in.CustomerID,
-			c.Principal.MembershipID,
-			in.FileName,
+			importPreview.PreviewID,
+			input.CustomerID,
+			call.Principal.MembershipID,
+			input.FileName,
 			rows,
-			p.ExpiresAt,
+			importPreview.ExpiresAt,
 		)
 
 		return apperr.Wrap(err, "insert assets.unit_import_previews")
@@ -483,7 +489,7 @@ func (m *Module) unitsImportPreview(
 		return ImportPreview{}, apperr.Wrap(runErr, "ops.Runner.Run")
 	}
 
-	return p, nil
+	return importPreview, nil
 }
 
 // UnitImport is UnitImport of service-contracts.ts.
@@ -507,25 +513,25 @@ const importCols = `id, tenant_id, version, created_at, updated_at, customer_id,
 	`created_space_ids, created_unit_ids, skipped_row_numbers, undo_until, state`
 
 func scanImport(r pgx.Row) (UnitImport, error) {
-	var x UnitImport
+	var unitImport UnitImport
 
 	err := r.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.UpdatedAt,
-		&x.CustomerID,
-		&x.PreviewID,
-		&x.CreatedPropertyIDs,
-		&x.CreatedSpaceIDs,
-		&x.CreatedUnitIDs,
-		&x.SkippedRowNumbers,
-		&x.UndoUntil,
-		&x.State,
+		&unitImport.ID,
+		&unitImport.TenantID,
+		&unitImport.Version,
+		&unitImport.CreatedAt,
+		&unitImport.UpdatedAt,
+		&unitImport.CustomerID,
+		&unitImport.PreviewID,
+		&unitImport.CreatedPropertyIDs,
+		&unitImport.CreatedSpaceIDs,
+		&unitImport.CreatedUnitIDs,
+		&unitImport.SkippedRowNumbers,
+		&unitImport.UndoUntil,
+		&unitImport.State,
 	)
 
-	return x, apperr.Wrap(err, "scan (scanImport)")
+	return unitImport, apperr.Wrap(err, "scan (scanImport)")
 }
 
 // ImportCommitInput is units.importCommit input.
@@ -536,16 +542,16 @@ type ImportCommitInput struct {
 
 // Validate implements ops.Validator.
 func (in *ImportCommitInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.PreviewID == uuid.Nil {
-		fe["previewId"] = "error.required"
+		fieldErrs["previewId"] = "error.required"
 	}
 
 	if in.CustomerID == uuid.Nil {
-		fe["customerId"] = "error.required"
+		fieldErrs["customerId"] = "error.required"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // unitsImportCommit serves units.importCommit.
@@ -576,8 +582,8 @@ func (in *ImportCommitInput) Validate() map[string]string {
 //	@Router			/v1/units/imports [post]
 func (m *Module) unitsImportCommit(
 	ctx context.Context,
-	c *ops.Call,
-	in *ImportCommitInput,
+	call *ops.Call,
+	input *ImportCommitInput,
 ) (UnitImport, error) {
 	var (
 		raw      []byte
@@ -586,11 +592,12 @@ func (m *Module) unitsImportCommit(
 		customer uuid.UUID
 	)
 
-	err := c.Tx.QueryRow(ctx, `DELETE FROM assets.unit_import_previews WHERE id = $1 RETURNING rows, file_name, expires_at,
-		customer_id`, in.PreviewID).
+	err := call.Tx.QueryRow(ctx, `DELETE FROM assets.unit_import_previews WHERE id = $1 RETURNING rows, file_name,
+		expires_at,
+		customer_id`, input.PreviewID).
 		Scan(&raw, &fileName, &expires, &customer)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && (!c.Now.Before(expires) || customer != in.CustomerID)) {
+		(err == nil && (!call.Now.Before(expires) || customer != input.CustomerID)) {
 		return UnitImport{}, conflict("error.previewExpired") // validate again
 	}
 
@@ -600,7 +607,7 @@ func (m *Module) unitsImportCommit(
 
 	var org uuid.UUID
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT organization_id FROM assets.customers WHERE id = $1 AND status =
+	scanErr := call.Tx.QueryRow(ctx, `SELECT organization_id FROM assets.customers WHERE id = $1 AND status =
 		'active'`, customer).
 		Scan(&org)
 	if scanErr != nil {
@@ -630,7 +637,8 @@ func (m *Module) unitsImportCommit(
 
 		var taken bool // someone added the property since the preview: validate again
 
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.properties WHERE customer_org_id = $1 AND NOT archived
+		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.properties WHERE customer_org_id = $1 AND NOT
+			archived
 			AND lower(name) = lower($2))`,
 			org, row.PropertyName).
 			Scan(&taken)
@@ -644,7 +652,7 @@ func (m *Module) unitsImportCommit(
 
 		id := uuid.Must(uuid.NewV7())
 
-		_, err = c.Tx.Exec(
+		_, err = call.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name) VALUES ($1,
 				current_setting('app.tenant_id')::uuid, $2, 'office', $3)`,
@@ -658,7 +666,7 @@ func (m *Module) unitsImportCommit(
 
 		created[row.PropertyID] = id
 		properties = append(properties, id)
-		c.Emit(
+		call.Emit(
 			ops.Event{
 				AggregateType: "property",
 				AggregateID:   id,
@@ -682,7 +690,8 @@ func (m *Module) unitsImportCommit(
 
 		var ok bool
 
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.spaces WHERE id = $1 AND NOT archived)`, *placeholder).
+		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.spaces WHERE id = $1 AND NOT
+			archived)`, *placeholder).
 			Scan(&ok)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select assets.spaces")
@@ -694,7 +703,7 @@ func (m *Module) unitsImportCommit(
 
 		id := uuid.Must(uuid.NewV7())
 
-		_, err = c.Tx.Exec(
+		_, err = call.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5)`,
@@ -710,7 +719,7 @@ func (m *Module) unitsImportCommit(
 
 		created[*placeholder] = id
 		spaces = append(spaces, id)
-		c.Emit(
+		call.Emit(
 			ops.Event{
 				AggregateType: "space",
 				AggregateID:   id,
@@ -772,7 +781,7 @@ func (m *Module) unitsImportCommit(
 
 		id := uuid.Must(uuid.NewV7())
 
-		_, execErr := c.Tx.Exec(
+		_, execErr := call.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id,
 				installed_at,
@@ -793,10 +802,19 @@ func (m *Module) unitsImportCommit(
 		}
 
 		units = append(units, id)
-		c.Emit(ops.Event{AggregateType: "unit", AggregateID: id, Type: "UnitChanged", Payload: nil})
+		call.Emit(
+			ops.Event{AggregateType: "unit", AggregateID: id, Type: "UnitChanged", Payload: nil},
+		)
 
 		if row.DeviceID != nil { // the serial column binds the device (bound or tampered since the preview: validate again)
-			ok, err := m.Import.BindImported(ctx, c, *row.DeviceID, id, org, "CSV import "+fileName)
+			ok, err := m.Import.BindImported(
+				ctx,
+				call,
+				*row.DeviceID,
+				id,
+				org,
+				"CSV import "+fileName,
+			)
 			if err != nil {
 				return UnitImport{}, apperr.Wrap(err, "assets.ImportModels.BindImported")
 			}
@@ -821,8 +839,8 @@ func (m *Module) unitsImportCommit(
 
 	id := uuid.Must(uuid.NewV7())
 
-	x, err := scanImport(
-		c.Tx.QueryRow(
+	unitImport, err := scanImport(
+		call.Tx.QueryRow(
 			ctx,
 			`INSERT INTO assets.unit_imports (id, tenant_id, customer_id, preview_id, source_object_key, created_property_ids,
 		created_space_ids, created_unit_ids, skipped_row_numbers, undo_until, state) VALUES ($1,
@@ -830,25 +848,25 @@ func (m *Module) unitsImportCommit(
 		RETURNING `+importCols,
 			id,
 			customer,
-			in.PreviewID,
+			input.PreviewID,
 			"inline:"+fileName,
 			properties,
 			spaces,
 			units,
 			skipped,
-			c.Now.Add(importUndoTime),
+			call.Now.Add(importUndoTime),
 		),
 	)
 	if err != nil {
 		return UnitImport{}, err
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "units.importCommit",
 			TargetKind:      "unit_import",
 			TargetID:        id.String(),
-			NextVersion:     &x.Version,
+			NextVersion:     &unitImport.Version,
 			PreviousVersion: nil,
 			Reason:          "",
 			Result:          "",
@@ -857,7 +875,7 @@ func (m *Module) unitsImportCommit(
 		},
 	)
 
-	return x, nil
+	return unitImport, nil
 }
 
 // ImportUndoInput is units.importUndo input.
@@ -868,16 +886,16 @@ type ImportUndoInput struct {
 
 // Validate implements ops.Validator.
 func (in *ImportUndoInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.ImportID == uuid.Nil {
-		fe["importId"] = "error.required"
+		fieldErrs["importId"] = "error.required"
 	}
 
 	if !strLen(in.Reason, 1, 1000) {
-		fe["reason"] = "error.length"
+		fieldErrs["reason"] = "error.length"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // unitsImportUndo serves units.importUndo.
@@ -909,14 +927,14 @@ func (in *ImportUndoInput) Validate() map[string]string {
 //	@Router			/v1/units/imports/{importId}/undo [post]
 func (m *Module) unitsImportUndo(
 	ctx context.Context,
-	c *ops.Call,
-	in *ImportUndoInput,
+	call *ops.Call,
+	input *ImportUndoInput,
 ) (UnitImport, error) {
-	x, err := scanImport(
-		c.Tx.QueryRow(
+	unitImport, err := scanImport(
+		call.Tx.QueryRow(
 			ctx,
 			`SELECT `+importCols+` FROM assets.unit_imports WHERE id = $1 FOR UPDATE`,
-			in.ImportID,
+			input.ImportID,
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -928,17 +946,17 @@ func (m *Module) unitsImportUndo(
 	}
 
 	switch {
-	case x.Version != *c.ExpectedVersion:
+	case unitImport.Version != *call.ExpectedVersion:
 		return UnitImport{}, conflict("error.versionConflict")
-	case x.State != "imported":
+	case unitImport.State != "imported":
 		return UnitImport{}, conflict("error.alreadyUndone")
-	case !c.Now.Before(x.UndoUntil):
+	case !call.Now.Before(unitImport.UndoUntil):
 		return UnitImport{}, conflict("error.undoWindowClosed")
 	}
 
-	for _, u := range x.CreatedUnitIDs {
+	for _, u := range unitImport.CreatedUnitIDs {
 		for _, a := range m.Activity {
-			busy, err := a.UnitInUse(ctx, c, u)
+			busy, err := a.UnitInUse(ctx, call, u)
 			if err != nil {
 				return UnitImport{}, apperr.Wrap(err, "assets.UnitUsage.UnitInUse")
 			}
@@ -951,9 +969,9 @@ func (m *Module) unitsImportUndo(
 	// the devices the serial column bound go back to unbound; history alone (no telemetry yet) does not block the undo
 	unbindUnitsErr := m.Import.UnbindUnits(
 		ctx,
-		c,
-		x.CreatedUnitIDs,
-		"CSV import undone: "+in.Reason,
+		call,
+		unitImport.CreatedUnitIDs,
+		"CSV import undone: "+input.Reason,
 	)
 	if unbindUnitsErr != nil {
 		return UnitImport{}, apperr.Wrap(unbindUnitsErr, "assets.ImportModels.UnbindUnits")
@@ -963,11 +981,11 @@ func (m *Module) unitsImportUndo(
 		table string
 		ids   []uuid.UUID
 	}{
-		{"assets.units", x.CreatedUnitIDs},
-		{"assets.spaces", x.CreatedSpaceIDs},
-		{"assets.properties", x.CreatedPropertyIDs},
+		{"assets.units", unitImport.CreatedUnitIDs},
+		{"assets.spaces", unitImport.CreatedSpaceIDs},
+		{"assets.properties", unitImport.CreatedPropertyIDs},
 	} {
-		_, err := c.Tx.Exec(
+		_, err := call.Tx.Exec(
 			ctx,
 			"UPDATE "+q.table+" SET archived = true, version = version + 1, updated_at = platform.app_now() WHERE id = "+
 				"ANY($1) AND NOT archived",
@@ -978,32 +996,34 @@ func (m *Module) unitsImportUndo(
 		}
 	}
 
-	x, err = scanImport(
-		c.Tx.QueryRow(
+	unitImport, err = scanImport(
+		call.Tx.QueryRow(
 			ctx,
 			`UPDATE assets.unit_imports SET state = 'undone', version = version + 1, updated_at = platform.app_now() WHERE id =
 				$1 RETURNING `+importCols,
-			in.ImportID,
+			input.ImportID,
 		),
 	)
 	if err != nil {
 		return UnitImport{}, err
 	}
 
-	for _, u := range x.CreatedUnitIDs {
-		c.Emit(ops.Event{AggregateType: "unit", AggregateID: u, Type: "UnitChanged", Payload: nil})
+	for _, u := range unitImport.CreatedUnitIDs {
+		call.Emit(
+			ops.Event{AggregateType: "unit", AggregateID: u, Type: "UnitChanged", Payload: nil},
+		)
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "units.importUndo",
 			TargetKind:      "unit_import",
-			TargetID:        x.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &x.Version,
-			Reason:          in.Reason, Result: "", Before: nil, After: nil,
+			TargetID:        unitImport.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			NextVersion:     &unitImport.Version,
+			Reason:          input.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return x, nil
+	return unitImport, nil
 }

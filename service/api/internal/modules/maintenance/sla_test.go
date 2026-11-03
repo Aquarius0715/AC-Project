@@ -9,13 +9,13 @@ import (
 
 // TestTargetFor: a job is held to the plan's target in effect when it was created; without one, the default.
 func TestTargetFor(t *testing.T) {
-	at := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
+	when := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
 
 	all := []SlaTargets{
 		{
 			PlanType:               "rto",
 			ResponseHours:          2,
-			EffectiveFrom:          at.Add(-48 * time.Hour),
+			EffectiveFrom:          when.Add(-48 * time.Hour),
 			Version:                1,
 			ID:                     uuid.UUID{},
 			TenantID:               uuid.UUID{},
@@ -27,7 +27,7 @@ func TestTargetFor(t *testing.T) {
 		{
 			PlanType:               "rto",
 			ResponseHours:          3,
-			EffectiveFrom:          at.Add(-time.Hour),
+			EffectiveFrom:          when.Add(-time.Hour),
 			Version:                2,
 			ID:                     uuid.UUID{},
 			TenantID:               uuid.UUID{},
@@ -39,7 +39,7 @@ func TestTargetFor(t *testing.T) {
 		{
 			PlanType:               "rto",
 			ResponseHours:          1,
-			EffectiveFrom:          at.Add(time.Hour),
+			EffectiveFrom:          when.Add(time.Hour),
 			Version:                3,
 			ID:                     uuid.UUID{},
 			TenantID:               uuid.UUID{},
@@ -51,7 +51,7 @@ func TestTargetFor(t *testing.T) {
 		{
 			PlanType:               "general",
 			ResponseHours:          6,
-			EffectiveFrom:          at.Add(-time.Hour),
+			EffectiveFrom:          when.Add(-time.Hour),
 			Version:                1,
 			ID:                     uuid.UUID{},
 			TenantID:               uuid.UUID{},
@@ -61,18 +61,18 @@ func TestTargetFor(t *testing.T) {
 			FirstTimeFixPercent:    0,
 		},
 	}
-	if got := targetFor(all, "rto", at); got.Version != 2 || got.ResponseHours != 3 {
+	if got := targetFor(all, "rto", when); got.Version != 2 || got.ResponseHours != 3 {
 		t.Errorf("rto in effect: %+v", got)
 	}
 
-	if got := targetFor(all, "rto", at.Add(-24*time.Hour)); got.Version != 1 {
+	if got := targetFor(all, "rto", when.Add(-24*time.Hour)); got.Version != 1 {
 		t.Errorf("rto a day earlier: %+v", got)
 	}
 
 	if got := targetFor(
 		all,
 		"energy",
-		at,
+		when,
 	); got.ResponseHours != DefaultSLA.ResponseHours ||
 		!got.EffectiveFrom.IsZero() {
 		t.Errorf("energy without targets: %+v", got)
@@ -81,7 +81,7 @@ func TestTargetFor(t *testing.T) {
 	if got := targetFor(
 		all,
 		"rto",
-		at.Add(-time.Hour),
+		when.Add(-time.Hour),
 	); got.Version != 2 { // effective from exactly then
 		t.Errorf("rto at its start: %+v", got)
 	}

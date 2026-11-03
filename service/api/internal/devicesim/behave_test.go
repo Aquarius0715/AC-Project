@@ -23,7 +23,7 @@ func readings(t *testing.T, raw []byte) []map[string]any {
 
 // TestTelemetryBehaviours: each pattern's readings are the problem the API is meant to flag.
 func TestTelemetryBehaviours(t *testing.T) {
-	at := time.Date(2026, 10, 13, 2, 0, 0, 0, time.UTC)
+	when := time.Date(2026, 10, 13, 2, 0, 0, 0, time.UTC)
 
 	run := func(telemetry string, powerOff bool) []byte {
 		raw, err := NewModule(
@@ -32,7 +32,7 @@ func TestTelemetryBehaviours(t *testing.T) {
 			"v1",
 			1,
 		).Behave(telemetry, "apply", powerOff).
-			Telemetry(at)
+			Telemetry(when)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -75,7 +75,7 @@ func TestCommandBehaviours(t *testing.T) {
 	)
 
 	answer := func(commands string) (map[string]any, time.Time) {
-		raw, at, err := NewModule(
+		raw, when, err := NewModule(
 			tenant,
 			device,
 			"v1",
@@ -87,7 +87,7 @@ func TestCommandBehaviours(t *testing.T) {
 		}
 
 		if raw == nil {
-			return nil, at
+			return nil, when
 		}
 
 		var a map[string]any
@@ -97,7 +97,7 @@ func TestCommandBehaviours(t *testing.T) {
 			t.Fatal(unmarshalErr)
 		}
 
-		return a, at
+		return a, when
 	}
 	if a, at := answer("apply"); a["result"] != "applied" || !at.Equal(now) {
 		t.Errorf("apply: %v at %v", a, at)
@@ -142,14 +142,14 @@ func TestOnlyNarrowsTheReadings(t *testing.T) {
 // TestAModuleWithoutSensorsOnlyBeats: a module narrowed to no sensor sends no readings, and still its heartbeat
 // (IR613).
 func TestAModuleWithoutSensorsOnlyBeats(t *testing.T) {
-	m := NewModule(tenant, device, "v1", 1).Only()
+	module := NewModule(tenant, device, "v1", 1).Only()
 
-	raw, err := m.Telemetry(time.Now())
+	raw, err := module.Telemetry(time.Now())
 	if err != nil || raw != nil {
 		t.Errorf("readings %s %v", raw, err)
 	}
 
-	raw, err = m.Beat(time.Now())
+	raw, err = module.Beat(time.Now())
 	if err != nil || raw == nil {
 		t.Errorf("heartbeat %s %v", raw, err)
 	}
@@ -159,7 +159,7 @@ func TestAModuleWithoutSensorsOnlyBeats(t *testing.T) {
 // command it applies changes the reported setpoint; a module that does not report sends no state.
 func TestHeartbeatReportsTheState(t *testing.T) {
 	on, c, mode, fan := true, 24.0, "cool", "mid"
-	m := NewModule(tenant, device, "v1", 1).Reports(&on, &c, &mode, &fan)
+	module := NewModule(tenant, device, "v1", 1).Reports(&on, &c, &mode, &fan)
 	beat := func(m *Module) map[string]any {
 		raw, err := m.Beat(time.Now())
 		if err != nil {
@@ -176,13 +176,13 @@ func TestHeartbeatReportsTheState(t *testing.T) {
 		return h
 	}
 
-	st := beat(m)["state"].(map[string]any)
+	st := beat(module)["state"].(map[string]any)
 	if st["power"] != true || st["celsius"] != 24.0 || st["mode"] != "cool" ||
 		st["fanLevel"] != "mid" {
 		t.Errorf("state %v", st)
 	}
 
-	_, _, err := m.Acknowledge(
+	_, _, err := module.Acknowledge(
 		[]byte(
 			`{"commandId":"c1","kind":"set_temperature","setpointCelsius":27,"expiresAt":"2099-01-01T00:00:00Z"}`,
 		),
@@ -192,7 +192,7 @@ func TestHeartbeatReportsTheState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if st := beat(m)["state"].(map[string]any); st["celsius"] != 27.0 {
+	if st := beat(module)["state"].(map[string]any); st["celsius"] != 27.0 {
 		t.Errorf("state after the command %v", st)
 	}
 
@@ -206,9 +206,9 @@ func TestHeartbeatReportsTheState(t *testing.T) {
 func TestKeptSetpoint(t *testing.T) {
 	celsius, power := 24.0, true
 
-	m := NewModule("t", "d", "v1", 1).Reports(&power, &celsius, nil, nil)
+	module := NewModule("t", "d", "v1", 1).Reports(&power, &celsius, nil, nil)
 
-	_, _, err := m.Acknowledge(
+	_, _, err := module.Acknowledge(
 		[]byte(
 			`{"commandId":"c1","kind":"set_temperature","setpointCelsius":27,"expiresAt":"2099-01-01T00:00:00Z"}`,
 		),
@@ -218,7 +218,7 @@ func TestKeptSetpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	kept, err := m.Keep()
+	kept, err := module.Keep()
 	if err != nil || string(kept) != `{"setpointCelsius":27}` {
 		t.Fatalf("keep: %s %v", kept, err)
 	}

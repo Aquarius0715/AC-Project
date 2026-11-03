@@ -90,7 +90,7 @@ const (
 
 func tick(
 	ctx context.Context,
-	m *db.TxManager,
+	txm *db.TxManager,
 	now time.Time,
 	domains []string,
 	reg *ops.Registry,
@@ -100,7 +100,7 @@ func tick(
 
 	var tenants []uuid.UUID
 
-	rows, err := m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
+	rows, err := txm.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 	if err != nil {
 		return Result{}, apperr.Wrap(err, "select platform.tenants")
 	}
@@ -125,12 +125,12 @@ func tick(
 		return Result{}, apperr.Wrap(rowsErr, "select platform.tenants")
 	}
 
-	var r Result
+	var result Result
 
 	actor := seed.ID("system-demo")
 
 	for _, t := range tenants {
-		err := m.Run(
+		err := txm.Run(
 			ctx,
 			false,
 			&ops.Principal{
@@ -145,8 +145,8 @@ func tick(
 				Timezone:          "",
 				SessionsRevokedAt: nil,
 			},
-			func(tx pgx.Tx) error {
-				_, err := tx.Exec(
+			func(txn pgx.Tx) error {
+				_, err := txn.Exec(
 					ctx,
 					`SELECT set_config('app.now', $1, true)`,
 					now.UTC().Format(time.RFC3339Nano),
@@ -163,7 +163,7 @@ func tick(
 					}
 
 					if wait {
-						_, err := tx.Exec(ctx, lockSQL, d, t)
+						_, err := txn.Exec(ctx, lockSQL, d, t)
 						if err != nil {
 							return apperr.Wrap(err, "select pg_advisory_xact_lock")
 						}
@@ -175,27 +175,27 @@ func tick(
 
 					var ok bool
 
-					err := tx.QueryRow(ctx, tryLockSQL, d, t).Scan(&ok)
+					err := txn.QueryRow(ctx, tryLockSQL, d, t).Scan(&ok)
 					if err != nil {
 						return apperr.Wrap(err, "select pg_try_advisory_xact_lock")
 					}
 
 					held[d] = ok
 					if !ok {
-						r.Skipped++
+						result.Skipped++
 					}
 				}
 
 				if held[ops.DomainEquipment] {
-					n, err := control.ExpireCommands(ctx, tx, now)
+					n, err := control.ExpireCommands(ctx, txn, now)
 					if err != nil {
 						return apperr.Wrap(err, "control.ExpireCommands")
 					}
 
-					r.ExpiredCommands += n
+					result.ExpiredCommands += n
 
-					c := &ops.Call{
-						Tx:  tx,
+					call := &ops.Call{
+						Tx:  txn,
 						Now: now,
 						Principal: &ops.Principal{
 							TenantID: t,
@@ -224,7 +224,7 @@ func tick(
 
 					n, err = control.AdvanceRuns(
 						ctx,
-						c,
+						call,
 						control.Commands{
 							Devices:      devices.Models{},
 							Restrictions: restrictions.Busy{},
@@ -236,7 +236,7 @@ func tick(
 						return apperr.Wrap(err, "control.AdvanceRuns")
 					}
 
-					r.Runs += n
+					result.Runs += n
 				}
 
 				if reg != nil { // the modules' jobs of the served domains, recorded like a write (events, audits)
@@ -246,8 +246,8 @@ func tick(
 						}
 
 						for _, job := range reg.Jobs[d] {
-							c := &ops.Call{
-								Tx:            tx,
+							call := &ops.Call{
+								Tx:            txn,
 								Now:           now,
 								CorrelationID: uuid.NewString(),
 								Queries:       reg,
@@ -271,15 +271,15 @@ func tick(
 								}, Bearer: "", ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil,
 							}
 
-							n, err := job(ctx, c)
+							n, err := job(ctx, call)
 							if err != nil {
 								return err
 							}
 
-							r.Jobs += n
+							result.Jobs += n
 
 							if reg.Rec != nil {
-								err := reg.Rec.Record(ctx, tx, c, "scheduler")
+								err := reg.Rec.Record(ctx, txn, call, "scheduler")
 								if err != nil {
 									return apperr.Wrap(err, "ops.Recorder.Record")
 								}
@@ -289,29 +289,29 @@ func tick(
 				}
 
 				if held[ops.DomainMaintenance] {
-					n, err := maintenance.ExpireOffers(ctx, tx, now, actor)
+					n, err := maintenance.ExpireOffers(ctx, txn, now, actor)
 					if err != nil {
 						return apperr.Wrap(err, "maintenance.ExpireOffers")
 					}
 
-					r.ExpiredOffers += n
+					result.ExpiredOffers += n
 
-					n, err = maintenance.ExpireProposals(ctx, tx, now)
+					n, err = maintenance.ExpireProposals(ctx, txn, now)
 					if err != nil {
 						return apperr.Wrap(err, "maintenance.ExpireProposals")
 					}
 
-					r.ExpiredProposals += n
+					result.ExpiredProposals += n
 
-					n, err = maintenance.ConfirmUnrated(ctx, tx, now)
+					n, err = maintenance.ConfirmUnrated(ctx, txn, now)
 					if err != nil {
 						return apperr.Wrap(err, "maintenance.ConfirmUnrated")
 					}
 
-					r.Confirmed += n
+					result.Confirmed += n
 					// freeze after expiry so histories see the final state of the tick
-					n, err = maintenance.FreezeEnded(ctx, tx, now)
-					r.FrozenHistories += n
+					n, err = maintenance.FreezeEnded(ctx, txn, now)
+					result.FrozenHistories += n
 
 					if err != nil {
 						return apperr.Wrap(err, "maintenance.FreezeEnded")
@@ -322,46 +322,46 @@ func tick(
 			},
 		)
 		if err != nil {
-			return r, apperr.Wrap(err, "db.TxManager.Run")
+			return result, apperr.Wrap(err, "db.TxManager.Run")
 		}
 	}
 
-	return r, nil
+	return result, nil
 }
 
 // RunDomains ticks the given domains (every domain when domains is nil) every interval until ctx is cancelled.
 func RunDomains(
 	ctx context.Context,
-	m *db.TxManager,
+	txm *db.TxManager,
 	interval time.Duration,
 	clock func() time.Time,
 	logf func(string, ...any),
 	domains []string,
 	reg *ops.Registry,
 ) {
-	t := time.NewTicker(interval)
-	defer t.Stop()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
 	rep := &logging.Repeats{
 		Logf: logf, Every: 0, Now: nil,
 	} // a failure that repeats every second is logged once a minute (IR429)
 
 	for {
-		r, err := TryTickDomains(ctx, m, clock(), domains, reg)
+		result, err := TryTickDomains(ctx, txm, clock(), domains, reg)
 		if err != nil {
 			rep.Failed(fmt.Sprintf("worker tick failed: %v", err))
 		} else {
 			rep.OK("worker tick")
 
-			if r.changes() > 0 {
-				logf("worker tick: %+v", r)
+			if result.changes() > 0 {
+				logf("worker tick: %+v", result)
 			}
 		}
 
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.C:
+		case <-ticker.C:
 		}
 	}
 }

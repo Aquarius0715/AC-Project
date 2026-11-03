@@ -23,8 +23,8 @@ type Preferences struct {
 	TwoFactorEnabled   bool   `json:"twoFactorEnabled"`
 }
 
-func loadPreferences(ctx context.Context, c *ops.Call) (Preferences, error) {
-	p := Preferences{
+func loadPreferences(ctx context.Context, call *ops.Call) (Preferences, error) {
+	preferences := Preferences{
 		Locale:             "en",
 		Timezone:           "Asia/Kuala_Lumpur",
 		Currency:           "MYR",
@@ -32,21 +32,22 @@ func loadPreferences(ctx context.Context, c *ops.Call) (Preferences, error) {
 		TwoFactorEnabled:   false,
 	}
 
-	err := c.Tx.QueryRow(ctx, `SELECT locale, timezone, currency, monthly_report_email FROM identity.preferences WHERE
-		user_id = $1`, c.Principal.UserID).
-		Scan(&p.Locale, &p.Timezone, &p.Currency, &p.MonthlyReportEmail)
+	err := call.Tx.QueryRow(ctx, `SELECT locale, timezone, currency, monthly_report_email FROM identity.preferences WHERE
+		user_id = $1`, call.Principal.UserID).
+		Scan(&preferences.Locale, &preferences.Timezone, &preferences.Currency, &preferences.MonthlyReportEmail)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = nil
 	}
 
 	if err != nil {
-		return p, err
+		return preferences, err
 	}
 
-	err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.two_factor WHERE user_id = $1)`, c.Principal.UserID).
-		Scan(&p.TwoFactorEnabled)
+	err = call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.two_factor WHERE user_id =
+		$1)`, call.Principal.UserID).
+		Scan(&preferences.TwoFactorEnabled)
 
-	return p, apperr.Wrap(err, "select identity.two_factor")
+	return preferences, apperr.Wrap(err, "select identity.two_factor")
 }
 
 // PreferencesInput is preferences.update input.
@@ -69,16 +70,16 @@ func ValidTimezone(tz string) bool {
 
 // Validate implements ops.Validator.
 func (in *PreferencesInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.Locale != "en" && in.Locale != "ms" {
-		fe["locale"] = "error.invalid"
+		fieldErrs["locale"] = "error.invalid"
 	}
 
 	if !ValidTimezone(in.Timezone) {
-		fe["timezone"] = "error.invalid"
+		fieldErrs["timezone"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // updatePreferences saves the caller's preferences; monthlyReportEmail is accepted only from client sessions (IR112).
@@ -108,46 +109,46 @@ func (in *PreferencesInput) Validate() map[string]string {
 //	@Router			/v1/preferences [put]
 func updatePreferences(
 	ctx context.Context,
-	c *ops.Call,
-	in *PreferencesInput,
+	call *ops.Call,
+	input *PreferencesInput,
 ) (Preferences, error) {
-	if in.MonthlyReportEmail != nil && c.Principal.Role != "client" {
+	if input.MonthlyReportEmail != nil && call.Principal.Role != "client" {
 		return Preferences{}, apperr.Fields(
 			map[string]string{"monthlyReportEmail": "error.notAllowed"},
 		)
 	}
 
-	cur, err := loadPreferences(ctx, c)
+	cur, err := loadPreferences(ctx, call)
 	if err != nil {
 		return cur, err
 	}
 
 	monthly := cur.MonthlyReportEmail
-	if in.MonthlyReportEmail != nil {
-		monthly = *in.MonthlyReportEmail
+	if input.MonthlyReportEmail != nil {
+		monthly = *input.MonthlyReportEmail
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`INSERT INTO identity.preferences (user_id, locale, timezone, monthly_report_email, updated_at) VALUES ($1, $2, $3,
 			$4, $5)
 		ON CONFLICT (user_id) DO UPDATE SET locale = $2, timezone = $3, monthly_report_email = $4, version =
 		identity.preferences.version + 1, updated_at = $5`,
-		c.Principal.UserID,
-		in.Locale,
-		in.Timezone,
+		call.Principal.UserID,
+		input.Locale,
+		input.Timezone,
 		monthly,
-		c.Now,
+		call.Now,
 	)
 	if execErr != nil {
 		return cur, apperr.Wrap(execErr, "insert identity.preferences")
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "preferences.update",
 			TargetKind:      "preferences",
-			TargetID:        c.Principal.UserID.String(),
+			TargetID:        call.Principal.UserID.String(),
 			PreviousVersion: nil,
 			NextVersion:     nil,
 			Reason:          "",
@@ -157,7 +158,7 @@ func updatePreferences(
 		},
 	)
 
-	cur.Locale, cur.Timezone, cur.MonthlyReportEmail = in.Locale, in.Timezone, monthly
+	cur.Locale, cur.Timezone, cur.MonthlyReportEmail = input.Locale, input.Timezone, monthly
 
 	return cur, nil
 }
@@ -190,7 +191,7 @@ func (in *ConsentGetInput) Validate() map[string]string {
 	return nil
 }
 
-func loadConsent(ctx context.Context, c *ops.Call, purpose string, lock bool) (Consent, error) {
+func loadConsent(ctx context.Context, call *ops.Call, purpose string, lock bool) (Consent, error) {
 	q := `SELECT id::text, tenant_id::text, version, created_at, updated_at, membership_id::text, purpose, granted,
 		granted_at, revoked_at
 		FROM identity.consents WHERE membership_id = $1 AND purpose = $2`
@@ -200,7 +201,7 @@ func loadConsent(ctx context.Context, c *ops.Call, purpose string, lock bool) (C
 
 	var x Consent
 
-	err := c.Tx.QueryRow(ctx, q, c.Principal.MembershipID, purpose).
+	err := call.Tx.QueryRow(ctx, q, call.Principal.MembershipID, purpose).
 		Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.MembershipID, &x.Purpose, &x.Granted,
 			&x.GrantedAt, &x.RevokedAt)
 	if errors.Is(err, pgx.ErrNoRows) { // IR84: a missing record is a fixture defect
@@ -280,8 +281,8 @@ func (in *ConsentUpdateInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/consents/{purpose} [put]
-func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Consent, error) {
-	x, err := loadConsent(ctx, c, in.Purpose, true)
+func updateConsent(ctx context.Context, c *ops.Call, input *ConsentUpdateInput) (Consent, error) {
+	x, err := loadConsent(ctx, c, input.Purpose, true)
 	if err != nil {
 		return x, err
 	}
@@ -290,11 +291,11 @@ func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Co
 		return x, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if x.Granted == in.Granted {
+	if x.Granted == input.Granted {
 		return x, nil
 	}
 
-	if in.Granted {
+	if input.Granted {
 		x.GrantedAt, x.RevokedAt = &c.Now, nil
 	} else {
 		x.RevokedAt = &c.Now
@@ -305,7 +306,7 @@ func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Co
 		`UPDATE identity.consents SET granted = $2, granted_at = $3, revoked_at = $4, version = version + 1, updated_at = $5
 			WHERE id = $1::uuid`,
 		x.ID,
-		in.Granted,
+		input.Granted,
 		x.GrantedAt,
 		x.RevokedAt,
 		c.Now,
@@ -316,8 +317,8 @@ func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Co
 
 	prev := x.Version
 
-	x.Granted, x.Version, x.UpdatedAt = in.Granted, x.Version+1, c.Now
-	if !in.Granted { // equipment disables the membership's location automations (IR53; another domain, so an event)
+	x.Granted, x.Version, x.UpdatedAt = input.Granted, x.Version+1, c.Now
+	if !input.Granted { // equipment disables the membership's location automations (IR53; another domain, so an event)
 		id, _ := uuid.Parse(x.ID)
 		c.Emit(ops.Event{
 			AggregateType: "consent",
@@ -325,7 +326,7 @@ func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Co
 			Type:          events.ConsentRevoked,
 			Payload: events.ConsentRevocation{
 				MembershipID: c.Principal.MembershipID,
-				Purpose:      in.Purpose,
+				Purpose:      input.Purpose,
 				At:           c.Now,
 			},
 		})

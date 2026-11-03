@@ -55,30 +55,30 @@ const runCols = `r.id, r.tenant_id, r.version, r.created_at, r.updated_at, r.job
 	r.reason, r.state, r.start_command_id, r.end_command_id, r.started_at, r.end_at, r.failure_code`
 
 func scanRun(row pgx.Row) (Run, error) {
-	var x Run
+	var run Run
 
 	err := row.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.UpdatedAt,
-		&x.JobID,
-		&x.UnitID,
-		&x.ActorMembershipID,
-		&x.StartAction,
-		&x.EndAction,
-		&x.DurationMinutes,
-		&x.Reason,
-		&x.State,
-		&x.StartCommandID,
-		&x.EndCommandID,
-		&x.StartedAt,
-		&x.EndAt,
-		&x.FailureCode,
+		&run.ID,
+		&run.TenantID,
+		&run.Version,
+		&run.CreatedAt,
+		&run.UpdatedAt,
+		&run.JobID,
+		&run.UnitID,
+		&run.ActorMembershipID,
+		&run.StartAction,
+		&run.EndAction,
+		&run.DurationMinutes,
+		&run.Reason,
+		&run.State,
+		&run.StartCommandID,
+		&run.EndCommandID,
+		&run.StartedAt,
+		&run.EndAt,
+		&run.FailureCode,
 	)
 
-	return x, apperr.Wrap(err, "scan (scanRun)")
+	return run, apperr.Wrap(err, "scan (scanRun)")
 }
 
 // RunInput is diagnosticRuns.create input.
@@ -96,34 +96,34 @@ type RunInput struct {
 
 // Validate implements ops.Validator.
 func (in *RunInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil || in.UnitID == uuid.Nil {
-		fe["jobId"] = "error.required"
+		fieldErrs["jobId"] = "error.required"
 	}
 
 	var ok bool
 	if in.start, ok = ParseAction(in.StartAction); !ok {
-		fe["startAction"] = "error.invalid"
+		fieldErrs["startAction"] = "error.invalid"
 	}
 
 	if in.end, ok = ParseAction(in.EndAction); !ok {
-		fe["endAction"] = "error.invalid"
+		fieldErrs["endAction"] = "error.invalid"
 	}
 
 	if in.DurationMinutes < 1 || in.DurationMinutes > 15 {
-		fe["durationMinutes"] = "error.range"
+		fieldErrs["durationMinutes"] = "error.range"
 	}
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fe["reason"] = "error.length"
+		fieldErrs["reason"] = "error.length"
 	}
 
 	if in.ExpectedUnitVersion < 1 || in.ExpectedJobVersion < 1 {
-		fe["expectedUnitVersion"] = "error.required"
+		fieldErrs["expectedUnitVersion"] = "error.required"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // create serves diagnosticRuns.create.
@@ -152,13 +152,13 @@ func (in *RunInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/diagnostic-runs [post]
-func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run, error) {
-	err := m.Commands.Access.TechnicianJob(ctx, c, in.JobID, in.UnitID)
+func (m Diagnostics) create(ctx context.Context, call *ops.Call, in *RunInput) (Run, error) {
+	err := m.Commands.Access.TechnicianJob(ctx, call, in.JobID, in.UnitID)
 	if err != nil {
 		return Run{}, apperr.Wrap(err, "control.TechAccess.TechnicianJob")
 	}
 
-	t, found, err := m.Commands.Units.Target(ctx, c, in.UnitID)
+	target, found, err := m.Commands.Units.Target(ctx, call, in.UnitID)
 	if err != nil {
 		return Run{}, apperr.Wrap(err, "control.Units.Target")
 	}
@@ -167,24 +167,24 @@ func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run
 		return Run{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	jv, _, _, err := m.Jobs.JobVersion(ctx, c, in.JobID)
+	jv, _, _, err := m.Jobs.JobVersion(ctx, call, in.JobID)
 	if err != nil {
 		return Run{}, apperr.Wrap(err, "control.JobVersions.JobVersion")
 	}
 
-	if t.Version != in.ExpectedUnitVersion || jv != in.ExpectedJobVersion {
+	if target.Version != in.ExpectedUnitVersion || jv != in.ExpectedJobVersion {
 		return Run{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if !in.start.Supports(t.Caps) {
+	if !in.start.Supports(target.Caps) {
 		return Run{}, apperr.Fields(map[string]string{"startAction": "error.unsupportedAction"})
 	}
 
-	if !in.end.Supports(t.Caps) {
+	if !in.end.Supports(target.Caps) {
 		return Run{}, apperr.Fields(map[string]string{"endAction": "error.unsupportedAction"})
 	}
 
-	policy, err := m.Commands.Restrictions.UnitPolicy(ctx, c, in.UnitID)
+	policy, err := m.Commands.Restrictions.UnitPolicy(ctx, call, in.UnitID)
 	if err != nil {
 		return Run{}, apperr.Wrap(err, "control.Restrictions.UnitPolicy")
 	}
@@ -196,7 +196,7 @@ func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run
 		return Run{}, e
 	}
 
-	dev, err := m.Commands.ready(ctx, c, in.UnitID)
+	dev, err := m.Commands.ready(ctx, call, in.UnitID)
 	if err != nil {
 		return Run{}, err
 	}
@@ -205,20 +205,20 @@ func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run
 
 	var cmd uuid.UUID
 
-	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id,
+	scanErr := call.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id,
 		source, action, diagnostic_run_id, job_id, reason, status, delivery,
 		requested_at, sent_at, expires_at, correlation_id, created_at, updated_at) VALUES
 		(current_setting('app.tenant_id')::uuid, $1, $2, $3, 'diagnostic', $4, $5, $6, $7, 'requested', 'not_sent',
 		$8, NULL, $9, $10, $8, $8) RETURNING
-		id`, in.UnitID, dev, c.Principal.MembershipID, []byte(in.StartAction), runID, in.JobID, in.Reason, c.Now,
-		c.Now.Add(CommandTTL), c.CorrelationID).
+		id`, in.UnitID, dev, call.Principal.MembershipID, []byte(in.StartAction), runID, in.JobID, in.Reason, call.Now,
+		call.Now.Add(CommandTTL), call.CorrelationID).
 		Scan(&cmd)
 	if scanErr != nil {
 		return Run{}, apperr.Wrap(scanErr, "insert control.commands")
 	}
 
-	x, err := scanRun(
-		c.Tx.QueryRow(
+	run, err := scanRun(
+		call.Tx.QueryRow(
 			ctx,
 			`INSERT INTO control.diagnostic_runs AS r (id, tenant_id, job_id, unit_id, actor_membership_id, start_action,
 				end_action, duration_minutes, reason, state,
@@ -227,20 +227,20 @@ func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run
 			runID,
 			in.JobID,
 			in.UnitID,
-			c.Principal.MembershipID,
+			call.Principal.MembershipID,
 			[]byte(in.StartAction),
 			[]byte(in.EndAction),
 			in.DurationMinutes,
 			in.Reason,
 			cmd,
-			c.Now,
+			call.Now,
 		),
 	)
 	if err != nil {
-		return x, err
+		return run, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "command",
 			AggregateID:   cmd,
@@ -252,30 +252,30 @@ func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run
 			},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:      "diagnosticRuns.create",
 			TargetKind:  "diagnostic_run",
 			TargetID:    runID.String(),
-			NextVersion: &x.Version,
+			NextVersion: &run.Version,
 			Reason:      in.Reason, PreviousVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return x, nil
+	return run, nil
 }
 
 // visible applies the IR139 read scope to a run: technicians see runs of jobs they hold or held an Assignment of,
 // read from equipment's projection of maintenance assignments (IR187).
-func visible(ctx context.Context, c *ops.Call, run Run) (bool, error) {
-	if c.Principal.Role != "technician" {
+func visible(ctx context.Context, call *ops.Call, run Run) (bool, error) {
+	if call.Principal.Role != "technician" {
 		return true, nil
 	}
 
 	var ok bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND
-		technician_membership_id = $2)`, run.JobID, c.Principal.MembershipID).
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND
+		technician_membership_id = $2)`, run.JobID, call.Principal.MembershipID).
 		Scan(&ok)
 
 	return ok, apperr.Wrap(err, "select assets.unit_assignment_access")
@@ -319,32 +319,32 @@ func (in *RunIDInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/diagnostic-runs/{diagnosticRunId} [get]
-func (m Diagnostics) get(ctx context.Context, c *ops.Call, in *RunIDInput) (Run, error) {
-	x, err := scanRun(
-		c.Tx.QueryRow(
+func (m Diagnostics) get(ctx context.Context, call *ops.Call, in *RunIDInput) (Run, error) {
+	run, err := scanRun(
+		call.Tx.QueryRow(
 			ctx,
 			"SELECT "+runCols+" FROM control.diagnostic_runs r WHERE r.id = $1",
 			in.DiagnosticRunID,
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return x, apperr.E(apperr.NotFound, "error.notFound")
+		return run, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	if err != nil {
-		return x, err
+		return run, err
 	}
 
-	ok, visibleErr := visible(ctx, c, x)
+	ok, visibleErr := visible(ctx, call, run)
 	if visibleErr != nil || !ok {
 		if visibleErr != nil {
-			return x, visibleErr
+			return run, visibleErr
 		}
 
 		return Run{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	return x, nil
+	return run, nil
 }
 
 // RunListInput is diagnosticRuns.list input.
@@ -393,16 +393,16 @@ func (in *RunListInput) Validate() map[string]string {
 //	@Router			/v1/diagnostic-runs [get]
 func (m Diagnostics) list(
 	ctx context.Context,
-	c *ops.Call,
-	in *RunListInput,
+	call *ops.Call,
+	input *RunListInput,
 ) (paging.Page[Run], error) {
-	err := paging.NoFilters(in.Query, "query.filters")
+	err := paging.NoFilters(input.Query, "query.filters")
 	if err != nil {
 		return paging.Page[Run]{}, apperr.Wrap(err, "paging.NoFilters")
 	}
 
 	order, err := paging.OrderBy(
-		in.Query.Sort,
+		input.Query.Sort,
 		map[string]string{"id": "r.id", "createdAt": "r.created_at"},
 		"r.created_at DESC, r.id",
 	)
@@ -410,24 +410,24 @@ func (m Diagnostics) list(
 		return paging.Page[Run]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 	// the cursor binds the unit and job, not the paging fields themselves (the next page carries the cursor)
-	w, err := paging.Resolve(in.Query, struct {
+	window, err := paging.Resolve(input.Query, struct {
 		UnitID uuid.UUID  `json:"unitId"`
 		JobID  *uuid.UUID `json:"jobId"`
-	}{in.UnitID, in.JobID}, c.Principal.ScopeVersion, 1)
+	}{input.UnitID, input.JobID}, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Run]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	args := []any{in.UnitID}
+	args := []any{input.UnitID}
 	where := "r.unit_id = $1"
 
-	if in.JobID != nil {
-		args = append(args, *in.JobID)
+	if input.JobID != nil {
+		args = append(args, *input.JobID)
 		where += " AND r.job_id = $2"
 	}
 
-	if c.Principal.Role == "technician" {
-		args = append(args, c.Principal.MembershipID)
+	if call.Principal.Role == "technician" {
+		args = append(args, call.Principal.MembershipID)
 		where += fmt.Sprintf(
 			" AND EXISTS (SELECT 1 FROM assets.unit_assignment_access a WHERE a.job_id = r.job_id AND "+
 				"a.technician_membership_id = $%d)",
@@ -437,21 +437,21 @@ func (m Diagnostics) list(
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.diagnostic_runs r WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM control.diagnostic_runs r WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Run]{}, apperr.Wrap(scanErr, "select control.diagnostic_runs")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM control.diagnostic_runs r WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			runCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -472,15 +472,15 @@ func (m Diagnostics) list(
 
 	return paging.Page[Run]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, apperr.Wrap(rows.Err(), "select control.diagnostic_runs")
 }
 
 // runAcknowledged moves a run when its start or end command is acknowledged (IR139 item 2).
-func runAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.Time) error {
-	_, execErr := tx.Exec(
+func runAcknowledged(ctx context.Context, txn pgx.Tx, command uuid.UUID, at time.Time) error {
+	_, execErr := txn.Exec(
 		ctx,
 		`UPDATE control.diagnostic_runs SET state = 'running', started_at = $2::timestamptz, end_at = $2::timestamptz +
 			make_interval(mins => duration_minutes),
@@ -492,7 +492,7 @@ func runAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.
 		return apperr.Wrap(execErr, "update control.diagnostic_runs")
 	}
 
-	_, err := tx.Exec(
+	_, err := txn.Exec(
 		ctx,
 		`UPDATE control.diagnostic_runs SET state = 'completed', version = version + 1, updated_at = $2 WHERE end_command_id =
 			$1 AND state = 'end_requested'`,
@@ -505,15 +505,15 @@ func runAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.
 
 // AdvanceRuns is the worker step of IR139 item 2: failed starts / ends from expired commands, and end commands at
 // endAt.
-func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
+func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
 	n := 0
 
-	tag, err := c.Tx.Exec(
+	tag, err := call.Tx.Exec(
 		ctx,
 		`UPDATE control.diagnostic_runs r SET state = 'start_failed', failure_code = 'TIMEOUT', version = r.version + 1,
 			updated_at = $1
 		FROM control.commands k WHERE k.id = r.start_command_id AND k.status = 'expired' AND r.state = 'awaiting_start'`,
-		c.Now,
+		call.Now,
 	)
 	if err != nil {
 		return 0, apperr.Wrap(err, "update control.diagnostic_runs")
@@ -521,12 +521,12 @@ func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
 
 	n += int(tag.RowsAffected())
 
-	tag, err = c.Tx.Exec(
+	tag, err = call.Tx.Exec(
 		ctx,
 		`UPDATE control.diagnostic_runs r SET state = 'end_failed', failure_code = 'TIMEOUT', version = r.version + 1,
 			updated_at = $1
 		FROM control.commands k WHERE k.id = r.end_command_id AND k.status = 'expired' AND r.state = 'end_requested'`,
-		c.Now,
+		call.Now,
 	)
 	if err != nil {
 		return n, apperr.Wrap(err, "update control.diagnostic_runs")
@@ -534,10 +534,10 @@ func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
 
 	n += int(tag.RowsAffected())
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		"SELECT "+runCols+" FROM control.diagnostic_runs r WHERE r.state = 'running' AND r.end_at <= $1 FOR UPDATE",
-		c.Now,
+		call.Now,
 	)
 	if err != nil {
 		return n, apperr.Wrap(err, "select control.diagnostic_runs")
@@ -546,14 +546,14 @@ func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
 	var due []Run
 
 	for rows.Next() {
-		x, err := scanRun(rows)
+		run, err := scanRun(rows)
 		if err != nil {
 			rows.Close()
 
 			return n, err
 		}
 
-		due = append(due, x)
+		due = append(due, run)
 	}
 
 	rows.Close()
@@ -563,10 +563,10 @@ func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
 		return n, apperr.Wrap(rowsErr, "select control.diagnostic_runs")
 	}
 
-	for _, x := range due {
-		end, _ := ParseAction(x.EndAction)
+	for _, run := range due {
+		end, _ := ParseAction(run.EndAction)
 
-		policy, err := m.Restrictions.UnitPolicy(ctx, c, x.UnitID)
+		policy, err := m.Restrictions.UnitPolicy(ctx, call, run.UnitID)
 		if err != nil {
 			return n, apperr.Wrap(err, "control.Restrictions.UnitPolicy")
 		}
@@ -578,7 +578,7 @@ func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
 		if !Allowed(end, policy) {
 			state, code = "end_blocked", "FORBIDDEN"
 		} else {
-			dev, conn, power, bound, err := m.Devices.BoundDevice(ctx, c, x.UnitID)
+			dev, conn, power, bound, err := m.Devices.BoundDevice(ctx, call, run.UnitID)
 			if err != nil {
 				return n, apperr.Wrap(err, "control.Devices.BoundDevice")
 			} else if Deliverable(bound, conn, power) != nil {
@@ -586,12 +586,14 @@ func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
 			} else {
 				var id uuid.UUID
 
-				err := c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source,
+				err := call.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id,
+					source,
 					action, diagnostic_run_id, job_id, reason, status, delivery,
 				requested_at, sent_at, expires_at, correlation_id, created_at, updated_at) VALUES ($1, $2, $3, $4, 'diagnostic', $5,
 				$6, $7, $8, 'requested', 'not_sent', $9, NULL, $10, $11, $9, $9) RETURNING id`,
-					x.TenantID, x.UnitID, dev, x.ActorMembershipID, []byte(x.EndAction), x.ID, x.JobID, x.Reason, c.Now,
-					c.Now.Add(CommandTTL), "tick-"+c.Now.Format(time.RFC3339)).
+					run.TenantID, run.UnitID, dev, run.ActorMembershipID, []byte(run.EndAction), run.ID, run.JobID, run.Reason,
+					call.Now,
+					call.Now.Add(CommandTTL), "tick-"+call.Now.Format(time.RFC3339)).
 					Scan(&id)
 				if err != nil {
 					return n, apperr.Wrap(err, "insert control.commands")
@@ -601,16 +603,16 @@ func AdvanceRuns(ctx context.Context, c *ops.Call, m Commands) (int, error) {
 			}
 		}
 
-		_, execErr := c.Tx.Exec(
+		_, execErr := call.Tx.Exec(
 			ctx,
 			`UPDATE control.diagnostic_runs SET state = $2, failure_code = NULLIF($3, ''), end_command_id = COALESCE($4,
 				end_command_id), version = version + 1, updated_at = $5
 			WHERE id = $1`,
-			x.ID,
+			run.ID,
 			state,
 			code,
 			cmd,
-			c.Now,
+			call.Now,
 		)
 		if execErr != nil {
 			return n, apperr.Wrap(execErr, "update control.diagnostic_runs")

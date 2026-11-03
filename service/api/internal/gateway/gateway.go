@@ -26,7 +26,7 @@ type Targets map[string]*url.URL
 
 // TargetsFromEnv reads <DOMAIN>_API_URL for every domain (IDENTITY_API_URL, EQUIPMENT_API_URL, …).
 func TargetsFromEnv(getenv func(string) string) (Targets, error) {
-	t := Targets{}
+	targets := Targets{}
 
 	for _, d := range ops.Domains {
 		key := envKey(d)
@@ -41,10 +41,10 @@ func TargetsFromEnv(getenv func(string) string) (Targets, error) {
 			return nil, fmt.Errorf("gateway: %s is not an absolute URL", key)
 		}
 
-		t[d] = u
+		targets[d] = u
 	}
 
-	return t, nil
+	return targets, nil
 }
 
 func envKey(domain string) string {
@@ -77,23 +77,23 @@ func notSniffedOrCached(next echo.HandlerFunc) echo.HandlerFunc {
 
 // New builds the gateway Echo instance (same middleware conventions as the services, IR173).
 func New(targets Targets, logger *slog.Logger) *echo.Echo {
-	e := echo.New()
+	app := echo.New()
 	if logger != nil {
-		e.Logger = logger
+		app.Logger = logger
 	}
 
-	e.HTTPErrorHandler = ops.HTTPErrorHandler
-	e.Use(middleware.Recover())
+	app.HTTPErrorHandler = ops.HTTPErrorHandler
+	app.Use(middleware.Recover())
 	// the request ID is the gateway's own: one a client sends is dropped, so no caller chooses the correlation ID the
 	// services log and store with its writes (IR435)
-	e.Pre(func(next echo.HandlerFunc) echo.HandlerFunc {
+	app.Pre(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
 			c.Request().Header.Del(echo.HeaderXRequestID)
 
 			return next(c)
 		}
 	})
-	e.Use(
+	app.Use(
 		middleware.RequestIDWithConfig(
 			middleware.RequestIDConfig{
 				Generator:        func() string { return uuid.Must(uuid.NewV7()).String() },
@@ -103,51 +103,51 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 			},
 		),
 	)
-	e.Use(notSniffedOrCached)
+	app.Use(notSniffedOrCached)
 
 	proxies := map[string]*httputil.ReverseProxy{}
 
 	for d, u := range targets {
-		p := httputil.NewSingleHostReverseProxy(u)
+		reverseProxy := httputil.NewSingleHostReverseProxy(u)
 		// set field by field: a literal would have to name every field, Dial and DialTLS too, which are deprecated
 		transport := new(http.Transport)
 		transport.ResponseHeaderTimeout = 35 * time.Second
 		transport.MaxIdleConnsPerHost = 64
-		p.Transport = transport
+		reverseProxy.Transport = transport
 		// the gateway's middleware sets the request ID and the two headers on every response; the upstream's copies of
 		// them are dropped here, or the proxy would add them a second time (IR407)
-		p.ModifyResponse = func(resp *http.Response) error {
+		reverseProxy.ModifyResponse = func(resp *http.Response) error {
 			resp.Header.Del(echo.HeaderXRequestID)
 			resp.Header.Del("X-Content-Type-Options")
 			resp.Header.Del("Cache-Control")
 
 			return nil
 		}
-		p.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-			e.Logger.Error("upstream failed", "domain", d, "error", err)
+		reverseProxy.ErrorHandler = func(writer http.ResponseWriter, r *http.Request, err error) {
+			app.Logger.Error("upstream failed", "domain", d, "error", err)
 
-			de := apperr.E(apperr.Unavailable, "error.unavailable")
-			de.CorrelationID = w.Header().Get(echo.HeaderXRequestID)
-			w.Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-			w.WriteHeader(de.HTTPStatus())
+			domainErr := apperr.E(apperr.Unavailable, "error.unavailable")
+			domainErr.CorrelationID = writer.Header().Get(echo.HeaderXRequestID)
+			writer.Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			writer.WriteHeader(domainErr.HTTPStatus())
 			_, _ = fmt.Fprintf(
-				w,
+				writer,
 				`{"code":%q,"messageKey":%q,"fieldErrors":{},"correlationId":%q,"retryAfterSeconds":null}`,
-				de.Code,
-				de.MessageKey,
-				de.CorrelationID,
+				domainErr.Code,
+				domainErr.MessageKey,
+				domainErr.CorrelationID,
 			)
 		}
-		proxies[d] = p
+		proxies[d] = reverseProxy
 	}
 
-	e.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
-	mountDocs(e) // /docs and /swagger.json (IR220)
+	app.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
+	mountDocs(app) // /docs and /swagger.json (IR220)
 
 	for _, s := range ops.Catalog { // REST routes go to the owning service unchanged (IR222)
 		p := proxies[ops.DomainOf(s.Name)]
 		for _, rt := range s.Routes {
-			e.Add(
+			app.Add(
 				rt.Method,
 				ops.EchoPath(rt.Path),
 				func(c *echo.Context) error { return forward(c, p) },
@@ -155,16 +155,16 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 		}
 	}
 
-	return e
+	return app
 }
 
-func forward(c *echo.Context, p *httputil.ReverseProxy) error {
-	if p == nil {
+func forward(c *echo.Context, reverseProxy *httputil.ReverseProxy) error {
+	if reverseProxy == nil {
 		return apperr.E(apperr.NotFound, "error.unknownOperation")
 	}
 	// the services keep the correlation ID: forward the one this request got
 	c.Request().Header.Set(echo.HeaderXRequestID, c.Response().Header().Get(echo.HeaderXRequestID))
-	p.ServeHTTP(c.Response(), c.Request())
+	reverseProxy.ServeHTTP(c.Response(), c.Request())
 
 	return nil
 }

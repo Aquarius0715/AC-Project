@@ -106,62 +106,64 @@ func unauth(c *echo.Context, key string) error {
 // Middleware returns the Echo middleware.
 func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c *echo.Context) error {
-			h := c.Request().Header.Get(echo.HeaderAuthorization)
+		return func(ectx *echo.Context) error {
+			h := ectx.Request().Header.Get(echo.HeaderAuthorization)
 			if h == "" {
-				return next(c)
+				return next(ectx)
 			}
 
 			token, ok := strings.CutPrefix(h, "Bearer ")
 			if !ok || token == "" {
-				return unauth(c, "error.unauthenticated")
+				return unauth(ectx, "error.unauthenticated")
 			}
 
-			id, err := a.Verifier.Verify(c.Request().Context(), token)
+			identity, err := a.Verifier.Verify(ectx.Request().Context(), token)
 			if err != nil {
 				// why, never the token: an expired one, an unknown signing key or another issuer or client
-				slog.InfoContext(c.Request().Context(), "auth: token refused", "err", err)
+				slog.InfoContext(ectx.Request().Context(), "auth: token refused", "err", err)
 
-				return unauth(c, "error.unauthenticated")
+				return unauth(ectx, "error.unauthenticated")
 			}
 
-			tenant, err1 := uuid.Parse(c.Request().Header.Get("X-Tenant-Id"))
+			tenant, err1 := uuid.Parse(ectx.Request().Header.Get("X-Tenant-Id"))
 
-			membership, err2 := uuid.Parse(c.Request().Header.Get("X-Membership-Id"))
+			membership, err2 := uuid.Parse(ectx.Request().Header.Get("X-Membership-Id"))
 			if err1 != nil || err2 != nil {
-				return unauth(c, "error.membershipRequired")
+				return unauth(ectx, "error.membershipRequired")
 			}
 
-			p, err := a.principal(
-				c.Request().Context(),
-				id.Subject,
+			principal, err := a.principal(
+				ectx.Request().Context(),
+				identity.Subject,
 				tenant,
 				membership,
-				id.SignedIn,
+				identity.SignedIn,
 			)
 			if errors.Is(err, ErrUnavailable) {
 				return apperr.E(apperr.Unavailable, "error.unavailable")
 			}
 
 			if err != nil {
-				return unauth(c, "error.membershipInvalid")
+				return unauth(ectx, "error.membershipInvalid")
 			}
 
 			if Revoked(
-				p,
-				id.SignedIn,
+				principal,
+				identity.SignedIn,
 			) { // HQ signed this user out everywhere after this sign-in (IR384)
-				return unauth(c, "errors.session_revoked")
+				return unauth(ectx, "errors.session_revoked")
 			}
 
-			if p.Role == "admin" && id.Client != "" &&
-				!id.AdminApp { // HQ works through its own app, signed in with the code (DEC-85, IR510)
+			if principal.Role == "admin" && identity.Client != "" &&
+				!identity.AdminApp { // HQ works through its own app, signed in with the code (DEC-85, IR510)
 				return apperr.E(apperr.Forbidden, "errors.hq_app_required")
 			}
 
-			c.SetRequest(c.Request().WithContext(ops.WithPrincipal(c.Request().Context(), p)))
+			ectx.SetRequest(
+				ectx.Request().WithContext(ops.WithPrincipal(ectx.Request().Context(), principal)),
+			)
 
-			return next(c)
+			return next(ectx)
 		}
 	}
 }
@@ -200,22 +202,26 @@ func (a *Authenticator) Principal(
 // the sign-in recorded last, last_sign_in_at becomes the business time now. In the demo that is the demo clock, so
 // the time reads like the rest of the scenario. The token of an older session does not move it back. A sign-in this
 // process has already recorded costs no query, and a failure is logged without failing the request.
-func (a *Authenticator) RecordSignIn(ctx context.Context, p *ops.Principal, signedIn time.Time) {
-	if p == nil || signedIn.IsZero() {
+func (a *Authenticator) RecordSignIn(
+	ctx context.Context,
+	principal *ops.Principal,
+	signedIn time.Time,
+) {
+	if principal == nil || signedIn.IsZero() {
 		return
 	}
 
 	signedIn = signedIn.UTC().Truncate(time.Second)
-	if last, ok := a.signIns.Load(p.UserID); ok && !signedIn.After(last.(time.Time)) {
+	if last, ok := a.signIns.Load(principal.UserID); ok && !signedIn.After(last.(time.Time)) {
 		return
 	}
 
-	err := a.DB.Run(ctx, false, p, func(tx pgx.Tx) error {
-		_, err := tx.Exec(
+	err := a.DB.Run(ctx, false, principal, func(txn pgx.Tx) error {
+		_, err := txn.Exec(
 			ctx,
 			`UPDATE identity.users SET last_sign_in_at = $3, sign_in_auth_time = $2
 			WHERE id = $1 AND (sign_in_auth_time IS NULL OR sign_in_auth_time < $2)`,
-			p.UserID,
+			principal.UserID,
 			signedIn,
 			a.now(),
 		)
@@ -229,7 +235,7 @@ func (a *Authenticator) RecordSignIn(ctx context.Context, p *ops.Principal, sign
 			`UPDATE identity.client_users SET status = 'active', version = version + 1, updated_at = $2 WHERE membership_id = $1
 				AND status = 'invited'`,
 		} {
-			_, err := tx.Exec(ctx, q, p.MembershipID, a.now())
+			_, err := txn.Exec(ctx, q, principal.MembershipID, a.now())
 			if err != nil {
 				return apperr.Wrap(err, "exec (RecordSignIn)")
 			}
@@ -238,12 +244,12 @@ func (a *Authenticator) RecordSignIn(ctx context.Context, p *ops.Principal, sign
 		return nil
 	})
 	if err != nil {
-		slog.WarnContext(ctx, "auth: sign-in not recorded", "user", p.UserID, "err", err)
+		slog.WarnContext(ctx, "auth: sign-in not recorded", "user", principal.UserID, "err", err)
 
 		return
 	}
 
-	a.signIns.Store(p.UserID, signedIn)
+	a.signIns.Store(principal.UserID, signedIn)
 }
 
 // Load reads the Membership for subject in tenant; it fails when the membership does not belong to the subject,
@@ -253,7 +259,7 @@ func (a *Authenticator) Load(
 	subject string,
 	tenant, membership uuid.UUID,
 ) (*ops.Principal, error) {
-	p := &ops.Principal{
+	principal := &ops.Principal{
 		TenantID:          tenant,
 		MembershipID:      membership,
 		Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
@@ -267,7 +273,7 @@ func (a *Authenticator) Load(
 	}
 	now := a.now()
 
-	err := a.DB.Run(ctx, true, p, func(tx pgx.Tx) error {
+	err := a.DB.Run(ctx, true, principal, func(txn pgx.Tx) error {
 		var (
 			clientRole, employment, timezone *string
 			validUntil                       *time.Time
@@ -275,13 +281,14 @@ func (a *Authenticator) Load(
 			status                           string
 		)
 
-		err := tx.QueryRow(ctx, `SELECT m.user_id, m.organization_id, m.role, m.client_role, m.employment, m.scope_version,
+		err := txn.QueryRow(ctx, `SELECT m.user_id, m.organization_id, m.role, m.client_role, m.employment, m.scope_version,
 			m.valid_from, m.valid_until, m.sessions_revoked_at, u.status, pf.timezone
 			FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id LEFT JOIN identity.preferences pf ON pf.user_id
 			= u.id
 			WHERE m.id = $1 AND (u.cognito_sub = $2 OR u.id::text = $2)`, membership, subject).
-			Scan(&p.UserID, &p.OrgID, &p.Role, &clientRole, &employment, &p.ScopeVersion, &validFrom, &validUntil,
-				&p.SessionsRevokedAt, &status, &timezone)
+			Scan(&principal.UserID, &principal.OrgID, &principal.Role, &clientRole, &employment, &principal.ScopeVersion,
+				&validFrom, &validUntil,
+				&principal.SessionsRevokedAt, &status, &timezone)
 		if err != nil {
 			return apperr.Wrap(err, "select identity.memberships")
 		}
@@ -295,18 +302,18 @@ func (a *Authenticator) Load(
 		}
 
 		if clientRole != nil {
-			p.ClientRole = *clientRole
+			principal.ClientRole = *clientRole
 		}
 
 		if employment != nil {
-			p.Employment = *employment
+			principal.Employment = *employment
 		}
 
 		if timezone != nil {
-			p.Timezone = *timezone
+			principal.Timezone = *timezone
 		}
 
-		rows, err := tx.Query(
+		rows, err := txn.Query(
 			ctx,
 			`SELECT permission FROM identity.membership_permissions WHERE membership_id = $1`,
 			membership,
@@ -315,7 +322,7 @@ func (a *Authenticator) Load(
 			return apperr.Wrap(err, "select identity.membership_permissions")
 		}
 
-		p.Permissions = map[string]bool{}
+		principal.Permissions = map[string]bool{}
 
 		for rows.Next() {
 			var perm string
@@ -325,7 +332,7 @@ func (a *Authenticator) Load(
 				return apperr.Wrap(err, "select identity.membership_permissions")
 			}
 
-			p.Permissions[perm] = true
+			principal.Permissions[perm] = true
 		}
 
 		rowsErr := rows.Err()
@@ -333,7 +340,7 @@ func (a *Authenticator) Load(
 			return apperr.Wrap(rowsErr, "select identity.membership_permissions")
 		}
 
-		scopes, err := tx.Query(
+		scopes, err := txn.Query(
 			ctx,
 			`SELECT kind, ref_id FROM identity.membership_scopes WHERE membership_id = $1`,
 			membership,
@@ -342,7 +349,7 @@ func (a *Authenticator) Load(
 			return apperr.Wrap(err, "select identity.membership_scopes")
 		}
 
-		p.Scopes = map[string][]uuid.UUID{}
+		principal.Scopes = map[string][]uuid.UUID{}
 
 		for scopes.Next() {
 			var (
@@ -355,7 +362,7 @@ func (a *Authenticator) Load(
 				return apperr.Wrap(err, "select identity.membership_scopes")
 			}
 
-			p.Scopes[kind] = append(p.Scopes[kind], ref)
+			principal.Scopes[kind] = append(principal.Scopes[kind], ref)
 		}
 
 		return scopes.Err()
@@ -364,5 +371,5 @@ func (a *Authenticator) Load(
 		return nil, apperr.Wrap(err, "ops.Runner.Run")
 	}
 
-	return p, nil
+	return principal, nil
 }

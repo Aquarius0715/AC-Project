@@ -68,7 +68,11 @@ func ruleMetric(a Alert) *string {
 // candidates lists an alert's evidence candidates (IR327, DD-A05 item 6): its own evidence at detection, the unit's
 // valid measured or inspection remeasurements after detection (of the rule's metric when it has one) and the recovery
 // events of the unit's device linked to the alert, the newest first.
-func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]EvidenceCandidate, error) {
+func (m Alerts) candidates(
+	ctx context.Context,
+	call *ops.Call,
+	a Alert,
+) ([]EvidenceCandidate, error) {
 	out := []EvidenceCandidate{}
 	for _, id := range a.EvidenceIDs {
 		out = append(
@@ -87,7 +91,7 @@ func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]Evidenc
 		)
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT m.event_id, m.observed_at, m.metric, m.value, m.unit, m.origin, m.quality `+remeasurementSQL+`
 		ORDER BY m.observed_at DESC, m.sequence DESC, m.event_id LIMIT `+strconv.Itoa(
@@ -103,15 +107,15 @@ func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]Evidenc
 
 	for rows.Next() {
 		var (
-			x                             EvidenceCandidate
+			evidenceCandidate             EvidenceCandidate
 			metric, unit, origin, quality string
 		)
 
 		err := rows.Scan(
-			&x.ID,
-			&x.ObservedAt,
+			&evidenceCandidate.ID,
+			&evidenceCandidate.ObservedAt,
 			&metric,
-			&x.Value,
+			&evidenceCandidate.Value,
 			&unit,
 			&origin,
 			&quality,
@@ -122,8 +126,12 @@ func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]Evidenc
 			return nil, apperr.Wrap(err, "select monitoring.measurements")
 		}
 
-		x.Kind, x.Metric, x.Unit, x.Origin, x.Quality = "remeasurement", &metric, &unit, &origin, &quality
-		out = append(out, x)
+		evidenceCandidate.Kind = "remeasurement"
+		evidenceCandidate.Metric = &metric
+		evidenceCandidate.Unit = &unit
+		evidenceCandidate.Origin = &origin
+		evidenceCandidate.Quality = &quality
+		out = append(out, evidenceCandidate)
 	}
 
 	rows.Close()
@@ -134,19 +142,19 @@ func (m Alerts) candidates(ctx context.Context, c *ops.Call, a Alert) ([]Evidenc
 	}
 
 	if m.Devices != nil {
-		recs, err := m.Devices.AlertRecoveries(ctx, c, a.ID, a.DetectedAt)
+		recs, err := m.Devices.AlertRecoveries(ctx, call, a.ID, a.DetectedAt)
 		if err != nil {
 			return nil, apperr.Wrap(err, "monitoring.DeviceRecoveries.AlertRecoveries")
 		}
 
-		for _, r := range recs {
-			typ := r.EventType
+		for _, deviceRecovery := range recs {
+			typ := deviceRecovery.EventType
 			out = append(
 				out,
 				EvidenceCandidate{
-					ID:         r.ID,
+					ID:         deviceRecovery.ID,
 					Kind:       "device_event",
-					ObservedAt: r.OccurredAt,
+					ObservedAt: deviceRecovery.OccurredAt,
 					EventType:  &typ, Metric: nil, Value: nil, Unit: nil, Origin: nil, Quality: nil,
 				},
 			)
@@ -208,9 +216,14 @@ func distinct(ids []uuid.UUID) bool {
 
 // checkEvidence applies IR66 / IR327 to a resolution: an alert without a policy needs at least one evidence ID, and
 // every ID given must be one of the alert's candidates.
-func (m Alerts) checkEvidence(ctx context.Context, c *ops.Call, a Alert, ids []uuid.UUID) error {
+func (m Alerts) checkEvidence(
+	ctx context.Context,
+	c *ops.Call,
+	alert Alert,
+	ids []uuid.UUID,
+) error {
 	if len(ids) == 0 {
-		if a.PolicyID == nil {
+		if alert.PolicyID == nil {
 			return apperr.Fields(
 				map[string]string{"resolutionEvidenceIds": "errors.evidence_required"},
 			)
@@ -220,7 +233,7 @@ func (m Alerts) checkEvidence(ctx context.Context, c *ops.Call, a Alert, ids []u
 	}
 
 	for _, id := range ids {
-		ok, err := m.isCandidate(ctx, c, a, id)
+		ok, err := m.isCandidate(ctx, c, alert, id)
 		if err != nil {
 			return err
 		}
@@ -278,21 +291,21 @@ func (in *EvidenceInput) Validate() map[string]string {
 //	@Router			/v1/alerts/{alertId}/evidence [get]
 func (m Alerts) evidence(
 	ctx context.Context,
-	c *ops.Call,
-	in *EvidenceInput,
+	call *ops.Call,
+	input *EvidenceInput,
 ) (paging.Page[EvidenceCandidate], error) {
-	err := paging.NoFilters(in.Query, "query.filters")
+	err := paging.NoFilters(input.Query, "query.filters")
 	if err != nil {
 		return paging.Page[EvidenceCandidate]{}, apperr.Wrap(err, "paging.NoFilters")
 	}
 
-	args := []any{in.AlertID}
+	args := []any{input.AlertID}
 
-	a, err := scanAlert(
-		c.Tx.QueryRow(
+	alert, err := scanAlert(
+		call.Tx.QueryRow(
 			ctx,
 			"SELECT "+alertCols+" FROM monitoring.alerts a WHERE a.id = $1 AND "+alertScope(
-				c,
+				call,
 				&args,
 				unitscope.List,
 			),
@@ -306,19 +319,19 @@ func (m Alerts) evidence(
 		return paging.Page[EvidenceCandidate]{}, err
 	}
 
-	gateErr := unitscope.Gate(ctx, c, []uuid.UUID{a.UnitID})
+	gateErr := unitscope.Gate(ctx, call, []uuid.UUID{alert.UnitID})
 	if gateErr != nil {
 		return paging.Page[EvidenceCandidate]{}, apperr.Wrap(gateErr, "unitscope.Gate")
 	}
 
-	all, err := m.candidates(ctx, c, a)
+	all, err := m.candidates(ctx, call, alert)
 	if err != nil {
 		return paging.Page[EvidenceCandidate]{}, err
 	}
 
 	sortSliceErr := paging.SortSlice(
 		all,
-		in.Query.Sort,
+		input.Query.Sort,
 		map[string]func(x, y EvidenceCandidate) int{
 			"id":         func(x, y EvidenceCandidate) int { return strings.Compare(x.ID.String(), y.ID.String()) },
 			"observedAt": func(x, y EvidenceCandidate) int { return x.ObservedAt.Compare(y.ObservedAt) },
@@ -328,20 +341,20 @@ func (m Alerts) evidence(
 		return paging.Page[EvidenceCandidate]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
 	}
 
-	w, err := paging.Resolve(in.Query, in.AlertID, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(input.Query, input.AlertID, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[EvidenceCandidate]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	items := []EvidenceCandidate{}
-	for i := w.Offset; i < len(all) && i < w.Offset+w.Limit; i++ {
+	for i := window.Offset; i < len(all) && i < window.Offset+window.Limit; i++ {
 		items = append(items, all[i])
 	}
 
 	return paging.Page[EvidenceCandidate]{
 		Items:           items,
-		NextCursor:      w.Next(len(all)),
+		NextCursor:      window.Next(len(all)),
 		Total:           len(all),
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }

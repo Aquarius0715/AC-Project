@@ -17,64 +17,66 @@ func TestRoutesEachOperationToItsDomain(t *testing.T) {
 	targets := Targets{}
 
 	for _, d := range ops.Domains {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			b, _ := io.ReadAll(r.Body)
-			seen[d] = r.URL.Path + " " + string(
-				b,
-			) + " " + r.Header.Get(
-				"Authorization",
-			) + " " + r.Header.Get(
-				"X-Request-ID",
-			)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"data":{"domain":"` + d + `"}}`))
-		}))
+		srv := httptest.NewServer(
+			http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
+				b, _ := io.ReadAll(r.Body)
+				seen[d] = r.URL.Path + " " + string(
+					b,
+				) + " " + r.Header.Get(
+					"Authorization",
+				) + " " + r.Header.Get(
+					"X-Request-ID",
+				)
+				writer.Header().Set("Content-Type", "application/json")
+				writer.WriteHeader(http.StatusCreated)
+				_, _ = writer.Write([]byte(`{"data":{"domain":"` + d + `"}}`))
+			}),
+		)
 		t.Cleanup(srv.Close)
 		u, _ := url.Parse(srv.URL)
 		targets[d] = u
 	}
 
-	e := New(targets, nil)
+	app := New(targets, nil)
 
-	for op, want := range map[string]string{
+	for operation, want := range map[string]string{
 		"jobs.create": ops.DomainMaintenance, "units.save": ops.DomainEquipment,
 		"preferences.update": ops.DomainIdentity, "invoices.create": ops.DomainBilling, "factors.save": ops.DomainEnergy,
 	} {
-		if ops.DomainOf(op) == "" {
-			t.Fatalf("%s is not in the catalog", op)
+		if ops.DomainOf(operation) == "" {
+			t.Fatalf("%s is not in the catalog", operation)
 		}
 
-		rt := ops.SpecByName()[op].Routes[0]
-		req := httptest.NewRequest(rt.Method, rt.Path, strings.NewReader(`{"limit":1}`))
+		route := ops.SpecByName()[operation].Routes[0]
+		req := httptest.NewRequest(route.Method, route.Path, strings.NewReader(`{"limit":1}`))
 		req.Header.Set("Authorization", "Bearer tok")
 
-		w := httptest.NewRecorder()
-		e.ServeHTTP(w, req)
+		rec := httptest.NewRecorder()
+		app.ServeHTTP(rec, req)
 
 		var body struct{ Data struct{ Domain string } }
 
-		_ = json.Unmarshal(w.Body.Bytes(), &body)
-		if w.Code != http.StatusCreated || body.Data.Domain != want {
-			t.Fatalf("%s → %d %s, want %s", op, w.Code, w.Body, want)
+		_ = json.Unmarshal(rec.Body.Bytes(), &body)
+		if rec.Code != http.StatusCreated || body.Data.Domain != want {
+			t.Fatalf("%s → %d %s, want %s", operation, rec.Code, rec.Body, want)
 		}
 
 		got := seen[want] // path, body, the user's token and the gateway's correlation ID reach the service
-		if !strings.HasPrefix(got, rt.Path+` {"limit":1} Bearer tok `) ||
+		if !strings.HasPrefix(got, route.Path+` {"limit":1} Bearer tok `) ||
 			strings.HasSuffix(got, " ") {
-			t.Fatalf("%s forwarded as %q", op, got)
+			t.Fatalf("%s forwarded as %q", operation, got)
 		}
 	}
 	// unknown routes (the retired POST /v1/ops/<operation> too) never leave the gateway
-	w := httptest.NewRecorder()
-	e.ServeHTTP(
-		w,
+	recorder := httptest.NewRecorder()
+	app.ServeHTTP(
+		recorder,
 		httptest.NewRequest(http.MethodPost, "/v1/ops/jobs.list", strings.NewReader(`{}`)),
 	)
 
-	if w.Code != http.StatusNotFound ||
-		!strings.Contains(w.Body.String(), "error.unknownOperation") {
-		t.Fatalf("unknown: %d %s", w.Code, w.Body)
+	if recorder.Code != http.StatusNotFound ||
+		!strings.Contains(recorder.Body.String(), "error.unknownOperation") {
+		t.Fatalf("unknown: %d %s", recorder.Code, recorder.Body)
 	}
 }
 
@@ -97,41 +99,44 @@ func TestRoutesEveryRESTRouteToItsDomain(t *testing.T) {
 		targets[d] = u
 	}
 
-	e := New(targets, nil)
+	app := New(targets, nil)
 	routes := 0
 
-	for _, s := range ops.Catalog {
-		if len(s.Routes) == 0 {
-			t.Fatalf("%s has no REST route", s.Name)
+	for _, spec := range ops.Catalog {
+		if len(spec.Routes) == 0 {
+			t.Fatalf("%s has no REST route", spec.Name)
 		}
 
-		for _, rt := range s.Routes {
+		for _, route := range spec.Routes {
 			routes++
 
-			path := rt.Path
-			for _, p := range ops.PathParams(rt.Path) {
+			path := route.Path
+			for _, p := range ops.PathParams(route.Path) {
 				path = strings.Replace(path, "{"+p+"}", "v-"+strings.ReplaceAll(p, ".", "-"), 1)
 			}
 
 			body := ""
-			if rt.Method != http.MethodGet && rt.Method != http.MethodDelete {
+			if route.Method != http.MethodGet && route.Method != http.MethodDelete {
 				body = `{"x":1}`
 			}
 
 			got = ""
-			w := httptest.NewRecorder()
-			e.ServeHTTP(w, httptest.NewRequest(rt.Method, path+"?q=1", strings.NewReader(body)))
+			rec := httptest.NewRecorder()
+			app.ServeHTTP(
+				rec,
+				httptest.NewRequest(route.Method, path+"?q=1", strings.NewReader(body)),
+			)
 
 			if want := ops.DomainOf(
-				s.Name,
-			) + " " + rt.Method + " " + path + "?q=1 " + body; w.Code != http.StatusOK ||
+				spec.Name,
+			) + " " + route.Method + " " + path + "?q=1 " + body; rec.Code != http.StatusOK ||
 				got != want {
 				t.Fatalf(
 					"%s %s (%s): %d, upstream saw %q, want %q",
-					rt.Method,
-					rt.Path,
-					s.Name,
-					w.Code,
+					route.Method,
+					route.Path,
+					spec.Name,
+					rec.Code,
 					got,
 					want,
 				)
@@ -193,48 +198,60 @@ func TestResponsesAreNotSniffedOrCachedAndCarryOneRequestID(t *testing.T) {
 	targets := Targets{}
 
 	for _, d := range ops.Domains {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("X-Request-ID", "upstream-id")
-			w.Header().Set("Cache-Control", "public, max-age=3600")
-			w.Header().Set("X-Content-Type-Options", "sniff-me")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"data":{}}`))
-		}))
+		srv := httptest.NewServer(
+			http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
+				writer.Header().Set("Content-Type", "application/json")
+				writer.Header().Set("X-Request-ID", "upstream-id")
+				writer.Header().Set("Cache-Control", "public, max-age=3600")
+				writer.Header().Set("X-Content-Type-Options", "sniff-me")
+				writer.WriteHeader(http.StatusOK)
+				_, _ = writer.Write([]byte(`{"data":{}}`))
+			}),
+		)
 		t.Cleanup(srv.Close)
 		u, _ := url.Parse(srv.URL)
 		targets[d] = u
 	}
 
-	e := New(targets, nil)
+	app := New(targets, nil)
 	rt := ops.SpecByName()["jobs.create"].Routes[0]
 	req := httptest.NewRequest(rt.Method, rt.Path, strings.NewReader(`{"limit":1}`))
 	req.Header.Set("Authorization", "Bearer tok")
 	req.Header.Set("X-Request-ID", "client-chosen") // dropped: the gateway makes its own (IR435)
 
-	for _, r := range []*http.Request{req, httptest.NewRequest(http.MethodGet, "/healthz", nil)} {
+	for _, request := range []*http.Request{req, httptest.NewRequest(http.MethodGet, "/healthz", nil)} {
 		w := httptest.NewRecorder()
-		e.ServeHTTP(w, r)
+		app.ServeHTTP(w, request)
 
-		h := w.Result().Header
-		if got := h.Values(
+		header := w.Result().Header
+		if got := header.Values(
 			"X-Request-ID",
 		); len(got) != 1 || got[0] == "upstream-id" ||
 			got[0] == "client-chosen" {
-			t.Errorf("%s %s: X-Request-Id = %q, want one gateway ID", r.Method, r.URL.Path, got)
-		}
-
-		if got := h.Values("X-Content-Type-Options"); len(got) != 1 || got[0] != "nosniff" {
 			t.Errorf(
-				"%s %s: X-Content-Type-Options = %q, want one nosniff",
-				r.Method,
-				r.URL.Path,
+				"%s %s: X-Request-Id = %q, want one gateway ID",
+				request.Method,
+				request.URL.Path,
 				got,
 			)
 		}
 
-		if got := h.Values("Cache-Control"); len(got) != 1 || got[0] != "no-store" {
-			t.Errorf("%s %s: Cache-Control = %q, want one no-store", r.Method, r.URL.Path, got)
+		if got := header.Values("X-Content-Type-Options"); len(got) != 1 || got[0] != "nosniff" {
+			t.Errorf(
+				"%s %s: X-Content-Type-Options = %q, want one nosniff",
+				request.Method,
+				request.URL.Path,
+				got,
+			)
+		}
+
+		if got := header.Values("Cache-Control"); len(got) != 1 || got[0] != "no-store" {
+			t.Errorf(
+				"%s %s: Cache-Control = %q, want one no-store",
+				request.Method,
+				request.URL.Path,
+				got,
+			)
 		}
 	}
 }

@@ -42,12 +42,12 @@ func CheckRange(from, to time.Time) error {
 // minute-slot power measurements (IR189).
 func Integrate(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	units []uuid.UUID,
-	from, to time.Time,
+	from, until time.Time,
 ) (Integration, error) {
 	out := Integration{
-		ExpectedSlots: len(units) * int(to.Sub(from)/time.Minute),
+		ExpectedSlots: len(units) * int(until.Sub(from)/time.Minute),
 		ValidSlots:    0,
 		KWh:           nil,
 		Warnings:      nil,
@@ -56,14 +56,14 @@ func Integrate(
 		return out, nil
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT DISTINCT ON (unit_id, observed_at) value, unit, origin, quality, boundary_id
 		FROM energy.ref_power_samples WHERE unit_id = ANY($1) AND observed_at >= $2 AND observed_at < $3
 		ORDER BY unit_id, observed_at, sequence DESC, event_id::text ASC`,
 		units,
 		from,
-		to,
+		until,
 	)
 	if err != nil {
 		return out, apperr.Wrap(err, "select energy.ref_power_samples")

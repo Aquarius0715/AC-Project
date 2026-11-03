@@ -97,7 +97,7 @@ var DefaultFactorID = uuid.NewSHA1(
 
 // DefaultFactor returns the current default factor, or nil when it is missing.
 func DefaultFactor(ctx context.Context, c *ops.Call) (*Factor, error) {
-	f, err := LoadFactor(ctx, c, DefaultFactorID, nil)
+	factor, err := LoadFactor(ctx, c, DefaultFactorID, nil)
 	if err != nil {
 		var de *apperr.DomainError
 		if errors.As(err, &de) && de.Code == apperr.NotFound {
@@ -107,7 +107,7 @@ func DefaultFactor(ctx context.Context, c *ops.Call) (*Factor, error) {
 		return nil, err
 	}
 
-	return &f, nil
+	return &factor, nil
 }
 
 func sameSet(a, b []uuid.UUID) bool {
@@ -123,21 +123,21 @@ func sameSet(a, b []uuid.UUID) bool {
 // null) and optional baseline: the comparison is made only when comparable (IR148 item 1).
 func Compute(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	units []uuid.UUID,
-	from, to time.Time,
+	from, until time.Time,
 	f *Factor,
-	b *Baseline,
+	baseline *Baseline,
 ) (Summary, Integration, error) {
-	n, err := Integrate(ctx, c, units, from, to)
+	integration, err := Integrate(ctx, call, units, from, until)
 	if err != nil {
-		return Summary{}, n, err
+		return Summary{}, integration, err
 	}
 
 	s := Summary{
 		Period: Range{
 			from,
-			to,
+			until,
 		},
 		UnitIDs:       units,
 		Currency:      "MYR",
@@ -146,7 +146,7 @@ func Compute(
 		Boundary:      BoundaryText,
 		QualityWarnings: append(
 			[]string{},
-			n.Warnings...),
+			integration.Warnings...),
 		Totals: Totals{
 			KWh:              nil,
 			AmountMinor:      nil,
@@ -167,8 +167,8 @@ func Compute(
 		s.UnitIDs = []uuid.UUID{}
 	}
 
-	if n.ExpectedSlots > 0 {
-		cov := float64(n.ValidSlots) / float64(n.ExpectedSlots)
+	if integration.ExpectedSlots > 0 {
+		cov := float64(integration.ValidSlots) / float64(integration.ExpectedSlots)
 		s.Coverage = &cov
 	}
 
@@ -181,28 +181,28 @@ func Compute(
 		s.QualityWarnings = append(s.QualityWarnings, "factor_missing")
 	}
 
-	s.Totals.KWh = Float(n.KWh)
-	s.Totals.AmountMinor = roundMinor(mul(n.KWh, TariffMYRPerKWh))
+	s.Totals.KWh = Float(integration.KWh)
+	s.Totals.AmountMinor = roundMinor(mul(integration.KWh, TariffMYRPerKWh))
 
-	s.Totals.EmissionsKg = Float(mul(n.KWh, factor))
-	if b != nil {
-		s.BaselineRef, s.BaselineSnapshot = &Ref{b.ID, b.Version}, b
+	s.Totals.EmissionsKg = Float(mul(integration.KWh, factor))
+	if baseline != nil {
+		s.BaselineRef, s.BaselineSnapshot = &Ref{baseline.ID, baseline.Version}, baseline
 
 		var q struct {
 			Kind     string   `json:"kind"`
 			Coverage *float64 `json:"coverage"`
 		}
 
-		_ = jsonUnmarshal(b.Quality, &q)
+		_ = jsonUnmarshal(baseline.Quality, &q)
 		if q.Kind == "modeled" {
 			s.QualityWarnings = append(s.QualityWarnings, "modeled_baseline")
 		}
 
-		if !Comparable(b, units, from, to, n) {
+		if !Comparable(baseline, units, from, until, integration) {
 			s.QualityWarnings = append(s.QualityWarnings, "baseline_not_comparable")
 		} else {
-			base := new(big.Rat).SetFloat64(*b.BaselineKWh)
-			saved := new(big.Rat).Sub(base, n.KWh)
+			base := new(big.Rat).SetFloat64(*baseline.BaselineKWh)
+			saved := new(big.Rat).Sub(base, integration.KWh)
 
 			s.Totals.SavedKWh, s.Totals.DeltaKWh = Float(saved), Float(new(big.Rat).Neg(saved))
 			if base.Sign() != 0 {
@@ -218,12 +218,12 @@ func Compute(
 
 	s.QualityWarnings = sortedUnique(s.QualityWarnings)
 
-	return s, n, nil
+	return s, integration, nil
 }
 
 // Comparable applies D07 / SR29: a value, the same unit set, boundary and minute count, actual coverage 1 and a
 // modeled value or measured coverage 1.
-func Comparable(b *Baseline, units []uuid.UUID, from, to time.Time, n Integration) bool {
+func Comparable(b *Baseline, units []uuid.UUID, from, to time.Time, integration Integration) bool {
 	var q struct {
 		Kind     string   `json:"kind"`
 		Coverage *float64 `json:"coverage"`
@@ -233,8 +233,8 @@ func Comparable(b *Baseline, units []uuid.UUID, from, to time.Time, n Integratio
 
 	return b.BaselineKWh != nil && sameSet(b.UnitIDs, units) && b.BoundaryID == Boundary &&
 		b.Period.To.Sub(b.Period.From) == to.Sub(from) &&
-		n.ExpectedSlots > 0 &&
-		n.ValidSlots == n.ExpectedSlots &&
+		integration.ExpectedSlots > 0 &&
+		integration.ValidSlots == integration.ExpectedSlots &&
 		(q.Kind == "modeled" || (q.Coverage != nil && *q.Coverage == 1))
 }
 
@@ -249,29 +249,29 @@ type SummaryInput struct {
 
 // Validate implements ops.Validator.
 func (in *SummaryInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if CheckRange(in.From, in.To) != nil {
-		fe["from"] = "errors.energy_range"
+		fieldErrs["from"] = "errors.energy_range"
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fe["unitIds"] = "error.invalid"
+			fieldErrs["unitIds"] = "error.invalid"
 		}
 
 		seen[u] = true
 	}
 
 	if in.UnitIDs == nil || len(in.UnitIDs) > 100 {
-		fe["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = "error.invalid"
 	}
 
 	if in.TariffVersion != nil && *in.TariffVersion != TariffVersion {
-		fe["tariffVersion"] = "error.invalid"
+		fieldErrs["tariffVersion"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // summary is energy.summary (D07, SR29, IR68, IR148): actuals for the units; with baselineId the signed comparison
@@ -303,43 +303,43 @@ func (in *SummaryInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/energy/summary [get]
-func summary(ctx context.Context, c *ops.Call, in *SummaryInput) (Summary, error) {
+func summary(ctx context.Context, c *ops.Call, input *SummaryInput) (Summary, error) {
 	if c.Principal.Role == "client" {
 		var mine int
 
 		err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id =
-			$2`, in.UnitIDs, c.Principal.OrgID).
+			$2`, input.UnitIDs, c.Principal.OrgID).
 			Scan(&mine)
 		if err != nil {
 			return Summary{}, apperr.Wrap(err, "select energy.ref_units")
 		}
 
-		if mine != len(in.UnitIDs) {
+		if mine != len(input.UnitIDs) {
 			return Summary{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
 	}
 
 	var known int
 
-	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).
+	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, input.UnitIDs).
 		Scan(&known)
 	if err != nil {
 		return Summary{}, apperr.Wrap(err, "select energy.ref_units")
 	}
 
-	if known != len(in.UnitIDs) {
+	if known != len(input.UnitIDs) {
 		return Summary{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	f, err := DefaultFactor(ctx, c)
+	factor, err := DefaultFactor(ctx, c)
 	if err != nil {
 		return Summary{}, err
 	}
 
 	var base *Baseline
 
-	if in.BaselineID != nil {
-		b, err := LoadBaseline(ctx, c, *in.BaselineID, nil)
+	if input.BaselineID != nil {
+		b, err := LoadBaseline(ctx, c, *input.BaselineID, nil)
 		if err != nil {
 			return Summary{}, err
 		}
@@ -347,7 +347,7 @@ func summary(ctx context.Context, c *ops.Call, in *SummaryInput) (Summary, error
 		base = &b
 	}
 
-	s, _, err := Compute(ctx, c, in.UnitIDs, in.From, in.To, f, base)
+	s, _, err := Compute(ctx, c, input.UnitIDs, input.From, input.To, factor, base)
 
 	return s, err
 }
@@ -378,12 +378,12 @@ type Forecast struct {
 // ForecastFor computes IR78 for the unit set U over [from, to) with the integration n of U.
 func ForecastFor(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	units []uuid.UUID,
 	from, to time.Time,
-	n Integration,
+	integration Integration,
 ) (Forecast, error) {
-	f := Forecast{
+	forecast := Forecast{
 		Period:                   Range{from, to},
 		UnitIDs:                  units,
 		Basis:                    "prorated_modeled_baseline",
@@ -398,29 +398,30 @@ func ForecastFor(
 		ForecastSavedKWh:         nil,
 		ForecastSavingPercentage: nil,
 	}
-	if f.UnitIDs == nil {
-		f.UnitIDs = []uuid.UUID{}
+	if forecast.UnitIDs == nil {
+		forecast.UnitIDs = []uuid.UUID{}
 	}
 
 	if len(units) == 0 {
-		f.QualityWarnings = []string{"no_units"}
+		forecast.QualityWarnings = []string{"no_units"}
 
-		return f, nil
+		return forecast, nil
 	}
 
-	f.ExpectedUnitMinutes, f.ValidUnitMinutes = n.ExpectedSlots, n.ValidSlots
-	f.ActualKWhOnValidSlots = Float(n.KWh)
+	forecast.ExpectedUnitMinutes, forecast.ValidUnitMinutes = integration.ExpectedSlots, integration.ValidSlots
+	forecast.ActualKWhOnValidSlots = Float(integration.KWh)
 
 	var predActual, predBase *big.Rat
-	if n.ValidSlots >= 1 {
+	if integration.ValidSlots >= 1 {
 		predActual = new(
 			big.Rat,
-		).Mul(new(big.Rat).Quo(n.KWh, big.NewRat(int64(n.ValidSlots), 1)), big.NewRat(int64(n.ExpectedSlots), 1))
+		).Mul(new(big.Rat).Quo(integration.KWh, big.NewRat(int64(integration.ValidSlots), 1)),
+			big.NewRat(int64(integration.ExpectedSlots), 1))
 	} else {
-		f.QualityWarnings = append(f.QualityWarnings, "actual_unavailable")
+		forecast.QualityWarnings = append(forecast.QualityWarnings, "actual_unavailable")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT id FROM energy.baselines WHERE is_current AND method = 'demo_fixed' AND boundary_id = $1 AND baseline_kwh IS
 			NOT NULL
@@ -428,7 +429,7 @@ func ForecastFor(
 		Boundary,
 	)
 	if err != nil {
-		return f, apperr.Wrap(err, "select energy.baselines")
+		return forecast, apperr.Wrap(err, "select energy.baselines")
 	}
 
 	ids := []uuid.UUID{}
@@ -440,7 +441,7 @@ func ForecastFor(
 		if err != nil {
 			rows.Close()
 
-			return f, apperr.Wrap(err, "select energy.baselines")
+			return forecast, apperr.Wrap(err, "select energy.baselines")
 		}
 
 		ids = append(ids, id)
@@ -450,56 +451,60 @@ func ForecastFor(
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return f, apperr.Wrap(rowsErr, "select energy.baselines")
+		return forecast, apperr.Wrap(rowsErr, "select energy.baselines")
 	}
 
 	var chosen *Baseline
 
 	for _, id := range ids {
-		b, err := LoadBaseline(ctx, c, id, nil)
+		baseline, err := LoadBaseline(ctx, call, id, nil)
 		if err != nil {
-			return f, err
+			return forecast, err
 		}
 
-		if sameSet(b.UnitIDs, units) {
-			chosen = &b
+		if sameSet(baseline.UnitIDs, units) {
+			chosen = &baseline
 
 			break
 		}
 	}
 
 	if chosen == nil {
-		f.QualityWarnings = append(f.QualityWarnings, "baseline_unavailable")
+		forecast.QualityWarnings = append(forecast.QualityWarnings, "baseline_unavailable")
 	} else {
-		f.BaselineRef, f.BaselineSnapshot = &Ref{chosen.ID, chosen.Version}, chosen
-		f.QualityWarnings = append(f.QualityWarnings, "modeled_baseline", "prorated_forecast")
+		forecast.BaselineRef, forecast.BaselineSnapshot = &Ref{chosen.ID, chosen.Version}, chosen
+		forecast.QualityWarnings = append(
+			forecast.QualityWarnings,
+			"modeled_baseline",
+			"prorated_forecast",
+		)
 
 		minutes := int64(chosen.Period.To.Sub(chosen.Period.From) / time.Minute)
 		if minutes > 0 {
 			predBase = new(
 				big.Rat,
 			).Mul(new(big.Rat).Quo(new(big.Rat).SetFloat64(*chosen.BaselineKWh), big.NewRat(int64(len(units))*minutes, 1)),
-				big.NewRat(int64(n.ExpectedSlots), 1))
+				big.NewRat(int64(integration.ExpectedSlots), 1))
 		}
 	}
 
-	if n.ValidSlots < n.ExpectedSlots {
-		f.QualityWarnings = append(f.QualityWarnings, "partial_coverage")
+	if integration.ValidSlots < integration.ExpectedSlots {
+		forecast.QualityWarnings = append(forecast.QualityWarnings, "partial_coverage")
 	}
 
-	f.PredictedActualKWh, f.PredictedBaselineKWh = Float(predActual), Float(predBase)
+	forecast.PredictedActualKWh, forecast.PredictedBaselineKWh = Float(predActual), Float(predBase)
 	if predBase != nil && predActual != nil {
 		saved := new(big.Rat).Sub(predBase, predActual)
 
-		f.ForecastSavedKWh = Float(saved)
+		forecast.ForecastSavedKWh = Float(saved)
 		if predBase.Sign() != 0 {
-			f.ForecastSavingPercentage = Float(
+			forecast.ForecastSavingPercentage = Float(
 				new(big.Rat).Mul(new(big.Rat).Quo(saved, predBase), big.NewRat(100, 1)),
 			)
 		}
 	}
 
-	f.QualityWarnings = sortedUnique(f.QualityWarnings)
+	forecast.QualityWarnings = sortedUnique(forecast.QualityWarnings)
 
-	return f, nil
+	return forecast, nil
 }

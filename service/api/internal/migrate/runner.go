@@ -56,28 +56,36 @@ func Load(fsys fs.FS) ([]Migration, error) {
 
 	seen := map[int64]string{}
 
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
+	for _, dirEntry := range entries {
+		if dirEntry.IsDir() || !strings.HasSuffix(dirEntry.Name(), ".sql") {
 			continue
 		}
 
-		m := fileRE.FindStringSubmatch(e.Name())
+		m := fileRE.FindStringSubmatch(dirEntry.Name())
 		if m == nil {
-			return nil, fmt.Errorf("migrate: bad file name %q (want NNNNNN_name.up.sql)", e.Name())
+			return nil, fmt.Errorf(
+				"migrate: bad file name %q (want NNNNNN_name.up.sql)",
+				dirEntry.Name(),
+			)
 		}
 
 		v, _ := strconv.ParseInt(m[1], 10, 64)
 		if v <= 0 {
-			return nil, fmt.Errorf("migrate: version must be positive in %q", e.Name())
+			return nil, fmt.Errorf("migrate: version must be positive in %q", dirEntry.Name())
 		}
 
 		if prev, dup := seen[v]; dup {
-			return nil, fmt.Errorf("migrate: version %d used by %q and %q", v, prev, e.Name())
+			return nil, fmt.Errorf(
+				"migrate: version %d used by %q and %q",
+				v,
+				prev,
+				dirEntry.Name(),
+			)
 		}
 
-		seen[v] = e.Name()
+		seen[v] = dirEntry.Name()
 
-		b, err := fs.ReadFile(fsys, e.Name())
+		b, err := fs.ReadFile(fsys, dirEntry.Name())
 		if err != nil {
 			return nil, apperr.Wrap(err, "fs.ReadFile")
 		}
@@ -148,17 +156,22 @@ func Up(ctx context.Context, conn *pgx.Conn, ms []Migration) ([]int64, error) {
 
 	var applied []int64
 
-	for _, m := range ms {
-		if m.Version <= cur {
+	for _, migration := range ms {
+		if migration.Version <= cur {
 			continue
 		}
 
-		err := apply(ctx, conn, m)
+		err := apply(ctx, conn, migration)
 		if err != nil {
-			return applied, fmt.Errorf("migrate: %06d_%s: %w", m.Version, m.Name, err)
+			return applied, fmt.Errorf(
+				"migrate: %06d_%s: %w",
+				migration.Version,
+				migration.Name,
+				err,
+			)
 		}
 
-		applied = append(applied, m.Version)
+		applied = append(applied, migration.Version)
 	}
 
 	return applied, nil
@@ -178,18 +191,18 @@ func Force(ctx context.Context, conn *pgx.Conn, version int64) error {
 	), "transaction")
 }
 
-func apply(ctx context.Context, conn *pgx.Conn, m Migration) error {
-	if m.NoTx() {
+func apply(ctx context.Context, conn *pgx.Conn, migration Migration) error {
+	if migration.NoTx() {
 		err := pgx.BeginFunc(
 			ctx,
 			conn,
-			func(tx pgx.Tx) error { return setVersion(ctx, tx, m.Version, true) },
+			func(tx pgx.Tx) error { return setVersion(ctx, tx, migration.Version, true) },
 		)
 		if err != nil {
 			return apperr.Wrap(err, "transaction")
 		}
 
-		_, err = conn.Exec(ctx, m.SQL)
+		_, err = conn.Exec(ctx, migration.SQL)
 		if err != nil {
 			return apperr.Wrap(err, "exec (apply)")
 		}
@@ -197,27 +210,27 @@ func apply(ctx context.Context, conn *pgx.Conn, m Migration) error {
 		return apperr.Wrap(pgx.BeginFunc(
 			ctx,
 			conn,
-			func(tx pgx.Tx) error { return setVersion(ctx, tx, m.Version, false) },
+			func(tx pgx.Tx) error { return setVersion(ctx, tx, migration.Version, false) },
 		), "transaction")
 	}
 
-	return apperr.Wrap(pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, m.SQL)
+	return apperr.Wrap(pgx.BeginFunc(ctx, conn, func(txn pgx.Tx) error {
+		_, err := txn.Exec(ctx, migration.SQL)
 		if err != nil {
 			return apperr.Wrap(err, "exec (apply)")
 		}
 
-		return setVersion(ctx, tx, m.Version, false)
+		return setVersion(ctx, txn, migration.Version, false)
 	}), "transaction")
 }
 
-func setVersion(ctx context.Context, tx pgx.Tx, v int64, dirty bool) error {
-	_, execErr := tx.Exec(ctx, `DELETE FROM public.schema_migrations`)
+func setVersion(ctx context.Context, txn pgx.Tx, v int64, dirty bool) error {
+	_, execErr := txn.Exec(ctx, `DELETE FROM public.schema_migrations`)
 	if execErr != nil {
 		return apperr.Wrap(execErr, "delete public.schema_migrations")
 	}
 
-	_, err := tx.Exec(
+	_, err := txn.Exec(
 		ctx,
 		`INSERT INTO public.schema_migrations (version, dirty) VALUES ($1, $2)`,
 		v,

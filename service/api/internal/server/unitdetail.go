@@ -20,71 +20,72 @@ type unitDetails struct{}
 
 func (unitDetails) Detail(
 	ctx context.Context,
-	c *ops.Call,
-	u assets.Unit,
+	call *ops.Call,
+	unit assets.Unit,
 ) (assets.DetailExtras, error) {
-	var d assets.DetailExtras
+	var detailExtras assets.DetailExtras
 
-	cp, ok, err := devices.LoadCapability(ctx, c, u.ModelID, u.CapabilityVersion)
+	cp, ok, err := devices.LoadCapability(ctx, call, unit.ModelID, unit.CapabilityVersion)
 	if err != nil {
-		return d, apperr.Wrap(err, "devices.LoadCapability")
+		return detailExtras, apperr.Wrap(err, "devices.LoadCapability")
 	} else if ok {
-		d.Capabilities = cp
+		detailExtras.Capabilities = cp
 	}
 	// effectiveControlPolicy: the newest restriction that currently restricts the unit (IR46)
 	// (restrictions belong to billing: asked through its queries, IR194)
-	r, err := restrictions.Busy{}.UnitRestriction(ctx, c, u.ID)
+	unitRestriction, err := restrictions.Busy{}.UnitRestriction(ctx, call, unit.ID)
 	switch {
 	case err != nil:
-		return d, apperr.Wrap(err, "restrictions.Busy.UnitRestriction")
-	case !r.Found:
-		d.EffectiveControlPolicy = map[string]any{"state": "unrestricted"}
+		return detailExtras, apperr.Wrap(err, "restrictions.Busy.UnitRestriction")
+	case !unitRestriction.Found:
+		detailExtras.EffectiveControlPolicy = map[string]any{"state": "unrestricted"}
 	default:
-		d.EffectiveControlPolicy = map[string]any{
+		detailExtras.EffectiveControlPolicy = map[string]any{
 			"state":     "restricted",
-			"phase":     r.Phase,
-			"policy":    r.Policy,
+			"phase":     unitRestriction.Phase,
+			"policy":    unitRestriction.Policy,
 			"reasonKey": "control.restriction_active",
 		}
 	}
 	// controlAvailability: blocked while any terminal-restriction recovery case of the unit is unresolved (SR26)
-	blocked, err := restrictions.Busy{}.UnitRecovering(ctx, c, u.ID)
+	blocked, err := restrictions.Busy{}.UnitRecovering(ctx, call, unit.ID)
 	if err != nil {
-		return d, apperr.Wrap(err, "restrictions.Busy.UnitRecovering")
+		return detailExtras, apperr.Wrap(err, "restrictions.Busy.UnitRecovering")
 	}
 
-	d.ControlAvailability = map[string]any{"state": "available"}
+	detailExtras.ControlAvailability = map[string]any{"state": "available"}
 	if blocked {
-		d.ControlAvailability = map[string]any{
+		detailExtras.ControlAvailability = map[string]any{
 			"state":     "blocked",
 			"reasonKey": "control.reconciliation_required",
 		}
 	}
 
-	d.Components = maintenance.Components(u.ServiceScope)
+	detailExtras.Components = maintenance.Components(unit.ServiceScope)
 
-	cmds, err := control.PendingCommands(ctx, c, u.ID)
+	cmds, err := control.PendingCommands(ctx, call, unit.ID)
 	if err != nil {
-		return d, apperr.Wrap(err, "control.PendingCommands")
+		return detailExtras, apperr.Wrap(err, "control.PendingCommands")
 	}
 
-	d.PendingCommands, d.PendingCommandIDs = cmds, []uuid.UUID{}
+	detailExtras.PendingCommands, detailExtras.PendingCommandIDs = cmds, []uuid.UUID{}
 	for _, x := range cmds {
-		d.PendingCommandIDs = append(d.PendingCommandIDs, x.ID)
+		detailExtras.PendingCommandIDs = append(detailExtras.PendingCommandIDs, x.ID)
 	}
 	// location: property > ancestor spaces > space, with the property address and access instructions
-	d.Location.PathLabels = []string{}
+	detailExtras.Location.PathLabels = []string{}
 
-	scanErr := c.Tx.QueryRow(ctx, `WITH RECURSIVE up(id, name, parent, depth) AS (
+	scanErr := call.Tx.QueryRow(ctx, `WITH RECURSIVE up(id, name, parent, depth) AS (
 			SELECT s.id, s.name, s.parent_space_id, 0 FROM assets.spaces s WHERE s.id = $2
 			UNION ALL SELECT a.id, a.name, a.parent_space_id, up.depth + 1 FROM up JOIN assets.spaces a ON a.id = up.parent)
 		SELECT array_prepend(p.name, COALESCE((SELECT array_agg(name ORDER BY depth DESC) FROM up), '{}')), p.address,
 		p.access_instructions
 		FROM assets.properties p WHERE p.id =
-		$1`, u.PropertyID, u.SpaceID).Scan(&d.Location.PathLabels, &d.Location.Address, &d.Location.AccessInstructions)
+		$1`, unit.PropertyID, unit.SpaceID).Scan(&detailExtras.Location.PathLabels, &detailExtras.Location.Address,
+		&detailExtras.Location.AccessInstructions)
 	if scanErr != nil {
-		return d, apperr.Wrap(scanErr, "select assets.properties")
+		return detailExtras, apperr.Wrap(scanErr, "select assets.properties")
 	}
 
-	return d, nil
+	return detailExtras, nil
 }

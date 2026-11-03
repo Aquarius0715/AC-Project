@@ -102,43 +102,51 @@ const automationCols = `a.id, a.tenant_id, a.version, a.created_at, a.updated_at
 	`r.command_id) FROM control.automation_runs r
 		WHERE r.rule_id = a.id ORDER BY r.occurred_at DESC, r.seq DESC LIMIT 1)`
 
-func scanAutomation(r pgx.Row) (Automation, error) {
+func scanAutomation(row pgx.Row) (Automation, error) {
 	var (
-		x         Automation
-		def, last []byte
+		automation Automation
+		def, last  []byte
 	)
 
-	err := r.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.UpdatedAt,
-		&x.Name,
-		&x.OwnerMembershipID,
-		&x.CreatedByUserID,
-		&x.Timezone,
-		&x.Enabled,
-		&x.Priority,
-		&x.DisabledReason,
-		&x.Kind,
+	err := row.Scan(
+		&automation.ID,
+		&automation.TenantID,
+		&automation.Version,
+		&automation.CreatedAt,
+		&automation.UpdatedAt,
+		&automation.Name,
+		&automation.OwnerMembershipID,
+		&automation.CreatedByUserID,
+		&automation.Timezone,
+		&automation.Enabled,
+		&automation.Priority,
+		&automation.DisabledReason,
+		&automation.Kind,
 		&def,
-		&x.customerOrg,
-		&x.UnitIDs,
+		&automation.customerOrg,
+		&automation.UnitIDs,
 		&last,
 	)
 	if err != nil {
-		return x, apperr.Wrap(err, "scan (scanAutomation)")
+		return automation, apperr.Wrap(err, "scan (scanAutomation)")
 	}
 
 	var d definition
 
 	_ = json.Unmarshal(def, &d)
 
-	x.Weekdays, x.StartLocal, x.EndLocal, x.EndsNextDay, x.StartAction, x.EndAction, x.Condition, x.Action, x.OnlyIf =
-		d.Weekdays, d.StartLocal, d.EndLocal, d.EndsNextDay, d.StartAction, d.EndAction, d.Condition, d.Action, d.OnlyIf
-	if len(x.OnlyIf) == 0 {
-		x.OnlyIf = json.RawMessage("[]")
+	automation.Weekdays = d.Weekdays
+	automation.StartLocal = d.StartLocal
+	automation.EndLocal = d.EndLocal
+	automation.EndsNextDay = d.EndsNextDay
+	automation.StartAction = d.StartAction
+	automation.EndAction = d.EndAction
+	automation.Condition = d.Condition
+	automation.Action = d.Action
+
+	automation.OnlyIf = d.OnlyIf
+	if len(automation.OnlyIf) == 0 {
+		automation.OnlyIf = json.RawMessage("[]")
 	}
 
 	if len(last) > 0 {
@@ -147,16 +155,16 @@ func scanAutomation(r pgx.Row) (Automation, error) {
 		err := json.Unmarshal(last, &lr)
 		if err == nil {
 			lr.At = lr.At.UTC()
-			x.LastRun = &lr
+			automation.LastRun = &lr
 		}
 	}
 
-	return x, nil
+	return automation, nil
 }
 
 func (m Automations) load(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	id uuid.UUID,
 	lock bool,
 ) (Automation, error) {
@@ -165,8 +173,8 @@ func (m Automations) load(
 		q += " FOR UPDATE OF a"
 	}
 
-	x, err := scanAutomation(c.Tx.QueryRow(ctx, q, id))
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && x.customerOrg != c.Principal.OrgID) {
+	x, err := scanAutomation(call.Tx.QueryRow(ctx, q, id))
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && x.customerOrg != call.Principal.OrgID) {
 		return Automation{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
@@ -205,8 +213,8 @@ func (m Automations) load(
 //	@Router			/v1/automations [get]
 func (m Automations) list(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[Automation], error) {
 	var f struct {
 		Kind    *string    `json:"kind,omitempty"`
@@ -214,8 +222,8 @@ func (m Automations) list(
 		UnitID  *uuid.UUID `json:"unitId,omitempty"`
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil || (f.Kind != nil && *f.Kind != "schedule" && *f.Kind != "event") {
@@ -226,7 +234,7 @@ func (m Automations) list(
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{
 			"id":        "a.id",
 			"name":      "a.name",
@@ -240,12 +248,12 @@ func (m Automations) list(
 		return paging.Page[Automation]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Automation]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	args := []any{c.Principal.OrgID}
+	args := []any{call.Principal.OrgID}
 	add := func(v any) string {
 		args = append(args, v)
 
@@ -274,21 +282,21 @@ func (m Automations) list(
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.automations a WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM control.automations a WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Automation]{}, apperr.Wrap(scanErr, "select control.automations")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM control.automations a WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			automationCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -314,9 +322,9 @@ func (m Automations) list(
 
 	return paging.Page[Automation]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
@@ -493,52 +501,52 @@ func validTimezone(tz string) bool {
 
 // Validate implements ops.Validator (DD-C04 / DD-C05 / D09).
 func (in *AutomationInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 
 	in.Name = strings.TrimSpace(in.Name)
 	if n := utf8.RuneCountInString(in.Name); n < 1 || n > 120 {
-		fe["name"] = "error.length"
+		fieldErrs["name"] = "error.length"
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fe["unitIds"] = "error.invalid"
+			fieldErrs["unitIds"] = "error.invalid"
 		}
 
 		seen[u] = true
 	}
 
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 50 {
-		fe["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = "error.invalid"
 	}
 
 	if !validTimezone(in.Timezone) {
-		fe["timezone"] = "error.invalid"
+		fieldErrs["timezone"] = "error.invalid"
 	}
 
 	if in.Priority < 0 || in.Priority > 100 {
-		fe["priority"] = "error.range"
+		fieldErrs["priority"] = "error.range"
 	}
 
 	action := func(k string, raw json.RawMessage) {
-		a, ok := ParseAction(raw)
+		unitAction, ok := ParseAction(raw)
 		if !ok {
-			fe[k] = "error.invalid"
+			fieldErrs[k] = "error.invalid"
 
 			return
 		}
 
-		in.actions = append(in.actions, a)
+		in.actions = append(in.actions, unitAction)
 	}
 
 	switch in.Kind {
 	case "schedule":
 		if in.Condition != nil || in.Action != nil {
-			fe["kind"] = "error.invalid"
+			fieldErrs["kind"] = "error.invalid"
 		}
 
-		validSchedule(fe, in.Weekdays, in.StartLocal, in.EndLocal, in.EndsNextDay)
+		validSchedule(fieldErrs, in.Weekdays, in.StartLocal, in.EndLocal, in.EndsNextDay)
 		action("startAction", in.StartAction)
 		action("endAction", in.EndAction)
 	case "event":
@@ -546,34 +554,34 @@ func (in *AutomationInput) Validate() map[string]string {
 			in.EndsNextDay != nil ||
 			in.StartAction != nil ||
 			in.EndAction != nil {
-			fe["kind"] = "error.invalid"
+			fieldErrs["kind"] = "error.invalid"
 		}
 
 		cnd, ok := parseCondition(in.Condition)
 		if !ok {
-			fe["condition"] = "error.invalid"
+			fieldErrs["condition"] = "error.invalid"
 		}
 
 		in.condition = cnd
 		action("action", in.Action)
 	default:
-		fe["kind"] = "error.invalid"
+		fieldErrs["kind"] = "error.invalid"
 	}
 
 	extras, why := parseExtras(in.OnlyIf, in.Kind, in.condition.Type)
 	if why != "" {
-		fe["onlyIf"] = why
+		fieldErrs["onlyIf"] = why
 	}
 
 	in.extras = extras
 
-	return fe
+	return fieldErrs
 }
 
 // validSchedule checks the schedule fields (DD-C04): ISO weekdays of the start day without duplicates, HH:mm times
 // that differ, an end at or before the start only as an overnight schedule and never beyond 24 hours.
 func validSchedule(
-	fe map[string]string,
+	fieldErrs map[string]string,
 	weekdays []int,
 	startLocal, endLocal string,
 	endsNextDay *bool,
@@ -581,37 +589,37 @@ func validSchedule(
 	days := map[int]bool{}
 	for _, d := range weekdays {
 		if d < 1 || d > 7 || days[d] {
-			fe["weekdays"] = "error.invalid"
+			fieldErrs["weekdays"] = "error.invalid"
 		}
 
 		days[d] = true
 	}
 
 	if len(weekdays) == 0 {
-		fe["weekdays"] = "error.required"
+		fieldErrs["weekdays"] = "error.required"
 	}
 
 	if !hhmm.MatchString(startLocal) {
-		fe["startLocal"] = "error.invalid"
+		fieldErrs["startLocal"] = "error.invalid"
 	}
 
 	if !hhmm.MatchString(endLocal) {
-		fe["endLocal"] = "error.invalid"
+		fieldErrs["endLocal"] = "error.invalid"
 	}
 
 	if endsNextDay == nil {
-		fe["endsNextDay"] = "error.required"
+		fieldErrs["endsNextDay"] = "error.required"
 	}
 
-	if fe["startLocal"] == "" && fe["endLocal"] == "" && endsNextDay != nil {
+	if fieldErrs["startLocal"] == "" && fieldErrs["endLocal"] == "" && endsNextDay != nil {
 		s, e := minutesOf(startLocal), minutesOf(endLocal)
 		switch {
 		case s == e:
-			fe["endLocal"] = "errors.same_as_start"
+			fieldErrs["endLocal"] = "errors.same_as_start"
 		case e < s && !*endsNextDay:
-			fe["endsNextDay"] = "errors.overnight_required"
+			fieldErrs["endsNextDay"] = "errors.overnight_required"
 		case e > s && *endsNextDay:
-			fe["endsNextDay"] = "errors.over_24_hours"
+			fieldErrs["endsNextDay"] = "errors.over_24_hours"
 		}
 	}
 }
@@ -723,22 +731,22 @@ type ScheduledOccurrence struct {
 //	@Router			/v1/automations [post]
 func (m Automations) save(
 	ctx context.Context,
-	c *ops.Call,
-	in *AutomationInput,
+	call *ops.Call,
+	input *AutomationInput,
 ) (Automation, error) {
-	for _, u := range in.UnitIDs { // own, not archived units whose capabilities support every action
-		t, found, err := m.Units.Target(ctx, c, u)
+	for _, u := range input.UnitIDs { // own, not archived units whose capabilities support every action
+		target, found, err := m.Units.Target(ctx, call, u)
 		if err != nil {
 			return Automation{}, apperr.Wrap(err, "control.Units.Target")
 		}
 
-		if !found || t.OrgID != c.Principal.OrgID {
+		if !found || target.OrgID != call.Principal.OrgID {
 			return Automation{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
 
 		var archived bool
 
-		scanErr := c.Tx.QueryRow(ctx, `SELECT archived FROM assets.units WHERE id = $1`, u).
+		scanErr := call.Tx.QueryRow(ctx, `SELECT archived FROM assets.units WHERE id = $1`, u).
 			Scan(&archived)
 		if scanErr != nil {
 			return Automation{}, apperr.Wrap(scanErr, "select assets.units")
@@ -748,8 +756,8 @@ func (m Automations) save(
 			return Automation{}, apperr.E(apperr.Conflict, "errors.unit_archived")
 		}
 
-		for _, a := range in.actions {
-			if !a.Supports(t.Caps) {
+		for _, a := range input.actions {
+			if !a.Supports(target.Caps) {
 				return Automation{}, apperr.Fields(
 					map[string]string{"unitIds": "error.unsupportedAction"},
 				)
@@ -757,12 +765,12 @@ func (m Automations) save(
 		}
 	}
 
-	if in.Kind == "event" &&
-		in.condition.Type == "location" { // location conditions need the owner's consent (SR02)
+	if input.Kind == "event" &&
+		input.condition.Type == "location" { // location conditions need the owner's consent (SR02)
 		granted, err := identity.ConsentGranted(
 			ctx,
-			c,
-			c.Principal.MembershipID,
+			call,
+			call.Principal.MembershipID,
 			"location_automation",
 		) // identity's record (IR194)
 		if err != nil {
@@ -777,22 +785,22 @@ func (m Automations) save(
 	}
 
 	def := definition{
-		Weekdays:    in.Weekdays,
-		StartLocal:  in.StartLocal,
-		EndLocal:    in.EndLocal,
-		EndsNextDay: in.EndsNextDay,
-		StartAction: in.StartAction,
-		EndAction:   in.EndAction,
-		Condition:   in.Condition,
-		Action:      in.Action, OnlyIf: nil,
+		Weekdays:    input.Weekdays,
+		StartLocal:  input.StartLocal,
+		EndLocal:    input.EndLocal,
+		EndsNextDay: input.EndsNextDay,
+		StartAction: input.StartAction,
+		EndAction:   input.EndAction,
+		Condition:   input.Condition,
+		Action:      input.Action, OnlyIf: nil,
 	}
-	if len(in.extras) > 0 {
-		def.OnlyIf, _ = json.Marshal(in.extras)
+	if len(input.extras) > 0 {
+		def.OnlyIf, _ = json.Marshal(input.extras)
 	}
 
-	if in.Kind == "schedule" {
-		loc, _ := time.LoadLocation(in.Timezone)
-		if _, bad := occurrences(def, loc, c.Now.In(loc), 367); bad {
+	if input.Kind == "schedule" {
+		loc, _ := time.LoadLocation(input.Timezone)
+		if _, bad := occurrences(def, loc, call.Now.In(loc), 367); bad {
 			return Automation{}, apperr.Fields(
 				map[string]string{"startLocal": "errors.local_time_invalid"},
 			)
@@ -808,49 +816,50 @@ func (m Automations) save(
 
 	version := 1
 
-	if in.ID == nil {
-		err := c.Tx.QueryRow(ctx, `INSERT INTO control.automations (tenant_id, customer_org_id, kind, name,
+	if input.ID == nil {
+		err := call.Tx.QueryRow(ctx, `INSERT INTO control.automations (tenant_id, customer_org_id, kind, name,
 			owner_membership_id, created_by_user_id, timezone, enabled, priority,
 			definition, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8,
 			$9, $10, $10) RETURNING id`,
-			c.Principal.OrgID, in.Kind, in.Name, c.Principal.MembershipID, c.Principal.UserID, in.Timezone, in.Enabled,
-			in.Priority, raw, c.Now).
+			call.Principal.OrgID, input.Kind, input.Name, call.Principal.MembershipID, call.Principal.UserID, input.Timezone,
+			input.Enabled,
+			input.Priority, raw, call.Now).
 			Scan(&id)
 		if err != nil {
 			return Automation{}, apperr.Wrap(err, "insert control.automations")
 		}
 	} else {
-		cur, err := m.load(ctx, c, *in.ID, true)
+		cur, err := m.load(ctx, call, *input.ID, true)
 		if err != nil {
 			return cur, err
 		}
 
-		if cur.Version != *c.ExpectedVersion {
+		if cur.Version != *call.ExpectedVersion {
 			return cur, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
 
-		if cur.Kind != in.Kind {
+		if cur.Kind != input.Kind {
 			return cur, apperr.Fields(map[string]string{"kind": "error.immutable"})
 		}
 		// IR27: explicit enabling rechecks (done above) and clears the stop reason; editing while disabled keeps it
-		_, execErr := c.Tx.Exec(
+		_, execErr := call.Tx.Exec(
 			ctx,
 			`UPDATE control.automations SET name = $2, timezone = $3, enabled = $4, priority = $5, definition = $6,
 			disabled_reason = CASE WHEN $4 THEN NULL ELSE disabled_reason END, version = version + 1, updated_at = $7 WHERE id =
 			$1`,
 			cur.ID,
-			in.Name,
-			in.Timezone,
-			in.Enabled,
-			in.Priority,
+			input.Name,
+			input.Timezone,
+			input.Enabled,
+			input.Priority,
 			raw,
-			c.Now,
+			call.Now,
 		)
 		if execErr != nil {
 			return cur, apperr.Wrap(execErr, "update control.automations")
 		}
 
-		_, execErr = c.Tx.Exec(
+		_, execErr = call.Tx.Exec(
 			ctx,
 			`DELETE FROM control.automation_units WHERE automation_id = $1`,
 			cur.ID,
@@ -859,11 +868,11 @@ func (m Automations) save(
 			return cur, apperr.Wrap(execErr, "delete control.automation_units")
 		}
 
-		id, prev, version = cur.ID, c.ExpectedVersion, cur.Version+1
+		id, prev, version = cur.ID, call.ExpectedVersion, cur.Version+1
 	}
 
-	for _, u := range in.UnitIDs {
-		_, err := c.Tx.Exec(
+	for _, u := range input.UnitIDs {
+		_, err := call.Tx.Exec(
 			ctx,
 			`INSERT INTO control.automation_units (tenant_id, automation_id, unit_id) VALUES
 				(current_setting('app.tenant_id')::uuid, $1, $2)`,
@@ -875,7 +884,7 @@ func (m Automations) save(
 		}
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "automations.save",
 			TargetKind:      "automation",
@@ -885,7 +894,7 @@ func (m Automations) save(
 		},
 	)
 
-	return m.load(ctx, c, id, false)
+	return m.load(ctx, call, id, false)
 }
 
 // ScheduleDraft is the unsaved schedule of the editor (automations.nextRuns draft, IR214).
@@ -908,38 +917,47 @@ type NextRunsInput struct {
 
 // Validate implements ops.Validator (count is fixed to 8; a draft is checked like automations.save, IR214).
 func (in *NextRunsInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 
 	switch {
 	case (in.AutomationID == nil) == (in.Draft == nil):
-		fe["automationId"] = "error.exactlyOneTarget"
+		fieldErrs["automationId"] = "error.exactlyOneTarget"
 	case in.AutomationID != nil && *in.AutomationID == uuid.Nil:
-		fe["automationId"] = "error.required"
+		fieldErrs["automationId"] = "error.required"
 	case in.Draft != nil:
-		d := in.Draft
-		if !validTimezone(d.Timezone) {
-			fe["draft.timezone"] = "error.invalid"
+		scheduleDraft := in.Draft
+		if !validTimezone(scheduleDraft.Timezone) {
+			fieldErrs["draft.timezone"] = "error.invalid"
 		}
 
 		sub := map[string]string{}
-		validSchedule(sub, d.Weekdays, d.StartLocal, d.EndLocal, d.EndsNextDay)
+		validSchedule(
+			sub,
+			scheduleDraft.Weekdays,
+			scheduleDraft.StartLocal,
+			scheduleDraft.EndLocal,
+			scheduleDraft.EndsNextDay,
+		)
 
 		for k, v := range sub {
-			fe["draft."+k] = v
+			fieldErrs["draft."+k] = v
 		}
 
-		for k, raw := range map[string]json.RawMessage{"draft.startAction": d.StartAction, "draft.endAction": d.EndAction} {
+		for k, raw := range map[string]json.RawMessage{
+			"draft.startAction": scheduleDraft.StartAction,
+			"draft.endAction":   scheduleDraft.EndAction,
+		} {
 			if _, ok := ParseAction(raw); !ok {
-				fe[k] = "error.invalid"
+				fieldErrs[k] = "error.invalid"
 			}
 		}
 	}
 
 	if in.Count != 8 {
-		fe["count"] = "error.invalid"
+		fieldErrs["count"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // nextRuns previews the next 8 start/end occurrences after now (D09): of a saved schedule rule — invalid local
@@ -970,8 +988,8 @@ func (in *NextRunsInput) Validate() map[string]string {
 //	@Router			/v1/automations/next-runs [post]
 func (m Automations) nextRuns(
 	ctx context.Context,
-	c *ops.Call,
-	in *NextRunsInput,
+	call *ops.Call,
+	input *NextRunsInput,
 ) ([]ScheduledOccurrence, error) {
 	var (
 		id  *uuid.UUID
@@ -979,51 +997,51 @@ func (m Automations) nextRuns(
 		tz  string
 	)
 
-	if in.Draft != nil {
-		d := in.Draft
+	if input.Draft != nil {
+		scheduleDraft := input.Draft
 		def = definition{
-			Weekdays:    d.Weekdays,
-			StartLocal:  d.StartLocal,
-			EndLocal:    d.EndLocal,
-			EndsNextDay: d.EndsNextDay,
-			StartAction: d.StartAction,
-			EndAction:   d.EndAction, Condition: nil, Action: nil, OnlyIf: nil,
+			Weekdays:    scheduleDraft.Weekdays,
+			StartLocal:  scheduleDraft.StartLocal,
+			EndLocal:    scheduleDraft.EndLocal,
+			EndsNextDay: scheduleDraft.EndsNextDay,
+			StartAction: scheduleDraft.StartAction,
+			EndAction:   scheduleDraft.EndAction, Condition: nil, Action: nil, OnlyIf: nil,
 		}
-		tz = d.Timezone
+		tz = scheduleDraft.Timezone
 
 		loc, _ := time.LoadLocation(tz)
-		if _, bad := occurrences(def, loc, c.Now.In(loc), 367); bad {
+		if _, bad := occurrences(def, loc, call.Now.In(loc), 367); bad {
 			return nil, apperr.Fields(
 				map[string]string{"draft.startLocal": "errors.local_time_invalid"},
 			)
 		}
 	} else {
-		x, err := m.load(ctx, c, *in.AutomationID, false)
+		automation, err := m.load(ctx, call, *input.AutomationID, false)
 		if err != nil {
 			return nil, err
 		}
 
-		if x.Kind != "schedule" {
+		if automation.Kind != "schedule" {
 			return nil, apperr.Fields(map[string]string{"automationId": "errors.not_schedule"})
 		}
 
 		def = definition{
-			Weekdays:    x.Weekdays,
-			StartLocal:  x.StartLocal,
-			EndLocal:    x.EndLocal,
-			EndsNextDay: x.EndsNextDay,
-			StartAction: x.StartAction,
-			EndAction:   x.EndAction, Condition: nil, Action: nil, OnlyIf: nil,
+			Weekdays:    automation.Weekdays,
+			StartLocal:  automation.StartLocal,
+			EndLocal:    automation.EndLocal,
+			EndsNextDay: automation.EndsNextDay,
+			StartAction: automation.StartAction,
+			EndAction:   automation.EndAction, Condition: nil, Action: nil, OnlyIf: nil,
 		}
-		tz, id = x.Timezone, &x.ID
+		tz, id = automation.Timezone, &automation.ID
 	}
 
 	loc, _ := time.LoadLocation(tz)
-	occ, _ := occurrences(def, loc, c.Now.In(loc).AddDate(0, 0, -1), 30)
+	occ, _ := occurrences(def, loc, call.Now.In(loc).AddDate(0, 0, -1), 30)
 
 	out := []ScheduledOccurrence{}
 	for _, o := range occ {
-		if o.At.After(c.Now) && len(out) < in.Count {
+		if o.At.After(call.Now) && len(out) < input.Count {
 			o.AutomationID = id
 			out = append(out, o)
 		}
@@ -1081,19 +1099,19 @@ type Deleted struct {
 //	@Router			/v1/automations/{id} [delete]
 func (m Automations) delete(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	in *AutomationIDInput,
 ) (Deleted, error) {
-	cur, err := m.load(ctx, c, in.ID, true)
+	cur, err := m.load(ctx, call, in.ID, true)
 	if err != nil {
 		return Deleted{}, err
 	}
 
-	if cur.Version != *c.ExpectedVersion {
+	if cur.Version != *call.ExpectedVersion {
 		return Deleted{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`DELETE FROM control.automations WHERE id = $1`,
 		cur.ID,
@@ -1102,7 +1120,7 @@ func (m Automations) delete(
 		return Deleted{}, apperr.Wrap(execErr, "delete control.automations")
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "automation",
 			AggregateID:   cur.ID,
@@ -1110,12 +1128,12 @@ func (m Automations) delete(
 			Payload:       map[string]any{"kind": cur.Kind},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "automations.delete",
 			TargetKind:      "automation",
 			TargetID:        cur.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     nil,
 			Reason:          "",
 			Result:          "",

@@ -23,7 +23,7 @@ type UnitCounts struct {
 // critical/warning alerts.
 func (m *Module) CountUnits(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	scoped bool,
 	ids *[]uuid.UUID,
 	customer, property, unit *uuid.UUID,
@@ -38,7 +38,7 @@ func (m *Module) CountUnits(
 
 	conds := []string{"NOT u.archived"}
 	if scoped {
-		conds = append(conds, scopeSQL(c, &args))
+		conds = append(conds, scopeSQL(call, &args))
 	}
 
 	if ids != nil {
@@ -62,40 +62,40 @@ func (m *Module) CountUnits(
 		conds = append(conds, "u.id = "+add(*unit))
 	}
 
-	units, _, err := m.query(ctx, c, strings.Join(conds, " AND "), args, "u.id ASC", 0, 0)
+	units, _, err := m.query(ctx, call, strings.Join(conds, " AND "), args, "u.id ASC", 0, 0)
 	if err != nil {
 		return UnitCounts{}, err
 	}
 
-	enrichErr := m.enrich(ctx, c, units)
+	enrichErr := m.enrich(ctx, call, units)
 	if enrichErr != nil {
 		return UnitCounts{}, enrichErr
 	}
 
-	var n UnitCounts
+	var unitCounts UnitCounts
 	for _, u := range units {
-		n.Total++
+		unitCounts.Total++
 
 		switch u.Connection {
 		case "online":
-			n.Online++
+			unitCounts.Online++
 		case "offline":
-			n.Offline++
+			unitCounts.Offline++
 		default:
-			n.Unknown++
+			unitCounts.Unknown++
 		}
 
 		switch u.EffectivePowerState {
 		case "on":
-			n.PowerOn++
+			unitCounts.PowerOn++
 		case "off":
-			n.PowerOff++
+			unitCounts.PowerOff++
 		default:
-			n.PowerUnknown++
+			unitCounts.PowerUnknown++
 		}
 
-		n.AlertCount += u.ActiveAlertCount
+		unitCounts.AlertCount += u.ActiveAlertCount
 	}
 
-	return n, nil
+	return unitCounts, nil
 }

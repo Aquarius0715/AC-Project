@@ -58,7 +58,7 @@ type restEmbedded struct {
 	Note string
 }
 
-func restOp(mode Mode, in func() any) *Operation {
+func restOp(mode Mode, input func() any) *Operation {
 	return &Operation{
 		Spec: Spec{
 			Name: "test.op",
@@ -75,7 +75,7 @@ func restOp(mode Mode, in func() any) *Operation {
 			DesignIDs:     "",
 			Routes:        nil,
 		},
-		NewInput: in,
+		NewInput: input,
 		Expr:     authz.Expr{Alternatives: nil, Notes: nil, Remark: ""},
 		Result:   nil,
 		Handle:   nil,
@@ -85,25 +85,25 @@ func restOp(mode Mode, in func() any) *Operation {
 // bind runs Binding.Input for a request on route with the given path values.
 func bind(
 	t *testing.T,
-	b *Binding,
+	binding *Binding,
 	method, target, body string,
 	path map[string]string,
 ) (map[string]any, map[string]string) {
 	t.Helper()
 
 	req := httptest.NewRequest(method, target, strings.NewReader(body))
-	c := echo.New().NewContext(req, httptest.NewRecorder())
+	ectx := echo.New().NewContext(req, httptest.NewRecorder())
 
-	var pv echo.PathValues
-	for _, name := range b.Path {
-		pv = append(pv, echo.PathValue{Name: name, Value: path[name]})
+	var pathValues echo.PathValues
+	for _, name := range binding.Path {
+		pathValues = append(pathValues, echo.PathValue{Name: name, Value: path[name]})
 	}
 
-	if len(pv) > 0 {
-		c.SetPathValues(pv)
+	if len(pathValues) > 0 {
+		ectx.SetPathValues(pathValues)
 	}
 
-	raw, err := b.Input(c, []byte(body))
+	raw, err := binding.Input(ectx, []byte(body))
 	if err != nil {
 		return nil, apperr.From(err).FieldErrors
 	}
@@ -289,7 +289,7 @@ func TestRESTParameters(t *testing.T) {
 		t.Fatalf("path %v body %v", b.Path, b.Body)
 	}
 	// a list read whose input is the paging query itself
-	q, err := NewBinding(
+	binding, err := NewBinding(
 		restOp(Read, func() any { return new(paging.Query) }),
 		Route{Method: "GET", Path: "/v1/things", FixedField: "", FixedValue: ""},
 	)
@@ -297,15 +297,15 @@ func TestRESTParameters(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if p := q.Params["sort"]; !p.Sort || !reflect.DeepEqual(p.At, []string{"sort"}) ||
-		q.Params["status"].At[0] != "filters" ||
-		len(q.Params) != 7 {
-		t.Fatalf("paging query params %+v", q.Params)
+	if p := binding.Params["sort"]; !p.Sort || !reflect.DeepEqual(p.At, []string{"sort"}) ||
+		binding.Params["status"].At[0] != "filters" ||
+		len(binding.Params) != 7 {
+		t.Fatalf("paging query params %+v", binding.Params)
 	}
 }
 
 func TestRESTQueryInput(t *testing.T) {
-	b, err := NewBinding(
+	binding, err := NewBinding(
 		restOp(Read, func() any { return new(restIn) }),
 		Route{Method: "GET", Path: "/v1/jobs/{jobId}/things", FixedField: "", FixedValue: ""},
 	)
@@ -314,7 +314,7 @@ func TestRESTQueryInput(t *testing.T) {
 	}
 
 	job, u1, u2 := uuid.NewString(), uuid.NewString(), uuid.NewString()
-	q := url.Values{
+	params := url.Values{
 		"count": {
 			"3",
 		},
@@ -332,16 +332,16 @@ func TestRESTQueryInput(t *testing.T) {
 		"overdueOnly": {"false"},
 	}
 
-	got, fe := bind(
+	got, problems := bind(
 		t,
-		b,
+		binding,
 		"GET",
-		"/v1/jobs/"+job+"/things?"+q.Encode(),
+		"/v1/jobs/"+job+"/things?"+params.Encode(),
 		"",
 		map[string]string{"jobId": job},
 	)
-	if fe != nil {
-		t.Fatal(fe)
+	if problems != nil {
+		t.Fatal(problems)
 	}
 
 	want := map[string]any{
@@ -363,7 +363,7 @@ func TestRESTQueryInput(t *testing.T) {
 	// sort without a direction is ascending; an empty value is absent
 	got, _ = bind(
 		t,
-		b,
+		binding,
 		"GET",
 		"/v1/jobs/"+job+"/things?sort=name&count=",
 		"",
@@ -377,21 +377,21 @@ func TestRESTQueryInput(t *testing.T) {
 		t.Fatalf("defaults: %v", got)
 	}
 	// an empty sort is no sort
-	if got, fe := bind(
+	if got, fieldErrs := bind(
 		t,
-		b,
+		binding,
 		"GET",
 		"/v1/jobs/"+job+"/things?sort=",
 		"",
 		map[string]string{"jobId": job},
-	); fe != nil ||
+	); fieldErrs != nil ||
 		got["query"] != nil {
-		t.Fatalf("empty sort: %v %v", got, fe)
+		t.Fatalf("empty sort: %v %v", got, fieldErrs)
 	}
 	// an empty list parameter is the empty list, not an absent field
 	got, _ = bind(
 		t,
-		b,
+		binding,
 		"GET",
 		"/v1/jobs/"+job+"/things?ids=&unitIds=,",
 		"",
@@ -415,44 +415,44 @@ func TestRESTQueryInput(t *testing.T) {
 		"?jobId=" + job:     {"jobId": "error.notAllowed"}, // a path parameter is not repeated in the query
 		"?limit=2&target=x": {"target": "error.notAllowed"},
 	} {
-		if _, fe := bind(
+		if _, fieldErrs := bind(
 			t,
-			b,
+			binding,
 			"GET",
 			"/v1/jobs/"+job+"/things"+target,
 			"",
 			map[string]string{"jobId": job},
 		); !reflect.DeepEqual(
-			fe,
+			fieldErrs,
 			wantFE,
 		) {
-			t.Errorf("%s: %v, want %v", target, fe, wantFE)
+			t.Errorf("%s: %v, want %v", target, fieldErrs, wantFE)
 		}
 	}
 
-	if _, fe := bind(
+	if _, fieldErrs := bind(
 		t,
-		b,
+		binding,
 		"GET",
 		"/v1/jobs/x/things",
 		"",
 		map[string]string{"jobId": ""},
-	); fe["jobId"] != "error.invalid" {
-		t.Errorf("empty path parameter: %v", fe)
+	); fieldErrs["jobId"] != "error.invalid" {
+		t.Errorf("empty path parameter: %v", fieldErrs)
 	}
 	// an ID in the path that is not a UUID names no resource
 	c := echo.New().
 		NewContext(httptest.NewRequest(http.MethodGet, "/v1/jobs/invoice-a/things", nil), httptest.NewRecorder())
 	c.SetPathValues(echo.PathValues{{Name: "jobId", Value: "invoice-a"}})
 
-	_, inputErr := b.Input(c, nil)
+	_, inputErr := binding.Input(c, nil)
 	if apperr.From(inputErr).Code != apperr.NotFound {
 		t.Errorf("malformed ID: %v", inputErr)
 	}
 }
 
 func TestRESTBodyInput(t *testing.T) {
-	b, err := NewBinding(
+	binding, err := NewBinding(
 		restOp(Write, func() any { return new(restIn) }),
 		Route{
 			Method:     "POST",
@@ -468,7 +468,14 @@ func TestRESTBodyInput(t *testing.T) {
 	job, other := uuid.NewString(), uuid.NewString()
 	path := map[string]string{"jobId": job, "target.kind": "space%20a"}
 
-	got, fe := bind(t, b, "POST", "/", `{"ratio": 12345678901234567890, "jobId": "`+job+`"}`, path)
+	got, fe := bind(
+		t,
+		binding,
+		"POST",
+		"/",
+		`{"ratio": 12345678901234567890, "jobId": "`+job+`"}`,
+		path,
+	)
 	if fe != nil {
 		t.Fatal(fe)
 	}
@@ -478,14 +485,14 @@ func TestRESTBodyInput(t *testing.T) {
 		t.Fatalf("body input %v", got)
 	}
 
-	c := echo.New().
+	ectx := echo.New().
 		NewContext(httptest.NewRequest(http.MethodPost, "/", nil), httptest.NewRecorder())
-	c.SetPathValues(
+	ectx.SetPathValues(
 		echo.PathValues{{Name: "jobId", Value: job}, {Name: "target.kind", Value: "unit"}},
 	)
 
-	raw, inputErr := b.Input(
-		c,
+	raw, inputErr := binding.Input(
+		ectx,
 		[]byte(`{"ratio": 12345678901234567890}`),
 	)
 	if inputErr != nil ||
@@ -503,42 +510,49 @@ func TestRESTBodyInput(t *testing.T) {
 		`{"action":"approve"}`:          nil,
 		`{"target":{"kind":"space a"}}`: nil,
 	} {
-		if _, fe := bind(t, b, "POST", "/", body, path); !reflect.DeepEqual(fe, wantFE) {
+		if _, fe := bind(t, binding, "POST", "/", body, path); !reflect.DeepEqual(fe, wantFE) {
 			t.Errorf("%s: %v, want %v", body, fe, wantFE)
 		}
 	}
 
-	if _, fe := bind(t, b, "POST", "/?ratio=1", `{}`, path); fe["ratio"] != "error.notAllowed" {
+	if _, fe := bind(
+		t,
+		binding,
+		"POST",
+		"/?ratio=1",
+		`{}`,
+		path,
+	); fe["ratio"] != "error.notAllowed" {
 		t.Errorf("query on a body route: %v", fe)
 	}
 }
 
 func TestRESTBindingRules(t *testing.T) {
-	in := func() any { return new(restIn) }
+	input := func() any { return new(restIn) }
 	for name, c := range map[string]struct {
 		op *Operation
 		rt Route
 	}{
-		"GET for a write":   {restOp(Write, in), Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""}},
-		"DELETE for a read": {restOp(Read, in), Route{Method: "DELETE", Path: "/v1/x", FixedField: "", FixedValue: ""}},
+		"GET for a write":   {restOp(Write, input), Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""}},
+		"DELETE for a read": {restOp(Read, input), Route{Method: "DELETE", Path: "/v1/x", FixedField: "", FixedValue: ""}},
 		"unknown method": {
-			restOp(Write, in),
+			restOp(Write, input),
 			Route{Method: "OPTIONS", Path: "/v1/x", FixedField: "", FixedValue: ""},
 		},
 		"unknown path parameter": {
-			restOp(Read, in),
+			restOp(Read, input),
 			Route{Method: "GET", Path: "/v1/x/{nope}", FixedField: "", FixedValue: ""},
 		},
 		"list path parameter": {
-			restOp(Read, in),
+			restOp(Read, input),
 			Route{Method: "GET", Path: "/v1/x/{ids}", FixedField: "", FixedValue: ""},
 		},
 		"filter path parameter": {
-			restOp(Read, in),
+			restOp(Read, input),
 			Route{Method: "GET", Path: "/v1/x/{status}", FixedField: "", FixedValue: ""},
 		},
 		"unknown fixed field": {
-			restOp(Write, in),
+			restOp(Write, input),
 			Route{Method: "POST", Path: "/v1/x", FixedField: "nope", FixedValue: "a"},
 		},
 		"objects in a query": {
@@ -576,7 +590,7 @@ func TestRESTBindingRules(t *testing.T) {
 // TestRESTEmbeddedQuery: an embedded paging query binds its cursor, limit, sort and filters at the top of the input,
 // and a field without a JSON name is named as Go names it.
 func TestRESTEmbeddedQuery(t *testing.T) {
-	b, err := NewBinding(
+	binding, err := NewBinding(
 		restOp(Read, func() any { return new(restEmbedded) }),
 		Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""},
 	)
@@ -584,7 +598,7 @@ func TestRESTEmbeddedQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, fe := bind(t, b, "GET", "/v1/x?limit=5&sort=name:desc&Note=hi&status=open", "", nil)
+	got, fe := bind(t, binding, "GET", "/v1/x?limit=5&sort=name:desc&Note=hi&status=open", "", nil)
 	if fe != nil {
 		t.Fatal(fe)
 	}
@@ -603,10 +617,10 @@ func TestRESTEmbeddedQuery(t *testing.T) {
 // TestRESTRoutes drives catalog routes end to end through the shared pipeline (authorization, idempotency,
 // ServiceResult) with the input taken from the path, the query string, the body and the fixed field.
 func TestRESTRoutes(t *testing.T) {
-	r := NewRegistry()
-	r.DB = fakeDB{readOnly: nil}
+	reg := NewRegistry()
+	reg.DB = fakeDB{readOnly: nil}
 	idem := &fakeIdem{stored: map[string]json.RawMessage{}, hash: map[string]string{}, aborted: 0}
-	r.Rec, r.Idem = &fakeRec{n: 0, err: nil}, idem
+	reg.Rec, reg.Idem = &fakeRec{n: 0, err: nil}, idem
 
 	type saveIn struct {
 		ID   *string `json:"id,omitempty"`
@@ -629,40 +643,44 @@ func TestRESTRoutes(t *testing.T) {
 	}
 
 	Register(
-		r,
+		reg,
 		"units.save",
 		func(ctx context.Context, c *Call, in *saveIn) (map[string]any, error) {
 			return map[string]any{"id": in.ID, "name": in.Name}, nil
 		},
 	)
-	Register(r, "units.get", func(ctx context.Context, c *Call, in *getIn) (map[string]any, error) {
-		err := c.Require(authz.Facts{"self": in.ID == "mine"})
-		if err != nil {
-			return nil, err
-		}
-
-		return map[string]any{"id": in.ID, "jobId": in.JobID}, nil
-	})
 	Register(
-		r,
+		reg,
+		"units.get",
+		func(ctx context.Context, c *Call, input *getIn) (map[string]any, error) {
+			err := c.Require(authz.Facts{"self": input.ID == "mine"})
+			if err != nil {
+				return nil, err
+			}
+
+			return map[string]any{"id": input.ID, "jobId": input.JobID}, nil
+		},
+	)
+	Register(
+		reg,
 		"units.delete",
 		func(ctx context.Context, c *Call, in *deleteIn) (map[string]any, error) {
 			return map[string]any{"id": in.ID, "reason": in.Reason}, nil
 		},
 	)
 	Register(
-		r,
+		reg,
 		"payouts.transition",
 		func(ctx context.Context, c *Call, in *transitionIn) (map[string]any, error) {
 			return map[string]any{"statementId": in.StatementID, "action": in.Action}, nil
 		},
 	)
 
-	e := echo.New()
+	app := echo.New()
 
-	e.HTTPErrorHandler = HTTPErrorHandler
+	app.HTTPErrorHandler = HTTPErrorHandler
 
-	err := r.MountREST(e.Group("/v1"))
+	err := reg.MountREST(app.Group("/v1"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -679,7 +697,7 @@ func TestRESTRoutes(t *testing.T) {
 		Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
 	}
 
-	call := func(p *Principal, method, target, body, key string, version string) (int, map[string]any, string) {
+	call := func(principal *Principal, method, target, body, key string, version string) (int, map[string]any, string) {
 		req := httptest.NewRequest(method, target, strings.NewReader(body))
 		if key != "" {
 			req.Header.Set("Idempotency-Key", key)
@@ -689,9 +707,9 @@ func TestRESTRoutes(t *testing.T) {
 			req.Header.Set("X-Expected-Version", version)
 		}
 
-		req = req.WithContext(WithPrincipal(req.Context(), p))
-		w := httptest.NewRecorder()
-		e.ServeHTTP(w, req)
+		req = req.WithContext(WithPrincipal(req.Context(), principal))
+		rec := httptest.NewRecorder()
+		app.ServeHTTP(rec, req)
 
 		var res struct {
 			Data map[string]any `json:"data"`
@@ -699,12 +717,12 @@ func TestRESTRoutes(t *testing.T) {
 			Code string         `json:"code"`
 		}
 
-		_ = json.Unmarshal(w.Body.Bytes(), &res)
+		_ = json.Unmarshal(rec.Body.Bytes(), &res)
 		if res.Meta != nil && res.Meta["operation"] == nil {
-			t.Fatalf("meta without operation: %s", w.Body.String())
+			t.Fatalf("meta without operation: %s", rec.Body.String())
 		}
 
-		return w.Code, res.Data, res.Code + w.Body.String()
+		return rec.Code, res.Data, res.Code + rec.Body.String()
 	}
 	if code, data, _ := call(
 		billing,

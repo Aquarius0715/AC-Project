@@ -17,30 +17,30 @@ func TestRemoteSource(t *testing.T) {
 	tenant, member, good := uuid.New(), uuid.New(), uuid.New()
 	calls, status, signedIn := 0, http.StatusOK, ""
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
 		calls++
 
 		signedIn = r.URL.Query().Get("signedIn")
 		if r.URL.Path != PrincipalPath || r.Header.Get("Authorization") != "Bearer internal" ||
 			r.URL.Query().Get("subject") != "sub-1" {
-			http.Error(w, "bad", http.StatusBadRequest)
+			http.Error(writer, "bad", http.StatusBadRequest)
 
 			return
 		}
 
 		if r.URL.Query().Get("membership") != member.String() {
-			w.WriteHeader(http.StatusNotFound)
+			writer.WriteHeader(http.StatusNotFound)
 
 			return
 		}
 
 		if status != http.StatusOK {
-			w.WriteHeader(status)
+			writer.WriteHeader(status)
 
 			return
 		}
 
-		_ = json.NewEncoder(w).Encode(PrincipalDTO{
+		_ = json.NewEncoder(writer).Encode(PrincipalDTO{
 			UserID:       good,
 			TenantID:     tenant,
 			MembershipID: member,
@@ -60,7 +60,7 @@ func TestRemoteSource(t *testing.T) {
 	defer srv.Close()
 
 	now := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
-	r := &RemoteSource{
+	remoteSource := &RemoteSource{
 		BaseURL: srv.URL,
 		Token:   "internal",
 		TTL:     30 * time.Second,
@@ -69,7 +69,7 @@ func TestRemoteSource(t *testing.T) {
 	ctx := context.Background()
 	none := time.Time{}
 
-	p, err := r.Principal(ctx, "sub-1", tenant, member, none)
+	p, err := remoteSource.Principal(ctx, "sub-1", tenant, member, none)
 	if err != nil || p.Role != "client" || !p.Permissions["control.execute"] ||
 		p.ScopeVersion != 3 ||
 		len(p.Scopes["unit"]) != 1 ||
@@ -81,21 +81,21 @@ func TestRemoteSource(t *testing.T) {
 		t.Fatalf("no sign-in time is sent without one: %q", signedIn)
 	}
 
-	_, principalErr := r.Principal(ctx, "sub-1", tenant, member, none)
+	_, principalErr := remoteSource.Principal(ctx, "sub-1", tenant, member, none)
 	if principalErr != nil || calls != 1 {
 		t.Fatalf("cached call: calls=%d err=%v", calls, principalErr)
 	}
 
 	now = now.Add(31 * time.Second)
 
-	at := time.Date(2026, 9, 14, 0, 55, 0, 0, time.UTC)
+	when := time.Date(2026, 9, 14, 0, 55, 0, 0, time.UTC)
 
-	_, principalErr = r.Principal(
+	_, principalErr = remoteSource.Principal(
 		ctx,
 		"sub-1",
 		tenant,
 		member,
-		at,
+		when,
 	)
 	if principalErr != nil || calls != 2 ||
 		signedIn != "2026-09-14T00:55:00Z" {
@@ -106,7 +106,7 @@ func TestRemoteSource(t *testing.T) {
 		) // the fetch passes the token's sign-in time on (IR268)
 	}
 
-	_, principalErr = r.Principal(
+	_, principalErr = remoteSource.Principal(
 		ctx,
 		"sub-1",
 		tenant,
@@ -123,14 +123,14 @@ func TestRemoteSource(t *testing.T) {
 	status = http.StatusServiceUnavailable
 	now = now.Add(time.Minute)
 
-	_, principalErr = r.Principal(ctx, "sub-1", tenant, member, none)
+	_, principalErr = remoteSource.Principal(ctx, "sub-1", tenant, member, none)
 	if !errors.Is(principalErr, ErrUnavailable) {
 		t.Fatalf("outage: %v", principalErr)
 	}
 
 	status = http.StatusOK
 
-	_, principalErr = r.Principal(ctx, "sub-1", tenant, member, none)
+	_, principalErr = remoteSource.Principal(ctx, "sub-1", tenant, member, none)
 	if principalErr != nil {
 		t.Fatalf("outage must not be cached: %v", principalErr)
 	}
@@ -139,7 +139,7 @@ func TestRemoteSource(t *testing.T) {
 
 	now = now.Add(time.Minute)
 
-	_, principalErr = r.Principal(ctx, "sub-1", tenant, member, none)
+	_, principalErr = remoteSource.Principal(ctx, "sub-1", tenant, member, none)
 	if !errors.Is(principalErr, ErrUnavailable) {
 		t.Fatalf("down: %v", principalErr)
 	}

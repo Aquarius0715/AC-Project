@@ -25,22 +25,22 @@ type testRunner struct{ pool *pgxpool.Pool }
 func (r testRunner) Run(
 	ctx context.Context,
 	_ bool,
-	p *ops.Principal,
-	fn func(pgx.Tx) error,
+	principal *ops.Principal,
+	callback func(pgx.Tx) error,
 ) error {
-	return apperr.Wrap(pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
-		if p != nil {
-			_, err := tx.Exec(
+	return apperr.Wrap(pgx.BeginFunc(ctx, r.pool, func(txn pgx.Tx) error {
+		if principal != nil {
+			_, err := txn.Exec(
 				ctx,
 				"SELECT set_config('app.tenant_id', $1, true)",
-				p.TenantID.String(),
+				principal.TenantID.String(),
 			)
 			if err != nil {
 				return apperr.Wrap(err, "select set_config")
 			}
 		}
 
-		return fn(tx)
+		return callback(txn)
 	}), "transaction")
 }
 
@@ -106,12 +106,12 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 
 	fail := true
 	clock := time.Now()
-	c := &Consumer{
+	consumer := &Consumer{
 		Name:  "test-" + uuid.NewString(),
 		DB:    m,
 		Batch: 1,
 		Now:   func() time.Time { return clock },
-		Handlers: map[string]Handler{typ: func(ctx context.Context, tx pgx.Tx, e Event) error {
+		Handlers: map[string]Handler{typ: func(ctx context.Context, txn pgx.Tx, e Event) error {
 			var p struct{ N int }
 
 			err := e.Decode(&p)
@@ -121,7 +121,7 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 
 			var got string
 
-			err = tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')`).
+			err = txn.QueryRow(ctx, `SELECT current_setting('app.tenant_id')`).
 				Scan(&got)
 			if err != nil ||
 				got != tenant.String() {
@@ -138,26 +138,26 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 		}}, Logf: nil, SplitFrom: "",
 	}
 
-	n, err := c.Drain(ctx)
+	n, err := consumer.Drain(ctx)
 	if err == nil || n != 1 || len(seen) != 1 || seen[0] != 1 {
 		t.Fatalf("first drain: n=%d seen=%v err=%v", n, seen, err)
 	}
 
 	fail = false
 	// the retry waits a minute after the failure (IR427)
-	drainN, drainErr := c.Drain(ctx)
+	drainN, drainErr := consumer.Drain(ctx)
 	if drainErr != nil || drainN != 0 || len(seen) != 1 {
 		t.Fatalf("before the pause: n=%d seen=%v err=%v", drainN, seen, drainErr)
 	}
 
 	clock = clock.Add(time.Minute)
 
-	drainN, drainErr = c.Drain(ctx)
+	drainN, drainErr = consumer.Drain(ctx)
 	if drainErr != nil || drainN != 1 || len(seen) != 2 || seen[1] != 2 {
 		t.Fatalf("retry: n=%d seen=%v err=%v", drainN, seen, drainErr)
 	}
 
-	drainN, drainErr = c.Drain(ctx)
+	drainN, drainErr = consumer.Drain(ctx)
 	if drainErr != nil || drainN != 0 {
 		t.Fatalf("nothing pending: n=%d err=%v", drainN, drainErr)
 	}
@@ -175,7 +175,7 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 		t.Fatalf("independent consumer: n=%d err=%v", drainN, drainErr)
 	}
 	// replaying an event that is already recorded does nothing
-	done, applyErr := c.apply(
+	done, applyErr := consumer.apply(
 		ctx,
 		Event{
 			ID:            first,
@@ -225,7 +225,7 @@ func TestConsumerDeadLetters(t *testing.T) {
 		logged  []string
 	)
 
-	c := &Consumer{
+	consumer := &Consumer{
 		Name: "test-" + uuid.NewString(), DB: m, Now: func() time.Time { return clock },
 		Logf: func(f string, a ...any) { logged = append(logged, fmt.Sprintf(f, a...)) },
 		Handlers: map[string]Handler{typ: func(_ context.Context, _ pgx.Tx, e Event) error {
@@ -245,7 +245,7 @@ func TestConsumerDeadLetters(t *testing.T) {
 	for i, pause := range []time.Duration{0, time.Minute, 2 * time.Minute, 4 * time.Minute} {
 		clock = clock.Add(pause)
 
-		_, err := c.Drain(ctx)
+		_, err := consumer.Drain(ctx)
 		if err == nil || len(applied) != 0 {
 			t.Fatalf("attempt %d: err=%v applied=%v", i+1, err, applied)
 		}
@@ -253,14 +253,14 @@ func TestConsumerDeadLetters(t *testing.T) {
 
 	clock = clock.Add(8*time.Minute - time.Second)
 
-	n, err := c.Drain(ctx)
+	n, err := consumer.Drain(ctx)
 	if n != 0 || err != nil {
 		t.Fatalf("before the last pause: n=%d err=%v", n, err)
 	}
 
 	clock = clock.Add(time.Second)
 
-	n, err = c.Drain(ctx)
+	n, err = consumer.Drain(ctx)
 	if n != 1 || err != nil || len(applied) != 1 || applied[0] != 2 {
 		t.Fatalf("fifth attempt: n=%d err=%v applied=%v", n, err, applied)
 	}
@@ -272,7 +272,7 @@ func TestConsumerDeadLetters(t *testing.T) {
 
 	err = m.Run(ctx, true, nil, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `SELECT attempts, dead_at IS NOT NULL FROM platform.event_failures WHERE consumer = $1 AND
-			event_id = $2`, c.Name, poison).
+			event_id = $2`, consumer.Name, poison).
 			Scan(&attempts, &dead)
 	})
 	if err != nil || attempts != MaxAttempts || !dead {
@@ -283,7 +283,7 @@ func TestConsumerDeadLetters(t *testing.T) {
 		t.Errorf("logged: %q", logged)
 	}
 
-	n, err = c.Drain(ctx)
+	n, err = consumer.Drain(ctx)
 	if n != 0 || err != nil {
 		t.Errorf("after the dead letter: n=%d err=%v", n, err)
 	}
@@ -311,13 +311,13 @@ func TestHousekeep(t *testing.T) {
 	a, b := "test-"+uuid.NewString(), "test-"+uuid.NewString()
 	key := "hk-" + uuid.NewString()
 
-	exec := func(p *ops.Principal, sql string, args ...any) {
+	exec := func(principal *ops.Principal, sql string, args ...any) {
 		t.Helper()
 
 		err := m.Run(
 			ctx,
 			false,
-			p,
+			principal,
 			func(tx pgx.Tx) error {
 				_, err := tx.Exec(ctx, sql, args...)
 
@@ -406,18 +406,18 @@ func TestHousekeep(t *testing.T) {
 		},
 	}
 
-	s, err := Housekeep(ctx, m, day(20), consumers)
+	swept, err := Housekeep(ctx, m, day(20), consumers)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	count := func(p *ops.Principal, sql string, args ...any) (n int) {
+	count := func(principal *ops.Principal, sql string, args ...any) (n int) {
 		t.Helper()
 
 		err := m.Run(
 			ctx,
 			true,
-			p,
+			principal,
 			func(tx pgx.Tx) error { return tx.QueryRow(ctx, sql, args...).Scan(&n) },
 		)
 		if err != nil {
@@ -478,8 +478,8 @@ func TestHousekeep(t *testing.T) {
 		t.Errorf("expired idempotency key: %d", n)
 	}
 
-	if s.Outbox < 1 || s.Processed < 1 || s.Failures < 1 || s.IdempotencyKeys < 1 {
-		t.Errorf("counts: %+v", s)
+	if swept.Outbox < 1 || swept.Processed < 1 || swept.Failures < 1 || swept.IdempotencyKeys < 1 {
+		t.Errorf("counts: %+v", swept)
 	}
 
 	exec(nil, `DELETE FROM platform.processed_events WHERE consumer = ANY($1)`, []string{a, b})

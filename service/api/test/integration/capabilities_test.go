@@ -27,38 +27,38 @@ func capBody(id, model, extra string) string {
 }
 
 func TestCapabilities(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 
-	code, m := post(s, &hq, "capabilities.list", `{"limit":100}`)
-	if code != 200 || len(items(m)) < 2 {
-		t.Fatalf("list: %d %v", code, m)
+	code, resp := post(srv, &hq, "capabilities.list", `{"limit":100}`)
+	if code != 200 || len(items(resp)) < 2 {
+		t.Fatalf("list: %d %v", code, resp)
 	}
 
-	if code, _ := post(s, &customerA, "capabilities.list", `{}`); code != 200 {
+	if code, _ := post(srv, &customerA, "capabilities.list", `{}`); code != 200 {
 		t.Error("clients read the model register (client:self)")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"capabilities.list",
 		`{"filters":{"x":1}}`,
 	); code != 422 ||
-		fields(m) != "x=error.notAllowed" {
-		t.Errorf("no filters: %d %s", code, fields(m))
+		fields(res) != "x=error.notAllowed" {
+		t.Errorf("no filters: %d %s", code, fields(res))
 	}
 
 	model := "TA-" + uuid.NewString()[:6]
 
-	code, m = write(s, &hq, "capabilities.save", capBody("", model, ""), 0)
-	if code != 200 || ver(m) != 1 || len(data(m)["sensors"].([]any)) != 2 {
-		t.Fatalf("create: %d %v", code, m)
+	code, resp = write(srv, &hq, "capabilities.save", capBody("", model, ""), 0)
+	if code != 200 || ver(resp) != 1 || len(data(resp)["sensors"].([]any)) != 2 {
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := data(m)["id"].(string)
+	id := data(resp)["id"].(string)
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"capabilities.save",
 		capBody("", strings.ToLower(model), ""),
@@ -147,12 +147,12 @@ func TestCapabilities(t *testing.T) {
 	}
 
 	for name, b := range bad {
-		code, m := write(s, &hq, "capabilities.save", b, 0)
+		code, m := write(srv, &hq, "capabilities.save", b, 0)
 		refusal(t, name, code, m, want[name])
 	}
 	// a unit on this model moves to the new capability version
 	_, um := write(
-		s,
+		srv,
 		&hq,
 		"units.save",
 		`{"customerOrgId":"`+seed.ID("org-customer-b").
@@ -166,19 +166,19 @@ func TestCapabilities(t *testing.T) {
 	)
 	unit, _ := data(um)["id"].(string)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"capabilities.save",
 		capBody(id, model, ""),
 		1,
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["changeReason"] != "error.required" {
-		t.Errorf("update without a change reason: %d %v", code, m)
+		res["fieldErrors"].(map[string]any)["changeReason"] != "error.required" {
+		t.Errorf("update without a change reason: %d %v", code, res)
 	}
 
-	code, m = write(
-		s,
+	code, resp = write(
+		srv,
 		&hq,
 		"capabilities.save",
 		strings.Replace(
@@ -189,8 +189,8 @@ func TestCapabilities(t *testing.T) {
 		),
 		1,
 	)
-	if code != 200 || ver(m) != 2 {
-		t.Fatalf("update: %d %v", code, m)
+	if code != 200 || ver(resp) != 2 {
+		t.Fatalf("update: %d %v", code, resp)
 	}
 	// the audit entry carries the changed fields only (DD-A04 version history, DD-A16 before/after)
 	day := `"from":"` + clock.Add(-time.Hour).
@@ -199,7 +199,7 @@ func TestCapabilities(t *testing.T) {
 		Format(time.RFC3339) +
 		`"`
 	_, am := post(
-		s,
+		srv,
 		&hq,
 		"audit.list",
 		`{"filters":{`+day+`,"targetKind":"capability","targetId":"`+id+`"},"limit":10}`,
@@ -221,14 +221,14 @@ func TestCapabilities(t *testing.T) {
 	}
 
 	if unit != "" {
-		_, g := post(s, &hq, "units.get", `{"id":"`+unit+`"}`)
+		_, g := post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
 		if int(data(g)["capabilityVersion"].(float64)) != 2 {
 			t.Fatalf("unit capability version: %v", data(g)["capabilityVersion"])
 		}
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"capabilities.save",
 		capBody(id, model, `,"changeReason":"again"`),
@@ -238,7 +238,7 @@ func TestCapabilities(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"capabilities.save",
 		capBody(uuid.NewString(), "new-"+model, `,"changeReason":"x"`),
@@ -248,7 +248,7 @@ func TestCapabilities(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerA,
 		"capabilities.save",
 		capBody("", "c-"+model, ""),
@@ -257,10 +257,10 @@ func TestCapabilities(t *testing.T) {
 		t.Error("client cannot edit models")
 	}
 	// only the current version is listed
-	_, m = post(s, &hq, "capabilities.list", `{"limit":100}`)
+	_, resp = post(srv, &hq, "capabilities.list", `{"limit":100}`)
 	n := 0
 
-	for _, c := range items(m) {
+	for _, c := range items(resp) {
 		if c["id"] == id {
 			n++
 		}

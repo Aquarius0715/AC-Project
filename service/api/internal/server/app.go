@@ -99,8 +99,8 @@ func (s *Server) DrainEvents(ctx context.Context) error {
 }
 
 // New wires the registry, database and modules. The verifier is injected so tests can use static tokens.
-func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
-	m, err := db.Open(ctx, cfg.DatabaseURL, cfg.DatabaseReaderURL)
+func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, error) {
+	txm, err := db.Open(ctx, cfg.DatabaseURL, cfg.DatabaseReaderURL)
 	if err != nil {
 		return nil, apperr.Wrap(err, "db.Open")
 	}
@@ -112,11 +112,11 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 
 	reg := ops.NewRegistry()
 	reg.ServeDomains(cfg.Domains...)
-	reg.DB, reg.Rec, reg.Idem = m, notifyingRecorder{
+	reg.DB, reg.Rec, reg.Idem = txm, notifyingRecorder{
 		inner: db.Recorder{},
 		store: notify.Store{},
 	}, db.Idempotency{
-		M: m,
+		M: txm,
 	}
 	reg.Limit = cfg.WriteLimit
 
@@ -139,31 +139,31 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		reg.Clock = cfg.Clock
 	}
 
-	var dc ScenarioClock = &demoClock{base: reg.Clock, mu: sync.Mutex{}, offset: 0}
+	var scenarioClock ScenarioClock = &demoClock{base: reg.Clock, mu: sync.Mutex{}, offset: 0}
 
 	if cfg.DemoOps {
 		if cfg.DemoClock != nil {
-			dc = cfg.DemoClock
+			scenarioClock = cfg.DemoClock
 		} else if !cfg.DemoStart.IsZero() {
 			// starts at fixture.clock, runs in real time, shared with the workers (IR36, IR168)
-			shared, err := democlock.Open(ctx, m.Writer, reg.Clock, cfg.DemoStart)
+			shared, err := democlock.Open(ctx, txm.Writer, reg.Clock, cfg.DemoStart)
 			if err != nil {
-				m.Close()
+				txm.Close()
 
 				return nil, apperr.Wrap(err, "democlock.Open")
 			}
 
-			dc = shared
+			scenarioClock = shared
 		}
 
-		reg.Clock = dc.Now
+		reg.Clock = scenarioClock.Now
 	}
 
 	demo := &demoOps{
 		inline:  len(cfg.Domains) == 0,
 		enabled: cfg.DemoOps,
-		m:       m,
-		clock:   dc,
+		m:       txm,
+		clock:   scenarioClock,
 		reg:     reg,
 		notify:  nil,
 	}
@@ -186,7 +186,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 			monitoring.Telemetry{Units: nil, Sensors: nil},
 			maintenance.Usage{},
 		},
-		Store: m,
+		Store: txm,
 		Active: []assets.UnitActivity{
 			maintenance.Usage{},
 			devices.Usage{},
@@ -342,7 +342,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		reg,
 		monitoring.Policies{Units: am, Recipients: identity.Directory{}, Caps: unitCaps{am}},
 	)
-	dm := &devices.Module{
+	module := &devices.Module{
 		Units: am,
 		Exclusion: []devices.Exclusion{
 			control.Busy{},
@@ -351,18 +351,18 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		Access:     nil,
 		UnitAccess: nil,
 	}
-	devices.RegisterDevices(reg, dm)
-	devices.RegisterCampaigns(reg, dm)
+	devices.RegisterDevices(reg, module)
+	devices.RegisterCampaigns(reg, module)
 	reg.AddJob(
 		ops.DomainEquipment,
 		devices.Lifecycle{Guard: control.Busy{}}.Advance,
 	) // IR67: operations start and time out on the equipment scheduler
 	reg.AddJob(
 		ops.DomainEquipment,
-		dm.AdvanceCampaigns,
+		module.AdvanceCampaigns,
 	) // IR339: campaign notices, starts, waves and completion (BR-A20), after the timeouts
 
-	authn := &auth.Authenticator{Verifier: v, DB: m, Now: reg.Clock, Source: nil}
+	authn := &auth.Authenticator{Verifier: verifier, DB: txm, Now: reg.Clock, Source: nil}
 
 	servesIdentity := len(cfg.Domains) == 0 || slices.Contains(cfg.Domains, ops.DomainIdentity)
 	if cfg.IdentityURL != "" && !servesIdentity { // IR181 step 1: principals come from identity-api
@@ -378,32 +378,36 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		}
 	}
 
-	e, err := newEcho(reg, m, authn, cfg.Logger, cfg.InternalToken, servesIdentity)
+	app, err := newEcho(reg, txm, authn, cfg.Logger, cfg.InternalToken, servesIdentity)
 	if err != nil {
-		m.Close()
+		txm.Close()
 
 		return nil, err
 	}
 
 	srv := &Server{
-		Echo:      e,
+		Echo:      app,
 		Registry:  reg,
-		DB:        m,
-		Consumers: consumers(m, cfg.Domains, cfg.IdentityProvider, cfg.AccountApps),
+		DB:        txm,
+		Consumers: consumers(txm, cfg.Domains, cfg.IdentityProvider, cfg.AccountApps),
 	}
 	if len(cfg.Domains) > 0 &&
 		len(cfg.ServiceURLs) > 0 { // read models ask the owning services (IR190)
-		q := &ops.HTTPQueries{Targets: map[string]*url.URL{}, Token: cfg.InternalToken, Client: nil}
+		httpQueries := &ops.HTTPQueries{
+			Targets: map[string]*url.URL{},
+			Token:   cfg.InternalToken,
+			Client:  nil,
+		}
 		for d, raw := range cfg.ServiceURLs {
 			u, err := url.Parse(raw)
 			if err != nil || u.Scheme == "" || u.Host == "" {
 				return nil, fmt.Errorf("server: service URL of %s is not absolute", d)
 			}
 
-			q.Targets[d] = u
+			httpQueries.Targets[d] = u
 		}
 
-		reg.Remote = q
+		reg.Remote = httpQueries
 	}
 
 	reg.WrapTx = cfg.WrapTx
@@ -493,15 +497,15 @@ type unitCaps struct{ am *assets.Module }
 
 func (u unitCaps) UnitCaps(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
 ) (control.Caps, bool, error) {
-	info, ok, err := u.am.UnitInfo(ctx, c, unit)
+	info, ok, err := u.am.UnitInfo(ctx, call, unit)
 	if err != nil || !ok {
 		return control.Caps{}, false, apperr.Wrap(err, "assets.Module.UnitInfo")
 	}
 
-	out, out2, err := devices.Models{}.Caps(ctx, c, info.ModelID, info.CapabilityVersion)
+	out, out2, err := devices.Models{}.Caps(ctx, call, info.ModelID, info.CapabilityVersion)
 
 	return out, out2, apperr.Wrap(err, "devices.Models.Caps")
 }
@@ -511,15 +515,15 @@ type restrictionTargets struct{ am *assets.Module }
 
 func (t restrictionTargets) RestrictionTarget(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
 ) (restrictions.UnitCaps, bool, error) {
-	ct, ok, err := controlTargets(t).Target(ctx, c, unit)
+	target, ok, err := controlTargets(t).Target(ctx, call, unit)
 	if err != nil || !ok {
 		return restrictions.UnitCaps{}, false, err
 	}
 
-	org, archived, _, err := t.am.UnitState(ctx, c, unit)
+	org, archived, _, err := t.am.UnitState(ctx, call, unit)
 	if err != nil {
 		return restrictions.UnitCaps{}, false, apperr.Wrap(err, "assets.Module.UnitState")
 	}
@@ -527,11 +531,11 @@ func (t restrictionTargets) RestrictionTarget(
 	return restrictions.UnitCaps{
 		OrgID:          org,
 		Archived:       archived,
-		Control:        ct.Caps.Control,
-		HasTemperature: ct.Caps.HasTemperature,
-		TempMin:        ct.Caps.TempMin,
-		TempMax:        ct.Caps.TempMax,
-		Step:           ct.Caps.TempStep,
+		Control:        target.Caps.Control,
+		HasTemperature: target.Caps.HasTemperature,
+		TempMin:        target.Caps.TempMin,
+		TempMax:        target.Caps.TempMax,
+		Step:           target.Caps.TempStep,
 	}, true, nil
 }
 
@@ -540,20 +544,20 @@ type controlTargets struct{ am *assets.Module }
 
 func (t controlTargets) Target(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
 ) (control.Target, bool, error) {
-	info, ok, err := t.am.UnitInfo(ctx, c, unit)
+	info, ok, err := t.am.UnitInfo(ctx, call, unit)
 	if err != nil || !ok {
 		return control.Target{}, false, apperr.Wrap(err, "assets.Module.UnitInfo")
 	}
 
-	v, err := t.am.UnitVersion(ctx, c, unit)
+	v, err := t.am.UnitVersion(ctx, call, unit)
 	if err != nil {
 		return control.Target{}, false, apperr.Wrap(err, "assets.Module.UnitVersion")
 	}
 
-	caps, _, err := devices.Models{}.Caps(ctx, c, info.ModelID, info.CapabilityVersion)
+	caps, _, err := devices.Models{}.Caps(ctx, call, info.ModelID, info.CapabilityVersion)
 
 	return control.Target{
 		OrgID:      info.OrgID,

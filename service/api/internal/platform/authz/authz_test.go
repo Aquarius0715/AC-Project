@@ -36,24 +36,24 @@ func TestPermissionsMatchContracts(t *testing.T) {
 func TestCatalogParses(t *testing.T) {
 	preds := map[string]int{}
 
-	for _, s := range ops.Catalog {
-		e, err := Parse(s.Authorization)
+	for _, spec := range ops.Catalog {
+		expr, err := Parse(spec.Authorization)
 		if err != nil {
-			t.Errorf("%s: %v", s.Name, err)
+			t.Errorf("%s: %v", spec.Name, err)
 
 			continue
 		}
 
-		if s.Mode == ops.Write {
-			for _, a := range e.Alternatives {
+		if spec.Mode == ops.Write {
+			for _, a := range expr.Alternatives {
 				if a.Role == "admin" && strings.HasSuffix(a.Permission, ".read") &&
 					!contains(a.Predicates, "scope-candidate-read-only") {
-					t.Errorf("%s: write op granted by read permission %s", s.Name, a.Permission)
+					t.Errorf("%s: write op granted by read permission %s", spec.Name, a.Permission)
 				}
 			}
 		}
 
-		for _, a := range e.Alternatives {
+		for _, a := range expr.Alternatives {
 			for _, p := range a.Predicates {
 				preds[p]++
 			}
@@ -86,20 +86,20 @@ func TestParseErrors(t *testing.T) {
 }
 
 func TestCandidatesAndAllowed(t *testing.T) {
-	e, err := Parse(
+	expr, err := Parse(
 		"client:self-customer:owner | admin:alert.policy.write | IR01:same-key-receipt; note",
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if e.Remark != "note" || len(e.Notes) != 1 || len(e.Alternatives) != 2 {
-		t.Fatalf("%+v", e)
+	if expr.Remark != "note" || len(expr.Notes) != 1 || len(expr.Alternatives) != 2 {
+		t.Fatalf("%+v", expr)
 	}
 
 	owner := &Principal{Role: "client", ClientRole: "owner", Permissions: map[string]bool{}}
 
-	c := e.Candidates(owner)
+	c := expr.Candidates(owner)
 	if len(c) != 1 || !Allowed(c, Facts{"self-customer": true, "owner": true}) ||
 		Allowed(c, Facts{"self-customer": true}) {
 		t.Fatal("client owner rules")
@@ -110,12 +110,12 @@ func TestCandidatesAndAllowed(t *testing.T) {
 		Permissions: map[string]bool{"alert.policy.read": true},
 		ClientRole:  "",
 	}
-	if len(e.Candidates(admin)) != 0 {
+	if len(expr.Candidates(admin)) != 0 {
 		t.Fatal("admin without write permission must not be a candidate")
 	}
 
 	admin.Permissions["alert.policy.write"] = true
-	if !Allowed(e.Candidates(admin), Facts{}) {
+	if !Allowed(expr.Candidates(admin), Facts{}) {
 		t.Fatal("admin with permission and no predicates is allowed")
 	}
 

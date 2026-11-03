@@ -16,7 +16,7 @@ import (
 // qualification, or whose technician left get none; a pending renewal does not stop them. The contractor reads the
 // notifications of its own technicians' certificates only.
 func TestCertificateReminders(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	ctx := context.Background()
 	tenant, org := seed.ID("tenant-a"), seed.ID("org-contractor-a")
 	day := 24 * time.Hour
@@ -98,7 +98,7 @@ func TestCertificateReminders(t *testing.T) {
 
 		drainEvents(t)
 
-		_, err := schedTick(ctx, s, clock.Add(time.Duration(tick)*time.Minute))
+		_, err := schedTick(ctx, srv, clock.Add(time.Duration(tick)*time.Minute))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -121,7 +121,7 @@ func TestCertificateReminders(t *testing.T) {
 		)
 
 		out := make([]reminder, n)
-		for i := range out {
+		for idx := range out {
 			ownerScan(
 				t,
 				`SELECT r.days_before, r.notifications, coalesce(string_agg(DISTINCT n.severity, ','), ''),
@@ -130,11 +130,11 @@ func TestCertificateReminders(t *testing.T) {
 				r.certificate_id::text AND n.type = 'certificate_expiry'
 				  AND n.template_key = 'certificate_expiry' AND n.occurred_at = r.sent_at
 				WHERE r.certificate_id = $1 GROUP BY r.days_before, r.notifications ORDER BY r.days_before DESC OFFSET $2 LIMIT 1`,
-				[]any{id, i},
-				&out[i].days,
-				&out[i].notifications,
-				&out[i].severity,
-				&out[i].to,
+				[]any{id, idx},
+				&out[idx].days,
+				&out[idx].notifications,
+				&out[idx].severity,
+				&out[idx].to,
 			)
 		}
 
@@ -252,19 +252,19 @@ func TestCertificateReminders(t *testing.T) {
 	}
 
 	// the contractor's inbox: titled by the certificate, its expiry in params.at; contractor-b reads none of them
-	code, m := post(
-		s,
+	code, res := post(
+		srv,
 		&contrA,
 		"notifications.list",
 		`{"filters":{"type":"certificate_expiry"},"limit":100}`,
 	)
 	if code != 200 {
-		t.Fatalf("list: %d %v", code, m)
+		t.Fatalf("list: %d %v", code, res)
 	}
 
 	var mine map[string]any
 
-	for _, it := range items(m) {
+	for _, it := range items(res) {
 		if target := it["target"].(map[string]any); target["kind"] == "certificate" &&
 			target["id"] == late {
 			mine = it
@@ -272,7 +272,7 @@ func TestCertificateReminders(t *testing.T) {
 	}
 
 	if mine == nil {
-		t.Fatalf("the reminder is not listed: %v", m)
+		t.Fatalf("the reminder is not listed: %v", res)
 	}
 
 	params := mine["params"].(map[string]any)
@@ -285,15 +285,15 @@ func TestCertificateReminders(t *testing.T) {
 		t.Errorf("notification: %v", mine)
 	}
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&contrA,
 		"notifications.markRead",
 		`{"id":"`+mine["id"].(string)+`"}`,
 		int(mine["version"].(float64)),
 	); code != 200 ||
-		data(m)["readAt"] == nil {
-		t.Errorf("markRead: %d %v", code, m)
+		data(resp)["readAt"] == nil {
+		t.Errorf("markRead: %d %v", code, resp)
 	}
 	// IR58: a notification of contractor-a's certificate addressed to contractor-b stays hidden from contractor-b
 	stray := uuid.NewString()
@@ -311,20 +311,20 @@ func TestCertificateReminders(t *testing.T) {
 	)
 	t.Cleanup(func() { owner(t, `DELETE FROM notify.notifications WHERE id = $1`, stray) })
 
-	_, m = post(
-		s,
+	_, res = post(
+		srv,
 		&contrB,
 		"notifications.list",
 		`{"filters":{"type":"certificate_expiry"},"limit":100}`,
 	)
-	for _, it := range items(m) {
+	for _, it := range items(res) {
 		if it["id"] == stray {
 			t.Error("contractor-b reads contractor-a's certificate")
 		}
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&contrB,
 		"notifications.markRead",
 		`{"id":"`+stray+`"}`,

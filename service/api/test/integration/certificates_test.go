@@ -12,7 +12,7 @@ import (
 )
 
 func TestCertificatesAndParts(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	tech := seed.ID("tech-external-a").String()
 	pdf := blobJSON("cert.pdf", "application/pdf", []byte("%PDF-1.4 demo"), 13)
 	issued, expires := clock.Add(-10*24*time.Hour).
@@ -44,16 +44,16 @@ func TestCertificatesAndParts(t *testing.T) {
 		"not a pdf":   strings.Replace(body(""), pdf, blobJSON("cert.pdf", "application/pdf", []byte("<html>"), 6), 1),
 		"pixel flood": strings.Replace(body(""), pdf, blobJSON("scan.png", "image/png", flood, len(flood)), 1),
 	} {
-		code, m := write(s, &contrA, "certificates.submit", b, 0)
+		code, m := write(srv, &contrA, "certificates.submit", b, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
-	if code, _ := write(s, &contrB, "certificates.submit", body(""), 0); code != 404 {
+	if code, _ := write(srv, &contrB, "certificates.submit", body(""), 0); code != 404 {
 		t.Error("other contractor's technician")
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&contrA,
 		"certificates.submit",
 		body(`,"renewalOf":"`+uuid.NewString()+`"`),
@@ -65,20 +65,20 @@ func TestCertificatesAndParts(t *testing.T) {
 	big := append(
 		[]byte("%PDF-1.4 "),
 		make([]byte, 3<<20)...) // IR277: a scan above the ordinary 1 MiB body limit
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"certificates.submit",
 		strings.Replace(body(""), pdf, blobJSON("scan.pdf", "application/pdf", big, len(big)), 1),
 		0,
 	); code != 200 ||
-		data(m)["fileName"] != "scan.pdf" {
-		t.Fatalf("a 3 MiB certificate: %d %v", code, m)
+		data(res)["fileName"] != "scan.pdf" {
+		t.Fatalf("a 3 MiB certificate: %d %v", code, res)
 	}
 
 	tooBig := make([]byte, 10*1000*1000+1)
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"certificates.submit",
 		strings.Replace(
@@ -89,32 +89,32 @@ func TestCertificatesAndParts(t *testing.T) {
 		),
 		0,
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["file"] != "error.invalidFile" {
-		t.Fatalf("a file over 10 MB is a field error, not a body error: %d %v", code, m)
+		res["fieldErrors"].(map[string]any)["file"] != "error.invalidFile" {
+		t.Fatalf("a file over 10 MB is a field error, not a body error: %d %v", code, res)
 	}
 
-	code, m := write(s, &contrA, "certificates.submit", body(""), 0)
-	if code != 200 || data(m)["status"] != "pending_verification" ||
-		data(m)["fileName"] != "cert.pdf" ||
-		data(m)["name"] != "Indoor AC" {
-		t.Fatalf("submit: %d %v", code, m)
+	code, resp := write(srv, &contrA, "certificates.submit", body(""), 0)
+	if code != 200 || data(resp)["status"] != "pending_verification" ||
+		data(resp)["fileName"] != "cert.pdf" ||
+		data(resp)["name"] != "Indoor AC" {
+		t.Fatalf("submit: %d %v", code, resp)
 	}
 
-	cert := data(m)["id"].(string)
+	cert := data(resp)["id"].(string)
 	// the uploaded document opens for HQ and for the company that sent it, before it is verified (IR436)
 	for _, a := range []*actor{&hq, &contrA} {
-		code, m := post(s, a, "certificates.getContent", `{"certificateId":"`+cert+`"}`)
+		code, res := post(srv, a, "certificates.getContent", `{"certificateId":"`+cert+`"}`)
 
-		d := data(m)
+		d := data(res)
 		if code != 200 || d["name"] != "cert.pdf" || d["mime"] != "application/pdf" ||
 			d["size"] != float64(13) ||
 			d["bytes"] != base64.StdEncoding.EncodeToString([]byte("%PDF-1.4 demo")) {
-			t.Fatalf("certificates.getContent: %d %v", code, m)
+			t.Fatalf("certificates.getContent: %d %v", code, res)
 		}
 	}
 
 	if code, _ := post(
-		s,
+		srv,
 		&hq,
 		"certificates.getContent",
 		`{"certificateId":"`+uuid.NewString()+`"}`,
@@ -122,19 +122,19 @@ func TestCertificatesAndParts(t *testing.T) {
 		t.Errorf("an unknown certificate: %d", code)
 	}
 	// verify
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"certificates.verify",
 		`{"certificateId":"`+cert+`","decision":"reject"}`,
 		1,
 	); code != 422 ||
-		fields(m) != "reason=error.required" {
-		t.Errorf("reject without reason: %d %s", code, fields(m))
+		fields(res) != "reason=error.required" {
+		t.Errorf("reject without reason: %d %s", code, fields(res))
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&contrA,
 		"certificates.verify",
 		`{"certificateId":"`+cert+`","decision":"approve"}`,
@@ -143,15 +143,15 @@ func TestCertificatesAndParts(t *testing.T) {
 		t.Error("contractor verifies")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"certificates.verify",
 		`{"certificateId":"`+cert+`","decision":"approve"}`,
 		1,
-	); code != 200 || data(m)["status"] != "valid" ||
-		data(m)["verifiedAt"] == nil {
-		t.Fatalf("approve: %d %v", code, m)
+	); code != 200 || data(res)["status"] != "valid" ||
+		data(res)["verifiedAt"] == nil {
+		t.Fatalf("approve: %d %v", code, res)
 	}
 
 	var until time.Time
@@ -167,7 +167,7 @@ func TestCertificatesAndParts(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"certificates.verify",
 		`{"certificateId":"`+cert+`","decision":"approve"}`,
@@ -176,47 +176,47 @@ func TestCertificatesAndParts(t *testing.T) {
 		t.Error("verify twice")
 	}
 	// a renewal can be rejected; training request
-	code, m = write(s, &contrA, "certificates.submit", body(`,"renewalOf":"`+cert+`"`), 0)
-	if code != 200 || data(m)["renewalOf"] != cert {
-		t.Fatalf("renewal: %d %v", code, m)
+	code, resp = write(srv, &contrA, "certificates.submit", body(`,"renewalOf":"`+cert+`"`), 0)
+	if code != 200 || data(resp)["renewalOf"] != cert {
+		t.Fatalf("renewal: %d %v", code, resp)
 	}
 
-	renewal := data(m)["id"].(string)
-	if code, m := write(
-		s,
+	renewal := data(resp)["id"].(string)
+	if code, res := write(
+		srv,
 		&hq,
 		"certificates.verify",
 		`{"certificateId":"`+renewal+`","decision":"reject","reason":"blurry scan"}`,
 		1,
 	); code != 200 ||
-		data(m)["status"] != "rejected" {
-		t.Fatalf("reject: %d %v", code, m)
+		data(res)["status"] != "rejected" {
+		t.Fatalf("reject: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"certificates.requestTraining",
 		`{"certificateId":"`+cert+`","note":" "}`,
 		2,
 	); code != 422 ||
-		fields(m) != "note=error.length" {
-		t.Errorf("blank note: %d %s", code, fields(m))
+		fields(res) != "note=error.length" {
+		t.Errorf("blank note: %d %s", code, fields(res))
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&contrA,
 		"certificates.requestTraining",
 		`{"certificateId":"`+cert+`","note":"refresher course"}`,
 		2,
 	); code != 200 ||
-		data(m)["trainingRequestedAt"] == nil {
-		t.Fatalf("training: %d %v", code, m)
+		data(res)["trainingRequestedAt"] == nil {
+		t.Fatalf("training: %d %v", code, res)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&contrB,
 		"certificates.requestTraining",
 		`{"certificateId":"`+cert+`","note":"x"}`,
@@ -233,7 +233,7 @@ func TestCertificatesAndParts(t *testing.T) {
 	)
 
 	ids := func(body string, a *actor) map[string]string {
-		_, m := post(s, a, "certificates.list", body)
+		_, m := post(srv, a, "certificates.list", body)
 
 		out := map[string]string{}
 		for _, it := range items(m) {
@@ -262,14 +262,14 @@ func TestCertificatesAndParts(t *testing.T) {
 		t.Error("contractor-b sees contractor-a's certificates")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"certificates.list",
 		`{"filters":{"code":"x"}}`,
 	); code != 422 ||
-		fields(m) != "filters=error.invalid" {
-		t.Errorf("bad code filter: %d %s", code, fields(m))
+		fields(res) != "filters=error.invalid" {
+		t.Errorf("bad code filter: %d %s", code, fields(res))
 	}
 
 	owner(
@@ -288,36 +288,36 @@ func TestCertificatesAndParts(t *testing.T) {
 		seed.ID("tenant-a"),
 	)
 
-	_, m = post(s, &hq, "parts.list", `{"filters":{"search":"filter MESH"},"limit":100}`)
+	_, resp = post(srv, &hq, "parts.list", `{"filters":{"search":"filter MESH"},"limit":100}`)
 
 	found := false
-	for _, it := range items(m) {
+	for _, it := range items(resp) {
 		found = found || (it["code"] == code1 && it["vanStockQuantity"] == nil)
 	}
 
 	if !found {
-		t.Fatalf("parts: %v", m)
+		t.Fatalf("parts: %v", resp)
 	}
 
-	if code, _ := post(s, &techInt, "parts.list", `{}`); code != 200 {
+	if code, _ := post(srv, &techInt, "parts.list", `{}`); code != 200 {
 		t.Error("technician parts")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"parts.list",
 		`{"filters":{"x":1}}`,
 	); code != 422 ||
-		fields(m) != "x=error.notAllowed" {
-		t.Errorf("bad parts filter: %d %s", code, fields(m))
+		fields(res) != "x=error.notAllowed" {
+		t.Errorf("bad parts filter: %d %s", code, fields(res))
 	}
 }
 
 // TestCertificateCreatesMissingGrant: approving a certificate for a code the technician holds no grant for creates
 // the grant (QualificationGranted, IR133, IR192), not only extends an existing one. The seed grant is restored after.
 func TestCertificateCreatesMissingGrant(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	tech := seed.ID("tech-external-a")
 
 	var from, until time.Time
@@ -348,8 +348,8 @@ func TestCertificateCreatesMissingGrant(t *testing.T) {
 	expires := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
 	pdf := blobJSON("outdoor.pdf", "application/pdf", []byte("%PDF-1.4 outdoor"), 16)
 
-	code, m := write(
-		s,
+	code, res := write(
+		srv,
 		&contrA,
 		"certificates.submit",
 		`{"membershipId":"`+tech.String()+`","code":"demo_outdoor","name":"Outdoor AC","number":"N-2","issuedAt":"`+
@@ -361,17 +361,17 @@ func TestCertificateCreatesMissingGrant(t *testing.T) {
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("submit: %d %v", code, m)
+		t.Fatalf("submit: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&hq,
 		"certificates.verify",
-		`{"certificateId":"`+data(m)["id"].(string)+`","decision":"approve"}`,
+		`{"certificateId":"`+data(res)["id"].(string)+`","decision":"approve"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("approve: %d %v", code, m)
+		t.Fatalf("approve: %d %v", code, resp)
 	}
 
 	var got time.Time

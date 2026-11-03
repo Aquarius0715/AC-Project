@@ -80,68 +80,68 @@ func readStatus(stored string, expires, now time.Time) string {
 }
 
 func scanCert(r pgx.Row, now time.Time) (Certificate, error) {
-	var x Certificate
+	var certificate Certificate
 
 	err := r.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.UpdatedAt,
-		&x.MembershipID,
-		&x.OrganizationID,
-		&x.Code,
-		&x.Name,
-		&x.Number,
-		&x.IssuedAt,
-		&x.ExpiresAt,
-		&x.FileName,
-		&x.Status,
-		&x.RenewalOf,
-		&x.VerifiedByMembershipID,
-		&x.VerifiedAt,
-		&x.TrainingRequestedAt,
+		&certificate.ID,
+		&certificate.TenantID,
+		&certificate.Version,
+		&certificate.CreatedAt,
+		&certificate.UpdatedAt,
+		&certificate.MembershipID,
+		&certificate.OrganizationID,
+		&certificate.Code,
+		&certificate.Name,
+		&certificate.Number,
+		&certificate.IssuedAt,
+		&certificate.ExpiresAt,
+		&certificate.FileName,
+		&certificate.Status,
+		&certificate.RenewalOf,
+		&certificate.VerifiedByMembershipID,
+		&certificate.VerifiedAt,
+		&certificate.TrainingRequestedAt,
 	)
-	x.Status = readStatus(x.Status, x.ExpiresAt, now)
+	certificate.Status = readStatus(certificate.Status, certificate.ExpiresAt, now)
 
-	return x, apperr.Wrap(err, "scan (scanCert)")
+	return certificate, apperr.Wrap(err, "scan (scanCert)")
 }
 
 func (m Certificates) lock(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	id uuid.UUID,
 ) (Certificate, string, error) {
 	var stored string
 
-	x, err := scanCert(
-		c.Tx.QueryRow(
+	certificate, err := scanCert(
+		call.Tx.QueryRow(
 			ctx,
 			"SELECT "+certCols+" FROM maintenance.certificates WHERE id = $1 FOR UPDATE",
 			id,
 		),
-		c.Now,
+		call.Now,
 	)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && c.Principal.Role == "contractor" && x.OrganizationID != c.Principal.OrgID) {
-		return x, "", apperr.E(apperr.NotFound, "error.notFound")
+		(err == nil && call.Principal.Role == "contractor" && certificate.OrganizationID != call.Principal.OrgID) {
+		return certificate, "", apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	if err != nil {
-		return x, "", err
+		return certificate, "", err
 	}
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT status FROM maintenance.certificates WHERE id = $1`, id).
+	scanErr := call.Tx.QueryRow(ctx, `SELECT status FROM maintenance.certificates WHERE id = $1`, id).
 		Scan(&stored)
 	if scanErr != nil {
-		return x, "", apperr.Wrap(scanErr, "select maintenance.certificates")
+		return certificate, "", apperr.Wrap(scanErr, "select maintenance.certificates")
 	}
 
-	if x.Version != *c.ExpectedVersion {
-		return x, "", apperr.E(apperr.Conflict, "error.versionConflict")
+	if certificate.Version != *call.ExpectedVersion {
+		return certificate, "", apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	return x, stored, nil
+	return certificate, stored, nil
 }
 
 func (m Certificates) reload(ctx context.Context, c *ops.Call, id uuid.UUID) (Certificate, error) {
@@ -182,34 +182,34 @@ type SubmitCertInput struct {
 
 // Validate implements ops.Validator.
 func (in *SubmitCertInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.MembershipID == uuid.Nil {
-		fe["membershipId"] = "error.required"
+		fieldErrs["membershipId"] = "error.required"
 	}
 
 	if !certCodes[in.Code] {
-		fe["code"] = "error.invalid"
+		fieldErrs["code"] = "error.invalid"
 	}
 
-	trimmedReason(&in.Name, 120, "name", fe)
-	trimmedReason(&in.Number, 64, "number", fe)
+	trimmedReason(&in.Name, 120, "name", fieldErrs)
+	trimmedReason(&in.Number, 64, "number", fieldErrs)
 
 	if in.IssuedAt.IsZero() || !in.IssuedAt.Before(in.ExpiresAt) {
-		fe["expiresAt"] = "error.range"
+		fieldErrs["expiresAt"] = "error.range"
 	}
 
-	f := in.File
-	if !ValidFileName(f.Name) ||
-		(f.Mime != "application/pdf" && f.Mime != "image/jpeg" && f.Mime != "image/png") ||
-		f.Size != len(f.Bytes) ||
-		f.Size < 1 ||
-		f.Size > 10*1000*1000 ||
-		!ContentMatches(f.Mime, f.Bytes) ||
-		(f.Mime != "application/pdf" && !ImageSizeOK(f.Mime, f.Bytes)) {
-		fe["file"] = "error.invalidFile"
+	blobInput := in.File
+	if !ValidFileName(blobInput.Name) ||
+		(blobInput.Mime != "application/pdf" && blobInput.Mime != "image/jpeg" && blobInput.Mime != "image/png") ||
+		blobInput.Size != len(blobInput.Bytes) ||
+		blobInput.Size < 1 ||
+		blobInput.Size > 10*1000*1000 ||
+		!ContentMatches(blobInput.Mime, blobInput.Bytes) ||
+		(blobInput.Mime != "application/pdf" && !ImageSizeOK(blobInput.Mime, blobInput.Bytes)) {
+		fieldErrs["file"] = "error.invalidFile"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // submit serves certificates.submit.
@@ -239,23 +239,24 @@ func (in *SubmitCertInput) Validate() map[string]string {
 //	@Router			/v1/certificates [post]
 func (m Certificates) submit(
 	ctx context.Context,
-	c *ops.Call,
-	in *SubmitCertInput,
+	call *ops.Call,
+	input *SubmitCertInput,
 ) (Certificate, error) {
-	t, found, err := m.Delivery.Directory.Technician(ctx, c, in.MembershipID)
+	technician, found, err := m.Delivery.Directory.Technician(ctx, call, input.MembershipID)
 	if err != nil {
 		return Certificate{}, apperr.Wrap(err, "maintenance.Directory.Technician")
 	}
 
-	if !found || !t.Active || t.OrgID != c.Principal.OrgID {
+	if !found || !technician.Active || technician.OrgID != call.Principal.OrgID {
 		return Certificate{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	if in.RenewalOf != nil {
+	if input.RenewalOf != nil {
 		var ok bool
 
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.certificates WHERE id = $1 AND membership_id = $2
-			AND code = $3)`, *in.RenewalOf, in.MembershipID, in.Code).
+		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.certificates WHERE id = $1 AND membership_id =
+			$2
+			AND code = $3)`, *input.RenewalOf, input.MembershipID, input.Code).
 			Scan(&ok)
 		if err != nil {
 			return Certificate{}, apperr.Wrap(err, "select maintenance.certificates")
@@ -268,57 +269,57 @@ func (m Certificates) submit(
 
 	id := uuid.New()
 
-	key := "certificates/" + in.MembershipID.String() + "/" + id.String()
+	key := "certificates/" + input.MembershipID.String() + "/" + id.String()
 
-	putErr := m.Blobs.Put(ctx, key, in.File.Mime, in.File.Bytes)
+	putErr := m.Blobs.Put(ctx, key, input.File.Mime, input.File.Bytes)
 	if putErr != nil {
 		return Certificate{}, apperr.Wrap(putErr, "blob.Store.Put")
 	}
 
-	name := strings.TrimSpace(in.File.Name)
+	name := strings.TrimSpace(input.File.Name)
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`INSERT INTO maintenance.certificates (id, tenant_id, membership_id, organization_id, code, name, number, issued_at,
 			expires_at, object_key,
 		file_name, status, renewal_of, created_at, updated_at) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4,
 		$5, $6, $7, $8, $9, $10, 'pending_verification', $11, $12, $12)`,
 		id,
-		in.MembershipID,
-		t.OrgID,
-		in.Code,
-		in.Name,
-		in.Number,
-		in.IssuedAt,
-		in.ExpiresAt,
+		input.MembershipID,
+		technician.OrgID,
+		input.Code,
+		input.Name,
+		input.Number,
+		input.IssuedAt,
+		input.ExpiresAt,
 		key,
 		name,
-		in.RenewalOf,
-		c.Now,
+		input.RenewalOf,
+		call.Now,
 	)
 	if execErr != nil {
 		return Certificate{}, apperr.Wrap(execErr, "insert maintenance.certificates")
 	}
 
-	x, err := m.reload(ctx, c, id)
+	certificate, err := m.reload(ctx, call, id)
 	if err != nil {
-		return x, err
+		return certificate, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "certificate",
 			AggregateID:   id,
 			Type:          "CertificateSubmitted",
-			Payload:       map[string]any{"membershipId": in.MembershipID},
+			Payload:       map[string]any{"membershipId": input.MembershipID},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "certificates.submit",
 			TargetKind:      "certificate",
 			TargetID:        id.String(),
-			NextVersion:     &x.Version,
+			NextVersion:     &certificate.Version,
 			PreviousVersion: nil,
 			Reason:          "",
 			Result:          "",
@@ -327,7 +328,7 @@ func (m Certificates) submit(
 		},
 	)
 
-	return x, nil
+	return certificate, nil
 }
 
 // ---- certificates.verify ----
@@ -341,24 +342,24 @@ type VerifyInput struct {
 
 // Validate implements ops.Validator.
 func (in *VerifyInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.CertificateID == uuid.Nil {
-		fe["certificateId"] = "error.required"
+		fieldErrs["certificateId"] = "error.required"
 	}
 
 	switch in.Decision {
 	case "approve":
 	case "reject":
 		if in.Reason == nil {
-			fe["reason"] = "error.required"
+			fieldErrs["reason"] = "error.required"
 		} else {
-			trimmedReason(in.Reason, 1000, "reason", fe)
+			trimmedReason(in.Reason, 1000, "reason", fieldErrs)
 		}
 	default:
-		fe["decision"] = "error.invalid"
+		fieldErrs["decision"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // verify serves certificates.verify.
@@ -392,98 +393,98 @@ func (in *VerifyInput) Validate() map[string]string {
 //	@Router			/v1/certificates/{certificateId}/verify [post]
 func (m Certificates) verify(
 	ctx context.Context,
-	c *ops.Call,
-	in *VerifyInput,
+	call *ops.Call,
+	input *VerifyInput,
 ) (Certificate, error) {
-	x, stored, err := m.lock(ctx, c, in.CertificateID)
+	certificate, stored, err := m.lock(ctx, call, input.CertificateID)
 	if err != nil {
-		return x, err
+		return certificate, err
 	}
 
 	if stored != "pending_verification" {
-		return x, apperr.E(apperr.Conflict, "error.invalidState")
+		return certificate, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
-	if in.Decision == "approve" {
-		_, err := c.Tx.Exec(
+	if input.Decision == "approve" {
+		_, err := call.Tx.Exec(
 			ctx,
 			`UPDATE maintenance.certificates SET status = 'valid', verified_by_membership_id = $2, verified_at = $3, version =
 				version + 1, updated_at = $3 WHERE id = $1`,
-			x.ID,
-			c.Principal.MembershipID,
-			c.Now,
+			certificate.ID,
+			call.Principal.MembershipID,
+			call.Now,
 		)
 		if err != nil {
-			return x, apperr.Wrap(err, "update maintenance.certificates")
+			return certificate, apperr.Wrap(err, "update maintenance.certificates")
 		}
 
-		if x.Code != "other" {
+		if certificate.Code != "other" {
 			err := m.Grants.SetGrant(
 				ctx,
-				c,
-				x.MembershipID,
-				x.Code,
-				x.IssuedAt,
-				x.ExpiresAt,
+				call,
+				certificate.MembershipID,
+				certificate.Code,
+				certificate.IssuedAt,
+				certificate.ExpiresAt,
 			)
 			if err != nil {
-				return x, apperr.Wrap(err, "maintenance.Grants.SetGrant")
+				return certificate, apperr.Wrap(err, "maintenance.Grants.SetGrant")
 			}
 
 			err = releaseQualificationEnded(
 				ctx,
-				c,
+				call,
 				m.Delivery.Units,
-				x.MembershipID,
-				x.Code,
-				x.IssuedAt,
-				x.ExpiresAt,
+				certificate.MembershipID,
+				certificate.Code,
+				certificate.IssuedAt,
+				certificate.ExpiresAt,
 			)
 			if err != nil { // IR440
-				return x, err
+				return certificate, err
 			}
 		}
 	} else {
-		_, err := c.Tx.Exec(
+		_, err := call.Tx.Exec(
 			ctx,
 			`UPDATE maintenance.certificates SET status = 'rejected', rejection_reason = $2, verified_by_membership_id = $3,
 				verified_at = $4,
 		version = version + 1, updated_at = $4 WHERE id = $1`,
-			x.ID,
-			*in.Reason,
-			c.Principal.MembershipID,
-			c.Now,
+			certificate.ID,
+			*input.Reason,
+			call.Principal.MembershipID,
+			call.Now,
 		)
 		if err != nil {
-			return x, apperr.Wrap(err, "update maintenance.certificates")
+			return certificate, apperr.Wrap(err, "update maintenance.certificates")
 		}
 	}
 
-	x, err = m.reload(ctx, c, x.ID)
+	certificate, err = m.reload(ctx, call, certificate.ID)
 	if err != nil {
-		return x, err
+		return certificate, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "certificate",
-			AggregateID:   x.ID,
+			AggregateID:   certificate.ID,
 			Type:          "CertificateVerified",
-			Payload:       map[string]any{"decision": in.Decision},
+			Payload:       map[string]any{"decision": input.Decision},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "certificates.verify",
 			TargetKind:      "certificate",
-			TargetID:        x.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &x.Version,
-			Reason:          deref(in.Reason), Result: "", Before: nil, After: nil,
+			TargetID:        certificate.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			NextVersion:     &certificate.Version,
+			Reason:          deref(input.Reason), Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return x, nil
+	return certificate, nil
 }
 
 // ---- certificates.requestTraining ----
@@ -496,14 +497,14 @@ type TrainingInput struct {
 
 // Validate implements ops.Validator.
 func (in *TrainingInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.CertificateID == uuid.Nil {
-		fe["certificateId"] = "error.required"
+		fieldErrs["certificateId"] = "error.required"
 	}
 
-	trimmedReason(&in.Note, 1000, "note", fe)
+	trimmedReason(&in.Note, 1000, "note", fieldErrs)
 
-	return fe
+	return fieldErrs
 }
 
 // requestTraining serves certificates.requestTraining.
@@ -535,51 +536,51 @@ func (in *TrainingInput) Validate() map[string]string {
 //	@Router			/v1/certificates/{certificateId}/request-training [post]
 func (m Certificates) requestTraining(
 	ctx context.Context,
-	c *ops.Call,
-	in *TrainingInput,
+	call *ops.Call,
+	input *TrainingInput,
 ) (Certificate, error) {
-	x, _, err := m.lock(ctx, c, in.CertificateID)
+	certificate, _, err := m.lock(ctx, call, input.CertificateID)
 	if err != nil {
-		return x, err
+		return certificate, err
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.certificates SET training_requested_at = $2, training_request_note = $3, version = version + 1,
 			updated_at = $2 WHERE id = $1`,
-		x.ID,
-		c.Now,
-		in.Note,
+		certificate.ID,
+		call.Now,
+		input.Note,
 	)
 	if execErr != nil {
-		return x, apperr.Wrap(execErr, "update maintenance.certificates")
+		return certificate, apperr.Wrap(execErr, "update maintenance.certificates")
 	}
 
-	x, err = m.reload(ctx, c, x.ID)
+	certificate, err = m.reload(ctx, call, certificate.ID)
 	if err != nil {
-		return x, err
+		return certificate, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "certificate",
-			AggregateID:   x.ID,
+			AggregateID:   certificate.ID,
 			Type:          "TrainingRequested",
 			Payload:       nil,
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "certificates.requestTraining",
 			TargetKind:      "certificate",
-			TargetID:        x.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &x.Version,
-			Reason:          in.Note, Result: "", Before: nil, After: nil,
+			TargetID:        certificate.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			NextVersion:     &certificate.Version,
+			Reason:          input.Note, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return x, nil
+	return certificate, nil
 }
 
 // ---- certificates.getContent, certificates.list ----
@@ -645,19 +646,19 @@ func documentMime(b []byte) string {
 //	@Router			/v1/certificates/{certificateId}/content [get]
 func (m Certificates) content(
 	ctx context.Context,
-	c *ops.Call,
-	in *CertificateContentInput,
+	call *ops.Call,
+	input *CertificateContentInput,
 ) (DocumentOut, error) {
 	var (
 		key, name *string
 		org       uuid.UUID
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT object_key, file_name, organization_id FROM maintenance.certificates WHERE id =
-		$1`, in.CertificateID).
+	err := call.Tx.QueryRow(ctx, `SELECT object_key, file_name, organization_id FROM maintenance.certificates WHERE id =
+		$1`, input.CertificateID).
 		Scan(&key, &name, &org)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && c.Principal.Role == "contractor" && org != c.Principal.OrgID) {
+		(err == nil && call.Principal.Role == "contractor" && org != call.Principal.OrgID) {
 		return DocumentOut{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
@@ -722,8 +723,8 @@ func (m Certificates) content(
 //	@Router			/v1/certificates [get]
 func (m Certificates) list(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[Certificate], error) {
 	var f struct {
 		OrganizationID     *uuid.UUID `json:"organizationId,omitempty"`
@@ -733,8 +734,8 @@ func (m Certificates) list(
 		ExpiringWithinDays *int       `json:"expiringWithinDays,omitempty"` // now <= expiresAt < now + N days
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil || (f.Code != nil && !certCodes[*f.Code]) ||
@@ -755,8 +756,8 @@ func (m Certificates) list(
 	}
 
 	conds := []string{"TRUE"}
-	if c.Principal.Role == "contractor" {
-		conds = append(conds, "organization_id = "+add(c.Principal.OrgID))
+	if call.Principal.Role == "contractor" {
+		conds = append(conds, "organization_id = "+add(call.Principal.OrgID))
 	}
 
 	if f.OrganizationID != nil {
@@ -772,7 +773,7 @@ func (m Certificates) list(
 	}
 
 	if f.ExpiringWithinDays != nil {
-		now := add(c.Now)
+		now := add(call.Now)
 		conds = append(
 			conds,
 			"expires_at >= "+now+"::timestamptz AND expires_at < "+now+"::timestamptz + make_interval(days => "+add(
@@ -781,7 +782,7 @@ func (m Certificates) list(
 		)
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		"SELECT "+certCols+" FROM maintenance.certificates WHERE "+strings.Join(
 			conds,
@@ -795,15 +796,15 @@ func (m Certificates) list(
 	all := []Certificate{}
 
 	for rows.Next() {
-		x, err := scanCert(rows, c.Now)
+		certificate, err := scanCert(rows, call.Now)
 		if err != nil {
 			rows.Close()
 
 			return paging.Page[Certificate]{}, err
 		}
 
-		if f.Status == nil || x.Status == *f.Status {
-			all = append(all, x)
+		if f.Status == nil || certificate.Status == *f.Status {
+			all = append(all, certificate)
 		}
 	}
 
@@ -814,7 +815,7 @@ func (m Certificates) list(
 		return paging.Page[Certificate]{}, apperr.Wrap(rowsErr, "select maintenance.certificates")
 	}
 
-	sortSliceErr := paging.SortSlice(all, in.Sort, map[string]func(a, b Certificate) int{
+	sortSliceErr := paging.SortSlice(all, query.Sort, map[string]func(a, b Certificate) int{
 		"id":        func(a, b Certificate) int { return strings.Compare(a.ID.String(), b.ID.String()) },
 		"expiresAt": func(a, b Certificate) int { return a.ExpiresAt.Compare(b.ExpiresAt) },
 		"status":    func(a, b Certificate) int { return strings.Compare(a.Status, b.Status) },
@@ -823,7 +824,7 @@ func (m Certificates) list(
 		return paging.Page[Certificate]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
 	}
 
-	return pageOf(all, *in, f, c.Principal.ScopeVersion)
+	return pageOf(all, *query, f, call.Principal.ScopeVersion)
 }
 
 // ---- parts.list ----
@@ -864,8 +865,8 @@ type PartItem struct {
 //	@Router			/v1/parts [get]
 func (m Certificates) parts(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[PartItem], error) {
 	var f struct {
 		Search *string `json:"search,omitempty"` // code or name contains, case-insensitive
@@ -873,8 +874,8 @@ func (m Certificates) parts(
 		MembershipID *uuid.UUID `json:"membershipId,omitempty"`
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil {
@@ -892,7 +893,7 @@ func (m Certificates) parts(
 		)
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		q+" ORDER BY lower(name), code",
 		args...) // name asc, id asc (query catalog)
@@ -903,16 +904,16 @@ func (m Certificates) parts(
 	all := []PartItem{}
 
 	for rows.Next() {
-		var p PartItem
+		var partItem PartItem
 
-		err := rows.Scan(&p.Code, &p.Name)
+		err := rows.Scan(&partItem.Code, &partItem.Name)
 		if err != nil {
 			rows.Close()
 
 			return paging.Page[PartItem]{}, apperr.Wrap(err, "select maintenance.parts_catalog")
 		}
 
-		all = append(all, p)
+		all = append(all, partItem)
 	}
 
 	rows.Close()
@@ -922,7 +923,7 @@ func (m Certificates) parts(
 		return paging.Page[PartItem]{}, apperr.Wrap(rowsErr, "select maintenance.parts_catalog")
 	}
 
-	sortSliceErr := paging.SortSlice(all, in.Sort, map[string]func(a, b PartItem) int{
+	sortSliceErr := paging.SortSlice(all, query.Sort, map[string]func(a, b PartItem) int{
 		"id":   func(a, b PartItem) int { return strings.Compare(a.Code, b.Code) },
 		"name": func(a, b PartItem) int { return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) },
 	})
@@ -930,7 +931,7 @@ func (m Certificates) parts(
 		return paging.Page[PartItem]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
 	}
 
-	return pageOf(all, *in, f, c.Principal.ScopeVersion)
+	return pageOf(all, *query, f, call.Principal.ScopeVersion)
 }
 
 // ---- expiry reminders (scheduler job) ----
@@ -955,8 +956,8 @@ func reminderStage(expires, now time.Time) int {
 // goes for a certificate that waits for HQ, was rejected or has expired, that a valid renewal or a later valid
 // certificate of the same qualification replaced, or whose technician is no longer an active member. A pending renewal
 // does not stop the reminders: the current expiry applies until HQ verifies it.
-func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
-	rows, err := c.Tx.Query(
+func (m Certificates) Remind(ctx context.Context, call *ops.Call) (int, error) {
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT c.id, c.organization_id, c.expires_at FROM maintenance.certificates c
 		JOIN maintenance.ref_memberships rm ON rm.id = c.membership_id AND rm.valid_from <= $1 AND (rm.valid_until IS NULL OR
@@ -966,8 +967,8 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 		  'valid' AND n.expires_at > c.expires_at
 		    AND (n.renewal_of = c.id OR (n.code = c.code AND c.code <> 'other')))
 		ORDER BY c.expires_at, c.id`,
-		c.Now,
-		c.Now.Add(time.Duration(reminderDays[len(reminderDays)-1])*24*time.Hour),
+		call.Now,
+		call.Now.Add(time.Duration(reminderDays[len(reminderDays)-1])*24*time.Hour),
 	)
 	if err != nil {
 		return 0, apperr.Wrap(err, "select maintenance.certificates")
@@ -990,9 +991,9 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 	n := 0
 
 	for _, d := range list {
-		days := reminderStage(d.expires, c.Now)
+		days := reminderStage(d.expires, call.Now)
 
-		tag, err := c.Tx.Exec(
+		tag, err := call.Tx.Exec(
 			ctx,
 			`INSERT INTO maintenance.certificate_reminders (certificate_id, days_before, tenant_id, sent_at)
 			SELECT $1, $2, current_setting('app.tenant_id')::uuid, $3
@@ -1000,7 +1001,7 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 			CONFLICT DO NOTHING`,
 			d.id,
 			days,
-			c.Now,
+			call.Now,
 		)
 		if err != nil {
 			return n, apperr.Wrap(err, "insert maintenance.certificate_reminders")
@@ -1012,7 +1013,7 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 
 		recipients, err := identity.Members(
 			ctx,
-			c,
+			call,
 			identity.MembersInput{
 				Role:           "contractor",
 				OrganizationID: &d.org,
@@ -1029,7 +1030,7 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 		}
 
 		for _, r := range recipients {
-			_, err := (notify.Store{}).Create(ctx, c, notify.New{
+			_, err := (notify.Store{}).Create(ctx, call, notify.New{
 				RecipientMembershipID: r,
 				Type:                  "certificate_expiry",
 				TemplateKey:           "certificate_expiry",
@@ -1048,7 +1049,7 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 			}
 		}
 
-		_, execErr := c.Tx.Exec(
+		_, execErr := call.Tx.Exec(
 			ctx,
 			`UPDATE maintenance.certificate_reminders SET notifications = $3 WHERE certificate_id = $1 AND days_before = $2`,
 			d.id,
@@ -1059,7 +1060,7 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 			return n, apperr.Wrap(execErr, "update maintenance.certificate_reminders")
 		}
 
-		c.Audit(
+		call.Audit(
 			ops.AuditEntry{
 				Action:     "certificates.remind",
 				TargetKind: "certificate",
@@ -1083,11 +1084,11 @@ func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
 }
 
 // RegisterCertificates binds the IR133 operations.
-func RegisterCertificates(r *ops.Registry, m Certificates) {
-	ops.Register(r, "certificates.submit", m.submit)
-	ops.Register(r, "certificates.verify", m.verify)
-	ops.Register(r, "certificates.requestTraining", m.requestTraining)
-	ops.Register(r, "certificates.list", m.list)
-	ops.Register(r, "certificates.getContent", m.content)
-	ops.Register(r, "parts.list", m.parts)
+func RegisterCertificates(reg *ops.Registry, m Certificates) {
+	ops.Register(reg, "certificates.submit", m.submit)
+	ops.Register(reg, "certificates.verify", m.verify)
+	ops.Register(reg, "certificates.requestTraining", m.requestTraining)
+	ops.Register(reg, "certificates.list", m.list)
+	ops.Register(reg, "certificates.getContent", m.content)
+	ops.Register(reg, "parts.list", m.parts)
 }

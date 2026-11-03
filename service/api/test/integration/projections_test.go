@@ -70,7 +70,7 @@ func listJob(s *apiserver.Server, a *actor, job string) map[string]any {
 }
 
 func TestContractorAndTechnicianProjections(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
@@ -99,11 +99,11 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		[]any{seed.ID("org-contractor-a"), seed.ID("tech-internal-a")},
 	)
 	unit := seed.ID("unit-non-rto").String()
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, m := write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	job := data(m)["id"].(string)
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	_, res := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	job := data(res)["id"].(string)
 	write(
-		s,
+		srv,
 		&hq,
 		"jobs.offer",
 		`{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").
@@ -112,11 +112,11 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 			49,
 			2,
 		)+
-			`,"offerExpiresAt":"`+ts(
+			`,"offerExpiresAt":"`+stamp(
 			12,
-		)+`","accessValidFrom":"`+ts(
+		)+`","accessValidFrom":"`+stamp(
 			1,
-		)+`","accessValidUntil":"`+ts(
+		)+`","accessValidUntil":"`+stamp(
 			100,
 		)+`","termsVersion":"t"}`,
 		1,
@@ -131,32 +131,32 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	)
 
 	// offer projection before acceptance
-	o := listJob(s, &contrA, job)
+	o := listJob(srv, &contrA, job)
 	if o == nil || o["projection"] != "offer" || o["status"] != "offered" || o["severity"] != nil ||
 		len(o["requiredQualifications"].([]any)) == 0 ||
 		o["unitId"] != nil {
 		t.Fatalf("offer projection: %v", o)
 	}
 
-	if code, m := post(
-		s,
+	if code, resp := post(
+		srv,
 		&contrA,
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); code != 200 || data(m)["projection"] != "offer" ||
-		data(m)["offerId"] != offer {
-		t.Fatalf("get offer: %d %v", code, m)
+	); code != 200 || data(resp)["projection"] != "offer" ||
+		data(resp)["offerId"] != offer {
+		t.Fatalf("get offer: %d %v", code, resp)
 	}
 
 	for body, want := range map[string]bool{
-		`{"filters":{"unitId":"` + unit + `"},"limit":100}`:                                                 false,
-		`{"filters":{"severity":"normal"},"limit":100}`:                                                     false,
-		`{"filters":{"organizationId":"` + seed.ID("org-contractor-a").String() + `"},"limit":100}`:         true,
-		`{"filters":{"organizationId":"` + seed.ID("org-contractor-b").String() + `"},"limit":100}`:         false,
-		`{"filters":{"status":"offered"},"limit":100}`:                                                      true,
-		`{"filters":{"status":"accepted"},"limit":100}`:                                                     false,
-		`{"filters":{"origin":"client_request","from":"` + ts(24) + `","to":"` + ts(26) + `"},"limit":100}`: true,
-		`{"filters":{"overdueOnly":true},"limit":100}`:                                                      false,
+		`{"filters":{"unitId":"` + unit + `"},"limit":100}`:                                                       false,
+		`{"filters":{"severity":"normal"},"limit":100}`:                                                           false,
+		`{"filters":{"organizationId":"` + seed.ID("org-contractor-a").String() + `"},"limit":100}`:               true,
+		`{"filters":{"organizationId":"` + seed.ID("org-contractor-b").String() + `"},"limit":100}`:               false,
+		`{"filters":{"status":"offered"},"limit":100}`:                                                            true,
+		`{"filters":{"status":"accepted"},"limit":100}`:                                                           false,
+		`{"filters":{"origin":"client_request","from":"` + stamp(24) + `","to":"` + stamp(26) + `"},"limit":100}`: true,
+		`{"filters":{"overdueOnly":true},"limit":100}`:                                                            false,
 		`{"filters":{"type":"reactive"},` +
 			`"limit":100}`: true, // the offer's public type (IR290)
 		`{"filters":{"type":"periodic"},"limit":100}`:                  false,
@@ -164,51 +164,51 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		`{"sort":{"field":"dueAt","direction":"asc"},"limit":100}`:     true,
 		`{"sort":{"field":"id","direction":"desc"},"limit":100}`:       true,
 	} {
-		if code, m := post(
-			s,
+		if code, resp := post(
+			srv,
 			&contrA,
 			"jobs.list",
 			body,
 		); code != 200 ||
-			(byJob(m, job) != nil) != want {
+			(byJob(resp, job) != nil) != want {
 			t.Errorf("%s: want %v", body, want)
 		}
 	}
 
-	if listJob(s, &contrB, job) != nil {
+	if listJob(srv, &contrB, job) != nil {
 		t.Error("other contractor sees the offer")
 	}
 
-	if code, _ := post(s, &contrB, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+	if code, _ := post(srv, &contrB, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Error("other contractor get")
 	}
 	// accepted before the access window: still the offer projection with public status accepted
 	write(
-		s,
+		srv,
 		&contrA,
 		"jobs.accept",
 		`{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`,
 		2,
 	)
 
-	if _, m := post(
-		s,
+	if _, resp := post(
+		srv,
 		&contrA,
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); data(m)["projection"] != "offer" ||
-		data(m)["status"] != "accepted" {
-		t.Fatalf("accepted offer: %v", m)
+	); data(resp)["projection"] != "offer" ||
+		data(resp)["status"] != "accepted" {
+		t.Fatalf("accepted offer: %v", resp)
 	}
 
-	if _, m := post(
-		s,
+	if _, resp := post(
+		srv,
 		&contrA,
 		"jobs.events",
 		`{"jobId":"`+job+`","query":{}}`,
-	); len(items(m)) != 1 ||
-		items(m)[0]["action"] != "offer.accepted" {
-		t.Fatalf("own decision events only: %v", m)
+	); len(items(resp)) != 1 ||
+		items(resp)[0]["action"] != "offer.accepted" {
+		t.Fatalf("own decision events only: %v", resp)
 	}
 	// inside the access window: summary / detail and all events
 	owner(
@@ -218,46 +218,47 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		clock.Add(-time.Hour),
 	)
 
-	if _, m := post(
-		s,
+	if _, resp := post(
+		srv,
 		&contrA,
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); data(m)["projection"] != "detail" {
-		t.Fatalf("detail in window: %v", m)
+	); data(resp)["projection"] != "detail" {
+		t.Fatalf("detail in window: %v", resp)
 	}
 
-	if row := listJob(s, &contrA, job); row["projection"] != "summary" {
+	if row := listJob(srv, &contrA, job); row["projection"] != "summary" {
 		t.Fatal("summary in window")
-	} else if row["accessValidFrom"] != clock.Add(-time.Hour).Format(time.RFC3339) || row["accessValidUntil"] != ts(100) {
+	} else if row["accessValidFrom"] != clock.Add(-time.Hour).Format(time.RFC3339) ||
+		row["accessValidUntil"] != stamp(100) {
 		t.Fatalf("the summary carries the accepted offer's access window (IR227): %v", row)
 	}
 
-	if _, m := post(
-		s,
+	if _, resp := post(
+		srv,
 		&contrA,
 		"jobs.events",
 		`{"jobId":"`+job+`","query":{}}`,
 	); len(
-		items(m),
+		items(resp),
 	) < 3 {
-		t.Fatalf("all events in window: %v", m)
+		t.Fatalf("all events in window: %v", resp)
 	}
 	// the list counts the events the caller reads and those the customer reads, with the newest (IR506); HQ's
 	// internal note is the contractor's to read, not the customer's
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"Check parts stock","visibility":"internal"}`,
-		int(listJob(s, &contrA, job)["version"].(float64)),
+		int(listJob(srv, &contrA, job)["version"].(float64)),
 	); code != 200 {
 		t.Fatalf("internal note: %d", code)
 	}
 
-	_, all := post(s, &contrA, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
-	_, seen := post(s, &customerA, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
-	es := listJob(s, &contrA, job)["eventSummary"].(map[string]any)
+	_, all := post(srv, &contrA, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
+	_, seen := post(srv, &customerA, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
+	es := listJob(srv, &contrA, job)["eventSummary"].(map[string]any)
 
 	newest := items(all)[len(items(all))-1]
 	if es["count"] != float64(len(items(all))) ||
@@ -274,7 +275,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		)
 	}
 
-	if cs := listJob(s, &customerA, job)["eventSummary"].(map[string]any); cs["count"] != float64(
+	if cs := listJob(srv, &customerA, job)["eventSummary"].(map[string]any); cs["count"] != float64(
 		len(items(seen)),
 	) ||
 		cs["count"] != cs["customerVisible"] ||
@@ -289,89 +290,89 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		clock.Add(-time.Minute),
 	)
 
-	if code, _ := post(s, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
+	if code, _ := post(srv, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
 		t.Error("ended window before freeze")
 	}
 
 	freeze(t, clock)
 	freeze(t, clock) // idempotent
 
-	code, m := post(s, &contrA, "jobs.get", `{"jobId":"`+job+`"}`)
+	code, res := post(srv, &contrA, "jobs.get", `{"jobId":"`+job+`"}`)
 
-	h := data(m)
+	h := data(res)
 	if code != 200 || h["projection"] != "history" || h["dueAt"] != nil || h["severity"] != nil ||
 		len(h["ownDecisionEvents"].([]any)) != 1 ||
 		h["redactedReportSummary"].(map[string]any)["hasReport"] != false {
-		t.Fatalf("history: %d %v", code, m)
+		t.Fatalf("history: %d %v", code, res)
 	}
 
-	if code, m := post(
-		s,
+	if code, resp := post(
+		srv,
 		&contrA,
 		"jobs.list",
 		`{"filters":{"status":"assigned"},"limit":100}`,
 	); code != 200 ||
-		byJob(m, job) != nil {
+		byJob(resp, job) != nil {
 		t.Error("history status filter")
 	}
 	// without a completion the history counts at its as-of, when the delegation ended (IR614)
 	for period, want := range map[string]bool{
-		`"from":"` + ts(-100) + `"`: true, `"from":"` + ts(1) + `"`: false,
-		`"to":"` + ts(-100) + `"`: false,
+		`"from":"` + stamp(-100) + `"`: true, `"from":"` + stamp(1) + `"`: false,
+		`"to":"` + stamp(-100) + `"`: false,
 	} {
-		if code, m := post(
-			s,
+		if code, resp := post(
+			srv,
 			&contrA,
 			"jobs.list",
 			`{"filters":{`+period+`},"limit":100}`,
 		); code != 200 ||
-			(byJob(m, job) != nil) != want {
+			(byJob(resp, job) != nil) != want {
 			t.Errorf("history period filter {%s} on null completedAt: want %v", period, want)
 		}
 	}
 
-	if _, m := post(
-		s,
+	if _, resp := post(
+		srv,
 		&contrA,
 		"jobs.list",
 		`{"filters":{"status":"accepted","organizationId":"`+seed.ID("org-contractor-a").
 			String()+
 			`"},"limit":100}`,
 	); byJob(
-		m,
+		resp,
 		job,
 	) == nil {
 		t.Error("history with own organization")
 	}
 
 	for typ, want := range map[string]bool{"reactive": true, "preventive": false} { // the history's public type (IR290)
-		if code, m := post(
-			s,
+		if code, resp := post(
+			srv,
 			&contrA,
 			"jobs.list",
 			`{"filters":{"type":"`+typ+`"},"limit":100}`,
 		); code != 200 ||
-			(byJob(m, job) != nil) != want {
+			(byJob(resp, job) != nil) != want {
 			t.Errorf("history type filter %s: want %v", typ, want)
 		}
 	}
 
-	if _, m := post(
-		s,
+	if _, resp := post(
+		srv,
 		&contrA,
 		"jobs.events",
 		`{"jobId":"`+job+`","query":{}}`,
 	); len(
-		items(m),
+		items(resp),
 	) != 1 {
 		t.Error("history events are own decisions only")
 	}
 
 	// expired unanswered offers disappear
-	_, m = write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	j2 := data(m)["id"].(string)
+	_, res = write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	j2 := data(res)["id"].(string)
 	write(
-		s,
+		srv,
 		&hq,
 		"jobs.offer",
 		`{"jobId":"`+j2+`","contractorOrgId":"`+seed.ID("org-contractor-a").
@@ -380,89 +381,89 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 			49,
 			2,
 		)+
-			`,"offerExpiresAt":"`+ts(
+			`,"offerExpiresAt":"`+stamp(
 			12,
-		)+`","accessValidFrom":"`+ts(
+		)+`","accessValidFrom":"`+stamp(
 			1,
-		)+`","accessValidUntil":"`+ts(
+		)+`","accessValidUntil":"`+stamp(
 			100,
 		)+`","termsVersion":"t"}`,
 		1,
 	)
 	owner(t, `UPDATE maintenance.offers SET offer_expires_at = $2 WHERE job_id = $1`, j2, clock)
 
-	if listJob(s, &contrA, j2) != nil {
+	if listJob(srv, &contrA, j2) != nil {
 		t.Error("expired offer listed")
 	}
 
 	// technician: detail during the viewing window, history after it
-	_, m = write(
-		s,
+	_, res = write(
+		srv,
 		&hq,
 		"jobs.create",
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	k := data(m)["id"].(string)
+	key := data(res)["id"].(string)
 	write(
-		s,
+		srv,
 		&hq,
 		"jobs.assign",
-		`{"jobId":"`+k+`","technicianMembershipId":"`+seed.ID("tech-internal-a").
+		`{"jobId":"`+key+`","technicianMembershipId":"`+seed.ID("tech-internal-a").
 			String()+
-			`","startAt":"`+ts(
+			`","startAt":"`+stamp(
 			25,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			27,
 		)+`"}`,
 		1,
 	)
 
-	if code, m := post(
-		s,
+	if code, resp := post(
+		srv,
 		&techInt,
 		"jobs.get",
-		`{"jobId":"`+k+`"}`,
+		`{"jobId":"`+key+`"}`,
 	); code != 200 ||
-		data(m)["projection"] != "detail" {
-		t.Fatalf("technician detail: %d %v", code, m)
+		data(resp)["projection"] != "detail" {
+		t.Fatalf("technician detail: %d %v", code, resp)
 	}
 
-	if _, m := post(
-		s,
+	if _, resp := post(
+		srv,
 		&techInt,
 		"jobs.list",
 		`{"filters":{"unitId":"`+unit+`"},"limit":100}`,
 	); byJob(
-		m,
-		k,
+		resp,
+		key,
 	) == nil {
 		t.Fatal("technician summary")
 	} else if row := byJob(
-		m,
-		k,
+		resp,
+		key,
 	); row["technicianMembershipId"] != seed.ID("tech-internal-a").String() ||
 		row["assignmentAcknowledgement"] != "pending" {
 		t.Fatalf("the summary names the active assignment's technician (IR225): %v", row)
 	}
 
-	if _, m := post(
-		s,
+	if _, resp := post(
+		srv,
 		&hq,
 		"jobs.list",
 		`{"filters":{"unitId":"`+unit+`"},"limit":100}`,
-	); byJob(m, job)["technicianMembershipId"] != nil {
-		t.Errorf("a job without an active assignment has no technician: %v", byJob(m, job))
-	} else if byJob(m, k)["accessValidFrom"] != nil || byJob(m, k)["accessValidUntil"] != nil ||
-		byJob(m, job)["accessValidUntil"] == nil {
+	); byJob(resp, job)["technicianMembershipId"] != nil {
+		t.Errorf("a job without an active assignment has no technician: %v", byJob(resp, job))
+	} else if byJob(resp, key)["accessValidFrom"] != nil || byJob(resp, key)["accessValidUntil"] != nil ||
+		byJob(resp, job)["accessValidUntil"] == nil {
 		t.Errorf(
 			"an internal job has no access window, a delegated one keeps its offer's: %v / %v",
-			byJob(m, k),
-			byJob(m, job),
+			byJob(resp, key),
+			byJob(resp, job),
 		)
 	}
 
-	if code, _ := post(s, &techA, "jobs.get", `{"jobId":"`+k+`"}`); code != 404 {
+	if code, _ := post(srv, &techA, "jobs.get", `{"jobId":"`+key+`"}`); code != 404 {
 		t.Error("another technician")
 	}
 
@@ -471,7 +472,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
 			job_id <> $2 AND scheduled && tstzrange($3, $4)`,
 		seed.ID("tech-internal-a"),
-		k,
+		key,
 		clock.Add(-3*time.Hour),
 		clock.Add(-time.Hour),
 	)
@@ -479,28 +480,28 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		t,
 		`UPDATE maintenance.assignments SET scheduled = tstzrange($2, $3), created_at = $2 WHERE job_id = $1 AND status =
 			'active'`,
-		k,
+		key,
 		clock.Add(-3*time.Hour),
 		clock.Add(-time.Hour),
 	)
 
-	if code, _ := post(s, &techInt, "jobs.get", `{"jobId":"`+k+`"}`); code != 404 {
+	if code, _ := post(srv, &techInt, "jobs.get", `{"jobId":"`+key+`"}`); code != 404 {
 		t.Error("ended viewing window before freeze")
 	}
 
 	freeze(t, clock)
 
-	if code, m := post(
-		s,
+	if code, resp := post(
+		srv,
 		&techInt,
 		"jobs.get",
-		`{"jobId":"`+k+`"}`,
-	); code != 200 || data(m)["projection"] != "history" ||
-		len(data(m)["ownDecisionEvents"].([]any)) != 0 {
-		t.Fatalf("technician history: %d %v", code, m)
+		`{"jobId":"`+key+`"}`,
+	); code != 200 || data(resp)["projection"] != "history" ||
+		len(data(resp)["ownDecisionEvents"].([]any)) != 0 {
+		t.Fatalf("technician history: %d %v", code, resp)
 	}
 
-	if listJob(s, &techInt, k) == nil {
+	if listJob(srv, &techInt, key) == nil {
 		t.Error("technician history listed")
 	}
 }

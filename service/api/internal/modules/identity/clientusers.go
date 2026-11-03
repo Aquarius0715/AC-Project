@@ -50,29 +50,29 @@ const clientUserCols = `x.id, x.tenant_id, x.version, x.created_at, x.updated_at
 const clientUserFrom = `identity.client_users x JOIN notify.ref_customers cu ON cu.id = x.customer_id`
 
 func scanClientUser(r pgx.Row) (ClientUser, error) {
-	var x ClientUser
+	var clientUser ClientUser
 
 	err := r.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.UpdatedAt,
-		&x.CustomerID,
-		&x.MembershipID,
-		&x.Email,
-		&x.DisplayName,
-		&x.ClientRole,
-		&x.Status,
-		&x.LastSignInAt,
-		&x.AllowedChannels,
-		&x.InvitedAt,
-		&x.InvitedByMembershipID,
-		&x.RevokedAt,
-		&x.customerOrg,
+		&clientUser.ID,
+		&clientUser.TenantID,
+		&clientUser.Version,
+		&clientUser.CreatedAt,
+		&clientUser.UpdatedAt,
+		&clientUser.CustomerID,
+		&clientUser.MembershipID,
+		&clientUser.Email,
+		&clientUser.DisplayName,
+		&clientUser.ClientRole,
+		&clientUser.Status,
+		&clientUser.LastSignInAt,
+		&clientUser.AllowedChannels,
+		&clientUser.InvitedAt,
+		&clientUser.InvitedByMembershipID,
+		&clientUser.RevokedAt,
+		&clientUser.customerOrg,
 	)
 
-	return x, apperr.Wrap(err, "scan (scanClientUser)")
+	return clientUser, apperr.Wrap(err, "scan (scanClientUser)")
 }
 
 // ownerOnly enforces the client:self-customer:owner alternative: clients must be owners (FORBIDDEN).
@@ -116,10 +116,10 @@ func ownerOnly(c *ops.Call) error {
 //	@Router			/v1/client-users [get]
 func clientUsersList(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[ClientUser], error) {
-	err := ownerOnly(c)
+	err := ownerOnly(call)
 	if err != nil {
 		return paging.Page[ClientUser]{}, err
 	}
@@ -131,8 +131,8 @@ func clientUsersList(
 		Search     *string    `json:"search,omitempty"` // email or display name contains, case-insensitive
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil ||
@@ -145,7 +145,7 @@ func clientUsersList(
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{
 			"id":        "x.id",
 			"name":      "lower(COALESCE(x.display_name, x.email::text))",
@@ -160,7 +160,7 @@ func clientUsersList(
 		return paging.Page[ClientUser]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[ClientUser]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -174,8 +174,8 @@ func clientUsersList(
 	}
 
 	conds := []string{"TRUE"}
-	if c.Principal.Role == "client" {
-		conds = append(conds, "cu.organization_id = "+add(c.Principal.OrgID))
+	if call.Principal.Role == "client" {
+		conds = append(conds, "cu.organization_id = "+add(call.Principal.OrgID))
 	}
 
 	if f.CustomerID != nil {
@@ -199,13 +199,13 @@ func clientUsersList(
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+clientUserFrom+" WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM "+clientUserFrom+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[ClientUser]{}, apperr.Wrap(scanErr, "select identity.client_users")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM %s WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
@@ -213,8 +213,8 @@ func clientUsersList(
 			clientUserFrom,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -240,25 +240,30 @@ func clientUsersList(
 
 	return paging.Page[ClientUser]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
-func loadClientUser(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (ClientUser, error) {
+func loadClientUser(
+	ctx context.Context,
+	call *ops.Call,
+	id uuid.UUID,
+	lock bool,
+) (ClientUser, error) {
 	q := "SELECT " + clientUserCols + " FROM " + clientUserFrom + " WHERE x.id = $1"
 	if lock {
 		q += " FOR UPDATE OF x"
 	}
 
-	x, err := scanClientUser(c.Tx.QueryRow(ctx, q, id))
+	clientUser, err := scanClientUser(call.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && c.Principal.Role == "client" && x.customerOrg != c.Principal.OrgID) {
+		(err == nil && call.Principal.Role == "client" && clientUser.customerOrg != call.Principal.OrgID) {
 		return ClientUser{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
-	return x, err
+	return clientUser, err
 }
 
 // ClientUserInput is clientUsers.save input.
@@ -275,9 +280,9 @@ type ClientUserInput struct {
 
 // Validate implements ops.Validator.
 func (in *ClientUserInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.CustomerID == uuid.Nil {
-		fe["customerId"] = "error.required"
+		fieldErrs["customerId"] = "error.required"
 	}
 
 	in.Email = strings.TrimSpace(in.Email)
@@ -287,43 +292,47 @@ func (in *ClientUserInput) Validate() map[string]string {
 	)
 	if err != nil || a.Address != in.Email ||
 		len(in.Email) > 254 {
-		fe["email"] = "error.invalid"
+		fieldErrs["email"] = "error.invalid"
 	}
 
 	if in.ClientRole != "owner" && in.ClientRole != "member" {
-		fe["clientRole"] = "error.invalid"
+		fieldErrs["clientRole"] = "error.invalid"
 	}
 
 	if in.Status != nil && *in.Status != "active" && *in.Status != "disabled" {
-		fe["status"] = "error.invalid"
+		fieldErrs["status"] = "error.invalid"
 	}
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
 		if n := utf8.RuneCountInString(*in.Reason); n < 1 || n > 1000 {
-			fe["reason"] = "error.length"
+			fieldErrs["reason"] = "error.length"
 		}
 	}
 
 	if in.ID == nil { // a new user is named (IR461)
 		if in.DisplayName == nil {
-			fe["displayName"] = "error.required"
+			fieldErrs["displayName"] = "error.required"
 		} else if *in.DisplayName = strings.TrimSpace(*in.DisplayName); utf8.RuneCountInString(*in.DisplayName) < 1 ||
 			utf8.RuneCountInString(*in.DisplayName) > 120 {
-			fe["displayName"] = "error.length"
+			fieldErrs["displayName"] = "error.length"
 		}
 	} else if in.DisplayName != nil {
-		fe["displayName"] = "error.notAllowed"
+		fieldErrs["displayName"] = "error.notAllowed"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // otherActiveOwner reports whether the customer keeps another active owner besides the given client user. The
 // customer's changes to its owners wait for each other here, so two at once — each demoting, disabling or removing
 // the other owner — cannot both see the other still active (IR471).
-func otherActiveOwner(ctx context.Context, c *ops.Call, customer, except uuid.UUID) (bool, error) {
-	_, execErr := c.Tx.Exec(
+func otherActiveOwner(
+	ctx context.Context,
+	call *ops.Call,
+	customer, except uuid.UUID,
+) (bool, error) {
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`SELECT pg_advisory_xact_lock(hashtext('identity.active_owners:' || $1::text))`,
 		customer,
@@ -334,7 +343,8 @@ func otherActiveOwner(ctx context.Context, c *ops.Call, customer, except uuid.UU
 
 	var ok bool
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.client_users WHERE customer_id = $1 AND id <> $2 AND
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.client_users WHERE customer_id = $1 AND id <> $2
+		AND
 		client_role = 'owner' AND status = 'active')`, customer, except).
 		Scan(&ok)
 
@@ -371,18 +381,18 @@ func otherActiveOwner(ctx context.Context, c *ops.Call, customer, except uuid.UU
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/client-users [post]
-func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (ClientUser, error) {
-	ownerOnlyErr := ownerOnly(c)
+func clientUsersSave(ctx context.Context, call *ops.Call, in *ClientUserInput) (ClientUser, error) {
+	ownerOnlyErr := ownerOnly(call)
 	if ownerOnlyErr != nil {
 		return ClientUser{}, ownerOnlyErr
 	}
 
 	var org uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `SELECT organization_id FROM notify.ref_customers WHERE id = $1`, in.CustomerID).
+	err := call.Tx.QueryRow(ctx, `SELECT organization_id FROM notify.ref_customers WHERE id = $1`, in.CustomerID).
 		Scan(&org)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && c.Principal.Role == "client" && org != c.Principal.OrgID) {
+		(err == nil && call.Principal.Role == "client" && org != call.Principal.OrgID) {
 		return ClientUser{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
@@ -398,7 +408,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 		self = *in.ID
 	}
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.client_users WHERE customer_id = $1 AND email =
+	scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.client_users WHERE customer_id = $1 AND email =
 		$2::citext AND id <> $3)`, in.CustomerID, in.Email, self).
 		Scan(&dup)
 	if scanErr != nil {
@@ -418,7 +428,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 
 		role := in.ClientRole
 
-		_, membership, err := createAccount(ctx, c, newAccount{
+		_, membership, err := createAccount(ctx, call, newAccount{
 			Email:       in.Email,
 			DisplayName: *in.DisplayName,
 			Role:        "client",
@@ -437,7 +447,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 
 		id := uuid.New()
 
-		_, execErr := c.Tx.Exec(
+		_, execErr := call.Tx.Exec(
 			ctx,
 			`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role,
 				status, invited_at, invited_by_membership_id, last_invite_sent_at, created_at, updated_at)
@@ -448,15 +458,15 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 			in.Email,
 			*in.DisplayName,
 			in.ClientRole,
-			c.Now,
-			c.Principal.MembershipID,
+			call.Now,
+			call.Principal.MembershipID,
 		)
 		if execErr != nil {
 			return ClientUser{}, apperr.Wrap(execErr, "insert identity.client_users")
 		}
 
 		v := 1
-		c.Audit(
+		call.Audit(
 			ops.AuditEntry{
 				Action:          "clientUsers.save",
 				TargetKind:      "client_user",
@@ -470,114 +480,114 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 			},
 		)
 
-		return loadClientUser(ctx, c, id, false)
+		return loadClientUser(ctx, call, id, false)
 	}
 
-	x, err := loadClientUser(ctx, c, *in.ID, true)
+	clientUser, err := loadClientUser(ctx, call, *in.ID, true)
 	if err != nil {
-		return x, err
+		return clientUser, err
 	}
 
-	if x.Version != *c.ExpectedVersion {
-		return x, apperr.E(apperr.Conflict, "error.versionConflict")
+	if clientUser.Version != *call.ExpectedVersion {
+		return clientUser, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if c.Principal.Role == "client" && x.MembershipID != nil &&
-		*x.MembershipID == c.Principal.MembershipID { // an owner never changes the own account (IR417)
-		return x, apperr.E(apperr.Conflict, "errors.own_account")
+	if call.Principal.Role == "client" && clientUser.MembershipID != nil &&
+		*clientUser.MembershipID == call.Principal.MembershipID { // an owner never changes the own account (IR417)
+		return clientUser, apperr.E(apperr.Conflict, "errors.own_account")
 	}
 	// the e-mail is the sign-in account's, created with the user (IR461): it stays, for HQ too (IR422)
-	if !strings.EqualFold(in.Email, x.Email) {
-		return x, apperr.Fields(map[string]string{"email": "error.immutable"})
+	if !strings.EqualFold(in.Email, clientUser.Email) {
+		return clientUser, apperr.Fields(map[string]string{"email": "error.immutable"})
 	}
 
-	in.Email = x.Email // the same address in other letter case keeps the stored spelling
-	if x.CustomerID != in.CustomerID {
-		return x, apperr.Fields(map[string]string{"customerId": "error.immutable"})
+	in.Email = clientUser.Email // the same address in other letter case keeps the stored spelling
+	if clientUser.CustomerID != in.CustomerID {
+		return clientUser, apperr.Fields(map[string]string{"customerId": "error.immutable"})
 	}
 
 	if in.Reason == nil {
-		return x, apperr.Fields(map[string]string{"reason": "error.required"})
+		return clientUser, apperr.Fields(map[string]string{"reason": "error.required"})
 	}
 
-	status := x.Status
+	status := clientUser.Status
 	if in.Status != nil {
 		status = *in.Status
 	}
 
-	if status == "active" && x.Status == "invited" ||
-		status == "active" && x.Status != "active" &&
-			x.MembershipID == nil { // an invite becomes active only on first sign-in
-		return x, apperr.E(apperr.Conflict, "errors.invite_pending")
+	if status == "active" && clientUser.Status == "invited" ||
+		status == "active" && clientUser.Status != "active" &&
+			clientUser.MembershipID == nil { // an invite becomes active only on first sign-in
+		return clientUser, apperr.E(apperr.Conflict, "errors.invite_pending")
 	}
 
-	if x.RevokedAt != nil &&
+	if clientUser.RevokedAt != nil &&
 		status != "disabled" { // HQ ended the access: a save would open the membership again, only HQ gives it back (IR508)
-		return x, apperr.E(apperr.Conflict, "errors.revoked_by_hq")
+		return clientUser, apperr.E(apperr.Conflict, "errors.revoked_by_hq")
 	}
 
-	if x.ClientRole == "owner" && x.Status == "active" &&
+	if clientUser.ClientRole == "owner" && clientUser.Status == "active" &&
 		(in.ClientRole != "owner" || status != "active") {
-		ok, err := otherActiveOwner(ctx, c, x.CustomerID, x.ID)
+		ok, err := otherActiveOwner(ctx, call, clientUser.CustomerID, clientUser.ID)
 		if err != nil {
-			return x, err
+			return clientUser, err
 		}
 
 		if !ok {
-			return x, apperr.E(apperr.Conflict, "errors.last_owner")
+			return clientUser, apperr.E(apperr.Conflict, "errors.last_owner")
 		}
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE identity.client_users SET email = $2, client_role = $3, status = $4, version = version + 1, updated_at = $5
 			WHERE id = $1`,
-		x.ID,
+		clientUser.ID,
 		in.Email,
 		in.ClientRole,
 		status,
-		c.Now,
+		call.Now,
 	)
 	if execErr != nil {
-		return x, apperr.Wrap(execErr, "update identity.client_users")
+		return clientUser, apperr.Wrap(execErr, "update identity.client_users")
 	}
 
-	if x.MembershipID != nil { // keep the membership in step: role and access window
+	if clientUser.MembershipID != nil { // keep the membership in step: role and access window
 		// $4 is cast: inside CASE … ELSE NULL the parameter's type would be taken as text
 		// an account created this instant (IR461) ends a second after it starts, as the membership's check requires
-		_, err := c.Tx.Exec(
+		_, err := call.Tx.Exec(
 			ctx,
 			`UPDATE identity.memberships SET client_role = $2, valid_until = CASE WHEN $3 = 'disabled' THEN
 				GREATEST($4::timestamptz, valid_from + interval '1 second') ELSE NULL END,
 			scope_version = scope_version + 1, version = version + 1, updated_at = $4 WHERE id = $1`,
-			*x.MembershipID,
+			*clientUser.MembershipID,
 			in.ClientRole,
 			status,
-			c.Now,
+			call.Now,
 		)
 		if err != nil {
-			return x, apperr.Wrap(err, "update identity.memberships")
+			return clientUser, apperr.Wrap(err, "update identity.memberships")
 		}
 
-		if status != x.Status &&
-			(status == "disabled" || x.Status == "disabled") { // the sign-in follows (IR461)
-			setAccountEnabled(c, *x.MembershipID, status != "disabled")
+		if status != clientUser.Status &&
+			(status == "disabled" || clientUser.Status == "disabled") { // the sign-in follows (IR461)
+			setAccountEnabled(call, *clientUser.MembershipID, status != "disabled")
 		}
 	}
 
-	next := x.Version + 1
-	c.Audit(
+	next := clientUser.Version + 1
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "clientUsers.save",
 			TargetKind:      "client_user",
-			TargetID:        x.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			TargetID:        clientUser.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next,
 			Reason:          *in.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return loadClientUser(ctx, c, x.ID, false)
+	return loadClientUser(ctx, call, clientUser.ID, false)
 }
 
 // RemoveInput is clientUsers.remove input.
@@ -588,17 +598,17 @@ type RemoveInput struct {
 
 // Validate implements ops.Validator.
 func (in *RemoveInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.ID == uuid.Nil {
-		fe["id"] = "error.required"
+		fieldErrs["id"] = "error.required"
 	}
 
 	in.Reason = strings.TrimSpace(in.Reason)
 	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
-		fe["reason"] = "error.length"
+		fieldErrs["reason"] = "error.length"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // Deleted is DeletedResource.
@@ -635,28 +645,28 @@ type Deleted struct {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/client-users/{id} [delete]
-func clientUsersRemove(ctx context.Context, c *ops.Call, in *RemoveInput) (Deleted, error) {
+func clientUsersRemove(ctx context.Context, c *ops.Call, input *RemoveInput) (Deleted, error) {
 	err := ownerOnly(c)
 	if err != nil {
 		return Deleted{}, err
 	}
 
-	x, err := loadClientUser(ctx, c, in.ID, true)
+	clientUser, err := loadClientUser(ctx, c, input.ID, true)
 	if err != nil {
 		return Deleted{}, err
 	}
 
-	if x.Version != *c.ExpectedVersion {
+	if clientUser.Version != *c.ExpectedVersion {
 		return Deleted{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if c.Principal.Role == "client" && x.MembershipID != nil &&
-		*x.MembershipID == c.Principal.MembershipID { // IR417
+	if c.Principal.Role == "client" && clientUser.MembershipID != nil &&
+		*clientUser.MembershipID == c.Principal.MembershipID { // IR417
 		return Deleted{}, apperr.E(apperr.Conflict, "errors.own_account")
 	}
 
-	if x.ClientRole == "owner" && x.Status == "active" {
-		ok, err := otherActiveOwner(ctx, c, x.CustomerID, x.ID)
+	if clientUser.ClientRole == "owner" && clientUser.Status == "active" {
+		ok, err := otherActiveOwner(ctx, c, clientUser.CustomerID, clientUser.ID)
 		if err != nil {
 			return Deleted{}, err
 		}
@@ -669,39 +679,39 @@ func clientUsersRemove(ctx context.Context, c *ops.Call, in *RemoveInput) (Delet
 	_, execErr := c.Tx.Exec(
 		ctx,
 		`DELETE FROM identity.client_users WHERE id = $1`,
-		x.ID,
+		clientUser.ID,
 	)
 	if execErr != nil {
 		return Deleted{}, apperr.Wrap(execErr, "delete identity.client_users")
 	}
 
-	if x.MembershipID != nil {
+	if clientUser.MembershipID != nil {
 		_, err := c.Tx.Exec(
 			ctx,
 			`UPDATE identity.memberships SET valid_until = GREATEST($2::timestamptz, valid_from + interval '1 second'),
 				scope_version = scope_version + 1, version = version + 1, updated_at = $2
 			WHERE id = $1 AND (valid_until IS NULL OR valid_until > $2)`,
-			*x.MembershipID,
+			*clientUser.MembershipID,
 			c.Now,
 		)
 		if err != nil {
 			return Deleted{}, apperr.Wrap(err, "update identity.memberships")
 		}
 
-		setAccountEnabled(c, *x.MembershipID, false) // the sign-in ends too (IR461)
+		setAccountEnabled(c, *clientUser.MembershipID, false) // the sign-in ends too (IR461)
 	}
 
 	c.Audit(
 		ops.AuditEntry{
 			Action:          "clientUsers.remove",
 			TargetKind:      "client_user",
-			TargetID:        x.ID.String(),
+			TargetID:        clientUser.ID.String(),
 			PreviousVersion: c.ExpectedVersion,
-			Reason:          in.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
+			Reason:          input.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return Deleted{ID: x.ID, Deleted: true}, nil
+	return Deleted{ID: clientUser.ID, Deleted: true}, nil
 }
 
 // ResendInput is clientUsers.resendInvite input.
@@ -769,51 +779,55 @@ type InvitePreview struct {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/client-users/{id}/resend-invite [post]
-func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (InvitePreview, error) {
-	err := ownerOnly(c)
+func clientUsersResend(
+	ctx context.Context,
+	call *ops.Call,
+	in *ResendInput,
+) (InvitePreview, error) {
+	err := ownerOnly(call)
 	if err != nil {
 		return InvitePreview{}, err
 	}
 
-	x, err := loadClientUser(ctx, c, in.ID, false)
+	clientUser, err := loadClientUser(ctx, call, in.ID, false)
 	if err != nil {
 		return InvitePreview{}, err
 	}
 
-	if x.Status != "invited" {
+	if clientUser.Status != "invited" {
 		return InvitePreview{}, apperr.E(apperr.Conflict, "errors.invite_not_pending")
 	}
 
-	inviteResendWaitErr := inviteResendWait(ctx, c, "client_users", x.ID)
+	inviteResendWaitErr := inviteResendWait(ctx, call, "client_users", clientUser.ID)
 	if inviteResendWaitErr != nil {
 		return InvitePreview{}, inviteResendWaitErr
 	}
 
 	var user uuid.UUID // the set-up e-mail again (IR461)
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *x.MembershipID).
+	scanErr := call.Tx.QueryRow(ctx, `SELECT user_id FROM identity.memberships WHERE id = $1`, *clientUser.MembershipID).
 		Scan(&user)
 	if scanErr != nil {
 		return InvitePreview{}, apperr.Wrap(scanErr, "select identity.memberships")
 	}
 
-	requestAccount(c, user, *x.MembershipID, "client")
+	requestAccount(call, user, *clientUser.MembershipID, "client")
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE identity.client_users SET last_invite_sent_at = $2 WHERE id = $1`,
-		x.ID,
-		c.Now,
+		clientUser.ID,
+		call.Now,
 	)
 	if execErr != nil {
 		return InvitePreview{}, apperr.Wrap(execErr, "update identity.client_users")
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "clientUsers.resendInvite",
 			TargetKind:      "client_user",
-			TargetID:        x.ID.String(),
+			TargetID:        clientUser.ID.String(),
 			Reason:          "set-up e-mail sent again",
 			PreviousVersion: nil,
 			NextVersion:     nil,
@@ -825,17 +839,17 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 
 	return InvitePreview{
 		ID:          uuid.New(),
-		TenantID:    x.TenantID,
+		TenantID:    clientUser.TenantID,
 		Version:     1,
-		CreatedAt:   c.Now,
-		UpdatedAt:   c.Now,
+		CreatedAt:   call.Now,
+		UpdatedAt:   call.Now,
 		TargetOpen:  true,
 		Type:        "invite",
-		Target:      map[string]string{"kind": "client_user", "id": x.ID.String()},
+		Target:      map[string]string{"kind": "client_user", "id": clientUser.ID.String()},
 		TemplateKey: "invite",
 		Params: map[string]any{
-			"targetName":  x.Email,
-			"at":          c.Now,
+			"targetName":  clientUser.Email,
+			"at":          call.Now,
 			"status":      "invited",
 			"reason":      nil,
 			"amountMinor": nil,
@@ -846,7 +860,7 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 		Channel:                "email",
 		DeliveryState:          "queued",
 		Severity:               "normal",
-		OccurredAt:             c.Now,
+		OccurredAt:             call.Now,
 		SourceAlertID:          nil,
 		RecipientMembershipID:  nil,
 		ScopeVersionAtCreation: 0,

@@ -539,13 +539,13 @@ func (v maintenanceView) rateAt(ctx context.Context, c *ops.Call, in *rateIn) (r
 // and its note.added event (IR193).
 func (v maintenanceView) AddJobNote(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	job uuid.UUID,
 	message string,
 ) error {
 	var tenant uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
+	err := call.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
 		Scan(&tenant)
 	if err != nil {
 		return apperr.Wrap(err, "select current_setting")
@@ -553,16 +553,16 @@ func (v maintenanceView) AddJobNote(
 
 	return apperr.Wrap(events.Publish(
 		ctx,
-		c.Tx,
+		call.Tx,
 		tenant,
 		"job",
 		job,
 		events.JobNoteRequested,
 		events.JobNote{
 			JobID:        job,
-			AuthorUserID: c.Principal.UserID,
+			AuthorUserID: call.Principal.UserID,
 			Message:      message,
-			At:           c.Now,
+			At:           call.Now,
 		},
 	), "events.Publish")
 }

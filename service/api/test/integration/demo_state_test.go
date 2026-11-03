@@ -14,7 +14,7 @@ import (
 // only the last-seen time (IR528); a report without a state, with a mode the air conditioner has no word for, or from
 // after the scenario clock is refused.
 func TestDemoStateReport(t *testing.T) {
-	s := serverWith(t, true)
+	srv := serverWith(t, true)
 	unit, device := seed.ID("unit-limited"), seed.ID("device-limited")
 
 	var state, seen string
@@ -37,7 +37,7 @@ func TestDemoStateReport(t *testing.T) {
 
 	report := func(at time.Time, st string) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&customerB,
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at.Format(
@@ -48,28 +48,28 @@ func TestDemoStateReport(t *testing.T) {
 		)
 	}
 
-	at := clock.Add(-30 * time.Second)
+	when := clock.Add(-30 * time.Second)
 	if code, m := report(
-		at,
+		when,
 		`,"state":{"power":false,"celsius":27,"mode":"dry","fanLevel":"high"}`,
 	); code != 200 {
 		t.Fatalf("state report: %d %v", code, m)
 	}
 
-	_, m := post(s, &hq, "units.get", `{"id":"`+unit.String()+`"}`)
+	_, res := post(srv, &hq, "units.get", `{"id":"`+unit.String()+`"}`)
 
-	o := data(m)["observedState"].(map[string]any)
+	o := data(res)["observedState"].(map[string]any)
 	if o["power"] != false || o["celsius"] != 27.0 || o["mode"] != "dry" ||
 		o["fanLevel"] != "high" ||
-		o["observedAt"] != at.Format(time.RFC3339) {
+		o["observedAt"] != when.Format(time.RFC3339) {
 		t.Errorf("observed state %v", o)
 	}
 
 	var last time.Time
 	ownerScan(t, `SELECT last_seen_at FROM assets.units WHERE id = $1`, []any{unit}, &last)
 
-	if !last.Equal(at) && last.Before(at) {
-		t.Errorf("last seen %v, want at least %v", last, at)
+	if !last.Equal(when) && last.Before(when) {
+		t.Errorf("last seen %v, want at least %v", last, when)
 	}
 	// a report with no settings (a module that reports none, IR528) is heard only: the observed state stays
 	later := clock.Add(-10 * time.Second)
@@ -80,11 +80,11 @@ func TestDemoStateReport(t *testing.T) {
 		t.Fatalf("heard-only report: %d %v", code, m)
 	}
 
-	_, m = post(s, &hq, "units.get", `{"id":"`+unit.String()+`"}`)
-	if o := data(m)["observedState"].(map[string]any); o["power"] != false ||
+	_, res = post(srv, &hq, "units.get", `{"id":"`+unit.String()+`"}`)
+	if o := data(res)["observedState"].(map[string]any); o["power"] != false ||
 		o["celsius"] != 27.0 ||
 		o["mode"] != "dry" ||
-		o["observedAt"] != at.Format(time.RFC3339) {
+		o["observedAt"] != when.Format(time.RFC3339) {
 		t.Errorf("a report with no settings changed the observed state: %v", o)
 	}
 
@@ -99,12 +99,12 @@ func TestDemoStateReport(t *testing.T) {
 		state string
 		want  string
 	}{
-		"no state": {at, ``, "state=error.required"},
-		"unknown mode": {at, `,"state":{"power":true,"celsius":24,"mode":"heat",` +
+		"no state": {when, ``, "state=error.required"},
+		"unknown mode": {when, `,"state":{"power":true,"celsius":24,"mode":"heat",` +
 			`"fanLevel":"mid"}`, "state.mode=error.invalid"},
-		"bad fan": {at, `,"state":{"power":true,"celsius":24,"mode":"cool",` +
+		"bad fan": {when, `,"state":{"power":true,"celsius":24,"mode":"cool",` +
 			`"fanLevel":"turbo"}`, "state.fanLevel=error.invalid"},
-		"hot": {at, `,"state":{"power":true,"celsius":55,"mode":"cool",` +
+		"hot": {when, `,"state":{"power":true,"celsius":55,"mode":"cool",` +
 			`"fanLevel":"mid"}`, "state.celsius=error.range"},
 		"future": {clock.Add(time.Hour), `,"state":{"power":true,"celsius":24,"mode":"cool",` +
 			`"fanLevel":"mid"}`, "occurredAt=error.range"},

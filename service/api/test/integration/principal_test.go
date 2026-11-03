@@ -47,13 +47,13 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 	}
 
 	user := seed.ID("user-customer-a").String()
-	if code, m := get(
+	if code, res := get(
 		"test-internal",
 		user,
 		seed.ID("customer-a").String(),
-	); code != 200 || m["role"] != "client" ||
-		m["clientRole"] != "owner" {
-		t.Fatalf("principal: %d %v", code, m)
+	); code != 200 || res["role"] != "client" ||
+		res["clientRole"] != "owner" {
+		t.Fatalf("principal: %d %v", code, res)
 	}
 
 	if code, _ := get("wrong", user, seed.ID("customer-a").String()); code != 401 {
@@ -64,13 +64,13 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 		t.Fatalf("another user's membership: %d", code)
 	}
 
-	cl := newCluster(t) // billing asks equipment for customers (IR193)
+	cluster := newCluster(t) // billing asks equipment for customers (IR193)
 
 	billing := serverCfg(t, func(c *apiserver.Config) {
 		c.Domains = []string{ops.DomainBilling}
 		c.IdentityURL = idSrv.URL
 		c.InternalToken = "test-internal"
-		c.ServiceURLs = cl.others(ops.DomainBilling)
+		c.ServiceURLs = cluster.others(ops.DomainBilling)
 	})
 	if code, m := post(billing, &customerA, "invoices.list", `{"limit":1}`); code != 200 {
 		t.Fatalf("billing-api with remote principal: %d %v", code, m)
@@ -86,15 +86,15 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 		c.Domains = []string{ops.DomainBilling}
 		c.IdentityURL = idSrv.URL
 		c.InternalToken = "test-internal"
-		c.ServiceURLs = cl.others(ops.DomainBilling)
+		c.ServiceURLs = cluster.others(ops.DomainBilling)
 	})
-	if code, m := post(
+	if code, res := post(
 		down,
 		&customerA,
 		"invoices.list",
 		`{"limit":1}`,
 	); code != 503 ||
-		m["code"] != "UNAVAILABLE" {
-		t.Fatalf("identity down: %d %v", code, m)
+		res["code"] != "UNAVAILABLE" {
+		t.Fatalf("identity down: %d %v", code, res)
 	}
 }

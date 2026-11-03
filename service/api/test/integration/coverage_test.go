@@ -10,7 +10,7 @@ import (
 )
 
 func TestUnitsCoverage(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	// warranty dates relative to the test clock: Bedroom AC expiring (30 d), Living room AC under warranty (200 d)
 	owner(
 		t,
@@ -38,13 +38,13 @@ func TestUnitsCoverage(t *testing.T) {
 		)
 	})
 	// contract covering the Lobby AC
-	k := uuid.NewString()
+	key := uuid.NewString()
 	owner(
 		t,
 		`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor,
 			currency, restriction_eligible, created_by)
 		VALUES ($1,1,$2,$3,$4,'rto',tstzrange($5,$6),12000,'MYR',true,$7)`,
-		k,
+		key,
 		seed.ID("tenant-a"),
 		seed.ID("cust-a"),
 		seed.ID("org-customer-a"),
@@ -56,18 +56,18 @@ func TestUnitsCoverage(t *testing.T) {
 		t,
 		`INSERT INTO billing.contract_units (tenant_id, contract_id, contract_version, unit_id) VALUES ($1,$2,1,$3)`,
 		seed.ID("tenant-a"),
-		k,
+		key,
 		seed.ID("unit-limited"),
 	)
 
 	byUnit := func(body string) map[string]map[string]any {
-		code, m := post(s, &hq, "units.coverage", body)
+		code, res := post(srv, &hq, "units.coverage", body)
 		if code != 200 {
-			t.Fatalf("%s: %d %v", body, code, m)
+			t.Fatalf("%s: %d %v", body, code, res)
 		}
 
 		out := map[string]map[string]any{}
-		for _, it := range items(m) {
+		for _, it := range items(res) {
 			out[it["unitId"].(string)] = it
 		}
 
@@ -86,7 +86,7 @@ func TestUnitsCoverage(t *testing.T) {
 	}
 	// a job completed under warranty whose accepted report lists replaced parts is claimable until a claim is filed
 	// (IR209)
-	job := completedJob(t, s)
+	job := completedJob(t, srv)
 	owner(
 		t,
 		`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, parts, accepted_at) VALUES
@@ -132,15 +132,15 @@ func TestUnitsCoverage(t *testing.T) {
 		clock.Add(200*24*time.Hour),
 	)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.recordWarrantyClaim",
 		`{"jobId":"`+job+`","partLabel":"Fan motor FM-25 ×1","amountMinor":21000,"currency":"MYR","reason":"replaced under `+
 			`warranty"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("claim: %d %v", code, m)
+		t.Fatalf("claim: %d %v", code, res)
 	}
 
 	if claimable() {
@@ -183,11 +183,11 @@ func TestUnitsCoverage(t *testing.T) {
 		`{"filters":{"coverage":"x"}}`, `{"filters":{"expiringWithinDays":0}}`,
 		`{"sort":{"field":"status","direction":"asc"}}`,
 	} {
-		code, m := post(s, &hq, "units.coverage", b)
+		code, m := post(srv, &hq, "units.coverage", b)
 		refusal(t, b, code, m, want[b])
 	}
 
-	if code, _ := post(s, &customerA, "units.coverage", `{}`); code != 403 {
+	if code, _ := post(srv, &customerA, "units.coverage", `{}`); code != 403 {
 		t.Error("client cannot read coverage")
 	}
 }

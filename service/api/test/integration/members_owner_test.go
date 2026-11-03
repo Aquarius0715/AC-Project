@@ -19,7 +19,7 @@ import (
 //   - the default rules' switches;
 //   - the filter-care settings.
 func TestClientMembersAreNotOwners(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	member := seed.ID("test-member-a")
 	owner(
 		t,
@@ -40,7 +40,7 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 	})
 
 	m := actor{"tok-a", "test-member-a"} // customer A's user, signed in with the member membership
-	if code, res := post(s, &m, "session.get", `{}`); code != 200 {
+	if code, res := post(srv, &m, "session.get", `{}`); code != 200 {
 		t.Fatalf("the member signs in: %d %v", code, res)
 	}
 
@@ -74,9 +74,9 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 			res  map[string]any
 		)
 		if c.write {
-			code, res = write(s, &m, c.op, c.body, c.version)
+			code, res = write(srv, &m, c.op, c.body, c.version)
 		} else {
-			code, res = post(s, &m, c.op, c.body)
+			code, res = post(srv, &m, c.op, c.body)
 		}
 
 		if code != 403 {
@@ -84,7 +84,7 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 		}
 	}
 	// the owner of the same customer may
-	if code, res := post(s, &customerA, "clientUsers.list", `{"limit":10}`); code != 200 {
+	if code, res := post(srv, &customerA, "clientUsers.list", `{"limit":10}`); code != 200 {
 		t.Errorf("the owner's list: %d %v", code, res)
 	}
 }
@@ -92,7 +92,7 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 // TestMembersSaveNewUser (IR461): HQ creates a person with the membership (newUser instead of userId); the e-mail of an
 // existing person is a field error, and newUser goes with neither userId nor id.
 func TestMembersSaveNewUser(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	email := "hq-new-" + uuid.NewString()[:8] + "@example.com"
 	body := func(user string) string {
 		return `{` + user + `"organizationId":"` + seed.ID("org-operator-a").
@@ -106,27 +106,27 @@ func TestMembersSaveNewUser(t *testing.T) {
 	}
 
 	newUser := `"newUser":{"email":"` + email + `","displayName":"New Colleague"},`
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"members.save",
 		body(`"userId":"`+seed.ID("user-customer-a").String()+`",`+newUser),
 		0,
 	); code != 422 ||
-		fields(m) != "newUser=error.notAllowed" {
-		t.Errorf("newUser with userId: %d %s", code, fields(m))
+		fields(res) != "newUser=error.notAllowed" {
+		t.Errorf("newUser with userId: %d %s", code, fields(res))
 	}
 
-	code, m := write(s, &hq, "members.save", body(newUser), 0)
-	if code != 200 || data(m)["role"] != "admin" {
-		t.Fatalf("create with a new person: %d %v", code, m)
+	code, resp := write(srv, &hq, "members.save", body(newUser), 0)
+	if code != 200 || data(resp)["role"] != "admin" {
+		t.Fatalf("create with a new person: %d %v", code, resp)
 	}
 
 	var name string
 	ownerScan(
 		t,
 		`SELECT u.display_name FROM identity.users u JOIN identity.memberships m ON m.user_id = u.id WHERE m.id = $1`,
-		[]any{data(m)["id"]},
+		[]any{data(resp)["id"]},
 		&name,
 	)
 
@@ -134,15 +134,15 @@ func TestMembersSaveNewUser(t *testing.T) {
 		t.Errorf("person: %q", name)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"members.save",
 		body(newUser),
 		0,
 	); code != 422 ||
-		fields(m) != "newUser.email=errors.email_taken" {
-		t.Errorf("the same e-mail again: %d %s", code, fields(m))
+		fields(res) != "newUser.email=errors.email_taken" {
+		t.Errorf("the same e-mail again: %d %s", code, fields(res))
 	}
 
 	// a contractor's technician created by HQ: the company's user list shows them as not signed in yet, until the first
@@ -159,12 +159,12 @@ func TestMembersSaveNewUser(t *testing.T) {
 		Format(time.RFC3339) +
 		`","reason":"new field technician"}`
 
-	code, m = write(s, &hq, "members.save", tech, 0)
+	code, resp = write(srv, &hq, "members.save", tech, 0)
 	if code != 200 {
-		t.Fatalf("a new technician: %d %v", code, m)
+		t.Fatalf("a new technician: %d %v", code, resp)
 	}
 
-	membership := data(m)["id"].(string)
+	membership := data(resp)["id"].(string)
 
 	var status, user string
 	ownerScan(
@@ -180,7 +180,7 @@ func TestMembersSaveNewUser(t *testing.T) {
 		t.Errorf("listed before the first sign-in: %s", status)
 	}
 
-	(&auth.Authenticator{DB: s.DB, Now: clockFunc, Verifier: nil, Source: nil}).RecordSignIn(
+	(&auth.Authenticator{DB: srv.DB, Now: clockFunc, Verifier: nil, Source: nil}).RecordSignIn(
 		context.Background(),
 		&ops.Principal{
 			TenantID: seed.ID("tenant-a"),

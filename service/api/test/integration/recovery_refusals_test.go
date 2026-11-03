@@ -14,11 +14,11 @@ import (
 // a removing case to pending when its remove command fails, and the automation skip reasons an applied restriction
 // (restricted) and an unresolved recovery case (reconciliation_required) give.
 func TestRestrictionRecoveryRefusals(t *testing.T) {
-	s := serverWith(t, true)
-	u := boundUnit(t, s, "online")
-	k, inv := overdueContract(t, s, u)
+	srv := serverWith(t, true)
+	unit := boundUnit(t, srv, "online")
+	key, inv := overdueContract(t, srv, unit)
 	_, sess := post(
-		s,
+		srv,
 		&customerB,
 		"session.get",
 		`{}`,
@@ -26,42 +26,42 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 	now, _ := time.Parse(time.RFC3339Nano, sess["meta"].(map[string]any)["snapshotAt"].(string))
 	at := now.Format(time.RFC3339)
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&customerB,
 		"automations.save",
 		`{"name":"cool",`+
-			`"unitIds":["`+u+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event",`+
+			`"unitIds":["`+unit+`"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event",`+
 			`"condition":{"type":"occupancy","occupied":true},"action":{"kind":"set_temperature","celsius":20}}`,
 		0,
 	); code != 200 {
-		t.Fatalf("rule: %d %v", code, m)
+		t.Fatalf("rule: %d %v", code, resp)
 	}
 
 	reason := func() string {
 		t.Helper()
 
-		code, m := post(
-			s,
+		code, resp := post(
+			srv,
 			&customerB,
 			"automations.simulate",
-			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+at+`","unitIds":["`+u+`"],"facts":[{"unitId":"`+u+
+			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+at+`","unitIds":["`+unit+`"],"facts":[{"unitId":"`+unit+
 				`","metric":"occupied","value":true,"unit":"boolean","observedAt":"`+at+
 				`","quality":"valid"}],"phase":"condition"}`,
 		)
 		if code != 200 {
-			t.Fatalf("simulate: %d %v", code, m)
+			t.Fatalf("simulate: %d %v", code, resp)
 		}
 
-		r, _ := data(m)["results"].([]any)[0].(map[string]any)["reason"].(string)
+		r, _ := data(resp)["results"].([]any)[0].(map[string]any)["reason"].(string)
 
 		return r
 	}
-	id, m := executed(t, s, k, inv, []string{u})
-	ackCommand(t, cmdOf(m, u, "applyCommandIds"), clock.Add(time.Second))
+	id, res := executed(t, srv, key, inv, []string{unit})
+	ackCommand(t, cmdOf(res, unit, "applyCommandIds"), clock.Add(time.Second))
 
 	get := func() map[string]any {
-		_, m := post(s, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
+		_, m := post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
 
 		return m
 	}
@@ -73,14 +73,14 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		t.Errorf("a setpoint below the restriction minimum: %q", r)
 	}
 
-	_, m = write(
-		s,
+	_, res = write(
+		srv,
 		&restrMgr,
 		"restrictions.cancel",
 		`{"restrictionId":"`+id+`","reason":"plan agreed"}`,
 		ver(get()),
 	)
-	ackCommand(t, cmdOf(m, u, "releaseCommandIds"), clock.Add(2*time.Second))
+	ackCommand(t, cmdOf(res, unit, "releaseCommandIds"), clock.Add(2*time.Second))
 
 	if data(get())["state"] != "released" {
 		t.Fatal("released")
@@ -91,10 +91,10 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 
 		body := `{"scenarioId":"t",` +
 			`"eventId":"` + uuid.NewString() + `","occurredAt":"` + at + `","eventType":"restriction_observation",` +
-			`"restrictionId":"` + id + `","unitId":"` + u + `","observed":{"restrictionId":"` + observed +
+			`"restrictionId":"` + id + `","unitId":"` + unit + `","observed":{"restrictionId":"` + observed +
 			`","rulesVersion":"rules-1","policy":{"kind":"temperature_limit","minimumCoolingSetpoint":24},` +
 			`"observedAt":"` + at + `"}}`
-		if code, m := write(s, &customerB, "demo.trigger", body, 0); code != 200 {
+		if code, m := write(srv, &customerB, "demo.trigger", body, 0); code != 200 {
 			t.Fatalf("observation: %d %v", code, m)
 		}
 	}
@@ -116,23 +116,28 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 
 	reconcile := func() (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&restrMgr,
 			"restrictions.reconcile",
-			`{"restrictionId":"`+id+`","unitIds":["`+u+`"]}`,
+			`{"restrictionId":"`+id+`","unitIds":["`+unit+`"]}`,
 			ver(get()),
 		)
 	}
 
-	owner(t, `UPDATE devices.devices SET connection = 'offline' WHERE unit_id = $1`, u)
+	owner(t, `UPDATE devices.devices SET connection = 'offline' WHERE unit_id = $1`, unit)
 
 	if code, m := reconcile(); code != 409 || m["code"] != "OFFLINE" ||
 		m["messageKey"] != "errors.device_offline" {
 		t.Errorf("device offline: %d %v", code, m)
 	}
 
-	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE unit_id = $1`, u)
-	owner(t, `UPDATE assets.units SET last_seen_at = $2 WHERE id = $1`, u, now.Add(-31*time.Second))
+	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE unit_id = $1`, unit)
+	owner(
+		t,
+		`UPDATE assets.units SET last_seen_at = $2 WHERE id = $1`,
+		unit,
+		now.Add(-31*time.Second),
+	)
 
 	if code, m := reconcile(); code != 504 || m["messageKey"] != "errors.observation_stale" {
 		t.Errorf("observation older than 30 s: %d %v", code, m)
@@ -149,17 +154,17 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 	observe(id)
 
 	var dev string
-	ownerScan(t, `SELECT id::text FROM devices.devices WHERE unit_id = $1`, []any{u}, &dev)
+	ownerScan(t, `SELECT id::text FROM devices.devices WHERE unit_id = $1`, []any{unit}, &dev)
 
-	op := uuid.NewString()
+	operation := uuid.NewString()
 	owner(
 		t,
 		`INSERT INTO devices.device_operations (id, tenant_id, device_id, unit_id, kind, status, expires_at) VALUES ($1,$2,$3,
 			$4,'check','queued',$5)`,
-		op,
+		operation,
 		seed.ID("tenant-a"),
 		dev,
-		u,
+		unit,
 		now.Add(time.Minute),
 	)
 
@@ -167,20 +172,20 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		t.Errorf("remove command not deliverable during a device operation: %d %v", code, m)
 	}
 
-	owner(t, `DELETE FROM devices.device_operations WHERE id = $1`, op)
+	owner(t, `DELETE FROM devices.device_operations WHERE id = $1`, operation)
 
-	code, m := reconcile()
+	code, res := reconcile()
 
-	cases := data(m)["recoveryCases"].([]any)
+	cases := data(res)["recoveryCases"].([]any)
 	if code != 200 || cases[len(cases)-1].(map[string]any)["state"] != "removing" {
-		t.Fatalf("reconcile: %d %v", code, m)
+		t.Fatalf("reconcile: %d %v", code, res)
 	}
 
 	cmds := cases[len(cases)-1].(map[string]any)["commandIds"].([]any)
 
 	cmd := cmds[len(cmds)-1].(string)
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&customerB,
 		"demo.trigger",
 		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Add(3*time.Second).
@@ -188,19 +193,19 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 			`","eventType":"command_fail","commandId":"`+cmd+`"}`,
 		0,
 	); code != 200 {
-		t.Fatalf("command_fail: %d %v", code, m)
+		t.Fatalf("command_fail: %d %v", code, resp)
 	}
 
 	if caseState() != "pending" {
 		t.Fatalf("a failed remove returns the case to pending: %v", get())
 	}
 
-	code, m = reconcile()
+	code, res = reconcile()
 
-	cases = data(m)["recoveryCases"].([]any)
+	cases = data(res)["recoveryCases"].([]any)
 	if code != 200 || cases[len(cases)-1].(map[string]any)["state"] != "removing" ||
 		len(cases[len(cases)-1].(map[string]any)["commandIds"].([]any)) != 2 {
-		t.Fatalf("reconcile again: %d %v", code, m)
+		t.Fatalf("reconcile again: %d %v", code, res)
 	}
 
 	cmds = cases[len(cases)-1].(map[string]any)["commandIds"].([]any)

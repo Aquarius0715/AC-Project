@@ -35,8 +35,8 @@ const (
 
 // SQL returns a predicate that is true when the unit with id unitExpr (a column or placeholder of the outer query)
 // is readable by the caller. Arguments are appended to args.
-func SQL(c *ops.Call, args *[]any, unitExpr string, mode Mode) string {
-	p := c.Principal
+func SQL(call *ops.Call, args *[]any, unitExpr string, mode Mode) string {
+	principal := call.Principal
 	add := func(v any) string {
 		*args = append(*args, v)
 
@@ -46,16 +46,16 @@ func SQL(c *ops.Call, args *[]any, unitExpr string, mode Mode) string {
 		return "EXISTS (SELECT 1 FROM assets.units su WHERE su.id = " + unitExpr + " AND " + cond + ")"
 	}
 
-	switch p.Role {
+	switch principal.Role {
 	case "admin", "system":
 		return "TRUE"
 	case "client":
-		return unit("su.customer_org_id = " + add(p.OrgID))
+		return unit("su.customer_org_id = " + add(principal.OrgID))
 	case "contractor":
-		now := add(c.Now)
+		now := add(call.Now)
 
 		return "EXISTS (SELECT 1 FROM assets.unit_offer_access so WHERE so.unit_id = " + unitExpr +
-			" AND so.contractor_org_id = " + add(p.OrgID) + " AND so.access_valid_from <= " + now + " AND " + now +
+			" AND so.contractor_org_id = " + add(principal.OrgID) + " AND so.access_valid_from <= " + now + " AND " + now +
 			" < so.access_valid_until)"
 	case "technician":
 	default:
@@ -63,15 +63,15 @@ func SQL(c *ops.Call, args *[]any, unitExpr string, mode Mode) string {
 	}
 
 	var parts []string
-	if ids := p.Scopes["organization"]; len(ids) > 0 {
+	if ids := principal.Scopes["organization"]; len(ids) > 0 {
 		parts = append(parts, "su.customer_org_id = ANY("+add(ids)+")")
 	}
 
-	if ids := p.Scopes["property"]; len(ids) > 0 {
+	if ids := principal.Scopes["property"]; len(ids) > 0 {
 		parts = append(parts, "su.property_id = ANY("+add(ids)+")")
 	}
 
-	if ids := p.Scopes["unit"]; len(ids) > 0 {
+	if ids := principal.Scopes["unit"]; len(ids) > 0 {
 		parts = append(parts, "su.id = ANY("+add(ids)+")")
 	}
 
@@ -80,15 +80,15 @@ func SQL(c *ops.Call, args *[]any, unitExpr string, mode Mode) string {
 	}
 
 	scope := unit("(" + strings.Join(parts, " OR ") + ")")
-	if p.Employment == "internal" {
+	if principal.Employment == "internal" {
 		return scope
 	}
 
-	return scope + " AND " + assignmentSQL(c, add, unitExpr, mode)
+	return scope + " AND " + assignmentSQL(call, add, unitExpr, mode)
 }
 
-func assignmentSQL(c *ops.Call, add func(any) string, unitExpr string, mode Mode) string {
-	now := add(c.Now)
+func assignmentSQL(call *ops.Call, add func(any) string, unitExpr string, mode Mode) string {
+	now := add(call.Now)
 
 	from := "sa.created_at"
 	if mode == Equipment {
@@ -99,23 +99,27 @@ func assignmentSQL(c *ops.Call, add func(any) string, unitExpr string, mode Mode
 		" JOIN assets.unit_offer_access so ON so.job_id = sa.job_id AND so.access_valid_from <= " + now + " AND " + now +
 		" < so.access_valid_until" +
 		" WHERE sa.unit_id = " + unitExpr + " AND sa.active AND sa.technician_membership_id = " +
-		add(c.Principal.MembershipID) +
+		add(call.Principal.MembershipID) +
 		" AND " + from + " <= " + now + " AND " + now + " < upper(sa.scheduled))"
 }
 
 // EquipmentReadable returns the units (already visible in List mode) whose equipment data the caller may read now: all
 // of them except an external technician's units whose work window has not started (IR49(b)).
-func EquipmentReadable(ctx context.Context, c *ops.Call, units []uuid.UUID) ([]uuid.UUID, error) {
-	p := c.Principal
+func EquipmentReadable(
+	ctx context.Context,
+	call *ops.Call,
+	units []uuid.UUID,
+) ([]uuid.UUID, error) {
+	p := call.Principal
 	if p.Role != "technician" || p.Employment == "internal" || len(units) == 0 {
 		return units, nil
 	}
 
 	args := []any{units}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
-		"SELECT t.id FROM unnest($1::uuid[]) AS t(id) WHERE "+SQL(c, &args, "t.id", Equipment),
+		"SELECT t.id FROM unnest($1::uuid[]) AS t(id) WHERE "+SQL(call, &args, "t.id", Equipment),
 		args...)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select unnest")
@@ -128,15 +132,15 @@ func EquipmentReadable(ctx context.Context, c *ops.Call, units []uuid.UUID) ([]u
 
 // Gate applies IR49(b) to equipment reads of units the caller can already see in List mode: an external technician
 // whose work window has not started gets FORBIDDEN errors.assignment_not_started. Everyone else passes.
-func Gate(ctx context.Context, c *ops.Call, units []uuid.UUID) error {
-	p := c.Principal
+func Gate(ctx context.Context, call *ops.Call, units []uuid.UUID) error {
+	p := call.Principal
 	if p.Role != "technician" || p.Employment == "internal" || len(units) == 0 {
 		return nil
 	}
 
 	args := []any{units}
 	q := "SELECT count(*) FROM unnest($1::uuid[]) AS t(id) WHERE NOT (" + SQL(
-		c,
+		call,
 		&args,
 		"t.id",
 		Equipment,
@@ -144,7 +148,7 @@ func Gate(ctx context.Context, c *ops.Call, units []uuid.UUID) error {
 
 	var waiting int
 
-	err := c.Tx.QueryRow(ctx, q, args...).Scan(&waiting)
+	err := call.Tx.QueryRow(ctx, q, args...).Scan(&waiting)
 	if err != nil {
 		return apperr.Wrap(err, "select unnest")
 	}

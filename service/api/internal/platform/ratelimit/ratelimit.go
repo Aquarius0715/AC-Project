@@ -70,7 +70,7 @@ func NewValkey(url string) (Valkey, error) {
 // Incr implements Store: INCR and EXPIRE in one transaction.
 func (v Valkey) Incr(ctx context.Context, key string, ttl time.Duration) (int64, error) {
 	pipe := v.Client.TxPipeline()
-	n := pipe.Incr(ctx, key)
+	intCmd := pipe.Incr(ctx, key)
 	pipe.Expire(ctx, key, ttl)
 
 	_, err := pipe.Exec(ctx)
@@ -78,7 +78,7 @@ func (v Valkey) Incr(ctx context.Context, key string, ttl time.Duration) (int64,
 		return 0, apperr.Wrap(err, "redis.Pipeliner.Exec")
 	}
 
-	return n.Val(), nil
+	return intCmd.Val(), nil
 }
 
 // Memory is a Store in this process, for tests: its counters do not expire.

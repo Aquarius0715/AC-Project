@@ -10,11 +10,17 @@ import (
 )
 
 func TestInquiries(t *testing.T) {
-	s := server(t)
-	u := boundUnit(t, s, "online")
-	k, inv := overdueContract(t, s, u)
-	_, m := write(s, &restrMgr, "restrictions.schedule", scheduleBody(k, inv, []string{u}, nil), 0)
-	rid := data(m)["id"].(string)
+	srv := server(t)
+	u := boundUnit(t, srv, "online")
+	k, inv := overdueContract(t, srv, u)
+	_, resp := write(
+		srv,
+		&restrMgr,
+		"restrictions.schedule",
+		scheduleBody(k, inv, []string{u}, nil),
+		0,
+	)
+	rid := data(resp)["id"].(string)
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"bad subject":              "subjectType=error.invalid",
 		"blank message":            "message=error.length",
@@ -39,7 +45,7 @@ func TestInquiries(t *testing.T) {
 		"unknown cited invoice": {`{"subjectType":"restriction",` +
 			`"restrictionId":"` + rid + `","invoiceId":"` + uuid.NewString() + `","message":"why"}`, 404},
 	} {
-		code, m := write(s, &customerB, "inquiries.create", tc.body, 0)
+		code, m := write(srv, &customerB, "inquiries.create", tc.body, 0)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
 		} else if code != tc.code {
@@ -48,7 +54,7 @@ func TestInquiries(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerA,
 		"inquiries.create",
 		`{"subjectType":"payment","invoiceId":"`+inv+`","message":"why"}`,
@@ -58,7 +64,7 @@ func TestInquiries(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"inquiries.create",
 		`{"subjectType":"payment","invoiceId":"`+inv+`","message":"why"}`,
@@ -67,19 +73,19 @@ func TestInquiries(t *testing.T) {
 		t.Error("HQ creates inquiry")
 	}
 
-	code, m := write(
-		s,
+	code, resp := write(
+		srv,
 		&customerB,
 		"inquiries.create",
 		`{"subjectType":"restriction","restrictionId":"`+rid+`","invoiceId":"`+inv+`","message":"I paid yesterday"}`,
 		0,
 	)
-	if code != 200 || data(m)["state"] != "received" || data(m)["reply"] != nil ||
-		data(m)["customerId"] != seed.ID("cust-b").String() {
-		t.Fatalf("create: %d %v", code, m)
+	if code != 200 || data(resp)["state"] != "received" || data(resp)["reply"] != nil ||
+		data(resp)["customerId"] != seed.ID("cust-b").String() {
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := data(m)["id"].(string)
+	id := data(resp)["id"].(string)
 
 	var received int
 	ownerScan(
@@ -93,54 +99,54 @@ func TestInquiries(t *testing.T) {
 		t.Error("HQ notified of the inquiry")
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&customerB,
 		"inquiries.list",
 		`{"filters":{"restrictionId":"`+rid+`"}}`,
 	); len(
-		items(m),
+		items(res),
 	) != 1 {
 		t.Error("client list")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerA,
 		"inquiries.list",
 		`{"filters":{"restrictionId":"`+rid+`"}}`,
 	); code != 200 ||
-		len(items(m)) != 0 {
+		len(items(res)) != 0 {
 		t.Error("other customer's inquiries")
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"inquiries.list",
 		`{"filters":{"status":"received","subjectType":"restriction","invoiceId":"`+inv+`"},"limit":100}`,
 	); len(
-		items(m),
+		items(res),
 	) != 1 {
-		t.Errorf("HQ list: %v", m)
+		t.Errorf("HQ list: %v", res)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"inquiries.list",
 		`{"filters":{"status":"open"}}`,
 	); code != 422 ||
-		fields(m) != "filters=error.invalid" {
-		t.Errorf("bad state filter: %d %s", code, fields(m))
+		fields(res) != "filters=error.invalid" {
+		t.Errorf("bad state filter: %d %s", code, fields(res))
 	}
 
-	if code, _ := post(s, &techB, "inquiries.list", `{}`); code != 403 {
+	if code, _ := post(srv, &techB, "inquiries.list", `{}`); code != 403 {
 		t.Error("technician inquiries")
 	}
 
 	answer := func(reply string, v int) (int, map[string]any) {
-		return write(s, &hq, "inquiries.answer", `{"inquiryId":"`+id+`","reply":"`+reply+`"}`, v)
+		return write(srv, &hq, "inquiries.answer", `{"inquiryId":"`+id+`","reply":"`+reply+`"}`, v)
 	}
 	if code, m := answer(" ", 1); code != 422 || fields(m) != "reply=error.length" {
 		t.Errorf("blank reply: %d %s", code, fields(m))
@@ -151,7 +157,7 @@ func TestInquiries(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerB,
 		"inquiries.answer",
 		`{"inquiryId":"`+id+`","reply":"x"}`,
@@ -160,28 +166,28 @@ func TestInquiries(t *testing.T) {
 		t.Error("client answers")
 	}
 
-	code, m = answer("Payment received, restriction will be lifted", 1)
-	if code != 200 || data(m)["state"] != "answered" || ver(m) != 2 {
-		t.Fatalf("answer: %d %v", code, m)
+	code, resp = answer("Payment received, restriction will be lifted", 1)
+	if code != 200 || data(resp)["state"] != "answered" || ver(resp) != 2 {
+		t.Fatalf("answer: %d %v", code, resp)
 	}
 
 	if code, _ := answer("again", 2); code != 409 {
 		t.Error("answer twice")
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&customerB,
 		"notifications.list",
 		`{"filters":{"type":"inquiry"},"limit":100}`,
 	); len(
-		items(m),
+		items(res),
 	) == 0 {
 		t.Error("client notified of the answer")
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"inquiries.answer",
 		`{"inquiryId":"`+uuid.NewString()+`","reply":"x"}`,
@@ -192,26 +198,26 @@ func TestInquiries(t *testing.T) {
 }
 
 func TestAuditList(t *testing.T) {
-	s := server(t)
-	_, inv := newInvoice(t, s)
+	srv := server(t)
+	_, inv := newInvoice(t, srv)
 	period := func(from, to time.Time) string {
 		return `"from":"` + from.Format(time.RFC3339) + `","to":"` + to.Format(time.RFC3339) + `"`
 	}
 	day := period(clock.Add(-time.Hour), clock.Add(time.Hour))
 
-	_, m := post(
-		s,
+	_, resp := post(
+		srv,
 		&hq,
 		"audit.list",
 		`{"filters":{`+day+`,"targetKind":"invoice","targetId":"`+inv+`"}}`,
 	)
-	if len(items(m)) != 1 || items(m)[0]["action"] != "invoices.create" ||
-		items(m)[0]["result"] != "success" {
-		t.Fatalf("invoice audit: %v", m)
+	if len(items(resp)) != 1 || items(resp)[0]["action"] != "invoices.create" ||
+		items(resp)[0]["result"] != "success" {
+		t.Fatalf("invoice audit: %v", resp)
 	}
 
-	if items(m)[0]["actorName"] != "hq-operator" { // the actor user's display name (IR305)
-		t.Errorf("actor name: %v", items(m)[0]["actorName"])
+	if items(resp)[0]["actorName"] != "hq-operator" { // the actor user's display name (IR305)
+		t.Errorf("actor name: %v", items(resp)[0]["actorName"])
 	}
 
 	sys := uuid.NewString() // a system actor matches no user, so it has no name
@@ -226,40 +232,40 @@ func TestAuditList(t *testing.T) {
 		uuid.NewString(),
 	)
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"audit.list",
 		`{"filters":{`+day+`,"targetKind":"test","targetId":"`+sys+`"}}`,
-	); len(items(m)) != 1 || items(m)[0]["actorName"] != nil ||
-		items(m)[0]["actorId"] != "system-demo" {
-		t.Errorf("system actor: %v", m)
+	); len(items(res)) != 1 || items(res)[0]["actorName"] != nil ||
+		items(res)[0]["actorId"] != "system-demo" {
+		t.Errorf("system actor: %v", res)
 	}
 
-	corr := items(m)[0]["correlationId"].(string)
-	if _, m := post(
-		s,
+	corr := items(resp)[0]["correlationId"].(string)
+	if _, res := post(
+		srv,
 		&hq,
 		"audit.list",
 		`{"filters":{`+day+`,"correlationId":"`+corr+`"},"limit":100}`,
 	); len(
-		items(m),
+		items(res),
 	) < 1 {
 		t.Error("by correlation")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"audit.list",
 		`{"filters":{`+day+`,"correlationId":"`+uuid.NewString()+`"}}`,
 	); code != 200 ||
-		len(items(m)) != 0 {
+		len(items(res)) != 0 {
 		t.Error("unknown correlation is empty")
 	}
 
 	if _, m := post(
-		s,
+		srv,
 		&hq,
 		"audit.list",
 		`{"filters":{`+day+`,"result":"denied"},"sort":{"field":"occurredAt","direction":"asc"},"limit":2}`,
@@ -276,7 +282,7 @@ func TestAuditList(t *testing.T) {
 		`{"filters":{` + day + `,"result":"ok"}}`:                           {"filters": "error.invalid"},
 		`{"filters":{` + day + `,"x":1}}`:                                   {"x": "error.notAllowed"},
 	} {
-		code, m := post(s, &hq, "audit.list", b)
+		code, m := post(srv, &hq, "audit.list", b)
 
 		fe, _ := m["fieldErrors"].(map[string]any)
 		if code != 422 || len(fe) != len(want) {
@@ -292,7 +298,7 @@ func TestAuditList(t *testing.T) {
 		}
 	}
 
-	if code, _ := post(s, &customerB, "audit.list", `{"filters":{`+day+`}}`); code != 403 {
+	if code, _ := post(srv, &customerB, "audit.list", `{"filters":{`+day+`}}`); code != 403 {
 		t.Error("client audit")
 	}
 }

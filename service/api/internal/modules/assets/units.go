@@ -122,26 +122,26 @@ type Module struct {
 }
 
 // Register binds the Assets operations implemented so far.
-func Register(r *ops.Registry, m *Module) {
-	ops.Register(r, "units.list", m.unitsList)
-	ops.Register(r, "units.get", m.unitsGet)
-	ops.Register(r, "properties.save", m.propertiesSave)
-	ops.Register(r, "spaces.save", m.spacesSave)
-	ops.Register(r, "units.save", m.unitsSave)
-	ops.Register(r, "properties.archive", m.propertiesArchive)
-	ops.Register(r, "spaces.archive", m.spacesArchive)
-	ops.Register(r, "units.archive", m.unitsArchive)
-	ops.Register(r, "customers.list", m.customersList)
-	ops.Register(r, "customers.save", m.customersSave)
-	ops.Register(r, "properties.list", m.propertiesList)
-	ops.Register(r, "spaces.list", m.spacesList)
-	ops.Register(r, "locations.rename", m.locationsRename)
-	ops.Register(r, "units.delete", m.unitsDelete)
-	ops.Register(r, "units.setAlertPolicies", m.unitsSetAlertPolicies)
-	ops.Register(r, "units.coverage", m.unitsCoverage)
-	ops.Register(r, "units.importPreview", m.unitsImportPreview)
-	ops.Register(r, "units.importCommit", m.unitsImportCommit)
-	ops.Register(r, "units.importUndo", m.unitsImportUndo)
+func Register(r *ops.Registry, module *Module) {
+	ops.Register(r, "units.list", module.unitsList)
+	ops.Register(r, "units.get", module.unitsGet)
+	ops.Register(r, "properties.save", module.propertiesSave)
+	ops.Register(r, "spaces.save", module.spacesSave)
+	ops.Register(r, "units.save", module.unitsSave)
+	ops.Register(r, "properties.archive", module.propertiesArchive)
+	ops.Register(r, "spaces.archive", module.spacesArchive)
+	ops.Register(r, "units.archive", module.unitsArchive)
+	ops.Register(r, "customers.list", module.customersList)
+	ops.Register(r, "customers.save", module.customersSave)
+	ops.Register(r, "properties.list", module.propertiesList)
+	ops.Register(r, "spaces.list", module.spacesList)
+	ops.Register(r, "locations.rename", module.locationsRename)
+	ops.Register(r, "units.delete", module.unitsDelete)
+	ops.Register(r, "units.setAlertPolicies", module.unitsSetAlertPolicies)
+	ops.Register(r, "units.coverage", module.unitsCoverage)
+	ops.Register(r, "units.importPreview", module.unitsImportPreview)
+	ops.Register(r, "units.importCommit", module.unitsImportCommit)
+	ops.Register(r, "units.importUndo", module.unitsImportUndo)
 }
 
 // UnitFilters are the units.list filters of query-catalog.csv.
@@ -184,7 +184,7 @@ const unitCols = `u.id, u.tenant_id, u.version, u.created_at, u.updated_at, u.cu
 
 func (m *Module) query(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	where string,
 	args []any,
 	order string,
@@ -192,7 +192,7 @@ func (m *Module) query(
 ) ([]Unit, int, error) {
 	var total int
 
-	err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.units u WHERE "+where, args...).
+	err := call.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.units u WHERE "+where, args...).
 		Scan(&total)
 	if err != nil {
 		return nil, 0, apperr.Wrap(err, "select assets.units")
@@ -203,7 +203,7 @@ func (m *Module) query(
 		q += fmt.Sprintf(" LIMIT %d OFFSET %d", limit, offset)
 	}
 
-	rows, err := c.Tx.Query(ctx, q, args...)
+	rows, err := call.Tx.Query(ctx, q, args...)
 	if err != nil {
 		return nil, 0, apperr.Wrap(err, "query (query)")
 	}
@@ -213,48 +213,48 @@ func (m *Module) query(
 
 	for rows.Next() {
 		var (
-			u     Unit
+			unit  Unit
 			state []byte
 		)
 
 		err := rows.Scan(
-			&u.ID,
-			&u.TenantID,
-			&u.Version,
-			&u.CreatedAt,
-			&u.UpdatedAt,
-			&u.CustomerOrgID,
-			&u.PropertyID,
-			&u.SpaceID,
-			&u.DisplayName,
-			&u.ModelID,
-			&u.Type,
-			&u.InstalledAt,
-			&u.ServiceScope,
-			&u.WarrantyEndsAt,
-			&u.Archived,
-			&u.CapabilityVersion,
-			&u.Connection,
+			&unit.ID,
+			&unit.TenantID,
+			&unit.Version,
+			&unit.CreatedAt,
+			&unit.UpdatedAt,
+			&unit.CustomerOrgID,
+			&unit.PropertyID,
+			&unit.SpaceID,
+			&unit.DisplayName,
+			&unit.ModelID,
+			&unit.Type,
+			&unit.InstalledAt,
+			&unit.ServiceScope,
+			&unit.WarrantyEndsAt,
+			&unit.Archived,
+			&unit.CapabilityVersion,
+			&unit.Connection,
 			&state,
-			&u.ObservedRestriction,
-			&u.LastSeenAt,
-			&u.AlertPolicyIDs,
+			&unit.ObservedRestriction,
+			&unit.LastSeenAt,
+			&unit.AlertPolicyIDs,
 		)
 		if err != nil {
 			return nil, 0, apperr.Wrap(err, "query (query)")
 		}
 
-		err = json.Unmarshal(state, &u.ObservedState)
+		err = json.Unmarshal(state, &unit.ObservedState)
 		if err != nil {
 			return nil, 0, apperr.Wrap(err, "json.Unmarshal")
 		}
 
-		if len(u.ObservedRestriction) == 0 {
-			u.ObservedRestriction = json.RawMessage("null")
+		if len(unit.ObservedRestriction) == 0 {
+			unit.ObservedRestriction = json.RawMessage("null")
 		}
 
-		u.LatestMeasurements = []any{}
-		out = append(out, u)
+		unit.LatestMeasurements = []any{}
+		out = append(out, unit)
 	}
 
 	rowsErr := rows.Err()
@@ -262,29 +262,29 @@ func (m *Module) query(
 		return nil, 0, apperr.Wrap(rowsErr, "query (query)")
 	}
 
-	return out, total, m.enrich(ctx, c, out)
+	return out, total, m.enrich(ctx, call, out)
 }
 
 // EffectivePower implements SR27: on/off only when online, the observation is not in the future and at most
 // 120 s old, and the latest valid measured power reading is fresh; otherwise unknown.
 func EffectivePower(u *Unit, now time.Time, measuredFresh, ok bool) string {
-	o := u.ObservedState
-	if u.Connection != "online" || o.Power == nil || o.ObservedAt == nil ||
-		o.ObservedAt.After(now) ||
-		now.Sub(*o.ObservedAt) > 120*time.Second ||
+	observedState := u.ObservedState
+	if u.Connection != "online" || observedState.Power == nil || observedState.ObservedAt == nil ||
+		observedState.ObservedAt.After(now) ||
+		now.Sub(*observedState.ObservedAt) > 120*time.Second ||
 		!ok ||
 		!measuredFresh {
 		return "unknown"
 	}
 
-	if *o.Power {
+	if *observedState.Power {
 		return "on"
 	}
 
 	return "off"
 }
 
-func (m *Module) enrich(ctx context.Context, c *ops.Call, units []Unit) error {
+func (m *Module) enrich(ctx context.Context, call *ops.Call, units []Unit) error {
 	if len(units) == 0 {
 		return nil
 	}
@@ -294,37 +294,37 @@ func (m *Module) enrich(ctx context.Context, c *ops.Call, units []Unit) error {
 		ids[i] = units[i].ID
 	}
 
-	power, err := m.Mon.PowerMeasured(ctx, c, ids)
+	power, err := m.Mon.PowerMeasured(ctx, call, ids)
 	if err != nil {
 		return apperr.Wrap(err, "assets.Monitoring.PowerMeasured")
 	}
 
-	counts, err := m.Mon.ActiveAlertCounts(ctx, c, ids)
+	counts, err := m.Mon.ActiveAlertCounts(ctx, call, ids)
 	if err != nil {
 		return apperr.Wrap(err, "assets.Monitoring.ActiveAlertCounts")
 	}
 
 	readable, err := unitscope.EquipmentReadable(
 		ctx,
-		c,
+		call,
 		ids,
 	) // telemetry is an equipment read (IR49(b)): nothing before the work window
 	if err != nil {
 		return apperr.Wrap(err, "unitscope.EquipmentReadable")
 	}
 
-	latest, err := m.Mon.LatestMeasurements(ctx, c, readable)
+	latest, err := m.Mon.LatestMeasurements(ctx, call, readable)
 	if err != nil {
 		return apperr.Wrap(err, "assets.Monitoring.LatestMeasurements")
 	}
 
-	for i := range units {
-		fresh, ok := power[units[i].ID]
-		units[i].EffectivePowerState = EffectivePower(&units[i], c.Now, fresh, ok)
+	for idx := range units {
+		fresh, ok := power[units[idx].ID]
+		units[idx].EffectivePowerState = EffectivePower(&units[idx], call.Now, fresh, ok)
 
-		units[i].ActiveAlertCount = counts[units[i].ID]
-		if ms := latest[units[i].ID]; ms != nil {
-			units[i].LatestMeasurements = ms
+		units[idx].ActiveAlertCount = counts[units[idx].ID]
+		if ms := latest[units[idx].ID]; ms != nil {
+			units[idx].LatestMeasurements = ms
 		}
 	}
 
@@ -380,34 +380,35 @@ func (m *Module) enrich(ctx context.Context, c *ops.Call, units []Unit) error {
 //	@Router			/v1/units [get]
 func (m *Module) unitsList(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[Unit], error) {
-	var f UnitFilters
+	var unitFilters UnitFilters
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		err := dec.Decode(&f)
+		err := dec.Decode(&unitFilters)
 		if err != nil {
 			return paging.Page[Unit]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
 	}
 
-	if f.UnassignedOnly != nil && *f.UnassignedOnly && f.SpaceID != nil {
+	if unitFilters.UnassignedOnly != nil && *unitFilters.UnassignedOnly &&
+		unitFilters.SpaceID != nil {
 		return paging.Page[Unit]{}, apperr.Fields(
 			map[string]string{"filters.unassignedOnly": "error.conflictsWithSpaceId"},
 		)
 	}
 
-	if f.Status != nil && !connections[*f.Status] {
+	if unitFilters.Status != nil && !connections[*unitFilters.Status] {
 		return paging.Page[Unit]{}, apperr.Fields(
 			map[string]string{"filters.status": "error.invalid"},
 		)
 	}
 
-	for _, s := range f.Connections {
+	for _, s := range unitFilters.Connections {
 		if !connections[s] {
 			return paging.Page[Unit]{}, apperr.Fields(
 				map[string]string{"filters.connections": "error.invalid"},
@@ -415,15 +416,16 @@ func (m *Module) unitsList(
 		}
 	}
 
-	if f.PowerState != nil && *f.PowerState != "on" && *f.PowerState != "off" &&
-		*f.PowerState != "unknown" {
+	if unitFilters.PowerState != nil && *unitFilters.PowerState != "on" &&
+		*unitFilters.PowerState != "off" &&
+		*unitFilters.PowerState != "unknown" {
 		return paging.Page[Unit]{}, apperr.Fields(
 			map[string]string{"filters.powerState": "error.invalid"},
 		)
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{"id": "u.id", "createdAt": "u.created_at", "updatedAt": "u.updated_at"},
 		"u.id ASC",
 	)
@@ -431,7 +433,7 @@ func (m *Module) unitsList(
 		return paging.Page[Unit]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, unitFilters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Unit]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -444,57 +446,57 @@ func (m *Module) unitsList(
 		return fmt.Sprintf("$%d", len(args))
 	}
 
-	conds := []string{"NOT u.archived", scopeSQL(c, &args)}
-	if f.CustomerID != nil {
+	conds := []string{"NOT u.archived", scopeSQL(call, &args)}
+	if unitFilters.CustomerID != nil {
 		conds = append(
 			conds,
 			"u.customer_org_id = (SELECT organization_id FROM assets.customers WHERE id = "+add(
-				*f.CustomerID,
+				*unitFilters.CustomerID,
 			)+")",
 		)
 	}
 
-	if f.OrganizationID != nil {
-		conds = append(conds, "u.customer_org_id = "+add(*f.OrganizationID))
+	if unitFilters.OrganizationID != nil {
+		conds = append(conds, "u.customer_org_id = "+add(*unitFilters.OrganizationID))
 	}
 
-	if f.PropertyID != nil {
-		conds = append(conds, "u.property_id = "+add(*f.PropertyID))
+	if unitFilters.PropertyID != nil {
+		conds = append(conds, "u.property_id = "+add(*unitFilters.PropertyID))
 	}
 
-	if f.SpaceID != nil {
-		if f.IncludeDescendants != nil && *f.IncludeDescendants {
+	if unitFilters.SpaceID != nil {
+		if unitFilters.IncludeDescendants != nil && *unitFilters.IncludeDescendants {
 			conds = append(
 				conds,
 				`u.space_id IN (WITH RECURSIVE t AS (SELECT id FROM assets.spaces WHERE id = `+add(
-					*f.SpaceID,
+					*unitFilters.SpaceID,
 				)+
 					` UNION ALL SELECT s.id FROM assets.spaces s JOIN t ON s.parent_space_id = t.id) SELECT id FROM t)`,
 			)
 		} else {
-			conds = append(conds, "u.space_id = "+add(*f.SpaceID))
+			conds = append(conds, "u.space_id = "+add(*unitFilters.SpaceID))
 		}
 	}
 
-	if f.UnassignedOnly != nil && *f.UnassignedOnly {
+	if unitFilters.UnassignedOnly != nil && *unitFilters.UnassignedOnly {
 		conds = append(conds, "u.space_id IS NULL")
 	}
 
-	if f.Status != nil {
-		conds = append(conds, "u.connection = "+add(*f.Status))
+	if unitFilters.Status != nil {
+		conds = append(conds, "u.connection = "+add(*unitFilters.Status))
 	}
 
-	if len(f.Connections) > 0 {
-		conds = append(conds, "u.connection = ANY("+add(f.Connections)+")")
+	if len(unitFilters.Connections) > 0 {
+		conds = append(conds, "u.connection = ANY("+add(unitFilters.Connections)+")")
 	}
 
-	if f.UnitIDs != nil {
-		conds = append(conds, "u.id = ANY("+add(*f.UnitIDs)+")")
+	if unitFilters.UnitIDs != nil {
+		conds = append(conds, "u.id = ANY("+add(*unitFilters.UnitIDs)+")")
 	}
 
 	where := strings.Join(conds, " AND ")
-	if f.PowerState != nil { // derived filter: evaluate on the full scoped set, then page in memory
-		all, _, err := m.query(ctx, c, where, args, order, 0, 0)
+	if unitFilters.PowerState != nil { // derived filter: evaluate on the full scoped set, then page in memory
+		all, _, err := m.query(ctx, call, where, args, order, 0, 0)
 		if err != nil {
 			return paging.Page[Unit]{}, err
 		}
@@ -502,27 +504,27 @@ func (m *Module) unitsList(
 		var keep []Unit
 
 		for _, u := range all {
-			if u.EffectivePowerState == *f.PowerState {
+			if u.EffectivePowerState == *unitFilters.PowerState {
 				keep = append(keep, u)
 			}
 		}
 
-		end := min(w.Offset+w.Limit, len(keep))
+		end := min(window.Offset+window.Limit, len(keep))
 
 		items := []Unit{}
-		if w.Offset < len(keep) {
-			items = keep[w.Offset:end]
+		if window.Offset < len(keep) {
+			items = keep[window.Offset:end]
 		}
 
 		return paging.Page[Unit]{
 			Items:           items,
-			NextCursor:      w.Next(len(keep)),
+			NextCursor:      window.Next(len(keep)),
 			Total:           len(keep),
-			SnapshotVersion: w.Snapshot,
+			SnapshotVersion: window.Snapshot,
 		}, nil
 	}
 
-	items, total, err := m.query(ctx, c, where, args, order, w.Limit, w.Offset)
+	items, total, err := m.query(ctx, call, where, args, order, window.Limit, window.Offset)
 	if err != nil {
 		return paging.Page[Unit]{}, err
 	}
@@ -533,9 +535,9 @@ func (m *Module) unitsList(
 
 	return paging.Page[Unit]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
@@ -588,10 +590,14 @@ func (in *UnitGetInput) Validate() map[string]string {
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/units/{id} [get]
-func (m *Module) unitsGet(ctx context.Context, c *ops.Call, in *UnitGetInput) (UnitDetail, error) {
+func (m *Module) unitsGet(
+	ctx context.Context,
+	c *ops.Call,
+	input *UnitGetInput,
+) (UnitDetail, error) {
 	var args []any
 
-	args = append(args, in.ID)
+	args = append(args, input.ID)
 	where := "u.id = $1 AND " + scopeSQL(c, &args)
 
 	units, _, err := m.query(ctx, c, where, args, "u.id", 1, 0)
@@ -606,13 +612,13 @@ func (m *Module) unitsGet(ctx context.Context, c *ops.Call, in *UnitGetInput) (U
 	gateErr := unitscope.Gate(
 		ctx,
 		c,
-		[]uuid.UUID{in.ID},
+		[]uuid.UUID{input.ID},
 	)
 	if gateErr != nil { // IR49(b): equipment read waits for the work window
 		return UnitDetail{}, apperr.Wrap(gateErr, "unitscope.Gate")
 	}
 
-	d := UnitDetail{
+	unitDetail := UnitDetail{
 		Unit: units[0],
 		DetailExtras: DetailExtras{
 			Capabilities:           nil,
@@ -629,11 +635,11 @@ func (m *Module) unitsGet(ctx context.Context, c *ops.Call, in *UnitGetInput) (U
 		},
 	}
 	if m.Details != nil {
-		d.DetailExtras, err = m.Details.Detail(ctx, c, units[0])
+		unitDetail.DetailExtras, err = m.Details.Detail(ctx, c, units[0])
 		if err != nil {
 			return UnitDetail{}, apperr.Wrap(err, "assets.Details.Detail")
 		}
 	}
 
-	return d, nil
+	return unitDetail, nil
 }

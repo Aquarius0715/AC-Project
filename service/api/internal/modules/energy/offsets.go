@@ -61,37 +61,37 @@ type QuoteInput struct {
 
 // Validate implements ops.Validator (DD-C13 / DD-A15).
 func (in *QuoteInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 
 	in.Purpose = strings.TrimSpace(in.Purpose)
 	if n := utf8.RuneCountInString(in.Purpose); n < 1 || n > 1000 {
-		fe["purpose"] = "error.length"
+		fieldErrs["purpose"] = "error.length"
 	}
 
 	if math.IsNaN(in.AmountKg) || in.AmountKg <= 0 || in.AmountKg > 100000 ||
 		math.Abs(in.AmountKg*1000-math.Round(in.AmountKg*1000)) > 1e-6 {
-		fe["amountKg"] = "error.range"
+		fieldErrs["amountKg"] = "error.range"
 	}
 
 	if in.Period.From.IsZero() || !in.Period.From.Before(in.Period.To) ||
 		in.Period.To.Sub(in.Period.From) > 366*24*time.Hour {
-		fe["period"] = "error.range"
+		fieldErrs["period"] = "error.range"
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, u := range in.UnitIDs {
 		if u == uuid.Nil || seen[u] {
-			fe["unitIds"] = "error.invalid"
+			fieldErrs["unitIds"] = "error.invalid"
 		}
 
 		seen[u] = true
 	}
 
 	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 100 {
-		fe["unitIds"] = "error.invalid"
+		fieldErrs["unitIds"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 const quoteCols = `q.id, q.tenant_id, q.version, q.created_at, q.customer_id, q.purpose, q.amount_kg::float8, ` +
@@ -99,47 +99,51 @@ const quoteCols = `q.id, q.tenant_id, q.version, q.created_at, q.customer_id, q.
 	q.estimated_amount_minor, q.currency, q.expires_at, q.provider`
 
 func scanQuote(r pgx.Row) (Quote, error) {
-	var x Quote
+	var quote Quote
 
 	err := r.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.CustomerID,
-		&x.Purpose,
-		&x.AmountKg,
-		&x.Period.From,
-		&x.Period.To,
-		&x.UnitIDs,
-		&x.EstimatedAmountMinor,
-		&x.Currency,
-		&x.ExpiresAt,
-		&x.Provider,
+		&quote.ID,
+		&quote.TenantID,
+		&quote.Version,
+		&quote.CreatedAt,
+		&quote.CustomerID,
+		&quote.Purpose,
+		&quote.AmountKg,
+		&quote.Period.From,
+		&quote.Period.To,
+		&quote.UnitIDs,
+		&quote.EstimatedAmountMinor,
+		&quote.Currency,
+		&quote.ExpiresAt,
+		&quote.Provider,
 	)
-	x.UpdatedAt, x.Scheme, x.IsDemo = x.CreatedAt, "demo", true
-	x.MarketConcept = MarketConcept{
+	quote.UpdatedAt, quote.Scheme, quote.IsDemo = quote.CreatedAt, "demo", true
+	quote.MarketConcept = MarketConcept{
 		Stage:              "future_concept",
 		ProviderLabel:      "unselected",
 		VerificationStatus: "unverified",
 		LedgerStatus:       "not_connected",
 	}
 
-	return x, apperr.Wrap(err, "scan (scanQuote)")
+	return quote, apperr.Wrap(err, "scan (scanQuote)")
 }
 
 // customerOf resolves the target customer: clients use their own (a different customerId is NOT_FOUND); HQ must name
 // it.
-func customerOf(ctx context.Context, c *ops.Call, given *uuid.UUID) (uuid.UUID, uuid.UUID, error) {
+func customerOf(
+	ctx context.Context,
+	call *ops.Call,
+	given *uuid.UUID,
+) (uuid.UUID, uuid.UUID, error) {
 	var (
 		id, org uuid.UUID
 		err     error
 	)
 
 	switch {
-	case c.Principal.Role == "client":
-		err = c.Tx.QueryRow(ctx, `SELECT id, organization_id FROM energy.ref_customers WHERE organization_id =
-			$1`, c.Principal.OrgID).
+	case call.Principal.Role == "client":
+		err = call.Tx.QueryRow(ctx, `SELECT id, organization_id FROM energy.ref_customers WHERE organization_id =
+			$1`, call.Principal.OrgID).
 			Scan(&id, &org)
 		if err == nil && given != nil && *given != id {
 			return id, org, apperr.E(apperr.NotFound, "error.notFound")
@@ -147,7 +151,7 @@ func customerOf(ctx context.Context, c *ops.Call, given *uuid.UUID) (uuid.UUID, 
 	case given == nil:
 		return id, org, apperr.Fields(map[string]string{"customerId": "error.required"})
 	default:
-		err = c.Tx.QueryRow(ctx, `SELECT id, organization_id FROM energy.ref_customers WHERE id = $1`, *given).
+		err = call.Tx.QueryRow(ctx, `SELECT id, organization_id FROM energy.ref_customers WHERE id = $1`, *given).
 			Scan(&id, &org)
 	}
 
@@ -183,8 +187,8 @@ func customerOf(ctx context.Context, c *ops.Call, given *uuid.UUID) (uuid.UUID, 
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/offsets/preview [post]
-func previewQuote(ctx context.Context, c *ops.Call, in *QuoteInput) (Quote, error) {
-	customer, org, err := customerOf(ctx, c, in.CustomerID)
+func previewQuote(ctx context.Context, c *ops.Call, input *QuoteInput) (Quote, error) {
+	customer, org, err := customerOf(ctx, c, input.CustomerID)
 	if err != nil {
 		return Quote{}, err
 	}
@@ -192,13 +196,13 @@ func previewQuote(ctx context.Context, c *ops.Call, in *QuoteInput) (Quote, erro
 	var inOrg int
 
 	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND
-		NOT archived`, in.UnitIDs, org).
+		NOT archived`, input.UnitIDs, org).
 		Scan(&inOrg)
 	if scanErr != nil {
 		return Quote{}, apperr.Wrap(scanErr, "select energy.ref_units")
 	}
 
-	if inOrg != len(in.UnitIDs) {
+	if inOrg != len(input.UnitIDs) {
 		if c.Principal.Role == "client" {
 			return Quote{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
@@ -211,7 +215,8 @@ func previewQuote(ctx context.Context, c *ops.Call, in *QuoteInput) (Quote, erro
 	scanErr = c.Tx.QueryRow(ctx, `INSERT INTO energy.offset_quotes (tenant_id, customer_id, purpose, amount_kg, period,
 		unit_ids, expires_at, created_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, tstzrange($4, $5), $6, $7, $8) RETURNING id`,
-		customer, in.Purpose, in.AmountKg, in.Period.From, in.Period.To, in.UnitIDs, c.Now.Add(QuoteTTL), c.Now).
+		customer, input.Purpose, input.AmountKg, input.Period.From, input.Period.To, input.UnitIDs, c.Now.Add(QuoteTTL),
+		c.Now).
 		Scan(&id)
 	if scanErr != nil {
 		return Quote{}, apperr.Wrap(scanErr, "insert energy.offset_quotes")
@@ -282,31 +287,31 @@ const recordCols = `r.id, r.tenant_id, r.version, r.created_at, r.updated_at, r.
 const recordFrom = `energy.offset_records r JOIN energy.ref_customers cu ON cu.id = r.customer_id`
 
 func scanRecord(row pgx.Row) (Record, error) {
-	var x Record
+	var record Record
 
 	err := row.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.UpdatedAt,
-		&x.QuoteID,
-		&x.CustomerID,
-		&x.AmountKg,
-		&x.State,
-		&x.PreviousState,
-		&x.PurchaseRef,
-		&x.RetirementRef,
-		&x.DemoCertificateRef,
-		&x.customerOrg,
+		&record.ID,
+		&record.TenantID,
+		&record.Version,
+		&record.CreatedAt,
+		&record.UpdatedAt,
+		&record.QuoteID,
+		&record.CustomerID,
+		&record.AmountKg,
+		&record.State,
+		&record.PreviousState,
+		&record.PurchaseRef,
+		&record.RetirementRef,
+		&record.DemoCertificateRef,
+		&record.customerOrg,
 	)
-	x.IsDemo = true
+	record.IsDemo = true
 
-	return x, apperr.Wrap(err, "scan (scanRecord)")
+	return record, apperr.Wrap(err, "scan (scanRecord)")
 }
 
-func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
-	rows, err := c.Tx.Query(
+func decorateRecord(ctx context.Context, call *ops.Call, x *Record) error {
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT id, stage, status, started_at, completed_at FROM energy.offset_attempts WHERE record_id = $1 ORDER BY
 			started_at, id`,
@@ -319,16 +324,22 @@ func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
 	x.Attempts = []Attempt{}
 
 	for rows.Next() {
-		var a Attempt
+		var attempt Attempt
 
-		err := rows.Scan(&a.ID, &a.Stage, &a.Status, &a.StartedAt, &a.CompletedAt)
+		err := rows.Scan(
+			&attempt.ID,
+			&attempt.Stage,
+			&attempt.Status,
+			&attempt.StartedAt,
+			&attempt.CompletedAt,
+		)
 		if err != nil {
 			rows.Close()
 
 			return apperr.Wrap(err, "select energy.offset_attempts")
 		}
 
-		x.Attempts = append(x.Attempts, a)
+		x.Attempts = append(x.Attempts, attempt)
 	}
 
 	rows.Close()
@@ -345,7 +356,7 @@ func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
 
 	hist, err := audit.History(
 		ctx,
-		c,
+		call,
 		"offset_record",
 		x.ID.String(),
 	) // identity's audit log (IR196)
@@ -357,7 +368,7 @@ func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
 
 	for _, v := range hist {
 		e := Event(v)
-		if c.Principal.Role == "client" { // a customer never sees an actor's name (IR305)
+		if call.Principal.Role == "client" { // a customer never sees an actor's name (IR305)
 			e.ActorName = nil
 		}
 
@@ -373,17 +384,17 @@ func loadRecord(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Reco
 		q += " FOR UPDATE OF r"
 	}
 
-	x, err := scanRecord(c.Tx.QueryRow(ctx, q, id))
+	record, err := scanRecord(c.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && c.Principal.Role == "client" && x.customerOrg != c.Principal.OrgID) {
+		(err == nil && c.Principal.Role == "client" && record.customerOrg != c.Principal.OrgID) {
 		return Record{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	if err != nil {
-		return x, err
+		return record, err
 	}
 
-	return x, decorateRecord(ctx, c, &x)
+	return record, decorateRecord(ctx, c, &record)
 }
 
 // listRecords serves offsets.list.
@@ -416,7 +427,11 @@ func loadRecord(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Reco
 //	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/offsets [get]
-func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Record], error) {
+func listRecords(
+	ctx context.Context,
+	call *ops.Call,
+	in *paging.Query,
+) (paging.Page[Record], error) {
 	var f struct {
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
 		Status     *string    `json:"status,omitempty"` // => state
@@ -446,7 +461,7 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 		return paging.Page[Record]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*in, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Record]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -460,10 +475,10 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	}
 
 	conds := []string{"TRUE"}
-	if c.Principal.Role == "client" { // IR90 / REV19-030: every quote unit must be the client's
+	if call.Principal.Role == "client" { // IR90 / REV19-030: every quote unit must be the client's
 		conds = append(
 			conds,
-			"cu.organization_id = "+add(c.Principal.OrgID),
+			"cu.organization_id = "+add(call.Principal.OrgID),
 			"NOT EXISTS (SELECT 1 FROM energy.offset_quotes q, unnest(q.unit_ids) uid LEFT JOIN energy.ref_units u ON u.id = "+
 				"uid WHERE q.id = r.quote_id AND u.customer_org_id IS DISTINCT FROM cu.organization_id)",
 		)
@@ -489,13 +504,13 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+recordFrom+" WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM "+recordFrom+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Record]{}, apperr.Wrap(scanErr, "select energy.offset_records")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM %s WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
@@ -503,8 +518,8 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 			recordFrom,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -514,14 +529,14 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	items := []Record{}
 
 	for rows.Next() {
-		x, err := scanRecord(rows)
+		record, err := scanRecord(rows)
 		if err != nil {
 			rows.Close()
 
 			return paging.Page[Record]{}, err
 		}
 
-		items = append(items, x)
+		items = append(items, record)
 	}
 
 	rows.Close()
@@ -532,7 +547,7 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	}
 
 	for i := range items {
-		err := decorateRecord(ctx, c, &items[i])
+		err := decorateRecord(ctx, call, &items[i])
 		if err != nil {
 			return paging.Page[Record]{}, err
 		}
@@ -540,9 +555,9 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 
 	return paging.Page[Record]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
@@ -559,9 +574,9 @@ type SimulateInput struct {
 
 // Validate implements ops.Validator: exactly the fields of the branch.
 func (in *SimulateInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if !in.DemoConfirmed {
-		fe["demoConfirmed"] = "error.required"
+		fieldErrs["demoConfirmed"] = "error.required"
 	}
 
 	switch in.Event {
@@ -569,34 +584,34 @@ func (in *SimulateInput) Validate() map[string]string {
 		if in.QuoteID == nil || in.QuoteVersion == nil || in.RecordID != nil ||
 			in.AttemptID != nil ||
 			in.EventID != nil {
-			fe["quoteId"] = "error.invalid"
+			fieldErrs["quoteId"] = "error.invalid"
 		}
 	case "purchase_confirm", "retire", "fail":
 		if in.RecordID == nil || in.AttemptID == nil || in.EventID == nil || in.QuoteID != nil ||
 			in.QuoteVersion != nil {
-			fe["recordId"] = "error.invalid"
+			fieldErrs["recordId"] = "error.invalid"
 		}
 	case "retry":
 		if in.RecordID == nil || in.AttemptID == nil || in.EventID != nil || in.QuoteID != nil ||
 			in.QuoteVersion != nil {
-			fe["recordId"] = "error.invalid"
+			fieldErrs["recordId"] = "error.invalid"
 		}
 	default:
-		fe["event"] = "error.invalid"
+		fieldErrs["event"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // newAttempt starts an attempt; UUIDv7 IDs keep attempts started at the same instant in creation order.
-func newAttempt(ctx context.Context, c *ops.Call, record uuid.UUID, stage string) error {
-	_, err := c.Tx.Exec(
+func newAttempt(ctx context.Context, call *ops.Call, record uuid.UUID, stage string) error {
+	_, err := call.Tx.Exec(
 		ctx,
 		`INSERT INTO energy.offset_attempts (id, tenant_id, record_id, stage, status, started_at) VALUES ($4,
 			current_setting('app.tenant_id')::uuid, $1, $2, 'pending', $3)`,
 		record,
 		stage,
-		c.Now,
+		call.Now,
 		uuid.Must(uuid.NewV7()),
 	)
 
@@ -634,8 +649,8 @@ func demoRef(prefix string) *string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/offsets/simulate [post]
-func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, error) {
-	client := c.Principal.Role == "client"
+func simulate(ctx context.Context, call *ops.Call, in *SimulateInput) (Record, error) {
+	client := call.Principal.Role == "client"
 	if client && in.Event != "request" && in.Event != "retry" {
 		return Record{}, apperr.E(apperr.Forbidden, "error.forbidden")
 	}
@@ -643,8 +658,8 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 	conflict := apperr.E(apperr.Conflict, "errors.offset_state")
 
 	if in.Event == "request" {
-		q, err := scanQuote(
-			c.Tx.QueryRow(
+		quote, err := scanQuote(
+			call.Tx.QueryRow(
 				ctx,
 				"SELECT "+quoteCols+" FROM energy.offset_quotes q WHERE q.id = $1 FOR UPDATE",
 				*in.QuoteID,
@@ -659,46 +674,47 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 		}
 
 		if client {
-			_, _, err := customerOf(ctx, c, &q.CustomerID)
+			_, _, err := customerOf(ctx, call, &quote.CustomerID)
 			if err != nil {
 				return Record{}, err
 			}
 		}
 
-		if q.Version != *in.QuoteVersion {
+		if quote.Version != *in.QuoteVersion {
 			return Record{}, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
 
 		var used bool
 
-		scanErr := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.offset_records WHERE quote_id = $1)`, q.ID).
+		scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.offset_records WHERE quote_id = $1)`, quote.ID).
 			Scan(&used)
 		if scanErr != nil {
 			return Record{}, apperr.Wrap(scanErr, "select energy.offset_records")
 		}
 
-		if used || !c.Now.Before(q.ExpiresAt) {
+		if used || !call.Now.Before(quote.ExpiresAt) {
 			return Record{}, apperr.E(apperr.Conflict, "errors.quote_unavailable")
 		}
 
 		var id uuid.UUID
 
-		scanErr = c.Tx.QueryRow(ctx, `INSERT INTO energy.offset_records (tenant_id, quote_id, customer_id, amount_kg, state,
+		scanErr = call.Tx.QueryRow(ctx, `INSERT INTO energy.offset_records (tenant_id, quote_id, customer_id, amount_kg,
+			state,
 			created_at, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'demo_requested', $4, $4) RETURNING
-			id`, q.ID, q.CustomerID, q.AmountKg, c.Now).
+			id`, quote.ID, quote.CustomerID, quote.AmountKg, call.Now).
 			Scan(&id)
 		if scanErr != nil {
 			return Record{}, apperr.Wrap(scanErr, "insert energy.offset_records")
 		}
 
-		newAttemptErr := newAttempt(ctx, c, id, "purchase")
+		newAttemptErr := newAttempt(ctx, call, id, "purchase")
 		if newAttemptErr != nil {
 			return Record{}, newAttemptErr
 		}
 
 		v := 1
-		c.Audit(
+		call.Audit(
 			ops.AuditEntry{
 				Action:          "offsets.request",
 				TargetKind:      "offset_record",
@@ -712,12 +728,12 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 			},
 		)
 
-		return loadRecord(ctx, c, id, false)
+		return loadRecord(ctx, call, id, false)
 	}
 
-	x, err := loadRecord(ctx, c, *in.RecordID, true)
+	record, err := loadRecord(ctx, call, *in.RecordID, true)
 	if err != nil {
-		return x, err
+		return record, err
 	}
 
 	if in.EventID != nil { // same eventId: stored result when identical, CONFLICT otherwise (SR18)
@@ -726,39 +742,39 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 			kind string
 		)
 
-		err := c.Tx.QueryRow(ctx, `SELECT id, completed_event FROM energy.offset_attempts WHERE completed_event_id =
+		err := call.Tx.QueryRow(ctx, `SELECT id, completed_event FROM energy.offset_attempts WHERE completed_event_id =
 			$1`, *in.EventID).
 			Scan(&att, &kind)
 		if err == nil {
 			if att == *in.AttemptID && kind == in.Event {
-				return x, nil
+				return record, nil
 			}
 
-			return x, conflict
+			return record, conflict
 		}
 
 		if !errors.Is(err, pgx.ErrNoRows) {
-			return x, apperr.Wrap(err, "select energy.offset_attempts")
+			return record, apperr.Wrap(err, "select energy.offset_attempts")
 		}
 	}
 
-	if x.Version != *c.ExpectedVersion {
-		return x, apperr.E(apperr.Conflict, "error.versionConflict")
+	if record.Version != *call.ExpectedVersion {
+		return record, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if x.CurrentAttemptID == nil || *x.CurrentAttemptID != *in.AttemptID {
-		return x, conflict
+	if record.CurrentAttemptID == nil || *record.CurrentAttemptID != *in.AttemptID {
+		return record, conflict
 	}
 
-	cur := x.Attempts[len(x.Attempts)-1]
+	cur := record.Attempts[len(record.Attempts)-1]
 	finish := func(status string) error {
-		_, err := c.Tx.Exec(
+		_, err := call.Tx.Exec(
 			ctx,
 			`UPDATE energy.offset_attempts SET status = $2, completed_at = $3, completed_event_id = $4, completed_event = $5
 				WHERE id = $1`,
 			cur.ID,
 			status,
-			c.Now,
+			call.Now,
 			in.EventID,
 			in.Event,
 		)
@@ -766,56 +782,57 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 		return apperr.Wrap(err, "update energy.offset_attempts")
 	}
 	setState := func(state string, purchase, retirement, cert *string) error {
-		_, err := c.Tx.Exec(
+		_, err := call.Tx.Exec(
 			ctx,
 			`UPDATE energy.offset_records SET previous_state = state, state = $2, purchase_ref = COALESCE($3, purchase_ref),
 			retirement_ref = COALESCE($4, retirement_ref), certificate_ref = COALESCE($5, certificate_ref), version = version +
 			1, updated_at = $6 WHERE id = $1`,
-			x.ID,
+			record.ID,
 			state,
 			purchase,
 			retirement,
 			cert,
-			c.Now,
+			call.Now,
 		)
 
 		return apperr.Wrap(err, "update energy.offset_records")
 	}
 
 	switch {
-	case in.Event == "purchase_confirm" && x.State == "demo_requested" && cur.Stage == "purchase" &&
+	case in.Event == "purchase_confirm" && record.State == "demo_requested" && cur.Stage == "purchase" &&
 		cur.Status == "pending":
 		finishErr := finish("succeeded")
 		if finishErr != nil {
-			return x, finishErr
+			return record, finishErr
 		}
 
 		var ref *string
-		if x.PurchaseRef == nil {
+		if record.PurchaseRef == nil {
 			ref = demoRef("DEMO-PUR")
 		}
 
 		setStateErr := setState("demo_purchased", ref, nil, nil)
 		if setStateErr != nil {
-			return x, setStateErr
+			return record, setStateErr
 		}
 
-		err = newAttempt(ctx, c, x.ID, "retirement")
-	case in.Event == "retire" && x.State == "demo_purchased" && cur.Stage == "retirement" && cur.Status == "pending":
+		err = newAttempt(ctx, call, record.ID, "retirement")
+	case in.Event == "retire" && record.State == "demo_purchased" && cur.Stage == "retirement" && cur.Status == "pending":
 		finishErr := finish("succeeded")
 		if finishErr != nil {
-			return x, finishErr
+			return record, finishErr
 		}
 
 		err = setState("demo_retired", nil, demoRef("DEMO-RET"), demoRef("DEMO-CERT"))
-	case in.Event == "fail" && (x.State == "demo_requested" || x.State == "demo_purchased") && cur.Status == "pending":
+	case in.Event == "fail" && (record.State == "demo_requested" || record.State == "demo_purchased") &&
+		cur.Status == "pending":
 		finishErr := finish("failed")
 		if finishErr != nil {
-			return x, finishErr
+			return record, finishErr
 		}
 
 		err = setState("failed", nil, nil, nil)
-	case in.Event == "retry" && x.State == "failed" && cur.Status == "failed":
+	case in.Event == "retry" && record.State == "failed" && cur.Status == "failed":
 		next := "demo_requested"
 		if cur.Stage == "retirement" {
 			next = "demo_purchased"
@@ -823,30 +840,30 @@ func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, erro
 
 		setStateErr := setState(next, nil, nil, nil)
 		if setStateErr != nil {
-			return x, setStateErr
+			return record, setStateErr
 		}
 
-		err = newAttempt(ctx, c, x.ID, cur.Stage)
+		err = newAttempt(ctx, call, record.ID, cur.Stage)
 	default:
-		return x, conflict
+		return record, conflict
 	}
 
 	if err != nil {
-		return x, err
+		return record, err
 	}
 
-	next := x.Version + 1
-	c.Audit(
+	next := record.Version + 1
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "offsets." + in.Event,
 			TargetKind:      "offset_record",
-			TargetID:        x.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			TargetID:        record.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return loadRecord(ctx, c, x.ID, false)
+	return loadRecord(ctx, call, record.ID, false)
 }
 
 // RegisterOffsets binds offsets.*.

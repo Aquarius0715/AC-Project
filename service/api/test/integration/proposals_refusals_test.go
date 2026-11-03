@@ -13,7 +13,7 @@ import (
 // its job. An unknown proposal, a proposal of another job and a decided proposal are each refused with the state
 // that applies, and the decided one changes nothing.
 func TestProposalRefusalsByState(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = ANY($1) AND status = 'active'
@@ -22,26 +22,26 @@ func TestProposalRefusalsByState(t *testing.T) {
 		clock.Add(2*time.Hour),
 	)
 	unit := seed.ID("unit-non-rto").String()
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	internalHold := `{"kind":"internal","membershipId":"` + seed.ID("tech-internal-a").
 		String() +
 		`"}`
-	_, m := write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	_, m := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
 
 	job := data(m)["id"].(string)
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.proposeSlot",
 		`{"jobId":"`+job+`","slot":`+slotJSON(
 			97,
 			2,
-		)+`,"hold":`+internalHold+`,"message":"Can we come then?","replyBy":"`+ts(
+		)+`,"hold":`+internalHold+`,"message":"Can we come then?","replyBy":"`+stamp(
 			48,
 		)+`"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("propose: %d %v", code, m)
+		t.Fatalf("propose: %d %v", code, res)
 	}
 
 	var proposal string
@@ -54,47 +54,47 @@ func TestProposalRefusalsByState(t *testing.T) {
 
 	unknown := uuid.NewString()
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.withdrawProposal",
 		`{"jobId":"`+job+`","proposalId":"`+unknown+`"}`,
 		2,
 	); code != 404 ||
-		m["messageKey"] != "error.notFound" {
-		t.Errorf("withdraw an unknown proposal: %d %v", code, m)
+		res["messageKey"] != "error.notFound" {
+		t.Errorf("withdraw an unknown proposal: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerA,
 		"jobs.respondProposal",
 		`{"jobId":"`+job+`","proposalId":"`+unknown+`","decision":"accept"}`,
 		2,
 	); code != 404 ||
-		m["messageKey"] != "error.notFound" {
-		t.Errorf("answer an unknown proposal: %d %v", code, m)
+		res["messageKey"] != "error.notFound" {
+		t.Errorf("answer an unknown proposal: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"jobs.withdrawProposal",
 		`{"jobId":"`+job+`","proposalId":"`+proposal+`"}`,
 		2,
 	); code != 200 {
-		t.Fatalf("withdraw: %d %v", code, m)
+		t.Fatalf("withdraw: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerA,
 		"jobs.respondProposal",
 		`{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`,
 		3,
 	); code != 409 ||
-		m["messageKey"] != "error.invalidState" {
-		t.Errorf("answer a withdrawn proposal: %d %v", code, m)
+		res["messageKey"] != "error.invalidState" {
+		t.Errorf("answer a withdrawn proposal: %d %v", code, res)
 	}
 
 	var status string

@@ -78,18 +78,18 @@ type Resolver struct {
 
 // NewResolver builds the lookup from the links, deriving every ID the way the seed does.
 func NewResolver(links []Link) *Resolver {
-	r := &Resolver{byDevice: map[uuid.UUID]target{}}
+	resolver := &Resolver{byDevice: map[uuid.UUID]target{}}
 
-	for _, l := range links {
-		t := target{unit: seed.ID(l.Unit), sensors: map[string]uuid.UUID{}}
-		for name, fixture := range l.Sensors {
+	for _, link := range links {
+		t := target{unit: seed.ID(link.Unit), sensors: map[string]uuid.UUID{}}
+		for name, fixture := range link.Sensors {
 			t.sensors[name] = seed.ID(fixture)
 		}
 
-		r.byDevice[seed.ID(l.Device)] = t
+		resolver.byDevice[seed.ID(link.Device)] = t
 	}
 
-	return r
+	return resolver
 }
 
 // DeviceID is the UUID a fixture device has in the API (and in the simulator's topics).
@@ -162,26 +162,30 @@ type Measurement struct {
 // Triggers converts one telemetry batch. A device the links do not know, or a sensor it does not have, is an error for
 // that reading; the rest of the batch still converts. Each reading's event ID is derived from the device and its
 // sequence, so a message delivered twice is one event to the API.
-func (r *Resolver) Triggers(b devicesim.Batch, received time.Time) ([]Trigger, error) {
-	dev, err := uuid.Parse(b.DeviceID)
+func (r *Resolver) Triggers(batch devicesim.Batch, received time.Time) ([]Trigger, error) {
+	dev, err := uuid.Parse(batch.DeviceID)
 	if err != nil {
-		return nil, fmt.Errorf("device %q: %w", b.DeviceID, err)
+		return nil, fmt.Errorf("device %q: %w", batch.DeviceID, err)
 	}
 
 	t, ok := r.byDevice[dev]
 	if !ok {
-		return nil, fmt.Errorf("device %s is not a demo link", b.DeviceID)
+		return nil, fmt.Errorf("device %s is not a demo link", batch.DeviceID)
 	}
 
 	var out []Trigger
 
 	var first error // the first reading that could not convert; the rest of the batch still converts
 
-	for _, m := range b.Measurements {
-		sensor, ok := t.sensors[m.SensorID]
+	for _, measurement := range batch.Measurements {
+		sensor, ok := t.sensors[measurement.SensorID]
 		if !ok {
 			if first == nil {
-				first = fmt.Errorf("device %s has no sensor %q", b.DeviceID, m.SensorID)
+				first = fmt.Errorf(
+					"device %s has no sensor %q",
+					batch.DeviceID,
+					measurement.SensorID,
+				)
 			}
 
 			continue
@@ -193,24 +197,24 @@ func (r *Resolver) Triggers(b devicesim.Batch, received time.Time) ([]Trigger, e
 			[]byte(
 				fmt.Sprintf(
 					"%s/%s/%s",
-					b.DeviceID,
-					m.SensorID,
-					m.ObservedAt.UTC().Format(time.RFC3339Nano),
+					batch.DeviceID,
+					measurement.SensorID,
+					measurement.ObservedAt.UTC().Format(time.RFC3339Nano),
 				),
 			),
 		)
 		out = append(out, Trigger{
 			ScenarioID: Scenario,
 			EventID:    event,
-			OccurredAt: m.ObservedAt,
+			OccurredAt: measurement.ObservedAt,
 			EventType:  "telemetry",
 			Measurement: &Measurement{
 				UnitID:     t.unit,
 				SensorID:   sensor,
-				Metric:     m.Metric,
-				Value:      m.Value,
-				Unit:       m.Unit, // nil: the API stores the reading missing
-				ObservedAt: m.ObservedAt,
+				Metric:     measurement.Metric,
+				Value:      measurement.Value,
+				Unit:       measurement.Unit, // nil: the API stores the reading missing
+				ObservedAt: measurement.ObservedAt,
 				ReceivedAt: received.UTC(),
 				Origin:     "measured",
 				Quality:    "valid",
@@ -227,15 +231,15 @@ func (r *Resolver) Triggers(b devicesim.Batch, received time.Time) ([]Trigger, e
 // command_ack, unsupported is command_fail (the device rejected it). An expired acknowledgement is not forwarded: the
 // backend decides a late acknowledgement by its own clock (common design §5), so the bridge does not change the
 // command.
-func CommandTrigger(a devicesim.Ack, received time.Time) (Trigger, bool, error) {
-	cmd, err := uuid.Parse(a.CommandID)
+func CommandTrigger(ack devicesim.Ack, received time.Time) (Trigger, bool, error) {
+	cmd, err := uuid.Parse(ack.CommandID)
 	if err != nil {
-		return Trigger{}, false, fmt.Errorf("command %q: %w", a.CommandID, err)
+		return Trigger{}, false, fmt.Errorf("command %q: %w", ack.CommandID, err)
 	}
 
 	var kind string
 
-	switch a.Result {
+	switch ack.Result {
 	case "applied":
 		kind = "command_ack"
 	case "unsupported":
@@ -262,7 +266,7 @@ func CommandTrigger(a devicesim.Ack, received time.Time) (Trigger, bool, error) 
 		ScenarioID: Scenario,
 		EventID: uuid.NewSHA1(
 			seed.Namespace,
-			[]byte(fmt.Sprintf("%s/%s/%s", a.DeviceID, a.CommandID, kind)),
+			[]byte(fmt.Sprintf("%s/%s/%s", ack.DeviceID, ack.CommandID, kind)),
 		),
 		OccurredAt:  received.UTC(),
 		EventType:   kind,
@@ -283,21 +287,21 @@ func CommandTrigger(a devicesim.Ack, received time.Time) (Trigger, bool, error) 
 func FleetLinks(f devicesim.Fleet) []Link {
 	var out []Link
 
-	for _, p := range f.Patterns {
-		if p.NoDevice {
+	for _, pattern := range f.Patterns {
+		if pattern.NoDevice {
 			continue
 		}
 
 		sensors := map[string]string{}
 		for _, s := range devicesim.Sensors {
-			sensors[s.ID] = devicesim.SensorName(p, s)
+			sensors[s.ID] = devicesim.SensorName(pattern, s)
 		}
 
 		out = append(
 			out,
 			Link{
-				Device:     devicesim.DeviceName(p),
-				Unit:       devicesim.UnitName(p),
+				Device:     devicesim.DeviceName(pattern),
+				Unit:       devicesim.UnitName(pattern),
 				Sensors:    sensors,
 				Connection: "",
 			},
@@ -311,13 +315,17 @@ func FleetLinks(f devicesim.Fleet) []Link {
 // the scenario minute it was received in (now + offset - margin), the slot energy counts (D07), so the newest reading
 // is never more than about a minute old there. What the module stamped beyond its own current minute (a reading from
 // the future) is kept as that many minutes ahead.
-func ToScenario(b devicesim.Batch, now time.Time, offset, margin time.Duration) devicesim.Batch {
+func ToScenario(
+	batch devicesim.Batch,
+	now time.Time,
+	offset, margin time.Duration,
+) devicesim.Batch {
 	slot := now.Add(offset - margin).UTC().Truncate(time.Minute)
 	moduleMinute := now.UTC().Truncate(time.Minute)
-	out := b
+	out := batch
 
-	out.Measurements = make([]devicesim.Measurement, len(b.Measurements))
-	for i, m := range b.Measurements {
+	out.Measurements = make([]devicesim.Measurement, len(batch.Measurements))
+	for i, m := range batch.Measurements {
 		ahead := max(m.ObservedAt.Sub(moduleMinute).Round(time.Minute), 0)
 
 		m.ObservedAt = slot.Add(ahead)

@@ -76,12 +76,12 @@ type DeletedResource struct {
 //	@Router			/v1/units/{id} [delete]
 func (m *Module) unitsDelete(
 	ctx context.Context,
-	c *ops.Call,
-	in *DeleteInput,
+	call *ops.Call,
+	input *DeleteInput,
 ) (DeletedResource, error) {
 	var v int
 
-	err := c.Tx.QueryRow(ctx, `SELECT version FROM assets.units WHERE id = $1 FOR UPDATE`, in.ID).
+	err := call.Tx.QueryRow(ctx, `SELECT version FROM assets.units WHERE id = $1 FOR UPDATE`, input.ID).
 		Scan(&v)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return DeletedResource{}, notFound()
@@ -91,12 +91,12 @@ func (m *Module) unitsDelete(
 		return DeletedResource{}, apperr.Wrap(err, "select assets.units")
 	}
 
-	if v != *c.ExpectedVersion {
+	if v != *call.ExpectedVersion {
 		return DeletedResource{}, conflict("error.versionConflict")
 	}
 
 	for _, u := range m.Usage {
-		busy, err := u.UnitInUse(ctx, c, in.ID)
+		busy, err := u.UnitInUse(ctx, call, input.ID)
 		if err != nil {
 			return DeletedResource{}, apperr.Wrap(err, "assets.UnitUsage.UnitInUse")
 		}
@@ -106,32 +106,34 @@ func (m *Module) unitsDelete(
 		}
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`DELETE FROM assets.unit_alert_policies WHERE unit_id = $1`,
-		in.ID,
+		input.ID,
 	)
 	if execErr != nil {
 		return DeletedResource{}, apperr.Wrap(execErr, "delete assets.unit_alert_policies")
 	}
 
-	_, execErr = c.Tx.Exec(ctx, `DELETE FROM assets.units WHERE id = $1`, in.ID)
+	_, execErr = call.Tx.Exec(ctx, `DELETE FROM assets.units WHERE id = $1`, input.ID)
 	if execErr != nil {
 		return DeletedResource{}, apperr.Wrap(execErr, "delete assets.units")
 	}
 
-	c.Emit(ops.Event{AggregateType: "unit", AggregateID: in.ID, Type: "UnitDeleted", Payload: nil})
-	c.Audit(
+	call.Emit(
+		ops.Event{AggregateType: "unit", AggregateID: input.ID, Type: "UnitDeleted", Payload: nil},
+	)
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "units.delete",
 			TargetKind:      "unit",
-			TargetID:        in.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			Reason:          in.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
+			TargetID:        input.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			Reason:          input.Reason, NextVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return DeletedResource{ID: in.ID, Deleted: true}, nil
+	return DeletedResource{ID: input.ID, Deleted: true}, nil
 }
 
 // SetPoliciesInput is units.setAlertPolicies input.
@@ -142,25 +144,25 @@ type SetPoliciesInput struct {
 
 // Validate implements ops.Validator.
 func (in *SetPoliciesInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.UnitID == uuid.Nil {
-		fe["unitId"] = "error.required"
+		fieldErrs["unitId"] = "error.required"
 	}
 
 	if in.AlertPolicyIDs == nil {
-		fe["alertPolicyIds"] = "error.required"
+		fieldErrs["alertPolicyIds"] = "error.required"
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, id := range in.AlertPolicyIDs {
 		if seen[id] {
-			fe["alertPolicyIds"] = "error.duplicate"
+			fieldErrs["alertPolicyIds"] = "error.duplicate"
 		}
 
 		seen[id] = true
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // unitsSetAlertPolicies replaces the unit's attached policies (IR108: only alert policies of the unit's customer;
@@ -206,17 +208,17 @@ func (m *Module) unitsSetAlertPolicies(
 // unitsSetAlertPoliciesUnit is unitsSetAlertPolicies answering the unit with its summary fields.
 func (m *Module) unitsSetAlertPoliciesUnit(
 	ctx context.Context,
-	c *ops.Call,
-	in *SetPoliciesInput,
+	call *ops.Call,
+	input *SetPoliciesInput,
 ) (Unit, error) {
 	var (
 		org        uuid.UUID
 		customerID *uuid.UUID
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT u.customer_org_id, (SELECT id FROM assets.customers WHERE organization_id =
+	err := call.Tx.QueryRow(ctx, `SELECT u.customer_org_id, (SELECT id FROM assets.customers WHERE organization_id =
 		u.customer_org_id)
-		FROM assets.units u WHERE u.id = $1 AND NOT u.archived FOR UPDATE`, in.UnitID).
+		FROM assets.units u WHERE u.id = $1 AND NOT u.archived FOR UPDATE`, input.UnitID).
 		Scan(&org, &customerID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Unit{}, notFound()
@@ -226,16 +228,16 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 		return Unit{}, apperr.Wrap(err, "select assets.units")
 	}
 
-	if c.Principal.Role == "client" && org != c.Principal.OrgID {
+	if call.Principal.Role == "client" && org != call.Principal.OrgID {
 		return Unit{}, notFound()
 	}
 
-	owners, err := m.Policies.Owners(ctx, c, in.AlertPolicyIDs)
+	owners, err := m.Policies.Owners(ctx, call, input.AlertPolicyIDs)
 	if err != nil {
 		return Unit{}, apperr.Wrap(err, "assets.PolicyReader.Owners")
 	}
 
-	for _, id := range in.AlertPolicyIDs {
+	for _, id := range input.AlertPolicyIDs {
 		o, ok := owners[id]
 		switch { // IR108 / IR120 item 8
 		case ok && o.Kind != "alert":
@@ -249,9 +251,10 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 
 	var v int
 
-	err = c.Tx.QueryRow(ctx, `UPDATE assets.units SET version = version + 1, updated_at = platform.app_now() WHERE id = $1
+	err = call.Tx.QueryRow(ctx, `UPDATE assets.units SET version = version + 1, updated_at = platform.app_now() WHERE id =
+		$1
 		AND version = $2 RETURNING version`,
-		in.UnitID, *c.ExpectedVersion).
+		input.UnitID, *call.ExpectedVersion).
 		Scan(&v)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Unit{}, conflict("error.versionConflict")
@@ -261,26 +264,26 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 		return Unit{}, apperr.Wrap(err, "update assets.units")
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`DELETE FROM assets.unit_alert_policies WHERE unit_id = $1 AND NOT (policy_id = ANY($2))`,
-		in.UnitID,
-		in.AlertPolicyIDs,
+		input.UnitID,
+		input.AlertPolicyIDs,
 	)
 	if execErr != nil {
 		return Unit{}, apperr.Wrap(execErr, "delete assets.unit_alert_policies")
 	}
 
-	ids := append([]uuid.UUID(nil), in.AlertPolicyIDs...)
+	ids := append([]uuid.UUID(nil), input.AlertPolicyIDs...)
 	sort.Slice(ids, func(i, j int) bool { return ids[i].String() < ids[j].String() })
 
 	for _, id := range ids {
-		_, err := c.Tx.Exec(
+		_, err := call.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.unit_alert_policies (tenant_id, unit_id, policy_id) VALUES
 				(current_setting('app.tenant_id')::uuid, $1, $2)
 			ON CONFLICT DO NOTHING`,
-			in.UnitID,
+			input.UnitID,
 			id,
 		)
 		if err != nil {
@@ -288,18 +291,23 @@ func (m *Module) unitsSetAlertPoliciesUnit(
 		}
 	}
 
-	c.Emit(
-		ops.Event{AggregateType: "unit", AggregateID: in.UnitID, Type: "UnitChanged", Payload: nil},
+	call.Emit(
+		ops.Event{
+			AggregateType: "unit",
+			AggregateID:   input.UnitID,
+			Type:          "UnitChanged",
+			Payload:       nil,
+		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "units.setAlertPolicies",
 			TargetKind:      "unit",
-			TargetID:        in.UnitID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			TargetID:        input.UnitID.String(),
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &v, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return m.load(ctx, c, in.UnitID)
+	return m.load(ctx, call, input.UnitID)
 }

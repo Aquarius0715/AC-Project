@@ -43,11 +43,16 @@ func serviceURL(domain string) string {
 }
 
 // buildCluster starts the five services from base (clock, demo flags). keep=false closes them when t ends.
-func buildCluster(t *testing.T, base apiserver.Config, v auth.Verifier, keep bool) splitCluster {
+func buildCluster(
+	t *testing.T,
+	base apiserver.Config,
+	verifier auth.Verifier,
+	keep bool,
+) splitCluster {
 	t.Helper()
 
 	ctx := context.Background()
-	cl := splitCluster{srv: map[string]*apiserver.Server{}, urls: map[string]string{}}
+	cluster := splitCluster{srv: map[string]*apiserver.Server{}, urls: map[string]string{}}
 	start := func(d string) {
 		cfg := base
 		cfg.Domains, cfg.InternalToken, cfg.DatabaseURL = []string{
@@ -58,21 +63,21 @@ func buildCluster(t *testing.T, base apiserver.Config, v auth.Verifier, keep boo
 
 		cfg.PrincipalTTL = -1 // the suite edits memberships directly and expects the next request to see them
 		if d != ops.DomainIdentity {
-			cfg.IdentityURL = cl.urls[ops.DomainIdentity]
+			cfg.IdentityURL = cluster.urls[ops.DomainIdentity]
 		}
 
-		s, err := apiserver.New(ctx, cfg, v)
+		srv, err := apiserver.New(ctx, cfg, verifier)
 		if err != nil {
 			t.Fatalf("%s service: %v", d, err)
 		}
 
-		hs := httptest.NewServer(s.Echo)
+		hs := httptest.NewServer(srv.Echo)
 
 		if !keep {
-			t.Cleanup(func() { hs.Close(); s.DB.Close() })
+			t.Cleanup(func() { hs.Close(); srv.DB.Close() })
 		}
 
-		cl.srv[d], cl.urls[d] = s, hs.URL
+		cluster.srv[d], cluster.urls[d] = srv, hs.URL
 	}
 	start(ops.DomainIdentity) // principals for the others
 
@@ -82,15 +87,15 @@ func buildCluster(t *testing.T, base apiserver.Config, v auth.Verifier, keep boo
 		}
 	}
 
-	for d, s := range cl.srv {
+	for d, s := range cluster.srv {
 		s.Registry.Remote = &ops.HTTPQueries{
-			Targets: cl.targets(d),
+			Targets: cluster.targets(d),
 			Token:   "test-internal",
 			Client:  nil,
 		}
 	}
 
-	return cl
+	return cluster
 }
 
 // statusRecorder keeps the status of a proxied response.
@@ -194,7 +199,7 @@ func (cl splitCluster) consumers() []*events.Consumer {
 // clusterFacade is the suite's server in cluster mode: the gateway in front of the cluster for the /v1 routes, the
 // all-domain server for health checks, its database for worker paths (scheduler ticks, device callbacks) and the
 // cluster's consumers for drainEvents.
-func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiserver.Server {
+func clusterFacade(t *testing.T, base apiserver.Config, verifier auth.Verifier) *apiserver.Server {
 	t.Helper()
 
 	if f, ok := facades[base.DemoOps]; ok {
@@ -205,30 +210,35 @@ func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiser
 		base.DemoClock = apiserver.NewScenarioClock(base.Clock)
 	}
 
-	all, err := apiserver.New(context.Background(), base, v)
+	all, err := apiserver.New(context.Background(), base, verifier)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cl := buildCluster(t, base, v, true)
+	cluster := buildCluster(t, base, verifier, true)
 
 	targets := gateway.Targets{}
-	for d, raw := range cl.urls {
+	for d, raw := range cluster.urls {
 		targets[d], _ = url.Parse(raw)
 	}
 
 	gw := gateway.New(targets, nil)
-	f := &apiserver.Server{Registry: all.Registry, DB: all.DB, Consumers: cl.consumers(), Echo: nil}
-	e := echo.New()
-	e.Any("/*", echo.WrapHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/v1/") {
-			all.Echo.ServeHTTP(w, r)
+	f := &apiserver.Server{
+		Registry:  all.Registry,
+		DB:        all.DB,
+		Consumers: cluster.consumers(),
+		Echo:      nil,
+	}
+	app := echo.New()
+	app.Any("/*", echo.WrapHandler(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !strings.HasPrefix(req.URL.Path, "/v1/") {
+			all.Echo.ServeHTTP(w, req)
 
 			return
 		}
 
 		err := f.DrainEvents(
-			r.Context(),
+			req.Context(),
 		)
 		if err != nil { // direct SQL of the test and worker paths (BeforeDispatch)
 			http.Error(w, "drain before: "+err.Error(), http.StatusInternalServerError)
@@ -237,12 +247,12 @@ func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiser
 		}
 
 		rec := &statusRecorder{ResponseWriter: w, status: 0}
-		gw.ServeHTTP(rec, r)
+		gw.ServeHTTP(rec, req)
 
-		if r.URL.Path == "/v1/demo/advance-clock" && rec.status == http.StatusOK &&
+		if req.URL.Path == "/v1/demo/advance-clock" && rec.status == http.StatusOK &&
 			base.DemoClock != nil { // the workers' tick on the new time
-			_, err := cl.tick(
-				context.WithoutCancel(r.Context()),
+			_, err := cluster.tick(
+				context.WithoutCancel(req.Context()),
 				base.DemoClock.Now(),
 			)
 			if err != nil {
@@ -251,15 +261,15 @@ func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiser
 		}
 
 		err = f.DrainEvents(
-			context.WithoutCancel(r.Context()),
+			context.WithoutCancel(req.Context()),
 		)
 		if err != nil { // the write's events (AfterCommit)
 			panic("drain after: " + err.Error())
 		}
 	})))
-	f.Echo = e
+	f.Echo = app
 	facades[base.DemoOps] = f
-	clusters[f] = cl
+	clusters[f] = cluster
 
 	return f
 }
@@ -272,18 +282,24 @@ func (cl splitCluster) tick(ctx context.Context, now time.Time) (scheduler.Resul
 	var total scheduler.Result
 
 	for _, d := range scheduler.Domains {
-		r, err := scheduler.TickDomains(ctx, cl.srv[d].DB, now, []string{d}, cl.srv[d].Registry)
+		result, err := scheduler.TickDomains(
+			ctx,
+			cl.srv[d].DB,
+			now,
+			[]string{d},
+			cl.srv[d].Registry,
+		)
 		if err != nil {
 			return total, apperr.Wrap(err, "scheduler.TickDomains")
 		}
 
-		total.ExpiredOffers += r.ExpiredOffers
-		total.ExpiredCommands += r.ExpiredCommands
-		total.Runs += r.Runs
-		total.Confirmed += r.Confirmed
-		total.ExpiredProposals += r.ExpiredProposals
-		total.FrozenHistories += r.FrozenHistories
-		total.Jobs += r.Jobs
+		total.ExpiredOffers += result.ExpiredOffers
+		total.ExpiredCommands += result.ExpiredCommands
+		total.Runs += result.Runs
+		total.Confirmed += result.Confirmed
+		total.ExpiredProposals += result.ExpiredProposals
+		total.FrozenHistories += result.FrozenHistories
+		total.Jobs += result.Jobs
 	}
 
 	f := &apiserver.Server{Consumers: cl.consumers(), Echo: nil, Registry: nil, DB: nil}
@@ -293,14 +309,18 @@ func (cl splitCluster) tick(ctx context.Context, now time.Time) (scheduler.Resul
 
 // schedTick is the worker tick of the suite: the domain schedulers of the cluster in cluster mode, otherwise the
 // all-domain tick on the server's database.
-func schedTick(ctx context.Context, s *apiserver.Server, now time.Time) (scheduler.Result, error) {
-	if cl, ok := clusters[s]; ok {
+func schedTick(
+	ctx context.Context,
+	srv *apiserver.Server,
+	now time.Time,
+) (scheduler.Result, error) {
+	if cl, ok := clusters[srv]; ok {
 		return cl.tick(ctx, now)
 	}
 
-	r, err := scheduler.Tick(ctx, s.DB, now, s.Registry)
+	r, err := scheduler.Tick(ctx, srv.DB, now, srv.Registry)
 	if err == nil {
-		err = s.DrainEvents(ctx) // the jobs' events (inline mode)
+		err = srv.DrainEvents(ctx) // the jobs' events (inline mode)
 	}
 
 	return r, apperr.Wrap(err, "server.Server.DrainEvents")

@@ -32,7 +32,7 @@ func SessionHandlers(ender SessionEnder) map[string]events.Handler {
 	}
 
 	return map[string]events.Handler{
-		EventSessionsRevoked: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
+		EventSessionsRevoked: func(ctx context.Context, txn pgx.Tx, e events.Event) error {
 			var p struct {
 				UserID uuid.UUID `json:"userId"`
 			}
@@ -44,7 +44,7 @@ func SessionHandlers(ender SessionEnder) map[string]events.Handler {
 
 			var subject string // the provider's subject: Cognito's sub, or locally the user ID itself
 
-			err := tx.QueryRow(ctx, `SELECT COALESCE(cognito_sub, id::text) FROM identity.users WHERE id = $1`, p.UserID).
+			err := txn.QueryRow(ctx, `SELECT COALESCE(cognito_sub, id::text) FROM identity.users WHERE id = $1`, p.UserID).
 				Scan(&subject)
 			if errors.Is(err, pgx.ErrNoRows) {
 				return nil

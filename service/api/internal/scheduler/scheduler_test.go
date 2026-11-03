@@ -17,7 +17,7 @@ func TestResultChanges(t *testing.T) {
 		t.Fatal("an empty tick changes nothing")
 	}
 
-	r := Result{
+	result := Result{
 		ExpiredOffers:    1,
 		ExpiredCommands:  2,
 		Runs:             3,
@@ -26,7 +26,7 @@ func TestResultChanges(t *testing.T) {
 		FrozenHistories:  6,
 		Jobs:             7, Skipped: 0,
 	}
-	if got := r.changes(); got != 28 {
+	if got := result.changes(); got != 28 {
 		t.Fatalf("changes() = %d, want the sum of every counter (28)", got)
 	}
 }

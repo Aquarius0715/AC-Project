@@ -91,22 +91,22 @@ func testDB(t *testing.T) *pgx.Conn {
 	cfg, _ := pgx.ParseConfig(admin)
 	cfg.Database = name
 
-	c, err := pgx.ConnectConfig(ctx, cfg)
+	conn, err := pgx.ConnectConfig(ctx, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Cleanup(func() {
-		c.Close(ctx)
+		conn.Close(ctx)
 		ac.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)") //nolint:errcheck
 	})
 
-	return c
+	return conn
 }
 
 func TestUpAppliesOnceAndRecordsVersion(t *testing.T) {
 	ctx := context.Background()
-	c := testDB(t)
+	conn := testDB(t)
 
 	ms, err := Load(migrations.FS)
 	if err != nil {
@@ -118,46 +118,46 @@ func TestUpAppliesOnceAndRecordsVersion(t *testing.T) {
 		Migration{Version: 900, Name: "probe", SQL: "CREATE TABLE public.probe (id int)"},
 	)
 
-	got, err := Up(ctx, c, extra)
+	got, err := Up(ctx, conn, extra)
 	if err != nil || len(got) != len(extra) {
 		t.Fatalf("Up = %v, %v", got, err)
 	}
 
-	if v, dirty, _ := Version(ctx, c); v != 900 || dirty {
+	if v, dirty, _ := Version(ctx, conn); v != 900 || dirty {
 		t.Fatalf("version = %d dirty=%t", v, dirty)
 	}
 
-	again, upErr := Up(ctx, c, extra)
+	again, upErr := Up(ctx, conn, extra)
 	if upErr != nil || len(again) != 0 {
 		t.Fatalf("second Up = %v, %v", again, upErr)
 	}
 
-	_, execErr := c.Exec(ctx, "DELETE FROM public.schema_migrations")
+	_, execErr := conn.Exec(ctx, "DELETE FROM public.schema_migrations")
 	if execErr != nil {
 		t.Fatal(execErr)
 	}
 
-	_, upErr = Up(ctx, c, extra)
+	_, upErr = Up(ctx, conn, extra)
 	if !errors.Is(upErr, ErrUnversioned) {
 		t.Fatalf("want ErrUnversioned, got %v", upErr)
 	}
 
-	forceErr := Force(ctx, c, 900)
+	forceErr := Force(ctx, conn, 900)
 	if forceErr != nil {
 		t.Fatal(forceErr)
 	}
 
-	ok, seededErr := Seeded(ctx, c)
+	ok, seededErr := Seeded(ctx, conn)
 	if seededErr != nil || ok {
 		t.Fatalf("Seeded = %t, %v", ok, seededErr)
 	}
 
-	ensureLoginErr := EnsureLogin(ctx, c, "ac_app_login", "it's-local", "ac_app")
+	ensureLoginErr := EnsureLogin(ctx, conn, "ac_app_login", "it's-local", "ac_app")
 	if ensureLoginErr != nil {
 		t.Fatal(ensureLoginErr)
 	}
 
-	ensureLoginErr = EnsureLogin(ctx, c, "ac_app_login", "local", "ac_app")
+	ensureLoginErr = EnsureLogin(ctx, conn, "ac_app_login", "local", "ac_app")
 	if ensureLoginErr != nil {
 		t.Fatal("EnsureLogin must be idempotent:", ensureLoginErr)
 	}
@@ -165,24 +165,24 @@ func TestUpAppliesOnceAndRecordsVersion(t *testing.T) {
 
 func TestFailedMigrationRollsBack(t *testing.T) {
 	ctx := context.Background()
-	c := testDB(t)
+	conn := testDB(t)
 	bad := []Migration{
 		{Version: 1, Name: "ok", SQL: "CREATE TABLE public.a (id int)"},
 		{Version: 2, Name: "bad", SQL: "CREATE TABLE public.b (id int); SELECT nope"},
 	}
 
-	applied, err := Up(ctx, c, bad)
+	applied, err := Up(ctx, conn, bad)
 	if err == nil || len(applied) != 1 || !strings.Contains(err.Error(), "000002_bad") {
 		t.Fatalf("Up = %v, %v", applied, err)
 	}
 
-	if v, dirty, _ := Version(ctx, c); v != 1 || dirty {
+	if v, dirty, _ := Version(ctx, conn); v != 1 || dirty {
 		t.Fatalf("version = %d dirty=%t", v, dirty)
 	}
 
 	var b *string
 
-	scanErr := c.QueryRow(ctx, "SELECT to_regclass('public.b')::text").
+	scanErr := conn.QueryRow(ctx, "SELECT to_regclass('public.b')::text").
 		Scan(&b)
 	if scanErr != nil ||
 		b != nil {
@@ -192,7 +192,7 @@ func TestFailedMigrationRollsBack(t *testing.T) {
 
 func TestNoTxFailureLeavesDirty(t *testing.T) {
 	ctx := context.Background()
-	c := testDB(t)
+	conn := testDB(t)
 
 	ms := []Migration{
 		{
@@ -205,17 +205,17 @@ func TestNoTxFailureLeavesDirty(t *testing.T) {
 		t.Fatal("marker not detected")
 	}
 
-	_, err := Up(ctx, c, ms)
+	_, err := Up(ctx, conn, ms)
 	if err == nil {
 		t.Fatal("want error")
 	}
 
-	_, err = Up(ctx, c, ms)
+	_, err = Up(ctx, conn, ms)
 	if !errors.Is(err, ErrDirty) {
 		t.Fatalf("want ErrDirty, got %v", err)
 	}
 
-	err = Force(ctx, c, 2)
+	err = Force(ctx, conn, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,12 +224,12 @@ func TestNoTxFailureLeavesDirty(t *testing.T) {
 		{Version: 3, Name: "idx", SQL: noTxMarker + "\nCREATE TABLE public.t (id int)"},
 	}
 
-	got, err := Up(ctx, c, ok)
+	got, err := Up(ctx, conn, ok)
 	if err != nil || len(got) != 1 {
 		t.Fatalf("Up after force = %v, %v", got, err)
 	}
 
-	if v, dirty, _ := Version(ctx, c); v != 3 || dirty {
+	if v, dirty, _ := Version(ctx, conn); v != 3 || dirty {
 		t.Fatalf("version = %d dirty=%t", v, dirty)
 	}
 }

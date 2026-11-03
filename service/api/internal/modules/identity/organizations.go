@@ -33,20 +33,20 @@ type Organization struct {
 const orgCols = `id, tenant_id, version, created_at, updated_at, name, kind, status`
 
 func scanOrg(r pgx.Row) (Organization, error) {
-	var o Organization
+	var organization Organization
 
 	err := r.Scan(
-		&o.ID,
-		&o.TenantID,
-		&o.Version,
-		&o.CreatedAt,
-		&o.UpdatedAt,
-		&o.Name,
-		&o.Kind,
-		&o.Status,
+		&organization.ID,
+		&organization.TenantID,
+		&organization.Version,
+		&organization.CreatedAt,
+		&organization.UpdatedAt,
+		&organization.Name,
+		&organization.Kind,
+		&organization.Status,
 	)
 
-	return o, apperr.Wrap(err, "scan (scanOrg)")
+	return organization, apperr.Wrap(err, "scan (scanOrg)")
 }
 
 var orgKinds = map[string]bool{"customer": true, "contractor": true, "operator": true}
@@ -81,16 +81,16 @@ var orgKinds = map[string]bool{"customer": true, "contractor": true, "operator":
 //	@Router			/v1/organizations [get]
 func organizationsList(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[Organization], error) {
 	var f struct {
 		Kind   *string `json:"kind,omitempty"`
 		Status *string `json:"status,omitempty"`
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil {
@@ -130,7 +130,7 @@ func organizationsList(
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{"id": "id", "createdAt": "created_at", "updatedAt": "updated_at"},
 		"id ASC",
 	)
@@ -138,7 +138,7 @@ func organizationsList(
 		return paging.Page[Organization]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Organization]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -147,21 +147,21 @@ func organizationsList(
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.organizations WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM identity.organizations WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Organization]{}, apperr.Wrap(scanErr, "select identity.organizations")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM identity.organizations WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			orgCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -182,9 +182,9 @@ func organizationsList(
 
 	return paging.Page[Organization]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, apperr.Wrap(rows.Err(), "select identity.organizations")
 }
 
@@ -198,22 +198,22 @@ type OrganizationSave struct {
 
 // Validate implements ops.Validator (DD-A02: name 1–120).
 func (in *OrganizationSave) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 
 	in.Name = strings.TrimSpace(in.Name)
 	if n := utf8.RuneCountInString(in.Name); n < 1 || n > 120 {
-		fe["name"] = "error.length"
+		fieldErrs["name"] = "error.length"
 	}
 
 	if !orgKinds[in.Kind] {
-		fe["kind"] = "error.invalid"
+		fieldErrs["kind"] = "error.invalid"
 	}
 
 	if in.Status != "active" && in.Status != "inactive" {
-		fe["status"] = "error.invalid"
+		fieldErrs["status"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // uniqueName rejects a second organization of the same kind with the same trimmed, case-insensitive name in the
@@ -263,38 +263,38 @@ func uniqueName(ctx context.Context, c *ops.Call, id uuid.UUID) error {
 //	@Router			/v1/organizations [post]
 func organizationsSave(
 	ctx context.Context,
-	c *ops.Call,
-	in *OrganizationSave,
+	call *ops.Call,
+	input *OrganizationSave,
 ) (Organization, error) {
-	if in.ID == nil {
+	if input.ID == nil {
 		id := uuid.Must(uuid.NewV7())
 
-		o, err := scanOrg(
-			c.Tx.QueryRow(
+		organization, err := scanOrg(
+			call.Tx.QueryRow(
 				ctx,
 				`INSERT INTO identity.organizations (id, tenant_id, name, kind, status)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4) RETURNING `+orgCols,
 				id,
-				in.Name,
-				in.Kind,
-				in.Status,
+				input.Name,
+				input.Kind,
+				input.Status,
 			),
 		)
 		if err != nil {
 			return Organization{}, err
 		}
 
-		uniqueNameErr := uniqueName(ctx, c, id)
+		uniqueNameErr := uniqueName(ctx, call, id)
 		if uniqueNameErr != nil {
 			return Organization{}, uniqueNameErr
 		}
 
-		c.Audit(
+		call.Audit(
 			ops.AuditEntry{
 				Action:          "organizations.save",
 				TargetKind:      "organization",
 				TargetID:        id.String(),
-				NextVersion:     &o.Version,
+				NextVersion:     &organization.Version,
 				PreviousVersion: nil,
 				Reason:          "",
 				Result:          "",
@@ -302,7 +302,7 @@ func organizationsSave(
 				After:           nil,
 			},
 		)
-		c.Emit(
+		call.Emit(
 			ops.Event{
 				AggregateType: "organization",
 				AggregateID:   id,
@@ -311,31 +311,31 @@ func organizationsSave(
 			},
 		)
 
-		return o, nil
+		return organization, nil
 	}
 	// kind is fixed after creation
 	o, err := scanOrg(
-		c.Tx.QueryRow(
+		call.Tx.QueryRow(
 			ctx,
 			`UPDATE identity.organizations SET name=$3, status=$4, version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 AND version = $2 AND kind = $5 RETURNING `+orgCols,
-			*in.ID,
-			*c.ExpectedVersion,
-			in.Name,
-			in.Status,
-			in.Kind,
+			*input.ID,
+			*call.ExpectedVersion,
+			input.Name,
+			input.Status,
+			input.Kind,
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		var kind string
 
-		e := c.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, *in.ID).
+		e := call.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, *input.ID).
 			Scan(&kind)
 		if e != nil {
 			return Organization{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
 
-		if kind != in.Kind {
+		if kind != input.Kind {
 			return Organization{}, apperr.Fields(map[string]string{"kind": "error.immutable"})
 		}
 
@@ -346,21 +346,21 @@ func organizationsSave(
 		return Organization{}, err
 	}
 
-	uniqueNameErr := uniqueName(ctx, c, o.ID)
+	uniqueNameErr := uniqueName(ctx, call, o.ID)
 	if uniqueNameErr != nil {
 		return Organization{}, uniqueNameErr
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "organizations.save",
 			TargetKind:      "organization",
 			TargetID:        o.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &o.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "organization",
 			AggregateID:   o.ID,
@@ -380,13 +380,13 @@ type Directory struct{}
 // HQ memberships with alert.read or client memberships of that organization (IR120 item 3).
 func (Directory) NonReaders(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	ids []uuid.UUID,
 	customerOrg uuid.UUID,
 ) ([]uuid.UUID, error) {
 	out, err := ops.Delegate(
 		ctx,
-		c,
+		call,
 		QueryNonReaders,
 		NonReadersInput{IDs: ids, CustomerOrgID: customerOrg},
 		nonReaders,
@@ -421,7 +421,7 @@ func (Directory) Technician(
 	c *ops.Call,
 	membership uuid.UUID,
 ) (Technician, bool, error) {
-	t, err := ops.Delegate(
+	technicianResult, err := ops.Delegate(
 		ctx,
 		c,
 		QueryTechnician,
@@ -429,13 +429,16 @@ func (Directory) Technician(
 		technician,
 	)
 
-	return t.Technician, t.Found, apperr.Wrap(err, "delegate identity.technician")
+	return technicianResult.Technician, technicianResult.Found, apperr.Wrap(
+		err,
+		"delegate identity.technician",
+	)
 }
 
 // Qualified reports whether the membership holds unrevoked grants for every code covering [start, end) (IR123 item 3).
 func (Directory) Qualified(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	membership uuid.UUID,
 	codes []string,
 	start, end time.Time,
@@ -446,7 +449,7 @@ func (Directory) Qualified(
 
 	out, err := ops.Delegate(
 		ctx,
-		c,
+		call,
 		QueryQualified,
 		QualifiedInput{MembershipID: membership, Codes: codes, Start: start, End: end},
 		qualified,
@@ -466,14 +469,14 @@ func (Directory) OrgName(ctx context.Context, c *ops.Call, org uuid.UUID) (strin
 // The caller's domain publishes QualificationGranted; identity applies it (IR192).
 func (Directory) SetGrant(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	membership uuid.UUID,
 	code string,
 	from, until time.Time,
 ) error {
 	var tenant uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
+	err := call.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
 		Scan(&tenant)
 	if err != nil {
 		return apperr.Wrap(err, "select current_setting")
@@ -482,7 +485,7 @@ func (Directory) SetGrant(
 	return apperr.Wrap(
 		events.Publish(
 			ctx,
-			c.Tx,
+			call.Tx,
 			tenant,
 			"membership",
 			membership,

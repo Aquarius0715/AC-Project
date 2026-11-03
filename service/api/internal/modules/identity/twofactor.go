@@ -40,17 +40,18 @@ func setupKey(c *ops.Call) string {
 	return base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(sum[:10])
 }
 
-func twoFactorStatus(ctx context.Context, c *ops.Call) (TwoFactorStatus, error) {
+func twoFactorStatus(ctx context.Context, call *ops.Call) (TwoFactorStatus, error) {
 	var (
-		at   time.Time
+		when time.Time
 		left int
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT enabled_at, cardinality(recovery_code_hashes) FROM identity.two_factor WHERE user_id
-		= $1`, c.Principal.UserID).
-		Scan(&at, &left)
+	err := call.Tx.QueryRow(ctx, `SELECT enabled_at, cardinality(recovery_code_hashes) FROM identity.two_factor WHERE
+		user_id
+		= $1`, call.Principal.UserID).
+		Scan(&when, &left)
 	if errors.Is(err, pgx.ErrNoRows) {
-		k := setupKey(c)
+		k := setupKey(call)
 
 		return TwoFactorStatus{
 			SetupKey:          &k,
@@ -66,7 +67,7 @@ func twoFactorStatus(ctx context.Context, c *ops.Call) (TwoFactorStatus, error) 
 
 	return TwoFactorStatus{
 		Enabled:           true,
-		EnabledAt:         &at,
+		EnabledAt:         &when,
 		RecoveryCodesLeft: &left,
 		SetupKey:          nil,
 	}, nil
@@ -111,8 +112,8 @@ func (in *CodeInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/two-factor/enable [post]
-func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactorEnabled, error) {
-	st, err := twoFactorStatus(ctx, c)
+func enableTwoFactor(ctx context.Context, call *ops.Call, in *CodeInput) (TwoFactorEnabled, error) {
+	st, err := twoFactorStatus(ctx, call)
 	if err != nil {
 		return TwoFactorEnabled{}, err
 	}
@@ -122,7 +123,7 @@ func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactor
 	}
 
 	codes, hashes := make([]string, 8), make([]string, 8)
-	for i := range codes {
+	for idx := range codes {
 		b := make([]byte, 5)
 
 		_, err := rand.Read(b)
@@ -131,27 +132,27 @@ func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactor
 		}
 
 		s := hex.EncodeToString(b)
-		codes[i] = s[:5] + "-" + s[5:]
-		h := sha256.Sum256([]byte(codes[i]))
-		hashes[i] = hex.EncodeToString(h[:])
+		codes[idx] = s[:5] + "-" + s[5:]
+		h := sha256.Sum256([]byte(codes[idx]))
+		hashes[idx] = hex.EncodeToString(h[:])
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`INSERT INTO identity.two_factor (user_id, enabled_at, recovery_code_hashes, updated_at) VALUES ($1, $2, $3, $2)`,
-		c.Principal.UserID,
-		c.Now,
+		call.Principal.UserID,
+		call.Now,
 		hashes,
 	)
 	if execErr != nil {
 		return TwoFactorEnabled{}, apperr.Wrap(execErr, "insert identity.two_factor")
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "twoFactor.enable",
 			TargetKind:      "user",
-			TargetID:        c.Principal.UserID.String(),
+			TargetID:        call.Principal.UserID.String(),
 			PreviousVersion: nil,
 			NextVersion:     nil,
 			Reason:          "",
@@ -166,7 +167,7 @@ func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactor
 	return TwoFactorEnabled{
 		TwoFactorStatus: TwoFactorStatus{
 			Enabled:           true,
-			EnabledAt:         &c.Now,
+			EnabledAt:         &call.Now,
 			RecoveryCodesLeft: &left, SetupKey: nil,
 		},
 		RecoveryCodes: codes,
@@ -198,11 +199,11 @@ func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactor
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/two-factor/disable [post]
-func disableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactorStatus, error) {
-	tag, err := c.Tx.Exec(
+func disableTwoFactor(ctx context.Context, call *ops.Call, in *CodeInput) (TwoFactorStatus, error) {
+	tag, err := call.Tx.Exec(
 		ctx,
 		`DELETE FROM identity.two_factor WHERE user_id = $1`,
-		c.Principal.UserID,
+		call.Principal.UserID,
 	)
 	if err != nil {
 		return TwoFactorStatus{}, apperr.Wrap(err, "delete identity.two_factor")
@@ -212,11 +213,11 @@ func disableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFacto
 		return TwoFactorStatus{}, apperr.E(apperr.Conflict, "errors.two_factor_disabled")
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "twoFactor.disable",
 			TargetKind:      "user",
-			TargetID:        c.Principal.UserID.String(),
+			TargetID:        call.Principal.UserID.String(),
 			PreviousVersion: nil,
 			NextVersion:     nil,
 			Reason:          "",
@@ -226,7 +227,7 @@ func disableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFacto
 		},
 	)
 
-	return twoFactorStatus(ctx, c)
+	return twoFactorStatus(ctx, call)
 }
 
 // RegisterTwoFactor binds twoFactor.*.

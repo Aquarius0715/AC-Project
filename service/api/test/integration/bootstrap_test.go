@@ -34,13 +34,13 @@ func TestBootstrapAdmin(t *testing.T) {
 	}
 	defer conn.Close(ctx)
 
-	run := func(in bootstrap.Input) (bootstrap.Result, error) {
+	run := func(req bootstrap.Input) (bootstrap.Result, error) {
 		var r bootstrap.Result
 
 		err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 			var err error
 
-			r, err = bootstrap.Admin(ctx, tx, in)
+			r, err = bootstrap.Admin(ctx, tx, req)
 
 			return apperr.Wrap(err, "bootstrap.Admin")
 		})
@@ -49,7 +49,7 @@ func TestBootstrapAdmin(t *testing.T) {
 	}
 	tag := uuid.NewString()[:8]
 
-	in := bootstrap.Input{
+	input := bootstrap.Input{
 		Tenant:       "Bootstrap " + tag,
 		Organization: "HQ " + tag,
 		Email:        "first-admin-" + tag + "@example.com",
@@ -57,9 +57,9 @@ func TestBootstrapAdmin(t *testing.T) {
 		At:           clock,
 	}
 	for name, bad := range map[string]bootstrap.Input{
-		"no tenant":  {Organization: "HQ", Email: in.Email, Name: in.Name, Tenant: "", At: time.Time{}},
-		"no address": {Tenant: in.Tenant, Organization: "HQ", Email: "nobody", Name: in.Name, At: time.Time{}},
-		"no name":    {Tenant: in.Tenant, Organization: "HQ", Email: in.Email, Name: "", At: time.Time{}},
+		"no tenant":  {Organization: "HQ", Email: input.Email, Name: input.Name, Tenant: "", At: time.Time{}},
+		"no address": {Tenant: input.Tenant, Organization: "HQ", Email: "nobody", Name: input.Name, At: time.Time{}},
+		"no name":    {Tenant: input.Tenant, Organization: "HQ", Email: input.Email, Name: "", At: time.Time{}},
 	} {
 		_, err := run(bad)
 		if err == nil {
@@ -67,16 +67,16 @@ func TestBootstrapAdmin(t *testing.T) {
 		}
 	}
 
-	r, err := run(in)
-	if err != nil || !r.NewTenant || !r.NewOrganization {
-		t.Fatalf("bootstrap: %+v %v", r, err)
+	result, err := run(input)
+	if err != nil || !result.NewTenant || !result.NewOrganization {
+		t.Fatalf("bootstrap: %+v %v", result, err)
 	}
 
 	var perms, hqPerms, scopes, events, audits int
 	ownerScan(
 		t,
 		`SELECT count(*) FROM identity.membership_permissions WHERE membership_id = $1`,
-		[]any{r.MembershipID},
+		[]any{result.MembershipID},
 		&perms,
 	)
 	ownerScan(
@@ -88,20 +88,20 @@ func TestBootstrapAdmin(t *testing.T) {
 	ownerScan(
 		t,
 		`SELECT count(*) FROM identity.membership_scopes WHERE membership_id = $1 AND kind = 'tenant' AND ref_id = $2`,
-		[]any{r.MembershipID, r.TenantID},
+		[]any{result.MembershipID, result.TenantID},
 		&scopes,
 	)
 	ownerScan(
 		t,
 		`SELECT count(*) FROM platform.outbox WHERE aggregate_id = $1 AND event_type = 'AccountRequested' AND payload->>'role'
 			= 'admin'`,
-		[]any{r.MembershipID},
+		[]any{result.MembershipID},
 		&events,
 	)
 	ownerScan(
 		t,
 		`SELECT count(*) FROM audit.audit_log WHERE tenant_id = $1 AND action = 'bootstrap.admin' AND target_id = $2`,
-		[]any{r.TenantID, r.MembershipID.String()},
+		[]any{result.TenantID, result.MembershipID.String()},
 		&audits,
 	)
 
@@ -116,12 +116,12 @@ func TestBootstrapAdmin(t *testing.T) {
 		)
 	}
 
-	_, runErr := run(in)
+	_, runErr := run(input)
 	if !errors.Is(runErr, bootstrap.ErrAdminExists) {
 		t.Errorf("second run for the tenant: %v", runErr)
 	}
 
-	other := in
+	other := input
 
 	other.Tenant = "Bootstrap other " + tag
 
@@ -151,9 +151,9 @@ func TestBootstrapAdmin(t *testing.T) {
 		generation: 0,
 	}
 	v := testVerifier(t)
-	v["tok-boot-"+tag] = r.UserID.String()
+	v["tok-boot-"+tag] = result.UserID.String()
 
-	s, err := apiserver.New(
+	srv, err := apiserver.New(
 		ctx,
 		apiserver.Config{
 			DatabaseURL:       testDB("ac_app_login"),
@@ -187,17 +187,18 @@ func TestBootstrapAdmin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(s.DB.Close)
+	t.Cleanup(srv.DB.Close)
 
-	drainEventsErr := s.DrainEvents(ctx)
+	drainEventsErr := srv.DrainEvents(ctx)
 	if drainEventsErr != nil {
 		t.Fatal(drainEventsErr)
 	}
 
 	fake.mu.Lock()
 	opened := slices.ContainsFunc(fake.created, func(a idp.Account) bool {
-		return a.Email == in.Email && a.Role == "admin" && a.TenantID == r.TenantID.String() &&
-			a.Membership == r.MembershipID.String()
+		return a.Email == input.Email && a.Role == "admin" &&
+			a.TenantID == result.TenantID.String() &&
+			a.Membership == result.MembershipID.String()
 	})
 	fake.mu.Unlock()
 
@@ -209,18 +210,18 @@ func TestBootstrapAdmin(t *testing.T) {
 		ops.ClientRequest("members.list", `{"limit":100}`),
 	) // the new tenant's headers, not tenant-a's
 	req.Header.Set("Authorization", "Bearer tok-boot-"+tag)
-	req.Header.Set("X-Tenant-Id", r.TenantID.String())
-	req.Header.Set("X-Membership-Id", r.MembershipID.String())
+	req.Header.Set("X-Tenant-Id", result.TenantID.String())
+	req.Header.Set("X-Membership-Id", result.MembershipID.String())
 
-	w := httptest.NewRecorder()
-	s.Echo.ServeHTTP(w, req)
+	rec := httptest.NewRecorder()
+	srv.Echo.ServeHTTP(rec, req)
 
 	var m map[string]any
 
-	_ = json.Unmarshal(w.Body.Bytes(), &m)
-	if w.Code != 200 || len(items(m)) != 1 || items(m)[0]["id"] != r.MembershipID.String() ||
+	_ = json.Unmarshal(rec.Body.Bytes(), &m)
+	if rec.Code != 200 || len(items(m)) != 1 || items(m)[0]["id"] != result.MembershipID.String() ||
 		!slices.Contains(toStrings(items(m)[0]["permissions"]), "identity.write") {
-		t.Fatalf("the administrator lists the tenant's memberships: %d %v", w.Code, m)
+		t.Fatalf("the administrator lists the tenant's memberships: %d %v", rec.Code, m)
 	}
 }
 

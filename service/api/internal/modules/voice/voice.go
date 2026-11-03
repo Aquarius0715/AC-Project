@@ -38,18 +38,18 @@ type Input struct {
 
 // Validate implements ops.Validator: 1–200 code points after trim, locale en|ms.
 func (in *Input) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 
 	in.Text = strings.TrimSpace(in.Text)
 	if n := utf8.RuneCountInString(in.Text); n < 1 || n > 200 {
-		fe["text"] = "error.length"
+		fieldErrs["text"] = "error.length"
 	}
 
 	if in.Locale != "en" && in.Locale != "ms" {
-		fe["locale"] = "error.invalid"
+		fieldErrs["locale"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 var grammar = map[string]struct{ temperature, set, help *regexp.Regexp }{
@@ -98,8 +98,8 @@ func (x Intent) MarshalJSON() ([]byte, error) {
 
 // candidates matches the room against not archived Space names (trimmed, ASCII case-insensitive, any kind) and returns
 // the caller-readable not archived units placed directly in the matched spaces with their path labels.
-func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Candidate, error) {
-	rows, err := c.Tx.Query(ctx, `WITH RECURSIVE path(id, label, parent) AS (
+func (v Voice) candidates(ctx context.Context, call *ops.Call, room string) ([]Candidate, error) {
+	rows, err := call.Tx.Query(ctx, `WITH RECURSIVE path(id, label, parent) AS (
 			SELECT s.id, s.name, s.parent_space_id FROM assets.spaces s WHERE NOT s.archived AND lower(btrim(s.name)) =
 			lower(btrim($1))
 			UNION ALL SELECT p.id, a.name || ' > ' || p.label, a.parent_space_id FROM path p JOIN assets.spaces a ON a.id =
@@ -114,16 +114,16 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 	var all []Candidate
 
 	for rows.Next() {
-		var x Candidate
+		var candidate Candidate
 
-		err := rows.Scan(&x.UnitID, &x.PathLabel)
+		err := rows.Scan(&candidate.UnitID, &candidate.PathLabel)
 		if err != nil {
 			rows.Close()
 
 			return nil, apperr.Wrap(err, "select path")
 		}
 
-		all = append(all, x)
+		all = append(all, candidate)
 	}
 
 	rows.Close()
@@ -138,7 +138,7 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 		ids[i] = x.UnitID
 	}
 
-	visible, err := v.Units.VisibleUnits(ctx, c, ids)
+	visible, err := v.Units.VisibleUnits(ctx, call, ids)
 	if err != nil {
 		return nil, apperr.Wrap(err, "voice.Units.VisibleUnits")
 	}
@@ -185,7 +185,7 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/voice/resolve-intent [post]
-func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, error) {
+func (v Voice) resolve(ctx context.Context, call *ops.Call, in *Input) (Intent, error) {
 	g := grammar[in.Locale]
 	if g.help.MatchString(in.Text) {
 		return Intent{
@@ -225,7 +225,7 @@ func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, err
 		}, nil
 	}
 
-	cands, err := v.candidates(ctx, c, room)
+	cands, err := v.candidates(ctx, call, room)
 	if err != nil {
 		return Intent{}, err
 	}
@@ -273,7 +273,7 @@ func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, err
 	}
 
 	if celsius == nil {
-		meas, err := monitoring.LatestMeasurement(ctx, c, unit, "temperature")
+		meas, err := monitoring.LatestMeasurement(ctx, call, unit, "temperature")
 		if err != nil {
 			return Intent{}, apperr.Wrap(err, "monitoring.LatestMeasurement")
 		}
@@ -296,7 +296,7 @@ func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, err
 		version int
 	)
 
-	err = c.Tx.QueryRow(ctx, `SELECT observed_state, version FROM assets.units WHERE id = $1`, unit).
+	err = call.Tx.QueryRow(ctx, `SELECT observed_state, version FROM assets.units WHERE id = $1`, unit).
 		Scan(&before, &version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Intent{}, apperr.E(apperr.NotFound, "error.notFound")

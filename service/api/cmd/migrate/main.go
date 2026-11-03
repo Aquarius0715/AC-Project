@@ -106,40 +106,40 @@ func run(ctx context.Context, args []string) error {
 // opens the sign-in account, which asks for a one-time-code device at the first sign-in (IR468), and e-mails the
 // set-up link (in development to the local Mailpit inbox).
 func bootstrapAdmin(ctx context.Context, conn *pgx.Conn, args []string) error {
-	fs := flag.NewFlagSet("bootstrap-admin", flag.ContinueOnError)
+	flagSet := flag.NewFlagSet("bootstrap-admin", flag.ContinueOnError)
 
-	var in bootstrap.Input
-	fs.StringVar(
-		&in.Tenant,
+	var input bootstrap.Input
+	flagSet.StringVar(
+		&input.Tenant,
 		"tenant",
 		"",
 		"the tenant's name (an existing tenant of that name, or a new one)",
 	)
-	fs.StringVar(
-		&in.Organization,
+	flagSet.StringVar(
+		&input.Organization,
 		"organization",
 		"HQ",
 		"the HQ organization's name, when the tenant has none",
 	)
-	fs.StringVar(
-		&in.Email,
+	flagSet.StringVar(
+		&input.Email,
 		"email",
 		"",
 		"the administrator's e-mail address (the set-up link goes there)",
 	)
-	fs.StringVar(&in.Name, "name", "", "the administrator's display name")
+	flagSet.StringVar(&input.Name, "name", "", "the administrator's display name")
 
-	err := fs.Parse(args)
+	err := flagSet.Parse(args)
 	if err != nil {
 		return apperr.Wrap(err, "flag.FlagSet.Parse")
 	}
 
-	var r bootstrap.Result
+	var result bootstrap.Result
 
 	err = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		var err error
 
-		r, err = bootstrap.Admin(ctx, tx, in)
+		result, err = bootstrap.Admin(ctx, tx, input)
 
 		return apperr.Wrap(err, "bootstrap.Admin")
 	})
@@ -150,13 +150,13 @@ func bootstrapAdmin(ctx context.Context, conn *pgx.Conn, args []string) error {
 	log.Printf(
 		"bootstrap-admin: tenant %s (new %t), HQ organization %s (new %t), administrator %s, membership %s; the set-up "+
 			"e-mail goes to %s",
-		r.TenantID,
-		r.NewTenant,
-		r.OrganizationID,
-		r.NewOrganization,
-		r.UserID,
-		r.MembershipID,
-		in.Email,
+		result.TenantID,
+		result.NewTenant,
+		result.OrganizationID,
+		result.NewOrganization,
+		result.UserID,
+		result.MembershipID,
+		input.Email,
 	)
 
 	return nil
@@ -199,7 +199,7 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 		return apperr.Wrap(err, "migrate.Seeded")
 	}
 
-	f, err := seed.Load(path)
+	fixture, err := seed.Load(path)
 	if err != nil {
 		return apperr.Wrap(err, "seed.Load")
 	}
@@ -210,13 +210,17 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 		err := pgx.BeginFunc(
 			ctx,
 			conn,
-			func(tx pgx.Tx) error { return seed.Apply(ctx, tx, f) },
+			func(tx pgx.Tx) error { return seed.Apply(ctx, tx, fixture) },
 		)
 		if err != nil {
 			return apperr.Wrap(err, "transaction")
 		}
 
-		log.Printf("migrate: seeded %d actors, %d units", len(f.Actors), len(f.DemoSeed.Units))
+		log.Printf(
+			"migrate: seeded %d actors, %d units",
+			len(fixture.Actors),
+			len(fixture.DemoSeed.Units),
+		)
 	}
 	// SEED_MOCK_FLEET=1 (development only): one air conditioner and IoT module per state pattern, on the fixture's clock
 	if os.Getenv("SEED_MOCK_FLEET") == "1" {
@@ -230,7 +234,7 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 		beginFuncErr := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 			var err error
 
-			n, err = seed.ApplyFleet(ctx, tx, fleet, f.SeedCreatedAt)
+			n, err = seed.ApplyFleet(ctx, tx, fleet, fixture.SeedCreatedAt)
 
 			return apperr.Wrap(err, "seed.ApplyFleet")
 		})
@@ -245,7 +249,7 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 		err := pgx.BeginFunc(
 			ctx,
 			conn,
-			func(tx pgx.Tx) error { return seed.ApplyLive(ctx, tx, f.SeedCreatedAt) },
+			func(tx pgx.Tx) error { return seed.ApplyLive(ctx, tx, fixture.SeedCreatedAt) },
 		)
 		if err != nil {
 			return apperr.Wrap(err, "transaction")

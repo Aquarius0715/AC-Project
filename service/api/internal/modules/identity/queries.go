@@ -20,9 +20,9 @@ type OrganizationsInput struct {
 }
 
 // RegisterQueries binds identity's internal queries.
-func RegisterQueries(r *ops.Registry) {
+func RegisterQueries(reg *ops.Registry) {
 	ops.RegisterQuery(
-		r,
+		reg,
 		ops.DomainIdentity,
 		QueryActiveOrganizations,
 		func(ctx context.Context, c *ops.Call, in *OrganizationsInput) ([]uuid.UUID, error) {
@@ -38,11 +38,11 @@ func RegisterQueries(r *ops.Registry) {
 			return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 		},
 	)
-	ops.RegisterQuery(r, ops.DomainIdentity, QueryMembers, members)
-	ops.RegisterQuery(r, ops.DomainIdentity, QueryNotificationsStored, notificationsStored)
-	ops.RegisterQuery(r, ops.DomainIdentity, QueryConsent, consent)
-	ops.RegisterQuery(r, ops.DomainIdentity, QueryLoadMembers, loadMembers)
-	registerDirectory(r)
+	ops.RegisterQuery(reg, ops.DomainIdentity, QueryMembers, members)
+	ops.RegisterQuery(reg, ops.DomainIdentity, QueryNotificationsStored, notificationsStored)
+	ops.RegisterQuery(reg, ops.DomainIdentity, QueryConsent, consent)
+	ops.RegisterQuery(reg, ops.DomainIdentity, QueryLoadMembers, loadMembers)
+	registerDirectory(reg)
 }
 
 // QueryMembers returns the memberships active at the caller's business time that match every given filter, sorted
@@ -78,13 +78,13 @@ func Members(ctx context.Context, c *ops.Call, f MembersInput) ([]uuid.UUID, err
 // ConsentGranted asks identity whether the membership granted the purpose (false when never recorded).
 func ConsentGranted(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	membership uuid.UUID,
 	purpose string,
 ) (bool, error) {
 	out, err := ops.Delegate(
 		ctx,
-		c,
+		call,
 		QueryConsent,
 		ConsentInput{MembershipID: membership, Purpose: purpose},
 		consent,
@@ -114,7 +114,7 @@ type NotificationsStoredInput struct {
 	OccurredAt time.Time   `json:"occurredAt"`
 }
 
-func members(ctx context.Context, c *ops.Call, in *MembersInput) ([]uuid.UUID, error) {
+func members(ctx context.Context, call *ops.Call, in *MembersInput) ([]uuid.UUID, error) {
 	q := `SELECT m.id FROM identity.memberships m WHERE m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until >
 		$1)
 		AND ($2::uuid[] IS NULL OR m.id = ANY($2)) AND ($3 = '' OR m.role = $3) AND ($4::uuid IS NULL OR m.organization_id =
@@ -128,10 +128,10 @@ func members(ctx context.Context, c *ops.Call, in *MembersInput) ([]uuid.UUID, e
 		ids = in.IDs
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		q,
-		c.Now,
+		call.Now,
 		ids,
 		in.Role,
 		in.OrganizationID,
@@ -153,13 +153,13 @@ func members(ctx context.Context, c *ops.Call, in *MembersInput) ([]uuid.UUID, e
 func notificationsStored(
 	ctx context.Context,
 	c *ops.Call,
-	in *NotificationsStoredInput,
+	input *NotificationsStoredInput,
 ) (int, error) {
 	var n int
 
 	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM notify.notifications n WHERE n.id = ANY($1) AND n.target->>'id' =
 		$2::text AND n.occurred_at = $3`,
-		in.IDs, in.TargetID, in.OccurredAt).
+		input.IDs, input.TargetID, input.OccurredAt).
 		Scan(&n)
 
 	return n, apperr.Wrap(err, "select notify.notifications")

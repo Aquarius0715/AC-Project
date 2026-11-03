@@ -12,52 +12,52 @@ import (
 // HTTPErrorHandler is the central Echo HTTPErrorHandler: DomainErrors keep their code and status, Echo's own errors
 // (unknown route, wrong method, body limit) map to the nearest DomainError, and anything else is a logged 503
 // UNAVAILABLE without internal details.
-func HTTPErrorHandler(c *echo.Context, err error) {
-	r, uerr := echo.UnwrapResponse(c.Response())
+func HTTPErrorHandler(ectx *echo.Context, err error) {
+	r, uerr := echo.UnwrapResponse(ectx.Response())
 	if uerr == nil && r.Committed {
 		return
 	}
 
-	var de *apperr.DomainError
+	var domainErr *apperr.DomainError
 
 	var sc echo.HTTPStatusCoder // Echo's own errors (route not found, method not allowed, body limit) carry a status
 	switch {
-	case errors.As(err, &de):
+	case errors.As(err, &domainErr):
 	case errors.As(err, &sc):
 		switch sc.StatusCode() {
 		case http.StatusNotFound, http.StatusMethodNotAllowed:
-			de = apperr.E(apperr.NotFound, "error.unknownOperation")
+			domainErr = apperr.E(apperr.NotFound, "error.unknownOperation")
 		case http.StatusRequestEntityTooLarge:
-			de = apperr.E(apperr.Validation, "error.bodyTooLarge")
+			domainErr = apperr.E(apperr.Validation, "error.bodyTooLarge")
 		case http.StatusServiceUnavailable, http.StatusGatewayTimeout:
-			de = apperr.E(apperr.Timeout, "error.timeout")
+			domainErr = apperr.E(apperr.Timeout, "error.timeout")
 		default:
-			de = apperr.From(err)
+			domainErr = apperr.From(err)
 		}
 	default:
-		de = apperr.From(err)
+		domainErr = apperr.From(err)
 	}
 
-	if de.CorrelationID == "" {
-		de.CorrelationID = correlationID(
-			c,
+	if domainErr.CorrelationID == "" {
+		domainErr.CorrelationID = correlationID(
+			ectx,
 		) // every ServiceError carries one, also for unknown routes (D07)
 	}
 
-	if de.HTTPStatus() >= http.StatusInternalServerError {
+	if domainErr.HTTPStatus() >= http.StatusInternalServerError {
 		cause := err
-		if de.Cause() != nil {
-			cause = de.Cause()
+		if domainErr.Cause() != nil {
+			cause = domainErr.Cause()
 		}
 
-		c.Logger().Error("request failed", "error", cause, "request_id", de.CorrelationID)
+		ectx.Logger().Error("request failed", "error", cause, "request_id", domainErr.CorrelationID)
 	}
 
-	if c.Request().Method == http.MethodHead {
-		_ = c.NoContent(de.HTTPStatus())
+	if ectx.Request().Method == http.MethodHead {
+		_ = ectx.NoContent(domainErr.HTTPStatus())
 
 		return
 	}
 
-	_ = c.JSON(de.HTTPStatus(), de)
+	_ = ectx.JSON(domainErr.HTTPStatus(), domainErr)
 }

@@ -31,7 +31,7 @@ type New struct {
 type Store struct{}
 
 // Create requests one notification and returns its ID.
-func (Store) Create(ctx context.Context, c *ops.Call, n New) (uuid.UUID, error) {
+func (Store) Create(ctx context.Context, call *ops.Call, n New) (uuid.UUID, error) {
 	if n.Params == nil {
 		n.Params = map[string]any{}
 	}
@@ -48,7 +48,7 @@ func (Store) Create(ctx context.Context, c *ops.Call, n New) (uuid.UUID, error) 
 
 	var tenant uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
+	err := call.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
 		Scan(&tenant)
 	if err != nil {
 		return id, apperr.Wrap(err, "select current_setting")
@@ -56,7 +56,7 @@ func (Store) Create(ctx context.Context, c *ops.Call, n New) (uuid.UUID, error) 
 
 	return id, apperr.Wrap(events.Publish(
 		ctx,
-		c.Tx,
+		call.Tx,
 		tenant,
 		"notification",
 		id,
@@ -74,7 +74,7 @@ func (Store) Create(ctx context.Context, c *ops.Call, n New) (uuid.UUID, error) 
 			Params:        n.Params,
 			Severity:      n.Severity,
 			SourceAlertID: n.SourceAlertID,
-			OccurredAt:    c.Now,
+			OccurredAt:    call.Now,
 		},
 	), "events.Publish")
 }
@@ -82,17 +82,17 @@ func (Store) Create(ctx context.Context, c *ops.Call, n New) (uuid.UUID, error) 
 // EventHandlers store requested notifications (consumer identity, IR191).
 func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
-		events.NotificationRequested: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
-			var p events.Notification
+		events.NotificationRequested: func(ctx context.Context, txn pgx.Tx, e events.Event) error {
+			var notification events.Notification
 
-			decodeErr := e.Decode(&p)
+			decodeErr := e.Decode(&notification)
 			if decodeErr != nil {
 				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
-			target, _ := json.Marshal(p.Target)
-			params, _ := json.Marshal(p.Params)
-			_, err := tx.Exec(
+			target, _ := json.Marshal(notification.Target)
+			params, _ := json.Marshal(notification.Params)
+			_, err := txn.Exec(
 				ctx,
 				`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel,
 					template_key, target, params,
@@ -100,17 +100,17 @@ func EventHandlers() map[string]events.Handler {
 				SELECT $1, $2, m.id, m.scope_version, $4, $5, $6, $7, $8, $9, $10, $11, $11 FROM identity.memberships m WHERE m.id =
 				$3
 				ON CONFLICT (id) DO NOTHING`,
-				p.NotificationID,
+				notification.NotificationID,
 				e.TenantID,
-				p.RecipientMembershipID,
-				p.Type,
-				p.Channel,
-				p.TemplateKey,
+				notification.RecipientMembershipID,
+				notification.Type,
+				notification.Channel,
+				notification.TemplateKey,
 				target,
 				params,
-				p.SourceAlertID,
-				p.Severity,
-				p.OccurredAt,
+				notification.SourceAlertID,
+				notification.Severity,
+				notification.OccurredAt,
 			)
 
 			return apperr.Wrap(err, "insert notify.notifications")

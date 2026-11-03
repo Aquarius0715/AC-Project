@@ -84,11 +84,11 @@ func (q qrOps) resolve(ctx context.Context, c *ops.Call, in *QrInput) (QrResolut
 // technician's open job on the unit whose scheduled window ends first after now, or null.
 func resolveQr(
 	ctx context.Context,
-	c *ops.Call,
-	in *QrInput,
-	a QrAssignments,
+	call *ops.Call,
+	input *QrInput,
+	qrAssignments QrAssignments,
 ) (QrResolution, error) {
-	code := in.Code
+	code := input.Code
 	if len(code) > 8 && strings.EqualFold(code[:8], "ac-unit:") {
 		code = code[8:]
 	}
@@ -99,8 +99,9 @@ func resolveQr(
 	if err == nil {
 		unit = id
 	} else {
-		scanErr := c.Tx.QueryRow(ctx, `SELECT unit_id FROM devices.devices WHERE upper(btrim(serial)) = upper($1) AND unit_id
-			IS NOT NULL`, in.Code).
+		scanErr := call.Tx.QueryRow(ctx, `SELECT unit_id FROM devices.devices WHERE upper(btrim(serial)) = upper($1) AND
+			unit_id
+			IS NOT NULL`, input.Code).
 			Scan(&unit)
 		if scanErr != nil && !errors.Is(scanErr, pgx.ErrNoRows) {
 			return QrResolution{}, apperr.Wrap(scanErr, "select devices.devices")
@@ -112,7 +113,7 @@ func resolveQr(
 		return QrResolution{}, nf
 	}
 
-	assigned, job, err := a.QrAssignment(ctx, c, unit)
+	assigned, job, err := qrAssignments.QrAssignment(ctx, call, unit)
 	if err != nil {
 		return QrResolution{}, apperr.Wrap(err, "assets.QrAssignments.QrAssignment")
 	}

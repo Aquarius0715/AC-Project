@@ -35,13 +35,13 @@ func warrantyStage(ends, now time.Time) int {
 // before warrantyEndsAt. Each reminder goes once per warranty end, and an earlier one never follows a later one. Each
 // HQ member who reads the units (asset.read) gets one warranty_expiring notification. A changed warranty end gets its
 // own reminders.
-func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error) {
-	rows, err := c.Tx.Query(
+func (m *Module) RemindWarranties(ctx context.Context, call *ops.Call) (int, error) {
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT id, warranty_ends_at FROM assets.units WHERE NOT archived AND warranty_ends_at > $1 AND warranty_ends_at <= $2
 		ORDER BY warranty_ends_at, id`,
-		c.Now,
-		c.Now.Add(time.Duration(warrantyReminderDays[len(warrantyReminderDays)-1])*24*time.Hour),
+		call.Now,
+		call.Now.Add(time.Duration(warrantyReminderDays[len(warrantyReminderDays)-1])*24*time.Hour),
 	)
 	if err != nil {
 		return 0, apperr.Wrap(err, "select assets.units")
@@ -66,7 +66,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 		ids[i] = d.id
 	}
 
-	contracts, err := m.Contracts.ActiveContracts(ctx, c, ids)
+	contracts, err := m.Contracts.ActiveContracts(ctx, call, ids)
 	if err != nil {
 		return 0, apperr.Wrap(err, "assets.ContractReader.ActiveContracts")
 	}
@@ -80,9 +80,9 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 			continue
 		}
 
-		days := warrantyStage(d.ends, c.Now)
+		days := warrantyStage(d.ends, call.Now)
 
-		tag, err := c.Tx.Exec(
+		tag, err := call.Tx.Exec(
 			ctx,
 			`INSERT INTO assets.warranty_reminders (unit_id, warranty_ends_at, days_before, tenant_id, sent_at)
 			SELECT $1, $2, $3, current_setting('app.tenant_id')::uuid, $4
@@ -91,7 +91,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 			d.id,
 			d.ends,
 			days,
-			c.Now,
+			call.Now,
 		)
 		if err != nil {
 			return n, apperr.Wrap(err, "insert assets.warranty_reminders")
@@ -104,7 +104,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 		if recipients == nil {
 			recipients, err = identity.Members(
 				ctx,
-				c,
+				call,
 				identity.MembersInput{
 					Role:           "admin",
 					Permission:     "asset.read",
@@ -124,7 +124,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 		}
 
 		for _, r := range recipients {
-			_, err := (notify.Store{}).Create(ctx, c, notify.New{
+			_, err := (notify.Store{}).Create(ctx, call, notify.New{
 				RecipientMembershipID: r,
 				Type:                  "warranty_expiring",
 				TemplateKey:           "warranty_expiring",
@@ -143,7 +143,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 			}
 		}
 
-		_, execErr := c.Tx.Exec(
+		_, execErr := call.Tx.Exec(
 			ctx,
 			`UPDATE assets.warranty_reminders SET notifications = $4 WHERE unit_id = $1 AND warranty_ends_at = $2 AND days_before
 				= $3`,
@@ -156,7 +156,7 @@ func (m *Module) RemindWarranties(ctx context.Context, c *ops.Call) (int, error)
 			return n, apperr.Wrap(execErr, "update assets.warranty_reminders")
 		}
 
-		c.Audit(
+		call.Audit(
 			ops.AuditEntry{
 				Action:     "units.remindWarranty",
 				TargetKind: "unit",

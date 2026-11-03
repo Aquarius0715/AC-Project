@@ -11,9 +11,9 @@ import (
 // recorded. The operation fails as a server error, the invoice stays as it was, and the same payment reference is then
 // still free: the same request succeeds once the database accepts the write (payments.recordManual; markPaid fails).
 func TestManualPaymentRollsBackWhenTheInvoiceCannotBePaid(t *testing.T) {
-	s := server(t)
-	_, inv := newInvoice(t, s)
-	_, before := post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`)
+	srv := server(t)
+	_, inv := newInvoice(t, srv)
+	_, before := post(srv, &hq, "invoices.get", `{"id":"`+inv+`"}`)
 	amount := data(before)["amountMinor"]
 	ref := "BANK-" + uuid.NewString()[:8]
 	body := `{"invoiceId":"` + inv + `","paymentReference":"` + ref + `","confirmedAmountMinor":` + fmt.Sprintf(
@@ -32,12 +32,12 @@ func TestManualPaymentRollsBackWhenTheInvoiceCannotBePaid(t *testing.T) {
 		)
 	}
 
-	_, after := post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`)
+	_, after := post(srv, &hq, "invoices.get", `{"id":"`+inv+`"}`)
 	if data(after)["status"] != data(before)["status"] || ver(after) != ver(before) {
 		t.Errorf("a failed payment changed the invoice: before %v, after %v", before, after)
 	}
 
-	if code, m := write(s, &hq, "payments.recordManual", body, ver(after)); code != 200 {
+	if code, m := write(srv, &hq, "payments.recordManual", body, ver(after)); code != 200 {
 		t.Errorf("the reference is not free after a failed payment: %d %v", code, m)
 	}
 }

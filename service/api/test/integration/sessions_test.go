@@ -24,7 +24,7 @@ import (
 // access stays. A client membership needs asset.write, any other identity.write; a reason is required; another tenant's
 // membership is NOT_FOUND and keeps its sessions.
 func TestRevokeSessions(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	tenantA, tenantB := seed.ID("tenant-a"), seed.ID("tenant-b")
 	user := seed.ID("user-test-revoke")
 	tech, client, foreign := seed.ID(
@@ -121,7 +121,7 @@ func TestRevokeSessions(t *testing.T) {
 	earlier := time.Now().Add(-time.Hour)
 
 	old, oldClient := signedIn("test-revoke-tech", earlier), signedIn("test-revoke-client", earlier)
-	if code, m := post(s, &old, "session.get", `{}`); code != 200 {
+	if code, m := post(srv, &old, "session.get", `{}`); code != 200 {
 		t.Fatalf("before the revocation: %d %v", code, m)
 	}
 
@@ -130,19 +130,19 @@ func TestRevokeSessions(t *testing.T) {
 	}
 
 	// the input and who may
-	code, m := write(s, &hq, "members.revokeSessions", body(tech, "   "), 0)
-	refusal(t, "an empty reason", code, m, "reason=error.length")
-	code, m = write(
-		s,
+	code, resp := write(srv, &hq, "members.revokeSessions", body(tech, "   "), 0)
+	refusal(t, "an empty reason", code, resp, "reason=error.length")
+	code, resp = write(
+		srv,
 		&hq,
 		"members.revokeSessions",
 		body("00000000-0000-0000-0000-000000000000", "Phone lost"),
 		0,
 	) // the path parameter, as the REST binding sends it
-	refusal(t, "no membership", code, m, "membershipId=error.required")
+	refusal(t, "no membership", code, resp, "membershipId=error.required")
 
 	if code, _ := write(
-		s,
+		srv,
 		&overrider,
 		"members.revokeSessions",
 		body(tech, "Phone lost"),
@@ -153,7 +153,7 @@ func TestRevokeSessions(t *testing.T) {
 
 	assetsOnly := actor{"tok-oo", "test-revoke-assets"}
 	if code, _ := write(
-		s,
+		srv,
 		&assetsOnly,
 		"members.revokeSessions",
 		body(tech, "Phone lost"),
@@ -163,7 +163,7 @@ func TestRevokeSessions(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"members.revokeSessions",
 		body(foreign, "Phone lost"),
@@ -172,7 +172,7 @@ func TestRevokeSessions(t *testing.T) {
 		t.Errorf("another tenant's membership: %d", code)
 	}
 
-	if code, m := post(s, &old, "session.get", `{}`); code != 200 {
+	if code, m := post(srv, &old, "session.get", `{}`); code != 200 {
 		t.Fatalf("the refused calls ended nothing: %d %v", code, m)
 	}
 
@@ -180,13 +180,13 @@ func TestRevokeSessions(t *testing.T) {
 	// one per run: the test database keeps earlier runs' audit rows
 	reason := "Phone reported lost " + uuid.NewString()[:8]
 
-	code, m = write(s, &assetsOnly, "members.revokeSessions", body(client, reason), 0)
+	code, resp = write(srv, &assetsOnly, "members.revokeSessions", body(client, reason), 0)
 	if code != 200 {
-		t.Fatalf("revoke: %d %v", code, m)
+		t.Fatalf("revoke: %d %v", code, resp)
 	}
 
 	var ids []string
-	for _, v := range data(m)["membershipIds"].([]any) {
+	for _, v := range data(resp)["membershipIds"].([]any) {
 		ids = append(ids, v.(string))
 	}
 
@@ -207,35 +207,35 @@ func TestRevokeSessions(t *testing.T) {
 		{actor{"tok-rv", "test-revoke-tech"}, "session.get"},
 		{oldClient, "units.list"},
 	} {
-		if code, m := post(
-			s,
+		if code, res := post(
+			srv,
 			&c.who,
 			c.op,
 			`{}`,
 		); code != 401 ||
-			m["messageKey"] != "errors.session_revoked" {
-			t.Errorf("%s as %s signed in before: %d %v", c.op, c.who.token, code, m)
+			res["messageKey"] != "errors.session_revoked" {
+			t.Errorf("%s as %s signed in before: %d %v", c.op, c.who.token, code, res)
 		}
 	}
 	// a sign-in in the revocation's own second: auth_time has whole seconds, so it cannot be told from one just before
-	revokedAt, err := time.Parse(time.RFC3339Nano, data(m)["revokedAt"].(string))
+	revokedAt, err := time.Parse(time.RFC3339Nano, data(resp)["revokedAt"].(string))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	sameSecond := signedIn("test-revoke-tech", revokedAt.Truncate(time.Second))
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&sameSecond,
 		"session.get",
 		`{}`,
 	); code != 401 ||
-		m["messageKey"] != "errors.session_revoked" {
-		t.Errorf("a sign-in in the revocation's second: %d %v", code, m)
+		res["messageKey"] != "errors.session_revoked" {
+		t.Errorf("a sign-in in the revocation's second: %d %v", code, res)
 	}
 
 	later := signedIn("test-revoke-tech", time.Now().Add(time.Minute))
-	if code, m := post(s, &later, "session.get", `{}`); code != 200 {
+	if code, m := post(srv, &later, "session.get", `{}`); code != 200 {
 		t.Errorf("a sign-in after the revocation: %d %v", code, m)
 	}
 
@@ -282,7 +282,7 @@ type fakeIdP struct {
 	generation int
 }
 
-func (f *fakeIdP) CreateAccount(_ context.Context, a idp.Account) (string, error) {
+func (f *fakeIdP) CreateAccount(_ context.Context, account idp.Account) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -290,15 +290,15 @@ func (f *fakeIdP) CreateAccount(_ context.Context, a idp.Account) (string, error
 		return "", errors.New("provider unavailable")
 	}
 
-	f.created = append(f.created, a)
+	f.created = append(f.created, account)
 	if f.generation > 0 {
-		return fmt.Sprintf("sub-%s#%d", a.Email, f.generation), nil
+		return fmt.Sprintf("sub-%s#%d", account.Email, f.generation), nil
 	}
 
-	return "sub-" + a.Email, nil
+	return "sub-" + account.Email, nil
 }
 
-func (f *fakeIdP) UpdateAccount(_ context.Context, subject string, a idp.Account) error {
+func (f *fakeIdP) UpdateAccount(_ context.Context, subject string, account idp.Account) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -310,7 +310,7 @@ func (f *fakeIdP) UpdateAccount(_ context.Context, subject string, a idp.Account
 		return idp.ErrNoAccount
 	}
 
-	f.updated = append(f.updated, a)
+	f.updated = append(f.updated, account)
 
 	return nil
 }
@@ -369,7 +369,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 		lost:       nil,
 		generation: 0,
 	}
-	s := serverCfg(
+	srv := serverCfg(
 		t,
 		func(c *apiserver.Config) { c.IdentityProvider = idp; c.Domains = ops.Domains },
 	)
@@ -396,17 +396,17 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 	revoke := func() {
 		t.Helper()
 
-		if code, m := write(
-			s,
+		if code, res := write(
+			srv,
 			&hq,
 			"members.revokeSessions",
 			fmt.Sprintf(`{"membershipId":"%s","reason":"Laptop stolen"}`, member),
 			0,
 		); code != 200 {
-			t.Fatalf("revoke: %d %v", code, m)
+			t.Fatalf("revoke: %d %v", code, res)
 		}
 
-		err := s.DrainEvents(context.Background())
+		err := srv.DrainEvents(context.Background())
 		if err != nil {
 			t.Fatalf("drain: %v", err)
 		}
@@ -418,7 +418,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 		t.Errorf("ended at the identity provider: %v, want %s", got, user)
 	}
 
-	err := s.DrainEvents(context.Background())
+	err := srv.DrainEvents(context.Background())
 	if err != nil || len(idp.take()) != 0 {
 		t.Errorf("the event was applied again: %v", err)
 	}
@@ -440,7 +440,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 
 	idp.err = nil
 
-	err = s.DrainEvents(context.Background())
+	err = srv.DrainEvents(context.Background())
 	if err != nil || len(idp.take()) != 0 {
 		t.Errorf("a failed provider call is retried and holds up the consumer: %v", err)
 	}
@@ -455,7 +455,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 		uuid.New(),
 	)
 
-	err = s.DrainEvents(context.Background())
+	err = srv.DrainEvents(context.Background())
 	if err != nil || len(idp.take()) != 0 {
 		t.Errorf("a user who is gone: %v", err)
 	}

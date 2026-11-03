@@ -39,10 +39,10 @@ func Handlers(replicas ...Replica) map[string]Handler {
 	return out
 }
 
-func (r Replica) handle(ctx context.Context, tx pgx.Tx, e Event) error {
-	var p RowChange
+func (r Replica) handle(ctx context.Context, txn pgx.Tx, e Event) error {
+	var rowChange RowChange
 
-	decodeErr := e.Decode(&p)
+	decodeErr := e.Decode(&rowChange)
 	if decodeErr != nil {
 		return decodeErr
 	}
@@ -52,15 +52,15 @@ func (r Replica) handle(ctx context.Context, tx pgx.Tx, e Event) error {
 		keyMatch[i] = fmt.Sprintf("t.%[1]s = s.%[1]s", k)
 	}
 
-	if p.Op == "DELETE" {
-		_, err := tx.Exec(
+	if rowChange.Op == "DELETE" {
+		_, err := txn.Exec(
 			ctx,
 			fmt.Sprintf(
 				`DELETE FROM %[1]s t USING jsonb_populate_record(NULL::%[1]s, $1) s WHERE %[2]s`,
 				r.Table,
 				strings.Join(keyMatch, " AND "),
 			),
-			[]byte(p.Row),
+			[]byte(rowChange.Row),
 		)
 
 		return apperr.Wrap(err, "delete (handle)")
@@ -79,7 +79,7 @@ func (r Replica) handle(ctx context.Context, tx pgx.Tx, e Event) error {
 	}
 
 	cols := strings.Join(all, ", ")
-	_, err := tx.Exec(
+	_, err := txn.Exec(
 		ctx,
 		fmt.Sprintf(
 			`INSERT INTO %[1]s (%[2]s) SELECT %[2]s FROM jsonb_populate_record(NULL::%[1]s, $1) ON CONFLICT (%[3]s) %[4]s`,
@@ -88,7 +88,7 @@ func (r Replica) handle(ctx context.Context, tx pgx.Tx, e Event) error {
 			strings.Join(r.Keys, ", "),
 			conflict,
 		),
-		[]byte(p.Row),
+		[]byte(rowChange.Row),
 	)
 
 	return apperr.Wrap(err, "insert (handle)")

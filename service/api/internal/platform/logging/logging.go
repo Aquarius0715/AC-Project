@@ -43,24 +43,24 @@ func Mask(s string) string {
 
 // ReplaceAttr masks one attribute (slog.HandlerOptions.ReplaceAttr): the value of a secret-named key, and the personal
 // data and passwords inside a string or an error.
-func ReplaceAttr(_ []string, a slog.Attr) slog.Attr {
-	if secretKey(a.Key) {
-		return slog.String(a.Key, Masked)
+func ReplaceAttr(_ []string, attr slog.Attr) slog.Attr {
+	if secretKey(attr.Key) {
+		return slog.String(attr.Key, Masked)
 	}
 
-	switch a.Value.Kind() {
+	switch attr.Value.Kind() {
 	case slog.KindString:
-		if s := a.Value.String(); Mask(s) != s {
-			return slog.String(a.Key, Mask(s))
+		if s := attr.Value.String(); Mask(s) != s {
+			return slog.String(attr.Key, Mask(s))
 		}
 	case slog.KindAny:
-		err, ok := a.Value.Any().(error)
+		err, ok := attr.Value.Any().(error)
 		if ok {
-			return slog.String(a.Key, Mask(err.Error()))
+			return slog.String(attr.Key, Mask(err.Error()))
 		}
 	}
 
-	return a
+	return attr
 }
 
 // New is the JSON logger of one service, writing to w.

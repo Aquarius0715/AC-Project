@@ -77,156 +77,159 @@ func (in *Input) Validate() error {
 
 // Admin creates the first administrator in tx. The tenant's identity administrators are locked as members.save locks
 // them (IR472), so a save that adds one at the same time waits for this one.
-func Admin(ctx context.Context, tx pgx.Tx, in Input) (Result, error) {
-	var r Result
+func Admin(ctx context.Context, txn pgx.Tx, in Input) (Result, error) {
+	var result Result
 
 	err := in.Validate()
 	if err != nil {
-		return r, err
+		return result, err
 	}
 	// the business time: a demo environment's clock runs at an offset from the wall clock (IR168)
-	r.At = in.At
-	if r.At.IsZero() {
-		err := tx.QueryRow(ctx, `SELECT now() + COALESCE((SELECT offset_ms FROM platform.demo_clock WHERE id), 0) * interval
+	result.At = in.At
+	if result.At.IsZero() {
+		err := txn.QueryRow(ctx, `SELECT now() + COALESCE((SELECT offset_ms FROM platform.demo_clock WHERE id), 0) * interval
 			'1 millisecond'`).
-			Scan(&r.At)
+			Scan(&result.At)
 		if err != nil {
-			return r, apperr.Wrap(err, "select platform.demo_clock")
+			return result, apperr.Wrap(err, "select platform.demo_clock")
 		}
 	}
 
 	var ids []uuid.UUID
 
-	rows, err := tx.Query(ctx, `SELECT id FROM platform.tenants WHERE name = $1`, in.Tenant)
+	rows, err := txn.Query(ctx, `SELECT id FROM platform.tenants WHERE name = $1`, in.Tenant)
 	if err != nil {
-		return r, apperr.Wrap(err, "select platform.tenants")
+		return result, apperr.Wrap(err, "select platform.tenants")
 	}
 
 	ids, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	if err != nil {
-		return r, apperr.Wrap(err, "select platform.tenants")
+		return result, apperr.Wrap(err, "select platform.tenants")
 	}
 
 	switch len(ids) {
 	case 0:
-		err := tx.QueryRow(ctx, `INSERT INTO platform.tenants (name, created_at) VALUES ($1, $2) RETURNING
-			id`, in.Tenant, r.At).
-			Scan(&r.TenantID)
+		err := txn.QueryRow(ctx, `INSERT INTO platform.tenants (name, created_at) VALUES ($1, $2) RETURNING
+			id`, in.Tenant, result.At).
+			Scan(&result.TenantID)
 		if err != nil {
-			return r, apperr.Wrap(err, "insert platform.tenants")
+			return result, apperr.Wrap(err, "insert platform.tenants")
 		}
 
-		r.NewTenant = true
+		result.NewTenant = true
 	case 1:
-		r.TenantID = ids[0]
+		result.TenantID = ids[0]
 	default:
-		return r, fmt.Errorf("tenant: %d tenants are named %q", len(ids), in.Tenant)
+		return result, fmt.Errorf("tenant: %d tenants are named %q", len(ids), in.Tenant)
 	}
 
-	_, execErr := tx.Exec(
+	_, execErr := txn.Exec(
 		ctx,
 		`SELECT pg_advisory_xact_lock(hashtext('identity.identity_admins:' || $1::text))`,
-		r.TenantID,
+		result.TenantID,
 	)
 	if execErr != nil {
-		return r, apperr.Wrap(execErr, "select pg_advisory_xact_lock")
+		return result, apperr.Wrap(execErr, "select pg_advisory_xact_lock")
 	}
 
 	var exists bool
 
-	scanErr := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships m JOIN identity.membership_permissions p
+	scanErr := txn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships m JOIN identity.membership_permissions
+		p
 		ON p.membership_id = m.id AND p.permission = 'identity.write'
-		WHERE m.tenant_id = $1 AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2))`, r.TenantID, r.At).
+		WHERE m.tenant_id = $1 AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until >
+		$2))`, result.TenantID, result.At).
 		Scan(&exists)
 	if scanErr != nil {
-		return r, apperr.Wrap(scanErr, "select identity.memberships")
+		return result, apperr.Wrap(scanErr, "select identity.memberships")
 	}
 
 	if exists {
-		return r, ErrAdminExists
+		return result, ErrAdminExists
 	}
 
-	err = tx.QueryRow(ctx, `SELECT id FROM identity.organizations WHERE tenant_id = $1 AND kind = 'operator' ORDER BY
-		created_at, id LIMIT 1`, r.TenantID).
-		Scan(&r.OrganizationID)
+	err = txn.QueryRow(ctx, `SELECT id FROM identity.organizations WHERE tenant_id = $1 AND kind = 'operator' ORDER BY
+		created_at, id LIMIT 1`, result.TenantID).
+		Scan(&result.OrganizationID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		err = tx.QueryRow(ctx, `INSERT INTO identity.organizations (tenant_id, name, kind, status, created_at, updated_at)
+		err = txn.QueryRow(ctx, `INSERT INTO identity.organizations (tenant_id, name, kind, status, created_at, updated_at)
 			VALUES ($1, $2, 'operator', 'active', $3, $3) RETURNING id`,
-			r.TenantID, in.Organization, r.At).
-			Scan(&r.OrganizationID)
-		r.NewOrganization = true
+			result.TenantID, in.Organization, result.At).
+			Scan(&result.OrganizationID)
+		result.NewOrganization = true
 	}
 
 	if err != nil {
-		return r, apperr.Wrap(err, "insert identity.organizations")
+		return result, apperr.Wrap(err, "insert identity.organizations")
 	}
 
-	err = tx.QueryRow(ctx, `INSERT INTO identity.users (email, display_name, status, created_at, updated_at) VALUES ($1,
+	err = txn.QueryRow(ctx, `INSERT INTO identity.users (email, display_name, status, created_at, updated_at) VALUES ($1,
 		$2, 'active', $3, $3)
-		ON CONFLICT (email) DO NOTHING RETURNING id`, in.Email, in.Name, r.At).
-		Scan(&r.UserID)
+		ON CONFLICT (email) DO NOTHING RETURNING id`, in.Email, in.Name, result.At).
+		Scan(&result.UserID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return r, ErrEmailTaken
+		return result, ErrEmailTaken
 	}
 
 	if err != nil {
-		return r, apperr.Wrap(err, "insert identity.users")
+		return result, apperr.Wrap(err, "insert identity.users")
 	}
 
-	scanErr = tx.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, valid_from,
+	scanErr = txn.QueryRow(ctx, `INSERT INTO identity.memberships (tenant_id, user_id, organization_id, role, valid_from,
 		created_at, updated_at)
-		VALUES ($1, $2, $3, 'admin', $4, $4, $4) RETURNING id`, r.TenantID, r.UserID, r.OrganizationID, r.At).
-		Scan(&r.MembershipID)
+		VALUES ($1, $2, $3, 'admin', $4, $4, $4) RETURNING
+		id`, result.TenantID, result.UserID, result.OrganizationID, result.At).
+		Scan(&result.MembershipID)
 	if scanErr != nil {
-		return r, apperr.Wrap(scanErr, "insert identity.memberships")
+		return result, apperr.Wrap(scanErr, "insert identity.memberships")
 	}
 	// every HQ permission (the contractor's partner.* are not HQ's), over the whole tenant
-	_, execErr = tx.Exec(
+	_, execErr = txn.Exec(
 		ctx,
 		`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
 		SELECT $1, $2, code FROM identity.permissions WHERE code NOT LIKE 'partner.%'`,
-		r.TenantID,
-		r.MembershipID,
+		result.TenantID,
+		result.MembershipID,
 	)
 	if execErr != nil {
-		return r, apperr.Wrap(execErr, "insert identity.membership_permissions")
+		return result, apperr.Wrap(execErr, "insert identity.membership_permissions")
 	}
 
-	_, execErr = tx.Exec(
+	_, execErr = txn.Exec(
 		ctx,
 		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1, $2, 'tenant', $1)`,
-		r.TenantID,
-		r.MembershipID,
+		result.TenantID,
+		result.MembershipID,
 	)
 	if execErr != nil {
-		return r, apperr.Wrap(execErr, "insert identity.membership_scopes")
+		return result, apperr.Wrap(execErr, "insert identity.membership_scopes")
 	}
 
-	_, execErr = tx.Exec(
+	_, execErr = txn.Exec(
 		ctx,
 		`INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, next_version,
 			occurred_at, correlation_id, result, reason)
 		VALUES ($1, 'system-bootstrap', 'system', 'bootstrap.admin', 'membership', $2::text, 1, $3, 'bootstrap-admin',
 		'success', 'first HQ administrator')`,
-		r.TenantID,
-		r.MembershipID,
-		r.At,
+		result.TenantID,
+		result.MembershipID,
+		result.At,
 	)
 	if execErr != nil {
-		return r, apperr.Wrap(execErr, "insert audit.audit_log")
+		return result, apperr.Wrap(execErr, "insert audit.audit_log")
 	}
 
-	_, err = tx.Exec(
+	_, err = txn.Exec(
 		ctx,
 		`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
 			occurred_at)
 		VALUES ($1, 'membership', $2::uuid, 'AccountRequested', jsonb_build_object('userId', $3::uuid::text, 'membershipId',
 		$2::uuid::text, 'role', 'admin'), 'bootstrap-admin', $4)`,
-		r.TenantID,
-		r.MembershipID,
-		r.UserID,
-		r.At,
+		result.TenantID,
+		result.MembershipID,
+		result.UserID,
+		result.At,
 	)
 
-	return r, apperr.Wrap(err, "insert platform.outbox")
+	return result, apperr.Wrap(err, "insert platform.outbox")
 }

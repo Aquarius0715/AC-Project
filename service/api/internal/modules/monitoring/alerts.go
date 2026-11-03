@@ -72,34 +72,34 @@ const alertCols = `a.id, a.tenant_id, a.version, a.created_at, a.updated_at, a.u
 	a.previous_alert_id, a.delivery_failures, ` + alertRule
 
 func scanAlert(r pgx.Row) (Alert, error) {
-	var a Alert
+	var alert Alert
 
 	err := r.Scan(
-		&a.ID,
-		&a.TenantID,
-		&a.Version,
-		&a.CreatedAt,
-		&a.UpdatedAt,
-		&a.UnitID,
-		&a.PolicyID,
-		&a.Type,
-		&a.Severity,
-		&a.Status,
-		&a.CauseCode,
-		&a.EvidenceKind,
-		&a.EvidenceText,
-		&a.ObservedAt,
-		&a.EvidenceIDs,
-		&a.DetectedAt,
-		&a.AcknowledgedAt,
-		&a.ResolvedAt,
-		&a.ResolutionReason,
-		&a.PreviousAlertID,
-		&a.DeliveryFailures,
-		&a.Rule,
+		&alert.ID,
+		&alert.TenantID,
+		&alert.Version,
+		&alert.CreatedAt,
+		&alert.UpdatedAt,
+		&alert.UnitID,
+		&alert.PolicyID,
+		&alert.Type,
+		&alert.Severity,
+		&alert.Status,
+		&alert.CauseCode,
+		&alert.EvidenceKind,
+		&alert.EvidenceText,
+		&alert.ObservedAt,
+		&alert.EvidenceIDs,
+		&alert.DetectedAt,
+		&alert.AcknowledgedAt,
+		&alert.ResolvedAt,
+		&alert.ResolutionReason,
+		&alert.PreviousAlertID,
+		&alert.DeliveryFailures,
+		&alert.Rule,
 	)
 
-	return a, apperr.Wrap(err, "scan (scanAlert)")
+	return alert, apperr.Wrap(err, "scan (scanAlert)")
 }
 
 // UnitLocator resolves property membership of units for the propertyId filter (Assets).
@@ -178,8 +178,8 @@ const severityRank = `CASE a.severity WHEN 'normal' THEN 0 WHEN 'warning' THEN 1
 //	@Router			/v1/alerts [get]
 func (m Alerts) list(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[Alert], error) {
 	var f struct {
 		UnitID     *uuid.UUID   `json:"unitId,omitempty"`
@@ -192,8 +192,8 @@ func (m Alerts) list(
 		PropertyID *uuid.UUID   `json:"propertyId,omitempty"`
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil {
@@ -218,9 +218,9 @@ func (m Alerts) list(
 	// default sort severity desc (critical → warning → normal), id asc; severity asc = normal, warning, critical
 	order := severityRank + " DESC, a.id ASC"
 
-	if in.Sort != nil {
-		if in.Sort.Field == "severity" {
-			dir, err := paging.Direction(in.Sort)
+	if query.Sort != nil {
+		if query.Sort.Field == "severity" {
+			dir, err := paging.Direction(query.Sort)
 			if err != nil {
 				return paging.Page[Alert]{}, apperr.Wrap(err, "paging.Direction")
 			}
@@ -228,7 +228,7 @@ func (m Alerts) list(
 			order = severityRank + " " + dir + ", a.id ASC"
 		} else {
 			o, err := paging.OrderBy(
-				in.Sort,
+				query.Sort,
 				map[string]string{
 					"id":        "a.id",
 					"createdAt": "a.created_at",
@@ -244,7 +244,7 @@ func (m Alerts) list(
 		}
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Alert]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -257,7 +257,7 @@ func (m Alerts) list(
 		return fmt.Sprintf("$%d", len(args))
 	}
 
-	conds := []string{alertScope(c, &args, unitscope.Equipment)}
+	conds := []string{alertScope(call, &args, unitscope.Equipment)}
 	if f.UnitID != nil {
 		conds = append(conds, "a.unit_id = "+add(*f.UnitID))
 	}
@@ -283,7 +283,7 @@ func (m Alerts) list(
 	}
 
 	if f.CustomerID != nil {
-		org, ok, err := m.Units.OrgOfCustomer(ctx, c, *f.CustomerID)
+		org, ok, err := m.Units.OrgOfCustomer(ctx, call, *f.CustomerID)
 		if err != nil {
 			return paging.Page[Alert]{}, apperr.Wrap(err, "monitoring.UnitLocator.OrgOfCustomer")
 		}
@@ -296,7 +296,7 @@ func (m Alerts) list(
 	}
 
 	if f.PropertyID != nil {
-		units, err := m.Units.UnitsOfProperty(ctx, c, *f.PropertyID)
+		units, err := m.Units.UnitsOfProperty(ctx, call, *f.PropertyID)
 		if err != nil {
 			return paging.Page[Alert]{}, apperr.Wrap(err, "monitoring.UnitLocator.UnitsOfProperty")
 		}
@@ -308,21 +308,21 @@ func (m Alerts) list(
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.alerts a WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM monitoring.alerts a WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Alert]{}, apperr.Wrap(scanErr, "select monitoring.alerts")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM monitoring.alerts a WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			alertCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -343,9 +343,9 @@ func (m Alerts) list(
 
 	return paging.Page[Alert]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, apperr.Wrap(rows.Err(), "select monitoring.alerts")
 }
 
@@ -387,35 +387,38 @@ func (in *GetInput) Validate() map[string]string {
 //	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/alerts/{id} [get]
-func (m Alerts) get(ctx context.Context, c *ops.Call, in *GetInput) (Alert, error) {
+func (m Alerts) get(ctx context.Context, call *ops.Call, in *GetInput) (Alert, error) {
 	args := []any{in.ID}
 
-	a, err := scanAlert(
-		c.Tx.QueryRow(
+	alert, err := scanAlert(
+		call.Tx.QueryRow(
 			ctx,
 			"SELECT "+alertCols+" FROM monitoring.alerts a WHERE a.id = $1 AND "+alertScope(
-				c,
+				call,
 				&args,
 				unitscope.List,
 			),
 			args...),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return a, apperr.E(apperr.NotFound, "error.notFound")
+		return alert, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	if err != nil {
-		return a, err
+		return alert, err
 	}
 
-	return a, apperr.Wrap(unitscope.Gate(ctx, c, []uuid.UUID{a.UnitID}), "unitscope.Gate")
+	return alert, apperr.Wrap(
+		unitscope.Gate(ctx, call, []uuid.UUID{alert.UnitID}),
+		"unitscope.Gate",
+	)
 }
 
 // lockAlert loads an alert in the caller's scope for update, applies the version and the technician rule (IR94 for
 // operations without jobId).
 func (m Alerts) lockAlert(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	id uuid.UUID,
 ) (string, uuid.UUID, error) {
 	args := []any{id}
@@ -426,8 +429,8 @@ func (m Alerts) lockAlert(
 		v      int
 	)
 
-	err := c.Tx.QueryRow(ctx, "SELECT a.status, a.unit_id, a.version FROM monitoring.alerts a WHERE a.id = $1 AND "+
-		alertScope(c, &args, unitscope.List)+" FOR UPDATE", args...).
+	err := call.Tx.QueryRow(ctx, "SELECT a.status, a.unit_id, a.version FROM monitoring.alerts a WHERE a.id = $1 AND "+
+		alertScope(call, &args, unitscope.List)+" FOR UPDATE", args...).
 		Scan(&status, &unit, &v)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", unit, apperr.E(apperr.NotFound, "error.notFound")
@@ -437,20 +440,20 @@ func (m Alerts) lockAlert(
 		return "", unit, apperr.Wrap(err, "select monitoring.alerts")
 	}
 
-	if c.Principal.Role == "technician" {
+	if call.Principal.Role == "technician" {
 		err := m.Access.TechnicianUnit(
 			ctx,
-			c,
+			call,
 			unit,
 			true,
-			c.Principal.Employment == "internal",
+			call.Principal.Employment == "internal",
 		)
 		if err != nil {
 			return "", unit, apperr.Wrap(err, "monitoring.TechAccess.TechnicianUnit")
 		}
 	}
 
-	if v != *c.ExpectedVersion {
+	if v != *call.ExpectedVersion {
 		return "", unit, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
@@ -498,8 +501,8 @@ func (in *AckInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/alerts/{alertId}/acknowledge [post]
-func (m Alerts) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Alert, error) {
-	status, unit, err := m.lockAlert(ctx, c, in.AlertID)
+func (m Alerts) acknowledge(ctx context.Context, call *ops.Call, in *AckInput) (Alert, error) {
+	status, unit, err := m.lockAlert(ctx, call, in.AlertID)
 	if err != nil {
 		return Alert{}, err
 	}
@@ -508,39 +511,39 @@ func (m Alerts) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Ale
 		return Alert{}, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
-	a, err := scanAlert(
-		c.Tx.QueryRow(
+	alert, err := scanAlert(
+		call.Tx.QueryRow(
 			ctx,
 			`UPDATE monitoring.alerts a SET status = 'acknowledged', acknowledged_at = $2, acknowledged_by = $3,
 		version = version + 1, updated_at = platform.app_now() WHERE a.id = $1 RETURNING `+alertCols,
 			in.AlertID,
-			c.Now,
-			c.Principal.MembershipID,
+			call.Now,
+			call.Principal.MembershipID,
 		),
 	)
 	if err != nil {
 		return Alert{}, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "alert",
-			AggregateID:   a.ID,
+			AggregateID:   alert.ID,
 			Type:          "AlertAcknowledged",
 			Payload:       map[string]any{"unitId": unit},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "alerts.acknowledge",
 			TargetKind:      "alert",
-			TargetID:        a.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &a.Version, Reason: "", Result: "", Before: nil, After: nil,
+			TargetID:        alert.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			NextVersion:     &alert.Version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return a, nil
+	return alert, nil
 }
 
 // ResolveInput is alerts.resolve input.
@@ -552,23 +555,23 @@ type ResolveInput struct {
 
 // Validate implements ops.Validator (IR87: 1–1000 after trimming).
 func (in *ResolveInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.AlertID == uuid.Nil {
-		fe["alertId"] = "error.required"
+		fieldErrs["alertId"] = "error.required"
 	}
 
 	in.ResolutionReason = strings.TrimSpace(in.ResolutionReason)
 	if n := utf8.RuneCountInString(in.ResolutionReason); n < 1 || n > 1000 {
-		fe["resolutionReason"] = "error.length"
+		fieldErrs["resolutionReason"] = "error.length"
 	}
 
 	if in.ResolutionEvidenceIDs == nil {
-		fe["resolutionEvidenceIds"] = "error.required"
+		fieldErrs["resolutionEvidenceIds"] = "error.required"
 	} else if len(in.ResolutionEvidenceIDs) > 20 || !distinct(in.ResolutionEvidenceIDs) {
-		fe["resolutionEvidenceIds"] = "error.invalid" // at most 20, each once
+		fieldErrs["resolutionEvidenceIds"] = "error.invalid" // at most 20, each once
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // resolve serves alerts.resolve.
@@ -600,8 +603,8 @@ func (in *ResolveInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/alerts/{alertId}/resolve [post]
-func (m Alerts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (Alert, error) {
-	status, unit, err := m.lockAlert(ctx, c, in.AlertID)
+func (m Alerts) resolve(ctx context.Context, call *ops.Call, in *ResolveInput) (Alert, error) {
+	status, unit, err := m.lockAlert(ctx, call, in.AlertID)
 	if err != nil {
 		return Alert{}, err
 	}
@@ -611,7 +614,7 @@ func (m Alerts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (Ale
 	}
 
 	cur, err := scanAlert(
-		c.Tx.QueryRow(
+		call.Tx.QueryRow(
 			ctx,
 			"SELECT "+alertCols+" FROM monitoring.alerts a WHERE a.id = $1",
 			in.AlertID,
@@ -621,20 +624,20 @@ func (m Alerts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (Ale
 		return Alert{}, err
 	}
 
-	checkEvidenceErr := m.checkEvidence(ctx, c, cur, in.ResolutionEvidenceIDs)
+	checkEvidenceErr := m.checkEvidence(ctx, call, cur, in.ResolutionEvidenceIDs)
 	if checkEvidenceErr != nil {
 		return Alert{}, checkEvidenceErr
 	}
 
-	a, err := scanAlert(
-		c.Tx.QueryRow(
+	alert, err := scanAlert(
+		call.Tx.QueryRow(
 			ctx,
 			`UPDATE monitoring.alerts a SET status = 'resolved', resolved_at = $2, resolved_by = $3, resolution_reason = $4,
 		resolution_evidence_ids = $5, version = version + 1, updated_at = platform.app_now() WHERE a.id = $1 RETURNING
 		`+alertCols,
 			in.AlertID,
-			c.Now,
-			c.Principal.MembershipID,
+			call.Now,
+			call.Principal.MembershipID,
 			in.ResolutionReason,
 			in.ResolutionEvidenceIDs,
 		),
@@ -643,26 +646,26 @@ func (m Alerts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (Ale
 		return Alert{}, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "alert",
-			AggregateID:   a.ID,
+			AggregateID:   alert.ID,
 			Type:          "AlertResolved",
 			Payload:       map[string]any{"unitId": unit},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "alerts.resolve",
 			TargetKind:      "alert",
-			TargetID:        a.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &a.Version,
+			TargetID:        alert.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			NextVersion:     &alert.Version,
 			Reason:          in.ResolutionReason, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return a, nil
+	return alert, nil
 }
 
 // ActiveAlertCounts implements assets.Monitoring: open + acknowledged critical/warning alerts per unit (IR51).

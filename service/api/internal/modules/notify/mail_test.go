@@ -83,23 +83,23 @@ func TestSMTPRefusesHeaderBreaks(t *testing.T) {
 // TestSMTPSends: a message reaches an SMTP server with the bare sender address in the envelope and the display name
 // in the From header, a Date, the non-ASCII subject RFC 2047 encoded and CRLF line ends in the body.
 func TestSMTPSends(t *testing.T) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ln.Close()
+	defer listener.Close()
 
 	got := make(chan string, 1)
 
 	go func() { // a minimal SMTP server: accept one message and report its envelope sender and data
-		c, err := ln.Accept()
+		conn, err := listener.Accept()
 		if err != nil {
 			return
 		}
-		defer c.Close()
+		defer conn.Close()
 
-		r := bufio.NewReader(c)
-		w := func(s string) { _, _ = c.Write([]byte(s + "\r\n")) }
+		reader := bufio.NewReader(conn)
+		w := func(s string) { _, _ = conn.Write([]byte(s + "\r\n")) }
 		w("220 test")
 
 		var (
@@ -110,7 +110,7 @@ func TestSMTPSends(t *testing.T) {
 		inData := false
 
 		for {
-			line, err := r.ReadString('\n')
+			line, err := reader.ReadString('\n')
 			if err != nil {
 				return
 			}
@@ -154,7 +154,7 @@ func TestSMTPSends(t *testing.T) {
 		}
 	}()
 
-	s := SMTP{Addr: ln.Addr().String(), From: "AC Project <no-reply@ac-project.local>"}
+	s := SMTP{Addr: listener.Addr().String(), From: "AC Project <no-reply@ac-project.local>"}
 
 	_, sendErr := s.Send(
 		context.Background(),

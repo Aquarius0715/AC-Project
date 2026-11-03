@@ -11,7 +11,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-func newAlert(t *testing.T, unit, org, severity string, at time.Time) string {
+func newAlert(t *testing.T, unit, org, severity string, when time.Time) string {
 	id := uuid.NewString()
 	// one open alert per unit / policy / rule / type (alerts_one_open_per_rule): use the severity as the rule key
 	owner(
@@ -24,19 +24,19 @@ func newAlert(t *testing.T, unit, org, severity string, at time.Time) string {
 		unit,
 		org,
 		severity,
-		at,
+		when,
 	)
 
 	return id
 }
 
 func TestAlerts(t *testing.T) {
-	s := server(t)
-	u := newUnit(t, s, "Alert AC")
+	srv := server(t)
+	unit := newUnit(t, srv, "Alert AC")
 	org := seed.ID("org-customer-b").String()
-	crit := newAlert(t, u, org, "critical", clock.Add(-10*time.Minute))
-	warn := newAlert(t, u, org, "warning", clock.Add(-5*time.Minute))
-	norm := newAlert(t, u, org, "normal", clock.Add(-time.Minute))
+	crit := newAlert(t, unit, org, "critical", clock.Add(-10*time.Minute))
+	warn := newAlert(t, unit, org, "warning", clock.Add(-5*time.Minute))
+	norm := newAlert(t, unit, org, "normal", clock.Add(-time.Minute))
 
 	ids := func(m map[string]any) []string {
 		out := []string{}
@@ -47,34 +47,34 @@ func TestAlerts(t *testing.T) {
 		return out
 	}
 
-	_, m := post(s, &hq, "alerts.list", `{"filters":{"unitId":"`+u+`"}}`)
-	if got := ids(m); strings.Join(got, ",") != strings.Join([]string{crit, warn, norm}, ",") {
+	_, resp := post(srv, &hq, "alerts.list", `{"filters":{"unitId":"`+unit+`"}}`)
+	if got := ids(resp); strings.Join(got, ",") != strings.Join([]string{crit, warn, norm}, ",") {
 		t.Fatalf("default severity desc: %v", got)
 	}
 
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&hq,
 		"alerts.list",
-		`{"filters":{"unitId":"`+u+`"},"sort":{"field":"severity","direction":"asc"}}`,
+		`{"filters":{"unitId":"`+unit+`"},"sort":{"field":"severity","direction":"asc"}}`,
 	)
-	if got := ids(m); got[0] != norm || got[2] != crit {
+	if got := ids(resp); got[0] != norm || got[2] != crit {
 		t.Fatalf("severity asc: %v", got)
 	}
 
 	for body, n := range map[string]int{
-		`{"filters":{"unitIds":["` + u + `"],"severity":"warning"}}`: 1,
-		`{"filters":{"unitId":"` + u + `","status":"open"}}`:         3,
-		`{"filters":{"unitId":"` + u + `","from":"` + clock.Add(-6*time.Minute).Format(time.RFC3339) + `","to":"` +
+		`{"filters":{"unitIds":["` + unit + `"],"severity":"warning"}}`: 1,
+		`{"filters":{"unitId":"` + unit + `","status":"open"}}`:         3,
+		`{"filters":{"unitId":"` + unit + `","from":"` + clock.Add(-6*time.Minute).Format(time.RFC3339) + `","to":"` +
 			clock.Format(time.RFC3339) + `"}}`: 2,
-		`{"filters":{"unitId":"` + u + `","customerId":"` + seed.ID("cust-b").String() +
+		`{"filters":{"unitId":"` + unit + `","customerId":"` + seed.ID("cust-b").String() +
 			`"}}`: 3,
-		`{"filters":{"propertyId":"` + seed.ID("property-home-b").String() + `","unitId":"` + u +
+		`{"filters":{"propertyId":"` + seed.ID("property-home-b").String() + `","unitId":"` + unit +
 			`"}}`: 3,
-		`{"filters":{"unitId":"` + u + `","customerId":"` + uuid.NewString() +
+		`{"filters":{"unitId":"` + unit + `","customerId":"` + uuid.NewString() +
 			`"}}`: 0,
 	} {
-		if code, m := post(s, &hq, "alerts.list", body); code != 200 || len(items(m)) != n {
+		if code, m := post(srv, &hq, "alerts.list", body); code != 200 || len(items(m)) != n {
 			t.Errorf("%s: %d want %d", body, len(items(m)), n)
 		}
 	}
@@ -92,51 +92,51 @@ func TestAlerts(t *testing.T) {
 		`{"filters":{"from":"2026-09-14T01:00:00Z","to":"2026-09-14T00:00:00Z"}}`, `{"filters":{"z":1}}`,
 		`{"sort":{"field":"title","direction":"asc"}}`,
 	} {
-		code, m := post(s, &hq, "alerts.list", b)
+		code, m := post(srv, &hq, "alerts.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 	// scope: customer-b sees, customer-a does not; units.list shows the active count
-	if code, _ := post(s, &customerB, "alerts.get", `{"id":"`+crit+`"}`); code != 200 {
+	if code, _ := post(srv, &customerB, "alerts.get", `{"id":"`+crit+`"}`); code != 200 {
 		t.Error("customer-b reads its alert")
 	}
 
-	if code, _ := post(s, &customerA, "alerts.get", `{"id":"`+crit+`"}`); code != 404 {
+	if code, _ := post(srv, &customerA, "alerts.get", `{"id":"`+crit+`"}`); code != 404 {
 		t.Error("customer-a must not read customer-b's alert")
 	}
 
-	_, g := post(s, &hq, "units.get", `{"id":"`+u+`"}`)
+	_, g := post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
 	if data(g)["activeAlertCount"].(float64) != 2 { // IR51: normal alerts are not counted
 		t.Fatalf("activeAlertCount: %v", data(g)["activeAlertCount"])
 	}
 	// acknowledge → resolve, with state and version rules
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"alerts.acknowledge",
 		`{"alertId":"`+crit+`"}`,
 		1,
-	); code != 200 || data(m)["status"] != "acknowledged" ||
-		data(m)["acknowledgedAt"] == nil {
-		t.Fatalf("ack: %d %v", code, m)
+	); code != 200 || data(res)["status"] != "acknowledged" ||
+		data(res)["acknowledgedAt"] == nil {
+		t.Fatalf("ack: %d %v", code, res)
 	}
 
-	if code, _ := write(s, &hq, "alerts.acknowledge", `{"alertId":"`+crit+`"}`, 2); code != 409 {
+	if code, _ := write(srv, &hq, "alerts.acknowledge", `{"alertId":"`+crit+`"}`, 2); code != 409 {
 		t.Error("ack twice")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"alerts.resolve",
 		`{"alertId":"`+crit+`","resolutionReason":"   ","resolutionEvidenceIds":[]}`,
 		2,
 	); code != 422 ||
-		fields(m) != "resolutionReason=error.length" {
-		t.Errorf("blank reason: %d %s", code, fields(m))
+		fields(res) != "resolutionReason=error.length" {
+		t.Errorf("blank reason: %d %s", code, fields(res))
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"alerts.resolve",
 		`{"alertId":"`+crit+`","resolutionReason":"`+strings.Repeat(
@@ -145,35 +145,35 @@ func TestAlerts(t *testing.T) {
 		)+`","resolutionEvidenceIds":[]}`,
 		2,
 	); code != 422 ||
-		fields(m) != "resolutionReason=error.length" {
-		t.Errorf("reason too long: %d %s", code, fields(m))
+		fields(res) != "resolutionReason=error.length" {
+		t.Errorf("reason too long: %d %s", code, fields(res))
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"alerts.resolve",
 		`{"alertId":"`+crit+`","resolutionReason":"fixed"}`,
 		2,
 	); code != 422 ||
-		fields(m) != "resolutionEvidenceIds=error.required" {
-		t.Errorf("evidence ids required: %d %s", code, fields(m))
+		fields(res) != "resolutionEvidenceIds=error.required" {
+		t.Errorf("evidence ids required: %d %s", code, fields(res))
 	}
 	// an alert without a policy cites a candidate (IR66, IR327): here a remeasurement after detection
-	back := reading(t, u, "temperature", 25, "°C", clock.Add(-2*time.Minute), "valid")
-	if code, m := write(
-		s,
+	back := reading(t, unit, "temperature", 25, "°C", clock.Add(-2*time.Minute), "valid")
+	if code, res := write(
+		srv,
 		&hq,
 		"alerts.resolve",
 		`{"alertId":"`+crit+`","resolutionReason":" window closed ","resolutionEvidenceIds":["`+back+`"]}`,
 		2,
 	); code != 200 ||
-		data(m)["resolutionReason"] != "window closed" {
-		t.Fatalf("resolve: %d %v", code, m)
+		data(res)["resolutionReason"] != "window closed" {
+		t.Fatalf("resolve: %d %v", code, res)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"alerts.resolve",
 		`{"alertId":"`+crit+`","resolutionReason":"again","resolutionEvidenceIds":[]}`,
@@ -182,23 +182,23 @@ func TestAlerts(t *testing.T) {
 		t.Error("resolve twice")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"alerts.resolve",
 		`{"alertId":"`+warn+`","resolutionReason":"direct","resolutionEvidenceIds":["`+back+`"]}`,
 		1,
 	); code != 200 ||
-		data(m)["status"] != "resolved" {
-		t.Fatalf("resolve from open: %d %v", code, m)
+		data(res)["status"] != "resolved" {
+		t.Fatalf("resolve from open: %d %v", code, res)
 	}
 
-	if code, _ := write(s, &hq, "alerts.acknowledge", `{"alertId":"`+norm+`"}`, 5); code != 409 {
+	if code, _ := write(srv, &hq, "alerts.acknowledge", `{"alertId":"`+norm+`"}`, 5); code != 409 {
 		t.Error("stale version")
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerB,
 		"alerts.acknowledge",
 		`{"alertId":"`+norm+`"}`,
@@ -208,7 +208,7 @@ func TestAlerts(t *testing.T) {
 	}
 	// technician without an assignment on the unit
 	if code, _ := write(
-		s,
+		srv,
 		&techInt,
 		"alerts.acknowledge",
 		`{"alertId":"`+norm+`"}`,
@@ -217,7 +217,7 @@ func TestAlerts(t *testing.T) {
 		t.Error("technician outside scope → NOT_FOUND")
 	}
 
-	_, g = post(s, &hq, "units.get", `{"id":"`+u+`"}`)
+	_, g = post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
 	if data(g)["activeAlertCount"].(float64) != 0 { // only the normal alert is left open (IR51)
 		t.Fatal("resolved alerts are not active")
 	}
@@ -227,8 +227,8 @@ func TestAlerts(t *testing.T) {
 // key — and none for an alert without a policy; a technician on the unit acknowledges with alert.read, and only
 // alert.resolve resolves.
 func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
-	s := server(t)
-	u := newUnit(t, s, "Rule AC")
+	srv := server(t)
+	unit := newUnit(t, srv, "Rule AC")
 	org := seed.ID("org-customer-b").String()
 	policy := uuid.NewString()
 	owner(
@@ -261,7 +261,7 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 			VALUES ($1,$2,$3,$4,$5,$6,$7,'warning','open','unknown','demo_observation','demo',$8,$8)`,
 			id,
 			seed.ID("tenant-a"),
-			u,
+			unit,
 			org,
 			policy,
 			ruleKey,
@@ -285,7 +285,7 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 		"tamper",
 	)
 	rule := func(a *actor, id string) any {
-		code, m := post(s, a, "alerts.get", `{"id":"`+id+`"}`)
+		code, m := post(srv, a, "alerts.get", `{"id":"`+id+`"}`)
 		if code != 200 {
 			t.Fatalf("alerts.get %s: %d %v", id, code, m)
 		}
@@ -319,14 +319,14 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 		t.Errorf("no policy, no rule: %v", got)
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"alerts.list",
-		`{"filters":{"unitId":"`+u+`"}}`,
-	); len(items(m)) != 3 ||
-		items(m)[0]["rule"] == nil && items(m)[1]["rule"] == nil {
-		t.Errorf("alerts.list carries the rule: %v", m)
+		`{"filters":{"unitId":"`+unit+`"}}`,
+	); len(items(res)) != 3 ||
+		items(res)[0]["rule"] == nil && items(res)[1]["rule"] == nil {
+		t.Errorf("alerts.list carries the rule: %v", res)
 	}
 	// a technician on the unit without alert.resolve acknowledges (alert.read) but does not resolve (DD-T07)
 	owner(
@@ -342,9 +342,9 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 			DO NOTHING`,
 		seed.ID("tenant-a"),
 		seed.ID("tech-internal-a"),
-		u,
+		unit,
 	)
-	assign(t, u, "tech-internal-a", clock.Add(-time.Hour), clock.Add(time.Hour), "active")
+	assign(t, unit, "tech-internal-a", clock.Add(-time.Hour), clock.Add(time.Hour), "active")
 	owner(
 		t,
 		`DELETE FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'alert.resolve'`,
@@ -360,19 +360,19 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 		)
 	})
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&techInt,
 		"alerts.acknowledge",
 		`{"alertId":"`+own+`"}`,
 		1,
-	); code != 200 || data(m)["status"] != "acknowledged" ||
-		data(m)["rule"] == nil {
-		t.Fatalf("technician acknowledges with alert.read: %d %v", code, m)
+	); code != 200 || data(res)["status"] != "acknowledged" ||
+		data(res)["rule"] == nil {
+		t.Fatalf("technician acknowledges with alert.read: %d %v", code, res)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&techInt,
 		"alerts.resolve",
 		`{"alertId":"`+own+`","resolutionReason":"filter replaced","resolutionEvidenceIds":[]}`,
@@ -389,14 +389,14 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 		seed.ID("tech-internal-a"),
 	)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&techInt,
 		"alerts.resolve",
 		`{"alertId":"`+own+`","resolutionReason":"filter replaced","resolutionEvidenceIds":[]}`,
 		2,
 	); code != 200 ||
-		data(m)["status"] != "resolved" {
-		t.Fatalf("resolve with alert.resolve: %d %v", code, m)
+		data(res)["status"] != "resolved" {
+		t.Fatalf("resolve with alert.resolve: %d %v", code, res)
 	}
 }

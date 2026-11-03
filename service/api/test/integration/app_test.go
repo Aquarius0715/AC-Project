@@ -74,7 +74,7 @@ func seedFixture(t *testing.T) *seed.Fixture {
 	}
 	defer conn.Close(ctx)
 
-	f, err := seed.Load("../../../../docs/04-agentic-sdlc/fixture-contract.json")
+	fixture, err := seed.Load("../../../../docs/04-agentic-sdlc/fixture-contract.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,13 +82,13 @@ func seedFixture(t *testing.T) *seed.Fixture {
 	beginFuncErr := pgx.BeginFunc(
 		ctx,
 		conn,
-		func(tx pgx.Tx) error { return seed.Apply(ctx, tx, f) },
+		func(tx pgx.Tx) error { return seed.Apply(ctx, tx, fixture) },
 	)
 	if beginFuncErr != nil {
 		t.Fatal(beginFuncErr)
 	}
 
-	return f
+	return fixture
 }
 
 // testTokens maps the static test tokens to the fixture users. "tok-a@1789000000" is tok-a signed in at that Unix
@@ -176,18 +176,18 @@ func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 		return f
 	}
 
-	s, err := apiserver.New(context.Background(), cfg, v)
+	srv, err := apiserver.New(context.Background(), cfg, v)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(s.DB.Close)
+	t.Cleanup(srv.DB.Close)
 
 	if len(cfg.Domains) == 0 {
-		lastServer = s
+		lastServer = srv
 	}
 
-	return s
+	return srv
 }
 
 // lastServer is the most recent all-domain test server; drainEvents applies its pending events (IR183/IR184).
@@ -206,7 +206,7 @@ func drainEvents(t *testing.T) {
 	}
 }
 
-func post(s *apiserver.Server, a *actor, op, body string) (int, map[string]any) {
+func post(srv *apiserver.Server, a *actor, op, body string) (int, map[string]any) {
 	req := httptest.NewRequest(ops.ClientRequest(op, body))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -216,14 +216,14 @@ func post(s *apiserver.Server, a *actor, op, body string) (int, map[string]any) 
 		req.Header.Set("X-Membership-Id", seed.ID(a.membership).String())
 	}
 
-	w := httptest.NewRecorder()
-	s.Echo.ServeHTTP(w, req)
+	rec := httptest.NewRecorder()
+	srv.Echo.ServeHTTP(rec, req)
 
 	var m map[string]any
 
-	_ = json.Unmarshal(w.Body.Bytes(), &m)
+	_ = json.Unmarshal(rec.Body.Bytes(), &m)
 
-	return w.Code, m
+	return rec.Code, m
 }
 
 func items(m map[string]any) []map[string]any {
@@ -252,15 +252,15 @@ func TestHealth(t *testing.T) {
 }
 
 func TestSessionGet(t *testing.T) {
-	s := server(t)
-	code, m := post(s, &hq, "session.get", `{}`)
+	srv := server(t)
+	code, res := post(srv, &hq, "session.get", `{}`)
 
-	d := m["data"].(map[string]any)
-	if code != 200 || d["role"] != "admin" ||
-		d["membershipId"] != seed.ID("hq-operator").String() ||
-		len(d["permissions"].([]any)) == 0 ||
-		d["clientRole"] != nil {
-		t.Fatalf("%d %v", code, m)
+	doc := res["data"].(map[string]any)
+	if code != 200 || doc["role"] != "admin" ||
+		doc["membershipId"] != seed.ID("hq-operator").String() ||
+		len(doc["permissions"].([]any)) == 0 ||
+		doc["clientRole"] != nil {
+		t.Fatalf("%d %v", code, res)
 	}
 
 	var user, org string // IR241: the shell names the user and the membership's organization
@@ -273,12 +273,12 @@ func TestSessionGet(t *testing.T) {
 		&org,
 	)
 
-	if d["displayName"] != user || d["organizationName"] != org || user == "" || org == "" {
-		t.Errorf("names: %v %v (%s, %s)", d["displayName"], d["organizationName"], user, org)
+	if doc["displayName"] != user || doc["organizationName"] != org || user == "" || org == "" {
+		t.Errorf("names: %v %v (%s, %s)", doc["displayName"], doc["organizationName"], user, org)
 	}
 
 	if _, c := post(
-		s,
+		srv,
 		&contrA,
 		"session.get",
 		`{}`,
@@ -288,7 +288,7 @@ func TestSessionGet(t *testing.T) {
 	}
 
 	if _, c := post(
-		s,
+		srv,
 		&customerA,
 		"session.get",
 		`{}`,
@@ -299,35 +299,35 @@ func TestSessionGet(t *testing.T) {
 		t.Errorf("client owner session: %v", c["data"])
 	}
 
-	if d["customerId"] != nil {
-		t.Errorf("HQ session customer: %v", d["customerId"])
+	if doc["customerId"] != nil {
+		t.Errorf("HQ session customer: %v", doc["customerId"])
 	}
 
-	meta := m["meta"].(map[string]any) // Meta of service-contracts.ts
+	meta := res["meta"].(map[string]any) // Meta of service-contracts.ts
 	if meta["snapshotAt"] != clock.Format(time.RFC3339) || meta["correlationId"] == "" ||
 		meta["eventCursor"] == nil {
 		t.Errorf("meta: %v", meta)
 	}
 
-	if code, _ := post(s, nil, "session.get", `{}`); code != 401 {
+	if code, _ := post(srv, nil, "session.get", `{}`); code != 401 {
 		t.Fatalf("anonymous: %d", code)
 	}
 }
 
 func TestUnitsListScopes(t *testing.T) {
-	s := server(t)
-	_, m := post(s, &hq, "units.list", `{"limit":100}`)
-	all := items(m)
-	_, m = post(s, &customerA, "units.list", `{"limit":100}`)
-	mine := items(m)
-	_, m = post(s, &customerB, "units.list", `{"limit":100}`)
-	other := items(m)
-	_, m = post(s, &techInt, "units.list", `{"limit":100}`)
-	tech := items(m)
-	_, m = post(s, &techB, "units.list", `{"limit":100}`)
-	external := items(m)
+	srv := server(t)
+	_, res := post(srv, &hq, "units.list", `{"limit":100}`)
+	all := items(res)
+	_, res = post(srv, &customerA, "units.list", `{"limit":100}`)
+	mine := items(res)
+	_, res = post(srv, &customerB, "units.list", `{"limit":100}`)
+	other := items(res)
+	_, res = post(srv, &techInt, "units.list", `{"limit":100}`)
+	tech := items(res)
+	_, res = post(srv, &techB, "units.list", `{"limit":100}`)
+	external := items(res)
 	total := func(a *actor) int {
-		_, m := post(s, a, "units.list", `{"limit":1}`)
+		_, m := post(srv, a, "units.list", `{"limit":1}`)
 
 		return int(m["data"].(map[string]any)["total"].(float64))
 	}
@@ -372,36 +372,41 @@ func TestUnitsListScopes(t *testing.T) {
 		t.Fatalf("external technician without an Assignment sees %d units", len(external))
 	}
 	// paging
-	code, m := post(s, &hq, "units.list", `{"limit":2}`)
+	code, res := post(srv, &hq, "units.list", `{"limit":2}`)
 
-	d := m["data"].(map[string]any)
-	if code != 200 || len(items(m)) != 2 || d["nextCursor"] == nil ||
-		int(d["total"].(float64)) != hqN {
-		t.Fatalf("page 1: %d %v", code, d)
+	doc := res["data"].(map[string]any)
+	if code != 200 || len(items(res)) != 2 || doc["nextCursor"] == nil ||
+		int(doc["total"].(float64)) != hqN {
+		t.Fatalf("page 1: %d %v", code, doc)
 	}
 
-	code, m = post(s, &hq, "units.list", `{"limit":2,"cursor":"`+d["nextCursor"].(string)+`"}`)
-	if code != 200 || len(items(m)) == 0 {
+	code, res = post(
+		srv,
+		&hq,
+		"units.list",
+		`{"limit":2,"cursor":"`+doc["nextCursor"].(string)+`"}`,
+	)
+	if code != 200 || len(items(res)) == 0 {
 		t.Fatalf("page 2: %d", code)
 	}
 	// filters
-	_, m = post(
-		s,
+	_, res = post(
+		srv,
 		&hq,
 		"units.list",
 		`{"filters":{"unitIds":["`+seed.ID("unit-online-rto").String()+`"]}}`,
 	)
-	if got := items(m); len(got) != 1 || got[0]["displayName"] != "Bedroom AC" {
+	if got := items(res); len(got) != 1 || got[0]["displayName"] != "Bedroom AC" {
 		t.Fatalf("unitIds filter: %v", got)
 	}
 
-	_, m = post(s, &hq, "units.list", `{"filters":{"unitIds":[]}}`)
-	if len(items(m)) != 0 {
+	_, res = post(srv, &hq, "units.list", `{"filters":{"unitIds":[]}}`)
+	if len(items(res)) != 0 {
 		t.Fatal("empty unitIds returns zero")
 	}
 
-	_, m = post(
-		s,
+	_, res = post(
+		srv,
 		&hq,
 		"units.list",
 		`{"filters":{"propertyId":"`+seed.ID("property-home-a").
@@ -410,22 +415,22 @@ func TestUnitsListScopes(t *testing.T) {
 			String()+
 			`","includeDescendants":true}}`,
 	)
-	if len(items(m)) == 0 {
+	if len(items(res)) == 0 {
 		t.Fatal("includeDescendants under floor-1")
 	}
 
-	_, m = post(
-		s,
+	_, res = post(
+		srv,
 		&hq,
 		"units.list",
 		`{"filters":{"customerId":"`+seed.ID("cust-a").String()+`"},"limit":100}`,
 	)
-	if len(items(m)) != len(mine) {
+	if len(items(res)) != len(mine) {
 		t.Fatal("customerId filter equals customer-a's own view")
 	}
 
-	_, m = post(s, &hq, "units.list", `{"filters":{"powerState":"unknown"},"limit":1}`)
-	if len(items(m)) != 1 {
+	_, res = post(srv, &hq, "units.list", `{"filters":{"powerState":"unknown"},"limit":1}`)
+	if len(items(res)) != 1 {
 		t.Fatal("derived powerState filter")
 	}
 
@@ -439,7 +444,7 @@ func TestUnitsListScopes(t *testing.T) {
 		`{"sort":{"field":"name","direction":"asc"}}`: "sort.field=error.invalid",
 		`{"limit":500}`:                               "limit=error.range",
 	} {
-		code, m := post(s, &hq, "units.list", body)
+		code, m := post(srv, &hq, "units.list", body)
 		refusal(t, body, code, m, want)
 	}
 
@@ -449,43 +454,43 @@ func TestUnitsListScopes(t *testing.T) {
 		`{"filters":{"organizationId":"` + seed.ID("org-customer-b").String() + `"}}`, `{"sort":{"field":"createdAt",` +
 			`"direction":"desc"}}`,
 	} {
-		if code, _ := post(s, &hq, "units.list", body); code != 200 {
+		if code, _ := post(srv, &hq, "units.list", body); code != 200 {
 			t.Errorf("%s: %d", body, code)
 		}
 	}
 }
 
 func TestUnitsGet(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 
 	id := seed.ID("unit-online-rto").String()
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerA,
 		"units.get",
 		`{"id":"`+id+`"}`,
 	); code != 200 ||
-		m["data"].(map[string]any)["displayName"] != "Bedroom AC" {
+		res["data"].(map[string]any)["displayName"] != "Bedroom AC" {
 		t.Fatalf("own unit: %d", code)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerB,
 		"units.get",
 		`{"id":"`+id+`"}`,
 	); code != 404 ||
-		m["code"] != "NOT_FOUND" {
+		res["code"] != "NOT_FOUND" {
 		t.Fatalf("other customer's unit must be NOT_FOUND (D01): %d", code)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"units.get",
 		`{}`,
 	); code != 404 ||
-		m["messageKey"] != "error.unknownOperation" { // GET /v1/units/ has no route
-		t.Fatalf("missing id: %d %v", code, m)
+		res["messageKey"] != "error.unknownOperation" { // GET /v1/units/ has no route
+		t.Fatalf("missing id: %d %v", code, res)
 	}
 }

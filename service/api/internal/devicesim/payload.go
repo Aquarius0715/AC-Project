@@ -181,37 +181,37 @@ func (m *Module) Telemetry(at time.Time) ([]byte, error) {
 		return nil, nil
 	}
 
-	b := Batch{DeviceID: m.DeviceID, Measurements: make([]Measurement, 0, len(sensors))}
-	for _, s := range sensors {
+	batch := Batch{DeviceID: m.DeviceID, Measurements: make([]Measurement, 0, len(sensors))}
+	for _, sensor := range sensors {
 		m.sequence++
-		v := math.Round((s.Base+(m.rng.Float64()*2-1)*s.Swing)*100) / 100
+		v := math.Round((sensor.Base+(m.rng.Float64()*2-1)*sensor.Swing)*100) / 100
 
-		unit := s.Unit
+		unit := sensor.Unit
 		switch {
-		case s.Metric == "power" && m.powerOff:
+		case sensor.Metric == "power" && m.powerOff:
 			v = 0
-		case s.Metric == "temperature" && m.telemetry == "unit_mismatch":
+		case sensor.Metric == "temperature" && m.telemetry == "unit_mismatch":
 			unit = "K"
-		case s.Metric == "temperature" && m.telemetry == "out_of_range":
+		case sensor.Metric == "temperature" && m.telemetry == "out_of_range":
 			v = 250
 		}
 
-		x := Measurement{
-			SensorID:   s.ID,
-			Metric:     s.Metric,
+		measurement := Measurement{
+			SensorID:   sensor.ID,
+			Metric:     sensor.Metric,
 			Value:      &v,
 			Unit:       unit,
 			ObservedAt: observed,
 			Sequence:   m.sequence,
 		}
 		if m.telemetry == "missing" {
-			x.Value = nil
+			measurement.Value = nil
 		}
 
-		b.Measurements = append(b.Measurements, x)
+		batch.Measurements = append(batch.Measurements, measurement)
 	}
 
-	out, err := json.Marshal(b)
+	out, err := json.Marshal(batch)
 
 	return out, apperr.Wrap(err, "json.Marshal")
 }
@@ -259,26 +259,26 @@ func (m *Module) AckTopic() string     { return Topic(m.TenantID, m.DeviceID, "c
 //
 // The pattern changes the answer: reject answers unsupported without applying, ignore sends nothing (nil), late
 // applies the command but sends the answer two seconds after the command expired.
-func (m *Module) Acknowledge(raw []byte, at time.Time) ([]byte, time.Time, error) {
-	var c Command
+func (m *Module) Acknowledge(raw []byte, when time.Time) ([]byte, time.Time, error) {
+	var command Command
 
-	err := json.Unmarshal(raw, &c)
+	err := json.Unmarshal(raw, &command)
 	if err != nil {
-		return nil, at, fmt.Errorf("command: %w", err)
+		return nil, when, fmt.Errorf("command: %w", err)
 	}
 
 	if m.commands == "ignore" {
-		return nil, at, nil
+		return nil, when, nil
 	}
 
-	result, sendAt := "applied", at
+	result, sendAt := "applied", when
 	switch {
-	case !at.Before(c.ExpiresAt):
+	case !when.Before(command.ExpiresAt):
 		result = "expired"
-	case m.commands == "reject" || c.Kind != "set_temperature":
+	case m.commands == "reject" || command.Kind != "set_temperature":
 		result = "unsupported"
-	case c.Setpoint != nil:
-		m.setpoint = *c.Setpoint
+	case command.Setpoint != nil:
+		m.setpoint = *command.Setpoint
 		if m.state != nil {
 			sp := m.setpoint
 			m.state.Celsius = &sp
@@ -286,14 +286,14 @@ func (m *Module) Acknowledge(raw []byte, at time.Time) ([]byte, time.Time, error
 	}
 
 	if m.commands == "late" && result == "applied" {
-		sendAt = c.ExpiresAt.Add(2 * time.Second)
+		sendAt = command.ExpiresAt.Add(2 * time.Second)
 	}
 
 	raw, err = json.Marshal(
 		Ack{
 			DeviceID:   m.DeviceID,
-			CommandID:  c.CommandID,
-			ReceivedAt: at.UTC(),
+			CommandID:  command.CommandID,
+			ReceivedAt: when.UTC(),
 			Result:     result,
 			Observed:   Observed{SetpointCelsius: m.setpoint},
 		},
@@ -321,18 +321,18 @@ func (m *Module) Keep() ([]byte, error) {
 
 // Restore applies a kept state read back from the broker; a setpoint outside 16–30 °C is ignored.
 func (m *Module) Restore(raw []byte) error {
-	var k Kept
+	var kept Kept
 
-	err := json.Unmarshal(raw, &k)
+	err := json.Unmarshal(raw, &kept)
 	if err != nil {
 		return fmt.Errorf("kept state: %w", err)
 	}
 
-	if k.SetpointCelsius < 16 || k.SetpointCelsius > 30 {
-		return fmt.Errorf("kept setpoint %v out of range", k.SetpointCelsius)
+	if kept.SetpointCelsius < 16 || kept.SetpointCelsius > 30 {
+		return fmt.Errorf("kept setpoint %v out of range", kept.SetpointCelsius)
 	}
 
-	m.setpoint = k.SetpointCelsius
+	m.setpoint = kept.SetpointCelsius
 	if m.state != nil {
 		sp := m.setpoint
 		m.state.Celsius = &sp

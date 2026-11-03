@@ -11,20 +11,26 @@ import (
 // rolls the transaction back (jobs.cancel; the status write fails). A job in progress cannot be cancelled, so the
 // job starts on hold.
 func TestCancelRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
-	s := server(t)
-	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
-	job := data(m)["id"].(string)
+	srv := server(t)
+	_, res := write(
+		srv,
+		&customerA,
+		"jobs.create",
+		jobBody(seed.ID("unit-non-rto").String(), nil),
+		0,
+	)
+	job := data(res)["id"].(string)
 	owner(
 		t,
 		`UPDATE maintenance.jobs SET status = 'on_hold', hold_reason = 'parts' WHERE id = $1`,
 		job,
 	)
-	_, m = post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
-	version := ver(m)
+	_, res = post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
+	version := ver(res)
 
 	broken := injectAt(t, "UPDATE maintenance.jobs SET status = 'cancelled'")
 
-	code, m := write(
+	code, res := write(
 		broken,
 		&hq,
 		"jobs.cancel",
@@ -32,11 +38,11 @@ func TestCancelRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 		version,
 	)
 	if code < 500 {
-		t.Fatalf("cancel with a failing status write: %d %v, want a server error", code, m)
+		t.Fatalf("cancel with a failing status write: %d %v, want a server error", code, res)
 	}
 
-	_, m = post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
-	if data(m)["status"] != "on_hold" || ver(m) != version {
-		t.Errorf("a failed cancel changed the job: %v", m)
+	_, res = post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
+	if data(res)["status"] != "on_hold" || ver(res) != version {
+		t.Errorf("a failed cancel changed the job: %v", res)
 	}
 }

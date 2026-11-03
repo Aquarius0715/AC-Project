@@ -38,7 +38,7 @@ type Observation struct {
 
 func loadCases(
 	ctx context.Context,
-	tx pgx.Tx,
+	txn pgx.Tx,
 	id uuid.UUID,
 	lock bool,
 ) ([]RecoveryCase, string, int, error) {
@@ -53,7 +53,7 @@ func loadCases(
 		version int
 	)
 
-	err := tx.QueryRow(ctx, q, id).Scan(&raw, &state, &version)
+	err := txn.QueryRow(ctx, q, id).Scan(&raw, &state, &version)
 	if err != nil {
 		return nil, "", 0, apperr.Wrap(err, "update (loadCases)")
 	}
@@ -67,14 +67,14 @@ func loadCases(
 
 func saveCases(
 	ctx context.Context,
-	tx pgx.Tx,
+	txn pgx.Tx,
 	id uuid.UUID,
 	cases []RecoveryCase,
 	now time.Time,
 ) error {
 	raw, _ := json.Marshal(cases)
 
-	_, err := tx.Exec(
+	_, err := txn.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions SET recovery_cases = $2, version = version + 1, updated_at = $3 WHERE id = $1`,
 		id,
@@ -85,14 +85,14 @@ func saveCases(
 		return apperr.Wrap(err, "update restrictions.restrictions")
 	}
 	// SR29: a recovery-case change also increments the target units' versions — owned by equipment (IR184)
-	units, err := restrictionUnits(ctx, tx, id)
+	units, err := restrictionUnits(ctx, txn, id)
 	if err != nil || len(units) == 0 {
 		return err
 	}
 
 	return publish(
 		ctx,
-		tx,
+		txn,
 		id,
 		"restriction",
 		id,
@@ -123,7 +123,7 @@ func restrictionUnits(ctx context.Context, tx pgx.Tx, id uuid.UUID) ([]uuid.UUID
 // The unit's own observedRestriction is recorded by the device side before this is called (IR184).
 func Observe(
 	ctx context.Context,
-	tx pgx.Tx,
+	txn pgx.Tx,
 	now time.Time,
 	unit uuid.UUID,
 	observed *Observation,
@@ -133,7 +133,7 @@ func Observe(
 		return false, nil
 	}
 
-	cases, state, _, err := loadCases(ctx, tx, observed.RestrictionID, true)
+	cases, state, _, err := loadCases(ctx, txn, observed.RestrictionID, true)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -147,7 +147,7 @@ func Observe(
 		s         uuid.UUID
 	)
 
-	scanErr := tx.QueryRow(ctx, `SELECT r.id FROM restrictions.restrictions r JOIN restrictions.restriction_units ru ON
+	scanErr := txn.QueryRow(ctx, `SELECT r.id FROM restrictions.restrictions r JOIN restrictions.restriction_units ru ON
 		ru.restriction_id = r.id
 		WHERE ru.unit_id = $1 AND r.id <> $2 AND r.state NOT IN ('released','cancelled') ORDER BY r.created_at DESC LIMIT
 		1`, unit, observed.RestrictionID).
@@ -186,14 +186,14 @@ func Observe(
 		})
 	}
 
-	saveCasesErr := saveCases(ctx, tx, observed.RestrictionID, cases, now)
+	saveCasesErr := saveCases(ctx, txn, observed.RestrictionID, cases, now)
 	if saveCasesErr != nil {
 		return false, saveCasesErr
 	}
 	// the reconciliation_required alert is owned by equipment (IR184)
 	err = publish(
 		ctx,
-		tx,
+		txn,
 		observed.RestrictionID,
 		"restriction",
 		observed.RestrictionID,
@@ -210,11 +210,11 @@ func Observe(
 // and state removing; no observation or the successor → resolved without Commands; any other restriction → CONFLICT.
 func (m Restrictions) reconcileTerminal(
 	ctx context.Context,
-	c *ops.Call,
-	x Restriction,
+	call *ops.Call,
+	restriction Restriction,
 	units []uuid.UUID,
 ) (any, error) {
-	cases, _, _, err := loadCases(ctx, c.Tx, x.ID, false)
+	cases, _, _, err := loadCases(ctx, call.Tx, restriction.ID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -234,12 +234,12 @@ func (m Restrictions) reconcileTerminal(
 			return nil, apperr.Fields(map[string]string{"unitIds": "errors.reconcile_not_needed"})
 		}
 
-		k := &cases[idx]
-		if k.State == "removing" {
+		recoveryCase := &cases[idx]
+		if recoveryCase.State == "removing" {
 			return nil, apperr.E(apperr.Conflict, "errors.command_pending")
 		}
 
-		_, conn, power, bound, err := m.Devices.BoundDevice(ctx, c, u)
+		_, conn, power, bound, err := m.Devices.BoundDevice(ctx, call, u)
 		if err != nil {
 			return nil, apperr.Wrap(err, "restrictions.Devices.BoundDevice")
 		}
@@ -248,12 +248,12 @@ func (m Restrictions) reconcileTerminal(
 			return nil, apperr.E(apperr.Offline, "errors.device_offline")
 		}
 
-		raw, at, err := m.Units.Observation(ctx, c, u) // equipment's observation (IR194)
+		raw, at, err := m.Units.Observation(ctx, call, u) // equipment's observation (IR194)
 		if err != nil {
 			return nil, apperr.Wrap(err, "restrictions.Units.Observation")
 		}
 
-		if at == nil || c.Now.Sub(*at) > IntentTTL {
+		if at == nil || call.Now.Sub(*at) > IntentTTL {
 			return nil, apperr.E(apperr.Timeout, "errors.observation_stale")
 		}
 
@@ -269,18 +269,19 @@ func (m Restrictions) reconcileTerminal(
 		}
 
 		switch {
-		case o == nil || (k.SuccessorRestrictionID != nil && o.RestrictionID == *k.SuccessorRestrictionID):
-			k.State, k.ResolvedAt = "resolved", &c.Now
-		case o.RestrictionID == k.ObservedRestrictionID && o.RulesVersion == k.ObservedRulesVersion:
+		case o == nil ||
+			(recoveryCase.SuccessorRestrictionID != nil && o.RestrictionID == *recoveryCase.SuccessorRestrictionID):
+			recoveryCase.State, recoveryCase.ResolvedAt = "resolved", &call.Now
+		case o.RestrictionID == recoveryCase.ObservedRestrictionID && o.RulesVersion == recoveryCase.ObservedRulesVersion:
 			remove, _ := json.Marshal(
 				map[string]any{
 					"kind":          "remove_restriction",
-					"restrictionId": x.ID,
-					"rulesVersion":  k.ObservedRulesVersion,
+					"restrictionId": restriction.ID,
+					"rulesVersion":  recoveryCase.ObservedRulesVersion,
 				},
 			)
 
-			cmd, delivered, _, err := m.send(ctx, c, x.ID, u, remove)
+			cmd, delivered, _, err := m.send(ctx, call, restriction.ID, u, remove)
 			if err != nil {
 				return nil, err
 			}
@@ -289,7 +290,10 @@ func (m Restrictions) reconcileTerminal(
 				return nil, apperr.E(apperr.Conflict, "errors.unit_busy")
 			}
 
-			k.State, k.CommandIDs = "removing", append(k.CommandIDs, cmd)
+			recoveryCase.State, recoveryCase.CommandIDs = "removing", append(
+				recoveryCase.CommandIDs,
+				cmd,
+			)
 		default:
 			return nil, apperr.E(apperr.Conflict, "errors.observation_mismatch")
 		}
@@ -298,36 +302,36 @@ func (m Restrictions) reconcileTerminal(
 	}
 
 	if changed {
-		err := saveCases(ctx, c.Tx, x.ID, cases, c.Now)
+		err := saveCases(ctx, call.Tx, restriction.ID, cases, call.Now)
 		if err != nil {
 			return nil, err
 		}
 
-		err = resolveRecoveryAlerts(ctx, c.Tx, units, c.Now)
+		err = resolveRecoveryAlerts(ctx, call.Tx, units, call.Now)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	next := x.Version + 1
-	c.Audit(
+	next := restriction.Version + 1
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "restrictions.reconcile",
 			TargetKind:      "restriction",
-			TargetID:        x.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			TargetID:        restriction.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
-	y, err := load(ctx, c, x.ID, false)
+	y, err := load(ctx, call, restriction.ID, false)
 
-	return project(c, y), err
+	return project(call, y), err
 }
 
 // resolveRecoveryAlerts resolves the reconciliation_required Alert of units without unresolved cases.
 // The alerts belong to equipment: restrictions publishes the units that no longer have an unresolved case (IR184).
-func resolveRecoveryAlerts(ctx context.Context, tx pgx.Tx, units []uuid.UUID, _ time.Time) error {
-	rows, err := tx.Query(ctx, `SELECT u FROM unnest($1::uuid[]) AS u
+func resolveRecoveryAlerts(ctx context.Context, txn pgx.Tx, units []uuid.UUID, _ time.Time) error {
+	rows, err := txn.Query(ctx, `SELECT u FROM unnest($1::uuid[]) AS u
 		WHERE NOT EXISTS (SELECT 1 FROM restrictions.restrictions r, jsonb_array_elements(r.recovery_cases) k
 			WHERE k->>'unitId' = u::text AND k->>'state' <> 'resolved') ORDER BY u`, units)
 	if err != nil {
@@ -341,7 +345,7 @@ func resolveRecoveryAlerts(ctx context.Context, tx pgx.Tx, units []uuid.UUID, _ 
 
 	var tenant uuid.UUID
 
-	scanErr := tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
+	scanErr := txn.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).
 		Scan(&tenant)
 	if scanErr != nil {
 		return apperr.Wrap(scanErr, "select current_setting")
@@ -349,7 +353,7 @@ func resolveRecoveryAlerts(ctx context.Context, tx pgx.Tx, units []uuid.UUID, _ 
 
 	return apperr.Wrap(events.Publish(
 		ctx,
-		tx,
+		txn,
 		tenant,
 		"unit",
 		done[0],
@@ -361,11 +365,11 @@ func resolveRecoveryAlerts(ctx context.Context, tx pgx.Tx, units []uuid.UUID, _ 
 // recoveryAcknowledged resolves the removing case of a terminal restriction when its remove Command is acknowledged.
 func recoveryAcknowledged(
 	ctx context.Context,
-	tx pgx.Tx,
+	txn pgx.Tx,
 	restriction, unit, command uuid.UUID,
-	at time.Time,
+	when time.Time,
 ) (bool, error) {
-	cases, state, _, err := loadCases(ctx, tx, restriction, true)
+	cases, state, _, err := loadCases(ctx, txn, restriction, true)
 	if err != nil || (state != "released" && state != "cancelled") {
 		return false, err
 	}
@@ -375,7 +379,7 @@ func recoveryAcknowledged(
 	for i := range cases {
 		for _, id := range cases[i].CommandIDs {
 			if id == command && cases[i].State == "removing" {
-				cases[i].State, cases[i].ResolvedAt, hit = "resolved", &at, true
+				cases[i].State, cases[i].ResolvedAt, hit = "resolved", &when, true
 			}
 		}
 	}
@@ -386,7 +390,7 @@ func recoveryAcknowledged(
 
 	publishErr := publish(
 		ctx,
-		tx,
+		txn,
 		restriction,
 		"unit",
 		unit,
@@ -397,17 +401,17 @@ func recoveryAcknowledged(
 		return true, publishErr
 	}
 
-	saveCasesErr := saveCases(ctx, tx, restriction, cases, at)
+	saveCasesErr := saveCases(ctx, txn, restriction, cases, when)
 	if saveCasesErr != nil {
 		return true, saveCasesErr
 	}
 
-	return true, resolveRecoveryAlerts(ctx, tx, []uuid.UUID{unit}, at)
+	return true, resolveRecoveryAlerts(ctx, txn, []uuid.UUID{unit}, when)
 }
 
 // recoveryEnded returns failed or expired recovery removes to pending (SR26).
-func recoveryEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now time.Time) error {
-	rows, err := tx.Query(
+func recoveryEnded(ctx context.Context, txn pgx.Tx, commands []uuid.UUID, now time.Time) error {
+	rows, err := txn.Query(
 		ctx,
 		`SELECT DISTINCT restriction_id FROM restrictions.restriction_commands WHERE command_id = ANY($1)`,
 		commands,
@@ -422,7 +426,7 @@ func recoveryEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now tim
 	}
 
 	for _, r := range ids {
-		cases, state, _, err := loadCases(ctx, tx, r, true)
+		cases, state, _, err := loadCases(ctx, txn, r, true)
 		if err != nil || (state != "released" && state != "cancelled") {
 			if err != nil {
 				return err
@@ -444,7 +448,7 @@ func recoveryEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now tim
 		}
 
 		if hit {
-			err := saveCases(ctx, tx, r, cases, now)
+			err := saveCases(ctx, txn, r, cases, now)
 			if err != nil {
 				return err
 			}
@@ -458,7 +462,7 @@ func recoveryEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now tim
 // ticks, device acknowledgements).
 func publish(
 	ctx context.Context,
-	tx pgx.Tx,
+	txn pgx.Tx,
 	restriction uuid.UUID,
 	aggregateType string,
 	aggregateID uuid.UUID,
@@ -467,14 +471,14 @@ func publish(
 ) error {
 	var tenant uuid.UUID
 
-	err := tx.QueryRow(ctx, `SELECT tenant_id FROM restrictions.restrictions WHERE id = $1`, restriction).
+	err := txn.QueryRow(ctx, `SELECT tenant_id FROM restrictions.restrictions WHERE id = $1`, restriction).
 		Scan(&tenant)
 	if err != nil {
 		return apperr.Wrap(err, "select restrictions.restrictions")
 	}
 
 	return apperr.Wrap(
-		events.Publish(ctx, tx, tenant, aggregateType, aggregateID, eventType, payload),
+		events.Publish(ctx, txn, tenant, aggregateType, aggregateID, eventType, payload),
 		"events.Publish",
 	)
 }

@@ -23,27 +23,27 @@ func TestKeycloakAccounts(t *testing.T) {
 
 	exists := false
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/token" {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == "/token" {
 			_, _ = w.Write([]byte(`{"access_token":"t","expires_in":300}`))
 
 			return
 		}
 
 		buf := make([]byte, 4096)
-		n, _ := r.Body.Read(buf)
+		n, _ := req.Body.Read(buf)
 
 		calls = append(
 			calls,
 			call{
-				r.Method,
-				strings.TrimPrefix(r.URL.Path, "/admin"),
-				r.URL.RawQuery,
+				req.Method,
+				strings.TrimPrefix(req.URL.Path, "/admin"),
+				req.URL.RawQuery,
 				string(buf[:n]),
 			},
 		)
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/admin/users":
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/users":
 			if exists {
 				w.WriteHeader(http.StatusConflict)
 
@@ -52,20 +52,20 @@ func TestKeycloakAccounts(t *testing.T) {
 
 			w.Header().Set("Location", "http://kc/admin/users/new-id")
 			w.WriteHeader(http.StatusCreated)
-		case r.Method == http.MethodGet && r.URL.Path == "/admin/users":
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/users":
 			_, _ = w.Write([]byte(`[{"id":"old-id"}]`))
-		case r.Method == http.MethodGet && r.URL.Path == "/admin/users/old-id":
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/users/old-id":
 			_, _ = w.Write(
 				[]byte(
 					`{"id":"old-id","username":"tech@contractor.example","email":"tech@contractor.example","enabled":false,` +
 						`"attributes":{"locale":["ms"],"membership_id":["m0"]}}`,
 				),
 			)
-		case r.URL.Path == "/admin/users/gone-id":
+		case req.URL.Path == "/admin/users/gone-id":
 			w.WriteHeader(http.StatusNotFound)
-		case r.Method == http.MethodGet && r.URL.Path == "/admin/users/hq-new/credentials":
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/users/hq-new/credentials":
 			_, _ = w.Write([]byte(`[{"type":"password"}]`))
-		case r.Method == http.MethodGet && r.URL.Path == "/admin/users/hq-otp/credentials":
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/users/hq-otp/credentials":
 			_, _ = w.Write([]byte(`[{"type":"password"},{"type":"otp"}]`))
 		default:
 			w.WriteHeader(http.StatusNoContent)
@@ -73,14 +73,14 @@ func TestKeycloakAccounts(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	k := &Keycloak{
+	keycloak := &Keycloak{
 		TokenURL:     srv.URL + "/token",
 		AdminURL:     srv.URL + "/admin",
 		ClientID:     "svc",
 		ClientSecret: "s", Client: nil, Now: nil, mu: sync.Mutex{}, token: "", until: time.Time{},
 	}
 	ctx := context.Background()
-	a := Account{
+	account := Account{
 		Email:       "tech@contractor.example",
 		DisplayName: "New Tech",
 		TenantID:    "t1",
@@ -90,7 +90,7 @@ func TestKeycloakAccounts(t *testing.T) {
 		RedirectURI: "http://localhost:3002/login",
 	}
 
-	id, err := k.CreateAccount(ctx, a)
+	id, err := keycloak.CreateAccount(ctx, account)
 	if err != nil || id != "new-id" {
 		t.Fatalf("create: %q %v", id, err)
 	}
@@ -105,7 +105,7 @@ func TestKeycloakAccounts(t *testing.T) {
 		[]byte(calls[0].body),
 		&user,
 	)
-	if unmarshalErr != nil || user.Username != a.Email || !user.Enabled ||
+	if unmarshalErr != nil || user.Username != account.Email || !user.Enabled ||
 		user.Attributes["membership_id"][0] != "m1" || user.Attributes["role"][0] != "technician" ||
 		user.Attributes["tenant_id"][0] != "t1" {
 		t.Errorf("created user: %s", calls[0].body)
@@ -113,9 +113,9 @@ func TestKeycloakAccounts(t *testing.T) {
 
 	exists, calls = true, nil
 
-	createAccountId, createAccountErr := k.CreateAccount(
+	createAccountId, createAccountErr := keycloak.CreateAccount(
 		ctx,
-		a,
+		account,
 	)
 	if createAccountErr != nil || createAccountId != "old-id" || len(calls) != 4 ||
 		calls[3].method != http.MethodPut ||
@@ -133,23 +133,23 @@ func TestKeycloakAccounts(t *testing.T) {
 		[]byte(calls[3].body),
 		&updated,
 	)
-	if unmarshalErr != nil || !updated.Enabled || updated.Email != a.Email ||
+	if unmarshalErr != nil || !updated.Enabled || updated.Email != account.Email ||
 		updated.Attributes["membership_id"][0] != "m1" ||
 		updated.Attributes["locale"][0] != "ms" {
 		t.Errorf("updated user: %s", calls[3].body)
 	}
 
-	updateAccountErr := k.UpdateAccount(ctx, "gone-id", a)
+	updateAccountErr := keycloak.UpdateAccount(ctx, "gone-id", account)
 	if !errors.Is(updateAccountErr, ErrNoAccount) {
 		t.Errorf("an account the realm lost: %v", updateAccountErr)
 	}
 
 	calls = nil
 
-	sendSetupErr := k.SendSetup(
+	sendSetupErr := keycloak.SendSetup(
 		ctx,
 		"new-id",
-		a,
+		account,
 	)
 	if sendSetupErr != nil || calls[0].path != "/users/new-id/execute-actions-email" ||
 		!strings.Contains(calls[0].query, "redirect_uri=http%3A%2F%2Flocalhost%3A3002%2Flogin") ||
@@ -158,12 +158,12 @@ func TestKeycloakAccounts(t *testing.T) {
 	}
 	// HQ (IR468): a new account must set up its one-time-code device, in the e-mail's steps and as a required action;
 	// one with a device keeps it
-	hq := a
+	hq := account
 	hq.Role = "admin"
 
 	exists, calls = false, nil
 
-	_, createAccountErr = k.CreateAccount(
+	_, createAccountErr = keycloak.CreateAccount(
 		ctx,
 		hq,
 	)
@@ -174,7 +174,7 @@ func TestKeycloakAccounts(t *testing.T) {
 
 	calls = nil
 
-	sendSetupErr = k.SendSetup(
+	sendSetupErr = keycloak.SendSetup(
 		ctx,
 		"hq-new",
 		hq,
@@ -186,7 +186,7 @@ func TestKeycloakAccounts(t *testing.T) {
 
 	calls = nil
 
-	sendSetupErr = k.SendSetup(
+	sendSetupErr = keycloak.SendSetup(
 		ctx,
 		"hq-otp",
 		hq,
@@ -198,7 +198,7 @@ func TestKeycloakAccounts(t *testing.T) {
 
 	calls = nil
 
-	setEnabledErr := k.SetEnabled(
+	setEnabledErr := keycloak.SetEnabled(
 		ctx,
 		"new-id",
 		false,

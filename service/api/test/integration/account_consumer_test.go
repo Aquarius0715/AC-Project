@@ -30,14 +30,14 @@ func TestAccountConsumerApart(t *testing.T) {
 		lost:       nil,
 		generation: 0,
 	}
-	s := serverCfg(
+	srv := serverCfg(
 		t,
 		func(c *apiserver.Config) { c.IdentityProvider = fake; c.Domains = ops.Domains },
 	)
 
 	ctx := context.Background()
 
-	err := s.DrainEvents(ctx)
+	err := srv.DrainEvents(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestAccountConsumerApart(t *testing.T) {
 	})
 	emit("AccountEnabled", `{"membershipId":"`+membership.String()+`","enabled":false}`)
 
-	err = s.DrainEvents(ctx)
+	err = srv.DrainEvents(ctx)
 	if err == nil {
 		t.Fatal("the audit entry that cannot be written was applied")
 	}

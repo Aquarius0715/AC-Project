@@ -219,14 +219,14 @@ func Load(path string) (*Fixture, error) {
 		return nil, apperr.Wrap(err, "os.ReadFile")
 	}
 
-	var f Fixture
+	var fixture Fixture
 
-	unmarshalErr := json.Unmarshal(b, &f)
+	unmarshalErr := json.Unmarshal(b, &fixture)
 	if unmarshalErr != nil {
 		return nil, fmt.Errorf("fixture: %w", unmarshalErr)
 	}
 
-	return &f, nil
+	return &fixture, nil
 }
 
 func tenantOfOrg(f *Fixture) map[string]string {
@@ -240,9 +240,9 @@ func tenantOfOrg(f *Fixture) map[string]string {
 
 // Apply inserts the fixture inside tx. It must run as the schema owner (seeding bypasses row-level security)
 // and is idempotent: rows that already exist are left unchanged.
-func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
+func Apply(ctx context.Context, txn pgx.Tx, f *Fixture) error {
 	ex := func(sql string, args ...any) error {
-		_, err := tx.Exec(ctx, sql, args...)
+		_, err := txn.Exec(ctx, sql, args...)
 
 		return apperr.Wrap(err, "exec (Apply)")
 	}
@@ -258,7 +258,7 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			return err
 		}
 
-		defer func() { _, _ = tx.Exec(ctx, `SELECT set_config('app.now', '', true)`) }()
+		defer func() { _, _ = txn.Exec(ctx, `SELECT set_config('app.now', '', true)`) }()
 	}
 
 	orgTenant := tenantOfOrg(f)
@@ -963,24 +963,24 @@ func fixtureIDs(v any, keys ...string) []byte {
 
 // applyBusiness loads the demoSeed business collections with deterministic IDs so the API demo shows the fixture
 // scenario (IR161). Tenants come from the referenced customers / units.
-func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
+func applyBusiness(ex func(string, ...any) error, fixture *Fixture) error {
 	tenantOf := map[string]string{}
-	for _, c := range f.DemoSeed.Customers {
+	for _, c := range fixture.DemoSeed.Customers {
 		tenantOf[c.ID] = c.TenantID
 	}
 
 	unitTenant := map[string]string{}
 	unitOrg := map[string]string{}
 
-	orgTenant := tenantOfOrg(f)
-	for _, u := range f.DemoSeed.Units {
+	orgTenant := tenantOfOrg(fixture)
+	for _, u := range fixture.DemoSeed.Units {
 		unitTenant[u.ID], unitOrg[u.ID] = orgTenant[u.CustomerOrgID], u.CustomerOrgID
 	}
 
 	hq := ID("hq-operator")
 	contractTenant := map[string]string{}
 
-	for _, k := range f.DemoSeed.Contracts {
+	for _, k := range fixture.DemoSeed.Contracts {
 		t := tenantOf[str(k, "customerId")]
 
 		contractTenant[str(k, "id")] = t
@@ -1027,12 +1027,12 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		}
 	}
 
-	for i, inv := range f.DemoSeed.Invoices {
+	for idx, inv := range fixture.DemoSeed.Invoices {
 		t := contractTenant[str(inv, "contractId")]
 
 		var customer string
 
-		for _, k := range f.DemoSeed.Contracts {
+		for _, k := range fixture.DemoSeed.Contracts {
 			if str(k, "id") == str(inv, "contractId") {
 				customer = str(k, "customerId")
 			}
@@ -1053,7 +1053,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 				str(inv, "id"),
 			),
 			ID(t),
-			billing.InvoiceNumber(start, i+1),
+			billing.InvoiceNumber(start, idx+1),
 			ID(str(inv, "contractId")),
 			int(num(inv, "contractVersion")),
 			ID(
@@ -1073,12 +1073,12 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		}
 	}
 
-	for _, r := range f.DemoSeed.Restrictions {
+	for _, r := range fixture.DemoSeed.Restrictions {
 		t := contractTenant[str(r, "contractId")]
 
 		var customer string
 
-		for _, k := range f.DemoSeed.Contracts {
+		for _, k := range fixture.DemoSeed.Contracts {
 			if str(k, "id") == str(r, "contractId") {
 				customer = str(k, "customerId")
 			}
@@ -1175,7 +1175,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		}
 	}
 
-	for _, c := range f.DemoSeed.Commands {
+	for _, c := range fixture.DemoSeed.Commands {
 		a, _ := c["action"].(map[string]any)
 
 		err := ex(
@@ -1233,7 +1233,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		}
 	}
 
-	for _, a := range f.DemoSeed.Alerts {
+	for _, a := range fixture.DemoSeed.Alerts {
 		u := str(a, "unitId")
 
 		err := ex(
@@ -1267,11 +1267,11 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 	}
 
 	memberTenant := map[string]string{}
-	for _, a := range f.Actors {
+	for _, a := range fixture.Actors {
 		memberTenant[a.MembershipID] = a.TenantID
 	}
 
-	for _, n := range f.DemoSeed.Notifications {
+	for _, n := range fixture.DemoSeed.Notifications {
 		tg, _ := n["target"].(map[string]any)
 
 		target := raw(map[string]any{"kind": tg["kind"], "id": ID(tg["id"].(string)).String()})
@@ -1302,7 +1302,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		}
 	}
 
-	for _, j := range f.DemoSeed.Jobs {
+	for _, j := range fixture.DemoSeed.Jobs {
 		u := str(j, "unitId")
 		rs, re := rng(j, "requestedSlot", "startAt", "endAt")
 		ss, se := rng(j, "scheduledSlot", "startAt", "endAt")
@@ -1340,7 +1340,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			optID(j, "contractorOrgId"),
 			optID(j, "assignmentId"),
 			int(num(j, "version")),
-			f.SeedCreatedAt,
+			fixture.SeedCreatedAt,
 		)
 		if err != nil {
 			return fmt.Errorf("job %s: %w", str(j, "id"), err)
@@ -1360,11 +1360,11 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 	}
 
 	jobTenant := map[string]string{}
-	for _, j := range f.DemoSeed.Jobs {
+	for _, j := range fixture.DemoSeed.Jobs {
 		jobTenant[str(j, "id")] = unitTenant[str(j, "unitId")]
 	}
 
-	for _, o := range f.DemoSeed.Offers {
+	for _, o := range fixture.DemoSeed.Offers {
 		vs, ve := rng(o, "visitSlot", "startAt", "endAt")
 
 		err := ex(
@@ -1399,7 +1399,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		}
 	}
 
-	for _, a := range f.DemoSeed.Assignments {
+	for _, a := range fixture.DemoSeed.Assignments {
 		err := ex(
 			`INSERT INTO maintenance.assignments (id, tenant_id, job_id, technician_membership_id, valid_from, valid_until,
 				scheduled, status, reason, acknowledgement, acknowledged_at,
@@ -1430,7 +1430,8 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		}
 	}
 
-	for _, r := range f.DemoSeed.RateCards { // contractor rate cards (FR-A22 / FR-P10): the payout prices of a contractor
+	for _, r := range fixture.DemoSeed.RateCards {
+		// contractor rate cards (FR-A22 / FR-P10): the payout prices of a contractor
 		lines, _ := json.Marshal(r["lines"])
 
 		err := ex(
@@ -1453,7 +1454,7 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		}
 	}
 
-	for _, c := range f.DemoSeed.FilterCleanings {
+	for _, c := range fixture.DemoSeed.FilterCleanings {
 		err := ex(
 			`INSERT INTO maintenance.filter_cleanings (id, tenant_id, unit_id, cleaned_at, marked_by_membership_id) VALUES ($1,
 				$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
@@ -1470,13 +1471,17 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 		}
 	}
 
-	return seedJobEvents(ex, f, jobTenant)
+	return seedJobEvents(ex, fixture, jobTenant)
 }
 
 // seedJobEvents derives the job history (jobs.events) that the fixture rows imply: created, offered, the offer
 // decision and the assignment. IDs are deterministic so re-seeding is idempotent; actors are only set where the
 // fixture names them (decidedBy).
-func seedJobEvents(ex func(string, ...any) error, f *Fixture, jobTenant map[string]string) error {
+func seedJobEvents(
+	ex func(string, ...any) error,
+	fixture *Fixture,
+	jobTenant map[string]string,
+) error {
 	ev := func(job, action string, actor, at any) error {
 		return ex(
 			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, occurred_at) VALUES ($1,$2,$3,$4,
@@ -1489,14 +1494,14 @@ func seedJobEvents(ex func(string, ...any) error, f *Fixture, jobTenant map[stri
 			at,
 		)
 	}
-	for _, j := range f.DemoSeed.Jobs {
-		err := ev(str(j, "id"), "job.created", nil, f.SeedCreatedAt)
+	for _, j := range fixture.DemoSeed.Jobs {
+		err := ev(str(j, "id"), "job.created", nil, fixture.SeedCreatedAt)
 		if err != nil {
 			return err
 		}
 	}
 
-	for _, o := range f.DemoSeed.Offers {
+	for _, o := range fixture.DemoSeed.Offers {
 		job := str(o, "jobId")
 
 		err := ev(job, "job.offered", nil, str(o, "offeredAt"))
@@ -1517,7 +1522,7 @@ func seedJobEvents(ex func(string, ...any) error, f *Fixture, jobTenant map[stri
 		}
 	}
 
-	for _, a := range f.DemoSeed.Assignments {
+	for _, a := range fixture.DemoSeed.Assignments {
 		err := ev(str(a, "jobId"), "job.assigned", nil, str(a, "createdAt"))
 		if err != nil {
 			return err

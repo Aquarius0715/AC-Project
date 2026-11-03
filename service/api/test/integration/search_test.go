@@ -12,7 +12,7 @@ import (
 // TestSearchIsLiteral: filters.search finds the term as written, anywhere and in any case, in every list that has it
 // (IR388). A %, _ or \ in the term is not a wildcard: "%" alone finds only values with a "%" in them, not every row.
 func TestSearchIsLiteral(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	// a part and a contractor whose names hold a % and an _ (the seed's do not)
 	owner(
 		t,
@@ -37,16 +37,16 @@ func TestSearchIsLiteral(t *testing.T) {
 		owner(t, `DELETE FROM maintenance.contractors WHERE organization_id = $1`, org)
 	})
 
-	search := func(op, term string) []map[string]any {
+	search := func(operation, term string) []map[string]any {
 		t.Helper()
 
 		b, _ := json.Marshal(
 			map[string]any{"filters": map[string]any{"search": term}, "limit": 100},
 		)
 
-		code, m := post(s, &hq, op, string(b))
+		code, m := post(srv, &hq, operation, string(b))
 		if code != 200 {
-			t.Fatalf("%s search %q: %d %v", op, term, code, m)
+			t.Fatalf("%s search %q: %d %v", operation, term, code, m)
 		}
 
 		return items(m)
@@ -59,28 +59,28 @@ func TestSearchIsLiteral(t *testing.T) {
 
 	// each list: a term taken from its own first row finds that row, in other case; a lone wildcard character finds
 	// only the rows that contain it
-	for op, field := range map[string]string{
+	for operation, field := range map[string]string{
 		"clientUsers.list": "email", "contractors.list": "name", "parts.list": "name",
 		"units.coverage": "unitId",
 	} {
-		all := search(op, "")
+		all := search(operation, "")
 		if len(all) == 0 {
-			t.Fatalf("%s lists nothing to search", op)
+			t.Fatalf("%s lists nothing to search", operation)
 		}
 
 		value, _ := all[0][field].(string)
 		if len(value) < 3 {
-			t.Fatalf("%s: no %s to search in %v", op, field, all[0])
+			t.Fatalf("%s: no %s to search in %v", operation, field, all[0])
 		}
 
-		if got := search(op, strings.ToUpper(value[1:len(value)-1])); len(got) == 0 {
-			t.Errorf("%s: the middle of %q in other case finds nothing", op, value)
+		if got := search(operation, strings.ToUpper(value[1:len(value)-1])); len(got) == 0 {
+			t.Errorf("%s: the middle of %q in other case finds nothing", operation, value)
 		}
 
 		for _, wildcard := range []string{"%", "_", `\`} {
-			for _, item := range search(op, wildcard) {
+			for _, item := range search(operation, wildcard) {
 				if !strings.Contains(text(item), strings.ToLower(wildcard)) {
-					t.Errorf("%s search %q found %v", op, wildcard, item[field])
+					t.Errorf("%s search %q found %v", operation, wildcard, item[field])
 				}
 			}
 		}

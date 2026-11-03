@@ -30,42 +30,42 @@ var (
 
 // Validate implements ops.Validator.
 func (in *ExportInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if !monthRe.MatchString(in.Month) {
-		fe["month"] = "error.invalid"
+		fieldErrs["month"] = "error.invalid"
 	}
 
 	seen := map[uuid.UUID]bool{}
 	for _, p := range in.PropertyIDs {
 		if p == uuid.Nil || seen[p] {
-			fe["propertyIds"] = "error.invalid"
+			fieldErrs["propertyIds"] = "error.invalid"
 		}
 
 		seen[p] = true
 	}
 
 	if len(in.PropertyIDs) == 0 || len(in.PropertyIDs) > 100 {
-		fe["propertyIds"] = "error.invalid"
+		fieldErrs["propertyIds"] = "error.invalid"
 	}
 
 	ss := map[string]bool{}
 	for _, s := range in.Sections {
 		if !slices.Contains(sections, s) || ss[s] {
-			fe["sections"] = "error.invalid"
+			fieldErrs["sections"] = "error.invalid"
 		}
 
 		ss[s] = true
 	}
 
 	if len(in.Sections) == 0 {
-		fe["sections"] = "error.required"
+		fieldErrs["sections"] = "error.required"
 	}
 
 	if in.Format != "pdf" && in.Format != "csv" {
-		fe["format"] = "error.invalid"
+		fieldErrs["format"] = "error.invalid"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // ReportFile is ReportFile of service-contracts.ts.
@@ -113,7 +113,7 @@ func f1(p *float64) string {
 //	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/energy/report [get]
-func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile, error) {
+func exportReport(ctx context.Context, c *ops.Call, input *ExportInput) (ReportFile, error) {
 	tz := "Asia/Kuala_Lumpur"
 	if c.Principal.Timezone != "" { // from identity with the principal (IR189)
 		tz = c.Principal.Timezone
@@ -124,7 +124,7 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 		loc = time.UTC
 	}
 
-	start, _ := time.ParseInLocation("2006-01", in.Month, loc)
+	start, _ := time.ParseInLocation("2006-01", input.Month, loc)
 
 	end := start.AddDate(0, 1, 0)
 	if end.After(c.Now) {
@@ -134,20 +134,20 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 	var own int
 
 	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_properties WHERE id = ANY($1) AND customer_org_id = $2
-		AND NOT archived`, in.PropertyIDs, c.Principal.OrgID).
+		AND NOT archived`, input.PropertyIDs, c.Principal.OrgID).
 		Scan(&own)
 	if scanErr != nil {
 		return ReportFile{}, apperr.Wrap(scanErr, "select energy.ref_properties")
 	}
 
-	if own != len(in.PropertyIDs) {
+	if own != len(input.PropertyIDs) {
 		return ReportFile{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	rows, err := c.Tx.Query(
 		ctx,
 		`SELECT id FROM energy.ref_units WHERE property_id = ANY($1) AND NOT archived ORDER BY id`,
-		in.PropertyIDs,
+		input.PropertyIDs,
 	)
 	if err != nil {
 		return ReportFile{}, apperr.Wrap(err, "select energy.ref_units")
@@ -158,20 +158,20 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 		return ReportFile{}, apperr.Wrap(err, "select energy.ref_units")
 	}
 
-	var b strings.Builder
-	b.WriteString("section,metric,value\n")
+	var builder strings.Builder
+	builder.WriteString("section,metric,value\n")
 
-	f, err := DefaultFactor(ctx, c)
+	factor, err := DefaultFactor(ctx, c)
 	if err != nil {
 		return ReportFile{}, err
 	}
 
-	month, _, err := Compute(ctx, c, units, start.UTC(), end.UTC(), f, nil)
+	month, _, err := Compute(ctx, c, units, start.UTC(), end.UTC(), factor, nil)
 	if err != nil {
 		return ReportFile{}, err
 	}
 
-	for _, s := range in.Sections {
+	for _, s := range input.Sections {
 		switch s {
 		case "energy_cost":
 			amount := "n/a"
@@ -180,7 +180,7 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 			}
 
 			fmt.Fprintf(
-				&b,
+				&builder,
 				"energy_cost,kWh,%s\nenergy_cost,cost,%s\n",
 				f1(month.Totals.KWh),
 				amount,
@@ -192,7 +192,7 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 				units,
 				start.AddDate(0, -1, 0).UTC(),
 				start.UTC(),
-				f,
+				factor,
 				nil,
 			)
 			if err != nil {
@@ -200,7 +200,7 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 			}
 
 			fmt.Fprintf(
-				&b,
+				&builder,
 				"month_comparison,previous_kWh,%s\nmonth_comparison,current_kWh,%s\n",
 				f1(prev.Totals.KWh),
 				f1(month.Totals.KWh),
@@ -218,7 +218,7 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 			}
 
 			fmt.Fprintf(
-				&b,
+				&builder,
 				"co2_offsets,emissions_kg,%s\nco2_offsets,demo_retired_kg,%.1f\n",
 				f1(month.Totals.EmissionsKg),
 				retired,
@@ -236,7 +236,7 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 			}
 
 			fmt.Fprintf(
-				&b,
+				&builder,
 				"alerts_maintenance,alerts,%d\nalerts_maintenance,completed_jobs,%d\n",
 				alerts,
 				jobs,
@@ -244,14 +244,14 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 		}
 	}
 
-	content, mime := b.String(), "text/csv"
-	if in.Format == "pdf" { // demo PDF: the same figures in a minimal one-page document
-		content, mime = "%PDF-1.4\n% Demo energy report "+in.Month+" (fictional values)\n"+content+
+	content, mime := builder.String(), "text/csv"
+	if input.Format == "pdf" { // demo PDF: the same figures in a minimal one-page document
+		content, mime = "%PDF-1.4\n% Demo energy report "+input.Month+" (fictional values)\n"+content+
 			"%%EOF\n", "application/pdf"
 	}
 
 	return ReportFile{
-		FileName:    "energy-report-" + in.Month + "." + in.Format,
+		FileName:    "energy-report-" + input.Month + "." + input.Format,
 		Mime:        mime,
 		Size:        len(content),
 		GeneratedAt: c.Now,

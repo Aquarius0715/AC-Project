@@ -16,56 +16,56 @@ import (
 
 // newInvoice creates a customer-b contract (rto, restriction eligible) and an unpaid invoice; returns contract and
 // invoice IDs.
-func newInvoice(t *testing.T, s *apiserver.Server) (string, string) {
+func newInvoice(t *testing.T, srv *apiserver.Server) (string, string) {
 	t.Helper()
-	u := newUnit(t, s, "Pay AC")
-	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	unit := newUnit(t, srv, "Pay AC")
+	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 
-	code, m := write(
-		s,
+	code, res := write(
+		srv,
 		&hq,
 		"contracts.save",
 		`{"customerId":"`+seed.ID("cust-b").
 			String()+
-			`","unitIds":["`+u+`"],"planType":"rto","startAt":"`+ts(
+			`","unitIds":["`+unit+`"],"planType":"rto","startAt":"`+stamp(
 			-24*30,
-		)+`","endAt":"`+ts(
+		)+`","endAt":"`+stamp(
 			24*365,
 		)+
 			`","priceMinor":5000,"currency":"MYR","restrictionEligible":true,"rulesVersion":"rules-1"}`,
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("contract: %d %v", code, m)
+		t.Fatalf("contract: %d %v", code, res)
 	}
 
-	k := data(m)["id"].(string)
+	key := data(res)["id"].(string)
 
-	code, m = write(
-		s,
+	code, res = write(
+		srv,
 		&hq,
 		"invoices.create",
-		`{"amountMinor":5000,"currency":"MYR","contractId":"`+k+`","contractVersion":1,"period":{"from":"`+ts(
+		`{"amountMinor":5000,"currency":"MYR","contractId":"`+key+`","contractVersion":1,"period":{"from":"`+stamp(
 			-24*14,
-		)+`","to":"`+ts(
+		)+`","to":"`+stamp(
 			24*16,
-		)+`"},"dueAt":"`+ts(
+		)+`"},"dueAt":"`+stamp(
 			48,
 		)+`"}`,
 		0,
 	)
 	if code != 200 {
-		t.Fatalf("invoice: %d %v", code, m)
+		t.Fatalf("invoice: %d %v", code, res)
 	}
 
-	return k, data(m)["id"].(string)
+	return key, data(res)["id"].(string)
 }
 
 func TestPaymentSimulation(t *testing.T) {
-	s := server(t)
-	_, inv := newInvoice(t, s)
+	srv := server(t)
+	_, inv := newInvoice(t, srv)
 	sim := func(body string, v int) (int, map[string]any) {
-		return write(s, &customerB, "payments.simulate", body, v)
+		return write(srv, &customerB, "payments.simulate", body, v)
 	}
 	want := map[string]string{ // the field each case is refused for
 		"bad event":     "event=error.invalid",
@@ -91,7 +91,7 @@ func TestPaymentSimulation(t *testing.T) {
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerA,
 		"payments.simulate",
 		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`,
@@ -108,15 +108,16 @@ func TestPaymentSimulation(t *testing.T) {
 		t.Errorf("initiate on a stale invoice version: %d %v", code, m)
 	}
 
-	code, m := sim(
+	code, resp := sim(
 		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_debit_card","demoConfirmed":true}`,
 		1,
 	)
-	if code != 200 || data(m)["status"] != "initiated" || data(m)["method"] != "demo_debit_card" {
-		t.Fatalf("initiate: %d %v", code, m)
+	if code != 200 || data(resp)["status"] != "initiated" ||
+		data(resp)["method"] != "demo_debit_card" {
+		t.Fatalf("initiate: %d %v", code, resp)
 	}
 
-	pay := data(m)["id"].(string)
+	pay := data(resp)["id"].(string)
 
 	ev := func(event string) string {
 		return `,"eventId":"` + uuid.NewString() + `","paymentReference":"REF-` + pay[:8] + `"`
@@ -130,12 +131,12 @@ func TestPaymentSimulation(t *testing.T) {
 
 	e1 := uuid.NewString()
 
-	code, m = sim(
+	code, resp = sim(
 		`{"event":"processing","paymentId":"`+pay+`","eventId":"`+e1+`","paymentReference":"REF-`+pay[:8]+`"}`,
 		1,
 	)
-	if code != 200 || data(m)["status"] != "processing" {
-		t.Fatalf("processing: %d %v", code, m)
+	if code != 200 || data(resp)["status"] != "processing" {
+		t.Fatalf("processing: %d %v", code, resp)
 	}
 
 	if code, m := sim(
@@ -162,14 +163,14 @@ func TestPaymentSimulation(t *testing.T) {
 		t.Errorf("an event on a stale payment version: %d %v", code, m)
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"invoices.get",
 		`{"id":"`+inv+`"}`,
-	); data(m)["status"] != "processing" ||
-		data(m)["paymentMethod"] != "demo_debit_card" {
-		t.Fatalf("invoice processing: %v", m)
+	); data(res)["status"] != "processing" ||
+		data(res)["paymentMethod"] != "demo_debit_card" {
+		t.Fatalf("invoice processing: %v", res)
 	}
 
 	if code, m := sim(
@@ -187,27 +188,27 @@ func TestPaymentSimulation(t *testing.T) {
 		t.Error("confirm after failure")
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"invoices.get",
 		`{"id":"`+inv+`"}`,
-	); data(m)["status"] != "unpaid" ||
-		data(m)["paymentStatus"] != "failed" {
-		t.Fatalf("invoice after failure: %v", m)
+	); data(res)["status"] != "unpaid" ||
+		data(res)["paymentStatus"] != "failed" {
+		t.Fatalf("invoice after failure: %v", res)
 	}
 	// second attempt confirms; the invoice becomes paid
-	_, m = post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`)
+	_, resp = post(srv, &hq, "invoices.get", `{"id":"`+inv+`"}`)
 
-	code, m = sim(
+	code, resp = sim(
 		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`,
-		ver(m),
+		ver(resp),
 	)
 	if code != 200 {
-		t.Fatalf("second initiate: %d %v", code, m)
+		t.Fatalf("second initiate: %d %v", code, resp)
 	}
 
-	pay = data(m)["id"].(string)
+	pay = data(resp)["id"].(string)
 	sim(`{"event":"processing","paymentId":"`+pay+`"`+ev("processing")+`}`, 1)
 
 	if code, m := sim(
@@ -222,35 +223,35 @@ func TestPaymentSimulation(t *testing.T) {
 		t.Error("fail after confirmed")
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&customerB,
 		"invoices.get",
 		`{"id":"`+inv+`"}`,
-	); data(m)["status"] != "paid" ||
-		len(data(m)["paymentRefs"].([]any)) != 2 {
-		t.Fatalf("paid: %v", m)
+	); data(res)["status"] != "paid" ||
+		len(data(res)["paymentRefs"].([]any)) != 2 {
+		t.Fatalf("paid: %v", res)
 	}
 
-	_, m = post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`)
+	_, resp = post(srv, &hq, "invoices.get", `{"id":"`+inv+`"}`)
 	if code, _ := sim(
 		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`,
-		ver(m),
+		ver(resp),
 	); code != 409 {
 		t.Error("pay a paid invoice")
 	}
 	// the confirmed payment's reference cannot confirm another invoice's payment
-	_, inv2 := newInvoice(t, s)
+	_, inv2 := newInvoice(t, srv)
 
-	code, m = sim(
+	code, resp = sim(
 		`{"event":"initiate","invoiceId":"`+inv2+`","method":"demo_credit_card","demoConfirmed":true}`,
 		1,
 	)
 	if code != 200 {
-		t.Fatalf("initiate another invoice: %d %v", code, m)
+		t.Fatalf("initiate another invoice: %d %v", code, resp)
 	}
 
-	pay2 := data(m)["id"].(string)
+	pay2 := data(resp)["id"].(string)
 	sim(
 		`{"event":"processing","paymentId":"`+pay2+`","eventId":"`+uuid.NewString()+`","paymentReference":"P-`+pay2[:8]+`"}`,
 		1,
@@ -266,8 +267,8 @@ func TestPaymentSimulation(t *testing.T) {
 }
 
 func TestHQPaymentsAndRelease(t *testing.T) {
-	s := server(t)
-	k, inv := newInvoice(t, s)
+	srv := server(t)
+	key, inv := newInvoice(t, srv)
 	// a restriction caused by this invoice
 	rid := uuid.NewString()
 	owner(
@@ -277,7 +278,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		VALUES ($1,$2,$3,1,$4,'rules-1',$5,$6,'unpaid','{"kind":"power_off"}','applied')`,
 		rid,
 		seed.ID("tenant-a"),
-		k,
+		key,
 		seed.ID("cust-b"),
 		clock,
 		clock.Add(25*time.Hour),
@@ -294,7 +295,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	ownerScan(
 		t,
 		`SELECT unit_id::text FROM billing.contract_units WHERE contract_id = $1`,
-		[]any{k},
+		[]any{key},
 		&unit,
 	)
 	owner(
@@ -310,7 +311,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 
 	manual := func(amount string, v int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&hq,
 			"payments.recordManual",
 			`{"invoiceId":"`+inv+`","paymentReference":"`+ref+`","confirmedAmountMinor":`+amount+`,"currency":"MYR",`+
@@ -326,19 +327,19 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		t.Errorf("partial amount: %d %s", code, fields(m))
 	}
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&hq,
 		"payments.recordManual",
 		`{"invoiceId":"`+inv+`","paymentReference":" ","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`,
 		1,
 	); code != 422 ||
-		fields(m) != "paymentReference=error.length" {
-		t.Errorf("blank reference: %d %s", code, fields(m))
+		fields(resp) != "paymentReference=error.length" {
+		t.Errorf("blank reference: %d %s", code, fields(resp))
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerB,
 		"payments.recordManual",
 		`{"invoiceId":"`+inv+`","paymentReference":"X","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`,
@@ -357,7 +358,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		},
 		{"payments.confirm", `{"invoiceId":"` + inv + `",` + entry + `}`, "_=error.malformedInput"},
 	} {
-		code, m := write(s, &hq, c.op, c.body, 1)
+		code, m := write(srv, &hq, c.op, c.body, 1)
 		refusal(t, c.op+" "+c.body, code, m, c.want)
 	}
 
@@ -365,17 +366,17 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		t.Errorf("manual on a stale invoice version: %d %v", code, m)
 	}
 
-	code, m := manual("5000", 1)
-	if code != 200 || data(m)["status"] != "confirmed" || data(m)["method"] != nil {
-		t.Fatalf("manual: %d %v", code, m)
+	code, res := manual("5000", 1)
+	if code != 200 || data(res)["status"] != "confirmed" || data(res)["method"] != nil {
+		t.Fatalf("manual: %d %v", code, res)
 	}
 
-	if code, m2 := manual("5000", 1); code != 200 || data(m2)["id"] != data(m)["id"] {
+	if code, m2 := manual("5000", 1); code != 200 || data(m2)["id"] != data(res)["id"] {
 		t.Errorf("repeat manual returns the same payment: %d", code)
 	}
 	// HQ sees the confirmation reason (DD-A08); the client does not
 	reason := func(who *actor) any {
-		_, d := post(s, who, "invoices.get", `{"id":"`+inv+`"}`)
+		_, d := post(srv, who, "invoices.get", `{"id":"`+inv+`"}`)
 
 		return data(d)["paymentRefs"].([]any)[0].(map[string]any)["confirmationReason"]
 	}
@@ -406,9 +407,9 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 
 	owner(t, `UPDATE restrictions.restrictions SET state = 'released' WHERE id = $1`, rid)
 	// the reference cannot be reused on another invoice; confirm needs a processing payment
-	_, inv2 := newInvoice(t, s)
+	_, inv2 := newInvoice(t, srv)
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"payments.recordManual",
 		`{"invoiceId":"`+inv2+`","paymentReference":"`+ref+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"dup"}`,
@@ -417,22 +418,22 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		t.Error("reference reuse")
 	}
 
-	code, m = write(
-		s,
+	code, res = write(
+		srv,
 		&customerB,
 		"payments.simulate",
 		`{"event":"initiate","invoiceId":"`+inv2+`","method":"demo_credit_card","demoConfirmed":true}`,
 		1,
 	)
 	if code != 200 {
-		t.Fatalf("initiate: %d %v", code, m)
+		t.Fatalf("initiate: %d %v", code, res)
 	}
 
-	pay := data(m)["id"].(string)
+	pay := data(res)["id"].(string)
 
 	confirm := func(v int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&hq,
 			"payments.confirm",
 			`{"paymentId":"`+pay+`","paymentReference":"HQ-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
@@ -445,7 +446,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	}
 
 	write(
-		s,
+		srv,
 		&customerB,
 		"payments.simulate",
 		`{"event":"processing","paymentId":"`+pay+`","eventId":"`+uuid.NewString()+`","paymentReference":"P-`+pay[:8]+`"}`,
@@ -453,7 +454,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	)
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"payments.recordManual",
 		`{"invoiceId":"`+inv2+`","paymentReference":"M-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
@@ -467,16 +468,16 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		t.Errorf("hq confirm on a stale version: %d %v", code, m)
 	}
 
-	if code, m := write(
-		s,
+	if code, resp := write(
+		srv,
 		&hq,
 		"payments.confirm",
 		`{"paymentId":"`+pay+`","paymentReference":"`+ref+`","confirmedAmountMinor":5000,"currency":"MYR",`+
 			`"reason":"checked"}`,
 		2,
 	); code != 409 ||
-		m["messageKey"] != "errors.reference_used" {
-		t.Errorf("hq confirm with the manual payment's reference: %d %v", code, m)
+		resp["messageKey"] != "errors.reference_used" {
+		t.Errorf("hq confirm with the manual payment's reference: %d %v", code, resp)
 	}
 
 	if code, m := confirm(
@@ -494,25 +495,25 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 // TestManualAfterFailedPayment (IR447): after the customer's card payment failed, HQ records the bank transfer it
 // received; an attempt still in flight keeps refusing it.
 func TestManualAfterFailedPayment(t *testing.T) {
-	s := server(t)
-	_, inv := newInvoice(t, s)
+	srv := server(t)
+	_, inv := newInvoice(t, srv)
 	sim := func(body string, v int) (int, map[string]any) {
-		return write(s, &customerB, "payments.simulate", body, v)
+		return write(srv, &customerB, "payments.simulate", body, v)
 	}
 
-	code, m := sim(
+	code, res := sim(
 		`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`,
 		1,
 	)
 	if code != 200 {
-		t.Fatalf("initiate: %d %v", code, m)
+		t.Fatalf("initiate: %d %v", code, res)
 	}
 
-	pay := data(m)["id"].(string)
+	pay := data(res)["id"].(string)
 
 	manual := func(v int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&hq,
 			"payments.recordManual",
 			`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
@@ -532,12 +533,12 @@ func TestManualAfterFailedPayment(t *testing.T) {
 		t.Fatalf("fail: %d %v", code, m)
 	}
 
-	_, m = post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`)
-	if code, m := manual(ver(m)); code != 200 || data(m)["status"] != "confirmed" {
+	_, res = post(srv, &hq, "invoices.get", `{"id":"`+inv+`"}`)
+	if code, m := manual(ver(res)); code != 200 || data(m)["status"] != "confirmed" {
 		t.Fatalf("manual after the failed card payment: %d %v", code, m)
 	}
 
-	if _, m := post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`); data(m)["status"] != "paid" {
+	if _, m := post(srv, &hq, "invoices.get", `{"id":"`+inv+`"}`); data(m)["status"] != "paid" {
 		t.Errorf("invoice after the manual payment: %v", data(m)["status"])
 	}
 }
@@ -547,13 +548,13 @@ func TestManualAfterFailedPayment(t *testing.T) {
 // initiate passed (the invoice stays unpaid until processing), so two attempts could both be confirmed. After the first
 // attempt fails, a new one starts.
 func TestInvoiceOnePaymentAtATime(t *testing.T) {
-	s := server(t)
-	_, inv := newInvoice(t, s)
+	srv := server(t)
+	_, inv := newInvoice(t, srv)
 	sim := func(body string, v int) (int, map[string]any) {
-		return write(s, &customerB, "payments.simulate", body, v)
+		return write(srv, &customerB, "payments.simulate", body, v)
 	}
 	invoiceVersion := func() int {
-		_, m := post(s, &customerB, "invoices.get", `{"id":"`+inv+`"}`)
+		_, m := post(srv, &customerB, "invoices.get", `{"id":"`+inv+`"}`)
 
 		return ver(m)
 	}

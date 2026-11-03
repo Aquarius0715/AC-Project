@@ -70,8 +70,8 @@ func cmp(op string, a, b float64) bool {
 
 // inWindow reports whether at falls into the active window in tz (nil window: always). An end before the start runs
 // past midnight and the weekdays are start days: 22:00–06:00 on Monday covers Monday 22:00 to Tuesday 06:00.
-func inWindow(w *ActiveWindow, at time.Time, tz string) bool {
-	if w == nil {
+func inWindow(activeWindow *ActiveWindow, at time.Time, tz string) bool {
+	if activeWindow == nil {
 		return true
 	}
 
@@ -88,12 +88,13 @@ func inWindow(w *ActiveWindow, at time.Time, tz string) bool {
 	}
 
 	hm := l.Format("15:04")
-	if w.StartLocal < w.EndLocal {
-		return slices.Contains(w.Weekdays, wd) && hm >= w.StartLocal && hm < w.EndLocal
+	if activeWindow.StartLocal < activeWindow.EndLocal {
+		return slices.Contains(activeWindow.Weekdays, wd) && hm >= activeWindow.StartLocal &&
+			hm < activeWindow.EndLocal
 	}
 
-	if hm >= w.StartLocal {
-		return slices.Contains(w.Weekdays, wd)
+	if hm >= activeWindow.StartLocal {
+		return slices.Contains(activeWindow.Weekdays, wd)
 	}
 
 	prev := wd - 1 // the morning part belongs to the window that started the day before
@@ -101,13 +102,13 @@ func inWindow(w *ActiveWindow, at time.Time, tz string) bool {
 		prev = 7
 	}
 
-	return hm < w.EndLocal && slices.Contains(w.Weekdays, prev)
+	return hm < activeWindow.EndLocal && slices.Contains(activeWindow.Weekdays, prev)
 }
 
 // policiesOf returns the notification candidates of a unit: attached alert policies plus the tenant default policy
 // with the rules enabled for the unit's customer (SR25, IR108).
-func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifPolicy, error) {
-	rows, err := c.Tx.Query(
+func policiesOf(ctx context.Context, call *ops.Call, unit, org uuid.UUID) ([]notifPolicy, error) {
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT p.id, p.kind = 'default_alert', p.enabled, p.owner_membership_id, p.condition, p.rules,
 			p.recipient_membership_ids, p.channels,
@@ -150,13 +151,13 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 			var rs []DefaultAlertRule
 
 			_ = json.Unmarshal(rules, &rs)
-			for _, r := range rs {
+			for _, defaultAlertRule := range rs {
 				p.conds, p.ruleKeys = append(
 					p.conds,
-					r.AlertCondition,
+					defaultAlertRule.AlertCondition,
 				), append(
 					p.ruleKeys,
-					r.RuleKey,
+					defaultAlertRule.RuleKey,
 				)
 			}
 		} else {
@@ -176,16 +177,16 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 		return nil, apperr.Wrap(rowsErr, "select monitoring.alert_policies")
 	}
 
-	for i := range out { // default rules switched off for this customer (owner-only settings, IR115)
-		if !out[i].isDefault {
+	for idx := range out { // default rules switched off for this customer (owner-only settings, IR115)
+		if !out[idx].isDefault {
 			continue
 		}
 
-		rs, err := c.Tx.Query(
+		rs, err := call.Tx.Query(
 			ctx,
 			`SELECT s.rule_key FROM monitoring.default_rule_settings s JOIN assets.customers cu ON cu.id = s.customer_id
 			WHERE s.policy_id = $1 AND cu.organization_id = $2 AND NOT s.enabled`,
-			out[i].id,
+			out[idx].id,
 			org,
 		)
 		if err != nil {
@@ -210,13 +211,13 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 			keys  []string
 		)
 
-		for j, k := range out[i].ruleKeys {
+		for j, k := range out[idx].ruleKeys {
 			if !off[k] {
-				conds, keys = append(conds, out[i].conds[j]), append(keys, k)
+				conds, keys = append(conds, out[idx].conds[j]), append(keys, k)
 			}
 		}
 
-		out[i].conds, out[i].ruleKeys = conds, keys
+		out[idx].conds, out[idx].ruleKeys = conds, keys
 	}
 
 	return out, nil
@@ -226,14 +227,14 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 // able to read the unit's customer) and channels; the default policy notifies the customer's active clients in-app.
 func recipientsOf(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	p notifPolicy,
 	org uuid.UUID,
 ) ([]uuid.UUID, []string, error) {
 	if p.isDefault {
 		ids, err := ops.Query[[]uuid.UUID](
 			ctx,
-			c,
+			call,
 			identity.QueryMembers,
 			identity.MembersInput{
 				Role:           "client",
@@ -253,7 +254,7 @@ func recipientsOf(
 
 	clients, err := ops.Query[[]uuid.UUID](
 		ctx,
-		c,
+		call,
 		identity.QueryMembers,
 		identity.MembersInput{
 			IDs:            p.recipients,
@@ -269,7 +270,7 @@ func recipientsOf(
 
 	admins, err := ops.Query[[]uuid.UUID](
 		ctx,
-		c,
+		call,
 		identity.QueryMembers,
 		identity.MembersInput{
 			IDs:            p.recipients,
@@ -320,12 +321,12 @@ func recovered(c AlertCondition, v float64) bool {
 // detected after the tick is left alone.
 func recoverAlert(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit, policy uuid.UUID,
 	ruleKey string,
 	cnd AlertCondition,
 	v float64,
-	at time.Time,
+	when time.Time,
 	eventID uuid.UUID,
 ) error {
 	var key *string
@@ -347,7 +348,7 @@ func recoverAlert(
 		cnd.DurationSeconds,
 	)
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`UPDATE monitoring.alerts a SET status = 'resolved', resolved_at = $4, resolution_reason = $5, resolution_evidence_ids
 			= ARRAY[$6::uuid],
@@ -358,7 +359,7 @@ func recoverAlert(
 		unit,
 		policy,
 		key,
-		at,
+		when,
 		reason,
 		eventID,
 	)
@@ -389,7 +390,7 @@ func recoverAlert(
 	}
 
 	for _, id := range ids {
-		c.Emit(
+		call.Emit(
 			ops.Event{
 				AggregateType: "alert",
 				AggregateID:   id,
@@ -411,10 +412,10 @@ func recoverAlert(
 // whether the policy is enabled or not (D08).
 func (n Notifier) Evaluate(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit uuid.UUID,
 	factsJSON []byte,
-	at time.Time,
+	when time.Time,
 	eventID uuid.UUID,
 	fire bool,
 ) ([]json.RawMessage, error) {
@@ -431,13 +432,13 @@ func (n Notifier) Evaluate(
 
 	var org uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.units WHERE id = $1`, unit).
+	err := call.Tx.QueryRow(ctx, `SELECT customer_org_id FROM assets.units WHERE id = $1`, unit).
 		Scan(&org)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select assets.units")
 	}
 
-	pols, err := policiesOf(ctx, c, unit, org)
+	pols, err := policiesOf(ctx, call, unit, org)
 	if err != nil {
 		return nil, err
 	}
@@ -446,18 +447,18 @@ func (n Notifier) Evaluate(
 
 	for _, p := range pols {
 		if fire { // sustained recovery resolves the policy's open Alert (D08)
-			for i, cnd := range p.conds {
+			for idx, cnd := range p.conds {
 				if f, ok := byMetric[cnd.Metric]; ok {
-					if v, ok := freshValue(f, at); ok && recovered(cnd, v) {
+					if v, ok := freshValue(f, when); ok && recovered(cnd, v) {
 						err := recoverAlert(
 							ctx,
-							c,
+							call,
 							unit,
 							p.id,
-							p.ruleKeys[i],
+							p.ruleKeys[idx],
 							cnd,
 							v,
-							at,
+							when,
 							eventID,
 						)
 						if err != nil {
@@ -468,7 +469,7 @@ func (n Notifier) Evaluate(
 			}
 		}
 
-		o := Outcome{
+		outcome := Outcome{
 			UnitID:          unit,
 			PolicyID:        p.id,
 			Decision:        "",
@@ -487,13 +488,13 @@ func (n Notifier) Evaluate(
 		} else {
 			reason = "not_due"
 
-			for i, cnd := range p.conds {
+			for idx, cnd := range p.conds {
 				f, ok := byMetric[cnd.Metric]
 				if !ok {
 					continue
 				}
 
-				v, ok := freshValue(f, at)
+				v, ok := freshValue(f, when)
 				if !ok {
 					if reason == "not_due" {
 						reason = "quality"
@@ -503,9 +504,9 @@ func (n Notifier) Evaluate(
 				}
 
 				if cmp(cnd.Operator, v, cnd.Threshold) &&
-					inWindow(cnd.ActiveWindow, at, p.timezone) {
-					cc := p.conds[i]
-					hit, hitKey, reason = &cc, p.ruleKeys[i], ""
+					inWindow(cnd.ActiveWindow, when, p.timezone) {
+					cc := p.conds[idx]
+					hit, hitKey, reason = &cc, p.ruleKeys[idx], ""
 
 					break
 				}
@@ -515,7 +516,7 @@ func (n Notifier) Evaluate(
 		if reason == "" { // owner still active (D02)
 			owner, err := ops.Query[[]uuid.UUID](
 				ctx,
-				c,
+				call,
 				identity.QueryMembers,
 				identity.MembersInput{
 					IDs:            []uuid.UUID{p.owner},
@@ -538,14 +539,14 @@ func (n Notifier) Evaluate(
 			p.cooldown > 0 { // cooldown since the last created notification of this policy and unit
 			var last *time.Time
 
-			err := c.Tx.QueryRow(ctx, `SELECT max(occurred_at) FROM monitoring.alert_notifications WHERE policy_id = $1 AND
+			err := call.Tx.QueryRow(ctx, `SELECT max(occurred_at) FROM monitoring.alert_notifications WHERE policy_id = $1 AND
 				unit_id = $2`, p.id, unit).
 				Scan(&last)
 			if err != nil {
 				return nil, apperr.Wrap(err, "select monitoring.alert_notifications")
 			}
 
-			if last != nil && at.Sub(*last) < time.Duration(p.cooldown)*time.Minute {
+			if last != nil && when.Sub(*last) < time.Duration(p.cooldown)*time.Minute {
 				reason = "cooldown"
 			}
 		}
@@ -562,7 +563,8 @@ func (n Notifier) Evaluate(
 
 			var told bool
 
-			err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.alerts a JOIN monitoring.alert_notifications n ON
+			err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM monitoring.alerts a JOIN monitoring.alert_notifications n
+				ON
 				n.alert_id = a.id AND n.policy_id = a.policy_id
 				WHERE a.unit_id = $1 AND a.policy_id = $2 AND a.rule_key IS NOT DISTINCT FROM $3 AND a.type = 'sensor' AND a.status
 				<> 'resolved')`, unit, p.id, key).
@@ -581,7 +583,7 @@ func (n Notifier) Evaluate(
 			channels []string
 		)
 		if reason == "" {
-			recips, channels, err = recipientsOf(ctx, c, p, org)
+			recips, channels, err = recipientsOf(ctx, call, p, org)
 			if err != nil {
 				return nil, err
 			}
@@ -589,34 +591,34 @@ func (n Notifier) Evaluate(
 
 		switch {
 		case reason != "":
-			o.Decision, o.Reason = "suppressed", &reason
+			outcome.Decision, outcome.Reason = "suppressed", &reason
 		case len(recips) == 0 || len(channels) == 0:
 			r := "no_recipient"
-			o.Decision, o.Reason = "failed", &r
+			outcome.Decision, outcome.Reason = "failed", &r
 		default:
-			o.Decision = "selected"
+			outcome.Decision = "selected"
 		}
 
 		if fire && reason == "" {
-			alert, err := sourceAlert(ctx, c, unit, org, p.id, hitKey, hit, at)
+			alert, err := sourceAlert(ctx, call, unit, org, p.id, hitKey, hit, when)
 			if err != nil {
 				return nil, err
 			}
 
-			if o.Decision == "failed" {
-				fid, err := deliveryFailure(ctx, c, alert, p.id, eventID, at)
+			if outcome.Decision == "failed" {
+				fid, err := deliveryFailure(ctx, call, alert, p.id, eventID, when)
 				if err != nil {
 					return nil, err
 				}
 
-				o.NotificationIDs, o.FailureIDs = []uuid.UUID{}, []uuid.UUID{fid}
+				outcome.NotificationIDs, outcome.FailureIDs = []uuid.UUID{}, []uuid.UUID{fid}
 			} else {
-				o.Decision, o.NotificationIDs, o.FailureIDs = "created", []uuid.UUID{}, []uuid.UUID{}
+				outcome.Decision, outcome.NotificationIDs, outcome.FailureIDs = "created", []uuid.UUID{}, []uuid.UUID{}
 				typ := "fault" // IR104: the alert template takes its type from the source Alert (sensor → fault)
 
 				for _, r := range recips {
 					for _, ch := range channels {
-						id, err := n.Notify.Create(ctx, c, notify.New{
+						id, err := n.Notify.Create(ctx, call, notify.New{
 							RecipientMembershipID: r,
 							Channel:               ch,
 							Type:                  typ,
@@ -631,7 +633,7 @@ func (n Notifier) Evaluate(
 							return nil, apperr.Wrap(err, "notify.Store.Create")
 						}
 
-						_, execErr := c.Tx.Exec(
+						_, execErr := call.Tx.Exec(
 							ctx,
 							`INSERT INTO monitoring.alert_notifications (tenant_id, notification_id, alert_id, policy_id, unit_id,
 								occurred_at)
@@ -640,7 +642,7 @@ func (n Notifier) Evaluate(
 							alert,
 							p.id,
 							unit,
-							c.Now,
+							call.Now,
 						)
 						if execErr != nil {
 							return nil, apperr.Wrap(
@@ -649,7 +651,7 @@ func (n Notifier) Evaluate(
 							)
 						}
 
-						o.NotificationIDs = append(o.NotificationIDs, id)
+						outcome.NotificationIDs = append(outcome.NotificationIDs, id)
 					}
 				}
 			}
@@ -658,8 +660,8 @@ func (n Notifier) Evaluate(
 		var raw []byte
 
 		if fire { // NotificationOutcome always carries both arrays
-			if o.NotificationIDs == nil {
-				o.NotificationIDs, o.FailureIDs = []uuid.UUID{}, []uuid.UUID{}
+			if outcome.NotificationIDs == nil {
+				outcome.NotificationIDs, outcome.FailureIDs = []uuid.UUID{}, []uuid.UUID{}
 			}
 
 			raw, _ = json.Marshal(struct {
@@ -667,10 +669,10 @@ func (n Notifier) Evaluate(
 
 				NotificationIDs []uuid.UUID `json:"notificationIds"`
 				FailureIDs      []uuid.UUID `json:"failureIds"`
-			}{o, o.NotificationIDs, o.FailureIDs})
+			}{outcome, outcome.NotificationIDs, outcome.FailureIDs})
 		} else {
-			o.NotificationIDs, o.FailureIDs = nil, nil
-			raw, _ = json.Marshal(o)
+			outcome.NotificationIDs, outcome.FailureIDs = nil, nil
+			raw, _ = json.Marshal(outcome)
 		}
 
 		out = append(out, raw)
@@ -683,11 +685,11 @@ func (n Notifier) Evaluate(
 // the latest earlier Alert of the same policy / rule on the unit (a recurrence after it resolved, IR66).
 func sourceAlert(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	unit, org, policy uuid.UUID,
 	ruleKey string,
 	cnd *AlertCondition,
-	at time.Time,
+	when time.Time,
 ) (uuid.UUID, error) {
 	var key *string
 	if ruleKey != "" {
@@ -696,7 +698,8 @@ func sourceAlert(
 
 	var id uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND rule_key IS NOT
+	err := call.Tx.QueryRow(ctx, `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND rule_key IS
+		NOT
 		DISTINCT FROM $3 AND type = 'sensor' AND status <> 'resolved'`,
 		unit, policy, key).
 		Scan(&id)
@@ -708,20 +711,21 @@ func sourceAlert(
 		return id, apperr.Wrap(err, "select monitoring.alerts")
 	}
 
-	err = c.Tx.QueryRow(ctx, `INSERT INTO monitoring.alerts (tenant_id, unit_id, customer_org_id, policy_id, rule_key,
+	err = call.Tx.QueryRow(ctx, `INSERT INTO monitoring.alerts (tenant_id, unit_id, customer_org_id, policy_id, rule_key,
 		type, severity, status, cause_code, evidence_kind, evidence_text,
 		observed_at, detected_at, created_at, updated_at, previous_alert_id) VALUES (current_setting('app.tenant_id')::uuid,
 		$1, $2, $3, $4, 'sensor', $5, 'open', 'unknown', 'demo_observation', $6, $7, $7, $7, $7,
 		(SELECT p.id FROM monitoring.alerts p WHERE p.unit_id = $1 AND p.policy_id = $3 AND p.rule_key IS NOT DISTINCT FROM $4
 		AND p.type = 'sensor' ORDER BY p.detected_at DESC, p.id DESC LIMIT 1))
 		ON CONFLICT DO NOTHING RETURNING
-		id`, unit, org, policy, key, cnd.Severity, "Demo event: "+cnd.Metric+" "+cnd.Operator+" threshold", at).
+		id`, unit, org, policy, key, cnd.Severity, "Demo event: "+cnd.Metric+" "+cnd.Operator+" threshold", when).
 		Scan(&id)
 	if errors.Is(
 		err,
 		pgx.ErrNoRows,
 	) { // a concurrent evaluation opened it first (alerts_one_open_per_rule)
-		err = c.Tx.QueryRow(ctx, `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND rule_key IS NOT
+		err = call.Tx.QueryRow(ctx, `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND rule_key IS
+			NOT
 			DISTINCT FROM $3 AND type = 'sensor' AND status <> 'resolved'`,
 			unit, policy, key).
 			Scan(&id)
@@ -733,13 +737,13 @@ func sourceAlert(
 // deliveryFailure appends one no_recipient DeliveryFailure per alert/event/policy (SR12; repeats add none).
 func deliveryFailure(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	alert, policy, eventID uuid.UUID,
-	at time.Time,
+	when time.Time,
 ) (uuid.UUID, error) {
 	var raw []byte
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT delivery_failures FROM monitoring.alerts WHERE id = $1 FOR UPDATE`, alert).
+	scanErr := call.Tx.QueryRow(ctx, `SELECT delivery_failures FROM monitoring.alerts WHERE id = $1 FOR UPDATE`, alert).
 		Scan(&raw)
 	if scanErr != nil {
 		return uuid.Nil, apperr.Wrap(scanErr, "select monitoring.alerts")
@@ -763,18 +767,18 @@ func deliveryFailure(
 			"id":            id,
 			"policyId":      policy,
 			"eventId":       eventID,
-			"occurredAt":    at,
+			"occurredAt":    when,
 			"reason":        "no_recipient",
 			"deliveryState": "failed",
 		},
 	)
 	b, _ := json.Marshal(fs)
-	_, err := c.Tx.Exec(
+	_, err := call.Tx.Exec(
 		ctx,
 		`UPDATE monitoring.alerts SET delivery_failures = $2, updated_at = $3 WHERE id = $1`,
 		alert,
 		b,
-		at,
+		when,
 	)
 
 	return id, apperr.Wrap(err, "update monitoring.alerts")

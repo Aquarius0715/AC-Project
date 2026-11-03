@@ -121,8 +121,8 @@ var coverageStatuses = map[string]bool{
 //	@Router			/v1/units/coverage [get]
 func (m *Module) unitsCoverage(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[UnitCoverage], error) {
 	var f struct {
 		CustomerID         *uuid.UUID `json:"customerId,omitempty"`
@@ -131,7 +131,7 @@ func (m *Module) unitsCoverage(
 		Search             *string    `json:"search,omitempty"`
 	}
 
-	err := decodeFilters(in.Filters, &f)
+	err := decodeFilters(query.Filters, &f)
 	if err != nil {
 		return paging.Page[UnitCoverage]{}, err
 	}
@@ -148,14 +148,14 @@ func (m *Module) unitsCoverage(
 		)
 	}
 
-	if in.Sort != nil && in.Sort.Field != "id" && in.Sort.Field != "name" &&
-		in.Sort.Field != "dueAt" {
+	if query.Sort != nil && query.Sort.Field != "id" && query.Sort.Field != "name" &&
+		query.Sort.Field != "dueAt" {
 		return paging.Page[UnitCoverage]{}, apperr.Fields(
 			map[string]string{"sort.field": "error.invalid"},
 		)
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[UnitCoverage]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -181,7 +181,7 @@ func (m *Module) unitsCoverage(
 		)
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT u.id, cu.id, u.model_id, u.warranty_ends_at, u.display_name FROM assets.units u
 		JOIN assets.customers cu ON cu.organization_id = u.customer_org_id WHERE `+strings.Join(conds, " AND "),
@@ -193,14 +193,14 @@ func (m *Module) unitsCoverage(
 	var all []UnitCoverage
 
 	for rows.Next() {
-		var x UnitCoverage
+		var unitCoverage UnitCoverage
 
 		err := rows.Scan(
-			&x.UnitID,
-			&x.CustomerID,
-			&x.ModelID,
-			&x.WarrantyEndsAt,
-			&x.name,
+			&unitCoverage.UnitID,
+			&unitCoverage.CustomerID,
+			&unitCoverage.ModelID,
+			&unitCoverage.WarrantyEndsAt,
+			&unitCoverage.name,
 		)
 		if err != nil {
 			rows.Close()
@@ -208,7 +208,7 @@ func (m *Module) unitsCoverage(
 			return paging.Page[UnitCoverage]{}, apperr.Wrap(err, "select assets.units")
 		}
 
-		all = append(all, x)
+		all = append(all, unitCoverage)
 	}
 
 	rows.Close()
@@ -223,7 +223,7 @@ func (m *Module) unitsCoverage(
 		ids[i] = all[i].UnitID
 	}
 
-	contracts, err := m.Contracts.ActiveContracts(ctx, c, ids)
+	contracts, err := m.Contracts.ActiveContracts(ctx, call, ids)
 	if err != nil {
 		return paging.Page[UnitCoverage]{}, apperr.Wrap(
 			err,
@@ -231,80 +231,87 @@ func (m *Module) unitsCoverage(
 		)
 	}
 
-	claims, err := m.Claims.ClaimableJobs(ctx, c, ids)
+	claims, err := m.Claims.ClaimableJobs(ctx, call, ids)
 	if err != nil {
 		return paging.Page[UnitCoverage]{}, apperr.Wrap(err, "assets.ClaimReader.ClaimableJobs")
 	}
 
 	var keep []UnitCoverage
 
-	for _, x := range all {
-		x.ContractIDs = append([]uuid.UUID{}, contracts[x.UnitID]...)
-		x.ClaimableJobIDs = claimable(claims[x.UnitID], x.WarrantyEndsAt)
+	for _, unitCoverage := range all {
+		unitCoverage.ContractIDs = append([]uuid.UUID{}, contracts[unitCoverage.UnitID]...)
+		unitCoverage.ClaimableJobIDs = claimable(
+			claims[unitCoverage.UnitID],
+			unitCoverage.WarrantyEndsAt,
+		)
 
-		x.Status = CoverageStatus(c.Now, x.WarrantyEndsAt, len(x.ContractIDs))
-		if f.Coverage != nil && x.Status != *f.Coverage {
+		unitCoverage.Status = CoverageStatus(
+			call.Now,
+			unitCoverage.WarrantyEndsAt,
+			len(unitCoverage.ContractIDs),
+		)
+		if f.Coverage != nil && unitCoverage.Status != *f.Coverage {
 			continue
 		}
 
 		if f.ExpiringWithinDays != nil &&
-			(x.WarrantyEndsAt == nil || x.WarrantyEndsAt.Before(c.Now) ||
-				x.WarrantyEndsAt.After(c.Now.Add(time.Duration(*f.ExpiringWithinDays)*24*time.Hour))) {
+			(unitCoverage.WarrantyEndsAt == nil || unitCoverage.WarrantyEndsAt.Before(call.Now) ||
+				unitCoverage.WarrantyEndsAt.After(call.Now.Add(time.Duration(*f.ExpiringWithinDays)*24*time.Hour))) {
 			continue
 		}
 
-		keep = append(keep, x)
+		keep = append(keep, unitCoverage)
 	}
 
-	desc := in.Sort != nil && in.Sort.Direction == "desc"
+	desc := query.Sort != nil && query.Sort.Direction == "desc"
 
 	field := "dueAt"
-	if in.Sort != nil {
-		field = in.Sort.Field
+	if query.Sort != nil {
+		field = query.Sort.Field
 	}
 
 	sort.SliceStable(keep, func(i, j int) bool {
-		a, b := keep[i], keep[j]
+		unitCoverage, b := keep[i], keep[j]
 		less, eq := false, false
 
 		switch field {
 		case "name":
-			less, eq = a.name < b.name, a.name == b.name
+			less, eq = unitCoverage.name < b.name, unitCoverage.name == b.name
 		case "dueAt": // warrantyEndsAt, null last
 			switch {
-			case a.WarrantyEndsAt == nil || b.WarrantyEndsAt == nil:
+			case unitCoverage.WarrantyEndsAt == nil || b.WarrantyEndsAt == nil:
 				less, eq = b.WarrantyEndsAt == nil &&
-					a.WarrantyEndsAt != nil, a.WarrantyEndsAt == nil &&
+					unitCoverage.WarrantyEndsAt != nil, unitCoverage.WarrantyEndsAt == nil &&
 					b.WarrantyEndsAt == nil
 				if !eq {
 					return less // nulls stay last in both directions
 				}
 			default:
-				less, eq = a.WarrantyEndsAt.Before(
+				less, eq = unitCoverage.WarrantyEndsAt.Before(
 					*b.WarrantyEndsAt,
-				), a.WarrantyEndsAt.Equal(
+				), unitCoverage.WarrantyEndsAt.Equal(
 					*b.WarrantyEndsAt,
 				)
 			}
 		}
 
 		if field == "id" || eq {
-			return a.UnitID.String() < b.UnitID.String()
+			return unitCoverage.UnitID.String() < b.UnitID.String()
 		}
 
 		return less != desc
 	})
-	end := min(w.Offset+w.Limit, len(keep))
+	end := min(window.Offset+window.Limit, len(keep))
 
 	items := []UnitCoverage{}
-	if w.Offset < len(keep) {
-		items = keep[w.Offset:end]
+	if window.Offset < len(keep) {
+		items = keep[window.Offset:end]
 	}
 
 	return paging.Page[UnitCoverage]{
 		Items:           items,
-		NextCursor:      w.Next(len(keep)),
+		NextCursor:      window.Next(len(keep)),
 		Total:           len(keep),
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }

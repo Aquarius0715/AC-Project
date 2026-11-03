@@ -24,8 +24,8 @@ import (
 // reading of the sensor (an earlier run, or the simulator's live reading) is skipped, so it can run again.
 func ApplyFleetHistory(
 	ctx context.Context,
-	tx pgx.Tx,
-	f devicesim.Fleet,
+	txn pgx.Tx,
+	fleet devicesim.Fleet,
 	until time.Time,
 	days int,
 ) (int64, error) {
@@ -35,14 +35,14 @@ func ApplyFleetHistory(
 
 	var tenant string
 
-	err := tx.QueryRow(ctx, `SELECT tenant_id::text FROM assets.customers WHERE organization_id =
-		$1`, ID(f.CustomerOrgID)).
+	err := txn.QueryRow(ctx, `SELECT tenant_id::text FROM assets.customers WHERE organization_id =
+		$1`, ID(fleet.CustomerOrgID)).
 		Scan(&tenant)
 	if err != nil {
-		return 0, fmt.Errorf("history customer %s: %w", f.CustomerOrgID, err)
+		return 0, fmt.Errorf("history customer %s: %w", fleet.CustomerOrgID, err)
 	}
 
-	_, err = tx.Exec(
+	_, err = txn.Exec(
 		ctx,
 		`SET LOCAL session_replication_role = replica`,
 	)
@@ -57,27 +57,27 @@ func ApplyFleetHistory(
 
 	var total int64
 
-	for _, p := range f.Patterns {
-		if p.NoDevice {
+	for _, pattern := range fleet.Patterns {
+		if pattern.NoDevice {
 			continue
 		}
 
 		last := end
-		if p.Telemetry == "silent" || p.Connection != "online" {
+		if pattern.Telemetry == "silent" || pattern.Connection != "online" {
 			last = end.Add(-24 * time.Hour) // stopped reporting a day ago
 		}
 
 		offFrom := end.Add(time.Hour) // never, unless the unit is off now
-		if p.State.Power != nil && !*p.State.Power {
+		if pattern.State.Power != nil && !*pattern.State.Power {
 			offFrom = end.Add(-3 * time.Hour)
 		}
 
 		zeroFrom := end.Add(time.Hour)
-		if p.PowerSignal == "off" {
+		if pattern.PowerSignal == "off" {
 			zeroFrom = end.Add(-6 * time.Hour)
 		}
 
-		unit := ID(devicesim.UnitName(p))
+		unit := ID(devicesim.UnitName(pattern))
 
 		var power, temperature devicesim.Sensor
 
@@ -91,9 +91,9 @@ func ApplyFleetHistory(
 		}
 
 		powerID, tempID := ID(
-			devicesim.SensorName(p, power),
+			devicesim.SensorName(pattern, power),
 		), ID(
-			devicesim.SensorName(p, temperature),
+			devicesim.SensorName(pattern, temperature),
 		)
 		// on: the KL schedule, and not in the switched-off window; jitter: a stable 0..1 per sensor and minute
 		const on = `((extract(isodow from t AT TIME ZONE 'Asia/Kuala_Lumpur') < 6 AND extract(hour from t AT TIME ZONE ` +
@@ -103,7 +103,7 @@ func ApplyFleetHistory(
 
 		const jitter = `(abs(hashtext($9 || t::text)) % 1000) / 1000.0` // $9: the sensor ID as text
 
-		tag, err := tx.Exec(ctx, `WITH s AS (
+		tag, err := txn.Exec(ctx, `WITH s AS (
 				SELECT t, CASE WHEN t >= $7 THEN 0
 					WHEN `+on+` THEN round((0.9 + 0.35 * sin(pi() * ((extract(hour from t AT TIME ZONE 'Asia/Kuala_Lumpur') + `+
 			`extract(minute from t) / 60.0) - 8) / 14) + 0.15 * `+jitter+`)::numeric, 2)::float8
@@ -122,12 +122,12 @@ func ApplyFleetHistory(
 			ON CONFLICT DO NOTHING`,
 			tenant, powerID, unit, start, last, offFrom, zeroFrom, power.Boundary, powerID.String())
 		if err != nil {
-			return total, fmt.Errorf("history power %s: %w", p.Key, err)
+			return total, fmt.Errorf("history power %s: %w", pattern.Key, err)
 		}
 
 		total += tag.RowsAffected()
 
-		tag, err = tx.Exec(
+		tag, err = txn.Exec(
 			ctx,
 			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
 				origin, quality, received_at, event_id)
@@ -158,7 +158,7 @@ func ApplyFleetHistory(
 			tempID.String(),
 		)
 		if err != nil {
-			return total, fmt.Errorf("history temperature %s: %w", p.Key, err)
+			return total, fmt.Errorf("history temperature %s: %w", pattern.Key, err)
 		}
 
 		total += tag.RowsAffected()
@@ -171,9 +171,9 @@ func ApplyFleetHistory(
 				`from t) / 60.0) - 8) / 14) + 80 * j`, `430 + 40 * j`},
 			{"pm25", "µg/m³", `12 + 10 * j`, `8 + 8 * j`},
 		} {
-			id := ID(
+			uuid := ID(
 				devicesim.SensorName(
-					p,
+					pattern,
 					devicesim.Sensor{
 						Metric:   a.metric,
 						ID:       "",
@@ -185,7 +185,7 @@ func ApplyFleetHistory(
 				),
 			)
 
-			tag, err = tx.Exec(
+			tag, err = txn.Exec(
 				ctx,
 				`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
 					origin, quality, received_at, event_id)
@@ -201,33 +201,33 @@ func ApplyFleetHistory(
 					WHERE NOT EXISTS (SELECT 1 FROM monitoring.measurements x WHERE x.sensor_id = $2 AND x.observed_at = t)) g
 				ON CONFLICT DO NOTHING`,
 				tenant,
-				id,
+				uuid,
 				unit,
 				quarter,
 				last,
 				offFrom,
-				id.String(),
+				uuid.String(),
 				a.metric,
 				a.unit,
 			)
 			if err != nil {
-				return total, fmt.Errorf("history %s %s: %w", a.metric, p.Key, err)
+				return total, fmt.Errorf("history %s %s: %w", a.metric, pattern.Key, err)
 			}
 
 			total += tag.RowsAffected()
 		}
 		// the module was last heard from at its last reading
-		_, execErr := tx.Exec(
+		_, execErr := txn.Exec(
 			ctx,
 			`UPDATE devices.devices SET last_seen_at = $2 WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < $2)`,
-			ID(devicesim.DeviceName(p)),
+			ID(devicesim.DeviceName(pattern)),
 			last,
 		)
 		if execErr != nil {
 			return total, apperr.Wrap(execErr, "update devices.devices")
 		}
 
-		_, execErr = tx.Exec(
+		_, execErr = txn.Exec(
 			ctx,
 			`UPDATE assets.units SET last_seen_at = $2 WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < $2)`,
 			unit,

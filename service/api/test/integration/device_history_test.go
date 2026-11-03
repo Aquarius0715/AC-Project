@@ -11,28 +11,34 @@ import (
 )
 
 func TestDeviceHistory(t *testing.T) {
-	s := server(t)
-	u := newUnit(t, s, "Hist AC")
-	_, m := write(
-		s,
+	srv := server(t)
+	unit := newUnit(t, srv, "Hist AC")
+	_, resp := write(
+		srv,
 		&hq,
 		"devices.register",
-		`{"serial":"HI-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+u+`"}`,
+		`{"serial":"HI-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+unit+`"}`,
 		0,
 	)
-	dev := data(m)["id"].(string)
-	sensor := data(m)["sensors"].([]any)[0].(map[string]any)["id"].(string)
+	dev := data(resp)["id"].(string)
+	sensor := data(resp)["sensors"].([]any)[0].(map[string]any)["id"].(string)
 
-	write(s, &hq, "devices.bind", `{"deviceId":"`+dev+`","unitId":"`+u+`","reason":"install"}`, 1)
 	write(
-		s,
+		srv,
+		&hq,
+		"devices.bind",
+		`{"deviceId":"`+dev+`","unitId":"`+unit+`","reason":"install"}`,
+		1,
+	)
+	write(
+		srv,
 		&hq,
 		"devices.calibrate",
 		`{"deviceId":"`+dev+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C","referenceValue":25,`+
 			`"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z"}`,
 		2,
 	)
-	write(s, &hq, "devices.check", `{"id":"`+dev+`"}`, 3)
+	write(srv, &hq, "devices.check", `{"id":"`+dev+`"}`, 3)
 
 	ev := uuid.NewString()
 	owner(
@@ -43,38 +49,38 @@ func TestDeviceHistory(t *testing.T) {
 		ev,
 		seed.ID("tenant-a"),
 		dev,
-		u,
+		unit,
 		clock,
 	) // after the binding (bound at the test clock)
 
-	for _, op := range []string{"devices.operations", "devices.calibrations"} {
-		code, m := post(s, &hq, op, `{"deviceId":"`+dev+`","query":{}}`)
+	for _, operation := range []string{"devices.operations", "devices.calibrations"} {
+		code, m := post(srv, &hq, operation, `{"deviceId":"`+dev+`","query":{}}`)
 		if code != 200 || len(items(m)) != 1 {
-			t.Fatalf("%s: %d %v", op, code, m)
+			t.Fatalf("%s: %d %v", operation, code, m)
 		}
 
-		if items(m)[0]["unitIdAtOccurrence"] != u {
-			t.Errorf("%s: occurrence scope missing", op)
+		if items(m)[0]["unitIdAtOccurrence"] != unit {
+			t.Errorf("%s: occurrence scope missing", operation)
 		}
 	}
 
-	code, m := post(s, &hq, "devices.events", `{"id":"`+dev+`","query":{"limit":10}}`)
-	if code != 200 || len(items(m)) != 1 || items(m)[0]["eventType"] != "tamper" {
-		t.Fatalf("events: %d %v", code, m)
+	code, resp := post(srv, &hq, "devices.events", `{"id":"`+dev+`","query":{"limit":10}}`)
+	if code != 200 || len(items(resp)) != 1 || items(resp)[0]["eventType"] != "tamper" {
+		t.Fatalf("events: %d %v", code, resp)
 	}
 	// customer-b (owner of the bound unit) reads events; customer-a gets NOT_FOUND
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerB,
 		"devices.events",
 		`{"id":"`+dev+`","query":{}}`,
 	); code != 200 ||
-		len(items(m)) != 1 {
+		len(items(res)) != 1 {
 		t.Error("customer-b sees events of its binding")
 	}
 
 	if code, _ := post(
-		s,
+		srv,
 		&customerA,
 		"devices.events",
 		`{"id":"`+dev+`","query":{}}`,
@@ -83,7 +89,7 @@ func TestDeviceHistory(t *testing.T) {
 	}
 
 	if code, _ := post(
-		s,
+		srv,
 		&customerB,
 		"devices.operations",
 		`{"deviceId":"`+dev+`","query":{}}`,
@@ -96,26 +102,26 @@ func TestDeviceHistory(t *testing.T) {
 		`{"query":{}}`: "deviceId=error.invalid",
 		`{"deviceId":"` + dev + `","query":{"sort":{"field":"kind","direction":"asc"}}}`: "sort.field=error.invalid",
 	} {
-		code, m := post(s, &hq, "devices.operations", b)
+		code, m := post(srv, &hq, "devices.operations", b)
 		refusal(t, b, code, m, want)
 	}
 	// response notes (DeviceEvent.version)
 	note := func(a *actor, msg string, v int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			a,
 			"devices.addResponseNote",
 			`{"deviceId":"`+dev+`","eventId":"`+ev+`","responseNote":"`+msg+`"}`,
 			v,
 		)
 	}
-	if code, m := note(
+	if code, res := note(
 		&hq,
 		"  cover reattached  ",
 		1,
-	); code != 200 || len(data(m)["responseNotes"].([]any)) != 1 ||
-		data(m)["responseNotes"].([]any)[0].(map[string]any)["message"] != "cover reattached" {
-		t.Fatalf("note: %d %v", code, m)
+	); code != 200 || len(data(res)["responseNotes"].([]any)) != 1 ||
+		data(res)["responseNotes"].([]any)[0].(map[string]any)["message"] != "cover reattached" {
+		t.Fatalf("note: %d %v", code, res)
 	}
 
 	if code, _ := note(&hq, "again", 1); code != 409 {
@@ -126,17 +132,17 @@ func TestDeviceHistory(t *testing.T) {
 		t.Errorf("blank note: %d %s", code, fields(m))
 	}
 
-	if code, m := note(
+	if code, res := note(
 		&hq,
 		strings.Repeat("x", 1001),
 		2,
 	); code != 422 ||
-		fields(m) != "responseNote=error.length" {
-		t.Errorf("note too long: %d %s", code, fields(m))
+		fields(res) != "responseNote=error.length" {
+		t.Errorf("note too long: %d %s", code, fields(res))
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"devices.addResponseNote",
 		`{"deviceId":"`+dev+`","eventId":"`+uuid.NewString()+`","responseNote":"x"}`,
@@ -150,7 +156,7 @@ func TestDeviceHistory(t *testing.T) {
 		`DELETE FROM maintenance.assignments WHERE technician_membership_id = $1 AND job_id IN (SELECT id FROM
 			maintenance.jobs WHERE unit_id = $2)`,
 		seed.ID("tech-internal-a"),
-		u,
+		unit,
 	)
 
 	if code, _ := note(&techInt, "tech note", 2); code != 404 && code != 403 {
@@ -164,14 +170,14 @@ func TestDeviceHistory(t *testing.T) {
 		seed.ID("tech-internal-a"),
 		seed.ID("org-customer-b"),
 	)
-	assign(t, u, "tech-internal-a", clock.Add(-time.Hour), clock.Add(time.Hour), "active")
+	assign(t, unit, "tech-internal-a", clock.Add(-time.Hour), clock.Add(time.Hour), "active")
 	owner(
 		t,
 		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'unit',$3) ON CONFLICT
 			DO NOTHING`,
 		seed.ID("tenant-a"),
 		seed.ID("tech-internal-a"),
-		u,
+		unit,
 	)
 
 	if code, m := note(&techInt, "tech note", 2); code != 200 {
@@ -182,52 +188,52 @@ func TestDeviceHistory(t *testing.T) {
 // A unit holds one device at a time (error.unitHasDevice), and only a bound device is calibrated
 // (error.deviceNotBound).
 func TestDeviceBindingRefusals(t *testing.T) {
-	s := server(t)
-	u := newUnit(t, s, "Bind AC")
+	srv := server(t)
+	unit := newUnit(t, srv, "Bind AC")
 	register := func(prefix string) map[string]any {
-		_, m := write(
-			s,
+		_, res := write(
+			srv,
 			&hq,
 			"devices.register",
-			`{"serial":"`+prefix+`-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+u+`"}`,
+			`{"serial":"`+prefix+`-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+unit+`"}`,
 			0,
 		)
 
-		return data(m)
+		return data(res)
 	}
 	first, second := register("BA"), register("BB")
 
 	sensor := second["sensors"].([]any)[0].(map[string]any)["id"].(string)
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"devices.calibrate",
 		`{"deviceId":"`+second["id"].(string)+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C",`+
 			`"referenceValue":25,"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z"}`,
 		1,
 	); code != 409 ||
-		m["messageKey"] != "error.deviceNotBound" {
-		t.Errorf("calibrate an unbound device: %d %v", code, m)
+		res["messageKey"] != "error.deviceNotBound" {
+		t.Errorf("calibrate an unbound device: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"devices.bind",
-		`{"deviceId":"`+first["id"].(string)+`","unitId":"`+u+`","reason":"install"}`,
+		`{"deviceId":"`+first["id"].(string)+`","unitId":"`+unit+`","reason":"install"}`,
 		1,
 	); code != 200 {
-		t.Fatalf("bind: %d %v", code, m)
+		t.Fatalf("bind: %d %v", code, res)
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"devices.bind",
-		`{"deviceId":"`+second["id"].(string)+`","unitId":"`+u+`","reason":"install"}`,
+		`{"deviceId":"`+second["id"].(string)+`","unitId":"`+unit+`","reason":"install"}`,
 		1,
 	); code != 409 ||
-		m["messageKey"] != "error.unitHasDevice" {
-		t.Errorf("a second device on the unit: %d %v", code, m)
+		res["messageKey"] != "error.unitHasDevice" {
+		t.Errorf("a second device on the unit: %d %v", code, res)
 	}
 }

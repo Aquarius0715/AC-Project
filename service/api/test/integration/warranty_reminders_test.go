@@ -12,7 +12,7 @@ import (
 // no active contract covers it: the latest reminder reached, once per warranty end, and a changed warranty end gets
 // its own. Archived units, covered units, ended warranties and ends beyond 90 days get none; clients get none.
 func TestWarrantyReminders(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	ctx := context.Background()
 	day := 24 * time.Hour
 
@@ -20,7 +20,7 @@ func TestWarrantyReminders(t *testing.T) {
 
 	unit := func(ends time.Duration) string {
 		t.Helper()
-		u := newUnit(t, s, "Warranty AC")
+		u := newUnit(t, srv, "Warranty AC")
 		owner(t, `UPDATE assets.units SET warranty_ends_at = $2 WHERE id = $1`, u, clock.Add(ends))
 		units = append(units, u)
 
@@ -37,7 +37,7 @@ func TestWarrantyReminders(t *testing.T) {
 
 		tick++
 
-		_, err := schedTick(ctx, s, clock.Add(time.Duration(tick)*time.Minute))
+		_, err := schedTick(ctx, srv, clock.Add(time.Duration(tick)*time.Minute))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -48,7 +48,7 @@ func TestWarrantyReminders(t *testing.T) {
 		severity            string
 	}
 
-	sent := func(u string) []reminder { // the unit's reminders for its current warranty end, the earliest first
+	sent := func(unitID string) []reminder { // the unit's reminders for its current warranty end, the earliest first
 		t.Helper()
 
 		var n int
@@ -56,12 +56,12 @@ func TestWarrantyReminders(t *testing.T) {
 			t,
 			`SELECT count(*) FROM assets.warranty_reminders r JOIN assets.units u ON u.id = r.unit_id AND u.warranty_ends_at =
 				r.warranty_ends_at WHERE r.unit_id = $1`,
-			[]any{u},
+			[]any{unitID},
 			&n,
 		)
 
 		out := make([]reminder, n)
-		for i := range out {
+		for idx := range out {
 			ownerScan(
 				t,
 				`SELECT r.days_before, r.notifications, coalesce(string_agg(DISTINCT n.severity, ','), '') FROM
@@ -70,10 +70,10 @@ func TestWarrantyReminders(t *testing.T) {
 				LEFT JOIN notify.notifications n ON n.target->>'id' = r.unit_id::text AND n.type = 'warranty_expiring' AND
 				n.template_key = 'warranty_expiring' AND n.occurred_at = r.sent_at
 				WHERE r.unit_id = $1 GROUP BY r.days_before, r.notifications ORDER BY r.days_before DESC OFFSET $2 LIMIT 1`,
-				[]any{u, i},
-				&out[i].days,
-				&out[i].notifications,
-				&out[i].severity,
+				[]any{unitID, idx},
+				&out[idx].days,
+				&out[idx].notifications,
+				&out[idx].severity,
 			)
 		}
 
@@ -84,8 +84,8 @@ func TestWarrantyReminders(t *testing.T) {
 	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, archived)
 
 	covered := unit(20 * day)
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"contracts.save",
 		`{"customerId":"`+seed.ID("cust-b").
@@ -98,7 +98,7 @@ func TestWarrantyReminders(t *testing.T) {
 			`","priceMinor":5000,"currency":"MYR","restrictionEligible":false,"rulesVersion":null}`,
 		0,
 	); code != 200 {
-		t.Fatalf("contract: %d %v", code, m)
+		t.Fatalf("contract: %d %v", code, res)
 	}
 
 	evaluate()
@@ -184,8 +184,8 @@ func TestWarrantyReminders(t *testing.T) {
 		t.Errorf("reminders for the unit's three warranty ends: %d", total)
 	}
 	// HQ reads the reminder about the unit in its inbox
-	_, m := post(
-		s,
+	_, resp := post(
+		srv,
 		&hq,
 		"notifications.list",
 		`{"filters":{"type":"warranty_expiring"},"limit":100}`,
@@ -193,14 +193,14 @@ func TestWarrantyReminders(t *testing.T) {
 
 	var mine map[string]any
 
-	for _, it := range items(m) {
+	for _, it := range items(resp) {
 		if it["target"].(map[string]any)["id"] == near {
 			mine = it
 		}
 	}
 
 	if mine == nil {
-		t.Fatalf("not listed: %v", m)
+		t.Fatalf("not listed: %v", resp)
 	}
 
 	params := mine["params"].(map[string]any)
@@ -212,13 +212,13 @@ func TestWarrantyReminders(t *testing.T) {
 		t.Errorf("notification: %v", mine)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&customerB,
 		"notifications.list",
 		`{"filters":{"type":"warranty_expiring"},"limit":100}`,
 	); code != 200 ||
-		len(items(m)) != 0 {
-		t.Errorf("a client receives none: %d %v", code, m)
+		len(items(res)) != 0 {
+		t.Errorf("a client receives none: %d %v", code, res)
 	}
 }

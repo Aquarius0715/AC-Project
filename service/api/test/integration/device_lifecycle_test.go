@@ -15,12 +15,12 @@ import (
 // one second after creation (check connecting), results only for running operations, TIMEOUT at expiresAt, the
 // start recheck of REV19-018 and the firmware OFFLINE start failure.
 func TestDeviceOperationLifecycle(t *testing.T) {
-	s := serverWith(t, true)
+	srv := serverWith(t, true)
 	ctx := context.Background()
-	u := boundUnit(t, s, "online")
+	unit := boundUnit(t, srv, "online")
 
 	var dev string
-	ownerScan(t, `SELECT id::text FROM devices.devices WHERE unit_id = $1`, []any{u}, &dev)
+	ownerScan(t, `SELECT id::text FROM devices.devices WHERE unit_id = $1`, []any{unit}, &dev)
 
 	version := func() int {
 		var v int
@@ -56,14 +56,14 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 	tick := func(at time.Time) {
 		t.Helper()
 
-		_, err := schedTick(ctx, s, at)
+		_, err := schedTick(ctx, srv, at)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	result := func(id, r string, at time.Time) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			&customerB,
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at.Format(
@@ -84,17 +84,17 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 			body = `{"deviceId":"` + dev + `","firmwareVersion":"v2"}`
 		}
 
-		code, m := write(s, &hq, "devices."+kind, body, version())
-		if code != 200 || data(m)["status"] != "queued" {
-			t.Fatalf("%s: %d %v", kind, code, m)
+		code, resp := write(srv, &hq, "devices."+kind, body, version())
+		if code != 200 || data(resp)["status"] != "queued" {
+			t.Fatalf("%s: %d %v", kind, code, resp)
 		}
 
 		base, _ = time.Parse(
 			time.RFC3339Nano,
-			data(m)["createdAt"].(string),
+			data(resp)["createdAt"].(string),
 		) // the server's business time (a shared demo cluster may run ahead of clock)
 
-		return data(m)["id"].(string)
+		return data(resp)["id"].(string)
 	}
 	// check: queued until the tick one second after creation, then running and connecting
 	check := start("check")
@@ -105,13 +105,13 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		t.Fatalf("started before one second: %s", st)
 	}
 
-	if code, m := result(
+	if code, resp := result(
 		check,
 		"succeeded",
 		base,
 	); code != 409 ||
-		m["messageKey"] != "errors.operation_not_running" {
-		t.Fatalf("result for a queued operation: %d %v", code, m)
+		resp["messageKey"] != "errors.operation_not_running" {
+		t.Fatalf("result for a queued operation: %d %v", code, resp)
 	}
 
 	tick(base.Add(time.Second))
@@ -222,18 +222,18 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		t.Fatalf("firmware installed: %s", firmware)
 	}
 
-	code, m := write(
-		s,
+	code, res := write(
+		srv,
 		&hq,
 		"devices.updateFirmware",
 		`{"deviceId":"`+dev+`","firmwareVersion":"v1"}`,
 		version(),
 	)
 	if code != 200 {
-		t.Fatalf("firmware v1: %d %v", code, m)
+		t.Fatalf("firmware v1: %d %v", code, res)
 	}
 
-	back := data(m)["id"].(string)
+	back := data(res)["id"].(string)
 
 	tick(base.Add(time.Second))
 	result(back, "failed", base.Add(5*time.Second))
@@ -258,7 +258,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 			VALUES ($1,$2,$3,$4,$5,$6,'{"kind":"set_power","power":false}','requested',$7,$8,$9,'t')`,
 			id,
 			seed.ID("tenant-a"),
-			u,
+			unit,
 			dev,
 			seed.ID("hq-operator"),
 			source,
@@ -309,7 +309,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		other,
 		seed.ID("tenant-a"),
 		dev,
-		u,
+		unit,
 		base.Add(10*time.Minute),
 		base.Add(time.Minute),
 	)
@@ -325,8 +325,8 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		`"operationId":"` + check + `","result":"done"`: "result=error.invalid",
 		`"result":"succeeded"`:                          "operationId=error.required",
 	} {
-		code, m := write(
-			s,
+		code, resp := write(
+			srv,
 			&customerB,
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(
@@ -334,7 +334,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 			)+`","eventType":"operation",`+b+`}`,
 			0,
 		)
-		refusal(t, b, code, m, want)
+		refusal(t, b, code, resp, want)
 	}
 
 	if code, _ := result(uuid.NewString(), "succeeded", clock); code != 404 {
@@ -345,14 +345,14 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 // TestDeviceEvents covers demo.trigger(device) (SR20, SR23, REV18-040, AT-T12-N/E/B): independent connection, power
 // and tamper axes, the tamper Alert, recoveries of the current fault only, out-of-order sequences and eventId repeats.
 func TestDeviceEvents(t *testing.T) {
-	s := serverWith(t, true)
-	u := boundUnit(t, s, "online")
+	srv := serverWith(t, true)
+	unit := boundUnit(t, srv, "online")
 
 	var dev, binding string
 	ownerScan(
 		t,
 		`SELECT id::text, binding_id::text FROM devices.devices WHERE unit_id = $1`,
-		[]any{u},
+		[]any{unit},
 		&dev,
 		&binding,
 	)
@@ -365,7 +365,7 @@ func TestDeviceEvents(t *testing.T) {
 		}
 
 		return write(
-			s,
+			srv,
 			&customerB,
 			"demo.trigger",
 			`{"scenarioId":"t12","eventId":"`+event+`","occurredAt":"`+at(
@@ -423,15 +423,15 @@ func TestDeviceEvents(t *testing.T) {
 	}
 	// ① missing heartbeat → offline only ② power signal lost ③ tamper signal: each axis independent (AT-T12-B)
 	lost := uuid.NewString()
-	if code, m := signal(
+	if code, res := signal(
 		lost,
 		"communication_lost",
 		1,
 		"",
 		1,
 	); code != 200 ||
-		data(m)["type"] != "device" {
-		t.Fatalf("communication_lost: %d %v", code, m)
+		data(res)["type"] != "device" {
+		t.Fatalf("communication_lost: %d %v", code, res)
 	}
 
 	if c, p, tm, uc := state(); c != "offline" || p != "on" || tm != "clear" || uc != "offline" {
@@ -487,15 +487,15 @@ func TestDeviceEvents(t *testing.T) {
 		t.Error("repeated eventId is idempotent")
 	}
 
-	if code, m := signal(
+	if code, res := signal(
 		tamper,
 		"tamper",
 		2,
 		"",
 		3,
 	); code != 409 ||
-		m["messageKey"] != "errors.event_id_reused" {
-		t.Errorf("eventId with other content: %d %v", code, m)
+		res["messageKey"] != "errors.event_id_reused" {
+		t.Errorf("eventId with other content: %d %v", code, res)
 	}
 	// connection recovery while the tamper alert is unacknowledged: only the connection recovers (AT-T12-E ①)
 	rec := func(axis, source, value string) string {
@@ -503,14 +503,14 @@ func TestDeviceEvents(t *testing.T) {
 	}
 
 	back := uuid.NewString()
-	if code, m := signal(
+	if code, res := signal(
 		back,
 		"restored",
 		2,
 		rec("connection", lostID, "online"),
 		10,
 	); code != 200 {
-		t.Fatalf("restored: %d %v", code, m)
+		t.Fatalf("restored: %d %v", code, res)
 	}
 
 	if c, p, tm, uc := state(); c != "online" || p != "off" || tm != "detected" || uc != "online" {
@@ -530,15 +530,15 @@ func TestDeviceEvents(t *testing.T) {
 		t.Errorf("tamper alert remains: %s", status)
 	}
 
-	if code, m := signal(
+	if code, res := signal(
 		uuid.NewString(),
 		"restored",
 		3,
 		rec("connection", lostID, "online"),
 		11,
 	); code != 409 ||
-		m["messageKey"] != "errors.recovery_source_not_current" {
-		t.Errorf("restoring a restored fault: %d %v", code, m)
+		res["messageKey"] != "errors.recovery_source_not_current" {
+		t.Errorf("restoring a restored fault: %d %v", code, res)
 	}
 	// an old heartbeat after a new communication loss leaves the device offline (AT-T12-E ②, IR102 G1-023)
 	lost5 := uuid.NewString()
@@ -584,20 +584,20 @@ func TestDeviceEvents(t *testing.T) {
 	// the recovery is evidence a resolution of the tamper alert may cite (IR327)
 	clearID, _, _, _ := eventOf(clear)
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"alerts.evidence",
 		`{"alertId":"`+alert+`","query":{"limit":100}}`,
 	); !slices.ContainsFunc(
-		items(m),
+		items(res),
 		func(it map[string]any) bool {
 			return it["id"] == clearID && it["kind"] == "device_event" &&
 				it["eventType"] == "restored" &&
 				it["observedAt"] != nil
 		},
 	) {
-		t.Errorf("tamper recovery as evidence: %v", m)
+		t.Errorf("tamper recovery as evidence: %v", res)
 	}
 	// a new tamper while the alert is open reuses it; after resolution a new alert links the previous one (IR66)
 	again := uuid.NewString()
@@ -622,15 +622,15 @@ func TestDeviceEvents(t *testing.T) {
 	var version int
 	ownerScan(t, `SELECT version FROM monitoring.alerts WHERE id = $1`, []any{alert}, &version)
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"alerts.resolve",
 		`{"alertId":"`+alert+`","resolutionReason":"Cover closed on site","resolutionEvidenceIds":["`+clearID+`"]}`,
 		version,
 	); code != 200 ||
-		data(m)["status"] != "resolved" {
-		t.Fatalf("resolve citing the recovery: %d %v", code, m)
+		data(res)["status"] != "resolved" {
+		t.Fatalf("resolve citing the recovery: %d %v", code, res)
 	}
 
 	third := uuid.NewString()
@@ -649,7 +649,7 @@ func TestDeviceEvents(t *testing.T) {
 		t.Errorf("recurrence links the resolved alert: %v %v", a, previous)
 	}
 	// devices.events shows the events with their alerts and recovery
-	code, m := post(s, &hq, "devices.events", `{"id":"`+dev+`","query":{"limit":50}}`)
+	code, m := post(srv, &hq, "devices.events", `{"id":"`+dev+`","query":{"limit":50}}`)
 	if code != 200 || len(items(m)) != count() {
 		t.Fatalf("events: %d %v", code, m)
 	}
@@ -672,12 +672,12 @@ func TestDeviceEvents(t *testing.T) {
 		body := `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + at(
 			60,
 		) + `","eventType":"device","deviceId":"` + dev + `","bindingId":"` + binding + `",` + b + `}`
-		code, m := write(s, &customerB, "demo.trigger", body, 0)
+		code, m := write(srv, &customerB, "demo.trigger", body, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&customerB,
 		"demo.trigger",
 		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at(
@@ -686,12 +686,12 @@ func TestDeviceEvents(t *testing.T) {
 			`","bindingId":"`+uuid.NewString()+`","kind":"tamper","sequence":9}`,
 		0,
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["bindingId"] == nil {
-		t.Errorf("binding mismatch: %d %v", code, m)
+		res["fieldErrors"].(map[string]any)["bindingId"] == nil {
+		t.Errorf("binding mismatch: %d %v", code, res)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&customerB,
 		"demo.trigger",
 		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at(

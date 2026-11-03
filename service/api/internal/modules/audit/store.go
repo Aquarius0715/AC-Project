@@ -36,7 +36,7 @@ func History(ctx context.Context, c *ops.Call, kind, id string) ([]View, error) 
 	return out, apperr.Wrap(err, "delegate audit.history")
 }
 
-func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error) {
+func history(ctx context.Context, c *ops.Call, input *HistoryInput) ([]View, error) {
 	rows, err := c.Tx.Query(
 		ctx,
 		`SELECT a.id, a.tenant_id, a.actor_id, u.display_name, a.actor_role_at_time, a.action, a.previous_version,
@@ -44,8 +44,8 @@ func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error)
 		a.masked_before, a.masked_after, a.reason FROM audit.audit_log a
 		`+actorJoin+` WHERE a.target_kind = $1 AND
 			a.target_id = $2 ORDER BY a.occurred_at, a.correlation_id, a.id`,
-		in.TargetKind,
-		in.TargetID,
+		input.TargetKind,
+		input.TargetID,
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select audit.audit_log")
@@ -55,31 +55,31 @@ func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error)
 	out := []View{}
 
 	for rows.Next() {
-		var x View
+		var view View
 
 		err := rows.Scan(
-			&x.ID,
-			&x.TenantID,
-			&x.ActorID,
-			&x.ActorName,
-			&x.ActorRoleAtTime,
-			&x.Action,
-			&x.PreviousVersion,
-			&x.NextVersion,
-			&x.OccurredAt,
-			&x.CorrelationID,
-			&x.Result,
-			&x.MaskedBefore,
-			&x.MaskedAfter,
-			&x.Reason,
+			&view.ID,
+			&view.TenantID,
+			&view.ActorID,
+			&view.ActorName,
+			&view.ActorRoleAtTime,
+			&view.Action,
+			&view.PreviousVersion,
+			&view.NextVersion,
+			&view.OccurredAt,
+			&view.CorrelationID,
+			&view.Result,
+			&view.MaskedBefore,
+			&view.MaskedAfter,
+			&view.Reason,
 		)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select audit.audit_log")
 		}
 
-		x.Version, x.CreatedAt, x.UpdatedAt = 1, x.OccurredAt, x.OccurredAt
-		x.TargetRef = map[string]string{"kind": in.TargetKind, "id": in.TargetID}
-		out = append(out, x)
+		view.Version, view.CreatedAt, view.UpdatedAt = 1, view.OccurredAt, view.OccurredAt
+		view.TargetRef = map[string]string{"kind": input.TargetKind, "id": input.TargetID}
+		out = append(out, view)
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select audit.audit_log")
@@ -93,15 +93,15 @@ func RegisterQueries(r *ops.Registry) {
 // EventHandlers store published audit entries (consumer identity); the entry ID makes a replay a no-op.
 func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
-		events.AuditRecorded: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
-			var a events.Audit
+		events.AuditRecorded: func(ctx context.Context, txn pgx.Tx, e events.Event) error {
+			var audit events.Audit
 
-			decodeErr := e.Decode(&a)
+			decodeErr := e.Decode(&audit)
 			if decodeErr != nil {
 				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
-			before, after := a.MaskedBefore, a.MaskedAfter
+			before, after := audit.MaskedBefore, audit.MaskedAfter
 			if before == nil {
 				before = map[string]*string{}
 			}
@@ -110,27 +110,27 @@ func EventHandlers() map[string]events.Handler {
 				after = map[string]*string{}
 			}
 
-			_, err := tx.Exec(
+			_, err := txn.Exec(
 				ctx,
 				`INSERT INTO audit.audit_log (id, tenant_id, actor_id, actor_role_at_time, membership_id, action, target_kind,
 					target_id,
 				previous_version, next_version, occurred_at, correlation_id, result, reason, masked_before, masked_after)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULLIF($14, ''), $15, $16) ON CONFLICT (id,
 				occurred_at) DO NOTHING`,
-				a.ID,
+				audit.ID,
 				e.TenantID,
-				a.ActorID,
-				a.ActorRole,
-				a.MembershipID,
-				a.Action,
-				a.TargetKind,
-				a.TargetID,
-				a.PreviousVersion,
-				a.NextVersion,
-				a.OccurredAt,
-				a.CorrelationID,
-				a.Result,
-				a.Reason,
+				audit.ActorID,
+				audit.ActorRole,
+				audit.MembershipID,
+				audit.Action,
+				audit.TargetKind,
+				audit.TargetID,
+				audit.PreviousVersion,
+				audit.NextVersion,
+				audit.OccurredAt,
+				audit.CorrelationID,
+				audit.Result,
+				audit.Reason,
 				before,
 				after,
 			)

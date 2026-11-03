@@ -13,7 +13,7 @@ import (
 // text is VALIDATION naming the field, whoever asks. Path parameters are sent as the nil UUID, so the route matches
 // and the rule for a missing ID fires.
 func TestRequiredInputs(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	long := func(n int) string { return `"` + strings.Repeat("x", n) + `"` }
 
 	req, inv, length, rng := "error.required", "error.invalid", "error.length", "error.range"
@@ -225,7 +225,7 @@ func TestRequiredInputs(t *testing.T) {
 		}
 
 		b, _ := json.Marshal(body)
-		code, m := write(s, &hq, c.op, string(b), 0)
+		code, m := write(srv, &hq, c.op, string(b), 0)
 
 		fe, _ := m["fieldErrors"].(map[string]any)
 		for field, key := range c.want {

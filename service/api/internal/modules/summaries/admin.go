@@ -108,7 +108,11 @@ func collectIDs(rows pgx.Rows) ([]uuid.UUID, error) {
 //	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/admin/summary [get]
-func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (AdminSummary, error) {
+func (m Summaries) admin(
+	ctx context.Context,
+	c *ops.Call,
+	input *AdminInput,
+) (AdminSummary, error) {
 	out := AdminSummary{
 		AsOf:                c.Now,
 		JobCounts:           map[string]int{},
@@ -155,17 +159,17 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 	}
 
 	conds := []string{"NOT u.archived"}
-	if in.CustomerID != nil {
+	if input.CustomerID != nil {
 		conds = append(
 			conds,
 			"u.customer_org_id = (SELECT organization_id FROM assets.customers WHERE id = "+add(
-				*in.CustomerID,
+				*input.CustomerID,
 			)+")",
 		)
 	}
 
-	if in.PropertyID != nil {
-		conds = append(conds, "u.property_id = "+add(*in.PropertyID))
+	if input.PropertyID != nil {
+		conds = append(conds, "u.property_id = "+add(*input.PropertyID))
 	}
 
 	rows, err := c.Tx.Query(
@@ -181,16 +185,31 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 		return out, err
 	}
 
-	n, err := m.Units.CountUnits(ctx, c, true, nil, in.CustomerID, in.PropertyID, nil)
+	unitCounts, err := m.Units.CountUnits(
+		ctx,
+		c,
+		true,
+		nil,
+		input.CustomerID,
+		input.PropertyID,
+		nil,
+	)
 	if err != nil {
 		return out, apperr.Wrap(err, "summaries.Units.CountUnits")
 	}
 
-	out.Total, out.Online, out.Offline, out.Unknown = n.Total, n.Online, n.Offline, n.Unknown
+	out.Total = unitCounts.Total
+	out.Online = unitCounts.Online
+	out.Offline = unitCounts.Offline
+	out.Unknown = unitCounts.Unknown
 
-	out.PowerOn, out.PowerOff, out.PowerUnknown, out.AlertCount = n.PowerOn, n.PowerOff, n.PowerUnknown, n.AlertCount
-	if d := n.PowerOn + n.PowerOff; d > 0 { // unknown power never counts as inactive (DD-A01)
-		r := float64(n.PowerOn) / float64(d) * 100
+	out.PowerOn = unitCounts.PowerOn
+	out.PowerOff = unitCounts.PowerOff
+	out.PowerUnknown = unitCounts.PowerUnknown
+
+	out.AlertCount = unitCounts.AlertCount
+	if d := unitCounts.PowerOn + unitCounts.PowerOff; d > 0 { // unknown power never counts as inactive (DD-A01)
+		r := float64(unitCounts.PowerOn) / float64(d) * 100
 		out.OperatingRate = &r
 	}
 	// customers: Customer and Organization both active (IR40; organization status from identity); filters narrow to the
@@ -203,15 +222,15 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 	}
 
 	cconds := []string{"cu.status = 'active'"}
-	if in.CustomerID != nil {
-		cconds = append(cconds, "cu.id = "+cadd(*in.CustomerID))
+	if input.CustomerID != nil {
+		cconds = append(cconds, "cu.id = "+cadd(*input.CustomerID))
 	}
 
-	if in.PropertyID != nil {
+	if input.PropertyID != nil {
 		cconds = append(
 			cconds,
 			"cu.organization_id = (SELECT customer_org_id FROM assets.properties WHERE id = "+cadd(
-				*in.PropertyID,
+				*input.PropertyID,
 			)+")",
 		)
 	}
@@ -257,7 +276,7 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 		m.Registry,
 		c,
 		maintenance.QueryStatusCounts,
-		maintenance.StatusCountsInput{UnitIDs: units, From: in.From, To: in.To},
+		maintenance.StatusCountsInput{UnitIDs: units, From: input.From, To: input.To},
 	)
 	if err != nil {
 		return out, err
@@ -291,18 +310,18 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 		out.OverdueInvoiceCount = &total
 	}
 	// energy: actuals only (no baseline) and the IR78 forecast
-	en, err := ops.Ask[energy.Actuals](
+	actuals, err := ops.Ask[energy.Actuals](
 		ctx,
 		m.Registry,
 		c,
 		energy.QueryActuals,
-		energy.ActualsInput{UnitIDs: units, From: in.From, To: in.To},
+		energy.ActualsInput{UnitIDs: units, From: input.From, To: input.To},
 	)
 	if err != nil {
 		return out, err
 	}
 
-	out.EnergySummary, out.EnergyForecast = &en.Summary, en.Forecast
+	out.EnergySummary, out.EnergyForecast = &actuals.Summary, actuals.Forecast
 
 	return out, nil
 }

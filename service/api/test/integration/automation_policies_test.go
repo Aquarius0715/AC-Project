@@ -44,19 +44,20 @@ func autoPolicyBody(extra map[string]string) string {
 }
 
 func TestAutomationPolicies(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	owner(
 		t,
 		`DELETE FROM control.automation_policies`,
 	) // test-only rows (none are seeded); keeps the lists within one page
 
-	code, m := write(s, &hq, "policies.save", autoPolicyBody(nil), 0)
-	if code != 200 || data(m)["kind"] != "automation" || len(data(m)["unitIds"].([]any)) != 2 ||
-		data(m)["action"].(map[string]any)["celsius"].(float64) != 26 {
-		t.Fatalf("create: %d %v", code, m)
+	code, resp := write(srv, &hq, "policies.save", autoPolicyBody(nil), 0)
+	if code != 200 || data(resp)["kind"] != "automation" ||
+		len(data(resp)["unitIds"].([]any)) != 2 ||
+		data(resp)["action"].(map[string]any)["celsius"].(float64) != 26 {
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := data(m)["id"].(string)
+	id := data(resp)["id"].(string)
 
 	valid := map[string]map[string]string{
 		"occupancy": {
@@ -81,7 +82,7 @@ func TestAutomationPolicies(t *testing.T) {
 		},
 	}
 	for name, e := range valid {
-		if code, m := write(s, &hq, "policies.save", autoPolicyBody(e), 0); code != 200 {
+		if code, m := write(srv, &hq, "policies.save", autoPolicyBody(e), 0); code != 200 {
 			t.Errorf("%s: %d %v", name, code, m)
 		}
 	}
@@ -147,12 +148,12 @@ func TestAutomationPolicies(t *testing.T) {
 	}
 
 	for name, e := range bad {
-		code, m := write(s, &hq, "policies.save", autoPolicyBody(e), 0)
+		code, m := write(srv, &hq, "policies.save", autoPolicyBody(e), 0)
 		refusal(t, name, code, m, want[name])
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"policies.save",
 		autoPolicyBody(map[string]string{"unitIds": `["` + uuid.NewString() + `"]`}),
@@ -161,15 +162,15 @@ func TestAutomationPolicies(t *testing.T) {
 		t.Error("unknown unit → NOT_FOUND")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"policies.save",
 		alertPolicyBody(map[string]string{"condition": `{"type":"peak","active":true}`}),
 		0,
 	); code != 422 ||
-		fields(m) != "kind=error.fieldsOfOtherKind" {
-		t.Errorf("alert policy with automation fields: %d %s", code, fields(m))
+		fields(res) != "kind=error.fieldsOfOtherKind" {
+		t.Errorf("alert policy with automation fields: %d %s", code, fields(res))
 	}
 
 	// update replaces units and clears disabledReason; kind and version rules
@@ -179,8 +180,8 @@ func TestAutomationPolicies(t *testing.T) {
 		id,
 	)
 
-	code, m = write(
-		s,
+	code, resp = write(
+		srv,
 		&hq,
 		"policies.save",
 		autoPolicyBody(
@@ -191,13 +192,14 @@ func TestAutomationPolicies(t *testing.T) {
 		),
 		1,
 	)
-	if code != 200 || len(data(m)["unitIds"].([]any)) != 1 || data(m)["disabledReason"] != nil ||
-		data(m)["version"].(float64) != 2 {
-		t.Fatalf("update: %d %v", code, m)
+	if code != 200 || len(data(resp)["unitIds"].([]any)) != 1 ||
+		data(resp)["disabledReason"] != nil ||
+		data(resp)["version"].(float64) != 2 {
+		t.Fatalf("update: %d %v", code, resp)
 	}
 
 	if code, _ := write(
-		s,
+		srv,
 		&hq,
 		"policies.save",
 		autoPolicyBody(map[string]string{"id": `"` + id + `"`}),
@@ -208,16 +210,16 @@ func TestAutomationPolicies(t *testing.T) {
 
 	def := seed.DefaultPolicyID("tenant-a").String()
 
-	_, dm := post(s, &hq, "policies.get", `{"policyId":"`+def+`"}`)
-	if code, m := write(
-		s,
+	_, dm := post(srv, &hq, "policies.get", `{"policyId":"`+def+`"}`)
+	if code, res := write(
+		srv,
 		&hq,
 		"policies.save",
 		autoPolicyBody(map[string]string{"id": `"` + def + `"`}),
 		ver(dm),
 	); code != 422 ||
-		fields(m) != "kind=error.kindFixed" {
-		t.Errorf("default policy saved as automation: %d %s", code, fields(m))
+		fields(res) != "kind=error.kindFixed" {
+		t.Errorf("default policy saved as automation: %d %s", code, fields(res))
 	}
 
 	// reads: kind filter, unit/customer filters, client and permission scope
@@ -230,43 +232,43 @@ func TestAutomationPolicies(t *testing.T) {
 		return out
 	}
 
-	_, m = post(s, &hq, "policies.list", `{"filters":{"kind":"automation"},"limit":100}`)
-	if !ids(m)[id] {
+	_, resp = post(srv, &hq, "policies.list", `{"filters":{"kind":"automation"},"limit":100}`)
+	if !ids(resp)[id] {
 		t.Fatal("kind=automation")
 	}
 
-	for _, it := range items(m) {
+	for _, it := range items(resp) {
 		if it["kind"] != "automation" {
 			t.Fatal("kind filter leaks")
 		}
 	}
 
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&hq,
 		"policies.list",
 		`{"filters":{"kind":"automation","unitId":"`+seed.ID("unit-limited").
 			String()+
 			`"},"limit":100}`,
 	)
-	if !ids(m)[id] {
+	if !ids(resp)[id] {
 		t.Fatal("automation unitId filter")
 	}
 
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&hq,
 		"policies.list",
 		`{"filters":{"kind":"automation","unitId":"`+seed.ID("unit-other-customer").
 			String()+
 			`"},"limit":100}`,
 	)
-	if ids(m)[id] {
+	if ids(resp)[id] {
 		t.Fatal("automation unitId filter excludes")
 	}
 	// the unit and the property together: the unit counts only when it is in the property
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&hq,
 		"policies.list",
 		`{"filters":{"kind":"automation","unitId":"`+seed.ID("unit-limited").
@@ -275,12 +277,12 @@ func TestAutomationPolicies(t *testing.T) {
 			String()+
 			`"},"limit":100}`,
 	)
-	if !ids(m)[id] {
+	if !ids(resp)[id] {
 		t.Error("unit in the property")
 	}
 
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&hq,
 		"policies.list",
 		`{"filters":{"kind":"automation","unitId":"`+seed.ID("unit-limited").
@@ -289,60 +291,66 @@ func TestAutomationPolicies(t *testing.T) {
 			String()+
 			`"},"limit":100}`,
 	)
-	if ids(m)[id] {
+	if ids(resp)[id] {
 		t.Error("unit outside the property")
 	}
 
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&hq,
 		"policies.list",
 		`{"filters":{"kind":"automation","customerId":"`+seed.ID("cust-a").
 			String()+
 			`","enabled":true},"limit":100}`,
 	)
-	if !ids(m)[id] {
+	if !ids(resp)[id] {
 		t.Fatal("automation customerId filter")
 	}
 
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&hq,
 		"policies.list",
 		`{"filters":{"kind":"automation","customerId":"`+seed.ID("cust-b").
 			String()+
 			`"},"limit":100}`,
 	)
-	if ids(m)[id] {
+	if ids(resp)[id] {
 		t.Fatal("automation customerId filter excludes")
 	}
 
-	if code, _ := post(s, &customerA, "policies.get", `{"policyId":"`+id+`"}`); code != 404 {
+	if code, _ := post(srv, &customerA, "policies.get", `{"policyId":"`+id+`"}`); code != 404 {
 		t.Error("clients do not see automation policies")
 	}
 
-	_, m = post(s, &customerA, "policies.list", `{"filters":{"kind":"automation"}}`)
-	if len(items(m)) != 0 {
+	_, resp = post(srv, &customerA, "policies.list", `{"filters":{"kind":"automation"}}`)
+	if len(items(resp)) != 0 {
 		t.Error("client automation list")
 	}
 
 	// delete removes unit targets
-	if code, _ := write(s, &customerA, "policies.delete", `{"policyId":"`+id+`"}`, 2); code != 404 {
+	if code, _ := write(
+		srv,
+		&customerA,
+		"policies.delete",
+		`{"policyId":"`+id+`"}`,
+		2,
+	); code != 404 {
 		t.Error("client delete automation")
 	}
 
-	if code, m := write(
-		s,
+	if code, res := write(
+		srv,
 		&hq,
 		"policies.delete",
 		`{"policyId":"`+id+`"}`,
 		2,
 	); code != 200 ||
-		data(m)["deleted"] != true {
+		data(res)["deleted"] != true {
 		t.Fatalf("delete: %d", code)
 	}
 
-	if code, _ := post(s, &hq, "policies.get", `{"policyId":"`+id+`"}`); code != 404 {
+	if code, _ := post(srv, &hq, "policies.get", `{"policyId":"`+id+`"}`); code != 404 {
 		t.Error("deleted automation policy")
 	}
 }

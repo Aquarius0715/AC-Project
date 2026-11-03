@@ -74,11 +74,11 @@ var LiveSite = struct {
 // ApplyLive adds the live site to a seeded database: the live customer and its owner (liveOwner), the model (remote
 // power only), a property with one room, the air conditioner and its module, online since at. Records that exist are
 // kept (ON CONFLICT DO NOTHING), so it can run on every start. Development only: tests and production never load it.
-func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
+func ApplyLive(ctx context.Context, txn pgx.Tx, at time.Time) error {
 	s := LiveSite
 	tenant := ID(s.Tenant)
 	ex := func(what, sql string, args ...any) error {
-		_, err := tx.Exec(ctx, sql, args...)
+		_, err := txn.Exec(ctx, sql, args...)
 		if err != nil {
 			return fmt.Errorf("live site %s: %w", what, err)
 		}
@@ -113,7 +113,7 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 		return err
 	}
 
-	err = liveOwner(ctx, tx, tenant, at)
+	err = liveOwner(ctx, txn, tenant, at)
 	if err != nil {
 		return err
 	}
@@ -227,7 +227,7 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 
 	device, binding := ID(s.Device), ID(s.Binding)
 
-	added, err := tx.Exec(
+	added, err := txn.Exec(
 		ctx,
 		`INSERT INTO devices.devices (id, tenant_id, serial, binding_id, unit_id, target_unit_id, created_by_membership_id,
 			connection, last_seen_at,
@@ -245,22 +245,22 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 		return fmt.Errorf("live site module: %w", err)
 	}
 
-	for _, x := range s.Sensors {
+	for _, liveSensor := range s.Sensors {
 		var boundary *string
-		if x.Boundary != "" {
-			boundary = &x.Boundary
+		if liveSensor.Boundary != "" {
+			boundary = &liveSensor.Boundary
 		}
 
 		err := ex(
-			"sensor "+x.Metric,
+			"sensor "+liveSensor.Metric,
 			`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds,
 				calibrated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,120,NULL) ON CONFLICT DO NOTHING`,
-			ID(x.Name),
+			ID(liveSensor.Name),
 			tenant,
 			device,
-			x.Metric,
-			x.Unit,
+			liveSensor.Metric,
+			liveSensor.Unit,
 			boundary,
 		)
 		if err != nil {
@@ -302,12 +302,12 @@ func ApplyLive(ctx context.Context, tx pgx.Tx, at time.Time) error {
 // entry in the customer's user list. A new membership asks for the sign-in account as bootstrap-admin does (IR509): on
 // AccountRequested the identity-accounts consumer opens it, with the address as its username, and e-mails the set-up
 // link (in development to Mailpit), where the owner chooses a password. A membership that exists asks for nothing.
-func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) error {
+func liveOwner(ctx context.Context, txn pgx.Tx, tenant uuid.UUID, at time.Time) error {
 	o, org, customer := LiveSite.Owner, ID(LiveSite.CustomerOrgID), ID(LiveSite.Customer)
 
 	user, membership := ID(o.User), ID(o.Membership)
 
-	_, err := tx.Exec(
+	_, err := txn.Exec(
 		ctx,
 		`INSERT INTO identity.users (id, email, display_name, status, created_at, updated_at) VALUES ($1,$2,$3,'active',$4,$4)
 		ON CONFLICT DO NOTHING`,
@@ -322,7 +322,7 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 
 	var holder uuid.UUID
 
-	err = tx.QueryRow(ctx, `SELECT id FROM identity.users WHERE email = $1`, o.Email).
+	err = txn.QueryRow(ctx, `SELECT id FROM identity.users WHERE email = $1`, o.Email).
 		Scan(&holder)
 	if err != nil {
 		return fmt.Errorf("live owner: %w", err)
@@ -332,7 +332,7 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 		return fmt.Errorf("live owner: %s belongs to another person", o.Email)
 	}
 
-	added, err := tx.Exec(
+	added, err := txn.Exec(
 		ctx,
 		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from, created_at,
 			updated_at)
@@ -348,7 +348,7 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 	}
 
 	for _, p := range identity.DefaultPermissions("client") {
-		_, err := tx.Exec(
+		_, err := txn.Exec(
 			ctx,
 			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1,$2,$3) ON CONFLICT DO
 				NOTHING`,
@@ -361,7 +361,7 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 		}
 	}
 
-	_, execErr := tx.Exec(
+	_, execErr := txn.Exec(
 		ctx,
 		`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'organization',$3) ON
 			CONFLICT DO NOTHING`,
@@ -373,7 +373,7 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 		return fmt.Errorf("live owner scope: %w", execErr)
 	}
 
-	_, execErr = tx.Exec(
+	_, execErr = txn.Exec(
 		ctx,
 		`INSERT INTO identity.consents (tenant_id, membership_id, purpose, granted, created_at, updated_at) VALUES ($1,$2,
 			'location_automation',false,$3,$3)
@@ -386,7 +386,7 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 		return fmt.Errorf("live owner consent: %w", execErr)
 	}
 
-	_, execErr = tx.Exec(
+	_, execErr = txn.Exec(
 		ctx,
 		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role,
 			status, invited_at,
@@ -408,7 +408,7 @@ func liveOwner(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, at time.Time) e
 		return nil
 	}
 
-	_, err = tx.Exec(
+	_, err = txn.Exec(
 		ctx,
 		`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
 			occurred_at)

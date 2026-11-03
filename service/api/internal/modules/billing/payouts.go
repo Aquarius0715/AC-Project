@@ -96,53 +96,53 @@ const statementCols = `id, tenant_id, version, created_at, updated_at, contracto
 	approved_by_membership_id, paid_at`
 
 func scanStatement(r pgx.Row) (Statement, error) {
-	var x Statement
+	var statement Statement
 
 	err := r.Scan(
-		&x.ID,
-		&x.TenantID,
-		&x.Version,
-		&x.CreatedAt,
-		&x.UpdatedAt,
-		&x.ContractorOrgID,
-		&x.Period,
-		&x.Status,
-		&x.Currency,
-		&x.GrossMinor,
-		&x.DeductionsMinor,
-		&x.NetMinor,
-		&x.PayDate,
-		&x.ApprovedByMembershipID,
-		&x.PaidAt,
+		&statement.ID,
+		&statement.TenantID,
+		&statement.Version,
+		&statement.CreatedAt,
+		&statement.UpdatedAt,
+		&statement.ContractorOrgID,
+		&statement.Period,
+		&statement.Status,
+		&statement.Currency,
+		&statement.GrossMinor,
+		&statement.DeductionsMinor,
+		&statement.NetMinor,
+		&statement.PayDate,
+		&statement.ApprovedByMembershipID,
+		&statement.PaidAt,
 	)
 
-	return x, apperr.Wrap(err, "scan (scanStatement)")
+	return statement, apperr.Wrap(err, "scan (scanStatement)")
 }
 
-func (m Payouts) fill(ctx context.Context, c *ops.Call, x *Statement) error {
+func (m Payouts) fill(ctx context.Context, c *ops.Call, statement *Statement) error {
 	rows, err := c.Tx.Query(
 		ctx,
 		`SELECT id, job_id, work_type, accepted_at, amount_minor, kind, note FROM billing.payout_lines WHERE statement_id = $1
 			ORDER BY accepted_at NULLS LAST, id`,
-		x.ID,
+		statement.ID,
 	)
 	if err != nil {
 		return apperr.Wrap(err, "select billing.payout_lines")
 	}
 
-	x.Lines = []PayoutLine{}
+	statement.Lines = []PayoutLine{}
 
 	for rows.Next() {
-		var l PayoutLine
+		var payoutLine PayoutLine
 
 		err := rows.Scan(
-			&l.ID,
-			&l.JobID,
-			&l.WorkType,
-			&l.AcceptedAt,
-			&l.AmountMinor,
-			&l.Kind,
-			&l.Note,
+			&payoutLine.ID,
+			&payoutLine.JobID,
+			&payoutLine.WorkType,
+			&payoutLine.AcceptedAt,
+			&payoutLine.AmountMinor,
+			&payoutLine.Kind,
+			&payoutLine.Note,
 		)
 		if err != nil {
 			rows.Close()
@@ -150,7 +150,7 @@ func (m Payouts) fill(ctx context.Context, c *ops.Call, x *Statement) error {
 			return apperr.Wrap(err, "select billing.payout_lines")
 		}
 
-		x.Lines = append(x.Lines, l)
+		statement.Lines = append(statement.Lines, payoutLine)
 	}
 
 	rows.Close()
@@ -159,32 +159,32 @@ func (m Payouts) fill(ctx context.Context, c *ops.Call, x *Statement) error {
 		ctx,
 		`SELECT id, line_id, topic, message, state, resolution, adjustment_minor FROM billing.payout_queries WHERE
 			statement_id = $1 ORDER BY created_at, id`,
-		x.ID,
+		statement.ID,
 	)
 	if err != nil {
 		return apperr.Wrap(err, "select billing.payout_queries")
 	}
 	defer rows.Close()
 
-	x.Queries = []Question{}
+	statement.Queries = []Question{}
 
 	for rows.Next() {
-		var q Question
+		var question Question
 
 		err := rows.Scan(
-			&q.ID,
-			&q.LineID,
-			&q.Topic,
-			&q.Message,
-			&q.State,
-			&q.Reply,
-			&q.AdjustmentMinor,
+			&question.ID,
+			&question.LineID,
+			&question.Topic,
+			&question.Message,
+			&question.State,
+			&question.Reply,
+			&question.AdjustmentMinor,
 		)
 		if err != nil {
 			return apperr.Wrap(err, "select billing.payout_queries")
 		}
 
-		x.Queries = append(x.Queries, q)
+		statement.Queries = append(statement.Queries, question)
 	}
 
 	return apperr.Wrap(rows.Err(), "select billing.payout_queries")
@@ -193,7 +193,7 @@ func (m Payouts) fill(ctx context.Context, c *ops.Call, x *Statement) error {
 // load reads a statement; contractors see only their own approved/paid statements.
 func (m Payouts) load(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	id uuid.UUID,
 	lock bool,
 ) (Statement, error) {
@@ -202,17 +202,18 @@ func (m Payouts) load(
 		q += " FOR UPDATE"
 	}
 
-	x, err := scanStatement(c.Tx.QueryRow(ctx, q, id))
+	statement, err := scanStatement(call.Tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && c.Principal.Role == "contractor" && (x.ContractorOrgID != c.Principal.OrgID || x.Status == "draft")) {
-		return x, apperr.E(apperr.NotFound, "error.notFound")
+		(err == nil && call.Principal.Role == "contractor" &&
+			(statement.ContractorOrgID != call.Principal.OrgID || statement.Status == "draft")) {
+		return statement, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	if err != nil {
-		return x, err
+		return statement, err
 	}
 
-	return x, m.fill(ctx, c, &x)
+	return statement, m.fill(ctx, call, &statement)
 }
 
 // ---- payouts.generate ----
@@ -268,15 +269,15 @@ func (in *GenerateInput) Validate() map[string]string {
 //	@Router			/v1/payouts/generate [post]
 func (m Payouts) generate(
 	ctx context.Context,
-	c *ops.Call,
-	in *GenerateInput,
+	call *ops.Call,
+	input *GenerateInput,
 ) ([]Statement, error) {
-	from, to, _ := periodBounds(in.Period)
-	if c.Now.Before(to) {
+	from, until, _ := periodBounds(input.Period)
+	if call.Now.Before(until) {
 		return nil, apperr.Fields(map[string]string{"period": "errors.period_not_ended"})
 	}
 
-	jobs, err := m.Source.AcceptedJobs(ctx, c, from, to)
+	jobs, err := m.Source.AcceptedJobs(ctx, call, from, until)
 	if err != nil {
 		return nil, apperr.Wrap(err, "billing.PayoutSource.AcceptedJobs")
 	}
@@ -298,25 +299,30 @@ func (m Payouts) generate(
 
 		return per[org]
 	}
-	for _, j := range jobs {
-		a := get(j.ContractorOrgID)
+	for _, acceptedJob := range jobs {
+		a := get(acceptedJob.ContractorOrgID)
 
-		rates, currency, found, err := m.Source.RateAt(ctx, c, j.ContractorOrgID, j.AcceptedAt)
+		rates, currency, found, err := m.Source.RateAt(
+			ctx,
+			call,
+			acceptedJob.ContractorOrgID,
+			acceptedJob.AcceptedAt,
+		)
 		if err != nil {
 			return nil, apperr.Wrap(err, "billing.PayoutSource.RateAt")
 		}
 
 		work := "repair_base"
-		if j.Type == "periodic" {
+		if acceptedJob.Type == "periodic" {
 			work = "periodic_inspection"
 		}
 
-		at := j.AcceptedAt
+		when := acceptedJob.AcceptedAt
 		line := PayoutLine{
 			ID:         uuid.New(),
-			JobID:      j.JobID,
+			JobID:      acceptedJob.JobID,
 			WorkType:   work,
-			AcceptedAt: &at,
+			AcceptedAt: &when,
 			Kind:       "charge", AmountMinor: 0, Note: nil,
 		}
 
@@ -329,14 +335,14 @@ func (m Payouts) generate(
 		}
 
 		a.lines = append(a.lines, line)
-		if j.Returned && found {
+		if acceptedJob.Returned && found {
 			a.lines = append(
 				a.lines,
 				PayoutLine{
 					ID:          uuid.New(),
-					JobID:       j.JobID,
+					JobID:       acceptedJob.JobID,
 					WorkType:    "rework_deduction",
-					AcceptedAt:  &at,
+					AcceptedAt:  &when,
 					AmountMinor: rates["rework_deduction"],
 					Kind:        "deduction", Note: nil,
 				},
@@ -345,20 +351,20 @@ func (m Payouts) generate(
 	}
 	// adjustments of answered questions not yet applied (from earlier periods); those carried by a draft of this
 	// period are released first because the draft is regenerated
-	_, execErr := c.Tx.Exec(ctx, `UPDATE billing.payout_queries SET applied_statement_id = NULL
+	_, execErr := call.Tx.Exec(ctx, `UPDATE billing.payout_queries SET applied_statement_id = NULL
 		WHERE applied_statement_id IN (SELECT id FROM billing.payout_statements WHERE period = $1 AND status =
-		'draft')`, in.Period)
+		'draft')`, input.Period)
 	if execErr != nil {
 		return nil, apperr.Wrap(execErr, "update billing.payout_queries")
 	}
 	// adjustments of answered questions not yet applied (from earlier periods)
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT q.id, s.contractor_org_id, q.adjustment_minor, l.job_id FROM billing.payout_queries q JOIN
 			billing.payout_statements s ON s.id = q.statement_id
 		LEFT JOIN billing.payout_lines l ON l.id = q.line_id
 		WHERE q.state = 'adjusted' AND q.applied_statement_id IS NULL AND s.period < $1 ORDER BY q.resolved_at, q.id`,
-		in.Period,
+		input.Period,
 	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select billing.payout_queries")
@@ -413,14 +419,14 @@ func (m Payouts) generate(
 		)
 	}
 
-	payDate := time.Date(to.Year(), to.Month(), 15, 0, 0, 0, 0, time.UTC)
+	payDate := time.Date(until.Year(), until.Month(), 15, 0, 0, 0, 0, time.UTC)
 	out := []Statement{}
 
 	for _, org := range order {
 		var status string
 
-		err := c.Tx.QueryRow(ctx, `SELECT status FROM billing.payout_statements WHERE contractor_org_id = $1 AND period =
-			$2`, org, in.Period).
+		err := call.Tx.QueryRow(ctx, `SELECT status FROM billing.payout_statements WHERE contractor_org_id = $1 AND period =
+			$2`, org, input.Period).
 			Scan(&status)
 		if err == nil && status != "draft" {
 			continue // approved / paid statements are untouched
@@ -430,11 +436,11 @@ func (m Payouts) generate(
 			return nil, apperr.Wrap(err, "select billing.payout_statements")
 		}
 
-		_, execErr := c.Tx.Exec(
+		_, execErr := call.Tx.Exec(
 			ctx,
 			`DELETE FROM billing.payout_statements WHERE contractor_org_id = $1 AND period = $2 AND status = 'draft'`,
 			org,
-			in.Period,
+			input.Period,
 		)
 		if execErr != nil {
 			return nil, apperr.Wrap(execErr, "delete billing.payout_statements")
@@ -444,42 +450,42 @@ func (m Payouts) generate(
 
 		var gross, ded int64
 
-		for _, l := range a.lines {
+		for _, payoutLine := range a.lines {
 			switch {
-			case l.Kind == "deduction":
-				ded += l.AmountMinor
-			case l.Kind == "adjustment" && l.AmountMinor < 0:
-				ded += -l.AmountMinor
+			case payoutLine.Kind == "deduction":
+				ded += payoutLine.AmountMinor
+			case payoutLine.Kind == "adjustment" && payoutLine.AmountMinor < 0:
+				ded += -payoutLine.AmountMinor
 			default:
-				gross += l.AmountMinor
+				gross += payoutLine.AmountMinor
 			}
 		}
 
 		var sid uuid.UUID
 
-		scanErr := c.Tx.QueryRow(ctx, `INSERT INTO billing.payout_statements (tenant_id, contractor_org_id, period, status,
+		scanErr := call.Tx.QueryRow(ctx, `INSERT INTO billing.payout_statements (tenant_id, contractor_org_id, period, status,
 			currency, gross_minor, deductions_minor, net_minor, pay_date, created_at, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'draft', $3, $4, $5, $6, $7, $8, $8) RETURNING
-			id`, org, in.Period, a.currency, gross, ded, gross-ded, payDate, c.Now).
+			id`, org, input.Period, a.currency, gross, ded, gross-ded, payDate, call.Now).
 			Scan(&sid)
 		if scanErr != nil {
 			return nil, apperr.Wrap(scanErr, "insert billing.payout_statements")
 		}
 
-		for _, l := range a.lines {
-			_, err := c.Tx.Exec(
+		for _, payoutLine := range a.lines {
+			_, err := call.Tx.Exec(
 				ctx,
 				`INSERT INTO billing.payout_lines (id, statement_id, tenant_id, job_id, work_type, accepted_at, amount_minor, kind,
 					note)
 				VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, $4, $5, $6, $7, $8)`,
-				l.ID,
+				payoutLine.ID,
 				sid,
-				l.JobID,
-				l.WorkType,
-				l.AcceptedAt,
-				l.AmountMinor,
-				l.Kind,
-				l.Note,
+				payoutLine.JobID,
+				payoutLine.WorkType,
+				payoutLine.AcceptedAt,
+				payoutLine.AmountMinor,
+				payoutLine.Kind,
+				payoutLine.Note,
 			)
 			if err != nil {
 				return nil, apperr.Wrap(err, "insert billing.payout_lines")
@@ -488,7 +494,7 @@ func (m Payouts) generate(
 
 		for _, x := range adjs {
 			if x.org == org {
-				_, err := c.Tx.Exec(
+				_, err := call.Tx.Exec(
 					ctx,
 					`UPDATE billing.payout_queries SET applied_statement_id = $2 WHERE id = $1`,
 					x.query,
@@ -500,27 +506,27 @@ func (m Payouts) generate(
 			}
 		}
 
-		x, err := m.load(ctx, c, sid, false)
+		statement, err := m.load(ctx, call, sid, false)
 		if err != nil {
 			return nil, err
 		}
 
-		out = append(out, x)
+		out = append(out, statement)
 
-		c.Emit(
+		call.Emit(
 			ops.Event{
 				AggregateType: "payout_statement",
 				AggregateID:   sid,
 				Type:          "PayoutDraftGenerated",
-				Payload:       map[string]any{"period": in.Period},
+				Payload:       map[string]any{"period": input.Period},
 			},
 		)
-		c.Audit(
+		call.Audit(
 			ops.AuditEntry{
 				Action:          "payouts.generate",
 				TargetKind:      "payout_statement",
 				TargetID:        sid.String(),
-				NextVersion:     &x.Version,
+				NextVersion:     &statement.Version,
 				PreviousVersion: nil,
 				Reason:          "",
 				Result:          "",
@@ -544,23 +550,23 @@ type TransitionInput struct {
 
 // Validate implements ops.Validator.
 func (in *TransitionInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.StatementID == uuid.Nil {
-		fe["statementId"] = "error.required"
+		fieldErrs["statementId"] = "error.required"
 	}
 
 	if in.Action != "approve" && in.Action != "mark_paid" {
-		fe["action"] = "error.invalid"
+		fieldErrs["action"] = "error.invalid"
 	}
 
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
 		if utf8.RuneCountInString(*in.Reason) > 1000 {
-			fe["reason"] = "error.length"
+			fieldErrs["reason"] = "error.length"
 		}
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // transition serves payouts.transition.
@@ -592,52 +598,52 @@ func (in *TransitionInput) Validate() map[string]string {
 //	@Router			/v1/payouts/{statementId}/approve [post]
 func (m Payouts) transition(
 	ctx context.Context,
-	c *ops.Call,
-	in *TransitionInput,
+	call *ops.Call,
+	input *TransitionInput,
 ) (Statement, error) {
-	x, err := m.load(ctx, c, in.StatementID, true)
+	statement, err := m.load(ctx, call, input.StatementID, true)
 	if err != nil {
-		return x, err
+		return statement, err
 	}
 
-	if x.Version != *c.ExpectedVersion {
-		return x, apperr.E(apperr.Conflict, "error.versionConflict")
+	if statement.Version != *call.ExpectedVersion {
+		return statement, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	switch in.Action {
+	switch input.Action {
 	case "approve":
-		if x.Status != "draft" {
-			return x, apperr.E(apperr.Conflict, "error.invalidState")
+		if statement.Status != "draft" {
+			return statement, apperr.E(apperr.Conflict, "error.invalidState")
 		}
 
-		_, err = c.Tx.Exec(
+		_, err = call.Tx.Exec(
 			ctx,
 			`UPDATE billing.payout_statements SET status = 'approved', approved_by_membership_id = $2, version = version + 1,
 				updated_at = $3 WHERE id = $1`,
-			x.ID,
-			c.Principal.MembershipID,
-			c.Now,
+			statement.ID,
+			call.Principal.MembershipID,
+			call.Now,
 		)
 	default:
-		today := c.Now.In(kualaLumpur).Format("2006-01-02")
-		if x.Status != "approved" || today < x.PayDate.Format("2006-01-02") {
-			return x, apperr.E(apperr.Conflict, "errors.not_payable_yet")
+		today := call.Now.In(kualaLumpur).Format("2006-01-02")
+		if statement.Status != "approved" || today < statement.PayDate.Format("2006-01-02") {
+			return statement, apperr.E(apperr.Conflict, "errors.not_payable_yet")
 		}
 
-		_, err = c.Tx.Exec(
+		_, err = call.Tx.Exec(
 			ctx,
 			`UPDATE billing.payout_statements SET status = 'paid', paid_at = $2, version = version + 1, updated_at = $2 WHERE id
 				= $1`,
-			x.ID,
-			c.Now,
+			statement.ID,
+			call.Now,
 		)
 	}
 
 	if err != nil {
-		return x, apperr.Wrap(err, "update billing.payout_statements")
+		return statement, apperr.Wrap(err, "update billing.payout_statements")
 	}
 
-	return m.finish(ctx, c, x.ID, "payouts.transition", reasonOf(in.Reason))
+	return m.finish(ctx, call, statement.ID, "payouts.transition", reasonOf(input.Reason))
 }
 
 func reasonOf(s *string) string {
@@ -650,35 +656,35 @@ func reasonOf(s *string) string {
 
 func (m Payouts) finish(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	id uuid.UUID,
 	action, reason string,
 ) (Statement, error) {
-	x, err := m.load(ctx, c, id, false)
+	statement, err := m.load(ctx, call, id, false)
 	if err != nil {
-		return x, err
+		return statement, err
 	}
 
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "payout_statement",
 			AggregateID:   id,
 			Type:          "PayoutStatementChanged",
-			Payload:       map[string]any{"status": x.Status},
+			Payload:       map[string]any{"status": statement.Status},
 		},
 	)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          action,
 			TargetKind:      "payout_statement",
 			TargetID:        id.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &x.Version,
+			PreviousVersion: call.ExpectedVersion,
+			NextVersion:     &statement.Version,
 			Reason:          reason, Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return x, nil
+	return statement, nil
 }
 
 // ---- payouts.query / payouts.resolveQuery ----
@@ -695,21 +701,21 @@ var topics = map[string]bool{"amount": true, "deduction": true, "missing_job": t
 
 // Validate implements ops.Validator.
 func (in *QueryInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.StatementID == uuid.Nil || in.LineID == uuid.Nil {
-		fe["lineId"] = "error.required"
+		fieldErrs["lineId"] = "error.required"
 	}
 
 	if !topics[in.Topic] {
-		fe["topic"] = "error.invalid"
+		fieldErrs["topic"] = "error.invalid"
 	}
 
 	in.Message = strings.TrimSpace(in.Message)
 	if n := utf8.RuneCountInString(in.Message); n < 1 || n > 2000 {
-		fe["message"] = "error.length"
+		fieldErrs["message"] = "error.length"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // query serves payouts.query.
@@ -739,69 +745,69 @@ func (in *QueryInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/payouts/{statementId}/queries [post]
-func (m Payouts) query(ctx context.Context, c *ops.Call, in *QueryInput) (Statement, error) {
-	x, err := m.load(ctx, c, in.StatementID, true)
+func (m Payouts) query(ctx context.Context, c *ops.Call, input *QueryInput) (Statement, error) {
+	statement, err := m.load(ctx, c, input.StatementID, true)
 	if err != nil {
-		return x, err
+		return statement, err
 	}
 
-	if x.Version != *c.ExpectedVersion {
-		return x, apperr.E(apperr.Conflict, "error.versionConflict")
+	if statement.Version != *c.ExpectedVersion {
+		return statement, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	if x.Status != "approved" {
-		return x, apperr.E(apperr.Conflict, "error.invalidState")
+	if statement.Status != "approved" {
+		return statement, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
 	var job *uuid.UUID
 
-	for _, l := range x.Lines {
-		if l.ID == in.LineID {
+	for _, l := range statement.Lines {
+		if l.ID == input.LineID {
 			j := l.JobID
 			job = &j
 		}
 	}
 
 	if job == nil {
-		return x, apperr.E(apperr.NotFound, "error.notFound")
+		return statement, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	_, execErr := c.Tx.Exec(
 		ctx,
 		`INSERT INTO billing.payout_queries (statement_id, line_id, tenant_id, asked_by, topic, message, state, created_at)
 		VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, $4, $5, 'open', $6)`,
-		x.ID,
-		in.LineID,
+		statement.ID,
+		input.LineID,
 		c.Principal.MembershipID,
-		in.Topic,
-		in.Message,
+		input.Topic,
+		input.Message,
 		c.Now,
 	)
 	if execErr != nil {
-		return x, apperr.Wrap(execErr, "insert billing.payout_queries")
+		return statement, apperr.Wrap(execErr, "insert billing.payout_queries")
 	}
 
 	addJobNoteErr := m.Source.AddJobNote(
 		ctx,
 		c,
 		*job,
-		fmt.Sprintf("Payout question (%s): %s", in.Topic, in.Message),
+		fmt.Sprintf("Payout question (%s): %s", input.Topic, input.Message),
 	)
 	if addJobNoteErr != nil {
-		return x, apperr.Wrap(addJobNoteErr, "billing.PayoutSource.AddJobNote")
+		return statement, apperr.Wrap(addJobNoteErr, "billing.PayoutSource.AddJobNote")
 	}
 
 	_, execErr = c.Tx.Exec(
 		ctx,
 		`UPDATE billing.payout_statements SET version = version + 1, updated_at = $2 WHERE id = $1`,
-		x.ID,
+		statement.ID,
 		c.Now,
 	)
 	if execErr != nil {
-		return x, apperr.Wrap(execErr, "update billing.payout_statements")
+		return statement, apperr.Wrap(execErr, "update billing.payout_statements")
 	}
 
-	return m.finish(ctx, c, x.ID, "payouts.query", "")
+	return m.finish(ctx, c, statement.ID, "payouts.query", "")
 }
 
 // ResolveInput is payouts.resolveQuery input.
@@ -814,21 +820,21 @@ type ResolveInput struct {
 
 // Validate implements ops.Validator.
 func (in *ResolveInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.StatementID == uuid.Nil || in.QueryID == uuid.Nil {
-		fe["queryId"] = "error.required"
+		fieldErrs["queryId"] = "error.required"
 	}
 
 	in.Reply = strings.TrimSpace(in.Reply)
 	if n := utf8.RuneCountInString(in.Reply); n < 1 || n > 2000 {
-		fe["reply"] = "error.length"
+		fieldErrs["reply"] = "error.length"
 	}
 
 	if in.AdjustmentMinor != nil && *in.AdjustmentMinor == 0 {
-		fe["adjustmentMinor"] = "error.nonZero"
+		fieldErrs["adjustmentMinor"] = "error.nonZero"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // resolve serves payouts.resolveQuery.
@@ -859,14 +865,14 @@ func (in *ResolveInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/payouts/{statementId}/queries/{queryId}/resolve [post]
-func (m Payouts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (Statement, error) {
-	x, err := m.load(ctx, c, in.StatementID, true)
+func (m Payouts) resolve(ctx context.Context, call *ops.Call, in *ResolveInput) (Statement, error) {
+	statement, err := m.load(ctx, call, in.StatementID, true)
 	if err != nil {
-		return x, err
+		return statement, err
 	}
 
-	if x.Version != *c.ExpectedVersion {
-		return x, apperr.E(apperr.Conflict, "error.versionConflict")
+	if statement.Version != *call.ExpectedVersion {
+		return statement, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
 	var (
@@ -874,19 +880,19 @@ func (m Payouts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (St
 		line  *uuid.UUID
 	)
 
-	err = c.Tx.QueryRow(ctx, `SELECT state, line_id FROM billing.payout_queries WHERE id = $1 AND statement_id = $2 FOR
-		UPDATE`, in.QueryID, x.ID).
+	err = call.Tx.QueryRow(ctx, `SELECT state, line_id FROM billing.payout_queries WHERE id = $1 AND statement_id = $2 FOR
+		UPDATE`, in.QueryID, statement.ID).
 		Scan(&state, &line)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return x, apperr.E(apperr.NotFound, "error.notFound")
+		return statement, apperr.E(apperr.NotFound, "error.notFound")
 	}
 
 	if err != nil {
-		return x, apperr.Wrap(err, "select billing.payout_queries")
+		return statement, apperr.Wrap(err, "select billing.payout_queries")
 	}
 
 	if state != "open" {
-		return x, apperr.E(apperr.Conflict, "error.invalidState")
+		return statement, apperr.E(apperr.Conflict, "error.invalidState")
 	}
 
 	next := "answered"
@@ -894,7 +900,7 @@ func (m Payouts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (St
 		next = "adjusted"
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE billing.payout_queries SET state = $2, resolution = $3, adjustment_minor = $4, resolved_by = $5, resolved_at =
 			$6 WHERE id = $1`,
@@ -902,33 +908,33 @@ func (m Payouts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (St
 		next,
 		in.Reply,
 		in.AdjustmentMinor,
-		c.Principal.MembershipID,
-		c.Now,
+		call.Principal.MembershipID,
+		call.Now,
 	)
 	if execErr != nil {
-		return x, apperr.Wrap(execErr, "update billing.payout_queries")
+		return statement, apperr.Wrap(execErr, "update billing.payout_queries")
 	}
 
-	for _, l := range x.Lines {
+	for _, l := range statement.Lines {
 		if line != nil && l.ID == *line {
-			err := m.Source.AddJobNote(ctx, c, l.JobID, "Payout reply: "+in.Reply)
+			err := m.Source.AddJobNote(ctx, call, l.JobID, "Payout reply: "+in.Reply)
 			if err != nil {
-				return x, apperr.Wrap(err, "billing.PayoutSource.AddJobNote")
+				return statement, apperr.Wrap(err, "billing.PayoutSource.AddJobNote")
 			}
 		}
 	}
 
-	_, execErr = c.Tx.Exec(
+	_, execErr = call.Tx.Exec(
 		ctx,
 		`UPDATE billing.payout_statements SET version = version + 1, updated_at = $2 WHERE id = $1`,
-		x.ID,
-		c.Now,
+		statement.ID,
+		call.Now,
 	)
 	if execErr != nil {
-		return x, apperr.Wrap(execErr, "update billing.payout_statements")
+		return statement, apperr.Wrap(execErr, "update billing.payout_statements")
 	}
 
-	return m.finish(ctx, c, x.ID, "payouts.resolveQuery", in.Reply)
+	return m.finish(ctx, call, statement.ID, "payouts.resolveQuery", in.Reply)
 }
 
 // ---- reads ----
@@ -1005,8 +1011,8 @@ func (m Payouts) get(ctx context.Context, c *ops.Call, in *PayoutIDInput) (State
 //	@Router			/v1/payouts [get]
 func (m Payouts) list(
 	ctx context.Context,
-	c *ops.Call,
-	in *paging.Query,
+	call *ops.Call,
+	query *paging.Query,
 ) (paging.Page[Statement], error) {
 	var f struct {
 		Period          *string    `json:"period,omitempty"`
@@ -1014,8 +1020,8 @@ func (m Payouts) list(
 		Status          *string    `json:"status,omitempty"`
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&f) != nil ||
@@ -1027,7 +1033,7 @@ func (m Payouts) list(
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{
 			"id":        "id",
 			"createdAt": "created_at",
@@ -1040,7 +1046,7 @@ func (m Payouts) list(
 		return paging.Page[Statement]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Statement]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -1054,10 +1060,10 @@ func (m Payouts) list(
 	}
 
 	conds := []string{"TRUE"}
-	if c.Principal.Role == "contractor" {
+	if call.Principal.Role == "contractor" {
 		conds = append(
 			conds,
-			"contractor_org_id = "+add(c.Principal.OrgID)+" AND status <> 'draft'",
+			"contractor_org_id = "+add(call.Principal.OrgID)+" AND status <> 'draft'",
 		)
 	}
 
@@ -1077,21 +1083,21 @@ func (m Payouts) list(
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.payout_statements WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.payout_statements WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[Statement]{}, apperr.Wrap(scanErr, "select billing.payout_statements")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s FROM billing.payout_statements WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
 			statementCols,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -1101,14 +1107,14 @@ func (m Payouts) list(
 	items := []Statement{}
 
 	for rows.Next() {
-		x, err := scanStatement(rows)
+		statement, err := scanStatement(rows)
 		if err != nil {
 			rows.Close()
 
 			return paging.Page[Statement]{}, err
 		}
 
-		items = append(items, x)
+		items = append(items, statement)
 	}
 
 	rows.Close()
@@ -1119,7 +1125,7 @@ func (m Payouts) list(
 	}
 
 	for i := range items {
-		err := m.fill(ctx, c, &items[i])
+		err := m.fill(ctx, call, &items[i])
 		if err != nil {
 			return paging.Page[Statement]{}, err
 		}
@@ -1127,9 +1133,9 @@ func (m Payouts) list(
 
 	return paging.Page[Statement]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, nil
 }
 
@@ -1149,26 +1155,26 @@ func endedPeriod(now time.Time) string {
 // it generates the drafts of the month that ended, exactly as payouts.generate does, once per month
 // (billing.payout_runs). A month that ended while the scheduler was down is generated at its first tick. HQ can
 // still regenerate the drafts; approved and paid statements are never touched.
-func (m Payouts) GenerateMonthly(ctx context.Context, c *ops.Call) (int, error) {
-	period := endedPeriod(c.Now)
+func (m Payouts) GenerateMonthly(ctx context.Context, call *ops.Call) (int, error) {
+	period := endedPeriod(call.Now)
 
-	tag, err := c.Tx.Exec(
+	tag, err := call.Tx.Exec(
 		ctx,
 		`INSERT INTO billing.payout_runs (tenant_id, period, ran_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2)
 			ON CONFLICT DO NOTHING`,
 		period,
-		c.Now,
+		call.Now,
 	)
 	if err != nil || tag.RowsAffected() == 0 { // generated already
 		return 0, apperr.Wrap(err, "insert billing.payout_runs")
 	}
 
-	drafts, err := m.generate(ctx, c, &GenerateInput{Period: period})
+	drafts, err := m.generate(ctx, call, &GenerateInput{Period: period})
 	if err != nil {
 		return 0, err
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE billing.payout_runs SET statements = $2 WHERE tenant_id = current_setting('app.tenant_id')::uuid AND period =
 			$1`,
@@ -1182,11 +1188,11 @@ func (m Payouts) GenerateMonthly(ctx context.Context, c *ops.Call) (int, error) 
 	return 1, nil
 }
 
-func RegisterPayouts(r *ops.Registry, m Payouts) {
-	ops.Register(r, "payouts.generate", m.generate)
-	ops.Register(r, "payouts.transition", m.transition)
-	ops.Register(r, "payouts.query", m.query)
-	ops.Register(r, "payouts.resolveQuery", m.resolve)
-	ops.Register(r, "payouts.get", m.get)
-	ops.Register(r, "payouts.list", m.list)
+func RegisterPayouts(reg *ops.Registry, m Payouts) {
+	ops.Register(reg, "payouts.generate", m.generate)
+	ops.Register(reg, "payouts.transition", m.transition)
+	ops.Register(reg, "payouts.query", m.query)
+	ops.Register(reg, "payouts.resolveQuery", m.resolve)
+	ops.Register(reg, "payouts.get", m.get)
+	ops.Register(reg, "payouts.list", m.list)
 }

@@ -103,15 +103,15 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 	t.Helper()
 
 	ro := new(bool)
-	r := NewRegistry()
-	r.DB = fakeDB{readOnly: ro}
+	reg := NewRegistry()
+	reg.DB = fakeDB{readOnly: ro}
 	rec := &fakeRec{n: 0, err: nil}
 	idem := &fakeIdem{stored: map[string]json.RawMessage{}, hash: map[string]string{}, aborted: 0}
-	r.Rec, r.Idem = rec, idem
-	r.Clock = func() time.Time { return time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC) }
+	reg.Rec, reg.Idem = rec, idem
+	reg.Clock = func() time.Time { return time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC) }
 	calls := 0
 
-	Register(r, "units.save", func(ctx context.Context, c *Call, in *unitIn) (out, error) {
+	Register(reg, "units.save", func(ctx context.Context, call *Call, in *unitIn) (out, error) {
 		if in.Name == "boom" {
 			return out{}, errors.New("boom")
 		}
@@ -122,10 +122,10 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 
 		calls++
 
-		c.Emit(
+		call.Emit(
 			Event{Type: "UnitChanged", AggregateType: "", AggregateID: uuid.UUID{}, Payload: nil},
 		)
-		c.Audit(
+		call.Audit(
 			AuditEntry{
 				Action:          "units.save",
 				TargetKind:      "",
@@ -141,7 +141,7 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 
 		return out{OK: true, Name: in.Name, Calls: calls}, nil
 	})
-	Register(r, "units.get", func(ctx context.Context, c *Call, in *struct {
+	Register(reg, "units.get", func(ctx context.Context, c *Call, in *struct {
 		ID string `json:"id"`
 	},
 	) (out, error) {
@@ -152,7 +152,7 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 
 		return out{OK: true, Name: "", Calls: 0}, nil
 	})
-	Register(r, "attachments.add", func(ctx context.Context, c *Call, in *struct {
+	Register(reg, "attachments.add", func(ctx context.Context, c *Call, input *struct {
 		JobID    string `json:"jobId"`
 		ReportID string `json:"reportId"`
 		File     struct {
@@ -160,23 +160,23 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 		} `json:"file"`
 	},
 	) (out, error) {
-		return out{OK: true, Calls: len(in.File.Bytes), Name: ""}, nil
+		return out{OK: true, Calls: len(input.File.Bytes), Name: ""}, nil
 	})
 
-	e := echo.New()
+	app := echo.New()
 
-	e.HTTPErrorHandler = HTTPErrorHandler
+	app.HTTPErrorHandler = HTTPErrorHandler
 
-	err := r.MountREST(e.Group("/v1"))
+	err := reg.MountREST(app.Group("/v1"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return r, e, rec, idem, ro
+	return reg, app, rec, idem, ro
 }
 
 // do sends one operation call at its REST route (ClientRequest).
-func do(e *echo.Echo, p *Principal, op, body, key string) *httptest.ResponseRecorder {
+func do(e *echo.Echo, principal *Principal, op, body, key string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(ClientRequest(op, body))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -184,8 +184,8 @@ func do(e *echo.Echo, p *Principal, op, body, key string) *httptest.ResponseReco
 		req.Header.Set("Idempotency-Key", key)
 	}
 
-	if p != nil {
-		req = req.WithContext(WithPrincipal(req.Context(), p))
+	if principal != nil {
+		req = req.WithContext(WithPrincipal(req.Context(), principal))
 	}
 
 	w := httptest.NewRecorder()
@@ -194,21 +194,21 @@ func do(e *echo.Echo, p *Principal, op, body, key string) *httptest.ResponseReco
 	return w
 }
 
-func errCode(t *testing.T, w *httptest.ResponseRecorder) string {
+func errCode(t *testing.T, rec *httptest.ResponseRecorder) string {
 	t.Helper()
 
-	var de apperr.DomainError
+	var domainError apperr.DomainError
 
-	err := json.Unmarshal(w.Body.Bytes(), &de)
+	err := json.Unmarshal(rec.Body.Bytes(), &domainError)
 	if err != nil {
-		t.Fatalf("not a DomainError: %s", w.Body.String())
+		t.Fatalf("not a DomainError: %s", rec.Body.String())
 	}
 
-	if de.CorrelationID == "" {
+	if domainError.CorrelationID == "" {
 		t.Fatal("correlationId missing")
 	}
 
-	return string(de.Code)
+	return string(domainError.Code)
 }
 
 var (
@@ -339,25 +339,25 @@ func TestPipeline(t *testing.T) {
 		t.Fatalf("meta: %v", res.Meta)
 	}
 	// an empty body counts as {}
-	if w := do(
+	if recorder := do(
 		e,
 		admin,
 		"units.save",
 		``,
 		"key-empty1",
-	); w.Code != 200 ||
-		!strings.Contains(w.Body.String(), `"name":""`) {
-		t.Fatalf("empty body: %d %s", w.Code, w.Body.String())
+	); recorder.Code != 200 ||
+		!strings.Contains(recorder.Body.String(), `"name":""`) {
+		t.Fatalf("empty body: %d %s", recorder.Code, recorder.Body.String())
 	}
 	// oversize body
-	if w := do(
+	if recorder := do(
 		e,
 		admin,
 		"units.save",
 		`{"name":"`+strings.Repeat("x", 1<<20)+`"}`,
 		"key-big1",
-	); w.Code != 422 {
-		t.Fatalf("oversize: %d", w.Code)
+	); recorder.Code != 422 {
+		t.Fatalf("oversize: %d", recorder.Code)
 	}
 }
 
@@ -366,39 +366,45 @@ func TestRecorderFailureRollsBack(t *testing.T) {
 	rec.err = apperr.E(apperr.Unavailable, "error.unavailable")
 	_ = r
 
-	if w := do(
+	if recorder := do(
 		e,
 		admin,
 		"units.save",
 		`{"name":"a"}`,
 		"key-0009",
-	); w.Code != 503 ||
+	); recorder.Code != 503 ||
 		idem.aborted != 1 {
-		t.Fatalf("%d aborted=%d", w.Code, idem.aborted)
+		t.Fatalf("%d aborted=%d", recorder.Code, idem.aborted)
 	}
 }
 
 func TestRegisterGuards(t *testing.T) {
-	r := NewRegistry()
+	reg := NewRegistry()
 
 	mustPanic(
 		t,
-		func() { Register(r, "no.such", func(context.Context, *Call, *struct{}) (int, error) { return 0, nil }) },
+		func() {
+			Register(
+				reg,
+				"no.such",
+				func(context.Context, *Call, *struct{}) (int, error) { return 0, nil },
+			)
+		},
 	)
 	Register(
-		r,
+		reg,
 		"units.list",
 		func(context.Context, *Call, *struct{}) (int, error) { return 0, nil },
 	)
 	mustPanic(t, func() {
 		Register(
-			r,
+			reg,
 			"units.list",
 			func(context.Context, *Call, *struct{}) (int, error) { return 0, nil },
 		)
 	})
 
-	if !r.Registered()["units.list"] || len(r.Registered()) != 1 {
+	if !reg.Registered()["units.list"] || len(reg.Registered()) != 1 {
 		t.Fatal("Registered")
 	}
 
@@ -422,13 +428,13 @@ func TestCatalogShape(t *testing.T) {
 		t.Fatalf("catalog size %d", len(Catalog))
 	}
 
-	for _, s := range Catalog {
-		if s.Mode == Write && len(s.Versions) == 0 {
-			t.Errorf("%s: write without version rule", s.Name)
+	for _, spec := range Catalog {
+		if spec.Mode == Write && len(spec.Versions) == 0 {
+			t.Errorf("%s: write without version rule", spec.Name)
 		}
 
-		if s.Module == "" {
-			t.Errorf("%s: no module", s.Name)
+		if spec.Module == "" {
+			t.Errorf("%s: no module", spec.Name)
 		}
 	}
 }
@@ -536,13 +542,13 @@ func TestExpectedVersionRules(t *testing.T) {
 }
 
 func TestVersionHeader(t *testing.T) {
-	_, e, _, _, _ := setup(t)
+	_, app, _, _, _ := setup(t)
 	req := httptest.NewRequest(http.MethodPost, "/v1/units", strings.NewReader(`{"name":"a"}`))
 	req.Header.Set("Idempotency-Key", "key-ver-0001")
 	req.Header.Set("X-Expected-Version", "4")
 	req = req.WithContext(WithPrincipal(req.Context(), admin))
 	w := httptest.NewRecorder()
-	e.ServeHTTP(w, req)
+	app.ServeHTTP(w, req)
 
 	if w.Code != 422 || !strings.Contains(w.Body.String(), "expectedVersion") {
 		t.Fatalf("version on a create must be rejected: %d %s", w.Code, w.Body.String())
@@ -551,7 +557,7 @@ func TestVersionHeader(t *testing.T) {
 
 // IR221: ordinary operations keep the 1 MiB body limit; operations with BlobInput files accept their larger bodies.
 func TestBodyLimits(t *testing.T) {
-	_, e, _, _, _ := setup(t)
+	_, app, _, _, _ := setup(t)
 	tech := &Principal{
 		Principal: authz.Principal{
 			Role:        "technician",
@@ -570,15 +576,19 @@ func TestBodyLimits(t *testing.T) {
 	}
 
 	big := strings.Repeat("a", 2<<20)
-	if w := do(
-		e,
+	if recorder := do(
+		app,
 		admin,
 		"units.save",
 		`{"name":"`+big+`"}`,
 		"key-12345678",
-	); w.Code != http.StatusUnprocessableEntity ||
-		!strings.Contains(w.Body.String(), "error.bodyTooLarge") {
-		t.Fatalf("2 MiB to an ordinary operation: %d %s", w.Code, w.Body.String()[:120])
+	); recorder.Code != http.StatusUnprocessableEntity ||
+		!strings.Contains(recorder.Body.String(), "error.bodyTooLarge") {
+		t.Fatalf(
+			"2 MiB to an ordinary operation: %d %s",
+			recorder.Code,
+			recorder.Body.String()[:120],
+		)
 	}
 
 	photo := base64.StdEncoding.EncodeToString(
@@ -603,28 +613,28 @@ func TestBodyLimits(t *testing.T) {
 		)
 	}
 
-	w := do(
-		e,
+	rec := do(
+		app,
 		tech,
 		"attachments.add",
 		`{"jobId":"j1","reportId":"r1","file":{"bytes":"`+photo+`"}}`,
 		"key-23456789",
 	)
-	if w.Code == http.StatusUnprocessableEntity &&
-		strings.Contains(w.Body.String(), "error.bodyTooLarge") {
-		t.Fatalf("a 4 MiB photo must pass the body limit: %d", w.Code)
+	if rec.Code == http.StatusUnprocessableEntity &&
+		strings.Contains(rec.Body.String(), "error.bodyTooLarge") {
+		t.Fatalf("a 4 MiB photo must pass the body limit: %d", rec.Code)
 	}
 
 	huge := base64.StdEncoding.EncodeToString(make([]byte, 7<<20))
-	if w := do(
-		e,
+	if recorder := do(
+		app,
 		tech,
 		"attachments.add",
 		`{"jobId":"j1","reportId":"r1","file":{"bytes":"`+huge+`"}}`,
 		"key-34567890",
-	); w.Code != http.StatusUnprocessableEntity ||
-		!strings.Contains(w.Body.String(), "error.bodyTooLarge") {
-		t.Fatalf("a body above the file limit: %d", w.Code)
+	); recorder.Code != http.StatusUnprocessableEntity ||
+		!strings.Contains(recorder.Body.String(), "error.bodyTooLarge") {
+		t.Fatalf("a body above the file limit: %d", recorder.Code)
 	}
 }
 

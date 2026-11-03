@@ -34,20 +34,20 @@ const maxScheduleWindow = 400 * 24 * time.Hour
 // suppresses it. The watermark (control.schedule_watermarks, locked for the tick) starts at the first tick, so
 // occurrences before it are never replayed; automation_runs keeps one outcome per rule, unit and occurrence. Returns
 // the Commands created.
-func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error) {
-	now := c.Now.UTC().Truncate(time.Minute)
+func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, error) {
+	now := call.Now.UTC().Truncate(time.Minute)
 
 	var since time.Time
 
-	err := c.Tx.QueryRow(ctx, `SELECT evaluated_until FROM control.schedule_watermarks WHERE tenant_id = $1 FOR
-		UPDATE`, c.Principal.TenantID).
+	err := call.Tx.QueryRow(ctx, `SELECT evaluated_until FROM control.schedule_watermarks WHERE tenant_id = $1 FOR
+		UPDATE`, call.Principal.TenantID).
 		Scan(&since)
 	if errors.Is(err, pgx.ErrNoRows) {
-		_, err = c.Tx.Exec(
+		_, err = call.Tx.Exec(
 			ctx,
 			`INSERT INTO control.schedule_watermarks (tenant_id, evaluated_until) VALUES ($1, $2) ON CONFLICT (tenant_id) DO
 				NOTHING`,
-			c.Principal.TenantID,
+			call.Principal.TenantID,
 			now,
 		)
 
@@ -70,7 +70,7 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 
 	ticks := map[string]*tick{}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT a.definition, a.timezone, array_agg(u.unit_id ORDER BY u.unit_id) FROM control.automations a
 		JOIN control.automation_units u ON u.automation_id = a.id WHERE a.kind = 'schedule' AND a.enabled GROUP BY a.id ORDER
@@ -106,16 +106,20 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 		_ = json.Unmarshal(raw, &d)
 
 		occ, _ := occurrences(d, loc, since.In(loc).AddDate(0, 0, -1), days)
-		for _, o := range occ {
-			if !o.At.After(since) || o.At.After(now) {
+		for _, scheduledOccurrence := range occ {
+			if !scheduledOccurrence.At.After(since) || scheduledOccurrence.At.After(now) {
 				continue
 			}
 
-			key := scheduleRef(o.Phase, o.At)
+			key := scheduleRef(scheduledOccurrence.Phase, scheduledOccurrence.At)
 
 			t := ticks[key]
 			if t == nil {
-				t = &tick{at: o.At.UTC(), phase: o.Phase, units: map[uuid.UUID]bool{}}
+				t = &tick{
+					at:    scheduledOccurrence.At.UTC(),
+					phase: scheduledOccurrence.Phase,
+					units: map[uuid.UUID]bool{},
+				}
 				ticks[key] = t
 			}
 
@@ -159,8 +163,8 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 	created := 0
 
 	for _, t := range order {
-		in := &EvaluationInput{
-			EventID:    uuid.NewSHA1(c.Principal.TenantID, []byte(scheduleRef(t.phase, t.at))),
+		input := &EvaluationInput{
+			EventID:    uuid.NewSHA1(call.Principal.TenantID, []byte(scheduleRef(t.phase, t.at))),
 			OccurredAt: t.at,
 			Phase:      t.phase, UnitIDs: nil, Facts: nil,
 		}
@@ -169,32 +173,34 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 				continue // passed over: a later minute sets the unit's state
 			}
 
-			_, found, err := m.Units.Target(ctx, c, u)
+			_, found, err := m.Units.Target(ctx, call, u)
 			if err != nil {
 				return created, apperr.Wrap(err, "control.Units.Target")
 			} else if found { // an archived or removed unit is skipped, not an error of the tick
-				in.UnitIDs = append(in.UnitIDs, u)
+				input.UnitIDs = append(input.UnitIDs, u)
 			}
 		}
 
-		if len(in.UnitIDs) == 0 {
+		if len(input.UnitIDs) == 0 {
 			continue
 		}
 
-		r, err := m.evaluate(ctx, c, in, true, false)
+		r, err := m.evaluate(ctx, call, input, true, false)
 		if err != nil {
 			return created, err
 		}
 
-		for _, d := range r.Results {
-			if d.Decision == "requested" && d.RuleID != nil && d.CommandID != nil && d.fresh {
+		for _, decision := range r.Results {
+			if decision.Decision == "requested" && decision.RuleID != nil &&
+				decision.CommandID != nil &&
+				decision.fresh {
 				created++
 
-				c.Audit(
+				call.Audit(
 					ops.AuditEntry{
 						Action:          "automations.schedule",
 						TargetKind:      "automation",
-						TargetID:        d.RuleID.String(),
+						TargetID:        decision.RuleID.String(),
 						Reason:          t.phase,
 						PreviousVersion: nil,
 						NextVersion:     nil,
@@ -207,10 +213,10 @@ func (m Automations) FireSchedules(ctx context.Context, c *ops.Call) (int, error
 		}
 	}
 
-	_, err = c.Tx.Exec(
+	_, err = call.Tx.Exec(
 		ctx,
 		`UPDATE control.schedule_watermarks SET evaluated_until = $2 WHERE tenant_id = $1`,
-		c.Principal.TenantID,
+		call.Principal.TenantID,
 		now,
 	)
 

@@ -38,57 +38,57 @@ type PrincipalDTO struct {
 }
 
 // ToDTO converts a principal for the wire.
-func ToDTO(p *ops.Principal) PrincipalDTO {
-	d := PrincipalDTO{
-		UserID:            p.UserID,
-		TenantID:          p.TenantID,
-		MembershipID:      p.MembershipID,
-		OrgID:             p.OrgID,
-		Role:              p.Role,
-		ClientRole:        p.ClientRole,
-		Employment:        p.Employment,
-		Timezone:          p.Timezone,
-		Scopes:            p.Scopes,
-		ScopeVersion:      p.ScopeVersion,
+func ToDTO(principal *ops.Principal) PrincipalDTO {
+	principalDTO := PrincipalDTO{
+		UserID:            principal.UserID,
+		TenantID:          principal.TenantID,
+		MembershipID:      principal.MembershipID,
+		OrgID:             principal.OrgID,
+		Role:              principal.Role,
+		ClientRole:        principal.ClientRole,
+		Employment:        principal.Employment,
+		Timezone:          principal.Timezone,
+		Scopes:            principal.Scopes,
+		ScopeVersion:      principal.ScopeVersion,
 		Permissions:       []string{},
-		SessionsRevokedAt: p.SessionsRevokedAt,
+		SessionsRevokedAt: principal.SessionsRevokedAt,
 	}
-	for perm, ok := range p.Permissions {
+	for perm, ok := range principal.Permissions {
 		if ok {
-			d.Permissions = append(d.Permissions, perm)
+			principalDTO.Permissions = append(principalDTO.Permissions, perm)
 		}
 	}
 
-	return d
+	return principalDTO
 }
 
 // FromDTO rebuilds the principal.
-func FromDTO(d PrincipalDTO) *ops.Principal {
-	p := &ops.Principal{
+func FromDTO(principalDTO PrincipalDTO) *ops.Principal {
+	principal := &ops.Principal{
 		Principal: authz.Principal{
-			Role:        d.Role,
-			ClientRole:  d.ClientRole,
+			Role:        principalDTO.Role,
+			ClientRole:  principalDTO.ClientRole,
 			Permissions: map[string]bool{},
 		},
-		TenantID:          d.TenantID,
-		MembershipID:      d.MembershipID,
-		UserID:            d.UserID,
-		OrgID:             d.OrgID,
-		ScopeVersion:      d.ScopeVersion,
-		Scopes:            d.Scopes,
-		Employment:        d.Employment,
-		Timezone:          d.Timezone,
-		SessionsRevokedAt: d.SessionsRevokedAt,
+		TenantID:          principalDTO.TenantID,
+		MembershipID:      principalDTO.MembershipID,
+		UserID:            principalDTO.UserID,
+		OrgID:             principalDTO.OrgID,
+		ScopeVersion:      principalDTO.ScopeVersion,
+		Scopes:            principalDTO.Scopes,
+		Employment:        principalDTO.Employment,
+		Timezone:          principalDTO.Timezone,
+		SessionsRevokedAt: principalDTO.SessionsRevokedAt,
 	}
-	for _, perm := range d.Permissions {
-		p.Permissions[perm] = true
-	}
-
-	if p.Scopes == nil {
-		p.Scopes = map[string][]uuid.UUID{}
+	for _, perm := range principalDTO.Permissions {
+		principal.Permissions[perm] = true
 	}
 
-	return p
+	if principal.Scopes == nil {
+		principal.Scopes = map[string][]uuid.UUID{}
+	}
+
+	return principal
 }
 
 // RemoteSource asks identity-api for principals and caches them for TTL (backend Go design §4: 30 s keyed by the
@@ -136,7 +136,7 @@ func (r *RemoteSource) Principal(
 	}
 	r.mu.Unlock()
 
-	p, err := r.fetch(ctx, subject, tenant, membership, signedIn)
+	principal, err := r.fetch(ctx, subject, tenant, membership, signedIn)
 	if errors.Is(err, ErrUnavailable) {
 		return nil, err // never cache an outage
 	}
@@ -146,10 +146,10 @@ func (r *RemoteSource) Principal(
 		r.cache = map[string]cached{}
 	}
 
-	r.cache[key] = cached{p: p, err: err, at: now()}
+	r.cache[key] = cached{p: principal, err: err, at: now()}
 	r.mu.Unlock()
 
-	return p, err
+	return principal, err
 }
 
 func (r *RemoteSource) fetch(
@@ -158,19 +158,19 @@ func (r *RemoteSource) fetch(
 	tenant, membership uuid.UUID,
 	signedIn time.Time,
 ) (*ops.Principal, error) {
-	q := url.Values{
+	params := url.Values{
 		"subject":    {subject},
 		"tenant":     {tenant.String()},
 		"membership": {membership.String()},
 	}
 	if !signedIn.IsZero() {
-		q.Set("signedIn", signedIn.UTC().Format(time.RFC3339))
+		params.Set("signedIn", signedIn.UTC().Format(time.RFC3339))
 	}
 
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
-		r.BaseURL+PrincipalPath+"?"+q.Encode(),
+		r.BaseURL+PrincipalPath+"?"+params.Encode(),
 		nil,
 	)
 	if err != nil {
@@ -197,14 +197,14 @@ func (r *RemoteSource) fetch(
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		var d PrincipalDTO
+		var principalDTO PrincipalDTO
 
-		err := json.NewDecoder(res.Body).Decode(&d)
+		err := json.NewDecoder(res.Body).Decode(&principalDTO)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrUnavailable, err)
 		}
 
-		return FromDTO(d), nil
+		return FromDTO(principalDTO), nil
 	case http.StatusNotFound:
 		return nil, ErrNoMembership
 	default:

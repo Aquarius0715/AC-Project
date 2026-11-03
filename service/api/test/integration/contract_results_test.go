@@ -45,7 +45,7 @@ var resultFieldsNeverAnswered = map[string]map[string]string{
 // contract is data the contract does not promise (D12: no extra DTO fields), and a missing one breaks a client that
 // follows the contract.
 func TestResultsMatchContract(t *testing.T) {
-	s := serverCfg(t, func(c *apiserver.Config) { c.Domains = ops.Domains })
+	srv := serverCfg(t, func(c *apiserver.Config) { c.Domains = ops.Domains })
 
 	raw, err := os.ReadFile("../../../web/shared/lib/contractResults.gen.json")
 	if err != nil {
@@ -102,8 +102,8 @@ func TestResultsMatchContract(t *testing.T) {
 	}
 	checked := 0
 
-	for _, op := range s.Registry.Operations() {
-		name := op.Spec.Name
+	for _, operation := range srv.Registry.Operations() {
+		name := operation.Spec.Name
 
 		want, ok := contract[name]
 		if !ok {
@@ -116,7 +116,7 @@ func TestResultsMatchContract(t *testing.T) {
 			continue
 		}
 
-		rt := op.Result
+		rt := operation.Result
 		for rt.Kind() == reflect.Pointer {
 			rt = rt.Elem()
 		}
@@ -148,24 +148,24 @@ func TestResultsMatchContract(t *testing.T) {
 		compare(name, rt, want.Fields, resultFieldsNeverAnswered[name])
 
 		if want.Items != nil {
-			f, ok := rt.FieldByName("Items")
-			if !ok || f.Type.Kind() != reflect.Slice {
+			structField, ok := rt.FieldByName("Items")
+			if !ok || structField.Type.Kind() != reflect.Slice {
 				t.Errorf("%s (%s) has no items, the contract's result does", name, rt)
 
 				continue
 			}
 
-			if !plain(f.Type.Elem()) {
+			if !plain(structField.Type.Elem()) {
 				t.Errorf(
 					"%s lists %s, whose fields are decided at run time: list the operation with the reason",
 					name,
-					f.Type.Elem(),
+					structField.Type.Elem(),
 				)
 
 				continue
 			}
 
-			compare(name+" items", f.Type.Elem(), *want.Items, nil)
+			compare(name+" items", structField.Type.Elem(), *want.Items, nil)
 		}
 	}
 

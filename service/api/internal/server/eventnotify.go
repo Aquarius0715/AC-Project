@@ -22,28 +22,33 @@ type notifyingRecorder struct {
 	store notify.Store
 }
 
-func (r notifyingRecorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) error {
+func (r notifyingRecorder) Record(
+	ctx context.Context,
+	tx pgx.Tx,
+	c *ops.Call,
+	operation string,
+) error {
 	if c.Principal != nil {
-		err := r.dispatch(ctx, c, op)
+		err := r.dispatch(ctx, c, operation)
 		if err != nil {
 			return err
 		}
 	}
 
-	return apperr.Wrap(r.inner.Record(ctx, tx, c, op), "ops.Recorder.Record")
+	return apperr.Wrap(r.inner.Record(ctx, tx, c, operation), "ops.Recorder.Record")
 }
 
 // RecordDenied passes a refused write's audit entry to the inner recorder (ops.DeniedRecorder, IR603); a refusal
 // notifies nobody.
 func (r notifyingRecorder) RecordDenied(
 	ctx context.Context,
-	tx pgx.Tx,
+	txn pgx.Tx,
 	c *ops.Call,
 	op string,
 	d ops.Denial,
 ) error {
 	if dr, ok := r.inner.(ops.DeniedRecorder); ok {
-		return apperr.Wrap(dr.RecordDenied(ctx, tx, c, op, d), "ops.DeniedRecorder.RecordDenied")
+		return apperr.Wrap(dr.RecordDenied(ctx, txn, c, op, d), "ops.DeniedRecorder.RecordDenied")
 	}
 
 	return nil
@@ -100,7 +105,7 @@ func (r notifyingRecorder) hq(ctx context.Context, c *ops.Call, perm string) ([]
 
 func (r notifyingRecorder) partners(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	org *uuid.UUID,
 	perm string,
 ) ([]uuid.UUID, error) {
@@ -110,7 +115,7 @@ func (r notifyingRecorder) partners(
 
 	return members(
 		ctx,
-		c,
+		call,
 		identity.MembersInput{
 			Role:           "contractor",
 			OrganizationID: org,
@@ -123,14 +128,19 @@ func (r notifyingRecorder) partners(
 
 func (r notifyingRecorder) technician(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	job uuid.UUID,
 ) ([]uuid.UUID, error) {
 	// the active assignment, or the one this very transition revoked (cancel / hold) or released (completion, IR234);
 	// maintenance's own rows
-	rows, err := c.Tx.Query(ctx, `SELECT a.technician_membership_id FROM maintenance.assignments a
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT a.technician_membership_id FROM maintenance.assignments a
 		WHERE a.job_id = $2 AND (a.status = 'active' OR (a.status IN ('revoked', 'completed') AND a.updated_at =
-		$1))`, c.Now, job)
+		$1))`,
+		call.Now,
+		job,
+	)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select maintenance.assignments")
 	}
@@ -142,7 +152,7 @@ func (r notifyingRecorder) technician(
 
 	return members(
 		ctx,
-		c,
+		call,
 		identity.MembersInput{
 			IDs:            ids,
 			Role:           "",
@@ -155,18 +165,18 @@ func (r notifyingRecorder) technician(
 
 func (r notifyingRecorder) send(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	set *recipientSet,
 	template, kind string,
 	target uuid.UUID,
 	severity, status string,
 ) error {
 	for _, id := range set.ids {
-		if id == c.Principal.MembershipID {
+		if id == call.Principal.MembershipID {
 			continue
 		}
 
-		_, err := r.store.Create(ctx, c, notify.New{
+		_, err := r.store.Create(ctx, call, notify.New{
 			RecipientMembershipID: id,
 			Type:                  template,
 			TemplateKey:           template,
@@ -188,42 +198,43 @@ func (r notifyingRecorder) send(
 }
 
 // jobEvent maps a job write and the job status after it to the IR95 event, template and audience.
-func jobEvent(op, status string) (event, template string) {
+func jobEvent(operation, status string) (event, template string) {
 	switch {
-	case op == "jobs.create" || op == "jobs.reportProblem":
+	case operation == "jobs.create" || operation == "jobs.reportProblem":
 		return "requested", "job_update"
-	case op == "jobs.offer":
+	case operation == "jobs.offer":
 		return "offered", "job_update"
-	case op == "jobs.accept":
+	case operation == "jobs.accept":
 		return "accepted", "job_update"
-	case op == "jobs.decline":
+	case operation == "jobs.decline":
 		return "declined", "job_update"
-	case op == "jobs.assign":
+	case operation == "jobs.assign":
 		return "assigned", "schedule_change"
-	case op == "jobs.submit":
+	case operation == "jobs.submit":
 		return "submitted", "job_update"
-	case op == "jobs.review" && status == "rework_requested":
+	case operation == "jobs.review" && status == "rework_requested":
 		return "returned", "report_return"
-	case op == "jobs.review" && status == "completed":
+	case operation == "jobs.review" && status == "completed":
 		return "completed", "completion"
-	case op == "jobs.cancel", op == "jobs.hold", op == "jobs.resumeHold":
+	case operation == "jobs.cancel", operation == "jobs.hold", operation == "jobs.resumeHold":
 		return status, "job_update"
 	}
 
 	return "", ""
 }
 
-func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string) error {
-	for _, a := range c.Audits {
-		id, err := uuid.Parse(a.TargetID)
+func (r notifyingRecorder) dispatch(ctx context.Context, call *ops.Call, op string) error {
+	for _, auditEntry := range call.Audits {
+		id, err := uuid.Parse(auditEntry.TargetID)
 		if err != nil {
 			continue
 		}
 
-		switch a.TargetKind {
+		switch auditEntry.TargetKind {
 		case "job":
 			if op == "jobs.reportProblem" { // the audit names the reported job; the request is the follow-up it created (IR438)
-				err := c.Tx.QueryRow(ctx, `SELECT id FROM maintenance.jobs WHERE follow_up_of_job_id = $1 ORDER BY created_at DESC,
+				err := call.Tx.QueryRow(ctx, `SELECT id FROM maintenance.jobs WHERE follow_up_of_job_id = $1 ORDER BY created_at
+					DESC,
 					id DESC LIMIT 1`, id).
 					Scan(&id)
 				if err != nil {
@@ -231,7 +242,7 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 				}
 			}
 
-			err := r.job(ctx, c, op, id)
+			err := r.job(ctx, call, op, id)
 			if err != nil {
 				return err
 			}
@@ -240,24 +251,25 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 				continue
 			}
 
-			err := r.restriction(ctx, c, id)
+			err := r.restriction(ctx, call, id)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	for _, e := range c.Events { // payment.confirmed
-		pl, _ := e.Payload.(map[string]any)
-		if e.Type != "PaymentChanged" || fmt.Sprint(pl["status"]) != "confirmed" {
+	for _, event := range call.Events { // payment.confirmed
+		pl, _ := event.Payload.(map[string]any)
+		if event.Type != "PaymentChanged" || fmt.Sprint(pl["status"]) != "confirmed" {
 			continue
 		}
 
 		var org, invoice uuid.UUID
 
-		err := c.Tx.QueryRow(ctx, `SELECT k.customer_org_id, i.id FROM billing.payments p JOIN billing.invoices i ON i.id =
+		err := call.Tx.QueryRow(ctx, `SELECT k.customer_org_id, i.id FROM billing.payments p JOIN billing.invoices i ON i.id =
 			p.invoice_id
-			JOIN billing.contracts k ON k.id = i.contract_id AND k.version = i.contract_version WHERE p.id = $1`, e.AggregateID).
+			JOIN billing.contracts k ON k.id = i.contract_id AND k.version = i.contract_version WHERE p.id =
+			$1`, event.AggregateID).
 			Scan(&org, &invoice)
 		if err != nil {
 			return apperr.Wrap(err, "select billing.payments")
@@ -265,12 +277,12 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 
 		set := &recipientSet{ids: nil}
 
-		cl, err := r.clients(ctx, c, org)
+		cl, err := r.clients(ctx, call, org)
 		if err != nil {
 			return err
 		}
 
-		hq, err := r.hq(ctx, c, "billing.write")
+		hq, err := r.hq(ctx, call, "billing.write")
 		if err != nil {
 			return err
 		}
@@ -280,7 +292,7 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 
 		sendErr := r.send(
 			ctx,
-			c,
+			call,
 			set,
 			"payment",
 			"invoice",
@@ -296,7 +308,12 @@ func (r notifyingRecorder) dispatch(ctx context.Context, c *ops.Call, op string)
 	return nil
 }
 
-func (r notifyingRecorder) job(ctx context.Context, c *ops.Call, op string, job uuid.UUID) error {
+func (r notifyingRecorder) job(
+	ctx context.Context,
+	c *ops.Call,
+	operation string,
+	job uuid.UUID,
+) error {
 	var (
 		status     string
 		org        uuid.UUID
@@ -310,7 +327,7 @@ func (r notifyingRecorder) job(ctx context.Context, c *ops.Call, op string, job 
 		return nil // not a job row (the audit target was resolved elsewhere)
 	}
 
-	event, template := jobEvent(op, status)
+	event, template := jobEvent(operation, status)
 	if event == "" {
 		return nil
 	}

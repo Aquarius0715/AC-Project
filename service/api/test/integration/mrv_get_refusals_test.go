@@ -10,16 +10,16 @@ import (
 // VALIDATION on id before any row is read (energy mrv.get, mrv.versions; the input rules of GetInput and
 // VersionsInput).
 func TestMRVReadRefusals(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	missing := uuid.NewString()
 
-	code, m := post(s, &hq, "mrv.get", `{"id":"`+missing+`"}`)
-	if code != 404 || m["messageKey"] != "error.notFound" {
-		t.Fatalf("mrv.get of a missing report: %d %v, want 404 NOT_FOUND", code, m)
+	code, res := post(srv, &hq, "mrv.get", `{"id":"`+missing+`"}`)
+	if code != 404 || res["messageKey"] != "error.notFound" {
+		t.Fatalf("mrv.get of a missing report: %d %v, want 404 NOT_FOUND", code, res)
 	}
 
-	code, m = post(s, &hq, "mrv.get", `{"id":"`+missing+`","reportVersion":0}`)
-	refusal(t, "mrv.get reportVersion 0", code, m, "id=error.invalid")
-	code, m = post(s, &hq, "mrv.versions", `{"id":"00000000-0000-0000-0000-000000000000"}`)
-	refusal(t, "mrv.versions nil id", code, m, "id=error.required")
+	code, res = post(srv, &hq, "mrv.get", `{"id":"`+missing+`","reportVersion":0}`)
+	refusal(t, "mrv.get reportVersion 0", code, res, "id=error.invalid")
+	code, res = post(srv, &hq, "mrv.versions", `{"id":"00000000-0000-0000-0000-000000000000"}`)
+	refusal(t, "mrv.versions nil id", code, res, "id=error.required")
 }

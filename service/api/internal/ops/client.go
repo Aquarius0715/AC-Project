@@ -27,68 +27,68 @@ func ClientRequest(operation, input string) (string, string, io.Reader) {
 		return http.MethodPost, "/v1/" + operation, strings.NewReader(input)
 	}
 
-	var in map[string]any
+	var req map[string]any
 
 	dec := json.NewDecoder(strings.NewReader(input))
 	dec.UseNumber()
 
-	parsed := strings.TrimSpace(input) == "" || dec.Decode(&in) == nil && in != nil && !dec.More()
-	if in == nil {
-		in = map[string]any{}
+	parsed := strings.TrimSpace(input) == "" || dec.Decode(&req) == nil && req != nil && !dec.More()
+	if req == nil {
+		req = map[string]any{}
 	}
 
-	rt := pickRoute(spec.Routes, in)
+	route := pickRoute(spec.Routes, req)
 
-	path := rt.Path
-	for _, p := range PathParams(rt.Path) {
+	path := route.Path
+	for _, p := range PathParams(route.Path) {
 		path = strings.Replace(
 			path,
 			"{"+p+"}",
-			url.PathEscape(paramText(takeAt(in, strings.Split(p, ".")))),
+			url.PathEscape(paramText(takeAt(req, strings.Split(p, ".")))),
 			1,
 		)
 	}
 
-	if f := rt.FixedField; f != "" && paramText(in[f]) == rt.FixedValue {
-		delete(in, f)
+	if f := route.FixedField; f != "" && paramText(req[f]) == route.FixedValue {
+		delete(req, f)
 	}
 
-	if rt.Method == http.MethodGet || rt.Method == http.MethodDelete {
-		q := url.Values{}
+	if route.Method == http.MethodGet || route.Method == http.MethodDelete {
+		params := url.Values{}
 		if parsed {
-			flattenQuery(q, "", in, true)
+			flattenQuery(params, "", req, true)
 		} else {
-			q.Set("_", input)
+			params.Set("_", input)
 		}
 
-		if len(q) > 0 {
-			path += "?" + q.Encode()
+		if len(params) > 0 {
+			path += "?" + params.Encode()
 		}
 
-		return rt.Method, path, nil
+		return route.Method, path, nil
 	}
 
 	if !parsed {
-		return rt.Method, path, strings.NewReader(input)
+		return route.Method, path, strings.NewReader(input)
 	}
 
-	b, _ := json.Marshal(in)
+	b, _ := json.Marshal(req)
 
-	return rt.Method, path, bytes.NewReader(b)
+	return route.Method, path, bytes.NewReader(b)
 }
 
 // pickRoute prefers the route with the most path parameters the input holds and whose fixed field it matches.
-func pickRoute(routes []Route, in map[string]any) Route {
+func pickRoute(routes []Route, input map[string]any) Route {
 	best, score := routes[0], -1
-	for _, rt := range routes {
-		if rt.FixedField != "" && paramText(in[rt.FixedField]) != rt.FixedValue {
+	for _, route := range routes {
+		if route.FixedField != "" && paramText(input[route.FixedField]) != route.FixedValue {
 			continue
 		}
 
 		n := 0
 
-		for _, p := range PathParams(rt.Path) {
-			if lookupAt(in, strings.Split(p, ".")) == nil {
+		for _, p := range PathParams(route.Path) {
+			if lookupAt(input, strings.Split(p, ".")) == nil {
 				n = -1
 
 				break
@@ -98,7 +98,7 @@ func pickRoute(routes []Route, in map[string]any) Route {
 		}
 
 		if n > score {
-			best, score = rt, n
+			best, score = route, n
 		}
 	}
 
@@ -155,29 +155,29 @@ func paramText(v any) string {
 	return string(b)
 }
 
-func flattenQuery(q url.Values, prefix string, obj map[string]any, top bool) {
-	for k, v := range obj {
+func flattenQuery(params url.Values, prefix string, obj map[string]any, top bool) {
+	for key, v := range obj {
 		switch x := v.(type) {
 		case nil:
 		case map[string]any:
 			switch {
-			case top && (k == "query" || k == "filters"):
-				flattenQuery(q, "", x, true)
-			case k == "sort":
-				q.Set("sort", paramText(x["field"])+":"+paramText(x["direction"]))
+			case top && (key == "query" || key == "filters"):
+				flattenQuery(params, "", x, true)
+			case key == "sort":
+				params.Set("sort", paramText(x["field"])+":"+paramText(x["direction"]))
 			default:
-				flattenQuery(q, prefix+k+".", x, false)
+				flattenQuery(params, prefix+key+".", x, false)
 			}
 		case []any:
 			if len(x) == 0 { // the empty list
-				q.Add(prefix+k, "")
+				params.Add(prefix+key, "")
 			}
 
 			for _, e := range x {
-				q.Add(prefix+k, paramText(e))
+				params.Add(prefix+key, paramText(e))
 			}
 		default:
-			q.Add(prefix+k, paramText(x))
+			params.Add(prefix+key, paramText(x))
 		}
 	}
 }

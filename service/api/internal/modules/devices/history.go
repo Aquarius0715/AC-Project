@@ -69,15 +69,15 @@ func (in *EventsInput) Validate() map[string]string {
 // clients only see rows whose binding belonged to their organization (occurrence scope).
 func (m *Module) historyAccess(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	device uuid.UUID,
 ) (string, []any, error) {
 	args := []any{device}
 
 	var unit *uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, "SELECT d.unit_id FROM devices.devices d WHERE d.id = $1 AND "+
-		deviceScope(c, &args, unitscope.List), args...).
+	err := call.Tx.QueryRow(ctx, "SELECT d.unit_id FROM devices.devices d WHERE d.id = $1 AND "+
+		deviceScope(call, &args, unitscope.List), args...).
 		Scan(&unit)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil, apperr.E(apperr.NotFound, "error.notFound")
@@ -87,7 +87,7 @@ func (m *Module) historyAccess(
 		return "", nil, apperr.Wrap(err, "select devices.devices")
 	}
 
-	switch c.Principal.Role {
+	switch call.Principal.Role {
 	case "technician":
 		if unit == nil {
 			return "", nil, apperr.E(apperr.NotFound, "error.notFound")
@@ -95,10 +95,10 @@ func (m *Module) historyAccess(
 
 		err := m.UnitAccess.TechnicianUnit(
 			ctx,
-			c,
+			call,
 			*unit,
 			true,
-			c.Principal.Employment == "internal",
+			call.Principal.Employment == "internal",
 		)
 		if err != nil {
 			return "", nil, apperr.Wrap(err, "devices.TechUnitAccess.TechnicianUnit")
@@ -106,7 +106,7 @@ func (m *Module) historyAccess(
 
 		return "b.unit_id = $2", []any{*unit}, nil // only history of the current binding's unit
 	case "client":
-		return "b.customer_org_id = $2", []any{c.Principal.OrgID}, nil
+		return "b.customer_org_id = $2", []any{call.Principal.OrgID}, nil
 	}
 
 	return "$2::uuid IS NULL", []any{nil}, nil // every history row (HQ); keeps the $2 slot
@@ -119,13 +119,13 @@ type historyFilter struct {
 	To   *time.Time `json:"to,omitempty"`
 }
 
-func decodeHistory(q paging.Query, period bool) (historyFilter, error) {
+func decodeHistory(query paging.Query, period bool) (historyFilter, error) {
 	var f historyFilter
-	if !q.HasFilters() {
+	if !query.HasFilters() {
 		return f, nil
 	}
 
-	dec := json.NewDecoder(strings.NewReader(string(q.Filters)))
+	dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 	dec.DisallowUnknownFields()
 
 	if !period || dec.Decode(&f) != nil {
@@ -141,45 +141,45 @@ func decodeHistory(q paging.Query, period bool) (historyFilter, error) {
 
 func historyPage[T any](
 	ctx context.Context,
-	c *ops.Call,
-	q paging.Query,
+	call *ops.Call,
+	query paging.Query,
 	sel, from, where string,
 	args []any,
 	order string,
 	scan func(pgx.Row) (T, error),
 ) (paging.Page[T], error) {
-	f, err := decodeHistory(q, false)
+	f, err := decodeHistory(query, false)
 	if err != nil {
 		return paging.Page[T]{}, err
 	}
 
-	return historyPageOf(ctx, c, q, f, sel, from, where, args, order, scan)
+	return historyPageOf(ctx, call, query, f, sel, from, where, args, order, scan)
 }
 
 func historyPageOf[T any](
 	ctx context.Context,
-	c *ops.Call,
-	q paging.Query,
+	call *ops.Call,
+	query paging.Query,
 	f historyFilter,
 	sel, from, where string,
 	args []any,
 	order string,
 	scan func(pgx.Row) (T, error),
 ) (paging.Page[T], error) {
-	w, err := paging.Resolve(q, f, c.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(query, f, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[T]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	var total int
 
-	scanErr := c.Tx.QueryRow(ctx, "SELECT count(*) "+from+" WHERE "+where, args...).
+	scanErr := call.Tx.QueryRow(ctx, "SELECT count(*) "+from+" WHERE "+where, args...).
 		Scan(&total)
 	if scanErr != nil {
 		return paging.Page[T]{}, apperr.Wrap(scanErr, "select count")
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		fmt.Sprintf(
 			"SELECT %s %s WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
@@ -187,8 +187,8 @@ func historyPageOf[T any](
 			from,
 			where,
 			order,
-			w.Limit,
-			w.Offset,
+			window.Limit,
+			window.Offset,
 		),
 		args...)
 	if err != nil {
@@ -209,9 +209,9 @@ func historyPageOf[T any](
 
 	return paging.Page[T]{
 		Items:           items,
-		NextCursor:      w.Next(total),
+		NextCursor:      window.Next(total),
 		Total:           total,
-		SnapshotVersion: w.Snapshot,
+		SnapshotVersion: window.Snapshot,
 	}, apperr.Wrap(rows.Err(), "select (historyPageOf)")
 }
 
@@ -259,15 +259,15 @@ func orderFor(q paging.Query, prefix string) (string, error) {
 //	@Router			/v1/devices/{deviceId}/operations [get]
 func (m *Module) operations(
 	ctx context.Context,
-	c *ops.Call,
-	in *HistoryInput,
+	call *ops.Call,
+	input *HistoryInput,
 ) (paging.Page[DeviceOperation], error) {
-	scope, sargs, err := m.historyAccess(ctx, c, in.device())
+	scope, sargs, err := m.historyAccess(ctx, call, input.device())
 	if err != nil {
 		return paging.Page[DeviceOperation]{}, err
 	}
 
-	order, err := orderFor(in.Query, "o.")
+	order, err := orderFor(input.Query, "o.")
 	if err != nil {
 		return paging.Page[DeviceOperation]{}, err
 	}
@@ -278,12 +278,12 @@ func (m *Module) operations(
 
 	return historyPage(
 		ctx,
-		c,
-		in.Query,
+		call,
+		input.Query,
 		opCols,
 		from,
 		"o.device_id = $1 AND "+scope,
-		append([]any{in.device()}, sargs...),
+		append([]any{input.device()}, sargs...),
 		order,
 		scanOp,
 	)
@@ -319,27 +319,27 @@ func (m *Module) operations(
 //	@Router			/v1/devices/{deviceId}/calibrations [get]
 func (m *Module) calibrations(
 	ctx context.Context,
-	c *ops.Call,
-	in *HistoryInput,
+	call *ops.Call,
+	input *HistoryInput,
 ) (paging.Page[CalibrationRecord], error) {
-	scope, sargs, err := m.historyAccess(ctx, c, in.device())
+	scope, sargs, err := m.historyAccess(ctx, call, input.device())
 	if err != nil {
 		return paging.Page[CalibrationRecord]{}, err
 	}
 
-	order, err := orderFor(in.Query, "r.")
+	order, err := orderFor(input.Query, "r.")
 	if err != nil {
 		return paging.Page[CalibrationRecord]{}, err
 	}
 
 	return historyPage(
 		ctx,
-		c,
-		in.Query,
+		call,
+		input.Query,
 		calCols,
 		calFrom,
 		"r.device_id = $1 AND "+scope,
-		append([]any{in.device()}, sargs...),
+		append([]any{input.device()}, sargs...),
 		order,
 		scanCal,
 	)
@@ -384,33 +384,33 @@ const evFrom = ` FROM devices.device_events e LEFT JOIN devices.device_bindings 
 
 func (m *Module) scanEvent(ctx context.Context, c *ops.Call) func(pgx.Row) (DeviceEvent, error) {
 	return func(r pgx.Row) (DeviceEvent, error) {
-		var e DeviceEvent
+		var deviceEvent DeviceEvent
 
 		err := r.Scan(
-			&e.ID,
-			&e.TenantID,
-			&e.Version,
-			&e.CreatedAt,
-			&e.UpdatedAt,
-			&e.BindingID,
-			&e.UnitIDAtOccurrence,
-			&e.CustomerOrgIDAtOccurrence,
-			&e.AlertIDs,
-			&e.DeviceID,
-			&e.EventType,
-			&e.Recovery,
-			&e.EvidenceSource,
-			&e.Sequence,
-			&e.OccurredAt,
-			&e.RestoredAt,
+			&deviceEvent.ID,
+			&deviceEvent.TenantID,
+			&deviceEvent.Version,
+			&deviceEvent.CreatedAt,
+			&deviceEvent.UpdatedAt,
+			&deviceEvent.BindingID,
+			&deviceEvent.UnitIDAtOccurrence,
+			&deviceEvent.CustomerOrgIDAtOccurrence,
+			&deviceEvent.AlertIDs,
+			&deviceEvent.DeviceID,
+			&deviceEvent.EventType,
+			&deviceEvent.Recovery,
+			&deviceEvent.EvidenceSource,
+			&deviceEvent.Sequence,
+			&deviceEvent.OccurredAt,
+			&deviceEvent.RestoredAt,
 		)
 
-		e.ResponseNotes = []ResponseNote{}
-		if len(e.Recovery) > 0 {
-			e.RecoveryJSON = jsonRaw(e.Recovery)
+		deviceEvent.ResponseNotes = []ResponseNote{}
+		if len(deviceEvent.Recovery) > 0 {
+			deviceEvent.RecoveryJSON = jsonRaw(deviceEvent.Recovery)
 		}
 
-		return e, apperr.Wrap(err, "scan (scanEvent)")
+		return deviceEvent, apperr.Wrap(err, "scan (scanEvent)")
 	}
 }
 
@@ -419,7 +419,7 @@ type jsonRaw []byte
 func (j jsonRaw) MarshalJSON() ([]byte, error) { return j, nil }
 
 // withNotes reads the response notes of a page of events in one query, not one per event (IR497).
-func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) error {
+func (m *Module) withNotes(ctx context.Context, call *ops.Call, evs []DeviceEvent) error {
 	if len(evs) == 0 {
 		return nil
 	}
@@ -429,7 +429,7 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 		ids[i], at[evs[i].ID] = evs[i].ID, i
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT event_id, actor_id, message, created_at FROM devices.device_event_notes WHERE event_id = ANY($1) ORDER BY
 			event_id, created_at, id`,
@@ -441,11 +441,11 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 
 	for rows.Next() {
 		var (
-			event uuid.UUID
-			n     ResponseNote
+			event        uuid.UUID
+			responseNote ResponseNote
 		)
 
-		err := rows.Scan(&event, &n.ActorID, &n.Message, &n.At)
+		err := rows.Scan(&event, &responseNote.ActorID, &responseNote.Message, &responseNote.At)
 		if err != nil {
 			rows.Close()
 
@@ -453,7 +453,7 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 		}
 
 		if i, ok := at[event]; ok {
-			evs[i].ResponseNotes = append(evs[i].ResponseNotes, n)
+			evs[i].ResponseNotes = append(evs[i].ResponseNotes, responseNote)
 		}
 	}
 
@@ -494,16 +494,16 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 //	@Router			/v1/devices/{id}/events [get]
 func (m *Module) events(
 	ctx context.Context,
-	c *ops.Call,
-	in *EventsInput,
+	call *ops.Call,
+	input *EventsInput,
 ) (paging.Page[DeviceEvent], error) {
-	scope, sargs, err := m.historyAccess(ctx, c, in.device())
+	scope, sargs, err := m.historyAccess(ctx, call, input.device())
 	if err != nil {
 		return paging.Page[DeviceEvent]{}, err
 	}
 
 	order, err := paging.OrderBy(
-		in.Query.Sort,
+		input.Query.Sort,
 		map[string]string{"id": "e.id", "createdAt": "e.created_at", "updatedAt": "e.created_at"},
 		"e.occurred_at DESC, e.sequence DESC, e.id ASC",
 	)
@@ -511,12 +511,12 @@ func (m *Module) events(
 		return paging.Page[DeviceEvent]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	f, err := decodeHistory(in.Query, true)
+	f, err := decodeHistory(input.Query, true)
 	if err != nil {
 		return paging.Page[DeviceEvent]{}, err
 	}
 
-	where, args := "e.device_id = $1 AND "+scope, append([]any{in.device()}, sargs...)
+	where, args := "e.device_id = $1 AND "+scope, append([]any{input.device()}, sargs...)
 	if f.From != nil {
 		args = append(args, *f.From)
 		where += fmt.Sprintf(" AND e.occurred_at >= $%d", len(args))
@@ -527,23 +527,23 @@ func (m *Module) events(
 		where += fmt.Sprintf(" AND e.occurred_at < $%d", len(args))
 	}
 
-	p, err := historyPageOf(
+	page, err := historyPageOf(
 		ctx,
-		c,
-		in.Query,
+		call,
+		input.Query,
 		f,
 		evCols,
 		evFrom,
 		where,
 		args,
 		order,
-		m.scanEvent(ctx, c),
+		m.scanEvent(ctx, call),
 	)
 	if err != nil {
-		return p, err
+		return page, err
 	}
 
-	return p, m.withNotes(ctx, c, p.Items)
+	return page, m.withNotes(ctx, call, page.Items)
 }
 
 // NoteInput is devices.addResponseNote input.
@@ -555,21 +555,21 @@ type NoteInput struct {
 
 // Validate implements ops.Validator (DD-T12: 1–1000 after trimming).
 func (in *NoteInput) Validate() map[string]string {
-	fe := map[string]string{}
+	fieldErrs := map[string]string{}
 	if in.DeviceID == uuid.Nil {
-		fe["deviceId"] = "error.required"
+		fieldErrs["deviceId"] = "error.required"
 	}
 
 	if in.EventID == uuid.Nil {
-		fe["eventId"] = "error.required"
+		fieldErrs["eventId"] = "error.required"
 	}
 
 	in.ResponseNote = strings.TrimSpace(in.ResponseNote)
 	if n := utf8.RuneCountInString(in.ResponseNote); n < 1 || n > 1000 {
-		fe["responseNote"] = "error.length"
+		fieldErrs["responseNote"] = "error.length"
 	}
 
-	return fe
+	return fieldErrs
 }
 
 // addResponseNote appends a note to a device event; the version is DeviceEvent.version (strict review).
@@ -602,19 +602,19 @@ func (in *NoteInput) Validate() map[string]string {
 //	@Router			/v1/devices/{deviceId}/events/{eventId}/response-note [post]
 func (m *Module) addResponseNote(
 	ctx context.Context,
-	c *ops.Call,
-	in *NoteInput,
+	call *ops.Call,
+	input *NoteInput,
 ) (DeviceEvent, error) {
-	scope, sargs, err := m.historyAccess(ctx, c, in.DeviceID)
+	scope, sargs, err := m.historyAccess(ctx, call, input.DeviceID)
 	if err != nil {
 		return DeviceEvent{}, err
 	}
 
 	var v int
 
-	err = c.Tx.QueryRow(ctx, "SELECT e.version "+evFrom+" WHERE e.id = $3 AND e.device_id = $1 AND "+scope+
+	err = call.Tx.QueryRow(ctx, "SELECT e.version "+evFrom+" WHERE e.id = $3 AND e.device_id = $1 AND "+scope+
 		" FOR UPDATE OF e",
-		append(append([]any{in.DeviceID}, sargs...), in.EventID)...).
+		append(append([]any{input.DeviceID}, sargs...), input.EventID)...).
 		Scan(&v)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return DeviceEvent{}, apperr.E(
@@ -627,58 +627,58 @@ func (m *Module) addResponseNote(
 		return DeviceEvent{}, apperr.Wrap(err, "select devices.device_events")
 	}
 
-	if v != *c.ExpectedVersion {
+	if v != *call.ExpectedVersion {
 		return DeviceEvent{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`INSERT INTO devices.device_event_notes (tenant_id, event_id, actor_id, message) VALUES
 			(current_setting('app.tenant_id')::uuid, $1, $2, $3)`,
-		in.EventID,
-		c.Principal.UserID,
-		in.ResponseNote,
+		input.EventID,
+		call.Principal.UserID,
+		input.ResponseNote,
 	)
 	if execErr != nil {
 		return DeviceEvent{}, apperr.Wrap(execErr, "insert devices.device_event_notes")
 	}
 
-	scanErr := c.Tx.QueryRow(ctx, `UPDATE devices.device_events SET version = version + 1 WHERE id = $1 RETURNING
-		version`, in.EventID).
+	scanErr := call.Tx.QueryRow(ctx, `UPDATE devices.device_events SET version = version + 1 WHERE id = $1 RETURNING
+		version`, input.EventID).
 		Scan(&v)
 	if scanErr != nil {
 		return DeviceEvent{}, apperr.Wrap(scanErr, "update devices.device_events")
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "devices.addResponseNote",
 			TargetKind:      "device_event",
-			TargetID:        in.EventID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			TargetID:        input.EventID.String(),
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &v, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: "device",
-			AggregateID:   in.DeviceID,
+			AggregateID:   input.DeviceID,
 			Type:          "DeviceEventNoted",
-			Payload:       map[string]any{"eventId": in.EventID},
+			Payload:       map[string]any{"eventId": input.EventID},
 		},
 	)
 
-	e, err := m.scanEvent(
+	deviceEvent, err := m.scanEvent(
 		ctx,
-		c,
+		call,
 	)(
-		c.Tx.QueryRow(ctx, "SELECT "+evCols+evFrom+" WHERE e.id = $1", in.EventID),
+		call.Tx.QueryRow(ctx, "SELECT "+evCols+evFrom+" WHERE e.id = $1", input.EventID),
 	)
 	if err != nil {
 		return DeviceEvent{}, err
 	}
 
-	evs := []DeviceEvent{e}
+	evs := []DeviceEvent{deviceEvent}
 
-	return evs[0], m.withNotes(ctx, c, evs)
+	return evs[0], m.withNotes(ctx, call, evs)
 }

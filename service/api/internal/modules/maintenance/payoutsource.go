@@ -32,13 +32,13 @@ type PayoutSource struct {
 func (PayoutSource) AcceptedJobs(
 	ctx context.Context,
 	c *ops.Call,
-	from, to time.Time,
+	from, until time.Time,
 ) ([]AcceptedJob, error) {
 	rows, err := c.Tx.Query(ctx, `SELECT j.id, j.contractor_org_id, j.type, w.accepted_at,
 		EXISTS (SELECT 1 FROM maintenance.report_reviews rr WHERE rr.report_id = w.id AND rr.decision = 'return')
 		FROM maintenance.jobs j JOIN maintenance.work_reports w ON w.job_id = j.id AND w.state = 'accepted'
 		WHERE j.contractor_org_id IS NOT NULL AND w.accepted_at >= $1 AND w.accepted_at < $2 ORDER BY j.contractor_org_id,
-		w.accepted_at, j.id`, from, to)
+		w.accepted_at, j.id`, from, until)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select maintenance.jobs")
 	}
@@ -47,20 +47,20 @@ func (PayoutSource) AcceptedJobs(
 	var out []AcceptedJob
 
 	for rows.Next() {
-		var a AcceptedJob
+		var acceptedJob AcceptedJob
 
 		err := rows.Scan(
-			&a.JobID,
-			&a.ContractorOrgID,
-			&a.Type,
-			&a.AcceptedAt,
-			&a.Returned,
+			&acceptedJob.JobID,
+			&acceptedJob.ContractorOrgID,
+			&acceptedJob.Type,
+			&acceptedJob.AcceptedAt,
+			&acceptedJob.Returned,
 		)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select maintenance.jobs")
 		}
 
-		out = append(out, a)
+		out = append(out, acceptedJob)
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select maintenance.jobs")
@@ -69,18 +69,18 @@ func (PayoutSource) AcceptedJobs(
 // RateAt returns the rate card lines (workType → amount) and currency effective for a contractor at a time.
 func (PayoutSource) RateAt(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	contractor uuid.UUID,
-	at time.Time,
+	when time.Time,
 ) (map[string]int64, string, bool, error) {
 	var (
 		raw      []byte
 		currency string
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT lines, currency FROM maintenance.rate_cards WHERE contractor_org_id = $1 AND
+	err := call.Tx.QueryRow(ctx, `SELECT lines, currency FROM maintenance.rate_cards WHERE contractor_org_id = $1 AND
 		effective_from <= $2 ORDER BY effective_from DESC LIMIT 1`,
-		contractor, at).
+		contractor, when).
 		Scan(&raw, &currency)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, "", false, nil
@@ -109,20 +109,20 @@ func (PayoutSource) RateAt(
 // authored by the requesting user at the request time.
 func NoteHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
-		events.JobNoteRequested: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
-			var n events.JobNote
+		events.JobNoteRequested: func(ctx context.Context, txn pgx.Tx, e events.Event) error {
+			var jobNote events.JobNote
 
-			err := e.Decode(&n)
+			err := e.Decode(&jobNote)
 			if err != nil {
 				return apperr.Wrap(err, "events.Event.Decode")
 			}
 
-			c := &ops.Call{
-				Tx:  tx,
-				Now: n.At,
+			call := &ops.Call{
+				Tx:  txn,
+				Now: jobNote.At,
 				Principal: &ops.Principal{
 					TenantID:          e.TenantID,
-					UserID:            n.AuthorUserID,
+					UserID:            jobNote.AuthorUserID,
 					Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
 					MembershipID:      uuid.UUID{},
 					OrgID:             uuid.UUID{},
@@ -145,9 +145,9 @@ func NoteHandlers() map[string]events.Handler {
 				Jobs: Jobs{Units: nil, Severity: nil, HQOrg: nil, Sites: nil, Blobs: nil},
 			}.AddJobNote(
 				ctx,
-				c,
-				n.JobID,
-				n.Message,
+				call,
+				jobNote.JobID,
+				jobNote.Message,
 			)
 		},
 	}
@@ -156,20 +156,20 @@ func NoteHandlers() map[string]events.Handler {
 // AddJobNote adds an internal note with a note.added event to a job's history (payout questions and replies).
 func (s PayoutSource) AddJobNote(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	job uuid.UUID,
 	message string,
 ) error {
 	var note uuid.UUID
 
-	err := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.job_notes (tenant_id, job_id, author_id, visibility, message,
+	err := call.Tx.QueryRow(ctx, `INSERT INTO maintenance.job_notes (tenant_id, job_id, author_id, visibility, message,
 		created_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'internal', $3, $4) RETURNING
-		id`, job, c.Principal.UserID, message, c.Now).
+		id`, job, call.Principal.UserID, message, call.Now).
 		Scan(&note)
 	if err != nil {
 		return apperr.Wrap(err, "insert maintenance.job_notes")
 	}
 
-	return s.Jobs.event(ctx, c, job, "note.added", &note)
+	return s.Jobs.event(ctx, call, job, "note.added", &note)
 }

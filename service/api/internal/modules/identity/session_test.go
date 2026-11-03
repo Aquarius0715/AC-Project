@@ -24,22 +24,22 @@ func (noDB) Run(ctx context.Context, ro bool, p *ops.Principal, fn func(pgx.Tx) 
 }
 
 func TestSessionGet(t *testing.T) {
-	r := ops.NewRegistry()
-	r.DB = noDB{}
+	reg := ops.NewRegistry()
+	reg.DB = noDB{}
 	now := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
-	r.Clock = func() time.Time { return now }
-	Register(r)
+	reg.Clock = func() time.Time { return now }
+	Register(reg)
 
-	e := echo.New()
+	app := echo.New()
 
-	e.HTTPErrorHandler = ops.HTTPErrorHandler
+	app.HTTPErrorHandler = ops.HTTPErrorHandler
 
-	err := r.MountREST(e.Group("/v1"))
+	err := reg.MountREST(app.Group("/v1"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	p := &ops.Principal{
+	principal := &ops.Principal{
 		Principal: authz.Principal{
 			Role:       "client",
 			ClientRole: "owner",
@@ -56,23 +56,24 @@ func TestSessionGet(t *testing.T) {
 		ScopeVersion: 3, Scopes: nil, Employment: "", Timezone: "", SessionsRevokedAt: nil,
 	}
 	req := httptest.NewRequest(http.MethodGet, "/v1/session", nil)
-	req = req.WithContext(ops.WithPrincipal(req.Context(), p))
-	w := httptest.NewRecorder()
-	e.ServeHTTP(w, req)
+	req = req.WithContext(ops.WithPrincipal(req.Context(), principal))
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
 
 	var res struct{ Data Session }
 
-	err = json.Unmarshal(w.Body.Bytes(), &res)
-	if err != nil || w.Code != 200 {
-		t.Fatalf("%d %s", w.Code, w.Body.String())
+	err = json.Unmarshal(rec.Body.Bytes(), &res)
+	if err != nil || rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
 	}
 
-	s := res.Data
-	if s.Role != "client" || s.ScopeVersion != 3 || s.UserID != p.UserID ||
-		strings.Join(s.Permissions, ",") != "alert.read,control.execute" ||
-		!s.ExpiresAt.Equal(now.Add(SessionTTL)) ||
-		s.Generation != 1 ||
-		s.OrganizationID != p.OrgID {
-		t.Fatalf("%+v", s)
+	session := res.Data
+	if session.Role != "client" || session.ScopeVersion != 3 ||
+		session.UserID != principal.UserID ||
+		strings.Join(session.Permissions, ",") != "alert.read,control.execute" ||
+		!session.ExpiresAt.Equal(now.Add(SessionTTL)) ||
+		session.Generation != 1 ||
+		session.OrganizationID != principal.OrgID {
+		t.Fatalf("%+v", session)
 	}
 }

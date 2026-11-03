@@ -28,9 +28,9 @@ type echoOut struct {
 // a call without a registry, and the errors of a missing registry, an unknown name and an undecodable input.
 func TestAskRoutesQueries(t *testing.T) {
 	ctx := context.Background()
-	r := NewRegistry()
+	reg := NewRegistry()
 	RegisterQuery(
-		r,
+		reg,
 		DomainEquipment,
 		"test.twice",
 		func(_ context.Context, _ *Call, in *echoIn) (map[string]int, error) {
@@ -38,8 +38,8 @@ func TestAskRoutesQueries(t *testing.T) {
 		},
 	)
 
-	c := &Call{
-		Queries:         r,
+	call := &Call{
+		Queries:         reg,
 		Tx:              nil,
 		Principal:       nil,
 		Now:             time.Time{},
@@ -53,8 +53,8 @@ func TestAskRoutesQueries(t *testing.T) {
 
 	out, err := Ask[echoOut](
 		ctx,
-		r,
-		c,
+		reg,
+		call,
 		"test.twice",
 		echoIn{N: 4},
 	)
@@ -65,8 +65,8 @@ func TestAskRoutesQueries(t *testing.T) {
 
 	_, err = Ask[echoOut](
 		ctx,
-		r,
-		c,
+		reg,
+		call,
 		"test.twice",
 		"not an object",
 	)
@@ -74,24 +74,24 @@ func TestAskRoutesQueries(t *testing.T) {
 		t.Errorf("undecodable input: %v", err)
 	}
 
-	_, err = Ask[echoOut](ctx, nil, c, "test.twice", echoIn{N: 0})
+	_, err = Ask[echoOut](ctx, nil, call, "test.twice", echoIn{N: 0})
 	if err == nil {
 		t.Error("a query outside a request")
 	}
 
-	_, err = Ask[echoOut](ctx, r, c, "test.nope", echoIn{N: 0})
+	_, err = Ask[echoOut](ctx, reg, call, "test.nope", echoIn{N: 0})
 	if err == nil {
 		t.Error("an unknown query")
 	}
 
-	r.ServeDomains(
+	reg.ServeDomains(
 		DomainMaintenance,
 	) // equipment is now another service's domain, and there is no transport
 
 	_, err = Ask[echoOut](
 		ctx,
-		r,
-		c,
+		reg,
+		call,
 		"test.twice",
 		echoIn{N: 1},
 	)
@@ -146,12 +146,12 @@ func TestHTTPQueries(t *testing.T) {
 	defer srv.Close()
 
 	target, _ := url.Parse(srv.URL + "/")
-	h := &HTTPQueries{
+	httpQueries := &HTTPQueries{
 		Targets: map[string]*url.URL{DomainEquipment: target},
 		Token:   "internal-token", Client: nil,
 	}
 	now := time.Date(2026, 9, 15, 1, 0, 0, 0, time.UTC)
-	p := &Principal{
+	principal := &Principal{
 		TenantID:          uuid.New(),
 		MembershipID:      uuid.New(),
 		Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
@@ -164,7 +164,7 @@ func TestHTTPQueries(t *testing.T) {
 		SessionsRevokedAt: nil,
 	}
 	user := &Call{
-		Principal:       p,
+		Principal:       principal,
 		Bearer:          "user-token",
 		CorrelationID:   "corr-1",
 		Now:             now,
@@ -176,7 +176,7 @@ func TestHTTPQueries(t *testing.T) {
 		Audits:          nil,
 	}
 
-	out, err := h.Query(
+	out, err := httpQueries.Query(
 		ctx,
 		user,
 		DomainEquipment,
@@ -190,7 +190,7 @@ func TestHTTPQueries(t *testing.T) {
 	if got.Method != http.MethodPost || got.URL.Path != "/internal/v1/queries/assets.unitState" ||
 		got.Header.Get(
 			"X-Tenant-Id",
-		) != p.TenantID.String() || got.Header.Get("X-Membership-Id") != p.MembershipID.String() ||
+		) != principal.TenantID.String() || got.Header.Get("X-Membership-Id") != principal.MembershipID.String() ||
 		got.Header.Get(
 			"Authorization",
 		) != "Bearer user-token" || got.Header.Get(InternalTokenHeader) != "internal-token" ||
@@ -201,7 +201,7 @@ func TestHTTPQueries(t *testing.T) {
 	}
 
 	worker := &Call{
-		Principal:       p,
+		Principal:       principal,
 		Now:             now,
 		Tx:              nil,
 		CorrelationID:   "",
@@ -213,7 +213,7 @@ func TestHTTPQueries(t *testing.T) {
 		Audits:          nil,
 	} // a scheduler job: no user, the tenant only (IR195)
 
-	_, queryErr := h.Query(
+	_, queryErr := httpQueries.Query(
 		ctx,
 		worker,
 		DomainEquipment,
@@ -228,7 +228,7 @@ func TestHTTPQueries(t *testing.T) {
 
 	status, body = http.StatusNotFound, `{"code":"NOT_FOUND","messageKey":"error.notFound","fieldErrors":{}}`
 
-	_, queryErr = h.Query(
+	_, queryErr = httpQueries.Query(
 		ctx,
 		user,
 		DomainEquipment,
@@ -243,7 +243,7 @@ func TestHTTPQueries(t *testing.T) {
 
 	status, body = http.StatusBadGateway, `<html>proxy error</html>`
 
-	_, queryErr = h.Query(
+	_, queryErr = httpQueries.Query(
 		ctx,
 		user,
 		DomainEquipment,
@@ -258,20 +258,20 @@ func TestHTTPQueries(t *testing.T) {
 
 	status, body = http.StatusOK, `not json`
 
-	_, queryErr = h.Query(ctx, user, DomainEquipment, "q", nil)
+	_, queryErr = httpQueries.Query(ctx, user, DomainEquipment, "q", nil)
 	if queryErr == nil {
 		t.Error("an undecodable envelope")
 	}
 
-	for name, c := range map[string]*Call{
+	for name, call := range map[string]*Call{
 		"no principal": {
 			Bearer: "x", Tx: nil, Principal: nil, Now: time.Time{}, CorrelationID: "", Queries: nil,
 			ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil,
 		},
 	} {
-		_, err := h.Query(
+		_, err := httpQueries.Query(
 			ctx,
-			c,
+			call,
 			DomainEquipment,
 			"q",
 			nil,
@@ -283,7 +283,7 @@ func TestHTTPQueries(t *testing.T) {
 		}
 	}
 
-	_, queryErr = h.Query(
+	_, queryErr = httpQueries.Query(
 		ctx,
 		user,
 		DomainBilling,
@@ -298,7 +298,7 @@ func TestHTTPQueries(t *testing.T) {
 
 	srv.Close()
 
-	_, queryErr = h.Query(
+	_, queryErr = httpQueries.Query(
 		ctx,
 		user,
 		DomainEquipment,

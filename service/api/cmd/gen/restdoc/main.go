@@ -92,9 +92,9 @@ func main() {
 
 	out := map[string][]route{}
 
-	for _, op := range srv.Registry.Operations() {
-		for _, rt := range op.Spec.Routes {
-			b, err := ops.NewBinding(op, rt)
+	for _, operation := range srv.Registry.Operations() {
+		for _, rt := range operation.Spec.Routes {
+			binding, err := ops.NewBinding(operation, rt)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -102,13 +102,13 @@ func main() {
 			r := route{
 				Method:     rt.Method,
 				Path:       rt.Path,
-				Body:       b.Body,
+				Body:       binding.Body,
 				FixedField: rt.FixedField,
 				FixedValue: rt.FixedValue,
 				Params:     []param{},
 			}
-			for _, name := range b.Path {
-				p := b.Params[name]
+			for _, name := range binding.Path {
+				p := binding.Params[name]
 				r.Params = append(
 					r.Params,
 					param{
@@ -122,11 +122,11 @@ func main() {
 				)
 			}
 
-			if !b.Body {
+			if !binding.Body {
 				var query []ops.Param
 
-				for name, p := range b.Params {
-					if name != rt.FixedField && !contains(b.Path, name) {
+				for name, p := range binding.Params {
+					if name != rt.FixedField && !contains(binding.Path, name) {
 						query = append(query, p)
 					}
 				}
@@ -148,7 +148,7 @@ func main() {
 				}
 			}
 
-			out[op.Spec.Name] = append(out[op.Spec.Name], r)
+			out[operation.Spec.Name] = append(out[operation.Spec.Name], r)
 		}
 	}
 

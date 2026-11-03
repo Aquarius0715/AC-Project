@@ -13,20 +13,20 @@ import (
 )
 
 func TestHTTPErrorHandler(t *testing.T) {
-	e := echo.New()
-	e.HTTPErrorHandler = HTTPErrorHandler
-	e.GET(
+	app := echo.New()
+	app.HTTPErrorHandler = HTTPErrorHandler
+	app.GET(
 		"/domain",
 		func(*echo.Context) error { return apperr.E(apperr.Conflict, "error.versionConflict") },
 	)
-	e.HEAD(
+	app.HEAD(
 		"/domain",
 		func(*echo.Context) error { return apperr.E(apperr.Conflict, "error.versionConflict") },
 	)
-	e.GET("/plain", func(*echo.Context) error { return errors.New("database exploded") })
-	e.GET("/large", func(*echo.Context) error { return echo.ErrStatusRequestEntityTooLarge })
-	e.GET("/timeout", func(*echo.Context) error { return echo.ErrServiceUnavailable })
-	e.GET("/committed", func(c *echo.Context) error {
+	app.GET("/plain", func(*echo.Context) error { return errors.New("database exploded") })
+	app.GET("/large", func(*echo.Context) error { return echo.ErrStatusRequestEntityTooLarge })
+	app.GET("/timeout", func(*echo.Context) error { return echo.ErrServiceUnavailable })
+	app.GET("/committed", func(c *echo.Context) error {
 		_ = c.NoContent(http.StatusAccepted)
 
 		return apperr.E(apperr.Conflict, "late")
@@ -49,36 +49,36 @@ func TestHTTPErrorHandler(t *testing.T) {
 		req := httptest.NewRequest(tc.method, tc.path, nil)
 		req.Header.Set(echo.HeaderXRequestID, "corr-1")
 
-		w := httptest.NewRecorder()
-		w.Header().Set(echo.HeaderXRequestID, "corr-1")
-		e.ServeHTTP(w, req)
+		rec := httptest.NewRecorder()
+		rec.Header().Set(echo.HeaderXRequestID, "corr-1")
+		app.ServeHTTP(rec, req)
 
-		if w.Code != tc.status {
-			t.Errorf("%s %s: status %d want %d", tc.method, tc.path, w.Code, tc.status)
+		if rec.Code != tc.status {
+			t.Errorf("%s %s: status %d want %d", tc.method, tc.path, rec.Code, tc.status)
 
 			continue
 		}
 
 		if tc.code == "" {
-			if w.Body.Len() != 0 {
-				t.Errorf("%s %s: unexpected body %s", tc.method, tc.path, w.Body)
+			if rec.Body.Len() != 0 {
+				t.Errorf("%s %s: unexpected body %s", tc.method, tc.path, rec.Body)
 			}
 
 			continue
 		}
 
-		var de apperr.DomainError
+		var domainError apperr.DomainError
 
 		err := json.Unmarshal(
-			w.Body.Bytes(),
-			&de,
+			rec.Body.Bytes(),
+			&domainError,
 		)
-		if err != nil || string(de.Code) != tc.code ||
-			de.CorrelationID != "corr-1" {
-			t.Errorf("%s %s: body %s", tc.method, tc.path, w.Body)
+		if err != nil || string(domainError.Code) != tc.code ||
+			domainError.CorrelationID != "corr-1" {
+			t.Errorf("%s %s: body %s", tc.method, tc.path, rec.Body)
 		}
 
-		if tc.path == "/plain" && de.MessageKey == "database exploded" {
+		if tc.path == "/plain" && domainError.MessageKey == "database exploded" {
 			t.Error("internal error text leaked")
 		}
 	}

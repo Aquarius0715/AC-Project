@@ -23,7 +23,7 @@ func (failingRunner) Run(context.Context, bool, *ops.Principal, func(pgx.Tx) err
 
 // A consumer without handlers has nothing to poll: Drain applies nothing and Run only waits for its context.
 func TestConsumerWithoutHandlers(t *testing.T) {
-	c := &Consumer{
+	consumer := &Consumer{
 		Name:      "idle",
 		DB:        nil,
 		Handlers:  nil,
@@ -33,7 +33,7 @@ func TestConsumerWithoutHandlers(t *testing.T) {
 		SplitFrom: "",
 	}
 
-	n, err := c.Drain(context.Background())
+	n, err := consumer.Drain(context.Background())
 	if n != 0 || err != nil {
 		t.Fatalf("Drain without handlers: %d %v", n, err)
 	}
@@ -44,7 +44,7 @@ func TestConsumerWithoutHandlers(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		c.Run(ctx, time.Millisecond) // polls until the context ends
+		consumer.Run(ctx, time.Millisecond) // polls until the context ends
 		close(done)
 	}()
 
@@ -58,32 +58,33 @@ func TestConsumerWithoutHandlers(t *testing.T) {
 // A failing poll is logged with the consumer name and does not stop the loop.
 func TestConsumerRunLogsFailures(t *testing.T) {
 	var (
-		mu     sync.Mutex
+		mutex  sync.Mutex
 		logged []string
 	)
 
-	c := &Consumer{
+	consumer := &Consumer{
 		Name: "broken",
 		DB:   failingRunner{},
 		Handlers: map[string]Handler{
 			"X": func(context.Context, pgx.Tx, Event) error { return nil },
 		},
 		Logf: func(f string, a ...any) {
-			mu.Lock()
+			mutex.Lock()
 
 			logged = append(logged, fmt.Sprintf(f, a...))
-			mu.Unlock()
+			mutex.Unlock()
 		}, Batch: 0, Now: nil, SplitFrom: "",
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
 
-	c.Run(ctx, time.Millisecond)
-	mu.Lock()
-	defer mu.Unlock()
+	consumer.Run(ctx, time.Millisecond)
+	mutex.Lock()
+	defer mutex.Unlock()
 
-	if len(logged) == 0 || !strings.HasPrefix(logged[0], "consumer broken: ") || !strings.Contains(logged[0], "no database") {
+	if len(logged) == 0 || !strings.HasPrefix(logged[0], "consumer broken: ") ||
+		!strings.Contains(logged[0], "no database") {
 		t.Fatalf("failures are logged with the consumer name and the cause: %q", logged)
 	}
 }

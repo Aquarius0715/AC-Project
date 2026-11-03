@@ -23,12 +23,12 @@ func TestReplicas(t *testing.T) {
 		t.Helper()
 		drainEvents(t)
 
-		for _, r := range append(
+		for _, replica := range append(
 			append(append(append([]events.Replica{}, notify.Replicas...), energy.Replicas...), maintenance.Replicas...),
 			billing.Replicas...) {
-			cols := strings.Join(append(append([]string{}, r.Keys...), r.Cols...), ", ")
+			cols := strings.Join(append(append([]string{}, replica.Keys...), replica.Cols...), ", ")
 
-			source := r.Source
+			source := replica.Source
 			if source == "monitoring.measurements" { // only minute-slot power samples are captured
 				source = "(SELECT * FROM monitoring.measurements WHERE metric = 'power' AND observed_at = date_trunc('minute', " +
 					"observed_at)) m"
@@ -37,14 +37,14 @@ func TestReplicas(t *testing.T) {
 			var diff int
 			ownerScan(
 				t,
-				`SELECT count(*) FROM ((SELECT `+cols+` FROM `+source+` EXCEPT SELECT `+cols+` FROM `+r.Table+`)
-				UNION ALL (SELECT `+cols+` FROM `+r.Table+` EXCEPT SELECT `+cols+` FROM `+source+`)) d`,
+				`SELECT count(*) FROM ((SELECT `+cols+` FROM `+source+` EXCEPT SELECT `+cols+` FROM `+replica.Table+`)
+				UNION ALL (SELECT `+cols+` FROM `+replica.Table+` EXCEPT SELECT `+cols+` FROM `+source+`)) d`,
 				nil,
 				&diff,
 			)
 
 			if diff != 0 {
-				t.Fatalf("%s and %s differ in %d rows", r.Source, r.Table, diff)
+				t.Fatalf("%s and %s differ in %d rows", replica.Source, replica.Table, diff)
 			}
 		}
 	}

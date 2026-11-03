@@ -13,7 +13,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-func ackCommand(t *testing.T, id string, at time.Time) bool {
+func ackCommand(t *testing.T, id string, when time.Time) bool {
 	t.Helper()
 
 	ctx := context.Background()
@@ -30,7 +30,7 @@ func ackCommand(t *testing.T, id string, at time.Time) bool {
 		ctx,
 		`UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2 WHERE id = $1 AND status = 'requested'`,
 		uuid.MustParse(id),
-		at.Add(-time.Second),
+		when.Add(-time.Second),
 	)
 	if execErr != nil {
 		t.Fatal(execErr)
@@ -42,7 +42,7 @@ func ackCommand(t *testing.T, id string, at time.Time) bool {
 		ctx,
 		conn,
 		func(tx pgx.Tx) error {
-			ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id), at)
+			ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id), when)
 
 			return apperr.Wrap(err, "control.Acknowledge")
 		},
@@ -59,7 +59,7 @@ func ackCommand(t *testing.T, id string, at time.Time) bool {
 }
 
 func TestDiagnosticRuns(t *testing.T) {
-	s := server(t)
+	srv := server(t)
 	unit := seed.ID("unit-non-rto").String()
 	clean := func() {
 		owner(
@@ -82,14 +82,14 @@ func TestDiagnosticRuns(t *testing.T) {
 	}
 	clean()
 	t.Cleanup(clean)
-	job := assignedNow(t, s)
-	_, m := post(s, &hq, "units.get", `{"id":"`+unit+`"}`)
-	uv := ver(m)
-	_, m = post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
-	jv := ver(m)
+	job := assignedNow(t, srv)
+	_, resp := post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
+	uv := ver(resp)
+	_, resp = post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
+	jv := ver(resp)
 	run := func(a *actor, start, end string, mins, u, j int) (int, map[string]any) {
 		return write(
-			s,
+			srv,
 			a,
 			"diagnosticRuns.create",
 			`{"jobId":"`+job+`","unitId":"`+unit+`","startAction":`+start+`,"endAction":`+end+`,"durationMinutes":`+itoa(
@@ -129,7 +129,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		}
 	}
 
-	if code, m := run(
+	if code, res := run(
 		&techInt,
 		on,
 		`{"kind":"ventilate","level":"low"}`,
@@ -137,24 +137,25 @@ func TestDiagnosticRuns(t *testing.T) {
 		uv,
 		jv,
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["endAction"] != "error.unsupportedAction" {
-		t.Errorf("an end action the unit does not support: %d %v", code, m)
+		res["fieldErrors"].(map[string]any)["endAction"] != "error.unsupportedAction" {
+		t.Errorf("an end action the unit does not support: %d %v", code, res)
 	}
 
 	if code, _ := run(&hq, on, off, 5, uv, jv); code != 403 {
 		t.Error("HQ creates runs")
 	}
 
-	code, m := run(&techInt, on, off, 5, uv, jv)
-	if code != 200 || data(m)["state"] != "awaiting_start" {
-		t.Fatalf("create: %d %v", code, m)
+	code, resp := run(&techInt, on, off, 5, uv, jv)
+	if code != 200 || data(resp)["state"] != "awaiting_start" {
+		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	r1 := data(m)["id"].(string)
+	r1 := data(resp)["id"].(string)
 
-	start := data(m)["startCommandId"].(string)
-	if code, m := write(
-		s,
+	start := data(resp)["startCommandId"].(string)
+
+	if code, res := write(
+		srv,
 		&techInt,
 		"commands.create",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","action":`+off+`,"reason":"x","expectedUnitVersion":`+itoa(
@@ -162,78 +163,78 @@ func TestDiagnosticRuns(t *testing.T) {
 		)+`}`,
 		0,
 	); code != 409 ||
-		m["messageKey"] != "errors.unit_busy" {
-		t.Errorf("busy during run: %d %v", code, m)
+		res["messageKey"] != "errors.unit_busy" {
+		t.Errorf("busy during run: %d %v", code, res)
 	}
 
 	if !ackCommand(t, start, clock.Add(5*time.Second)) {
 		t.Fatal("start ack")
 	}
 
-	_, m = post(s, &techInt, "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`)
-	if data(m)["state"] != "running" ||
-		data(m)["endAt"] != clock.Add(5*time.Second+5*time.Minute).Format(time.RFC3339) {
-		t.Fatalf("running: %v", m)
+	_, resp = post(srv, &techInt, "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`)
+	if data(resp)["state"] != "running" ||
+		data(resp)["endAt"] != clock.Add(5*time.Second+5*time.Minute).Format(time.RFC3339) {
+		t.Fatalf("running: %v", resp)
 	}
 
 	ctx := context.Background()
 
-	_, err := schedTick(ctx, s, clock.Add(6*time.Minute))
+	_, err := schedTick(ctx, srv, clock.Add(6*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, m = post(s, &hq, "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`)
-	if data(m)["state"] != "end_requested" || data(m)["endCommandId"] == nil {
-		t.Fatalf("end requested: %v", m)
+	_, resp = post(srv, &hq, "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`)
+	if data(resp)["state"] != "end_requested" || data(resp)["endCommandId"] == nil {
+		t.Fatalf("end requested: %v", resp)
 	}
 
-	if !ackCommand(t, data(m)["endCommandId"].(string), clock.Add(6*time.Minute+3*time.Second)) {
+	if !ackCommand(t, data(resp)["endCommandId"].(string), clock.Add(6*time.Minute+3*time.Second)) {
 		t.Fatal("end ack")
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r1+`"}`,
-	); data(m)["state"] != "completed" {
-		t.Fatalf("completed: %v", m)
+	); data(res)["state"] != "completed" {
+		t.Fatalf("completed: %v", res)
 	}
 	// start never acknowledged → start_failed
-	code, m = run(&techInt, on, off, 5, uv, jv)
+	code, resp = run(&techInt, on, off, 5, uv, jv)
 	if code != 200 {
-		t.Fatalf("second run: %d %v", code, m)
+		t.Fatalf("second run: %d %v", code, resp)
 	}
 
-	r2 := data(m)["id"].(string)
+	r2 := data(resp)["id"].(string)
 
 	_, err = schedTick(
 		ctx,
-		s,
+		srv,
 		clock.Add(36*time.Second),
 	)
 	if err != nil { // 30 s window + the 5 s grace (IR453)
 		t.Fatal(err)
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r2+`"}`,
-	); data(m)["state"] != "start_failed" ||
-		data(m)["failureCode"] != "TIMEOUT" {
-		t.Fatalf("start failed: %v", m)
+	); data(res)["state"] != "start_failed" ||
+		data(res)["failureCode"] != "TIMEOUT" {
+		t.Fatalf("start failed: %v", res)
 	}
 	// a restriction at the end blocks the end action
-	code, m = run(&techInt, off, on, 1, uv, jv)
+	code, resp = run(&techInt, off, on, 1, uv, jv)
 	if code != 200 {
-		t.Fatalf("third run: %d %v", code, m)
+		t.Fatalf("third run: %d %v", code, resp)
 	}
 
-	r3 := data(m)["id"].(string)
-	ackCommand(t, data(m)["startCommandId"].(string), clock.Add(time.Second))
+	r3 := data(resp)["id"].(string)
+	ackCommand(t, data(resp)["startCommandId"].(string), clock.Add(time.Second))
 
 	rid := uuid.NewString()
 	owner(
@@ -261,117 +262,117 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Errorf("start action prohibited or busy: %d", code)
 	}
 
-	_, err = schedTick(ctx, s, clock.Add(2*time.Minute))
+	_, err = schedTick(ctx, srv, clock.Add(2*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r3+`"}`,
-	); data(m)["state"] != "end_blocked" {
-		t.Fatalf("end blocked: %v", m)
+	); data(res)["state"] != "end_blocked" {
+		t.Fatalf("end blocked: %v", res)
 	}
 	// the device offline at the end: the end action fails with OFFLINE and sends nothing
 	owner(t, `UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id = $1`, rid)
 
-	code, m = run(&techInt, off, on, 1, uv, jv)
+	code, resp = run(&techInt, off, on, 1, uv, jv)
 	if code != 200 {
-		t.Fatalf("fourth run: %d %v", code, m)
+		t.Fatalf("fourth run: %d %v", code, resp)
 	}
 
-	r4 := data(m)["id"].(string)
-	ackCommand(t, data(m)["startCommandId"].(string), clock.Add(time.Second))
+	r4 := data(resp)["id"].(string)
+	ackCommand(t, data(resp)["startCommandId"].(string), clock.Add(time.Second))
 	owner(t, `UPDATE devices.devices SET connection = 'offline' WHERE unit_id = $1`, unit)
 
-	_, err = schedTick(ctx, s, clock.Add(3*time.Minute))
+	_, err = schedTick(ctx, srv, clock.Add(3*time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE unit_id = $1`, unit)
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r4+`"}`,
-	); data(m)["state"] != "end_failed" || data(m)["failureCode"] != "OFFLINE" ||
-		data(m)["endCommandId"] != nil {
-		t.Fatalf("end offline: %v", m)
+	); data(res)["state"] != "end_failed" || data(res)["failureCode"] != "OFFLINE" ||
+		data(res)["endCommandId"] != nil {
+		t.Fatalf("end offline: %v", res)
 	}
 	// the retry of the end (Figma Technician 425:474, IR351): once the device is back, the technician sends the end action
 	// again as an ordinary command of the job (commands.create); the run stays end_failed
-	_, m = post(s, &hq, "units.get", `{"id":"`+unit+`"}`)
-	if code, m := write(
-		s,
+	_, resp = post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
+	if code, res := write(
+		srv,
 		&techInt,
 		"commands.create",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","action":`+on+`,"reason":"End of test run sent again: check cooling",`+
 			`"expectedUnitVersion":`+itoa(
-			ver(m),
+			ver(resp),
 		)+`}`,
 		0,
-	); code != 200 || data(m)["source"] != "ui" || data(m)["jobId"] != job ||
-		data(m)["diagnosticRunId"] != nil {
-		t.Errorf("retry the end: %d %v", code, m)
+	); code != 200 || data(res)["source"] != "ui" || data(res)["jobId"] != job ||
+		data(res)["diagnosticRunId"] != nil {
+		t.Errorf("retry the end: %d %v", code, res)
 	}
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&hq,
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r4+`"}`,
-	); data(m)["state"] != "end_failed" {
-		t.Errorf("the run after the retry: %v", data(m)["state"])
+	); data(res)["state"] != "end_failed" {
+		t.Errorf("the run after the retry: %v", data(res)["state"])
 	}
 	// reads
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&techInt,
 		"diagnosticRuns.list",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","query":{}}`,
 	); len(
-		items(m),
+		items(res),
 	) != 4 {
-		t.Errorf("list: %d", len(items(m)))
+		t.Errorf("list: %d", len(items(res)))
 	}
 	// pages of two: the cursor binds unit and job, so the second page reads the third and fourth runs (IR223 fix)
-	_, m = post(
-		s,
+	_, resp = post(
+		srv,
 		&techInt,
 		"diagnosticRuns.list",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":2}}`,
 	)
 
-	next, _ := data(m)["nextCursor"].(string)
-	if code, m := post(
-		s,
+	next, _ := data(resp)["nextCursor"].(string)
+	if code, res := post(
+		srv,
 		&techInt,
 		"diagnosticRuns.list",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":2,"cursor":"`+next+`"}}`,
 	); next == "" || code != 200 ||
-		len(items(m)) != 2 {
-		t.Errorf("second page: %d %v", code, m)
+		len(items(res)) != 2 {
+		t.Errorf("second page: %d %v", code, res)
 	}
 	// a revoked Assignment keeps the runs of the job visible (IR139, IR187)
 	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE job_id = $1`, job)
 
-	if _, m := post(
-		s,
+	if _, res := post(
+		srv,
 		&techInt,
 		"diagnosticRuns.list",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","query":{}}`,
 	); len(
-		items(m),
+		items(res),
 	) != 4 {
-		t.Errorf("list after revoke: %d", len(items(m)))
+		t.Errorf("list after revoke: %d", len(items(res)))
 	}
 
 	if code, _ := post(
-		s,
+		srv,
 		&techInt,
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r1+`"}`,
@@ -379,18 +380,18 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Errorf("get after revoke: %d", code)
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&techB,
 		"diagnosticRuns.list",
 		`{"unitId":"`+unit+`","query":{}}`,
 	); code != 200 ||
-		len(items(m)) != 0 {
+		len(items(res)) != 0 {
 		t.Error("other technician lists runs")
 	}
 
 	if code, _ := post(
-		s,
+		srv,
 		&techB,
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r1+`"}`,
@@ -400,7 +401,7 @@ func TestDiagnosticRuns(t *testing.T) {
 	}
 
 	if code, _ := post(
-		s,
+		srv,
 		&hq,
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+uuid.NewString()+`"}`,
@@ -408,13 +409,13 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Error("unknown run")
 	}
 
-	if code, m := post(
-		s,
+	if code, res := post(
+		srv,
 		&hq,
 		"diagnosticRuns.list",
 		`{"query":{}}`,
 	); code != 422 ||
-		fields(m) != "unitId=error.required" {
-		t.Errorf("unitId required: %d %s", code, fields(m))
+		fields(res) != "unitId=error.required" {
+		t.Errorf("unitId required: %d %s", code, fields(res))
 	}
 }

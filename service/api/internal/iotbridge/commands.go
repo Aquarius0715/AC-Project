@@ -24,37 +24,37 @@ type Waiting struct {
 // stored (for example {"kind":"set_temperature","celsius":26}); the module applies a set-temperature change. The API
 // keeps the expiry on its scenario clock and the module runs on real time, so the expiry is moved by the clock offset
 // (scenario minus real): the module then decides "in time" and "late" on its own clock.
-func CommandMessage(w Waiting, offset time.Duration) (devicesim.Command, error) {
+func CommandMessage(waiting Waiting, offset time.Duration) (devicesim.Command, error) {
 	var a struct {
 		Kind    string   `json:"kind"`
 		Celsius *float64 `json:"celsius"`
 	}
 
-	err := json.Unmarshal(w.Action, &a)
+	err := json.Unmarshal(waiting.Action, &a)
 	if err != nil {
-		return devicesim.Command{}, fmt.Errorf("command %s action: %w", w.ID, err)
+		return devicesim.Command{}, fmt.Errorf("command %s action: %w", waiting.ID, err)
 	}
 
 	if a.Kind == "" {
-		return devicesim.Command{}, fmt.Errorf("command %s has no action kind", w.ID)
+		return devicesim.Command{}, fmt.Errorf("command %s has no action kind", waiting.ID)
 	}
 
 	return devicesim.Command{
-		CommandID: w.ID.String(),
+		CommandID: waiting.ID.String(),
 		Kind:      a.Kind,
 		Setpoint:  a.Celsius,
-		ExpiresAt: w.ExpiresAt.Add(-offset).UTC(),
+		ExpiresAt: waiting.ExpiresAt.Add(-offset).UTC(),
 	}, nil
 }
 
 // SentTrigger reports a command sent to its device: the demo trigger command_sent moves it requested → sent.
-func SentTrigger(w Waiting, at time.Time) Trigger {
+func SentTrigger(w Waiting, when time.Time) Trigger {
 	cmd := w.ID
 
 	return Trigger{
 		ScenarioID:  Scenario,
 		EventID:     uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/sent", cmd))),
-		OccurredAt:  at.UTC(),
+		OccurredAt:  when.UTC(),
 		EventType:   "command_sent",
 		CommandID:   &cmd,
 		Measurement: nil,
@@ -77,7 +77,7 @@ func CommandTopic(tenant, device uuid.UUID) string {
 // heartbeat without a state, as a module that reads no air-conditioner settings sends it, is a report with no settings,
 // which the API takes as heard only (IR528): the device's last seen time follows its heartbeats, as the live module's
 // does (IR613).
-func StateTrigger(hb devicesim.Heartbeat, at time.Time) (Trigger, error) {
+func StateTrigger(hb devicesim.Heartbeat, when time.Time) (Trigger, error) {
 	dev, err := uuid.Parse(hb.DeviceID)
 	if err != nil {
 		return Trigger{}, fmt.Errorf("device %q: %w", hb.DeviceID, err)
@@ -88,15 +88,15 @@ func StateTrigger(hb devicesim.Heartbeat, at time.Time) (Trigger, error) {
 		state = &devicesim.ReportedState{Power: nil, Celsius: nil, Mode: nil, FanLevel: nil}
 	}
 
-	at = at.UTC()
+	when = when.UTC()
 
 	return Trigger{
 		ScenarioID: Scenario,
 		EventID: uuid.NewSHA1(
 			seed.Namespace,
-			[]byte(fmt.Sprintf("%s/state/%s", dev, at.Format(time.RFC3339Nano))),
+			[]byte(fmt.Sprintf("%s/state/%s", dev, when.Format(time.RFC3339Nano))),
 		),
-		OccurredAt:  at,
+		OccurredAt:  when,
 		EventType:   "state",
 		DeviceID:    &dev,
 		State:       state,
