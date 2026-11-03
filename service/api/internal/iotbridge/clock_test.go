@@ -1,4 +1,4 @@
-package iotbridge
+package iotbridge_test
 
 import (
 	"encoding/json"
@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/pradita/ac-project/service/api/internal/iotbridge"
 )
 
 // TestScenarioNowReadsThePreviewSnapshot: the scenario time is the preview's snapshot time; an answer without one, a
@@ -27,7 +29,7 @@ func TestScenarioNowReadsThePreviewSnapshot(t *testing.T) {
 
 	client := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
 
-	got, err := ScenarioNow(client, srv.URL)
+	got, err := iotbridge.ScenarioNow(client, srv.URL)
 	if err != nil || !got.Equal(scenario) {
 		t.Fatalf("scenario now %v, err %v", got, err)
 	}
@@ -39,7 +41,7 @@ func TestScenarioNowReadsThePreviewSnapshot(t *testing.T) {
 			),
 		)
 
-		_, err := ScenarioNow(client, bad.URL)
+		_, err := iotbridge.ScenarioNow(client, bad.URL)
 		if err == nil {
 			t.Errorf("%s: accepted", name)
 		}
@@ -47,7 +49,7 @@ func TestScenarioNowReadsThePreviewSnapshot(t *testing.T) {
 		bad.Close()
 	}
 
-	_, scenarioNowErr := ScenarioNow(client, "http://127.0.0.1:1")
+	_, scenarioNowErr := iotbridge.ScenarioNow(client, "http://127.0.0.1:1")
 	if scenarioNowErr == nil {
 		t.Error("a dead API is not an error")
 	}

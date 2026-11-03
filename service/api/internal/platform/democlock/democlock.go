@@ -18,6 +18,9 @@ import (
 // refreshEvery bounds how stale another process's advance can be in this process.
 const refreshEvery = time.Second
 
+// refreshTimeout bounds one refresh of the offset from the database.
+const refreshTimeout = 2 * time.Second
+
 // Clock reads the shared offset (cached for refreshEvery) and adds it to the base clock.
 type Clock struct {
 	pool *pgxpool.Pool
@@ -60,10 +63,48 @@ func Open(
 	return clock, nil
 }
 
-func (c *Clock) load(ctx context.Context) error {
-	var ms int64
+// Now is the scenario time. A failed refresh keeps the last known offset.
+func (c *Clock) Now() time.Time {
+	c.mu.Lock()
+	stale := c.base().Sub(c.loadedAt) >= refreshEvery
+	c.mu.Unlock()
 
-	err := c.pool.QueryRow(ctx, `SELECT offset_ms FROM platform.demo_clock WHERE id`).Scan(&ms)
+	if stale {
+		ctx, cancel := context.WithTimeout(context.Background(), refreshTimeout)
+		_ = c.load(ctx)
+
+		cancel()
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.base().Add(c.offset).UTC()
+}
+
+// Advance moves the scenario clock forward by d for every process.
+func (c *Clock) Advance(ctx context.Context, d time.Duration) error {
+	var offsetMS int64
+
+	err := c.pool.QueryRow(ctx, `UPDATE platform.demo_clock SET offset_ms = offset_ms + $1, updated_at = now() WHERE id
+		RETURNING offset_ms`, d.Milliseconds()).
+		Scan(&offsetMS)
+	if err != nil {
+		return apperr.Wrap(err, "update platform.demo_clock")
+	}
+
+	c.mu.Lock()
+	c.offset, c.loadedAt = time.Duration(offsetMS)*time.Millisecond, c.base()
+	c.mu.Unlock()
+
+	return nil
+}
+
+func (c *Clock) load(ctx context.Context) error {
+	var offsetMS int64
+
+	err := c.pool.QueryRow(ctx, `SELECT offset_ms FROM platform.demo_clock WHERE id`).
+		Scan(&offsetMS)
 	if errors.Is(
 		err,
 		pgx.ErrNoRows,
@@ -80,44 +121,7 @@ func (c *Clock) load(ctx context.Context) error {
 	}
 
 	c.mu.Lock()
-	c.offset, c.loadedAt = time.Duration(ms)*time.Millisecond, c.base()
-	c.mu.Unlock()
-
-	return nil
-}
-
-// Now is the scenario time. A failed refresh keeps the last known offset.
-func (c *Clock) Now() time.Time {
-	c.mu.Lock()
-	stale := c.base().Sub(c.loadedAt) >= refreshEvery
-	c.mu.Unlock()
-
-	if stale {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		_ = c.load(ctx)
-
-		cancel()
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.base().Add(c.offset).UTC()
-}
-
-// Advance moves the scenario clock forward by d for every process.
-func (c *Clock) Advance(ctx context.Context, d time.Duration) error {
-	var ms int64
-
-	err := c.pool.QueryRow(ctx, `UPDATE platform.demo_clock SET offset_ms = offset_ms + $1, updated_at = now() WHERE id
-		RETURNING offset_ms`, d.Milliseconds()).
-		Scan(&ms)
-	if err != nil {
-		return apperr.Wrap(err, "update platform.demo_clock")
-	}
-
-	c.mu.Lock()
-	c.offset, c.loadedAt = time.Duration(ms)*time.Millisecond, c.base()
+	c.offset, c.loadedAt = time.Duration(offsetMS)*time.Millisecond, c.base()
 	c.mu.Unlock()
 
 	return nil

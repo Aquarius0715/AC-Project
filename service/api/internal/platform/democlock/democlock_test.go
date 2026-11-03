@@ -1,4 +1,4 @@
-package democlock
+package democlock_test
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
 )
 
 // scratch creates an empty database with only platform.demo_clock, so the shared row of the dev database "ac"
@@ -19,6 +21,7 @@ func scratch(t *testing.T) *pgxpool.Pool {
 
 	admin := os.Getenv("AC_TEST_ADMIN_DATABASE_URL")
 	if admin == "" {
+		//nolint:gosec // local test database password, not a secret
 		admin = "postgres://postgres:local@localhost:5432/postgres?sslmode=disable"
 	}
 
@@ -54,13 +57,32 @@ func scratch(t *testing.T) *pgxpool.Pool {
 
 	t.Cleanup(func() {
 		pool.Close()
-		conn.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)") //nolint:errcheck
-		conn.Close(ctx)
+
+		_, _ = conn.Exec(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)")
+		_ = conn.Close(ctx)
 	})
 
 	return pool
 }
 
+// open opens a clock on the scratch database and fails the test if it cannot.
+func open(
+	t *testing.T,
+	pool *pgxpool.Pool,
+	base func() time.Time,
+	start time.Time,
+) *democlock.Clock {
+	t.Helper()
+
+	clock, err := democlock.Open(t.Context(), pool, base, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return clock
+}
+
+//nolint:paralleltest // every test rebuilds the same scratch database ac_democlock_test
 func TestSharedAcrossProcessesAndRestarts(t *testing.T) {
 	ctx := context.Background()
 	pool := scratch(t)
@@ -68,11 +90,7 @@ func TestSharedAcrossProcessesAndRestarts(t *testing.T) {
 	base := func() time.Time { return wall }
 	start := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
 
-	api, err := Open(ctx, pool, base, start)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	api := open(t, pool, base, start)
 	if got := api.Now(); !got.Equal(start) {
 		t.Fatalf("first open: %v, want %v", got, start)
 	}
@@ -82,10 +100,7 @@ func TestSharedAcrossProcessesAndRestarts(t *testing.T) {
 		t.Fatal(advanceErr)
 	}
 
-	worker, err := Open(ctx, pool, base, start)
-	if err != nil {
-		t.Fatal(err)
-	}
+	worker := open(t, pool, base, start)
 
 	if got := worker.Now(); !got.Equal(start.Add(2 * time.Hour)) {
 		t.Fatalf("worker sees %v", got)
@@ -107,22 +122,19 @@ func TestSharedAcrossProcessesAndRestarts(t *testing.T) {
 		t.Fatalf("worker %v, want %v", got, want)
 	}
 	// a restarted API never moves the clock back to the scenario start
-	again, err := Open(ctx, pool, base, start)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	again := open(t, pool, base, start)
 	if got := again.Now(); !got.Equal(want) {
 		t.Fatalf("restart %v, want %v", got, want)
 	}
 }
 
+//nolint:paralleltest // every test rebuilds the same scratch database ac_democlock_test
 func TestNowKeepsOffsetWhenDatabaseFails(t *testing.T) {
 	ctx := context.Background()
 	pool := scratch(t)
 	wall := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
 
-	clock, err := Open(ctx, pool, func() time.Time { return wall }, time.Time{})
+	clock, err := democlock.Open(ctx, pool, func() time.Time { return wall }, time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,13 +152,14 @@ func TestNowKeepsOffsetWhenDatabaseFails(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // every test rebuilds the same scratch database ac_democlock_test
 func TestMissingRowKeepsOffset(t *testing.T) {
 	ctx := context.Background()
 	pool := scratch(t)
 	wall := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
 	start := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
 
-	clock, err := Open(ctx, pool, func() time.Time { return wall }, start)
+	clock, err := democlock.Open(ctx, pool, func() time.Time { return wall }, start)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,15 +176,17 @@ func TestMissingRowKeepsOffset(t *testing.T) {
 }
 
 func TestStartFromEnv(t *testing.T) {
-	s, err := StartFromEnv(
+	t.Parallel()
+
+	s, err := democlock.StartFromEnv(
 		func(string) string { return "" },
 	)
 	if err != nil ||
-		s.Format(time.RFC3339) != DefaultStart {
+		s.Format(time.RFC3339) != democlock.DefaultStart {
 		t.Fatalf("default = %v, %v", s, err)
 	}
 
-	_, err = StartFromEnv(func(string) string { return "soon" })
+	_, err = democlock.StartFromEnv(func(string) string { return "soon" })
 	if err == nil {
 		t.Fatal("want parse error")
 	}

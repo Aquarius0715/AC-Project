@@ -71,7 +71,7 @@ type Result struct {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/writes/{idempotencyKey} [get]
-func get(ctx context.Context, c *ops.Call, input *Input) (Result, error) {
+func get(ctx context.Context, call *ops.Call, input *Input) (Result, error) {
 	if _, ok := ops.SpecByName()[input.Operation]; !ok {
 		return Result{}, apperr.Fields(map[string]string{"operation": apperr.KeyInvalid})
 	}
@@ -81,9 +81,9 @@ func get(ctx context.Context, c *ops.Call, input *Input) (Result, error) {
 		resp   []byte
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT status, response FROM platform.idempotency_keys
+	err := call.Tx.QueryRow(ctx, `SELECT status, response FROM platform.idempotency_keys
 		WHERE membership_id = $1 AND key = $2 AND operation = $3 AND expires_at >
-		$4`, c.Principal.MembershipID, input.IdempotencyKey, input.Operation, c.Now).Scan(&status, &resp)
+		$4`, call.Principal.MembershipID, input.IdempotencyKey, input.Operation, call.Now).Scan(&status, &resp)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Result{State: "not_received", Operation: "", ResourceIDs: nil, Result: nil}, nil
 	}

@@ -38,14 +38,14 @@ func Open(ctx context.Context, writerURL, readerURL string) (*TxManager, error) 
 		return &TxManager{Writer: pool, Reader: pool}, nil
 	}
 
-	r, err := newPool(ctx, readerURL)
+	reader, err := newPool(ctx, readerURL)
 	if err != nil {
 		pool.Close()
 
 		return nil, err
 	}
 
-	return &TxManager{Writer: pool, Reader: r}, nil
+	return &TxManager{Writer: pool, Reader: reader}, nil
 }
 
 // Close closes the pools.
@@ -117,10 +117,6 @@ func (m *TxManager) Run(
 // Idempotency implements ops.Idempotency on platform.idempotency_keys.
 type Idempotency struct{ M *TxManager }
 
-func (s Idempotency) tx(ctx context.Context, p *ops.Principal, fn func(pgx.Tx) error) error {
-	return s.M.Run(ctx, false, p, fn)
-}
-
 // Begin claims a key or returns the stored response.
 func (s Idempotency) Begin(
 	ctx context.Context,
@@ -131,7 +127,7 @@ func (s Idempotency) Begin(
 		return nil, nil // public demo operations are not keyed per membership
 	}
 
-	h, err := hex.DecodeString(hash)
+	requestHash, err := hex.DecodeString(hash)
 	if err != nil {
 		return nil, fmt.Errorf("hash: %w", err)
 	}
@@ -147,7 +143,7 @@ func (s Idempotency) Begin(
 			principal.MembershipID,
 			key,
 			operation,
-			h,
+			requestHash,
 		)
 		if err != nil {
 			return apperr.Wrap(err, "insert platform.idempotency_keys")
@@ -157,46 +153,24 @@ func (s Idempotency) Begin(
 			return nil
 		}
 
-		var (
-			gotOp, status string
-			gotHash       []byte
-			resp          []byte
-			expired       bool
-		)
-
-		scanErr := txn.QueryRow(ctx, `SELECT operation, request_hash, status, response, expires_at < platform.app_now() FROM
-			platform.idempotency_keys
-			WHERE tenant_id=$1 AND membership_id=$2 AND key=$3 FOR UPDATE`, principal.TenantID, principal.MembershipID, key).
-			Scan(&gotOp, &gotHash, &status, &resp, &expired)
-		if scanErr != nil {
-			return apperr.Wrap(scanErr, "select platform.idempotency_keys")
+		claimed, err := lockKey(ctx, txn, principal, key)
+		if err != nil {
+			return err
 		}
 
-		if expired {
-			_, err := txn.Exec(
-				ctx,
-				`UPDATE platform.idempotency_keys SET operation=$4, request_hash=$5, status='in_progress', response=NULL,
-				created_at=platform.app_now(), expires_at=platform.app_now()+interval '24 hours' WHERE tenant_id=$1 AND
-				membership_id=$2 AND key=$3`,
-				principal.TenantID,
-				principal.MembershipID,
-				key,
-				operation,
-				h,
-			)
-
-			return apperr.Wrap(err, "update platform.idempotency_keys")
+		if claimed.expired {
+			return renewKey(ctx, txn, principal, operation, key, requestHash)
 		}
 
-		if gotOp != operation || hex.EncodeToString(gotHash) != hash {
+		if claimed.operation != operation || hex.EncodeToString(claimed.requestHash) != hash {
 			return apperr.E(apperr.Conflict, "error.idempotencyKeyReused")
 		}
 
-		if status == "in_progress" {
+		if claimed.status == "in_progress" {
 			return apperr.E(apperr.Conflict, "error.requestInProgress").RetryAfter(1)
 		}
 
-		stored = resp
+		stored = claimed.response
 
 		return nil
 	})
@@ -208,7 +182,7 @@ func (s Idempotency) Begin(
 func (s Idempotency) Complete(
 	ctx context.Context,
 	principal *ops.Principal,
-	op, key string,
+	_, key string,
 	resp json.RawMessage,
 ) error {
 	if principal == nil {
@@ -231,7 +205,7 @@ func (s Idempotency) Complete(
 }
 
 // Abort releases a key after a failed attempt so the client may retry with the same key.
-func (s Idempotency) Abort(ctx context.Context, principal *ops.Principal, op, key string) {
+func (s Idempotency) Abort(ctx context.Context, principal *ops.Principal, _, key string) {
 	if principal == nil {
 		return
 	}
@@ -249,6 +223,62 @@ func (s Idempotency) Abort(ctx context.Context, principal *ops.Principal, op, ke
 	})
 }
 
+func (s Idempotency) tx(ctx context.Context, p *ops.Principal, fn func(pgx.Tx) error) error {
+	return s.M.Run(ctx, false, p, fn)
+}
+
+// storedKey is the row of a key claimed by an earlier request.
+type storedKey struct {
+	operation   string
+	requestHash []byte
+	status      string
+	response    []byte
+	expired     bool
+}
+
+// lockKey reads the earlier claim of the caller's key and locks it for this transaction.
+func lockKey(
+	ctx context.Context,
+	txn pgx.Tx,
+	principal *ops.Principal,
+	key string,
+) (storedKey, error) {
+	var claimed storedKey
+
+	err := txn.QueryRow(ctx, `SELECT operation, request_hash, status, response, expires_at < platform.app_now() FROM
+			platform.idempotency_keys
+			WHERE tenant_id=$1 AND membership_id=$2 AND key=$3 FOR UPDATE`, principal.TenantID, principal.MembershipID, key).
+		Scan(&claimed.operation, &claimed.requestHash, &claimed.status, &claimed.response, &claimed.expired)
+	if err != nil {
+		return claimed, apperr.Wrap(err, "select platform.idempotency_keys")
+	}
+
+	return claimed, nil
+}
+
+// renewKey claims an expired key again for this request.
+func renewKey(
+	ctx context.Context,
+	txn pgx.Tx,
+	principal *ops.Principal,
+	operation, key string,
+	requestHash []byte,
+) error {
+	_, err := txn.Exec(
+		ctx,
+		`UPDATE platform.idempotency_keys SET operation=$4, request_hash=$5, status='in_progress', response=NULL,
+				created_at=platform.app_now(), expires_at=platform.app_now()+interval '24 hours' WHERE tenant_id=$1 AND
+				membership_id=$2 AND key=$3`,
+		principal.TenantID,
+		principal.MembershipID,
+		key,
+		operation,
+		requestHash,
+	)
+
+	return apperr.Wrap(err, "update platform.idempotency_keys")
+}
+
 // Recorder writes audit rows and outbox events in the operation's transaction (ops.Recorder).
 type Recorder struct{}
 
@@ -262,7 +292,7 @@ func (Recorder) RecordDenied(
 	denial ops.Denial,
 ) error {
 	principal := call.Principal
-	id := uuid.Must(uuid.NewV7())
+	auditID := uuid.Must(uuid.NewV7())
 
 	var membership *uuid.UUID
 
@@ -277,10 +307,10 @@ func (Recorder) RecordDenied(
 			txn,
 			principal.TenantID,
 			"audit",
-			id,
+			auditID,
 			events.AuditRecorded,
 			events.Audit{
-				ID:              id,
+				ID:              auditID,
 				ActorID:         principal.UserID.String(),
 				ActorRole:       principal.Role,
 				MembershipID:    membership,
@@ -302,87 +332,106 @@ func (Recorder) RecordDenied(
 }
 
 // Record implements ops.Recorder.
-func (Recorder) Record(ctx context.Context, txn pgx.Tx, c *ops.Call, op string) error {
-	principal := c.Principal
-	if principal == nil {
+func (Recorder) Record(ctx context.Context, txn pgx.Tx, call *ops.Call, _ string) error {
+	if call.Principal == nil {
 		return nil
 	}
 
-	for _, auditEntry := range c.Audits {
+	for _, auditEntry := range call.Audits {
 		// the audit log is identity's: published in this transaction, stored by its consumer (IR196)
-		id := uuid.Must(uuid.NewV7())
-
-		result := auditEntry.Result
-		if result == "" {
-			result = "success"
-		}
-
-		var membership *uuid.UUID
-
-		if principal.MembershipID != uuid.Nil {
-			m := principal.MembershipID
-			membership = &m
-		}
-
-		err := events.Publish(
-			ctx,
-			txn,
-			principal.TenantID,
-			"audit",
-			id,
-			events.AuditRecorded,
-			events.Audit{
-				ID:              id,
-				ActorID:         principal.UserID.String(),
-				ActorRole:       principal.Role,
-				MembershipID:    membership,
-				Action:          auditEntry.Action,
-				TargetKind:      auditEntry.TargetKind,
-				TargetID:        auditEntry.TargetID,
-				PreviousVersion: auditEntry.PreviousVersion,
-				NextVersion:     auditEntry.NextVersion,
-				OccurredAt:      c.Now,
-				CorrelationID:   c.CorrelationID,
-				Result:          result,
-				Reason:          auditEntry.Reason,
-				MaskedBefore:    ops.Masked(auditEntry.Before),
-				MaskedAfter:     ops.Masked(auditEntry.After),
-			},
-		)
+		err := publishAudit(ctx, txn, call, auditEntry)
 		if err != nil {
-			return apperr.Wrap(err, "events.Publish")
+			return err
 		}
 	}
 
-	for _, event := range c.Events {
-		payload, err := json.Marshal(event.Payload)
+	for _, event := range call.Events {
+		err := insertOutbox(ctx, txn, call, event)
 		if err != nil {
-			return apperr.Wrap(err, "json.Marshal")
-		}
-
-		if event.Payload == nil {
-			payload = []byte("{}")
-		}
-
-		_, execErr := txn.Exec(
-			ctx,
-			`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
-				occurred_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-			principal.TenantID,
-			event.AggregateType,
-			event.AggregateID,
-			event.Type,
-			payload,
-			c.CorrelationID,
-			c.Now,
-		)
-		if execErr != nil {
-			return apperr.Wrap(execErr, "insert platform.outbox")
+			return err
 		}
 	}
 
 	return nil
+}
+
+// publishAudit publishes one audit entry of the call as an AuditRecorded event.
+func publishAudit(
+	ctx context.Context,
+	txn pgx.Tx,
+	call *ops.Call,
+	auditEntry ops.AuditEntry,
+) error {
+	principal := call.Principal
+	auditID := uuid.Must(uuid.NewV7())
+
+	result := auditEntry.Result
+	if result == "" {
+		result = "success"
+	}
+
+	var membership *uuid.UUID
+
+	if principal.MembershipID != uuid.Nil {
+		m := principal.MembershipID
+		membership = &m
+	}
+
+	err := events.Publish(
+		ctx,
+		txn,
+		principal.TenantID,
+		"audit",
+		auditID,
+		events.AuditRecorded,
+		events.Audit{
+			ID:              auditID,
+			ActorID:         principal.UserID.String(),
+			ActorRole:       principal.Role,
+			MembershipID:    membership,
+			Action:          auditEntry.Action,
+			TargetKind:      auditEntry.TargetKind,
+			TargetID:        auditEntry.TargetID,
+			PreviousVersion: auditEntry.PreviousVersion,
+			NextVersion:     auditEntry.NextVersion,
+			OccurredAt:      call.Now,
+			CorrelationID:   call.CorrelationID,
+			Result:          result,
+			Reason:          auditEntry.Reason,
+			MaskedBefore:    ops.Masked(auditEntry.Before),
+			MaskedAfter:     ops.Masked(auditEntry.After),
+		},
+	)
+
+	return apperr.Wrap(err, "events.Publish")
+}
+
+// insertOutbox stores one event of the call in the outbox.
+func insertOutbox(ctx context.Context, txn pgx.Tx, call *ops.Call, event ops.Event) error {
+	payload, err := json.Marshal(event.Payload)
+	if err != nil {
+		return apperr.Wrap(err, "json.Marshal")
+	}
+
+	if event.Payload == nil {
+		payload = []byte("{}")
+	}
+
+	_, err = txn.Exec(
+		ctx,
+		`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
+				occurred_at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		call.Principal.TenantID,
+		event.AggregateType,
+		event.AggregateID,
+		event.Type,
+		payload,
+		call.CorrelationID,
+		call.Now,
+	)
+
+	return apperr.Wrap(err, "insert platform.outbox")
 }
 
 // newPool opens a pool whose timestamptz values scan in UTC, so every Instant leaves the API with a Z offset

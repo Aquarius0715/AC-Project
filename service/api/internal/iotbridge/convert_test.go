@@ -1,10 +1,11 @@
-package iotbridge
+package iotbridge_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
+	"github.com/pradita/ac-project/service/api/internal/iotbridge"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -14,7 +15,7 @@ var (
 )
 
 func batch(device string, seqs ...int64) devicesim.Batch {
-	b := devicesim.Batch{DeviceID: DeviceID(device).String(), Measurements: nil}
+	b := devicesim.Batch{DeviceID: iotbridge.DeviceID(device).String(), Measurements: nil}
 
 	for i, s := range seqs {
 		name := []string{"temperature", "power"}[i%2]
@@ -38,7 +39,7 @@ func batch(device string, seqs ...int64) devicesim.Batch {
 // TestTriggersUseTheFixtureIDs: a reading of a demo device becomes a telemetry trigger on its fixture unit and sensor,
 // measured and valid, with the scenario label and the receiving time.
 func TestTriggersUseTheFixtureIDs(t *testing.T) {
-	r := NewResolver(Links)
+	r := iotbridge.NewResolver(iotbridge.Links)
 
 	out, err := r.Triggers(batch("device-online-rto", 1, 2), received)
 	if err != nil {
@@ -50,7 +51,7 @@ func TestTriggersUseTheFixtureIDs(t *testing.T) {
 	}
 
 	trigger := out[0]
-	if trigger.ScenarioID != Scenario || trigger.EventType != "telemetry" ||
+	if trigger.ScenarioID != iotbridge.Scenario || trigger.EventType != "telemetry" ||
 		trigger.Measurement.Origin != "measured" {
 		t.Errorf("trigger %+v", trigger)
 	}
@@ -78,7 +79,7 @@ func TestTriggersUseTheFixtureIDs(t *testing.T) {
 // TestEventIDIsOnePerReading: the same reading twice has the same event ID (a redelivery is one event), and the next
 // reading of the device has another.
 func TestEventIDIsOnePerReading(t *testing.T) {
-	resolver := NewResolver(Links)
+	resolver := iotbridge.NewResolver(iotbridge.Links)
 	a, _ := resolver.Triggers(batch("device-online-rto", 7), received)
 	b, _ := resolver.Triggers(batch("device-online-rto", 7), received.Add(time.Minute))
 	next := batch("device-online-rto", 8)
@@ -106,7 +107,8 @@ func TestEventIDIsOnePerReading(t *testing.T) {
 
 // TestUnknownDeviceIsRefused: a device that is not a demo link converts to nothing and says why.
 func TestUnknownDeviceIsRefused(t *testing.T) {
-	out, err := NewResolver(Links).Triggers(batch("device-unknown", 1), received)
+	out, err := iotbridge.NewResolver(iotbridge.Links).
+		Triggers(batch("device-unknown", 1), received)
 	if err == nil || len(out) != 0 {
 		t.Fatalf("unknown device: %d triggers, err %v", len(out), err)
 	}
@@ -128,7 +130,7 @@ func TestUnknownSensorSkipsOnlyThatReading(t *testing.T) {
 		},
 	)
 
-	out, err := NewResolver(Links).Triggers(b, received)
+	out, err := iotbridge.NewResolver(iotbridge.Links).Triggers(b, received)
 	if err == nil {
 		t.Error("an unknown sensor is not reported")
 	}
@@ -144,7 +146,7 @@ func TestCommandTriggerMapsTheAcknowledgement(t *testing.T) {
 	cmd := "9f67089f-44c9-5231-ba20-03d3b9a1be53"
 	ack := func(result string) devicesim.Ack {
 		return devicesim.Ack{
-			DeviceID:   DeviceID("device-online-rto").String(),
+			DeviceID:   iotbridge.DeviceID("device-online-rto").String(),
 			CommandID:  cmd,
 			Result:     result,
 			ReceivedAt: time.Time{},
@@ -152,23 +154,23 @@ func TestCommandTriggerMapsTheAcknowledgement(t *testing.T) {
 		}
 	}
 
-	trigger, ok, err := CommandTrigger(ack("applied"), received)
+	trigger, ok, err := iotbridge.CommandTrigger(ack("applied"), received)
 	if err != nil || !ok || trigger.EventType != "command_ack" || trigger.CommandID == nil ||
 		trigger.CommandID.String() != cmd ||
 		trigger.Measurement != nil {
 		t.Fatalf("applied: %+v ok=%v err=%v", trigger, ok, err)
 	}
 
-	trigger, ok, _ = CommandTrigger(ack("unsupported"), received)
+	trigger, ok, _ = iotbridge.CommandTrigger(ack("unsupported"), received)
 	if !ok || trigger.EventType != "command_fail" {
 		t.Errorf("unsupported: %+v ok=%v", trigger, ok)
 	}
 
-	if _, ok, _ := CommandTrigger(ack("expired"), received); ok {
+	if _, ok, _ := iotbridge.CommandTrigger(ack("expired"), received); ok {
 		t.Error("an expired acknowledgement is forwarded")
 	}
 
-	_, _, commandTriggerErr := CommandTrigger(
+	_, _, commandTriggerErr := iotbridge.CommandTrigger(
 		devicesim.Ack{
 			CommandID:  "not-a-uuid",
 			Result:     "applied",
@@ -185,8 +187,8 @@ func TestCommandTriggerMapsTheAcknowledgement(t *testing.T) {
 
 // TestBadDeviceIDIsRefused: a device ID in the message that is not a UUID converts to nothing.
 func TestBadDeviceIDIsRefused(t *testing.T) {
-	out, err := NewResolver(
-		Links,
+	out, err := iotbridge.NewResolver(
+		iotbridge.Links,
 	).Triggers(devicesim.Batch{DeviceID: "not-a-uuid", Measurements: nil}, received)
 	if err == nil || len(out) != 0 {
 		t.Fatalf("bad device ID: %d triggers, err %v", len(out), err)
@@ -201,12 +203,14 @@ func TestFleetLinksResolve(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	links := FleetLinks(f)
+	links := iotbridge.FleetLinks(f)
 	if len(links) != 18 {
 		t.Fatalf("%d fleet links, want one per pattern with a module (18)", len(links))
 	}
 
-	resolver := NewResolver(append(append([]Link{}, Links...), links...))
+	resolver := iotbridge.NewResolver(
+		append(append([]iotbridge.Link{}, iotbridge.Links...), links...),
+	)
 
 	out, err := resolver.Triggers(batch("device-mock-tamper", 1, 2), received)
 	if err != nil || len(out) != 2 {
@@ -234,7 +238,7 @@ func TestToScenarioKeepsTheMinuteSlot(t *testing.T) {
 	b := batch("device-online-rto", 1, 2)
 	b.Measurements[0].ObservedAt = now.Truncate(time.Minute)
 	b.Measurements[1].ObservedAt = now.Truncate(time.Minute).Add(time.Hour)
-	got := ToScenario(b, now, offset, margin)
+	got := iotbridge.ToScenario(b, now, offset, margin)
 
 	slot := now.Add(offset - margin).Truncate(time.Minute)
 	if !got.Measurements[0].ObservedAt.Equal(slot) {
@@ -260,7 +264,14 @@ func TestToScenarioKeepsTheMinuteSlot(t *testing.T) {
 	late := batch("device-online-rto", 3)
 
 	late.Measurements[0].ObservedAt = now.Truncate(time.Minute).Add(-time.Minute)
-	if got := ToScenario(late, now, offset, margin); !got.Measurements[0].ObservedAt.Equal(slot) {
+	if got := iotbridge.ToScenario(
+		late,
+		now,
+		offset,
+		margin,
+	); !got.Measurements[0].ObservedAt.Equal(
+		slot,
+	) {
 		t.Errorf("late reading at %v, want %v", got.Measurements[0].ObservedAt, slot)
 	}
 }
@@ -283,14 +294,14 @@ func TestLinksFollowTheFixture(t *testing.T) {
 		devices[d.ID] = struct{ unit, connection string }{unit, d.Connection}
 	}
 
-	for _, l := range Links {
+	for _, l := range iotbridge.Links {
 		d, ok := devices[l.Device]
 		if !ok || d.unit != l.Unit || d.connection != l.Connection {
 			t.Errorf("%s: link %s/%s, fixture %+v", l.Device, l.Unit, l.Connection, d)
 		}
 	}
 
-	if len(Links) != len(devices) {
-		t.Errorf("%d links for %d fixture devices", len(Links), len(devices))
+	if len(iotbridge.Links) != len(devices) {
+		t.Errorf("%d links for %d fixture devices", len(iotbridge.Links), len(devices))
 	}
 }

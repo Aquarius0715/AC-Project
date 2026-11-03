@@ -6,11 +6,32 @@ import "testing"
 // power signal off, tamper detected, each telemetry problem the API flags, each way a module answers a command, the
 // three modes and fan levels, a unit switched off, a unit without a module and an archived unit.
 func TestMockFleetCoversEveryState(t *testing.T) {
+	t.Parallel()
+
 	fleet, err := MockFleet()
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	has := fleetStates(fleet)
+
+	for _, want := range []string{
+		"connection=online", "connection=offline", "connection=unknown", "connection=connecting", "connection=error",
+		"power=on", "power=off", "power=unknown", "tamper=clear", "tamper=detected",
+		"telemetry=normal", "telemetry=silent", "telemetry=unit_mismatch", "telemetry=out_of_range", "telemetry=missing",
+		"telemetry=invalid_time",
+		"commands=apply", "commands=reject", "commands=ignore", "commands=late",
+		"mode=cool", "mode=dry", "mode=fan", "fan=low", "fan=mid", "fan=high",
+		"switched off", "no module", "archived", "other firmware",
+	} {
+		if !has[want] {
+			t.Errorf("no pattern for %s", want)
+		}
+	}
+}
+
+// fleetStates are the values the fleet's patterns show, as "field=value" or the name of a state.
+func fleetStates(fleet Fleet) map[string]bool {
 	has := map[string]bool{}
 	for _, pattern := range fleet.Patterns {
 		has["connection="+pattern.Connection] = true
@@ -44,42 +65,16 @@ func TestMockFleetCoversEveryState(t *testing.T) {
 		}
 	}
 
-	for _, want := range []string{
-		"connection=online", "connection=offline", "connection=unknown", "connection=connecting", "connection=error",
-		"power=on", "power=off", "power=unknown", "tamper=clear", "tamper=detected",
-		"telemetry=normal", "telemetry=silent", "telemetry=unit_mismatch", "telemetry=out_of_range", "telemetry=missing",
-		"telemetry=invalid_time",
-		"commands=apply", "commands=reject", "commands=ignore", "commands=late",
-		"mode=cool", "mode=dry", "mode=fan", "fan=low", "fan=mid", "fan=high",
-		"switched off", "no module", "archived", "other firmware",
-	} {
-		if !has[want] {
-			t.Errorf("no pattern for %s", want)
-		}
-	}
+	return has
 }
 
 // TestFleetNames: each pattern's records have their own fixture-style names.
 func TestFleetNames(t *testing.T) {
-	pattern := Pattern{
-		Key:         "cool-on",
-		Name:        "",
-		Room:        "",
-		Connection:  "",
-		PowerSignal: "",
-		Tamper:      "",
-		Firmware:    "",
-		Archived:    false,
-		NoDevice:    false,
-		State: *new(struct {
-			Power    *bool    `json:"power"`
-			Celsius  *float64 `json:"celsius"`
-			Mode     *string  `json:"mode"`
-			FanLevel *string  `json:"fanLevel"`
-		}),
-		Telemetry: "",
-		Commands:  "",
-	}
+	t.Parallel()
+
+	var pattern Pattern
+
+	pattern.Key = "cool-on"
 	if UnitName(pattern) != "unit-mock-cool-on" || DeviceName(pattern) != "device-mock-cool-on" ||
 		BindingName(pattern) != "binding-mock-cool-on" ||
 		SensorName(pattern, Sensors[0]) != "sensor-mock-cool-on-temperature" {
@@ -96,6 +91,8 @@ func TestFleetNames(t *testing.T) {
 // TestFleetRefusesBadDefinitions: a broken file, a repeated key, an unknown behaviour, or a behaviour on a unit
 // without a module are refused.
 func TestFleetRefusesBadDefinitions(t *testing.T) {
+	t.Parallel()
+
 	for name, raw := range map[string]string{
 		"not json":          `{`,
 		"empty key":         `{"patterns":[{"key":""}]}`,
@@ -115,6 +112,8 @@ func TestFleetRefusesBadDefinitions(t *testing.T) {
 
 // TestEveryUnitIsInARoom: every pattern's unit is in a room of the fleet's floors, and the rooms hold the 20 units.
 func TestEveryUnitIsInARoom(t *testing.T) {
+	t.Parallel()
+
 	fleet, err := MockFleet()
 	if err != nil {
 		t.Fatal(err)

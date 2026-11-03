@@ -2,6 +2,7 @@ package iotbridge
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,17 +11,21 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
+// errNoSnapshot is the preview's answer without the scenario clock's time.
+var errNoSnapshot = errors.New("no snapshot time in the preview's answer")
+
 // ScenarioNow reads the Core API's scenario clock: the snapshot time of the demo-only password-reset preview, which
 // saves and sends nothing. The demo runs its own clock (a seed date that moves with real time), and readings and
 // history must be stamped on it.
 func ScenarioNow(client *http.Client, api string) (time.Time, error) {
-	req, err := http.NewRequest(
+	req, err := http.NewRequestWithContext(
+		context.Background(),
 		http.MethodPost,
 		api+"/v1/auth/password-reset-preview",
 		bytes.NewReader([]byte(`{"demoEmail":"clock.probe@iot-bridge.invalid"}`)),
 	)
 	if err != nil {
-		return time.Time{}, apperr.Wrap(err, "http.NewRequest")
+		return time.Time{}, apperr.Wrap(err, "http.NewRequestWithContext")
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -29,7 +34,8 @@ func ScenarioNow(client *http.Client, api string) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, apperr.Wrap(err, "http.Client.Do")
 	}
-	defer resp.Body.Close()
+
+	defer func() { _ = resp.Body.Close() }()
 
 	var out struct {
 		Meta struct {
@@ -43,7 +49,7 @@ func ScenarioNow(client *http.Client, api string) (time.Time, error) {
 	}
 
 	if out.Meta.SnapshotAt.IsZero() {
-		return time.Time{}, errors.New("no snapshot time in the preview's answer")
+		return time.Time{}, errNoSnapshot
 	}
 
 	return out.Meta.SnapshotAt, nil

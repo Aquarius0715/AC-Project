@@ -13,12 +13,20 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
+// The page sizes: the default and the largest a query may ask for.
 const (
 	DefaultLimit = 25
 	MaxLimit     = 100
 )
 
-// Sort is Query.sort.
+// The sort directions, and the field that names a wrong one.
+const (
+	directionAsc       = "asc"
+	directionDesc      = "desc"
+	fieldSortDirection = "sort.direction"
+)
+
+// SortSpec is Query.sort.
 type SortSpec struct {
 	Field     string `json:"field"`
 	Direction string `json:"direction"`
@@ -79,50 +87,32 @@ func Resolve(query Query, conditions any, scopeVersion, snapshot int) (Window, e
 		Offset:   0,
 		hash:     "",
 	}
-	if query.Limit != nil {
-		if *query.Limit < 1 || *query.Limit > MaxLimit {
-			return window, apperr.Fields(map[string]string{"limit": apperr.KeyRange})
-		}
 
-		window.Limit = *query.Limit
+	limit, err := pageLimit(query)
+	if err != nil {
+		return window, err
 	}
+
+	window.Limit = limit
 
 	if query.Sort != nil {
-		if query.Sort.Direction != "asc" && query.Sort.Direction != "desc" {
-			return window, apperr.Fields(map[string]string{"sort.direction": apperr.KeyInvalid})
+		if query.Sort.Direction != directionAsc && query.Sort.Direction != directionDesc {
+			return window, apperr.Fields(map[string]string{fieldSortDirection: apperr.KeyInvalid})
 		}
 	}
 
-	b, _ := json.Marshal(struct {
-		C any       `json:"c"`
-		S *SortSpec `json:"s"`
-		L int       `json:"l"`
-	}{conditions, query.Sort, window.Limit})
-	sum := sha256.Sum256(b)
+	window.hash, err = queryHash(conditions, query.Sort, window.Limit)
+	if err != nil {
+		return window, err
+	}
 
-	window.hash = hex.EncodeToString(sum[:8])
 	if query.Cursor == nil || *query.Cursor == "" {
 		return window, nil
 	}
 
-	raw, err := base64.RawURLEncoding.DecodeString(*query.Cursor)
+	window.Offset, err = cursorOffset(*query.Cursor, window.hash, scopeVersion, snapshot)
 
-	var c cursor
-	if err != nil || json.Unmarshal(raw, &c) != nil || c.Offset < 0 {
-		return window, apperr.Fields(map[string]string{"cursor": apperr.KeyInvalid})
-	}
-
-	if c.Hash != window.hash {
-		return window, apperr.Fields(map[string]string{"cursor": "error.queryChanged"})
-	}
-
-	if c.Scope != scopeVersion || c.Snapshot != snapshot {
-		return window, apperr.E(apperr.Conflict, "error.cursorExpired")
-	}
-
-	window.Offset = c.Offset
-
-	return window, nil
+	return window, err
 }
 
 // Next returns the cursor for the following page or nil at the end.
@@ -131,12 +121,65 @@ func (w Window) Next(total int) *string {
 		return nil
 	}
 
-	b, _ := json.Marshal(
+	body, err := json.Marshal(
 		cursor{Hash: w.hash, Scope: w.scope, Snapshot: w.Snapshot, Offset: w.Offset + w.Limit},
 	)
-	s := base64.RawURLEncoding.EncodeToString(b)
+	if err != nil {
+		return nil // never: a cursor holds a string and integers, which always encode
+	}
+
+	s := base64.RawURLEncoding.EncodeToString(body)
 
 	return &s
+}
+
+// pageLimit is the page size a query asks for: DefaultLimit when it asks for none.
+func pageLimit(query Query) (int, error) {
+	if query.Limit == nil {
+		return DefaultLimit, nil
+	}
+
+	if *query.Limit < 1 || *query.Limit > MaxLimit {
+		return DefaultLimit, apperr.Fields(map[string]string{"limit": apperr.KeyRange})
+	}
+
+	return *query.Limit, nil
+}
+
+// queryHash binds a cursor to the query: its conditions, sort and limit.
+func queryHash(conditions any, sortSpec *SortSpec, limit int) (string, error) {
+	body, err := json.Marshal(struct {
+		C any       `json:"c"`
+		S *SortSpec `json:"s"`
+		L int       `json:"l"`
+	}{conditions, sortSpec, limit})
+	if err != nil {
+		return "", apperr.Wrap(err, "json.Marshal")
+	}
+
+	sum := sha256.Sum256(body)
+
+	return hex.EncodeToString(sum[:8]), nil
+}
+
+// cursorOffset is the offset in a cursor of the query with that hash, at the scope and snapshot versions of the request.
+func cursorOffset(token, hash string, scopeVersion, snapshot int) (int, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(token)
+
+	var decoded cursor
+	if err != nil || json.Unmarshal(raw, &decoded) != nil || decoded.Offset < 0 {
+		return 0, apperr.Fields(map[string]string{"cursor": apperr.KeyInvalid})
+	}
+
+	if decoded.Hash != hash {
+		return 0, apperr.Fields(map[string]string{"cursor": "error.queryChanged"})
+	}
+
+	if decoded.Scope != scopeVersion || decoded.Snapshot != snapshot {
+		return 0, apperr.E(apperr.Conflict, "error.cursorExpired")
+	}
+
+	return decoded.Offset, nil
 }
 
 // OrderBy maps a sort to SQL with the id tie-break; allowed maps API fields to SQL columns.
@@ -171,23 +214,25 @@ func OrderBy(sortSpec *SortSpec, allowed map[string]string, def string) (string,
 // on sort.direction here, so no ORDER BY depends on Resolve having refused it first (IR365).
 func Direction(s *SortSpec) (string, error) {
 	switch s.Direction {
-	case "asc":
+	case directionAsc:
 		return "ASC", nil
-	case "desc":
+	case directionDesc:
 		return "DESC", nil
 	}
 
-	return "", apperr.Fields(map[string]string{"sort.direction": apperr.KeyInvalid})
+	return "", apperr.Fields(map[string]string{fieldSortDirection: apperr.KeyInvalid})
 }
 
 // likeEscape takes the LIKE wildcards of a search term literally; the backslash is PostgreSQL's default escape
 // character.
-var likeEscape = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+func likeEscape() *strings.Replacer {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+}
 
 // Contains is the LIKE / ILIKE pattern of filters.search: the trimmed term anywhere in the value. A %, _ or \ in the
 // term is matched as itself, so "50%" finds "50%" and not every value with "50" in it (IR388).
 func Contains(search string) string {
-	return "%" + likeEscape.Replace(strings.TrimSpace(search)) + "%"
+	return "%" + likeEscape().Replace(strings.TrimSpace(search)) + "%"
 }
 
 // SortSlice orders in-memory items by the requested sort: keys compares two items per allowed field (like
@@ -203,23 +248,23 @@ func SortSlice[T any](items []T, sortSpec *SortSpec, keys map[string]func(a, b T
 		return apperr.Fields(map[string]string{"sort.field": apperr.KeyInvalid})
 	}
 
-	if sortSpec.Direction != "asc" && sortSpec.Direction != "desc" {
-		return apperr.Fields(map[string]string{"sort.direction": apperr.KeyInvalid})
+	if sortSpec.Direction != directionAsc && sortSpec.Direction != directionDesc {
+		return apperr.Fields(map[string]string{fieldSortDirection: apperr.KeyInvalid})
 	}
 
-	id := keys["id"]
+	byID := keys["id"]
 
-	slices.SortStableFunc(items, func(a, b T) int {
-		c := cmp(a, b)
-		if sortSpec.Direction == "desc" {
-			c = -c
+	slices.SortStableFunc(items, func(left, right T) int {
+		order := cmp(left, right)
+		if sortSpec.Direction == directionDesc {
+			order = -order
 		}
 
-		if c == 0 && id != nil && sortSpec.Field != "id" {
-			c = id(a, b)
+		if order == 0 && byID != nil && sortSpec.Field != "id" {
+			order = byID(left, right)
 		}
 
-		return c
+		return order
 	})
 
 	return nil

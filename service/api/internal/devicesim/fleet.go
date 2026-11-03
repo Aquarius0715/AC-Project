@@ -3,6 +3,7 @@ package devicesim
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -35,13 +36,17 @@ type Pattern struct {
 
 // Fleet is the mock fleet: one property of a customer with one unit per pattern, all of one model.
 type Fleet struct {
-	CustomerOrgID     string                          `json:"customerOrgId"`
-	Property          struct{ ID, Kind, Name string } `json:"property"`
-	ModelID           string                          `json:"modelId"`
-	CapabilityVersion int                             `json:"capabilityVersion"`
-	Firmware          string                          `json:"firmware"`
-	Floors            []Floor                         `json:"floors"`
-	Patterns          []Pattern                       `json:"patterns"`
+	CustomerOrgID string `json:"customerOrgId"`
+	Property      struct {
+		ID   string `json:"id"`
+		Kind string `json:"kind"`
+		Name string `json:"name"`
+	} `json:"property"`
+	ModelID           string    `json:"modelId"`
+	CapabilityVersion int       `json:"capabilityVersion"`
+	Firmware          string    `json:"firmware"`
+	Floors            []Floor   `json:"floors"`
+	Patterns          []Pattern `json:"patterns"`
 }
 
 // Floor is a floor of the fleet's property and its rooms (assets spaces: floor, then room).
@@ -57,9 +62,9 @@ type Room struct {
 	Name string `json:"name"`
 }
 
-// Telemetry and command behaviours a pattern may name.
-var (
-	telemetryKinds = map[string]bool{
+// telemetryKinds are the telemetry behaviours a pattern may name.
+func telemetryKinds() map[string]bool {
+	return map[string]bool{
 		"":              true,
 		"normal":        true,
 		"silent":        true,
@@ -68,14 +73,21 @@ var (
 		"missing":       true,
 		"invalid_time":  true,
 	}
-	commandKinds = map[string]bool{
+}
+
+// commandKinds are the command behaviours a pattern may name.
+func commandKinds() map[string]bool {
+	return map[string]bool{
 		"":       true,
 		"apply":  true,
 		"reject": true,
 		"ignore": true,
 		"late":   true,
 	}
-)
+}
+
+// errBadFleet starts every refusal of a fleet definition.
+var errBadFleet = errors.New("fleet")
 
 // MockFleet reads the embedded fleet and checks it: unique keys, known behaviours, and a module for every pattern
 // that reports or answers.
@@ -89,45 +101,72 @@ func parseFleet(raw []byte) (Fleet, error) {
 		return fleet, fmt.Errorf("fleet: %w", err)
 	}
 
-	rooms := map[string]bool{}
-
-	for _, fl := range fleet.Floors {
-		for _, r := range fl.Rooms {
-			if r.Key == "" || rooms[r.Key] || r.Key == fl.Key {
-				return fleet, fmt.Errorf("fleet: room key %q is empty or repeated", r.Key)
-			}
-
-			rooms[r.Key] = true
-		}
+	rooms, err := fleetRooms(fleet.Floors)
+	if err != nil {
+		return fleet, err
 	}
 
 	seen := map[string]bool{}
 
 	for _, pattern := range fleet.Patterns {
-		switch {
-		case pattern.Key == "" || seen[pattern.Key]:
-			return fleet, fmt.Errorf("fleet: pattern key %q is empty or repeated", pattern.Key)
-		case !telemetryKinds[pattern.Telemetry] || !commandKinds[pattern.Commands]:
-			return fleet, fmt.Errorf(
-				"fleet: pattern %s has an unknown behaviour (%q, %q)",
-				pattern.Key,
-				pattern.Telemetry,
-				pattern.Commands,
-			)
-		case len(rooms) > 0 && !rooms[pattern.Room]:
-			return fleet, fmt.Errorf(
-				"fleet: pattern %s is in no known room (%q)",
-				pattern.Key,
-				pattern.Room,
-			)
-		case pattern.NoDevice && (pattern.Telemetry != "" || pattern.Commands != ""):
-			return fleet, fmt.Errorf("fleet: pattern %s has no module but a behaviour", pattern.Key)
+		err := checkPattern(pattern, seen, rooms)
+		if err != nil {
+			return fleet, err
 		}
 
 		seen[pattern.Key] = true
 	}
 
 	return fleet, nil
+}
+
+// fleetRooms are the room keys of the floors; a room key that is empty, repeated or its floor's own is refused.
+func fleetRooms(floors []Floor) (map[string]bool, error) {
+	rooms := map[string]bool{}
+
+	for _, floor := range floors {
+		for _, room := range floor.Rooms {
+			if room.Key == "" || rooms[room.Key] || room.Key == floor.Key {
+				return nil, fmt.Errorf(
+					"%w: room key %q is empty or repeated",
+					errBadFleet,
+					room.Key,
+				)
+			}
+
+			rooms[room.Key] = true
+		}
+	}
+
+	return rooms, nil
+}
+
+// checkPattern refuses a pattern whose key is empty or already seen, whose behaviour is unknown, whose room is none of
+// the fleet's rooms (when it has any), or which has a behaviour but no module.
+func checkPattern(pattern Pattern, seen, rooms map[string]bool) error {
+	switch {
+	case pattern.Key == "" || seen[pattern.Key]:
+		return fmt.Errorf("%w: pattern key %q is empty or repeated", errBadFleet, pattern.Key)
+	case !telemetryKinds()[pattern.Telemetry] || !commandKinds()[pattern.Commands]:
+		return fmt.Errorf(
+			"%w: pattern %s has an unknown behaviour (%q, %q)",
+			errBadFleet,
+			pattern.Key,
+			pattern.Telemetry,
+			pattern.Commands,
+		)
+	case len(rooms) > 0 && !rooms[pattern.Room]:
+		return fmt.Errorf(
+			"%w: pattern %s is in no known room (%q)",
+			errBadFleet,
+			pattern.Key,
+			pattern.Room,
+		)
+	case pattern.NoDevice && (pattern.Telemetry != "" || pattern.Commands != ""):
+		return fmt.Errorf("%w: pattern %s has no module but a behaviour", errBadFleet, pattern.Key)
+	}
+
+	return nil
 }
 
 // FirmwareOf is the firmware a pattern's module reports (the fleet's unless the pattern names another).
@@ -139,9 +178,18 @@ func (f Fleet) FirmwareOf(p Pattern) string {
 	return f.Firmware
 }
 
-// Fixture-style IDs of a pattern's records; the API IDs come from seed.ID of these names.
-func UnitName(p Pattern) string             { return "unit-mock-" + p.Key }
-func DeviceName(p Pattern) string           { return "device-mock-" + p.Key }
-func BindingName(p Pattern) string          { return "binding-mock-" + p.Key }
+// UnitName is the fixture-style ID of a pattern's unit; the API IDs of a pattern's records come from seed.ID of these
+// names.
+func UnitName(p Pattern) string { return "unit-mock-" + p.Key }
+
+// DeviceName is the fixture-style ID of a pattern's device.
+func DeviceName(p Pattern) string { return "device-mock-" + p.Key }
+
+// BindingName is the fixture-style ID of a pattern's binding.
+func BindingName(p Pattern) string { return "binding-mock-" + p.Key }
+
+// SensorName is the fixture-style ID of one sensor of a pattern's device.
 func SensorName(p Pattern, s Sensor) string { return "sensor-mock-" + p.Key + "-" + s.Metric }
-func SpaceName(key string) string           { return "space-mock-" + key } // a floor or a room
+
+// SpaceName is the fixture-style ID of a space of the fleet's property: a floor or a room.
+func SpaceName(key string) string { return "space-mock-" + key }

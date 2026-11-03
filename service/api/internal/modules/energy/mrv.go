@@ -124,10 +124,10 @@ type Preview struct {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/mrv/preview [get]
-func preview(ctx context.Context, c *ops.Call, input *Conditions) (Preview, error) {
+func preview(ctx context.Context, call *ops.Call, input *Conditions) (Preview, error) {
 	var kind string
 
-	err := c.Tx.QueryRow(ctx, `SELECT kind FROM energy.ref_organizations WHERE id = $1`, input.OrganizationID).
+	err := call.Tx.QueryRow(ctx, `SELECT kind FROM energy.ref_organizations WHERE id = $1`, input.OrganizationID).
 		Scan(&kind)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && kind != "customer") {
 		return Preview{}, apperr.Fields(map[string]string{"organizationId": apperr.KeyInvalid})
@@ -139,7 +139,7 @@ func preview(ctx context.Context, c *ops.Call, input *Conditions) (Preview, erro
 
 	var inOrg int
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND
+	scanErr := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND
 		NOT archived`, input.UnitIDs, input.OrganizationID).
 		Scan(&inOrg)
 	if scanErr != nil {
@@ -152,25 +152,25 @@ func preview(ctx context.Context, c *ops.Call, input *Conditions) (Preview, erro
 		)
 	}
 
-	baseline, err := LoadBaseline(ctx, c, input.BaselineID, &input.BaselineVersion)
+	baseline, err := LoadBaseline(ctx, call, input.BaselineID, &input.BaselineVersion)
 	if err != nil {
 		return Preview{}, err
 	}
 
-	f, err := LoadFactor(ctx, c, input.FactorID, &input.FactorVersion)
+	f, err := LoadFactor(ctx, call, input.FactorID, &input.FactorVersion)
 	if err != nil {
 		return Preview{}, err
 	}
 
-	s, n, err := Compute(ctx, c, input.UnitIDs, input.From, input.To, &f, &baseline)
+	s, integration, err := Compute(ctx, call, input.UnitIDs, input.From, input.To, &f, &baseline)
 	if err != nil {
 		return Preview{}, err
 	}
 
 	incomplete := input.BoundaryID != Boundary || baseline.BoundaryID != input.BoundaryID ||
-		n.ExpectedSlots == 0 ||
-		n.ValidSlots < n.ExpectedSlots ||
-		!Comparable(&baseline, input.UnitIDs, input.From, input.To, n)
+		integration.ExpectedSlots == 0 ||
+		integration.ValidSlots < integration.ExpectedSlots ||
+		!Comparable(&baseline, input.UnitIDs, input.From, input.To, integration)
 
 	return Preview{
 		Conditions: *input,
@@ -274,30 +274,30 @@ func reviews(ctx context.Context, c *ops.Call, report *Report) error {
 }
 
 func latestVersion(ctx context.Context, c *ops.Call, id uuid.UUID) (int, error) {
-	var v *int
+	var latest *int
 
 	err := c.Tx.QueryRow(ctx, `SELECT max(version) FROM energy.mrv_reports WHERE id = $1`, id).
-		Scan(&v)
+		Scan(&latest)
 	if err != nil {
 		return 0, apperr.Wrap(err, "select energy.mrv_reports")
 	}
 
-	if v == nil {
+	if latest == nil {
 		return 0, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
-	return *v, nil
+	return *latest, nil
 }
 
 // LoadReport returns a report version (latest when version is nil).
-func LoadReport(ctx context.Context, call *ops.Call, id uuid.UUID, version *int) (Report, error) {
-	v := 0
+func LoadReport(ctx context.Context, call *ops.Call, reportID uuid.UUID, version *int) (Report, error) {
+	reportVersion := 0
 	if version != nil {
-		v = *version
+		reportVersion = *version
 	} else {
 		var err error
 
-		v, err = latestVersion(ctx, call, id)
+		reportVersion, err = latestVersion(ctx, call, reportID)
 		if err != nil {
 			return Report{}, err
 		}
@@ -307,8 +307,8 @@ func LoadReport(ctx context.Context, call *ops.Call, id uuid.UUID, version *int)
 		call.Tx.QueryRow(
 			ctx,
 			"SELECT "+reportCols+" FROM energy.mrv_reports r WHERE r.id = $1 AND r.version = $2",
-			id,
-			v,
+			reportID,
+			reportVersion,
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -471,9 +471,9 @@ func pageReports(
 func listReports(
 	ctx context.Context,
 	call *ops.Call,
-	in *paging.Query,
+	query *paging.Query,
 ) (paging.Page[Report], error) {
-	var f struct {
+	var filter struct {
 		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
 		UnitID         *uuid.UUID `json:"unitId,omitempty"`
 		Status         *string    `json:"status,omitempty"`
@@ -481,13 +481,13 @@ func listReports(
 		To             *time.Time `json:"to,omitempty"`
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil ||
-			(f.Status != nil && *f.Status != "draft" && *f.Status != "demo_reviewed") ||
-			(f.From != nil && f.To != nil && !f.From.Before(*f.To)) {
+		if dec.Decode(&filter) != nil ||
+			(filter.Status != nil && *filter.Status != "draft" && *filter.Status != "demo_reviewed") ||
+			(filter.From != nil && filter.To != nil && !filter.From.Before(*filter.To)) {
 			return paging.Page[Report]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
@@ -495,7 +495,7 @@ func listReports(
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{
 			"id":         "r.id",
 			"createdAt":  "r.created_at",
@@ -519,27 +519,27 @@ func listReports(
 	conds := []string{
 		"r.version = (SELECT max(version) FROM energy.mrv_reports o WHERE o.id = r.id)",
 	}
-	if f.OrganizationID != nil {
-		conds = append(conds, "r.organization_id = "+add(*f.OrganizationID))
+	if filter.OrganizationID != nil {
+		conds = append(conds, "r.organization_id = "+add(*filter.OrganizationID))
 	}
 
-	if f.UnitID != nil {
-		conds = append(conds, "r.conditions->'unitIds' ? "+add(f.UnitID.String()))
+	if filter.UnitID != nil {
+		conds = append(conds, "r.conditions->'unitIds' ? "+add(filter.UnitID.String()))
 	}
 
-	if f.Status != nil {
-		conds = append(conds, "r.status = "+add(*f.Status))
+	if filter.Status != nil {
+		conds = append(conds, "r.status = "+add(*filter.Status))
 	}
 
-	if f.From != nil {
-		conds = append(conds, "upper(r.period) > "+add(*f.From))
+	if filter.From != nil {
+		conds = append(conds, "upper(r.period) > "+add(*filter.From))
 	}
 
-	if f.To != nil {
-		conds = append(conds, "lower(r.period) < "+add(*f.To))
+	if filter.To != nil {
+		conds = append(conds, "lower(r.period) < "+add(*filter.To))
 	}
 
-	return pageReports(ctx, call, *in, f, strings.Join(conds, " AND "), args, order)
+	return pageReports(ctx, call, *query, filter, strings.Join(conds, " AND "), args, order)
 }
 
 // VersionsInput is mrv.versions input.
@@ -583,7 +583,7 @@ func (in *VersionsInput) Validate() map[string]string {
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/mrv/{id}/versions [get]
-func versions(ctx context.Context, c *ops.Call, input *VersionsInput) (paging.Page[Report], error) {
+func versions(ctx context.Context, call *ops.Call, input *VersionsInput) (paging.Page[Report], error) {
 	if input.Query.HasFilters() { // no filters (query catalog)
 		return paging.Page[Report]{}, apperr.Fields(
 			map[string]string{"query.filters": apperr.KeyInvalid},
@@ -599,12 +599,12 @@ func versions(ctx context.Context, c *ops.Call, input *VersionsInput) (paging.Pa
 		return paging.Page[Report]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	_, latestVersionErr := latestVersion(ctx, c, input.ID)
+	_, latestVersionErr := latestVersion(ctx, call, input.ID)
 	if latestVersionErr != nil {
 		return paging.Page[Report]{}, latestVersionErr
 	}
 
-	return pageReports(ctx, c, input.Query, input.ID, "r.id = $1", []any{input.ID}, order)
+	return pageReports(ctx, call, input.Query, input.ID, "r.id = $1", []any{input.ID}, order)
 }
 
 // SaveInput is mrv.saveDraft input.
@@ -638,24 +638,24 @@ func (in *SaveInput) Validate() map[string]string {
 func insertReport(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	reportID uuid.UUID,
 	version int,
-	p Preview,
+	content Preview,
 	status string,
 	evidence []uuid.UUID,
 ) error {
-	cond, _ := json.Marshal(p.Conditions)
-	res, _ := json.Marshal(stored{Summary: p.Summary, Incomplete: p.Incomplete})
+	cond, _ := json.Marshal(content.Conditions)
+	res, _ := json.Marshal(stored{Summary: content.Summary, Incomplete: content.Incomplete})
 	_, err := call.Tx.Exec(
 		ctx,
 		`INSERT INTO energy.mrv_reports (id, version, tenant_id, organization_id, period, status, conditions, results,
 			evidence_ids, created_by, created_at)
 		VALUES ($1, $2, current_setting('app.tenant_id')::uuid, $3, tstzrange($4, $5), $6, $7, $8, $9, $10, $11)`,
-		id,
+		reportID,
 		version,
-		p.Conditions.OrganizationID,
-		p.Conditions.From,
-		p.Conditions.To,
+		content.Conditions.OrganizationID,
+		content.Conditions.From,
+		content.Conditions.To,
 		status,
 		cond,
 		res,
@@ -692,25 +692,25 @@ func insertReport(
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/mrv [post]
-func saveDraft(ctx context.Context, c *ops.Call, input *SaveInput) (Report, error) {
-	id, version := uuid.New(), 1
+func saveDraft(ctx context.Context, call *ops.Call, input *SaveInput) (Report, error) {
+	reportID, version := uuid.New(), 1
 
 	if input.ID != nil {
-		latest, err := latestVersion(ctx, c, *input.ID)
+		latest, err := latestVersion(ctx, call, *input.ID)
 		if err != nil {
 			return Report{}, err
 		}
 
-		if latest != *c.ExpectedVersion {
+		if latest != *call.ExpectedVersion {
 			return Report{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
-		id, version = *input.ID, latest+1
+		reportID, version = *input.ID, latest+1
 	}
 
 	var found int
 
-	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_attachments WHERE id = ANY($1)`, input.EvidenceIDs).
+	err := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_attachments WHERE id = ANY($1)`, input.EvidenceIDs).
 		Scan(&found)
 	if err != nil {
 		return Report{}, apperr.Wrap(err, "select energy.ref_attachments")
@@ -720,27 +720,27 @@ func saveDraft(ctx context.Context, c *ops.Call, input *SaveInput) (Report, erro
 		return Report{}, apperr.Fields(map[string]string{"evidenceIds": "errors.evidence_unknown"})
 	}
 
-	p, err := preview(ctx, c, &input.Conditions)
+	p, err := preview(ctx, call, &input.Conditions)
 	if err != nil {
 		return Report{}, err
 	}
 
-	insertReportErr := insertReport(ctx, c, id, version, p, "draft", input.EvidenceIDs)
+	insertReportErr := insertReport(ctx, call, reportID, version, p, "draft", input.EvidenceIDs)
 	if insertReportErr != nil {
 		return Report{}, insertReportErr
 	}
 
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "mrv.saveDraft",
 			TargetKind:      "mrv_report",
-			TargetID:        id.String(),
-			PreviousVersion: c.ExpectedVersion,
+			TargetID:        reportID.String(),
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return LoadReport(ctx, c, id, &version)
+	return LoadReport(ctx, call, reportID, &version)
 }
 
 // ReviewInput is mrv.recordReview input.
@@ -798,17 +798,17 @@ func (in *ReviewInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/mrv/{reportId}/review [post]
-func recordReview(ctx context.Context, call *ops.Call, in *ReviewInput) (Report, error) {
-	latest, err := latestVersion(ctx, call, in.ReportID)
+func recordReview(ctx context.Context, call *ops.Call, input *ReviewInput) (Report, error) {
+	latest, err := latestVersion(ctx, call, input.ReportID)
 	if err != nil {
 		return Report{}, err
 	}
 
-	if latest != in.ReportVersion || latest != *call.ExpectedVersion {
+	if latest != input.ReportVersion || latest != *call.ExpectedVersion {
 		return Report{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	report, err := LoadReport(ctx, call, in.ReportID, &latest)
+	report, err := LoadReport(ctx, call, input.ReportID, &latest)
 	if err != nil {
 		return report, err
 	}
@@ -828,7 +828,7 @@ func recordReview(ctx context.Context, call *ops.Call, in *ReviewInput) (Report,
 		report.ID,
 		latest,
 		call.Principal.UserID,
-		in.ReviewComment,
+		input.ReviewComment,
 		call.Now,
 	)
 	if execErr != nil {
@@ -837,7 +837,7 @@ func recordReview(ctx context.Context, call *ops.Call, in *ReviewInput) (Report,
 
 	next := latest + 1
 
-	p := Preview{
+	content := Preview{
 		Conditions: report.Conditions,
 		Summary:    report.Summary,
 		Incomplete: report.Incomplete,
@@ -850,7 +850,7 @@ func recordReview(ctx context.Context, call *ops.Call, in *ReviewInput) (Report,
 		call,
 		report.ID,
 		next,
-		p,
+		content,
 		"demo_reviewed",
 		report.EvidenceIDs,
 	)
@@ -865,7 +865,7 @@ func recordReview(ctx context.Context, call *ops.Call, in *ReviewInput) (Report,
 			TargetID:        report.ID.String(),
 			PreviousVersion: &latest,
 			NextVersion:     &next,
-			Reason:          in.ReviewComment, Result: "", Before: nil, After: nil,
+			Reason:          input.ReviewComment, Result: "", Before: nil, After: nil,
 		},
 	)
 

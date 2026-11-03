@@ -16,6 +16,12 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
+const (
+	keyWindows       = 2 // a counter outlives its window by one more window
+	dialTimeout      = time.Second
+	readWriteTimeout = 500 * time.Millisecond
+)
+
 // Store keeps the counters.
 type Store interface {
 	// Incr adds one to key, which expires after ttl, and returns the new count.
@@ -40,12 +46,16 @@ func (w *Window) Allow(ctx context.Context, key string) (int, error) {
 
 	start := now.Truncate(w.Window)
 
-	n, err := w.Store.Incr(ctx, fmt.Sprintf("%s%s:%d", w.Prefix, key, start.Unix()), 2*w.Window)
+	count, err := w.Store.Incr(
+		ctx,
+		fmt.Sprintf("%s%s:%d", w.Prefix, key, start.Unix()),
+		keyWindows*w.Window,
+	)
 	if err != nil {
 		return 0, apperr.Wrap(err, "ratelimit.Store.Incr")
 	}
 
-	if n <= int64(w.Limit) {
+	if count <= int64(w.Limit) {
 		return 0, nil
 	}
 
@@ -62,7 +72,7 @@ func NewValkey(url string) (Valkey, error) {
 		return Valkey{}, apperr.Wrap(err, "redis.ParseURL")
 	}
 
-	opt.DialTimeout, opt.ReadTimeout, opt.WriteTimeout = time.Second, 500*time.Millisecond, 500*time.Millisecond
+	opt.DialTimeout, opt.ReadTimeout, opt.WriteTimeout = dialTimeout, readWriteTimeout, readWriteTimeout
 
 	return Valkey{Client: redis.NewClient(opt)}, nil
 }

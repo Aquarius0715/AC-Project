@@ -10,6 +10,8 @@ import (
 // TestRepeats: a repeated failure is logged once a minute with its count, another failure at once, and the recovery
 // once.
 func TestRepeats(t *testing.T) {
+	t.Parallel()
+
 	var lines []string
 
 	now := time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC)

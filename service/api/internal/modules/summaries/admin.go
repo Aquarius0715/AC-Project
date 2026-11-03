@@ -62,17 +62,22 @@ type AdminSummary struct {
 	AsOf                time.Time       `json:"asOf"`
 }
 
-var jobStatuses = []string{
-	"requested",
-	"offered",
-	"accepted",
-	"assigned",
-	"in_progress",
-	"submitted",
-	"completed",
-	"rework_requested",
-	"cancelled",
-	"on_hold",
+// percent turns a share into a percentage.
+const percent = 100
+
+func jobStatuses() []string {
+	return []string{
+		"requested",
+		"offered",
+		"accepted",
+		"assigned",
+		"in_progress",
+		"submitted",
+		"completed",
+		"rework_requested",
+		"cancelled",
+		"on_hold",
+	}
 }
 
 func collectIDs(rows pgx.Rows) ([]uuid.UUID, error) {
@@ -110,11 +115,88 @@ func collectIDs(rows pgx.Rows) ([]uuid.UUID, error) {
 //	@Router			/v1/admin/summary [get]
 func (m Summaries) admin(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	input *AdminInput,
 ) (AdminSummary, error) {
+	out := newAdminSummary(call.Now)
+
+	units, err := targetUnits(ctx, call, input)
+	if err != nil {
+		return out, err
+	}
+
+	unitCounts, err := m.Units.CountUnits(
+		ctx,
+		call,
+		true,
+		nil,
+		input.CustomerID,
+		input.PropertyID,
+		nil,
+	)
+	if err != nil {
+		return out, apperr.Wrap(err, "summaries.Units.CountUnits")
+	}
+
+	out.Total = unitCounts.Total
+	out.Online = unitCounts.Online
+	out.Offline = unitCounts.Offline
+	out.Unknown = unitCounts.Unknown
+
+	out.PowerOn = unitCounts.PowerOn
+	out.PowerOff = unitCounts.PowerOff
+	out.PowerUnknown = unitCounts.PowerUnknown
+
+	out.AlertCount = unitCounts.AlertCount
+	out.OperatingRate = operatingRate(unitCounts.PowerOn, unitCounts.PowerOff)
+
+	out.CustomerCount, err = m.activeCustomerCount(ctx, call, input)
+	if err != nil {
+		return out, err
+	}
+	// jobs whose requested slot starts in the period, by status (maintenance)
+	counts, err := ops.Ask[map[string]int](
+		ctx,
+		m.Registry,
+		call,
+		maintenance.QueryStatusCounts,
+		maintenance.StatusCountsInput{UnitIDs: units, From: input.From, To: input.To},
+	)
+	if err != nil {
+		return out, err
+	}
+
+	maps.Copy(out.JobCounts, counts)
+	// billing (billing.read; IR115): unpaid invoices past due on contracts covering the units
+	if call.Principal.Permissions["billing.read"] {
+		total, amounts, err := m.overdueBilling(ctx, call, units)
+		if err != nil {
+			return out, err
+		}
+
+		out.BillingVisibility, out.AmountsByCurrency, out.OverdueInvoiceCount = "allowed", amounts, &total
+	}
+	// energy: actuals only (no baseline) and the IR78 forecast
+	actuals, err := ops.Ask[energy.Actuals](
+		ctx,
+		m.Registry,
+		call,
+		energy.QueryActuals,
+		energy.ActualsInput{UnitIDs: units, From: input.From, To: input.To},
+	)
+	if err != nil {
+		return out, err
+	}
+
+	out.EnergySummary, out.EnergyForecast = &actuals.Summary, actuals.Forecast
+
+	return out, nil
+}
+
+// newAdminSummary is the summary before any count: every job status at zero and billing forbidden.
+func newAdminSummary(now time.Time) AdminSummary {
 	out := AdminSummary{
-		AsOf:                c.Now,
+		AsOf:                now,
 		JobCounts:           map[string]int{},
 		BillingVisibility:   "forbidden",
 		CustomerCount:       0,
@@ -146,10 +228,15 @@ func (m Summaries) admin(
 			QualityWarnings:          nil,
 		},
 	}
-	for _, s := range jobStatuses {
+	for _, s := range jobStatuses() {
 		out.JobCounts[s] = 0
 	}
-	// target units U: not archived, matching the filters
+
+	return out
+}
+
+// targetUnits returns the target units U: not archived, matching the filters.
+func targetUnits(ctx context.Context, call *ops.Call, input *AdminInput) ([]uuid.UUID, error) {
 	var args []any
 
 	add := func(v any) string {
@@ -172,48 +259,33 @@ func (m Summaries) admin(
 		conds = append(conds, "u.property_id = "+add(*input.PropertyID))
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		"SELECT u.id FROM assets.units u WHERE "+strings.Join(conds, " AND ")+" ORDER BY u.id",
 		args...)
 	if err != nil {
-		return out, apperr.Wrap(err, "select assets.units")
+		return nil, apperr.Wrap(err, "select assets.units")
 	}
 
-	units, err := collectIDs(rows)
-	if err != nil {
-		return out, err
+	return collectIDs(rows)
+}
+
+// operatingRate is the percentage of powered-on units among those with a known power state; unknown power never
+// counts as inactive (DD-A01). It is nil when no unit reports its power.
+func operatingRate(powerOn, powerOff int) *float64 {
+	known := powerOn + powerOff
+	if known <= 0 {
+		return nil
 	}
 
-	unitCounts, err := m.Units.CountUnits(
-		ctx,
-		c,
-		true,
-		nil,
-		input.CustomerID,
-		input.PropertyID,
-		nil,
-	)
-	if err != nil {
-		return out, apperr.Wrap(err, "summaries.Units.CountUnits")
-	}
+	rate := float64(powerOn) / float64(known) * percent
 
-	out.Total = unitCounts.Total
-	out.Online = unitCounts.Online
-	out.Offline = unitCounts.Offline
-	out.Unknown = unitCounts.Unknown
+	return &rate
+}
 
-	out.PowerOn = unitCounts.PowerOn
-	out.PowerOff = unitCounts.PowerOff
-	out.PowerUnknown = unitCounts.PowerUnknown
-
-	out.AlertCount = unitCounts.AlertCount
-	if d := unitCounts.PowerOn + unitCounts.PowerOff; d > 0 { // unknown power never counts as inactive (DD-A01)
-		r := float64(unitCounts.PowerOn) / float64(d) * 100
-		out.OperatingRate = &r
-	}
-	// customers: Customer and Organization both active (IR40; organization status from identity); filters narrow to the
-	// matching customer
+// activeCustomerCount counts the customers whose Customer and Organization are both active (IR40; organization
+// status from identity); the filters narrow it to the matching customer.
+func (m Summaries) activeCustomerCount(ctx context.Context, call *ops.Call, input *AdminInput) (int, error) {
 	cargs := []any{}
 	cadd := func(v any) string {
 		cargs = append(cargs, v)
@@ -235,7 +307,7 @@ func (m Summaries) admin(
 		)
 	}
 
-	rows, err = c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		"SELECT DISTINCT cu.organization_id FROM assets.customers cu WHERE "+strings.Join(
 			cconds,
@@ -243,87 +315,63 @@ func (m Summaries) admin(
 		),
 		cargs...)
 	if err != nil {
-		return out, apperr.Wrap(err, "select assets.customers")
+		return 0, apperr.Wrap(err, "select assets.customers")
 	}
 
 	orgs, err := collectIDs(rows)
 	if err != nil {
-		return out, err
+		return 0, err
 	}
 
 	active, err := ops.Ask[[]uuid.UUID](
 		ctx,
 		m.Registry,
-		c,
+		call,
 		identity.QueryActiveOrganizations,
 		identity.OrganizationsInput{IDs: orgs},
 	)
 	if err != nil {
-		return out, err
+		return 0, err
 	}
+
+	var count int
 
 	if len(active) > 0 {
-		err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.customers cu WHERE cu.organization_id = ANY("+cadd(active)+
+		err := call.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.customers cu WHERE cu.organization_id = ANY("+cadd(active)+
 			") AND "+strings.Join(cconds, " AND "), cargs...).
-			Scan(&out.CustomerCount)
+			Scan(&count)
 		if err != nil {
-			return out, apperr.Wrap(err, "select assets.customers")
+			return 0, apperr.Wrap(err, "select assets.customers")
 		}
 	}
-	// jobs whose requested slot starts in the period, by status (maintenance)
-	counts, err := ops.Ask[map[string]int](
+
+	return count, nil
+}
+
+// overdueBilling returns the number and the amounts by currency of the unpaid invoices past due on contracts
+// covering the units (billing).
+func (m Summaries) overdueBilling(ctx context.Context, call *ops.Call, units []uuid.UUID) (int, []Money, error) {
+	overdue, err := ops.Ask[[]billing.Overdue](
 		ctx,
 		m.Registry,
-		c,
-		maintenance.QueryStatusCounts,
-		maintenance.StatusCountsInput{UnitIDs: units, From: input.From, To: input.To},
+		call,
+		billing.QueryOverdue,
+		billing.OverdueInput{UnitIDs: units},
 	)
 	if err != nil {
-		return out, err
+		return 0, nil, err
 	}
 
-	maps.Copy(out.JobCounts, counts)
-	// billing (billing.read; IR115): unpaid invoices past due on contracts covering the units
-	if c.Principal.Permissions["billing.read"] {
-		overdue, err := ops.Ask[[]billing.Overdue](
-			ctx,
-			m.Registry,
-			c,
-			billing.QueryOverdue,
-			billing.OverdueInput{UnitIDs: units},
+	total, amounts := 0, []Money{}
+	for _, o := range overdue {
+		total += o.Count
+		amounts = append(
+			amounts,
+			Money{AmountMinor: o.AmountMinor, Currency: o.Currency},
 		)
-		if err != nil {
-			return out, err
-		}
-
-		out.BillingVisibility, out.AmountsByCurrency = "allowed", []Money{}
-
-		total := 0
-		for _, o := range overdue {
-			total += o.Count
-			out.AmountsByCurrency = append(
-				out.AmountsByCurrency,
-				Money{AmountMinor: o.AmountMinor, Currency: o.Currency},
-			)
-		}
-
-		out.OverdueInvoiceCount = &total
-	}
-	// energy: actuals only (no baseline) and the IR78 forecast
-	actuals, err := ops.Ask[energy.Actuals](
-		ctx,
-		m.Registry,
-		c,
-		energy.QueryActuals,
-		energy.ActualsInput{UnitIDs: units, From: input.From, To: input.To},
-	)
-	if err != nil {
-		return out, err
 	}
 
-	out.EnergySummary, out.EnergyForecast = &actuals.Summary, actuals.Forecast
-
-	return out, nil
+	return total, amounts, nil
 }
 
 // RegisterAdmin binds admin.summary.

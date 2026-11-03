@@ -31,20 +31,20 @@ func RegisterQueries(r *ops.Registry) {
 		r,
 		ops.DomainEnergy,
 		QueryActuals,
-		func(ctx context.Context, call *ops.Call, in *ActualsInput) (Actuals, error) {
+		func(ctx context.Context, call *ops.Call, input *ActualsInput) (Actuals, error) {
 			f, err := DefaultFactor(ctx, call)
 			if err != nil {
 				return Actuals{}, err
 			}
 
-			s, integ, err := Compute(ctx, call, in.UnitIDs, in.From, in.To, f, nil)
+			energySummary, integ, err := Compute(ctx, call, input.UnitIDs, input.From, input.To, f, nil)
 			if err != nil {
 				return Actuals{}, err
 			}
 
-			fc, err := ForecastFor(ctx, call, in.UnitIDs, in.From, in.To, integ)
+			fc, err := ForecastFor(ctx, call, input.UnitIDs, input.From, input.To, integ)
 
-			return Actuals{Summary: s, Forecast: fc}, err
+			return Actuals{Summary: energySummary, Forecast: fc}, err
 		},
 	)
 }

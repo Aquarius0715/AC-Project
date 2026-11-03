@@ -65,14 +65,14 @@ func roundMinor(myr *big.Rat) *int64 {
 	x := new(big.Rat).Mul(myr, big.NewRat(100, 1))
 	neg := x.Sign() < 0
 	x.Abs(x)
-	q := new(big.Int).Quo(x.Num(), x.Denom())
+	minor := new(big.Int).Quo(x.Num(), x.Denom())
 
-	rem := new(big.Rat).Sub(x, new(big.Rat).SetInt(q))
+	rem := new(big.Rat).Sub(x, new(big.Rat).SetInt(minor))
 	if rem.Cmp(big.NewRat(1, 2)) >= 0 {
-		q.Add(q, big.NewInt(1))
+		minor.Add(minor, big.NewInt(1))
 	}
 
-	v := q.Int64()
+	v := minor.Int64()
 	if neg {
 		v = -v
 	}
@@ -126,7 +126,7 @@ func Compute(
 	call *ops.Call,
 	units []uuid.UUID,
 	from, until time.Time,
-	f *Factor,
+	emissionFactor *Factor,
 	baseline *Baseline,
 ) (Summary, Integration, error) {
 	integration, err := Integrate(ctx, call, units, from, until)
@@ -134,7 +134,7 @@ func Compute(
 		return Summary{}, integration, err
 	}
 
-	s := Summary{
+	out := Summary{
 		Period: Range{
 			from,
 			until,
@@ -163,79 +163,79 @@ func Compute(
 		FactorSnapshot:   nil,
 		Coverage:         nil,
 	}
-	if s.UnitIDs == nil {
-		s.UnitIDs = []uuid.UUID{}
+	if out.UnitIDs == nil {
+		out.UnitIDs = []uuid.UUID{}
 	}
 
 	if integration.ExpectedSlots > 0 {
 		cov := float64(integration.ValidSlots) / float64(integration.ExpectedSlots)
-		s.Coverage = &cov
+		out.Coverage = &cov
 	}
 
 	var factor *big.Rat
 
-	if f != nil {
-		s.FactorRef, s.FactorSnapshot = &Ref{f.ID, f.Version}, f
-		factor = new(big.Rat).SetFloat64(f.KgCO2ePerKWh)
+	if emissionFactor != nil {
+		out.FactorRef, out.FactorSnapshot = &Ref{emissionFactor.ID, emissionFactor.Version}, emissionFactor
+		factor = new(big.Rat).SetFloat64(emissionFactor.KgCO2ePerKWh)
 	} else {
-		s.QualityWarnings = append(s.QualityWarnings, "factor_missing")
+		out.QualityWarnings = append(out.QualityWarnings, "factor_missing")
 	}
 
-	s.Totals.KWh = Float(integration.KWh)
-	s.Totals.AmountMinor = roundMinor(mul(integration.KWh, TariffMYRPerKWh))
+	out.Totals.KWh = Float(integration.KWh)
+	out.Totals.AmountMinor = roundMinor(mul(integration.KWh, TariffMYRPerKWh))
 
-	s.Totals.EmissionsKg = Float(mul(integration.KWh, factor))
+	out.Totals.EmissionsKg = Float(mul(integration.KWh, factor))
 	if baseline != nil {
-		s.BaselineRef, s.BaselineSnapshot = &Ref{baseline.ID, baseline.Version}, baseline
+		out.BaselineRef, out.BaselineSnapshot = &Ref{baseline.ID, baseline.Version}, baseline
 
-		var q struct {
+		var quality struct {
 			Kind     string   `json:"kind"`
 			Coverage *float64 `json:"coverage"`
 		}
 
-		_ = jsonUnmarshal(baseline.Quality, &q)
-		if q.Kind == "modeled" {
-			s.QualityWarnings = append(s.QualityWarnings, "modeled_baseline")
+		_ = jsonUnmarshal(baseline.Quality, &quality)
+		if quality.Kind == "modeled" {
+			out.QualityWarnings = append(out.QualityWarnings, "modeled_baseline")
 		}
 
 		if !Comparable(baseline, units, from, until, integration) {
-			s.QualityWarnings = append(s.QualityWarnings, "baseline_not_comparable")
+			out.QualityWarnings = append(out.QualityWarnings, "baseline_not_comparable")
 		} else {
 			base := new(big.Rat).SetFloat64(*baseline.BaselineKWh)
 			saved := new(big.Rat).Sub(base, integration.KWh)
 
-			s.Totals.SavedKWh, s.Totals.DeltaKWh = Float(saved), Float(new(big.Rat).Neg(saved))
+			out.Totals.SavedKWh, out.Totals.DeltaKWh = Float(saved), Float(new(big.Rat).Neg(saved))
 			if base.Sign() != 0 {
-				s.Totals.SavingPercentage = Float(
+				out.Totals.SavingPercentage = Float(
 					new(big.Rat).Mul(new(big.Rat).Quo(saved, base), big.NewRat(100, 1)),
 				)
 			}
 
-			s.Totals.SavedAmountMinor = roundMinor(mul(saved, TariffMYRPerKWh))
-			s.Totals.SavedEmissionsKg = Float(mul(saved, factor))
+			out.Totals.SavedAmountMinor = roundMinor(mul(saved, TariffMYRPerKWh))
+			out.Totals.SavedEmissionsKg = Float(mul(saved, factor))
 		}
 	}
 
-	s.QualityWarnings = sortedUnique(s.QualityWarnings)
+	out.QualityWarnings = sortedUnique(out.QualityWarnings)
 
-	return s, integration, nil
+	return out, integration, nil
 }
 
 // Comparable applies D07 / SR29: a value, the same unit set, boundary and minute count, actual coverage 1 and a
 // modeled value or measured coverage 1.
-func Comparable(b *Baseline, units []uuid.UUID, from, to time.Time, integration Integration) bool {
-	var q struct {
+func Comparable(baseline *Baseline, units []uuid.UUID, from, to time.Time, integration Integration) bool {
+	var quality struct {
 		Kind     string   `json:"kind"`
 		Coverage *float64 `json:"coverage"`
 	}
 
-	_ = jsonUnmarshal(b.Quality, &q)
+	_ = jsonUnmarshal(baseline.Quality, &quality)
 
-	return b.BaselineKWh != nil && sameSet(b.UnitIDs, units) && b.BoundaryID == Boundary &&
-		b.Period.To.Sub(b.Period.From) == to.Sub(from) &&
+	return baseline.BaselineKWh != nil && sameSet(baseline.UnitIDs, units) && baseline.BoundaryID == Boundary &&
+		baseline.Period.To.Sub(baseline.Period.From) == to.Sub(from) &&
 		integration.ExpectedSlots > 0 &&
 		integration.ValidSlots == integration.ExpectedSlots &&
-		(q.Kind == "modeled" || (q.Coverage != nil && *q.Coverage == 1))
+		(quality.Kind == "modeled" || (quality.Coverage != nil && *quality.Coverage == 1))
 }
 
 // SummaryInput is energy.summary input.
@@ -303,12 +303,12 @@ func (in *SummaryInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/energy/summary [get]
-func summary(ctx context.Context, c *ops.Call, input *SummaryInput) (Summary, error) {
-	if c.Principal.Role == "client" {
+func summary(ctx context.Context, call *ops.Call, input *SummaryInput) (Summary, error) {
+	if call.Principal.Role == "client" {
 		var mine int
 
-		err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id =
-			$2`, input.UnitIDs, c.Principal.OrgID).
+		err := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id =
+			$2`, input.UnitIDs, call.Principal.OrgID).
 			Scan(&mine)
 		if err != nil {
 			return Summary{}, apperr.Wrap(err, "select energy.ref_units")
@@ -321,7 +321,7 @@ func summary(ctx context.Context, c *ops.Call, input *SummaryInput) (Summary, er
 
 	var known int
 
-	err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, input.UnitIDs).
+	err := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, input.UnitIDs).
 		Scan(&known)
 	if err != nil {
 		return Summary{}, apperr.Wrap(err, "select energy.ref_units")
@@ -331,7 +331,7 @@ func summary(ctx context.Context, c *ops.Call, input *SummaryInput) (Summary, er
 		return Summary{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
-	factor, err := DefaultFactor(ctx, c)
+	factor, err := DefaultFactor(ctx, call)
 	if err != nil {
 		return Summary{}, err
 	}
@@ -339,7 +339,7 @@ func summary(ctx context.Context, c *ops.Call, input *SummaryInput) (Summary, er
 	var base *Baseline
 
 	if input.BaselineID != nil {
-		b, err := LoadBaseline(ctx, c, *input.BaselineID, nil)
+		b, err := LoadBaseline(ctx, call, *input.BaselineID, nil)
 		if err != nil {
 			return Summary{}, err
 		}
@@ -347,7 +347,7 @@ func summary(ctx context.Context, c *ops.Call, input *SummaryInput) (Summary, er
 		base = &b
 	}
 
-	s, _, err := Compute(ctx, c, input.UnitIDs, input.From, input.To, factor, base)
+	s, _, err := Compute(ctx, call, input.UnitIDs, input.From, input.To, factor, base)
 
 	return s, err
 }
@@ -435,16 +435,16 @@ func ForecastFor(
 	ids := []uuid.UUID{}
 
 	for rows.Next() {
-		var id uuid.UUID
+		var baselineID uuid.UUID
 
-		err := rows.Scan(&id)
+		err := rows.Scan(&baselineID)
 		if err != nil {
 			rows.Close()
 
 			return forecast, apperr.Wrap(err, "select energy.baselines")
 		}
 
-		ids = append(ids, id)
+		ids = append(ids, baselineID)
 	}
 
 	rows.Close()

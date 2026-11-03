@@ -48,13 +48,13 @@ func (in *ExportInput) Validate() map[string]string {
 		fieldErrs["propertyIds"] = apperr.KeyInvalid
 	}
 
-	ss := map[string]bool{}
+	seenSections := map[string]bool{}
 	for _, s := range in.Sections {
-		if !slices.Contains(sections, s) || ss[s] {
+		if !slices.Contains(sections, s) || seenSections[s] {
 			fieldErrs["sections"] = apperr.KeyInvalid
 		}
 
-		ss[s] = true
+		seenSections[s] = true
 	}
 
 	if len(in.Sections) == 0 {
@@ -113,10 +113,10 @@ func f1(p *float64) string {
 //	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/energy/report [get]
-func exportReport(ctx context.Context, c *ops.Call, input *ExportInput) (ReportFile, error) {
+func exportReport(ctx context.Context, call *ops.Call, input *ExportInput) (ReportFile, error) {
 	tz := "Asia/Kuala_Lumpur"
-	if c.Principal.Timezone != "" { // from identity with the principal (IR189)
-		tz = c.Principal.Timezone
+	if call.Principal.Timezone != "" { // from identity with the principal (IR189)
+		tz = call.Principal.Timezone
 	}
 
 	loc, err := time.LoadLocation(tz)
@@ -127,14 +127,14 @@ func exportReport(ctx context.Context, c *ops.Call, input *ExportInput) (ReportF
 	start, _ := time.ParseInLocation("2006-01", input.Month, loc)
 
 	end := start.AddDate(0, 1, 0)
-	if end.After(c.Now) {
+	if end.After(call.Now) {
 		return ReportFile{}, apperr.Fields(map[string]string{"month": "errors.month_not_ended"})
 	}
 
 	var own int
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_properties WHERE id = ANY($1) AND customer_org_id = $2
-		AND NOT archived`, input.PropertyIDs, c.Principal.OrgID).
+	scanErr := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_properties WHERE id = ANY($1) AND customer_org_id = $2
+		AND NOT archived`, input.PropertyIDs, call.Principal.OrgID).
 		Scan(&own)
 	if scanErr != nil {
 		return ReportFile{}, apperr.Wrap(scanErr, "select energy.ref_properties")
@@ -144,7 +144,7 @@ func exportReport(ctx context.Context, c *ops.Call, input *ExportInput) (ReportF
 		return ReportFile{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
-	rows, err := c.Tx.Query(
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT id FROM energy.ref_units WHERE property_id = ANY($1) AND NOT archived ORDER BY id`,
 		input.PropertyIDs,
@@ -161,12 +161,12 @@ func exportReport(ctx context.Context, c *ops.Call, input *ExportInput) (ReportF
 	var builder strings.Builder
 	builder.WriteString("section,metric,value\n")
 
-	factor, err := DefaultFactor(ctx, c)
+	factor, err := DefaultFactor(ctx, call)
 	if err != nil {
 		return ReportFile{}, err
 	}
 
-	month, _, err := Compute(ctx, c, units, start.UTC(), end.UTC(), factor, nil)
+	month, _, err := Compute(ctx, call, units, start.UTC(), end.UTC(), factor, nil)
 	if err != nil {
 		return ReportFile{}, err
 	}
@@ -188,7 +188,7 @@ func exportReport(ctx context.Context, c *ops.Call, input *ExportInput) (ReportF
 		case "month_comparison":
 			prev, _, err := Compute(
 				ctx,
-				c,
+				call,
 				units,
 				start.AddDate(0, -1, 0).UTC(),
 				start.UTC(),
@@ -208,10 +208,10 @@ func exportReport(ctx context.Context, c *ops.Call, input *ExportInput) (ReportF
 		case "co2_offsets":
 			var retired float64
 
-			err := c.Tx.QueryRow(ctx, `SELECT COALESCE(sum(r.amount_kg), 0)::float8 FROM energy.offset_records r JOIN
+			err := call.Tx.QueryRow(ctx, `SELECT COALESCE(sum(r.amount_kg), 0)::float8 FROM energy.offset_records r JOIN
 				energy.ref_customers cu ON cu.id = r.customer_id
 				WHERE cu.organization_id = $1 AND r.state = 'demo_retired' AND r.updated_at >= $2 AND r.updated_at <
-				$3`, c.Principal.OrgID, start, end).
+				$3`, call.Principal.OrgID, start, end).
 				Scan(&retired)
 			if err != nil {
 				return ReportFile{}, apperr.Wrap(err, "select energy.offset_records")
@@ -226,7 +226,7 @@ func exportReport(ctx context.Context, c *ops.Call, input *ExportInput) (ReportF
 		case "alerts_maintenance":
 			var alerts, jobs int
 
-			err := c.Tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM energy.ref_alerts WHERE unit_id = ANY($1) AND detected_at >=
+			err := call.Tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM energy.ref_alerts WHERE unit_id = ANY($1) AND detected_at >=
 				$2 AND detected_at < $3),
 				(SELECT count(*) FROM energy.ref_jobs WHERE unit_id = ANY($1) AND status = 'completed' AND updated_at >= $2 AND
 				updated_at < $3)`, units, start, end).
@@ -254,7 +254,7 @@ func exportReport(ctx context.Context, c *ops.Call, input *ExportInput) (ReportF
 		FileName:    "energy-report-" + input.Month + "." + input.Format,
 		Mime:        mime,
 		Size:        len(content),
-		GeneratedAt: c.Now,
+		GeneratedAt: call.Now,
 		IsDemo:      true,
 	}, nil
 }

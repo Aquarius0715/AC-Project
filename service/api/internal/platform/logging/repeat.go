@@ -19,14 +19,6 @@ type Repeats struct {
 	repeated int
 }
 
-func (r *Repeats) now() time.Time {
-	if r.Now != nil {
-		return r.Now()
-	}
-
-	return time.Now()
-}
-
 // Failed logs msg unless it repeats the failure logged less than Every ago.
 func (r *Repeats) Failed(msg string) {
 	r.mu.Lock()
@@ -64,4 +56,12 @@ func (r *Repeats) OK(what string) {
 
 	r.Logf("%s recovered", what)
 	r.last, r.repeated = "", 0
+}
+
+func (r *Repeats) now() time.Time {
+	if r.Now != nil {
+		return r.Now()
+	}
+
+	return time.Now()
 }

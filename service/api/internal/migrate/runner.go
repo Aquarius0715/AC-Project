@@ -1,4 +1,4 @@
-// Package runner applies the embedded SQL migrations in version order (database design §9).
+// Package migrate applies the embedded SQL migrations in version order (database design §9).
 // The bookkeeping table is golang-migrate compatible: public.schema_migrations(version bigint, dirty boolean)
 // holding one row, so the golang-migrate CLI can inspect or force the same database.
 package migrate
@@ -25,6 +25,13 @@ const lockKey int64 = 0x41435f6d696772 // "AC_migr"
 const noTxMarker = "-- migrate:no-transaction"
 
 var fileRE = regexp.MustCompile(`^(\d+)_([a-z0-9_]+)\.up\.sql$`)
+
+// The problems Load finds in the migration files.
+var (
+	errBadFileName        = errors.New("bad file name")
+	errVersionNotPositive = errors.New("version must be positive")
+	errVersionUsed        = errors.New("used by")
+)
 
 // Migration is one numbered up migration.
 type Migration struct {
@@ -61,36 +68,38 @@ func Load(fsys fs.FS) ([]Migration, error) {
 			continue
 		}
 
-		m := fileRE.FindStringSubmatch(dirEntry.Name())
-		if m == nil {
+		match := fileRE.FindStringSubmatch(dirEntry.Name())
+		if match == nil {
 			return nil, fmt.Errorf(
-				"migrate: bad file name %q (want NNNNNN_name.up.sql)",
+				"migrate: %w %q (want NNNNNN_name.up.sql)",
+				errBadFileName,
 				dirEntry.Name(),
 			)
 		}
 
-		v, _ := strconv.ParseInt(m[1], 10, 64)
-		if v <= 0 {
-			return nil, fmt.Errorf("migrate: version must be positive in %q", dirEntry.Name())
+		version, _ := strconv.ParseInt(match[1], 10, 64)
+		if version <= 0 {
+			return nil, fmt.Errorf("migrate: %w in %q", errVersionNotPositive, dirEntry.Name())
 		}
 
-		if prev, dup := seen[v]; dup {
+		if prev, dup := seen[version]; dup {
 			return nil, fmt.Errorf(
-				"migrate: version %d used by %q and %q",
-				v,
+				"migrate: version %d %w %q and %q",
+				version,
+				errVersionUsed,
 				prev,
 				dirEntry.Name(),
 			)
 		}
 
-		seen[v] = dirEntry.Name()
+		seen[version] = dirEntry.Name()
 
 		b, err := fs.ReadFile(fsys, dirEntry.Name())
 		if err != nil {
 			return nil, apperr.Wrap(err, "fs.ReadFile")
 		}
 
-		out = append(out, Migration{Version: v, Name: m[2], SQL: string(b)})
+		out = append(out, Migration{Version: version, Name: match[2], SQL: string(b)})
 	}
 
 	sort.Slice(out, func(i, j int) bool { return out[i].Version < out[j].Version })
@@ -106,30 +115,33 @@ func Version(ctx context.Context, conn *pgx.Conn) (int64, bool, error) {
 	}
 
 	var (
-		v     int64
-		dirty bool
+		version int64
+		dirty   bool
 	)
 
 	err := conn.QueryRow(ctx, `SELECT version, dirty FROM public.schema_migrations LIMIT 1`).
-		Scan(&v, &dirty)
+		Scan(&version, &dirty)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, false, nil
 	}
 
-	return v, dirty, apperr.Wrap(err, "select public.schema_migrations")
+	return version, dirty, apperr.Wrap(err, "select public.schema_migrations")
 }
 
 // Up applies every migration newer than the recorded version and returns the versions it applied.
-func Up(ctx context.Context, conn *pgx.Conn, ms []Migration) ([]int64, error) {
+func Up(ctx context.Context, conn *pgx.Conn, available []Migration) ([]int64, error) {
 	_, err := conn.Exec(ctx, `SELECT pg_advisory_lock($1)`, lockKey)
 	if err != nil {
 		return nil, apperr.Wrap(err, "select pg_advisory_lock")
 	}
-	defer conn.Exec(
-		context.WithoutCancel(ctx),
-		`SELECT pg_advisory_unlock($1)`,
-		lockKey,
-	)
+
+	defer func() {
+		_, _ = conn.Exec(
+			context.WithoutCancel(ctx),
+			`SELECT pg_advisory_unlock($1)`,
+			lockKey,
+		)
+	}()
 
 	cur, dirty, err := Version(ctx, conn)
 	if err != nil {
@@ -156,7 +168,7 @@ func Up(ctx context.Context, conn *pgx.Conn, ms []Migration) ([]int64, error) {
 
 	var applied []int64
 
-	for _, migration := range ms {
+	for _, migration := range available {
 		if migration.Version <= cur {
 			continue
 		}
@@ -224,7 +236,7 @@ func apply(ctx context.Context, conn *pgx.Conn, migration Migration) error {
 	}), "transaction")
 }
 
-func setVersion(ctx context.Context, txn pgx.Tx, v int64, dirty bool) error {
+func setVersion(ctx context.Context, txn pgx.Tx, version int64, dirty bool) error {
 	_, execErr := txn.Exec(ctx, `DELETE FROM public.schema_migrations`)
 	if execErr != nil {
 		return apperr.Wrap(execErr, "delete public.schema_migrations")
@@ -233,7 +245,7 @@ func setVersion(ctx context.Context, txn pgx.Tx, v int64, dirty bool) error {
 	_, err := txn.Exec(
 		ctx,
 		`INSERT INTO public.schema_migrations (version, dirty) VALUES ($1, $2)`,
-		v,
+		version,
 		dirty,
 	)
 

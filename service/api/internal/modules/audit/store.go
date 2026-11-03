@@ -93,10 +93,10 @@ func RegisterQueries(r *ops.Registry) {
 // EventHandlers store published audit entries (consumer identity); the entry ID makes a replay a no-op.
 func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
-		events.AuditRecorded: func(ctx context.Context, txn pgx.Tx, e events.Event) error {
+		events.AuditRecorded: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
 			var audit events.Audit
 
-			decodeErr := e.Decode(&audit)
+			decodeErr := event.Decode(&audit)
 			if decodeErr != nil {
 				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
@@ -118,7 +118,7 @@ func EventHandlers() map[string]events.Handler {
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULLIF($14, ''), $15, $16) ON CONFLICT (id,
 				occurred_at) DO NOTHING`,
 				audit.ID,
-				e.TenantID,
+				event.TenantID,
 				audit.ActorID,
 				audit.ActorRole,
 				audit.MembershipID,

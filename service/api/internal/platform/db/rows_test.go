@@ -1,4 +1,4 @@
-package db
+package db_test
 
 import (
 	"go/ast"
@@ -17,6 +17,8 @@ import (
 // result (IR484). Every `for rows.Next()` of the service code must be followed by a rows.Err() check in its function;
 // pgx.CollectRows and pgx.ForEachRow check it themselves.
 func TestRowLoopsCheckErr(t *testing.T) {
+	t.Parallel()
+
 	fset := token.NewFileSet()
 	loops := 0
 
@@ -27,43 +29,10 @@ func TestRowLoopsCheckErr(t *testing.T) {
 				return err
 			}
 
-			f, err := parser.ParseFile(fset, path, nil, 0)
-			if err != nil {
-				return apperr.Wrap(err, "parser.ParseFile")
-			}
+			found, err := checkRowLoops(t, fset, path)
+			loops += found
 
-			ast.Inspect(f, func(n ast.Node) bool {
-				var body *ast.BlockStmt
-
-				switch fn := n.(type) {
-				case *ast.FuncDecl:
-					body = fn.Body
-				case *ast.FuncLit:
-					body = fn.Body
-				}
-
-				if body == nil {
-					return true
-				}
-
-				for _, loop := range rowLoops(body) {
-					loops++
-
-					name := loop.Cond.(*ast.CallExpr).Fun.(*ast.SelectorExpr).X.(*ast.Ident).Name
-					if !errChecked(body, name, loop.End()) {
-						t.Errorf(
-							"%s: the loop over %s.Next() has no %s.Err() check after it",
-							fset.Position(loop.Pos()),
-							name,
-							name,
-						)
-					}
-				}
-
-				return true
-			})
-
-			return nil
+			return err
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -75,20 +44,70 @@ func TestRowLoopsCheckErr(t *testing.T) {
 	}
 }
 
+// checkRowLoops reports each row loop of the file without an Err check after it and returns how many loops it saw.
+func checkRowLoops(t *testing.T, fset *token.FileSet, path string) (int, error) {
+	t.Helper()
+
+	file, err := parser.ParseFile(fset, path, nil, 0)
+	if err != nil {
+		return 0, apperr.Wrap(err, "parser.ParseFile")
+	}
+
+	loops := 0
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		var body *ast.BlockStmt
+
+		switch fn := n.(type) {
+		case *ast.FuncDecl:
+			body = fn.Body
+		case *ast.FuncLit:
+			body = fn.Body
+		}
+
+		if body == nil {
+			return true
+		}
+
+		for _, loop := range rowLoops(body) {
+			loops++
+
+			if !errChecked(body, loop.rows, loop.stmt.End()) {
+				t.Errorf(
+					"%s: the loop over %s.Next() has no %s.Err() check after it",
+					fset.Position(loop.stmt.Pos()),
+					loop.rows,
+					loop.rows,
+				)
+			}
+		}
+
+		return true
+	})
+
+	return loops, nil
+}
+
+// rowLoop is a `for x.Next() { … }` loop and the name of its rows variable x.
+type rowLoop struct {
+	stmt *ast.ForStmt
+	rows string
+}
+
 // rowLoops returns the `for x.Next() { … }` loops of a function body, leaving out its nested function literals
 // (they are checked as functions of their own).
-func rowLoops(body *ast.BlockStmt) []*ast.ForStmt {
-	var out []*ast.ForStmt
+func rowLoops(body *ast.BlockStmt) []rowLoop {
+	var out []rowLoop
 
 	ast.Inspect(body, func(n ast.Node) bool {
-		switch x := n.(type) {
+		switch node := n.(type) {
 		case *ast.FuncLit:
 			return false
 		case *ast.ForStmt:
-			if c, ok := x.Cond.(*ast.CallExpr); ok && len(c.Args) == 0 {
+			if c, ok := node.Cond.(*ast.CallExpr); ok && len(c.Args) == 0 {
 				if s, ok := c.Fun.(*ast.SelectorExpr); ok && s.Sel.Name == "Next" {
-					if _, ok := s.X.(*ast.Ident); ok {
-						out = append(out, x)
+					if id, ok := s.X.(*ast.Ident); ok {
+						out = append(out, rowLoop{stmt: node, rows: id.Name})
 					}
 				}
 			}

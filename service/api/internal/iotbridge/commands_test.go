@@ -1,4 +1,4 @@
-package iotbridge
+package iotbridge_test
 
 import (
 	"encoding/json"
@@ -8,19 +8,20 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/devicesim"
+	"github.com/pradita/ac-project/service/api/internal/iotbridge"
 )
 
 // TestCommandMessageFromTheStoredAction: a stored set-temperature action becomes the module's command with its setpoint
 // and expiry; an action without a kind is refused; the sent report names the command.
 func TestCommandMessageFromTheStoredAction(t *testing.T) {
-	waiting := Waiting{
+	waiting := iotbridge.Waiting{
 		ID:        uuid.MustParse("9f67089f-44c9-5231-ba20-03d3b9a1be53"),
-		DeviceID:  DeviceID("device-online-rto"),
+		DeviceID:  iotbridge.DeviceID("device-online-rto"),
 		Action:    json.RawMessage(`{"kind":"set_temperature","celsius":26}`),
 		ExpiresAt: time.Date(2026, 10, 13, 3, 0, 0, 0, time.UTC), UnitID: uuid.UUID{},
 	}
 
-	cmd, err := CommandMessage(waiting, 0)
+	cmd, err := iotbridge.CommandMessage(waiting, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,19 +35,19 @@ func TestCommandMessageFromTheStoredAction(t *testing.T) {
 
 	waiting.Action = json.RawMessage(`{"celsius":26}`)
 
-	_, commandMessageErr := CommandMessage(waiting, 0)
+	_, commandMessageErr := iotbridge.CommandMessage(waiting, 0)
 	if commandMessageErr == nil {
 		t.Error("an action without a kind is accepted")
 	}
 
-	trigger := SentTrigger(waiting, waiting.ExpiresAt)
+	trigger := iotbridge.SentTrigger(waiting, waiting.ExpiresAt)
 	if trigger.EventType != "command_sent" || trigger.CommandID == nil ||
 		*trigger.CommandID != waiting.ID ||
 		trigger.Measurement != nil {
 		t.Errorf("sent trigger %+v", trigger)
 	}
 
-	if SentTrigger(waiting, waiting.ExpiresAt).EventID != trigger.EventID {
+	if iotbridge.SentTrigger(waiting, waiting.ExpiresAt).EventID != trigger.EventID {
 		t.Error("a repeated report has another event ID")
 	}
 }
@@ -54,9 +55,9 @@ func TestCommandMessageFromTheStoredAction(t *testing.T) {
 // TestCommandTopicOfTheDevice: the command goes down the device's own topic in its tenant.
 func TestCommandTopicOfTheDevice(t *testing.T) {
 	tenant := uuid.MustParse("820cc6b6-9ea8-5d18-8b10-5c8c1d126814")
-	if got, want := CommandTopic(
+	if got, want := iotbridge.CommandTopic(
 		tenant,
-		DeviceID("device-online-rto"),
+		iotbridge.DeviceID("device-online-rto"),
 	), "t/820cc6b6-9ea8-5d18-8b10-5c8c1d126814/d/71f1fdc1-0d2b-516c-8bfa-bd8dfecd338b/cmd"; got != want {
 		t.Errorf("topic %q, want %q", got, want)
 	}
@@ -64,7 +65,7 @@ func TestCommandTopicOfTheDevice(t *testing.T) {
 
 // TestCommandMessageRefusesBadActions: an action that is not JSON is refused with the command named.
 func TestCommandMessageRefusesBadActions(t *testing.T) {
-	waiting := Waiting{
+	waiting := iotbridge.Waiting{
 		ID:        uuid.New(),
 		Action:    json.RawMessage(`{"kind":`),
 		DeviceID:  uuid.UUID{},
@@ -72,7 +73,7 @@ func TestCommandMessageRefusesBadActions(t *testing.T) {
 		ExpiresAt: time.Time{},
 	}
 
-	_, err := CommandMessage(waiting, 0)
+	_, err := iotbridge.CommandMessage(waiting, 0)
 	if err == nil {
 		t.Error("an action that is not JSON is accepted")
 	}
@@ -83,13 +84,13 @@ func TestCommandMessageRefusesBadActions(t *testing.T) {
 func TestCommandExpiryOnTheDeviceClock(t *testing.T) {
 	scenario := time.Date(2026, 9, 14, 22, 0, 30, 0, time.UTC)
 	offset := -29 * 24 * time.Hour // scenario minus real
-	waiting := Waiting{
+	waiting := iotbridge.Waiting{
 		ID:        uuid.New(),
 		Action:    json.RawMessage(`{"kind":"set_temperature","celsius":26}`),
 		ExpiresAt: scenario, DeviceID: uuid.UUID{}, UnitID: uuid.UUID{},
 	}
 
-	cmd, err := CommandMessage(waiting, offset)
+	cmd, err := iotbridge.CommandMessage(waiting, offset)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,10 +105,10 @@ func TestCommandExpiryOnTheDeviceClock(t *testing.T) {
 // is an error.
 func TestStateTriggerFromAHeartbeat(t *testing.T) {
 	on, c := true, 24.0
-	dev := DeviceID("device-mock-cool-on")
+	dev := iotbridge.DeviceID("device-mock-cool-on")
 	when := time.Date(2026, 9, 15, 1, 30, 0, 0, time.UTC)
 
-	trigger, err := StateTrigger(
+	trigger, err := iotbridge.StateTrigger(
 		devicesim.Heartbeat{
 			DeviceID: dev.String(),
 			State: &devicesim.ReportedState{
@@ -129,7 +130,7 @@ func TestStateTriggerFromAHeartbeat(t *testing.T) {
 		t.Fatalf("state trigger %+v err=%v", trigger, err)
 	}
 
-	trigger, err = StateTrigger(
+	trigger, err = iotbridge.StateTrigger(
 		devicesim.Heartbeat{DeviceID: dev.String(), At: time.Time{}, Firmware: "", State: nil},
 		when,
 	)
@@ -139,7 +140,7 @@ func TestStateTriggerFromAHeartbeat(t *testing.T) {
 		t.Errorf("a heartbeat without a state: %+v err=%v", trigger, err)
 	}
 
-	_, stateTriggerErr := StateTrigger(
+	_, stateTriggerErr := iotbridge.StateTrigger(
 		devicesim.Heartbeat{
 			DeviceID: "nope",
 			State:    &devicesim.ReportedState{Power: nil, Celsius: nil, Mode: nil, FanLevel: nil},
