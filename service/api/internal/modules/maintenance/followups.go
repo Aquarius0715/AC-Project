@@ -34,13 +34,15 @@ type FollowUps struct {
 	Warranty WarrantyUnits
 }
 
-// RatingTags are the allowed JobRating tags (DD-C17).
-var RatingTags = []string{
-	"On time",
-	"Clean work",
-	"Explained clearly",
-	"Polite",
-	"Fixed the problem",
+// ratingTags are the allowed JobRating tags (DD-C17).
+func ratingTags() []string {
+	return []string{
+		"On time",
+		"Clean work",
+		"Explained clearly",
+		"Polite",
+		"Fixed the problem",
+	}
 }
 
 // Rating is JobRating.
@@ -71,7 +73,7 @@ func (m FollowUps) lock(ctx context.Context, call *ops.Call, jobID uuid.UUID) (j
 		warranty_claims, version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, jobID).
 		Scan(&state.status, &state.org, &state.unit, &state.completedAt, &state.rating, &state.followUp, &state.claims, &version)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && call.Principal.Role == "client" && state.org != call.Principal.OrgID) {
+		(err == nil && call.Principal.Role == roleClient && state.org != call.Principal.OrgID) {
 		return state, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
@@ -133,7 +135,7 @@ type RateInput struct {
 func (in *RateInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.Stars < 1 || in.Stars > 5 {
@@ -147,7 +149,7 @@ func (in *RateInput) Validate() map[string]string {
 	}
 
 	for _, t := range in.Tags {
-		if !slices.Contains(RatingTags, t) || seen[t] {
+		if !slices.Contains(ratingTags(), t) || seen[t] {
 			fieldErrs["tags"] = apperr.KeyInvalid
 		}
 
@@ -206,7 +208,7 @@ func (m FollowUps) rateJob(ctx context.Context, call *ops.Call, input *RateInput
 		return Job{}, err
 	}
 
-	if state.status != "completed" {
+	if state.status != statusCompleted {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -218,7 +220,7 @@ func (m FollowUps) rateJob(ctx context.Context, call *ops.Call, input *RateInput
 		EditableUntil: call.Now.Add(7 * 24 * time.Hour),
 	}
 
-	first := len(state.rating) == 0 || string(state.rating) == "null"
+	first := len(state.rating) == 0 || string(state.rating) == jsonNull
 	if !first {
 		var prev Rating
 
@@ -270,21 +272,31 @@ type ProblemInput struct {
 	PreferredSlot *Slot       `json:"preferredSlot"`
 }
 
-var problemCodes = map[string]bool{
-	"same_problem":  true,
-	"new_damage":    true,
-	"not_completed": true,
-	"other":         true,
+// problemCodes are the reasons a customer reports a problem with a completed job for (ProblemInput.reasonCode).
+func problemCodes() map[string]bool {
+	return map[string]bool{
+		"same_problem":  true,
+		"new_damage":    true,
+		"not_completed": true,
+		codeOther:       true,
+	}
 }
 
-// ValidBlob checks one image upload (a valid name, JPEG/PNG whose bytes are that type, 1 byte – max bytes, size equal
+// The file types an upload may have: JPEG and PNG photos, and PDF certificate documents.
+const (
+	mimeJPEG = "image/jpeg"
+	mimePNG  = "image/png"
+	mimePDF  = "application/pdf"
+)
+
+// ValidBlob checks one image upload (a valid name, JPEG/PNG whose bytes are that type, 1 byte – maxBytes, size equal
 // to the payload, and a header within the pixel limits).
-func ValidBlob(blobInput BlobInput, max int) bool {
+func ValidBlob(blobInput BlobInput, maxBytes int) bool {
 	return ValidFileName(blobInput.Name) &&
-		(blobInput.Mime == "image/jpeg" || blobInput.Mime == "image/png") &&
+		(blobInput.Mime == mimeJPEG || blobInput.Mime == mimePNG) &&
 		blobInput.Size == len(blobInput.Bytes) &&
 		blobInput.Size >= 1 &&
-		blobInput.Size <= max &&
+		blobInput.Size <= maxBytes &&
 		ContentMatches(blobInput.Mime, blobInput.Bytes) &&
 		ImageSizeOK(blobInput.Mime, blobInput.Bytes)
 }
@@ -339,11 +351,11 @@ func bidiFormat(r rune) bool {
 // of image marker or the PDF header — so a file is stored and served only as what it is (IR308).
 func ContentMatches(mime string, content []byte) bool {
 	switch mime {
-	case "image/png":
+	case mimePNG:
 		return bytes.HasPrefix(content, []byte("\x89PNG\r\n\x1a\n"))
-	case "image/jpeg":
+	case mimeJPEG:
 		return bytes.HasPrefix(content, []byte{0xFF, 0xD8, 0xFF})
-	case "application/pdf":
+	case mimePDF:
 		return bytes.HasPrefix(content, []byte("%PDF-"))
 	}
 
@@ -354,10 +366,10 @@ func ContentMatches(mime string, content []byte) bool {
 func (in *ProblemInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
-	if !problemCodes[in.ReasonCode] {
+	if !problemCodes()[in.ReasonCode] {
 		fieldErrs["reasonCode"] = apperr.KeyInvalid
 	}
 
@@ -425,7 +437,7 @@ func (m FollowUps) reportProblemJob(
 		return Job{}, err
 	}
 
-	if state.status != "completed" || state.completedAt == nil ||
+	if state.status != statusCompleted || state.completedAt == nil ||
 		!call.Now.Before(state.completedAt.Add(7*24*time.Hour)) {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
@@ -540,14 +552,14 @@ type ClassifyInput struct {
 func (in *ClassifyInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.Classification != "rework" && in.Classification != "new_request" {
 		fieldErrs["classification"] = apperr.KeyInvalid
 	}
 
-	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
+	trimmedReason(&in.Reason, 1000, fieldReason, fieldErrs)
 
 	return fieldErrs
 }
@@ -627,6 +639,12 @@ func (m FollowUps) classifyJob(
 
 // ---- jobs.saveCost ----
 
+// The currencies of the amounts of cost lines, warranty claims and rate cards.
+const (
+	currencyMYR = "MYR"
+	currencyUSD = "USD"
+)
+
 // CostLine is CostLine of service-contracts.ts.
 type CostLine struct {
 	AmountMinor int    `json:"amountMinor"`
@@ -646,7 +664,7 @@ type CostInput struct {
 func (in *CostInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.CostLines == nil || len(in.CostLines) > 50 {
@@ -658,11 +676,12 @@ func (in *CostInput) Validate() map[string]string {
 		costLine.Description = strings.TrimSpace(costLine.Description)
 
 		n := utf8.RuneCountInString(costLine.Description)
-		if costLine.AmountMinor < 0 || (costLine.Currency != "MYR" && costLine.Currency != "USD") ||
+		if costLine.AmountMinor < 0 ||
+			(costLine.Currency != currencyMYR && costLine.Currency != currencyUSD) ||
 			(costLine.Kind != "estimate" && costLine.Kind != "actual") ||
 			n < 1 ||
 			n > 200 ||
-			(costLine.Visibility != "internal" && costLine.Visibility != "customer") {
+			(costLine.Visibility != visibilityInternal && costLine.Visibility != visibilityCustomer) {
 			fieldErrs["costLines"] = apperr.KeyInvalid
 		}
 	}
@@ -711,7 +730,7 @@ func (m FollowUps) saveCostJob(ctx context.Context, call *ops.Call, input *CostI
 		return Job{}, err
 	}
 
-	if s.status == "cancelled" {
+	if s.status == statusCancelled {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -738,14 +757,14 @@ type ExtendInput struct {
 func (in *ExtendInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.AccessValidUntil.IsZero() {
 		fieldErrs["accessValidUntil"] = apperr.KeyRequired
 	}
 
-	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
+	trimmedReason(&in.Reason, 1000, fieldReason, fieldErrs)
 
 	return fieldErrs
 }
@@ -867,7 +886,7 @@ type ClaimInput struct {
 func (in *ClaimInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	trimmedReason(&in.PartLabel, 120, "partLabel", fieldErrs)
@@ -876,11 +895,11 @@ func (in *ClaimInput) Validate() map[string]string {
 		fieldErrs["amountMinor"] = apperr.KeyRange
 	}
 
-	if in.Currency != "MYR" && in.Currency != "USD" {
+	if in.Currency != currencyMYR && in.Currency != currencyUSD {
 		fieldErrs["currency"] = apperr.KeyInvalid
 	}
 
-	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
+	trimmedReason(&in.Reason, 1000, fieldReason, fieldErrs)
 
 	return fieldErrs
 }
@@ -943,7 +962,7 @@ func (m FollowUps) recordWarrantyClaimJob(
 		return Job{}, err
 	}
 
-	if state.status != "completed" || state.completedAt == nil {
+	if state.status != statusCompleted || state.completedAt == nil {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -953,7 +972,7 @@ func (m FollowUps) recordWarrantyClaimJob(
 	}
 
 	if end == nil || end.Before(*state.completedAt) {
-		return Job{}, apperr.Fields(map[string]string{"jobId": "errors.outside_warranty"})
+		return Job{}, apperr.Fields(map[string]string{fieldJobID: "errors.outside_warranty"})
 	}
 
 	claims := []WarrantyClaim{}

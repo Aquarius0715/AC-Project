@@ -40,7 +40,7 @@ func (m Workforce) technicians(
 
 	args := []any{call.Now}
 	switch {
-	case call.Principal.Role == "contractor":
+	case call.Principal.Role == roleContractor:
 		stmt += " AND m.organization_id = $2"
 
 		args = append(args, call.Principal.OrgID)
@@ -106,8 +106,8 @@ func decodeTechFilter(query paging.Query) (techFilter, error) {
 	dec.DisallowUnknownFields()
 
 	if dec.Decode(&filter) != nil ||
-		(filter.Qualification != nil && (!certCodes[*filter.Qualification] || *filter.Qualification == "other")) {
-		return filter, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
+		(filter.Qualification != nil && (!certCodes()[*filter.Qualification] || *filter.Qualification == codeOther)) {
+		return filter, apperr.Fields(map[string]string{fieldFilters: apperr.KeyInvalid})
 	}
 
 	return filter, nil
@@ -217,7 +217,7 @@ type EligibleInput struct {
 func (in *EligibleInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if !in.StartAt.Before(in.EndAt) {
@@ -273,7 +273,7 @@ func (m Workforce) eligible(
 	err := call.Tx.QueryRow(ctx, `SELECT unit_id, contractor_org_id FROM maintenance.jobs WHERE id = $1`, input.JobID).
 		Scan(&unit, &contractor)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && call.Principal.Role == "contractor" && (contractor == nil || *contractor != call.Principal.OrgID)) {
+		(err == nil && call.Principal.Role == roleContractor && (contractor == nil || *contractor != call.Principal.OrgID)) {
 		return paging.Page[identity.Member]{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
@@ -300,7 +300,7 @@ func (m Workforce) eligible(
 	out := []identity.Member{}
 
 	for _, member := range techs {
-		isContractor := call.Principal.Role == "contractor"
+		isContractor := call.Principal.Role == roleContractor
 		if m.Delivery.checkTechnician(ctx, call, unit, member.ID, isContractor, nil) != nil ||
 			m.Delivery.checkQualified(ctx, call, unit, member.ID, slot) != nil {
 			continue
@@ -341,9 +341,9 @@ func (m Workforce) eligible(
 		out,
 		input.Query.Sort,
 		map[string]func(a, b identity.Member) int{
-			"id":        func(a, b identity.Member) int { return strings.Compare(a.ID.String(), b.ID.String()) },
-			"createdAt": func(a, b identity.Member) int { return a.CreatedAt.Compare(b.CreatedAt) },
-			"updatedAt": func(a, b identity.Member) int { return a.UpdatedAt.Compare(b.UpdatedAt) },
+			"id":           func(a, b identity.Member) int { return strings.Compare(a.ID.String(), b.ID.String()) },
+			fieldCreatedAt: func(a, b identity.Member) int { return a.CreatedAt.Compare(b.CreatedAt) },
+			fieldUpdatedAt: func(a, b identity.Member) int { return a.UpdatedAt.Compare(b.UpdatedAt) },
 		},
 	)
 	if sortSliceErr != nil {
@@ -593,7 +593,7 @@ var unavailabilityTypes = map[string]bool{
 	"training":       true,
 	"public_holiday": true,
 	"sick":           true,
-	"other":          true,
+	codeOther:        true,
 }
 
 // Validate implements ops.Validator.
@@ -678,7 +678,7 @@ func (m Workforce) setUnavailability(
 		}
 
 		if !found ||
-			(call.Principal.Role == "contractor" && technician.OrgID != call.Principal.OrgID) {
+			(call.Principal.Role == roleContractor && technician.OrgID != call.Principal.OrgID) {
 			return Unavailability{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
@@ -759,7 +759,7 @@ func (m Workforce) setUnavailability(
 			"unavailability",
 			unavailability.ID,
 			"UnavailabilitySet",
-			map[string]any{"organizationId": org},
+			map[string]any{fieldOrganizationID: org},
 		),
 	)
 	call.Audit(
@@ -852,7 +852,7 @@ func (m Workforce) unavailabilityList(
 
 		if dec.Decode(&filters) != nil {
 			return paging.Page[Unavailability]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{fieldFilters: apperr.KeyInvalid},
 			)
 		}
 	}
@@ -865,7 +865,7 @@ func (m Workforce) unavailabilityList(
 	}
 
 	conds := []string{"upper(days) > $1::date"}
-	if call.Principal.Role == "contractor" {
+	if call.Principal.Role == roleContractor {
 		conds = append(conds, "organization_id = "+add(call.Principal.OrgID))
 	}
 
@@ -917,8 +917,8 @@ func (m Workforce) unavailabilityList(
 	}
 
 	sortSliceErr := paging.SortSlice(all, query.Sort, map[string]func(a, b Unavailability) int{
-		"id":   func(a, b Unavailability) int { return strings.Compare(a.ID.String(), b.ID.String()) },
-		"from": func(a, b Unavailability) int { return strings.Compare(a.From, b.From) },
+		"id":      func(a, b Unavailability) int { return strings.Compare(a.ID.String(), b.ID.String()) },
+		fieldFrom: func(a, b Unavailability) int { return strings.Compare(a.From, b.From) },
 	})
 	if sortSliceErr != nil {
 		return paging.Page[Unavailability]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
@@ -944,7 +944,7 @@ func (in *ClearUnavailabilityInput) Validate() map[string]string {
 
 	_, err := time.Parse("2006-01-02", in.From)
 	if err != nil {
-		fieldErrs["from"] = apperr.KeyInvalid
+		fieldErrs[fieldFrom] = apperr.KeyInvalid
 	}
 
 	return fieldErrs
@@ -1001,7 +1001,7 @@ func (m Workforce) clearUnavailability(
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && call.Principal.Role == "contractor" && unavailability.OrganizationID != call.Principal.OrgID) {
+		(err == nil && call.Principal.Role == roleContractor && unavailability.OrganizationID != call.Principal.OrgID) {
 		return UnavailabilityCleared{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
@@ -1015,10 +1015,13 @@ func (m Workforce) clearUnavailability(
 
 	if input.From < call.Now.In(kualaLumpur).Format("2006-01-02") ||
 		input.From > unavailability.To {
-		return UnavailabilityCleared{}, apperr.Fields(map[string]string{"from": apperr.KeyRange})
+		return UnavailabilityCleared{}, apperr.Fields(map[string]string{fieldFrom: apperr.KeyRange})
 	}
 
-	payload := map[string]any{"organizationId": unavailability.OrganizationID, "from": input.From}
+	payload := map[string]any{
+		fieldOrganizationID: unavailability.OrganizationID,
+		fieldFrom:           input.From,
+	}
 	if input.From <= unavailability.From {
 		_, err := call.Tx.Exec(
 			ctx,

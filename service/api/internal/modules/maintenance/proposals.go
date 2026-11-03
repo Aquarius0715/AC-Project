@@ -26,6 +26,15 @@ type Hold struct {
 	TechnicianMembershipID *uuid.UUID `json:"technicianMembershipId"`
 }
 
+// The kinds of a slot hold (SlotHold.kind): an HQ technician, or a contractor with its technician when known.
+const (
+	holdInternal   = "internal"
+	holdContractor = "contractor"
+)
+
+// proposalPending is the status of a slot proposal, and of a contractor's time change, that waits for an answer.
+const proposalPending = "pending"
+
 // Proposals is the IR128 operation set.
 type Proposals struct {
 	Delivery Delivery
@@ -84,9 +93,9 @@ func (m Proposals) checkHold(
 	delivery := m.Delivery
 
 	switch hold.Kind {
-	case "internal":
+	case holdInternal:
 		if hold.MembershipID == nil || hold.ContractorOrgID != nil {
-			return apperr.Fields(map[string]string{"hold": apperr.KeyInvalid})
+			return apperr.Fields(map[string]string{fieldHold: apperr.KeyInvalid})
 		}
 
 		err := delivery.checkTechnician(ctx, call, unit, *hold.MembershipID, false, nil)
@@ -95,9 +104,9 @@ func (m Proposals) checkHold(
 		}
 
 		return delivery.checkQualified(ctx, call, unit, *hold.MembershipID, slot)
-	case "contractor":
+	case holdContractor:
 		if hold.ContractorOrgID == nil || hold.MembershipID != nil {
-			return apperr.Fields(map[string]string{"hold": apperr.KeyInvalid})
+			return apperr.Fields(map[string]string{fieldHold: apperr.KeyInvalid})
 		}
 
 		kind, status, found, err := delivery.Directory.OrgState(ctx, call, *hold.ContractorOrgID)
@@ -105,7 +114,7 @@ func (m Proposals) checkHold(
 			return apperr.Wrap(err, "maintenance.Directory.OrgState")
 		}
 
-		if !found || kind != "contractor" || status != "active" {
+		if !found || kind != orgKindContractor || status != orgStatusActive {
 			return apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
@@ -141,7 +150,7 @@ func (m Proposals) checkHold(
 		return nil
 	}
 
-	return apperr.Fields(map[string]string{"hold": apperr.KeyInvalid})
+	return apperr.Fields(map[string]string{fieldHold: apperr.KeyInvalid})
 }
 
 // ---- jobs.proposeSlot ----
@@ -159,7 +168,7 @@ type ProposeInput struct {
 func (in *ProposeInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	trimmedReason(&in.Message, 1000, "message", fieldErrs)
@@ -219,9 +228,9 @@ func (m Proposals) proposeSlotJob(
 		return Job{}, err
 	}
 
-	allowed := job.status == "requested"
+	allowed := job.status == statusRequested
 	switch job.status {
-	case "offered", "accepted":
+	case statusOffered, statusAccepted:
 		var count int
 
 		err := call.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.partner_slot_proposals p JOIN maintenance.offers o ON
@@ -234,7 +243,7 @@ func (m Proposals) proposeSlotJob(
 		}
 
 		allowed = count > 0
-	case "assigned":
+	case statusAssigned:
 		var ack string // no active assignment: not allowed
 
 		err := call.Tx.QueryRow(ctx, `SELECT acknowledgement FROM maintenance.assignments WHERE job_id = $1 AND status =
@@ -245,7 +254,7 @@ func (m Proposals) proposeSlotJob(
 			return Job{}, apperr.Wrap(err, "select maintenance.assignments")
 		}
 
-		allowed = ack == "cant_make"
+		allowed = ack == ackCantMake
 	}
 
 	if !allowed {
@@ -262,12 +271,12 @@ func (m Proposals) proposeSlotJob(
 	}
 
 	if !PreferredSlotsOK(call.Now, []Slot{input.Slot}) {
-		return Job{}, apperr.Fields(map[string]string{"slot": apperr.KeySlotRules})
+		return Job{}, apperr.Fields(map[string]string{fieldSlot: apperr.KeySlotRules})
 	}
 
 	for _, p := range job.preferred {
 		if sameSlot(p, input.Slot) {
-			return Job{}, apperr.Fields(map[string]string{"slot": "errors.slot_is_preferred"})
+			return Job{}, apperr.Fields(map[string]string{fieldSlot: "errors.slot_is_preferred"})
 		}
 	}
 
@@ -337,7 +346,7 @@ type ProposalRef struct {
 func (in *ProposalRef) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.ProposalID == uuid.Nil {
@@ -407,7 +416,7 @@ func (m Proposals) withdrawProposalJob(
 		return Job{}, apperr.Wrap(err, "select maintenance.slot_proposals")
 	}
 
-	if status != "pending" {
+	if status != proposalPending {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -459,7 +468,7 @@ type RespondInput struct {
 func (in *RespondInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.ProposalID == uuid.Nil {
@@ -467,13 +476,13 @@ func (in *RespondInput) Validate() map[string]string {
 	}
 
 	switch in.Decision {
-	case "accept":
+	case decisionAccept:
 		if in.DeclineReason != nil || in.PreferredSlots != nil {
 			fieldErrs["decision"] = "error.fieldsNotAllowed"
 		}
-	case "decline":
+	case decisionDecline:
 		if in.DeclineReason == nil ||
-			(*in.DeclineReason != "not_home" && *in.DeclineReason != "too_late" && *in.DeclineReason != "other") {
+			(*in.DeclineReason != "not_home" && *in.DeclineReason != "too_late" && *in.DeclineReason != codeOther) {
 			fieldErrs["declineReason"] = apperr.KeyInvalid
 		}
 
@@ -578,7 +587,7 @@ func (m Proposals) respondJob(
 		return Job{}, apperr.Wrap(err, "select maintenance.slot_proposals")
 	}
 
-	if status != "pending" {
+	if status != proposalPending {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -589,7 +598,7 @@ func (m Proposals) respondJob(
 		return Job{}, apperr.Wrap(unmarshalErr, "json.Unmarshal")
 	}
 
-	if input.Decision == "decline" {
+	if input.Decision == decisionDecline {
 		if len(input.PreferredSlots) == 3 && !PreferredSlotsOK(call.Now, input.PreferredSlots) {
 			return Job{}, apperr.Fields(map[string]string{"preferredSlots": apperr.KeySlotRules})
 		}
@@ -692,7 +701,7 @@ func (m Proposals) applyAccepted(
 	slot Slot,
 ) error {
 	d := m.Delivery
-	if hold.Kind == "internal" {
+	if hold.Kind == holdInternal {
 		return d.createAssignment(ctx, call, job, *hold.MembershipID, slot, "proposal accepted")
 	}
 
@@ -827,7 +836,7 @@ type RescheduleInput struct {
 func (in *RescheduleInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if len(in.PreferredSlots) != 3 {
@@ -912,7 +921,7 @@ func (m Proposals) requestRescheduleJob(
 	}
 
 	if origin != "periodic_plan" ||
-		(job.status != "offered" && job.status != "accepted" && job.status != "assigned") {
+		(job.status != statusOffered && job.status != statusAccepted && job.status != statusAssigned) {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -996,14 +1005,14 @@ type PartnerProposeInput struct {
 func (in *PartnerProposeInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil || in.OfferID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.TechnicianMembershipID == uuid.Nil {
 		fieldErrs["technicianMembershipId"] = apperr.KeyRequired
 	}
 
-	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
+	trimmedReason(&in.Reason, 1000, fieldReason, fieldErrs)
 
 	return fieldErrs
 }
@@ -1069,7 +1078,7 @@ func (m Proposals) proposePartnerJob(
 		return Job{}, err
 	}
 
-	if job.status != "offered" || !call.Now.Before(expires) {
+	if job.status != statusOffered || !call.Now.Before(expires) {
 		return Job{}, apperr.E(apperr.Conflict, "errors.offer_expired")
 	}
 
@@ -1088,7 +1097,7 @@ func (m Proposals) proposePartnerJob(
 	}
 
 	if !PreferredSlotsOK(call.Now, []Slot{input.Slot}) {
-		return Job{}, apperr.Fields(map[string]string{"slot": apperr.KeySlotRules})
+		return Job{}, apperr.Fields(map[string]string{fieldSlot: apperr.KeySlotRules})
 	}
 
 	checkTechnicianErr := m.Delivery.checkTechnician(
@@ -1225,7 +1234,7 @@ func (m Proposals) withdrawPartnerJob(
 		return Job{}, lockErr
 	}
 
-	if status != "pending" {
+	if status != proposalPending {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -1338,7 +1347,7 @@ func (m Proposals) resolvePartnerJob(
 		return Job{}, lockErr
 	}
 
-	if status != "pending" {
+	if status != proposalPending {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -1359,7 +1368,7 @@ func (m Proposals) resolvePartnerJob(
 		}
 
 		hold := Hold{
-			Kind:                   "contractor",
+			Kind:                   holdContractor,
 			ContractorOrgID:        &org,
 			TechnicianMembershipID: &tech,
 			MembershipID:           nil,

@@ -175,12 +175,12 @@ func (m Partners) kpis(ctx context.Context, call *ops.Call, org uuid.UUID) (KPIs
 		if metric.firstReview != "" {
 			firstSub++
 
-			if metric.firstReview == "accept" {
+			if metric.firstReview == decisionAccept {
 				firstOK++
 			}
 		}
 
-		if metric.status == "completed" {
+		if metric.status == statusCompleted {
 			completed++
 
 			if metric.reworkFollowUp {
@@ -303,7 +303,7 @@ func (m Partners) loadProfile(
 ) (Profile, error) {
 	q := "SELECT " + profileCols + " FROM maintenance.contractors p WHERE " + where
 	if lock {
-		q += " FOR UPDATE"
+		q += forUpdate
 	}
 
 	profile, err := scanProfile(call.Tx.QueryRow(ctx, q, append([]any{call.Now}, args...)...))
@@ -362,16 +362,16 @@ func (m Partners) list(
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&filters) != nil ||
-			(filters.Status != nil && *filters.Status != "active" && *filters.Status != "suspended") {
+			(filters.Status != nil && *filters.Status != contractorActive && *filters.Status != contractorSuspended) {
 			return paging.Page[Profile]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{fieldFilters: apperr.KeyInvalid},
 			)
 		}
 	}
 
 	order, err := paging.OrderBy(
 		query.Sort,
-		map[string]string{"id": "p.id", "name": "p.name", "updatedAt": "p.updated_at"},
+		map[string]string{"id": "p.id", fieldName: "p.name", fieldUpdatedAt: "p.updated_at"},
 		"p.name ASC, p.id ASC",
 	)
 	if err != nil {
@@ -384,7 +384,7 @@ func (m Partners) list(
 	}
 
 	args := []any{call.Now}
-	conds := []string{"TRUE"}
+	conds := []string{sqlTrue}
 
 	if filters.Status != nil {
 		args = append(args, *filters.Status)
@@ -481,7 +481,7 @@ type ProfileInput struct {
 func (in *ProfileInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.OrganizationID == uuid.Nil {
-		fieldErrs["organizationId"] = apperr.KeyRequired
+		fieldErrs[fieldOrganizationID] = apperr.KeyRequired
 	}
 
 	trimmedReason(&in.RegistrationNo, 64, "registrationNo", fieldErrs)
@@ -551,8 +551,10 @@ func (m Partners) save(ctx context.Context, call *ops.Call, input *ProfileInput)
 		return Profile{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
-	if kind != "contractor" {
-		return Profile{}, apperr.Fields(map[string]string{"organizationId": "error.notContractor"})
+	if kind != orgKindContractor {
+		return Profile{}, apperr.Fields(
+			map[string]string{fieldOrganizationID: "error.notContractor"},
+		)
 	}
 
 	name, err := m.Orgs.OrgName(ctx, call, input.OrganizationID)
@@ -604,7 +606,7 @@ func (m Partners) save(ctx context.Context, call *ops.Call, input *ProfileInput)
 
 		if profile.OrganizationID != input.OrganizationID {
 			return profile, apperr.Fields(
-				map[string]string{"organizationId": "error.organizationFixed"},
+				map[string]string{fieldOrganizationID: "error.organizationFixed"},
 			)
 		}
 
@@ -643,7 +645,7 @@ func (m Partners) save(ctx context.Context, call *ops.Call, input *ProfileInput)
 			"contractor",
 			profileID,
 			"ContractorSaved",
-			map[string]any{"organizationId": input.OrganizationID},
+			map[string]any{fieldOrganizationID: input.OrganizationID},
 		),
 	)
 	call.Audit(
@@ -660,6 +662,12 @@ func (m Partners) save(ctx context.Context, call *ops.Call, input *ProfileInput)
 	return saved, nil
 }
 
+// The offer statuses of a contractor profile: an active contractor is offered jobs, a suspended one is not.
+const (
+	contractorActive    = "active"
+	contractorSuspended = "suspended"
+)
+
 // OfferStatusInput is contractors.setOfferStatus input.
 type OfferStatusInput struct {
 	ContractorOrgID uuid.UUID `json:"contractorOrgId"`
@@ -674,11 +682,11 @@ func (in *OfferStatusInput) Validate() map[string]string {
 		fieldErrs["contractorOrgId"] = apperr.KeyRequired
 	}
 
-	if in.Status != "active" && in.Status != "suspended" {
-		fieldErrs["status"] = apperr.KeyInvalid
+	if in.Status != contractorActive && in.Status != contractorSuspended {
+		fieldErrs[fieldStatus] = apperr.KeyInvalid
 	}
 
-	trimmedReason(&in.Reason, 1000, "reason", fieldErrs)
+	trimmedReason(&in.Reason, 1000, fieldReason, fieldErrs)
 
 	return fieldErrs
 }
@@ -735,7 +743,7 @@ func (m Partners) setOfferStatus(
 	}
 
 	var reason *string
-	if input.Status == "suspended" {
+	if input.Status == contractorSuspended {
 		reason = &input.Reason
 	}
 
@@ -762,7 +770,7 @@ func (m Partners) setOfferStatus(
 			"contractor",
 			profile.ID,
 			"ContractorOfferStatusChanged",
-			map[string]any{"status": input.Status},
+			map[string]any{fieldStatus: input.Status},
 		),
 	)
 	call.Audit(
@@ -819,10 +827,10 @@ func (in *RateCardInput) Validate() map[string]string {
 	}
 
 	if in.EffectiveFrom.IsZero() {
-		fieldErrs["effectiveFrom"] = apperr.KeyRequired
+		fieldErrs[fieldEffectiveFrom] = apperr.KeyRequired
 	}
 
-	if in.Currency != "MYR" && in.Currency != "USD" {
+	if in.Currency != currencyMYR && in.Currency != currencyUSD {
 		fieldErrs["currency"] = apperr.KeyInvalid
 	}
 
@@ -913,7 +921,7 @@ func (m Partners) saveRateCard(
 	input *RateCardInput,
 ) (RateCard, error) {
 	if !input.EffectiveFrom.After(call.Now) {
-		return RateCard{}, apperr.Fields(map[string]string{"effectiveFrom": apperr.KeyPast})
+		return RateCard{}, apperr.Fields(map[string]string{fieldEffectiveFrom: apperr.KeyPast})
 	}
 
 	var exists bool
@@ -1005,18 +1013,22 @@ func (m Partners) listRateCards(
 
 		if dec.Decode(&filters) != nil {
 			return paging.Page[RateCard]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{fieldFilters: apperr.KeyInvalid},
 			)
 		}
 	}
 
-	if call.Principal.Role == "contractor" {
+	if call.Principal.Role == roleContractor {
 		filters.ContractorOrgID = &call.Principal.OrgID
 	}
 
 	order, err := paging.OrderBy(
 		query.Sort,
-		map[string]string{"id": "id", "createdAt": "created_at", "effectiveFrom": "effective_from"},
+		map[string]string{
+			"id":               "id",
+			fieldCreatedAt:     "created_at",
+			fieldEffectiveFrom: "effective_from",
+		},
 		"effective_from DESC, id",
 	)
 	if err != nil {
@@ -1028,7 +1040,7 @@ func (m Partners) listRateCards(
 		return paging.Page[RateCard]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	where, args := "TRUE", []any{}
+	where, args := sqlTrue, []any{}
 	if filters.ContractorOrgID != nil {
 		where, args = "contractor_org_id = $1", append(args, *filters.ContractorOrgID)
 	}
@@ -1078,20 +1090,38 @@ func (m Partners) listRateCards(
 
 // ---- SLA ----
 
-var planTypes = []string{"rto", "general", "energy", "environment"}
+// The service profiles the SLA targets are set for (SlaTargets.planType).
+const (
+	planRTO         = "rto"
+	planGeneral     = "general"
+	planEnergy      = "energy"
+	planEnvironment = "environment"
+)
 
-// DefaultSLA is the target used when no SlaTargets row applies (IR131 item 4).
-var DefaultSLA = SlaTargets{
-	ResponseHours:          4,
-	ArrivalInWindowPercent: 90,
-	FirstTimeFixPercent:    85,
-	ID:                     uuid.UUID{},
-	TenantID:               uuid.UUID{},
-	Version:                0,
-	CreatedAt:              time.Time{},
-	UpdatedAt:              time.Time{},
-	PlanType:               "",
-	EffectiveFrom:          time.Time{},
+// planTypes lists the service profiles in the order the target views show them.
+func planTypes() []string { return []string{planRTO, planGeneral, planEnergy, planEnvironment} }
+
+// The default targets of IR131 item 4.
+const (
+	defaultResponseHours          = 4
+	defaultArrivalInWindowPercent = 90
+	defaultFirstTimeFixPercent    = 85
+)
+
+// defaultSLA is the target used when no SlaTargets row applies (IR131 item 4).
+func defaultSLA() SlaTargets {
+	return SlaTargets{
+		ResponseHours:          defaultResponseHours,
+		ArrivalInWindowPercent: defaultArrivalInWindowPercent,
+		FirstTimeFixPercent:    defaultFirstTimeFixPercent,
+		ID:                     uuid.UUID{},
+		TenantID:               uuid.UUID{},
+		Version:                0,
+		CreatedAt:              time.Time{},
+		UpdatedAt:              time.Time{},
+		PlanType:               "",
+		EffectiveFrom:          time.Time{},
+	}
 }
 
 // SlaTargets is SlaTargets of service-contracts.ts.
@@ -1120,7 +1150,7 @@ type TargetsInput struct {
 // Validate implements ops.Validator (IR111).
 func (in *TargetsInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
-	if !slices.Contains(planTypes, in.PlanType) {
+	if !slices.Contains(planTypes(), in.PlanType) {
 		fieldErrs["planType"] = apperr.KeyInvalid
 	}
 
@@ -1137,7 +1167,7 @@ func (in *TargetsInput) Validate() map[string]string {
 	}
 
 	if in.EffectiveFrom.IsZero() {
-		fieldErrs["effectiveFrom"] = apperr.KeyRequired
+		fieldErrs[fieldEffectiveFrom] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -1175,7 +1205,7 @@ func (m Partners) saveTargets(
 	input *TargetsInput,
 ) (SlaTargets, error) {
 	if input.EffectiveFrom.Before(call.Now) {
-		return SlaTargets{}, apperr.Fields(map[string]string{"effectiveFrom": apperr.KeyPast})
+		return SlaTargets{}, apperr.Fields(map[string]string{fieldEffectiveFrom: apperr.KeyPast})
 	}
 
 	var slaTargets SlaTargets
@@ -1216,7 +1246,7 @@ func (m Partners) saveTargets(
 
 // targetFor returns the SLA target for a plan type at a job's creation (IR131 item 4).
 func targetFor(all []SlaTargets, plan string, at time.Time) SlaTargets {
-	best := DefaultSLA
+	best := defaultSLA()
 
 	var bestAt *time.Time
 	for _, t := range all {
@@ -1229,6 +1259,14 @@ func targetFor(all []SlaTargets, plan string, at time.Time) SlaTargets {
 
 	return best
 }
+
+// The states of a target view (SlaTargetView.state, IR236): a saved row in effect, the IR131 default in effect, or a
+// saved row that starts later.
+const (
+	targetsInEffect  = "in_effect"
+	targetsDefault   = "default"
+	targetsScheduled = "scheduled"
+)
 
 // targetViews lists, per plan type, the targets in effect at now (a saved row, or the default with no version) and then
 // the saved rows that start later, earliest first (IR236).
@@ -1243,7 +1281,7 @@ func targetViews(all []SlaTargets, now time.Time) []TargetView {
 			Version:                slaTargets.Version,
 			State:                  state, EffectiveFrom: nil,
 		}
-		if state != "default" {
+		if state != targetsDefault {
 			e := slaTargets.EffectiveFrom
 			targetView.EffectiveFrom = &e
 		}
@@ -1251,13 +1289,13 @@ func targetViews(all []SlaTargets, now time.Time) []TargetView {
 		return targetView
 	}
 
-	for _, plan := range planTypes {
+	for _, plan := range planTypes() {
 		cur := targetFor(all, plan, now)
 		if cur.EffectiveFrom.IsZero() {
 			cur.PlanType = plan
-			out = append(out, view(cur, "default"))
+			out = append(out, view(cur, targetsDefault))
 		} else {
-			out = append(out, view(cur, "in_effect"))
+			out = append(out, view(cur, targetsInEffect))
 		}
 	}
 
@@ -1275,7 +1313,7 @@ func targetViews(all []SlaTargets, now time.Time) []TargetView {
 	)
 
 	for _, t := range later {
-		out = append(out, view(t, "scheduled"))
+		out = append(out, view(t, targetsScheduled))
 	}
 
 	return out
@@ -1412,7 +1450,7 @@ func (m Partners) scorecard(
 	call *ops.Call,
 	input *ScorecardInput,
 ) (Scorecard, error) {
-	extra, args := "TRUE", []any{input.Period.From, input.Period.To}
+	extra, args := sqlTrue, []any{input.Period.From, input.Period.To}
 	if input.ContractorOrgID != nil {
 		extra, args = "j.contractor_org_id = $3", append(args, *input.ContractorOrgID)
 	}
@@ -1613,7 +1651,7 @@ func (m Partners) scorecard(
 			}
 		}
 
-		if metric.status == "completed" {
+		if metric.status == statusCompleted {
 			fixedFirstTime := !metric.everReturned && !metric.followUpWithin30
 
 			for _, t := range []*tally{total, per[cust]} {
@@ -1645,7 +1683,7 @@ func (m Partners) scorecard(
 			}
 		}
 
-		if metric.status != "completed" && metric.status != "cancelled" &&
+		if metric.status != statusCompleted && metric.status != statusCancelled &&
 			call.Now.After(metric.dueAt) {
 			for _, t := range []*tally{total, per[cust]} {
 				t.overdue++
@@ -1694,21 +1732,28 @@ func (m Partners) scorecard(
 	return out, nil
 }
 
+// The SLA standings of a customer (CustomerMetrics.status, DD-A22).
+const (
+	slaOnTrack  = "on_track"
+	slaAtRisk   = "at_risk"
+	slaBreached = "breached"
+)
+
 // customerStatus is a customer's SLA standing (DD-A22): every response is due within the plan's hours, so the response
 // share is held to 100 %, arrival in window and first-time fix to the plan's targets. A share at or above its target
 // is on track; up to 10 points below is at risk, more than 10 below — or any open overdue job — is breached. A share
 // without jobs to measure says nothing.
 func customerStatus(metrics Metrics, tgt SlaTargets) string {
-	status := "on_track"
+	status := slaOnTrack
 	check := func(v *float64, target float64) {
 		if v == nil || *v >= target {
 			return
 		}
 
 		if target-*v > 10 {
-			status = "breached"
-		} else if status != "breached" {
-			status = "at_risk"
+			status = slaBreached
+		} else if status != slaBreached {
+			status = slaAtRisk
 		}
 	}
 	check(metrics.ResponseWithinTarget, 100)
@@ -1716,7 +1761,7 @@ func customerStatus(metrics Metrics, tgt SlaTargets) string {
 	check(metrics.FirstTimeFix, tgt.FirstTimeFixPercent)
 
 	if metrics.OpenOverdue > 0 {
-		status = "breached"
+		status = slaBreached
 	}
 
 	return status

@@ -72,6 +72,18 @@ type FilterStatus struct {
 	Status                string     `json:"status"`
 }
 
+// The filter statuses of a unit (FilterCareStatus.status), from unknown (no run time and no cleaning) to overdue.
+const (
+	filterUnknown = "unknown"
+	filterOK      = "ok"
+	filterDueSoon = "due_soon"
+	filterOverdue = "overdue"
+)
+
+// recipientsOwners sends the cleaning reminders to the customer's owners only (FilterCareSettings.recipients); the
+// other choice is all_users.
+const recipientsOwners = "owners"
+
 func (m FilterCare) settings(
 	ctx context.Context,
 	call *ops.Call,
@@ -82,7 +94,7 @@ func (m FilterCare) settings(
 		Version:      0,
 		CustomerID:   customer,
 		FallbackDays: 30,
-		Recipients:   "owners",
+		Recipients:   recipientsOwners,
 		Channels: []string{
 			"inApp",
 		},
@@ -116,7 +128,7 @@ func (m FilterCare) status(
 		UnitID:                unitBrief.ID,
 		ThresholdHours:        DefaultFilterHours,
 		FallbackDays:          set.FallbackDays,
-		Status:                "unknown",
+		Status:                filterUnknown,
 		RunHoursSinceCleaning: nil,
 		LastCleanedAt:         nil,
 		LastCleanedBy:         nil,
@@ -183,17 +195,20 @@ func (m FilterCare) status(
 
 	switch {
 	case ratio >= 1:
-		filterStatus.Status = "overdue"
+		filterStatus.Status = filterOverdue
 	case ratio >= 0.8:
-		filterStatus.Status = "due_soon"
+		filterStatus.Status = filterDueSoon
 	case ratio >= 0:
-		filterStatus.Status = "ok"
+		filterStatus.Status = filterOK
 	}
 
 	return filterStatus, nil
 }
 
-var filterRank = map[string]int{"unknown": 0, "ok": 1, "due_soon": 2, "overdue": 3}
+// filterRank orders the filter statuses for the status sort, unknown first.
+func filterRank() map[string]int {
+	return map[string]int{filterUnknown: 0, filterOK: 1, filterDueSoon: 2, filterOverdue: 3}
+}
 
 // list serves filterCare.list.
 //
@@ -244,9 +259,9 @@ func (m FilterCare) list(
 		dec.DisallowUnknownFields()
 
 		if dec.Decode(&filters) != nil ||
-			(filters.Status != nil && filterRank[*filters.Status] == 0 && *filters.Status != "unknown") {
+			(filters.Status != nil && filterRank()[*filters.Status] == 0 && *filters.Status != filterUnknown) {
 			return paging.Page[FilterStatus]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{fieldFilters: apperr.KeyInvalid},
 			)
 		}
 	}
@@ -254,13 +269,13 @@ func (m FilterCare) list(
 	desc := true
 
 	if query.Sort != nil {
-		if query.Sort.Field != "status" && query.Sort.Field != "id" {
+		if query.Sort.Field != fieldStatus && query.Sort.Field != "id" {
 			return paging.Page[FilterStatus]{}, apperr.Fields(
 				map[string]string{"sort.field": apperr.KeyInvalid},
 			)
 		}
 
-		desc = query.Sort.Direction == "desc"
+		desc = query.Sort.Direction == sortDesc
 	}
 
 	units, err := m.Units.BriefUnits(
@@ -308,8 +323,8 @@ func (m FilterCare) list(
 	}
 
 	sort.SliceStable(out, func(left, right int) bool {
-		if query.Sort == nil || query.Sort.Field == "status" {
-			if a, b := filterRank[out[left].Status], filterRank[out[right].Status]; a != b {
+		if query.Sort == nil || query.Sort.Field == fieldStatus {
+			if a, b := filterRank()[out[left].Status], filterRank()[out[right].Status]; a != b {
 				return (a > b) == desc
 			}
 		}
@@ -333,7 +348,7 @@ type MarkInput struct {
 // Validate implements ops.Validator.
 func (in *MarkInput) Validate() map[string]string {
 	if in.UnitID == uuid.Nil {
-		return map[string]string{"unitId": apperr.KeyRequired}
+		return map[string]string{fieldUnitID: apperr.KeyRequired}
 	}
 
 	return nil
@@ -379,7 +394,7 @@ func (m FilterCare) markCleaned(
 	}
 
 	if archived {
-		return FilterStatus{}, apperr.Fields(map[string]string{"unitId": apperr.KeyUnitArchived})
+		return FilterStatus{}, apperr.Fields(map[string]string{fieldUnitID: apperr.KeyUnitArchived})
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -449,7 +464,7 @@ func (in *SettingsInput) Validate() map[string]string {
 		fieldErrs["fallbackDays"] = apperr.KeyRange
 	}
 
-	if in.Recipients != "owners" && in.Recipients != "all_users" {
+	if in.Recipients != recipientsOwners && in.Recipients != "all_users" {
 		fieldErrs["recipients"] = apperr.KeyInvalid
 	}
 
@@ -671,7 +686,7 @@ func (m FilterCare) Remind(ctx context.Context, call *ops.Call) (int, error) {
 			return count, err
 		}
 
-		if filterStatus.Status == "overdue" {
+		if filterStatus.Status == filterOverdue {
 			k, err := remind(ctx, call, unitBrief, set, filterStatus)
 			if count += k; err != nil {
 				return count, err
@@ -750,13 +765,13 @@ func remind(
 	}
 
 	membersInput := identity.MembersInput{
-		Role:           "client",
+		Role:           roleClient,
 		OrganizationID: &unitBrief.OrgID,
 		IDs:            nil,
 		Permission:     "",
 		ClientRole:     "",
 	}
-	if set.Recipients == "owners" {
+	if set.Recipients == recipientsOwners {
 		membersInput.ClientRole = "owner"
 	}
 
@@ -777,9 +792,9 @@ func remind(
 				TemplateKey:           "alert",
 				TargetKind:            "unit",
 				TargetID:              unitBrief.ID,
-				Severity:              "normal",
+				Severity:              severityNormal,
 				SourceAlertID:         &alertID,
-				Params:                map[string]any{"status": "open", "message": evidence},
+				Params:                map[string]any{fieldStatus: "open", "message": evidence},
 			})
 			if err != nil {
 				return 0, apperr.Wrap(err, "notify.Store.Create")

@@ -132,7 +132,7 @@ func (m Plans) load(
 ) (Plan, error) {
 	q := "SELECT " + planCols + " FROM maintenance.plans p WHERE p.id = $1"
 	if lock {
-		q += " FOR UPDATE"
+		q += forUpdate
 	}
 
 	plan, err := scanPlan(call.Tx.QueryRow(ctx, q, planID))
@@ -257,14 +257,18 @@ func (m Plans) list(
 
 		if dec.Decode(&filters) != nil {
 			return paging.Page[Plan]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{fieldFilters: apperr.KeyInvalid},
 			)
 		}
 	}
 
 	order, err := paging.OrderBy(
 		query.Sort,
-		map[string]string{"id": "p.id", "createdAt": "p.created_at", "updatedAt": "p.updated_at"},
+		map[string]string{
+			"id":           "p.id",
+			fieldCreatedAt: "p.created_at",
+			fieldUpdatedAt: "p.updated_at",
+		},
 		"p.id ASC",
 	)
 	if err != nil {
@@ -284,7 +288,7 @@ func (m Plans) list(
 		return fmt.Sprintf("$%d", len(args))
 	}
 
-	conds := []string{"TRUE"}
+	conds := []string{sqlTrue}
 	if filters.UnitID != nil {
 		conds = append(conds, "p.unit_id = "+add(*filters.UnitID))
 	}
@@ -388,7 +392,7 @@ type PlanSaveInput struct {
 func (in *PlanSaveInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.UnitID == uuid.Nil {
-		fieldErrs["unitId"] = apperr.KeyRequired
+		fieldErrs[fieldUnitID] = apperr.KeyRequired
 	}
 
 	if in.Recurrence.Kind != "monthly" || in.Recurrence.IntervalMonths < 1 ||
@@ -442,7 +446,7 @@ func (m Plans) save(ctx context.Context, call *ops.Call, input *PlanSaveInput) (
 	}
 
 	if archived {
-		return Plan{}, apperr.Fields(map[string]string{"unitId": apperr.KeyUnitArchived})
+		return Plan{}, apperr.Fields(map[string]string{fieldUnitID: apperr.KeyUnitArchived})
 	}
 
 	next := input.NextDueAt.UTC()
@@ -467,7 +471,7 @@ func (m Plans) save(ctx context.Context, call *ops.Call, input *PlanSaveInput) (
 		}
 
 		if plan.UnitID != input.UnitID {
-			return plan, apperr.Fields(map[string]string{"unitId": "error.unitFixed"})
+			return plan, apperr.Fields(map[string]string{fieldUnitID: "error.unitFixed"})
 		}
 
 		if plan.Version != *call.ExpectedVersion {
@@ -501,7 +505,7 @@ func (m Plans) save(ctx context.Context, call *ops.Call, input *PlanSaveInput) (
 		return saved, err
 	}
 
-	call.Emit(outboxEvent("plan", planID, event, map[string]any{"unitId": saved.UnitID}))
+	call.Emit(outboxEvent("plan", planID, event, map[string]any{fieldUnitID: saved.UnitID}))
 	call.Audit(auditEntry("plans.save", "plan", planID, call.ExpectedVersion, &saved.Version, ""))
 
 	return saved, nil
@@ -644,7 +648,7 @@ func (m Plans) generateNextJob(
 			"plan",
 			plan.ID,
 			"PlanOccurrenceGenerated",
-			map[string]any{"jobId": jobID, "occurrenceAt": start},
+			map[string]any{fieldJobID: jobID, "occurrenceAt": start},
 		),
 	)
 	call.Audit(

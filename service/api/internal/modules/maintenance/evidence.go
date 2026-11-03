@@ -48,7 +48,7 @@ func (in *ListAttachmentsInput) Validate() map[string]string {
 
 	switch {
 	case in.From.IsZero():
-		fieldErrs["from"] = apperr.KeyRequired
+		fieldErrs[fieldFrom] = apperr.KeyRequired
 	case in.To.IsZero():
 		fieldErrs["to"] = apperr.KeyRequired
 	case !in.To.After(in.From) || in.To.Sub(in.From) > 366*24*time.Hour:
@@ -159,13 +159,13 @@ func (m Files) list(
 
 	sort := input.Query.Sort
 	if sort == nil {
-		sort = &paging.SortSpec{Field: "createdAt", Direction: "desc"}
+		sort = &paging.SortSpec{Field: fieldCreatedAt, Direction: sortDesc}
 	}
 
 	sortSliceErr := paging.SortSlice(all, sort, map[string]func(x, y EvidenceAttachment) int{
-		"id":        func(x, y EvidenceAttachment) int { return strings.Compare(x.ID.String(), y.ID.String()) },
-		"createdAt": func(x, y EvidenceAttachment) int { return x.CreatedAt.Compare(y.CreatedAt) },
-		"name": func(x, y EvidenceAttachment) int {
+		"id":           func(x, y EvidenceAttachment) int { return strings.Compare(x.ID.String(), y.ID.String()) },
+		fieldCreatedAt: func(x, y EvidenceAttachment) int { return x.CreatedAt.Compare(y.CreatedAt) },
+		fieldName: func(x, y EvidenceAttachment) int {
 			return strings.Compare(strings.ToLower(x.Name), strings.ToLower(y.Name))
 		},
 	})

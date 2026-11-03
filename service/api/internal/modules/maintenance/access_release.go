@@ -157,9 +157,9 @@ func releaseAssignment(
 		return apperr.Wrap(err, "update maintenance.assignments")
 	}
 
-	status := "requested" // HQ's own delivery assigns from requested
+	status := statusRequested // HQ's own delivery assigns from requested
 	if target.contractor != nil {
-		status = "accepted" // the contractor assigns again on its accepted offer
+		status = statusAccepted // the contractor assigns again on its accepted offer
 	}
 
 	_, err = call.Tx.Exec(
@@ -186,7 +186,7 @@ func releaseAssignment(
 	}
 
 	input := identity.MembersInput{
-		Role:           "admin",
+		Role:           roleAdmin,
 		Permission:     "job.write",
 		IDs:            nil,
 		OrganizationID: nil,
@@ -194,7 +194,7 @@ func releaseAssignment(
 	}
 	if target.contractor != nil {
 		input = identity.MembersInput{
-			Role:           "contractor",
+			Role:           roleContractor,
 			OrganizationID: target.contractor,
 			Permission:     "partner.assign", IDs: nil, ClientRole: "",
 		}
@@ -212,10 +212,10 @@ func releaseAssignment(
 			TemplateKey:           "job_update",
 			TargetKind:            "job",
 			TargetID:              target.job,
-			Severity:              "warning",
+			Severity:              severityWarning,
 			Params: map[string]any{
-				"status": status,
-				"reason": why.notice,
+				fieldStatus: status,
+				fieldReason: why.notice,
 			},
 			Channel:       "",
 			SourceAlertID: nil,

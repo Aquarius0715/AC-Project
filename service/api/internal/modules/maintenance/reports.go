@@ -142,6 +142,12 @@ type NextAction struct {
 	Note *string    `json:"note,omitempty"`
 }
 
+// The kinds of a next action: none, or a follow-up with a date and a note.
+const (
+	nextActionNone     = "none"
+	nextActionFollowUp = "follow_up"
+)
+
 // Review is Review.
 type Review struct {
 	ReviewerUserID uuid.UUID `json:"reviewerUserId"`
@@ -190,6 +196,18 @@ type Report struct {
 	ReviewHistory      []Review            `json:"reviewHistory"`
 	State              string              `json:"-"`
 }
+
+// The states of a work report version: the draft being written, submitted for review, and accepted or returned by
+// it.
+const (
+	reportDraft     = "draft"
+	reportSubmitted = "submitted"
+	reportAccepted  = "accepted"
+	reportReturned  = "returned"
+)
+
+// resultNormal is the result of an inspection item without a finding: the only one that needs no reason.
+const resultNormal = "normal"
 
 // Reports is the work-report operation set (IR126).
 type Reports struct {
@@ -248,7 +266,7 @@ func scanReport(row pgx.Row) (Report, error) {
 		}
 	}
 
-	if len(next) > 0 && string(next) != "null" {
+	if len(next) > 0 && string(next) != jsonNull {
 		report.NextAction = &NextAction{Kind: "", Date: nil, Note: nil}
 
 		err := json.Unmarshal(next, report.NextAction)
@@ -258,7 +276,7 @@ func scanReport(row pgx.Row) (Report, error) {
 	}
 
 	if report.SignOff == nil {
-		report.SignOff = json.RawMessage("null")
+		report.SignOff = json.RawMessage(jsonNull)
 	}
 
 	return report, nil
@@ -358,18 +376,18 @@ func (m Reports) decorate(ctx context.Context, call *ops.Call, report *Report) e
 	reason := any(nil)
 
 	switch {
-	case (call.Principal.Role != "contractor" || !call.Principal.Permissions["partner.review"]) &&
-		(call.Principal.Role != "admin" || !call.Principal.Permissions["job.write"]):
+	case (call.Principal.Role != roleContractor || !call.Principal.Permissions["partner.review"]) &&
+		(call.Principal.Role != roleAdmin || !call.Principal.Permissions["job.write"]):
 		reason = "permission_denied"
 	case report.AuthorID == call.Principal.UserID:
 		reason = "self_authored"
 	case report.Version != latest:
 		reason = "not_current"
-	case report.State != "submitted":
+	case report.State != reportSubmitted:
 		reason = "not_submitted"
 	}
 
-	report.ReviewAvailability = map[string]any{"allowed": reason == nil, "reason": reason}
+	report.ReviewAvailability = map[string]any{"allowed": reason == nil, fieldReason: reason}
 
 	return nil
 }
@@ -410,7 +428,7 @@ type DraftInput struct {
 
 var (
 	itemResults = map[string]bool{
-		"normal":         true,
+		resultNormal:     true,
 		"attention":      true,
 		"not_inspected":  true,
 		"not_applicable": true,
@@ -436,7 +454,7 @@ var (
 func (in *DraftInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.Items == nil || in.Measurements == nil || in.Parts == nil || in.Refrigerant == nil ||
@@ -453,18 +471,18 @@ func (in *DraftInput) Validate() map[string]string {
 		if groupOf(itemInput.ComponentKey) == "" ||
 			groupOf(itemInput.ComponentKey) != itemInput.ComponentGroup ||
 			seen[itemInput.ComponentKey] {
-			fieldErrs["items"] = apperr.KeyInvalid
+			fieldErrs[fieldItems] = apperr.KeyInvalid
 		}
 
 		seen[itemInput.ComponentKey] = true
 		if itemInput.Result != nil && !itemResults[*itemInput.Result] {
-			fieldErrs["items"] = apperr.KeyInvalid
+			fieldErrs[fieldItems] = apperr.KeyInvalid
 		}
 
 		if itemInput.Reason != nil {
 			*itemInput.Reason = strings.TrimSpace(*itemInput.Reason)
 			if utf8.RuneCountInString(*itemInput.Reason) > 1000 {
-				fieldErrs["items"] = apperr.KeyLength
+				fieldErrs[fieldItems] = apperr.KeyLength
 			}
 		}
 
@@ -504,17 +522,17 @@ func (in *DraftInput) Validate() map[string]string {
 
 	if nextAction := in.NextAction; nextAction != nil {
 		switch nextAction.Kind {
-		case "none":
+		case nextActionNone:
 			if nextAction.Date != nil || nextAction.Note != nil {
-				fieldErrs["nextAction"] = apperr.KeyInvalid
+				fieldErrs[fieldNextAction] = apperr.KeyInvalid
 			}
-		case "follow_up":
+		case nextActionFollowUp:
 			if nextAction.Date == nil || nextAction.Note == nil ||
 				utf8.RuneCountInString(*nextAction.Note) > 1000 {
-				fieldErrs["nextAction"] = apperr.KeyInvalid
+				fieldErrs[fieldNextAction] = apperr.KeyInvalid
 			}
 		default:
-			fieldErrs["nextAction"] = apperr.KeyInvalid
+			fieldErrs[fieldNextAction] = apperr.KeyInvalid
 		}
 	}
 
@@ -530,7 +548,7 @@ func (m Reports) draftOf(
 ) (*Report, error) {
 	q := "SELECT " + reportCols + " FROM maintenance.work_reports WHERE job_id = $1 AND state = 'draft'"
 	if lock {
-		q += " FOR UPDATE"
+		q += forUpdate
 	}
 
 	x, err := scanReport(call.Tx.QueryRow(ctx, q, job))
@@ -590,7 +608,7 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 		return Report{}, technicianJobErr
 	}
 
-	if status != "in_progress" {
+	if status != statusInProgress {
 		return Report{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -695,7 +713,7 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 		for _, e := range req.EvidenceIDs {
 			if !allowed[e] {
 				return Report{}, apperr.Fields(
-					map[string]string{"items": apperr.KeyOtherReportAttachment},
+					map[string]string{fieldItems: apperr.KeyOtherReportAttachment},
 				)
 			}
 		}
@@ -868,7 +886,7 @@ func (m Reports) saveDraft(ctx context.Context, call *ops.Call, input *DraftInpu
 			"report",
 			report.ID,
 			"ReportDraftSaved",
-			map[string]any{"jobId": input.JobID, "version": report.Version},
+			map[string]any{fieldJobID: input.JobID, "version": report.Version},
 		),
 	)
 	call.Audit(
@@ -928,11 +946,11 @@ type SubmitInput struct {
 func (in *SubmitInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.ReportVersion < 1 {
-		fieldErrs["reportVersion"] = apperr.KeyRequired
+		fieldErrs[fieldReportVersion] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -959,7 +977,7 @@ func (m Reports) lockJob(
 		return "", unit, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
-	if call.Principal.Role == "technician" {
+	if call.Principal.Role == roleTechnician {
 		err := m.Access.TechnicianJob(ctx, call, jobID, unit)
 		if err != nil {
 			return "", unit, err
@@ -1012,7 +1030,7 @@ func (m Reports) submitJob(ctx context.Context, call *ops.Call, input *SubmitInp
 		return Job{}, err
 	}
 
-	if status != "in_progress" {
+	if status != statusInProgress {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -1069,7 +1087,7 @@ func (m Reports) submitJob(ctx context.Context, call *ops.Call, input *SubmitInp
 		FinishedAt:    nil,
 		OnSiteMinutes: nil,
 	}
-	if len(raw) > 0 && string(raw) != "null" {
+	if len(raw) > 0 && string(raw) != jsonNull {
 		_ = json.Unmarshal(raw, &timeOnSite)
 	}
 
@@ -1222,9 +1240,9 @@ func submitErrors(report *Report, components []string, now time.Time) map[string
 	for _, it := range report.Items {
 		keys = append(keys, it.ComponentKey)
 		if it.Result == nil {
-			fieldErrs["items"] = "errors.result_required"
-		} else if *it.Result != "normal" && (it.Reason == nil || utf8.RuneCountInString(*it.Reason) < 1) {
-			fieldErrs["items"] = "errors.reason_required"
+			fieldErrs[fieldItems] = "errors.result_required"
+		} else if *it.Result != resultNormal && (it.Reason == nil || utf8.RuneCountInString(*it.Reason) < 1) {
+			fieldErrs[fieldItems] = "errors.reason_required"
 		}
 	}
 
@@ -1233,7 +1251,7 @@ func submitErrors(report *Report, components []string, now time.Time) map[string
 	slices.Sort(b)
 
 	if !slices.Equal(a, b) {
-		fieldErrs["items"] = "errors.components_mismatch"
+		fieldErrs[fieldItems] = "errors.components_mismatch"
 	}
 
 	if n := utf8.RuneCountInString(report.WorkText); n < 10 || n > 4000 {
@@ -1242,11 +1260,11 @@ func submitErrors(report *Report, components []string, now time.Time) map[string
 
 	switch {
 	case report.NextAction == nil:
-		fieldErrs["nextAction"] = apperr.KeyRequired
-	case report.NextAction.Kind == "follow_up" &&
+		fieldErrs[fieldNextAction] = apperr.KeyRequired
+	case report.NextAction.Kind == nextActionFollowUp &&
 		(report.NextAction.Date == nil || !report.NextAction.Date.After(now) || report.NextAction.Note == nil ||
 			utf8.RuneCountInString(*report.NextAction.Note) < 1):
-		fieldErrs["nextAction"] = apperr.KeyInvalid
+		fieldErrs[fieldNextAction] = apperr.KeyInvalid
 	}
 
 	for _, p := range report.Parts {
@@ -1297,6 +1315,15 @@ func (m Reports) reportEvent(
 
 // ---- jobs.review ----
 
+// decisionReturn sends a submitted report back for rework (the other review decision is decisionAccept).
+const decisionReturn = "return"
+
+// The review modes: a contractor's or HQ's review of its own delivery, or HQ stepping in on a contractor's report.
+const (
+	reviewNormal       = "normal"
+	reviewHQEscalation = "hq_escalation"
+)
+
 // ReviewInput is jobs.review input.
 type ReviewInput struct {
 	JobID         uuid.UUID `json:"jobId"`
@@ -1310,27 +1337,27 @@ type ReviewInput struct {
 func (in *ReviewInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.ReportVersion < 1 {
-		fieldErrs["reportVersion"] = apperr.KeyRequired
+		fieldErrs[fieldReportVersion] = apperr.KeyRequired
 	}
 
-	if in.Decision != "accept" && in.Decision != "return" {
+	if in.Decision != decisionAccept && in.Decision != decisionReturn {
 		fieldErrs["decision"] = apperr.KeyInvalid
 	}
 
-	if in.ReviewMode != "normal" && in.ReviewMode != "hq_escalation" {
+	if in.ReviewMode != reviewNormal && in.ReviewMode != reviewHQEscalation {
 		fieldErrs["reviewMode"] = apperr.KeyInvalid
 	}
 
 	if in.Reason != nil {
-		trimmedReason(in.Reason, 1000, "reason", fieldErrs)
+		trimmedReason(in.Reason, 1000, fieldReason, fieldErrs)
 	}
 
-	if (in.Decision == "return" || in.ReviewMode == "hq_escalation") && in.Reason == nil {
-		fieldErrs["reason"] = apperr.KeyRequired
+	if (in.Decision == decisionReturn || in.ReviewMode == reviewHQEscalation) && in.Reason == nil {
+		fieldErrs[fieldReason] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -1383,16 +1410,16 @@ func (m Reports) reviewJob(ctx context.Context, call *ops.Call, input *ReviewInp
 	}
 
 	switch call.Principal.Role {
-	case "contractor":
+	case roleContractor:
 		if contractor == nil || *contractor != call.Principal.OrgID {
 			return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
-		if input.ReviewMode != "normal" {
+		if input.ReviewMode != reviewNormal {
 			return Job{}, apperr.Fields(map[string]string{"reviewMode": apperr.KeyInvalid})
 		}
 	default: // admin
-		if (contractor == nil) != (input.ReviewMode == "normal") {
+		if (contractor == nil) != (input.ReviewMode == reviewNormal) {
 			return Job{}, apperr.E(apperr.Forbidden, "errors.review_mode")
 		}
 	}
@@ -1411,7 +1438,7 @@ func (m Reports) reviewJob(ctx context.Context, call *ops.Call, input *ReviewInp
 	err = call.Tx.QueryRow(ctx, `SELECT id, author_id, state FROM maintenance.work_reports WHERE job_id = $1 ORDER BY version
 		DESC LIMIT 1 FOR UPDATE`, input.JobID).
 		Scan(&reportID, &author, &state)
-	if errors.Is(err, pgx.ErrNoRows) || status != "submitted" {
+	if errors.Is(err, pgx.ErrNoRows) || status != statusSubmitted {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -1427,7 +1454,7 @@ func (m Reports) reviewJob(ctx context.Context, call *ops.Call, input *ReviewInp
 		return Job{}, apperr.Wrap(scanErr, "select maintenance.work_reports")
 	}
 
-	if latest != input.ReportVersion || state != "submitted" {
+	if latest != input.ReportVersion || state != reportSubmitted {
 		return Job{}, apperr.E(apperr.Conflict, "errors.report_version_changed")
 	}
 
@@ -1435,9 +1462,9 @@ func (m Reports) reviewJob(ctx context.Context, call *ops.Call, input *ReviewInp
 		return Job{}, apperr.E(apperr.Forbidden, "errors.self_review")
 	}
 
-	reportState, jobStatus := "accepted", "completed"
-	if input.Decision == "return" {
-		reportState, jobStatus = "returned", "rework_requested"
+	reportState, jobStatus := reportAccepted, statusCompleted
+	if input.Decision == decisionReturn {
+		reportState, jobStatus = reportReturned, statusReworkRequested
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -1483,7 +1510,7 @@ func (m Reports) reviewJob(ctx context.Context, call *ops.Call, input *ReviewInp
 		return Job{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
-	if jobStatus == "completed" { // DEC-73 / IR234: completion releases the assignment; a return keeps it for the rework
+	if jobStatus == statusCompleted { // DEC-73 / IR234: completion releases the assignment; a return keeps it for the rework
 		err := ReleaseOnCompletion(ctx, call.Tx, input.JobID, call.Now)
 		if err != nil {
 			return Job{}, err
@@ -1582,7 +1609,7 @@ func (m Reports) resumeReworkJob(
 		return Job{}, err
 	}
 
-	if status != "rework_requested" {
+	if status != statusReworkRequested {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -1622,7 +1649,7 @@ type GetReportInput struct {
 func (in *GetReportInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.ReportID == uuid.Nil {
@@ -1630,7 +1657,7 @@ func (in *GetReportInput) Validate() map[string]string {
 	}
 
 	if in.ReportVersion < 1 {
-		fieldErrs["reportVersion"] = apperr.KeyRequired
+		fieldErrs[fieldReportVersion] = apperr.KeyRequired
 	}
 
 	return fieldErrs
@@ -1691,15 +1718,15 @@ func (m Reports) get(ctx context.Context, call *ops.Call, input *GetReportInput)
 	}
 
 	switch call.Principal.Role {
-	case "client":
-		if org != call.Principal.OrgID || report.State != "accepted" {
+	case roleClient:
+		if org != call.Principal.OrgID || report.State != reportAccepted {
 			return Report{}, notFoundErr
 		}
-	case "contractor":
-		if contractor == nil || *contractor != call.Principal.OrgID || report.State == "draft" {
+	case roleContractor:
+		if contractor == nil || *contractor != call.Principal.OrgID || report.State == reportDraft {
 			return Report{}, notFoundErr
 		}
-	case "technician":
+	case roleTechnician:
 		err := m.Access.TechnicianJob(ctx, call, input.JobID, unit)
 		if err != nil {
 			return Report{}, err

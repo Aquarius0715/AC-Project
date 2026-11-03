@@ -80,7 +80,7 @@ func (m OnSite) lockOwn(
 		FinishedAt:    nil,
 		OnSiteMinutes: nil,
 	}
-	if len(raw) > 0 && string(raw) != "null" {
+	if len(raw) > 0 && string(raw) != jsonNull {
 		err := json.Unmarshal(raw, &timeOnSite)
 		if err != nil {
 			return "", timeOnSite, apperr.Wrap(err, "json.Unmarshal")
@@ -128,7 +128,7 @@ func (m OnSite) save(
 		return job, err
 	}
 
-	call.Emit(outboxEvent("job", jobID, event, map[string]any{"status": job.Status}))
+	call.Emit(outboxEvent("job", jobID, event, map[string]any{fieldStatus: job.Status}))
 	call.Audit(
 		auditEntry("jobs."+action[4:], "job", jobID, call.ExpectedVersion, &job.Version, reason),
 	)
@@ -146,7 +146,7 @@ type StartInput struct {
 func (in *StartInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.StartConfirmed == nil || !*in.StartConfirmed {
@@ -194,7 +194,7 @@ func (m OnSite) startJob(ctx context.Context, call *ops.Call, input *StartInput)
 		return Job{}, err
 	}
 
-	if status != "assigned" {
+	if status != statusAssigned {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -205,7 +205,7 @@ func (m OnSite) startJob(ctx context.Context, call *ops.Call, input *StartInput)
 		ctx,
 		call,
 		input.JobID,
-		"in_progress",
+		statusInProgress,
 		timeOnSite,
 		"job.started",
 		"JobStarted",
@@ -226,7 +226,7 @@ type CheckInInput struct {
 func (in *CheckInInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	switch in.Method {
@@ -240,9 +240,9 @@ func (in *CheckInInput) Validate() map[string]string {
 		}
 	case "manual":
 		if in.Reason == nil {
-			fieldErrs["reason"] = apperr.KeyRequired
+			fieldErrs[fieldReason] = apperr.KeyRequired
 		} else {
-			trimmedReason(in.Reason, 1000, "reason", fieldErrs)
+			trimmedReason(in.Reason, 1000, fieldReason, fieldErrs)
 		}
 
 		if in.DistanceMeters != nil && *in.DistanceMeters < 0 {
@@ -312,7 +312,7 @@ func (m OnSite) checkInJob(ctx context.Context, call *ops.Call, input *CheckInIn
 		}
 	}
 
-	if status != "assigned" && (status != "in_progress" || timeOnSite.ArrivedAt != nil) {
+	if status != statusAssigned && (status != statusInProgress || timeOnSite.ArrivedAt != nil) {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -332,7 +332,7 @@ func (m OnSite) checkInJob(ctx context.Context, call *ops.Call, input *CheckInIn
 		ctx,
 		call,
 		input.JobID,
-		"in_progress",
+		statusInProgress,
 		timeOnSite,
 		"job.checked_in",
 		"JobCheckedIn",
@@ -350,7 +350,7 @@ type PauseInput struct {
 func (in *PauseInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.Paused == nil {
@@ -397,7 +397,7 @@ func (m OnSite) pauseJob(ctx context.Context, call *ops.Call, input *PauseInput)
 		return Job{}, err
 	}
 
-	if status != "in_progress" {
+	if status != statusInProgress {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -421,6 +421,14 @@ func (m OnSite) pauseJob(ctx context.Context, call *ops.Call, input *PauseInput)
 	return m.save(ctx, call, input.JobID, status, timeOnSite, action, "JobPauseChanged", "")
 }
 
+// The acknowledgements of an assignment (Assignment.acknowledgement): pending until the technician answers, then
+// accepted or cant_make, which is also the decision that answers it so.
+const (
+	ackPending  = "pending"
+	ackAccepted = "accepted"
+	ackCantMake = "cant_make"
+)
+
 // AckInput is jobs.acknowledgeAssignment input.
 type AckInput struct {
 	JobID           uuid.UUID `json:"jobId"`
@@ -433,19 +441,19 @@ type AckInput struct {
 func (in *AckInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	switch in.Decision {
-	case "accept":
+	case decisionAccept:
 		if in.Reason != nil || in.AlternativeSlot != nil {
 			fieldErrs["decision"] = "error.fieldsNotAllowed"
 		}
-	case "cant_make":
+	case ackCantMake:
 		if in.Reason == nil {
-			fieldErrs["reason"] = apperr.KeyRequired
+			fieldErrs[fieldReason] = apperr.KeyRequired
 		} else {
-			trimmedReason(in.Reason, 1000, "reason", fieldErrs)
+			trimmedReason(in.Reason, 1000, fieldReason, fieldErrs)
 		}
 
 		if in.AlternativeSlot != nil &&
@@ -526,16 +534,16 @@ func (m OnSite) acknowledge(
 		return Assignment{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	if ack != "pending" {
+	if ack != ackPending {
 		return Assignment{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
-	value := "accepted"
+	value := ackAccepted
 
 	var altStart, altEnd *time.Time
 
-	if input.Decision == "cant_make" {
-		value = "cant_make"
+	if input.Decision == ackCantMake {
+		value = ackCantMake
 
 		if input.AlternativeSlot != nil {
 			altStart, altEnd = &input.AlternativeSlot.StartAt, &input.AlternativeSlot.EndAt

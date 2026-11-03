@@ -46,6 +46,13 @@ type ServiceUnits interface {
 	) (org, property uuid.UUID, scope []string, err error)
 }
 
+// The organization kind and status a contractor needs to be offered a job or to hold a proposed slot
+// (Directory.OrgState).
+const (
+	orgKindContractor = "contractor"
+	orgStatusActive   = "active"
+)
+
 // QualificationRequirements maps Unit.serviceScope entries to QualificationCodes (fixture qualificationRequirements).
 var QualificationRequirements = map[string]string{
 	"indoor":     "demo_indoor",
@@ -169,6 +176,9 @@ func (m Delivery) agreed(
 
 // ---- jobs.offer ----
 
+// keySlotNotAgreed refuses a visit or an assignment slot that is not an agreed slot of the job (IR113 item 3).
+const keySlotNotAgreed = "errors.slot_not_agreed"
+
 // OfferInput is jobs.offer input.
 type OfferInput struct {
 	JobID            uuid.UUID `json:"jobId"`
@@ -184,7 +194,7 @@ type OfferInput struct {
 func (in *OfferInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.ContractorOrgID == uuid.Nil {
@@ -262,7 +272,7 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, input *OfferInpu
 		return Job{}, apperr.Wrap(err, "maintenance.Directory.OrgState")
 	}
 
-	if !found || kind != "contractor" || status != "active" {
+	if !found || kind != orgKindContractor || status != orgStatusActive {
 		return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
@@ -280,7 +290,7 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, input *OfferInpu
 		return Job{}, err
 	}
 
-	if job.status != "requested" {
+	if job.status != statusRequested {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -294,7 +304,7 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, input *OfferInpu
 	}
 
 	if !ok {
-		return Job{}, apperr.Fields(map[string]string{"visitSlot": "errors.slot_not_agreed"})
+		return Job{}, apperr.Fields(map[string]string{"visitSlot": keySlotNotAgreed})
 	}
 
 	_, execErr := call.Tx.Exec(
@@ -338,6 +348,12 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, input *OfferInpu
 
 // ---- jobs.accept / jobs.decline ----
 
+// The decisions on an offer, an assignment, a slot proposal and a work report review.
+const (
+	decisionAccept  = "accept"
+	decisionDecline = "decline"
+)
+
 // AcceptInput is jobs.accept input: the company takes the offer under the terms version it read.
 type AcceptInput struct {
 	JobID        uuid.UUID `json:"jobId"`
@@ -367,7 +383,7 @@ type DeclineInput struct {
 // Validate implements ops.Validator.
 func (in *DeclineInput) Validate() map[string]string {
 	fe := decisionRefs(in.JobID, in.OfferID)
-	trimmedReason(&in.Reason, 1000, "reason", fe)
+	trimmedReason(&in.Reason, 1000, fieldReason, fe)
 
 	return fe
 }
@@ -375,7 +391,7 @@ func (in *DeclineInput) Validate() map[string]string {
 func decisionRefs(job, offer uuid.UUID) map[string]string {
 	fieldErrs := map[string]string{}
 	if job == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if offer == uuid.Nil {
@@ -435,11 +451,11 @@ func (m Delivery) decide(
 		return Receipt{}, apperr.E(apperr.Conflict, "errors.offer_expired")
 	}
 
-	if locked.status != "offered" {
+	if locked.status != statusOffered {
 		return Receipt{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
-	if decision == "accept" {
+	if decision == decisionAccept {
 		var open bool
 
 		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND
@@ -454,7 +470,7 @@ func (m Delivery) decide(
 		}
 	}
 
-	if decision == "accept" && readTerms != terms {
+	if decision == decisionAccept && readTerms != terms {
 		return Receipt{}, apperr.E(apperr.Conflict, "errors.terms_changed")
 	}
 
@@ -472,9 +488,9 @@ func (m Delivery) decide(
 		return Receipt{}, apperr.Wrap(execErr, "update maintenance.offers")
 	}
 
-	next, contractor := "accepted", "contractor_org_id"
-	if decision == "decline" {
-		next, contractor = "requested", "NULL"
+	next, contractor := statusAccepted, "contractor_org_id"
+	if decision == decisionDecline {
+		next, contractor = statusRequested, "NULL"
 		// the contractor's open time change ends with the declined offer (IR444), and so does a client proposal that holds
 		// this contractor: accepting it would offer the job again to the company that just declined it (IR445)
 		_, err := call.Tx.Exec(
@@ -512,7 +528,7 @@ func (m Delivery) decide(
 	}
 
 	// the past tense the history reads (offer.declined)
-	done := map[string]string{"accept": "accepted", "decline": "declined"}[decision]
+	done := map[string]string{decisionAccept: "accepted", decisionDecline: "declined"}[decision]
 
 	eventErr := m.Jobs.event(ctx, call, job, "offer."+done, nil)
 	if eventErr != nil {
@@ -563,7 +579,7 @@ func (m Delivery) decide(
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/offers/{offerId}/accept [post]
 func (m Delivery) accept(ctx context.Context, c *ops.Call, in *AcceptInput) (Receipt, error) {
-	return m.decide(ctx, c, in.JobID, in.OfferID, "accept", in.TermsVersion, "")
+	return m.decide(ctx, c, in.JobID, in.OfferID, decisionAccept, in.TermsVersion, "")
 }
 
 // decline serves jobs.decline.
@@ -597,7 +613,7 @@ func (m Delivery) accept(ctx context.Context, c *ops.Call, in *AcceptInput) (Rec
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/offers/{offerId}/decline [post]
 func (m Delivery) decline(ctx context.Context, c *ops.Call, in *DeclineInput) (Receipt, error) {
-	return m.decide(ctx, c, in.JobID, in.OfferID, "decline", "", in.Reason)
+	return m.decide(ctx, c, in.JobID, in.OfferID, decisionDecline, "", in.Reason)
 }
 
 // ---- jobs.assign ----
@@ -615,7 +631,7 @@ type AssignInput struct {
 func (in *AssignInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	if in.JobID == uuid.Nil {
-		fieldErrs["jobId"] = apperr.KeyRequired
+		fieldErrs[fieldJobID] = apperr.KeyRequired
 	}
 
 	if in.TechnicianMembershipID == uuid.Nil {
@@ -629,7 +645,7 @@ func (in *AssignInput) Validate() map[string]string {
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
 		if utf8.RuneCountInString(*in.Reason) > 1000 {
-			fieldErrs["reason"] = apperr.KeyLength
+			fieldErrs[fieldReason] = apperr.KeyLength
 		}
 	}
 
@@ -682,7 +698,7 @@ func (m Delivery) assignJob(ctx context.Context, call *ops.Call, input *AssignIn
 	}
 
 	slot := Slot{input.StartAt, input.EndAt}
-	contractor := call.Principal.Role == "contractor"
+	contractor := call.Principal.Role == roleContractor
 	// scope: HQ internal jobs; contractor its accepted Offer within the access window
 	var visit Slot
 
@@ -728,7 +744,7 @@ func (m Delivery) assignJob(ctx context.Context, call *ops.Call, input *AssignIn
 	}
 	// state and slot rules (IR113 / IR49 / IR123 item 4)
 	switch {
-	case (locked.status == "requested" && !contractor) || (locked.status == "accepted" && contractor):
+	case (locked.status == statusRequested && !contractor) || (locked.status == statusAccepted && contractor):
 		if !slot.EndAt.After(
 			call.Now,
 		) { // a time already over cannot be worked (IR456): HQ proposes another
@@ -744,13 +760,13 @@ func (m Delivery) assignJob(ctx context.Context, call *ops.Call, input *AssignIn
 		}
 
 		if !agreed {
-			return Job{}, apperr.Fields(map[string]string{"startAt": "errors.slot_not_agreed"})
+			return Job{}, apperr.Fields(map[string]string{"startAt": keySlotNotAgreed})
 		}
-	case locked.status == "assigned":
+	case locked.status == statusAssigned:
 		if locked.scheduled == nil || !sameSlot(*locked.scheduled, slot) {
-			return Job{}, apperr.Fields(map[string]string{"startAt": "errors.slot_not_agreed"})
+			return Job{}, apperr.Fields(map[string]string{"startAt": keySlotNotAgreed})
 		}
-	case locked.status == "in_progress" || locked.status == "rework_requested" || locked.status == "on_hold":
+	case locked.status == statusInProgress || locked.status == statusReworkRequested || locked.status == statusOnHold:
 		// D06 extension / reassignment
 		if locked.scheduled == nil || !slot.StartAt.Equal(locked.scheduled.StartAt) ||
 			slot.EndAt.Before(locked.scheduled.EndAt) {
@@ -758,7 +774,7 @@ func (m Delivery) assignJob(ctx context.Context, call *ops.Call, input *AssignIn
 		}
 
 		if input.Reason == nil || *input.Reason == "" {
-			return Job{}, apperr.Fields(map[string]string{"reason": apperr.KeyRequired})
+			return Job{}, apperr.Fields(map[string]string{fieldReason: apperr.KeyRequired})
 		}
 	default:
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
@@ -853,7 +869,7 @@ func (m Delivery) checkTechnician(
 		own = *org
 	}
 
-	if (contractor && tech.OrgID != own) || (!contractor && tech.Employment != "internal") {
+	if (contractor && tech.OrgID != own) || (!contractor && tech.Employment != employmentInternal) {
 		return apperr.E(apperr.Forbidden, "errors.technician_not_allowed")
 	}
 

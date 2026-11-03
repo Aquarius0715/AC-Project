@@ -11,6 +11,8 @@ import (
 // cleaning, run hours without a recorded cleaning, days since the last cleaning when the run time is unknown, or
 // neither — always "not a fault".
 func TestReminderEvidence(t *testing.T) {
+	t.Parallel()
+
 	now := time.Date(2026, 9, 15, 1, 0, 0, 0, time.UTC)
 
 	hours, cleaned := 412.4, now.AddDate(0, 0, -95)

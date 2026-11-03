@@ -7,6 +7,8 @@ import (
 
 // TestWorkedFor (IR449): time on site leaves out pauses and the periods off the job, overlaps once.
 func TestWorkedFor(t *testing.T) {
+	t.Parallel()
+
 	atMinute := func(m int) time.Time {
 		return time.Date(2026, 9, 14, 9, 0, 0, 0, time.UTC).Add(time.Duration(m) * time.Minute)
 	}

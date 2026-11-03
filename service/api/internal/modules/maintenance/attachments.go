@@ -55,7 +55,7 @@ func (m Files) lockDraft(
 		return nil, err
 	}
 
-	if status != "in_progress" || draft == nil || draft.ID != report {
+	if status != statusInProgress || draft == nil || draft.ID != report {
 		return nil, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -204,7 +204,7 @@ func (m Files) add(ctx context.Context, call *ops.Call, input *AddInput) (Attach
 			"report",
 			input.ReportID,
 			"AttachmentAdded",
-			map[string]any{"attachmentId": attachmentID},
+			map[string]any{fieldAttachmentID: attachmentID},
 		),
 	)
 	call.Audit(
@@ -253,7 +253,7 @@ func (in *SignOffInput) Validate() map[string]string {
 
 	switch {
 	case in.Signature != nil && in.AbsentReason == nil && in.SitePhoto == nil:
-		if in.Signature.Mime != "image/png" || !ValidBlob(*in.Signature, 5<<20) {
+		if in.Signature.Mime != mimePNG || !ValidBlob(*in.Signature, 5<<20) {
 			fieldErrs["signature"] = apperr.KeyInvalidFile
 		}
 	case in.Signature == nil && in.AbsentReason != nil && in.SitePhoto != nil:
@@ -363,7 +363,7 @@ func (m Files) signOff(ctx context.Context, call *ops.Call, input *SignOffInput)
 			"report",
 			input.ReportID,
 			"ReportSignedOff",
-			map[string]any{"reportVersion": draft.Version},
+			map[string]any{fieldReportVersion: draft.Version},
 		),
 	)
 	call.Audit(
@@ -394,7 +394,7 @@ type ContentInput struct {
 func (in *ContentInput) Validate() map[string]string {
 	if in.JobID == uuid.Nil || in.ReportID == uuid.Nil || in.AttachmentID == uuid.Nil ||
 		in.ReportVersion < 1 {
-		return map[string]string{"attachmentId": apperr.KeyRequired}
+		return map[string]string{fieldAttachmentID: apperr.KeyRequired}
 	}
 
 	return nil

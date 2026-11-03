@@ -63,20 +63,30 @@ const certCols = `id, tenant_id, version, created_at, updated_at, membership_id,
 	` issued_at, expires_at, file_name, status,
 	renewal_of, verified_by_membership_id, verified_at, training_requested_at`
 
+// The statuses of a certificate: stored as pending_verification until HQ approves it (valid) or rejects it; a valid
+// one reads as expiring within 30 days of its expiry and as expired from it on (IR133 item 2).
+const (
+	certValid               = "valid"
+	certExpiring            = "expiring"
+	certExpired             = "expired"
+	certPendingVerification = "pending_verification"
+	certRejected            = "rejected"
+)
+
 // readStatus is IR133 item 2.
 func readStatus(stored string, expires, now time.Time) string {
-	if stored != "valid" {
+	if stored != certValid {
 		return stored
 	}
 
 	switch {
 	case !expires.After(now):
-		return "expired"
+		return certExpired
 	case expires.Sub(now) <= 30*24*time.Hour:
-		return "expiring"
+		return certExpiring
 	}
 
-	return "valid"
+	return certValid
 }
 
 func scanCert(r pgx.Row, now time.Time) (Certificate, error) {
@@ -123,7 +133,7 @@ func (m Certificates) lock(
 		call.Now,
 	)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && call.Principal.Role == "contractor" && certificate.OrganizationID != call.Principal.OrgID) {
+		(err == nil && call.Principal.Role == roleContractor && certificate.OrganizationID != call.Principal.OrgID) {
 		return certificate, "", apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
@@ -153,19 +163,29 @@ func (m Certificates) reload(ctx context.Context, c *ops.Call, id uuid.UUID) (Ce
 
 // ---- certificates.submit ----
 
-var certCodes = map[string]bool{
-	"demo_indoor":     true,
-	"demo_outdoor":    true,
-	"demo_electrical": true,
-	"other":           true,
+// codeOther is the catch-all choice of the code lists: a qualification that grants no work, a problem's reason, a kind
+// of unavailable day and a client's reason to decline a proposed slot.
+const codeOther = "other"
+
+// certCodes are the qualification codes a certificate is for (QualificationCode).
+func certCodes() map[string]bool {
+	return map[string]bool{
+		"demo_indoor":     true,
+		"demo_outdoor":    true,
+		"demo_electrical": true,
+		codeOther:         true,
+	}
 }
 
-var certStatuses = map[string]bool{
-	"valid":                true,
-	"expiring":             true,
-	"expired":              true,
-	"pending_verification": true,
-	"rejected":             true,
+// certStatuses are the statuses a certificate reads as, which certificates.list filters on.
+func certStatuses() map[string]bool {
+	return map[string]bool{
+		certValid:               true,
+		certExpiring:            true,
+		certExpired:             true,
+		certPendingVerification: true,
+		certRejected:            true,
+	}
 }
 
 // SubmitCertInput is certificates.submit input.
@@ -187,11 +207,11 @@ func (in *SubmitCertInput) Validate() map[string]string {
 		fieldErrs["membershipId"] = apperr.KeyRequired
 	}
 
-	if !certCodes[in.Code] {
+	if !certCodes()[in.Code] {
 		fieldErrs["code"] = apperr.KeyInvalid
 	}
 
-	trimmedReason(&in.Name, 120, "name", fieldErrs)
+	trimmedReason(&in.Name, 120, fieldName, fieldErrs)
 	trimmedReason(&in.Number, 64, "number", fieldErrs)
 
 	if in.IssuedAt.IsZero() || !in.IssuedAt.Before(in.ExpiresAt) {
@@ -200,12 +220,12 @@ func (in *SubmitCertInput) Validate() map[string]string {
 
 	blobInput := in.File
 	if !ValidFileName(blobInput.Name) ||
-		(blobInput.Mime != "application/pdf" && blobInput.Mime != "image/jpeg" && blobInput.Mime != "image/png") ||
+		(blobInput.Mime != mimePDF && blobInput.Mime != mimeJPEG && blobInput.Mime != mimePNG) ||
 		blobInput.Size != len(blobInput.Bytes) ||
 		blobInput.Size < 1 ||
 		blobInput.Size > 10*1000*1000 ||
 		!ContentMatches(blobInput.Mime, blobInput.Bytes) ||
-		(blobInput.Mime != "application/pdf" && !ImageSizeOK(blobInput.Mime, blobInput.Bytes)) {
+		(blobInput.Mime != mimePDF && !ImageSizeOK(blobInput.Mime, blobInput.Bytes)) {
 		fieldErrs["file"] = apperr.KeyInvalidFile
 	}
 
@@ -348,9 +368,9 @@ func (in *VerifyInput) Validate() map[string]string {
 	case "approve":
 	case "reject":
 		if in.Reason == nil {
-			fieldErrs["reason"] = apperr.KeyRequired
+			fieldErrs[fieldReason] = apperr.KeyRequired
 		} else {
-			trimmedReason(in.Reason, 1000, "reason", fieldErrs)
+			trimmedReason(in.Reason, 1000, fieldReason, fieldErrs)
 		}
 	default:
 		fieldErrs["decision"] = apperr.KeyInvalid
@@ -415,7 +435,7 @@ func (m Certificates) verify(
 			return certificate, apperr.Wrap(err, "update maintenance.certificates")
 		}
 
-		if certificate.Code != "other" {
+		if certificate.Code != codeOther {
 			err := m.Grants.SetGrant(
 				ctx,
 				call,
@@ -599,7 +619,7 @@ type DocumentOut struct {
 
 // documentMime names an uploaded document's type from its leading bytes (certificates.submit admitted only these).
 func documentMime(b []byte) string {
-	for _, m := range []string{"application/pdf", "image/png", "image/jpeg"} {
+	for _, m := range []string{mimePDF, mimePNG, mimeJPEG} {
 		if ContentMatches(m, b) {
 			return m
 		}
@@ -648,7 +668,7 @@ func (m Certificates) content(
 		$1`, input.CertificateID).
 		Scan(&key, &name, &org)
 	if errors.Is(err, pgx.ErrNoRows) ||
-		(err == nil && call.Principal.Role == "contractor" && org != call.Principal.OrgID) {
+		(err == nil && call.Principal.Role == roleContractor && org != call.Principal.OrgID) {
 		return DocumentOut{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
@@ -728,11 +748,11 @@ func (m Certificates) list(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&filters) != nil || (filters.Code != nil && !certCodes[*filters.Code]) ||
-			(filters.Status != nil && !certStatuses[*filters.Status]) ||
+		if dec.Decode(&filters) != nil || (filters.Code != nil && !certCodes()[*filters.Code]) ||
+			(filters.Status != nil && !certStatuses()[*filters.Status]) ||
 			(filters.ExpiringWithinDays != nil && (*filters.ExpiringWithinDays < 1 || *filters.ExpiringWithinDays > 3650)) {
 			return paging.Page[Certificate]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{fieldFilters: apperr.KeyInvalid},
 			)
 		}
 	}
@@ -745,8 +765,8 @@ func (m Certificates) list(
 		return fmt.Sprintf("$%d", len(args))
 	}
 
-	conds := []string{"TRUE"}
-	if call.Principal.Role == "contractor" {
+	conds := []string{sqlTrue}
+	if call.Principal.Role == roleContractor {
 		conds = append(conds, "organization_id = "+add(call.Principal.OrgID))
 	}
 
@@ -808,7 +828,7 @@ func (m Certificates) list(
 	sortSliceErr := paging.SortSlice(all, query.Sort, map[string]func(a, b Certificate) int{
 		"id":        func(a, b Certificate) int { return strings.Compare(a.ID.String(), b.ID.String()) },
 		"expiresAt": func(a, b Certificate) int { return a.ExpiresAt.Compare(b.ExpiresAt) },
-		"status":    func(a, b Certificate) int { return strings.Compare(a.Status, b.Status) },
+		fieldStatus: func(a, b Certificate) int { return strings.Compare(a.Status, b.Status) },
 	})
 	if sortSliceErr != nil {
 		return paging.Page[Certificate]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
@@ -870,7 +890,7 @@ func (m Certificates) parts(
 
 		if dec.Decode(&filters) != nil {
 			return paging.Page[PartItem]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
+				map[string]string{fieldFilters: apperr.KeyInvalid},
 			)
 		}
 	}
@@ -914,8 +934,8 @@ func (m Certificates) parts(
 	}
 
 	sortSliceErr := paging.SortSlice(all, query.Sort, map[string]func(a, b PartItem) int{
-		"id":   func(a, b PartItem) int { return strings.Compare(a.Code, b.Code) },
-		"name": func(a, b PartItem) int { return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) },
+		"id":      func(a, b PartItem) int { return strings.Compare(a.Code, b.Code) },
+		fieldName: func(a, b PartItem) int { return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) },
 	})
 	if sortSliceErr != nil {
 		return paging.Page[PartItem]{}, apperr.Wrap(sortSliceErr, "paging.SortSlice")
@@ -1005,7 +1025,7 @@ func (m Certificates) Remind(ctx context.Context, call *ops.Call) (int, error) {
 			ctx,
 			call,
 			identity.MembersInput{
-				Role:           "contractor",
+				Role:           roleContractor,
 				OrganizationID: &cert.org,
 				Permission:     "partner.assign", IDs: nil, ClientRole: "",
 			},
@@ -1014,9 +1034,9 @@ func (m Certificates) Remind(ctx context.Context, call *ops.Call) (int, error) {
 			return count, apperr.Wrap(err, "identity.Members")
 		}
 
-		severity := "normal"
+		severity := severityNormal
 		if days == reminderDays[0] {
-			severity = "warning"
+			severity = severityWarning
 		}
 
 		for _, r := range recipients {
@@ -1028,8 +1048,8 @@ func (m Certificates) Remind(ctx context.Context, call *ops.Call) (int, error) {
 				TargetID:              cert.id,
 				Severity:              severity,
 				Params: map[string]any{
-					"at":     cert.expires,
-					"status": "expiring",
+					"at":        cert.expires,
+					fieldStatus: certExpiring,
 				},
 				Channel:       "",
 				SourceAlertID: nil,

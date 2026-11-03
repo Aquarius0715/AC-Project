@@ -8,6 +8,8 @@ import (
 // TestUnionMinutes covers the busy time of a technician's day (members.capacity): overlapping, contained and
 // touching slots count once, gaps do not count, and the order of the slots does not matter.
 func TestUnionMinutes(t *testing.T) {
+	t.Parallel()
+
 	base := time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC)
 
 	slot := func(fromMin, toMin int) Slot {

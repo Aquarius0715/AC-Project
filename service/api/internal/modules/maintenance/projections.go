@@ -25,7 +25,7 @@ type listItem struct {
 
 var rankOf = func() map[string]int {
 	m := map[string]int{}
-	for i, s := range jobStatuses {
+	for i, s := range jobStatuses() {
 		m[s] = i
 	}
 
@@ -38,7 +38,7 @@ func sortItems(items []listItem, field string, desc bool) {
 		var diff int
 
 		switch field {
-		case "status":
+		case fieldStatus:
 			diff = left.rank - right.rank
 		case "severity":
 			switch {
@@ -50,7 +50,7 @@ func sortItems(items []listItem, field string, desc bool) {
 			default:
 				diff = left.sev - right.sev
 			}
-		case "dueAt":
+		case fieldDueAt:
 			switch {
 			case left.due == nil && right.due == nil:
 			case left.due == nil:
@@ -188,9 +188,9 @@ func (m Jobs) offers(ctx context.Context, call *ops.Call, job *uuid.UUID) ([]Off
 			return nil, apperr.Wrap(err, "query (offers)")
 		}
 
-		offerSummary.Projection, offerSummary.Status = "offer", "offered"
+		offerSummary.Projection, offerSummary.Status = projectionOffer, statusOffered
 		if decision != nil {
-			offerSummary.Status = "accepted"
+			offerSummary.Status = statusAccepted
 		}
 
 		out, units = append(out, offerSummary), append(units, unit)
@@ -245,7 +245,7 @@ func requiredCodes(scope []string) []string {
 // histories returns the caller's frozen snapshots (contractor organization or technician membership).
 func (m Jobs) histories(ctx context.Context, call *ops.Call, job *uuid.UUID) ([]History, error) {
 	kind, owner := "organization", call.Principal.OrgID
-	if call.Principal.Role == "technician" {
+	if call.Principal.Role == roleTechnician {
 		kind, owner = "membership", call.Principal.MembershipID
 	}
 
@@ -294,7 +294,7 @@ func (m Jobs) histories(ctx context.Context, call *ops.Call, job *uuid.UUID) ([]
 			return nil, apperr.Wrap(err, "query (histories)")
 		}
 
-		history.Projection = "history"
+		history.Projection = projectionHistory
 		history.RedactedReportSummary = map[string]any{"hasReport": has, "acceptance": acc}
 		out, evIDs = append(out, history), append(evIDs, ids)
 	}
@@ -394,7 +394,7 @@ func (m Jobs) extraProjections(
 
 	var out []listItem
 
-	if call.Principal.Role == "contractor" {
+	if call.Principal.Role == roleContractor {
 		offers, err := m.offers(ctx, call, nil)
 		if err != nil {
 			return nil, err
@@ -461,21 +461,21 @@ func (m Jobs) projection(
 ) (any, string, error) {
 	j, err := m.detail(ctx, call, jobID)
 	if err == nil {
-		return j, "detail", nil
+		return j, projectionDetail, nil
 	}
 
 	if apperr.From(err).Code != apperr.NotFound {
 		return nil, "", err
 	}
 
-	if call.Principal.Role == "contractor" {
+	if call.Principal.Role == roleContractor {
 		offers, err := m.offers(ctx, call, &jobID)
 		if err != nil {
 			return nil, "", err
 		}
 
 		if len(offers) > 0 {
-			return offers[0], "offer", nil
+			return offers[0], projectionOffer, nil
 		}
 	}
 
@@ -485,7 +485,7 @@ func (m Jobs) projection(
 	}
 
 	if len(histories) > 0 {
-		return histories[0], "history", nil
+		return histories[0], projectionHistory, nil
 	}
 
 	return nil, "", apperr.E(apperr.NotFound, apperr.KeyNotFound)

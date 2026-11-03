@@ -8,12 +8,14 @@ import (
 // IR368: an upload's name is a label. Names in any script pass; control characters, path separators and
 // bidirectional formatting characters do not.
 func TestValidFileName(t *testing.T) {
-	for _, n := range []string{
-		"photo.jpg", "写真 1.jpg", "Foto unit (2).png", " padded.pdf ", "ملف.png",
+	t.Parallel()
+
+	for _, name := range []string{
+		"photo.jpg", "\u5199\u771f 1.jpg", "Foto unit (2).png", " padded.pdf ", "ملف.png",
 		strings.Repeat("a", 200),
 	} {
-		if !ValidFileName(n) {
-			t.Errorf("%q refused", n)
+		if !ValidFileName(name) {
+			t.Errorf("%q refused", name)
 		}
 	}
 
@@ -28,12 +30,12 @@ func TestValidFileName(t *testing.T) {
 	}
 
 	png := tinyPNG(t)
-	if !ValidBlob(BlobInput{Name: "p.png", Mime: "image/png", Size: len(png), Bytes: png}, 100) {
+	if !ValidBlob(BlobInput{Name: "p.png", Mime: mimePNG, Size: len(png), Bytes: png}, 100) {
 		t.Error("a valid photo is refused")
 	}
 
 	if ValidBlob(
-		BlobInput{Name: "p\u202egnp.exe", Mime: "image/png", Size: len(png), Bytes: png},
+		BlobInput{Name: "p\u202egnp.exe", Mime: mimePNG, Size: len(png), Bytes: png},
 		100,
 	) {
 		t.Error("a name with a right-to-left override is accepted")
