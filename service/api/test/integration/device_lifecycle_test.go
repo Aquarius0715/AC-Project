@@ -406,23 +406,27 @@ func TestDeviceEvents(t *testing.T) {
 
 		return conn, power, tamper, unitConn
 	}
-	eventOf := func(eventID string) (string, []uuid.UUID, *time.Time, string) {
-		var (
-			eventRowID, evidence string
-			alerts               []uuid.UUID
-			restored             *time.Time
-		)
+	// the stored device event of a signal: its row, the alerts it raised, when it was restored and its evidence source
+	type storedEvent struct {
+		id, evidence string
+		alerts       []uuid.UUID
+		restored     *time.Time
+	}
+
+	eventOf := func(eventID string) storedEvent {
+		var stored storedEvent
+
 		ownerScan(
 			t,
 			`SELECT id::text, alert_ids, restored_at, evidence_source FROM devices.device_events WHERE event_id = $1`,
 			[]any{eventID},
-			&eventRowID,
-			&alerts,
-			&restored,
-			&evidence,
+			&stored.id,
+			&stored.alerts,
+			&stored.restored,
+			&stored.evidence,
 		)
 
-		return eventRowID, alerts, restored, evidence
+		return stored
 	}
 	count := func() int {
 		var total int
@@ -453,7 +457,9 @@ func TestDeviceEvents(t *testing.T) {
 		t.Fatalf("offline only: %s %s %s %s", c, p, tm, uc)
 	}
 
-	lostID, alerts, _, evidence := eventOf(lost)
+	lostEvent := eventOf(lost)
+
+	lostID, alerts, evidence := lostEvent.id, lostEvent.alerts, lostEvent.evidence
 	if len(alerts) != 0 || evidence != "heartbeat" {
 		t.Errorf("communication_lost evidence: %v %s", alerts, evidence)
 	}
@@ -465,7 +471,7 @@ func TestDeviceEvents(t *testing.T) {
 		t.Fatalf("power lost: %s %s %s", c, p, tm)
 	}
 
-	if _, _, _, evidence := eventOf(power); evidence != "power_signal" {
+	if evidence := eventOf(power).evidence; evidence != "power_signal" {
 		t.Errorf("power evidence: %s", evidence)
 	}
 
@@ -474,7 +480,9 @@ func TestDeviceEvents(t *testing.T) {
 		t.Fatalf("tamper: %d %v", code, m)
 	}
 
-	tamperID, tamperAlerts, _, evidence := eventOf(tamper)
+	tamperEvent := eventOf(tamper)
+
+	tamperID, tamperAlerts, evidence := tamperEvent.id, tamperEvent.alerts, tamperEvent.evidence
 	if c, p, tm, _ := state(); c != connectionOffline || p != powerOff || tm != "detected" ||
 		len(tamperAlerts) != 1 ||
 		evidence != "tamper_signal" {
@@ -533,9 +541,7 @@ func TestDeviceEvents(t *testing.T) {
 		t.Fatalf("connection restored only: %s %s %s %s", c, p, tm, uc)
 	}
 
-	if _, _, restored, _ := eventOf(
-		lost,
-	); restored == nil ||
+	if restored := eventOf(lost).restored; restored == nil ||
 		!restored.Equal(clock().Add(10*time.Second)) {
 		t.Errorf("restoredAt on the fault: %v", restored)
 	}
@@ -559,7 +565,7 @@ func TestDeviceEvents(t *testing.T) {
 	// an old heartbeat after a new communication loss leaves the device offline (AT-T12-E ②, IR102 G1-023)
 	lost5 := uuid.NewString()
 	signal(lost5, "communication_lost", 5, "", 20)
-	lost5ID, _, _, _ := eventOf(lost5)
+	lost5ID := eventOf(lost5).id
 	before = count()
 
 	if code, _ := signal(
@@ -576,7 +582,7 @@ func TestDeviceEvents(t *testing.T) {
 		t.Fatalf("old sequence changes nothing: %s %d/%d", c, count(), before)
 	}
 
-	if _, _, restored, _ := eventOf(lost5); restored != nil {
+	if restored := eventOf(lost5).restored; restored != nil {
 		t.Error("old heartbeat does not restore the fault")
 	}
 	// tamper recovery clears the observed tamper only; the event inherits the fault's alerts (SR23), the alert stays
@@ -591,7 +597,9 @@ func TestDeviceEvents(t *testing.T) {
 		t.Fatalf("tamper restored: %d %v", code, res)
 	}
 
-	_, inherited, _, evidence := eventOf(clearEvent)
+	clearStored := eventOf(clearEvent)
+
+	inherited, evidence := clearStored.alerts, clearStored.evidence
 	if _, _, tm, _ := state(); tm != tamperClear || len(inherited) != 1 ||
 		inherited[0].String() != alert ||
 		evidence != "tamper_signal" {
@@ -604,7 +612,7 @@ func TestDeviceEvents(t *testing.T) {
 		t.Errorf("tamper recovery does not resolve the alert: %s", status)
 	}
 	// the recovery is evidence a resolution of the tamper alert may cite (IR327)
-	clearID, _, _, _ := eventOf(clearEvent)
+	clearID := eventOf(clearEvent).id
 
 	if _, res := post(
 		srv,
@@ -625,8 +633,8 @@ func TestDeviceEvents(t *testing.T) {
 	again := uuid.NewString()
 	signal(again, "tamper", 3, "", 40)
 
-	if _, a, _, _ := eventOf(again); len(a) != 1 || a[0].String() != alert {
-		t.Errorf("open alert reused: %v", a)
+	if raised := eventOf(again).alerts; len(raised) != 1 || raised[0].String() != alert {
+		t.Errorf("open alert reused: %v", raised)
 	}
 
 	signal(
@@ -634,9 +642,7 @@ func TestDeviceEvents(t *testing.T) {
 		"restored",
 		4,
 		rec("tamper", func() string {
-			id, _, _, _ := eventOf(again)
-
-			return id
+			return eventOf(again).id
 		}(), "clear"),
 		41,
 	)
@@ -657,7 +663,7 @@ func TestDeviceEvents(t *testing.T) {
 
 	third := uuid.NewString()
 	signal(third, "tamper", 5, "", 50)
-	_, alertIDs, _, _ := eventOf(third)
+	alertIDs := eventOf(third).alerts
 
 	var previous *string
 	ownerScan(

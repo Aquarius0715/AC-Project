@@ -35,7 +35,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 
 	start := clock().Add(48 * time.Hour).Format(time.RFC3339)
 	body := func(extra map[string]string) string {
-		f := map[string]string{
+		bodyFields := map[string]string{
 			fieldModelID:              `"` + model + `"`,
 			fieldTargetVersion:        `"v2"`,
 			fieldDeviceIDs:            "[" + strings.Join(devs, ",") + "]",
@@ -44,10 +44,10 @@ func TestFirmwareCampaigns(t *testing.T) {
 			"autoPauseFailurePercent": "5",
 			fieldStartAt:              `"` + start + `"`,
 		}
-		maps.Copy(f, extra)
+		maps.Copy(bodyFields, extra)
 
-		parts := make([]string, 0, len(f))
-		for k, v := range f {
+		parts := make([]string, 0, len(bodyFields))
+		for k, v := range bodyFields {
 			parts = append(parts, `"`+k+`":`+v)
 		}
 

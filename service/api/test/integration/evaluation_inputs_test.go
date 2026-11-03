@@ -23,7 +23,7 @@ func TestEvaluationInputValidation(t *testing.T) {
 			`","observedAt":"` + stamp + `","quality":"` + quality + `"}`
 	}
 	body := func(fields map[string]string) string {
-		f := map[string]string{
+		bodyFields := map[string]string{
 			fieldEventID:    `"` + uuid.NewString() + `"`,
 			fieldOccurredAt: `"` + stamp + `"`,
 			fieldUnitIDs:    `["` + unitID + `"]`,
@@ -33,14 +33,14 @@ func TestEvaluationInputValidation(t *testing.T) {
 
 		for k, v := range fields {
 			if v == "" {
-				delete(f, k)
+				delete(bodyFields, k)
 			} else {
-				f[k] = v
+				bodyFields[k] = v
 			}
 		}
 
-		parts := make([]string, 0, len(f))
-		for k, v := range f {
+		parts := make([]string, 0, len(bodyFields))
+		for k, v := range bodyFields {
 			parts = append(parts, `"`+k+`":`+v)
 		}
 

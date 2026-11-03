@@ -20,7 +20,7 @@ func TestContractsAndInvoices(t *testing.T) {
 	cust := seed.ID("cust-b").String()
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	body := func(extra map[string]string) string {
-		f := map[string]string{
+		bodyFields := map[string]string{
 			fieldCustomerID:       `"` + cust + `"`,
 			fieldUnitIDs:          `["` + unit + `"]`,
 			fieldPlanType:         jsonKindRTO,
@@ -31,10 +31,10 @@ func TestContractsAndInvoices(t *testing.T) {
 			"restrictionEligible": jsonTrue,
 			fieldRulesVersion:     `"rules-demo-1"`,
 		}
-		maps.Copy(f, extra)
+		maps.Copy(bodyFields, extra)
 
-		parts := make([]string, 0, len(f))
-		for k, v := range f {
+		parts := make([]string, 0, len(bodyFields))
+		for k, v := range bodyFields {
 			parts = append(parts, `"`+k+`":`+v)
 		}
 
@@ -213,7 +213,7 @@ func TestContractsAndInvoices(t *testing.T) {
 
 	// invoices
 	inv := func(extra map[string]string) (int, map[string]any) {
-		f := map[string]string{
+		bodyFields := map[string]string{
 			"amountMinor":     "15000",
 			fieldCurrency:     `"MYR"`,
 			fieldContractID:   `"` + key + `"`,
@@ -225,10 +225,10 @@ func TestContractsAndInvoices(t *testing.T) {
 			) + `"}`,
 			fieldDueAt: `"` + stamp(48) + `"`,
 		}
-		maps.Copy(f, extra)
+		maps.Copy(bodyFields, extra)
 
-		parts := make([]string, 0, len(f))
-		for kk, v := range f {
+		parts := make([]string, 0, len(bodyFields))
+		for kk, v := range bodyFields {
 			parts = append(parts, `"`+kk+`":`+v)
 		}
 

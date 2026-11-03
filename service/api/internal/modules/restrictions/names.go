@@ -19,6 +19,7 @@ const (
 	opExecute               = "restrictions.execute"
 	phaseApply              = "apply"
 	phaseRelease            = "release"
+	releaseWaitingReconcile = "waiting_reconcile"
 	policyTemperatureLimit  = "temperature_limit"
 	powerOff                = "off"
 	stateApplied            = "applied"

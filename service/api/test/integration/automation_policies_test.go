@@ -10,7 +10,7 @@ import (
 )
 
 func autoPolicyBody(extra map[string]string) string {
-	f := map[string]string{
+	bodyFields := map[string]string{
 		fieldKind:     `"automation"`,
 		fieldName:     `"Peak shave"`,
 		fieldTimezone: jsonKualaLumpur,
@@ -27,16 +27,16 @@ func autoPolicyBody(extra map[string]string) string {
 
 	for key, value := range extra {
 		if value == "" {
-			delete(f, key)
+			delete(bodyFields, key)
 
 			continue
 		}
 
-		f[key] = value
+		bodyFields[key] = value
 	}
 
-	parts := make([]string, 0, len(f))
-	for k, v := range f {
+	parts := make([]string, 0, len(bodyFields))
+	for k, v := range bodyFields {
 		parts = append(parts, `"`+k+`":`+v)
 	}
 

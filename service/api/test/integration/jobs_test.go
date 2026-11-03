@@ -30,7 +30,7 @@ func slotJSON(h, d int) string {
 
 func jobBody(unit string, extra map[string]string) string {
 	// clock = 2026-09-14 09:00 Kuala Lumpur; +25 h is the next local day
-	f := map[string]string{
+	bodyFields := map[string]string{
 		fieldUnitID:  `"` + unit + `"`,
 		fieldType:    `"reactive"`,
 		fieldSymptom: `"Water dripping from the indoor unit"`,
@@ -43,16 +43,16 @@ func jobBody(unit string, extra map[string]string) string {
 
 	for key, value := range extra {
 		if value == "" {
-			delete(f, key)
+			delete(bodyFields, key)
 
 			continue
 		}
 
-		f[key] = value
+		bodyFields[key] = value
 	}
 
-	parts := make([]string, 0, len(f))
-	for k, v := range f {
+	parts := make([]string, 0, len(bodyFields))
+	for k, v := range bodyFields {
 		parts = append(parts, `"`+k+`":`+v)
 	}
 

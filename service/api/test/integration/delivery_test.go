@@ -39,7 +39,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 	job := asStr(t, data(resp)["id"])
 	slot2 := slotJSON(49, 2)
 	offerBody := func(extra map[string]string) string {
-		f := map[string]string{
+		bodyFields := map[string]string{
 			fieldJobID:           `"` + job + `"`,
 			fieldContractorOrgID: `"` + seed.ID("org-contractor-a").String() + `"`,
 			fieldVisitSlot:       slot2,
@@ -50,10 +50,10 @@ func TestOfferAcceptAssign(t *testing.T) {
 			fieldAccessValidUntil: `"` + stamp(100) + `"`,
 			fieldTermsVersion:     `"terms-v1"`,
 		}
-		maps.Copy(f, extra)
+		maps.Copy(bodyFields, extra)
 
 		out := "{"
-		for k, v := range f {
+		for k, v := range bodyFields {
 			if len(out) > 1 {
 				out += ","
 			}

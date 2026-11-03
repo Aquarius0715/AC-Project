@@ -124,7 +124,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		"stale job":      {powerOn, off, 5, currentUnitVersion, currentJobVersion + 3, 409},
 		"bad end action": {powerOn, `{"kind":"dance"}`, 5, currentUnitVersion, currentJobVersion, 422},
 	} {
-		code, m := run(
+		code, reply := run(
 			techInt(),
 			testCase.start,
 			testCase.end,
@@ -133,7 +133,7 @@ func TestDiagnosticRuns(t *testing.T) {
 			testCase.j,
 		)
 		if w, ok := refused[name]; ok {
-			refusal(t, name, code, m, w)
+			refusal(t, name, code, reply, w)
 		} else if code != testCase.code {
 			t.Errorf("%s: %d want %d", name, code, testCase.code)
 		}

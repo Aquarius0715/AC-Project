@@ -484,22 +484,22 @@ func TestClientUsersByOwner(t *testing.T) {
 	}
 
 	email2 := email
-	if code, m := save(
+	if code, reply := save(
 		`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","reason":"not an `+
 			`owner"}`,
 		1,
 	); code != 200 ||
-		data(m)["clientRole"] != clientRoleMember {
-		t.Fatalf("change the role: %d %v", code, m)
+		data(reply)["clientRole"] != clientRoleMember {
+		t.Fatalf("change the role: %d %v", code, reply)
 	}
 
-	if code, m := save(
+	if code, reply := save(
 		`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","status":"active",`+
 			`"reason":"x"}`,
 		2,
 	); code != 409 ||
-		m["messageKey"] != "errors.invite_pending" {
-		t.Errorf("activate an invite: %d %v", code, m)
+		reply["messageKey"] != "errors.invite_pending" {
+		t.Errorf("activate an invite: %d %v", code, reply)
 	}
 	// the owner's own row
 	_, resp = post(srv, customerB(), "clientUsers.list", `{"limit":100}`)

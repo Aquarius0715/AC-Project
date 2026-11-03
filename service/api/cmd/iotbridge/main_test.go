@@ -18,6 +18,8 @@ import (
 // TestFetchWaitingReadsTheRequestedCommands: the internal query is called with the token and the tenant, and its rows
 // come back as the waiting commands; a refused token, a bad answer and a dead API are errors.
 func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
+	t.Parallel()
+
 	commandID := uuid.New()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
@@ -78,6 +80,8 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 // TestDemoClockFollowsTheScenarioClock: the offset is the scenario time minus the real time of the preview's answer;
 // an answer without a snapshot time is an error and keeps the old offset.
 func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
+	t.Parallel()
+
 	scenario := time.Date(2026, 9, 14, 22, 43, 0, 0, time.UTC)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
@@ -132,6 +136,8 @@ func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
 
 // TestSendReportsRefusals: a trigger the API accepts is sent with the idempotency key; a refused one is an error.
 func TestSendReportsRefusals(t *testing.T) {
+	t.Parallel()
+
 	var key string
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -202,6 +208,8 @@ func TestSendReportsRefusals(t *testing.T) {
 // TestSendCommandStopsBeforePublishingABadCommand: a command with no action kind is refused before anything is
 // published or reported sent.
 func TestSendCommandStopsBeforePublishingABadCommand(t *testing.T) {
+	t.Parallel()
+
 	waiting := iotbridge.Waiting{
 		ID:        uuid.New(),
 		Action:    json.RawMessage(`{"celsius":26}`),

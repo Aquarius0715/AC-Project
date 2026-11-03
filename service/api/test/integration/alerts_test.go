@@ -79,14 +79,14 @@ func TestAlerts(t *testing.T) {
 		`{"filters":{"unitId":"` + unit + `","customerId":"` + uuid.NewString() +
 			`"}}`: 0,
 	} {
-		if code, m := post(
+		if code, reply := post(
 			srv,
 			hq(),
 			"alerts.list",
 			body,
 		); code != 200 ||
-			len(items(t, m)) != want {
-			t.Errorf("%s: %d want %d", body, len(items(t, m)), want)
+			len(items(t, reply)) != want {
+			t.Errorf("%s: %d want %d", body, len(items(t, reply)), want)
 		}
 	}
 

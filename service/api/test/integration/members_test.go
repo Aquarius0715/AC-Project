@@ -42,7 +42,7 @@ func TestMembersSave(t *testing.T) {
 	unit := seed.ID("unit-non-rto").String()
 	from := clock().Add(-time.Hour).Format(time.RFC3339)
 	until := clock().Add(30 * 24 * time.Hour).Format(time.RFC3339)
-	body := func(f map[string]string) string {
+	body := func(bodyFields map[string]string) string {
 		base := map[string]string{
 			fieldUserID:         `"` + user + `"`,
 			fieldOrganizationID: `"` + operation + `"`,
@@ -55,7 +55,7 @@ func TestMembersSave(t *testing.T) {
 			fieldReason:         `"onboarding"`,
 		}
 
-		for key, value := range f {
+		for key, value := range bodyFields {
 			if value == "" {
 				delete(base, key)
 

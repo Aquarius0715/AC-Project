@@ -41,28 +41,30 @@ func loadCases(
 	txn pgx.Tx,
 	restrictionID uuid.UUID,
 	lock bool,
-) ([]RecoveryCase, string, int, error) {
-	stmt := `SELECT recovery_cases, state, version FROM restrictions.restrictions WHERE id = $1`
+) ([]RecoveryCase, string, error) {
+	stmt := `SELECT recovery_cases, state FROM restrictions.restrictions WHERE id = $1`
 	if lock {
 		stmt += " FOR UPDATE"
 	}
 
 	var (
-		raw     []byte
-		state   string
-		version int
+		raw   []byte
+		state string
 	)
 
-	err := txn.QueryRow(ctx, stmt, restrictionID).Scan(&raw, &state, &version)
+	err := txn.QueryRow(ctx, stmt, restrictionID).Scan(&raw, &state)
 	if err != nil {
-		return nil, "", 0, apperr.Wrap(err, "update (loadCases)")
+		return nil, "", apperr.Wrap(err, "select restrictions.restrictions")
 	}
 
 	var cases []RecoveryCase
 
-	_ = json.Unmarshal(raw, &cases)
+	err = json.Unmarshal(raw, &cases)
+	if err != nil {
+		return nil, "", apperr.Wrap(err, "json.Unmarshal")
+	}
 
-	return cases, state, version, nil
+	return cases, state, nil
 }
 
 func saveCases(
@@ -136,7 +138,7 @@ func Observe(
 		return false, nil
 	}
 
-	cases, state, _, err := loadCases(ctx, txn, observed.RestrictionID, true)
+	cases, state, err := loadCases(ctx, txn, observed.RestrictionID, true)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -207,6 +209,91 @@ func Observe(
 	return true, err
 }
 
+// openCase is the unit's unresolved recovery case (its last one), which must not be removing already.
+func openCase(cases []RecoveryCase, unit uuid.UUID) (*RecoveryCase, error) {
+	idx := -1
+
+	for i, recoveryCase := range cases {
+		if recoveryCase.UnitID == unit && recoveryCase.State != caseResolved {
+			idx = i
+		}
+	}
+
+	if idx < 0 {
+		return nil, apperr.Fields(map[string]string{keyUnitIDs: "errors.reconcile_not_needed"})
+	}
+
+	if cases[idx].State == caseRemoving {
+		return nil, apperr.E(apperr.Conflict, "errors.command_pending")
+	}
+
+	return &cases[idx], nil
+}
+
+// recoverUnit acts on the fresh observation of a recovery case's unit (SR26). Nothing observed, or the successor
+// restriction, resolves the case; the restriction the case observed, at its rules version, gets its remove command;
+// anything else is a mismatch.
+func (m Restrictions) recoverUnit(
+	ctx context.Context,
+	call *ops.Call,
+	restriction Restriction,
+	recoveryCase *RecoveryCase,
+	unit uuid.UUID,
+	raw []byte,
+) error {
+	var observed *Observation
+
+	if len(raw) > 0 {
+		observed = &Observation{
+			RestrictionID: uuid.UUID{},
+			RulesVersion:  "",
+			Policy:        nil,
+			ObservedAt:    time.Time{},
+		}
+
+		err := json.Unmarshal(raw, observed)
+		if err != nil {
+			return apperr.Wrap(err, "json.Unmarshal")
+		}
+	}
+
+	successor := recoveryCase.SuccessorRestrictionID
+
+	switch {
+	case observed == nil || (successor != nil && observed.RestrictionID == *successor):
+		recoveryCase.State, recoveryCase.ResolvedAt = caseResolved, &call.Now
+
+		return nil
+	case observed.RestrictionID != recoveryCase.ObservedRestrictionID ||
+		observed.RulesVersion != recoveryCase.ObservedRulesVersion:
+		return apperr.E(apperr.Conflict, "errors.observation_mismatch")
+	}
+
+	remove, err := json.Marshal(
+		map[string]any{
+			keyKind:          actionRemoveRestriction,
+			keyRestrictionID: restriction.ID,
+			keyRulesVersion:  recoveryCase.ObservedRulesVersion,
+		},
+	)
+	if err != nil {
+		return apperr.Wrap(err, "json.Marshal")
+	}
+
+	cmd, delivered, _, err := m.send(ctx, call, restriction.ID, unit, remove)
+	if err != nil {
+		return err
+	}
+
+	if !delivered {
+		return apperr.E(apperr.Conflict, "errors.unit_busy")
+	}
+
+	recoveryCase.State, recoveryCase.CommandIDs = caseRemoving, append(recoveryCase.CommandIDs, cmd)
+
+	return nil
+}
+
 // reconcileTerminal handles restrictions.reconcile for a released/cancelled restriction with unresolved recovery cases
 // (SR26): per unit the observation must be at most 30 s old (TIMEOUT) and the device online without an unfinished
 // restriction Command (OFFLINE / CONFLICT). Observation of the old restriction and rules version → a remove Command
@@ -217,7 +304,7 @@ func (m Restrictions) reconcileTerminal(
 	restriction Restriction,
 	units []uuid.UUID,
 ) (any, error) {
-	cases, _, _, err := loadCases(ctx, call.Tx, restriction.ID, false)
+	cases, _, err := loadCases(ctx, call.Tx, restriction.ID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -225,86 +312,19 @@ func (m Restrictions) reconcileTerminal(
 	changed := false
 
 	for _, unitID := range units {
-		idx := -1
-
-		for i, k := range cases {
-			if k.UnitID == unitID && k.State != caseResolved {
-				idx = i
-			}
-		}
-
-		if idx < 0 {
-			return nil, apperr.Fields(
-				map[string]string{keyUnitIDs: "errors.reconcile_not_needed"},
-			)
-		}
-
-		recoveryCase := &cases[idx]
-		if recoveryCase.State == caseRemoving {
-			return nil, apperr.E(apperr.Conflict, "errors.command_pending")
-		}
-
-		_, conn, power, bound, err := m.Devices.BoundDevice(ctx, call, unitID)
+		recoveryCase, err := openCase(cases, unitID)
 		if err != nil {
-			return nil, apperr.Wrap(err, "restrictions.Devices.BoundDevice")
+			return nil, err
 		}
 
-		if !bound || conn != connectionOnline || power == powerOff {
-			return nil, apperr.E(apperr.Offline, "errors.device_offline")
-		}
-
-		raw, at, err := m.Units.Observation(ctx, call, unitID) // equipment's observation (IR194)
+		raw, err := m.currentObservation(ctx, call, unitID)
 		if err != nil {
-			return nil, apperr.Wrap(err, "restrictions.Units.Observation")
+			return nil, err
 		}
 
-		if at == nil || call.Now.Sub(*at) > IntentTTL {
-			return nil, apperr.E(apperr.Timeout, "errors.observation_stale")
-		}
-
-		var observed *Observation
-		if len(raw) > 0 {
-			observed = &Observation{
-				RestrictionID: uuid.UUID{},
-				RulesVersion:  "",
-				Policy:        nil,
-				ObservedAt:    time.Time{},
-			}
-			_ = json.Unmarshal(raw, observed)
-		}
-
-		switch {
-		case observed == nil ||
-			(recoveryCase.SuccessorRestrictionID != nil && observed.RestrictionID == *recoveryCase.SuccessorRestrictionID):
-			recoveryCase.State, recoveryCase.ResolvedAt = caseResolved, &call.Now
-		case observed.RestrictionID == recoveryCase.ObservedRestrictionID &&
-			observed.RulesVersion == recoveryCase.ObservedRulesVersion:
-			remove, marshalErr := json.Marshal(
-				map[string]any{
-					keyKind:          actionRemoveRestriction,
-					keyRestrictionID: restriction.ID,
-					keyRulesVersion:  recoveryCase.ObservedRulesVersion,
-				},
-			)
-			if marshalErr != nil {
-				return nil, apperr.Wrap(marshalErr, "json.Marshal")
-			}
-
-			cmd, delivered, _, err := m.send(ctx, call, restriction.ID, unitID, remove)
-			if err != nil {
-				return nil, err
-			}
-
-			if !delivered {
-				return nil, apperr.E(apperr.Conflict, "errors.unit_busy")
-			}
-
-			recoveryCase.State, recoveryCase.CommandIDs = caseRemoving, append(
-				recoveryCase.CommandIDs,
-				cmd,
-			)
-		default:
-			return nil, apperr.E(apperr.Conflict, "errors.observation_mismatch")
+		err = m.recoverUnit(ctx, call, restriction, recoveryCase, unitID, raw)
+		if err != nil {
+			return nil, err
 		}
 
 		changed = true
@@ -378,7 +398,7 @@ func recoveryAcknowledged(
 	restriction, unit, command uuid.UUID,
 	when time.Time,
 ) (bool, error) {
-	cases, state, _, err := loadCases(ctx, txn, restriction, true)
+	cases, state, err := loadCases(ctx, txn, restriction, true)
 	if err != nil || (state != stateReleased && state != stateCancelled) {
 		return false, err
 	}
@@ -435,7 +455,7 @@ func recoveryEnded(ctx context.Context, txn pgx.Tx, commands []uuid.UUID, now ti
 	}
 
 	for _, restrictionID := range ids {
-		cases, state, _, err := loadCases(ctx, txn, restrictionID, true)
+		cases, state, err := loadCases(ctx, txn, restrictionID, true)
 		if err != nil || (state != stateReleased && state != stateCancelled) {
 			if err != nil {
 				return err

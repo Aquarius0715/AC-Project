@@ -116,107 +116,128 @@ func (m Restrictions) evaluateRelease(ctx context.Context, call *ops.Call, id uu
 	}
 
 	for _, pendingUnit := range units {
-		set := func(sql string, args ...any) error {
-			_, err := call.Tx.Exec(
-				ctx,
-				`UPDATE restrictions.restriction_units SET `+sql+` WHERE restriction_id = $1 AND unit_id = $2`,
-				append([]any{id, pendingUnit.unit}, args...)...)
-
-			return apperr.Wrap(err, "update restrictions.restriction_units")
-		}
-
-		switch pendingUnit.apply {
-		case applyNotSent: // undelivered apply is finalized as cancelled: zero-delivery evidence
-			unit := pendingUnit.unit
-
-			publishErr := events.Publish(
-				ctx,
-				call.Tx,
-				call.Principal.TenantID,
-				kindRestriction,
-				id,
-				events.RestrictionCommandsCancelled,
-				events.CommandsCancelled{RestrictionID: id, UnitID: &unit, CommandIDs: nil},
-			)
-			if publishErr != nil {
-				return apperr.Wrap(publishErr, "events.Publish")
-			}
-
-			_, execErr := call.Tx.Exec(
-				ctx,
-				`UPDATE restrictions.restriction_commands SET status = 'cancelled', updated_at = $3
-				WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested' AND NOT delivered`,
-				id,
-				unit,
-				call.Now,
-			)
-			if execErr != nil { // same rule as equipment
-				return apperr.Wrap(execErr, "update restrictions.restriction_commands")
-			}
-
-			err = set(
-				`apply_state = 'not_applied', release_state = 'not_required', pending_reason = NULL`,
-			)
-		case "not_applied":
-			err = set(`release_state = 'not_required', pending_reason = NULL`)
-		case applySentUnknown:
-			err = set(`release_state = 'waiting_reconcile'`)
-		case stateApplied:
-			var (
-				cmd       uuid.UUID
-				delivered bool
-				reason    *string
-			)
-
-			cmd, delivered, reason, err = m.send(ctx, call, id, pendingUnit.unit, remove)
-			if err != nil {
-				return err
-			}
-
-			if delivered {
-				err = set(
-					`release_state = 'requested', release_command_ids = release_command_ids || $3::uuid, pending_reason = NULL`,
-					cmd,
-				)
-			} else { // offline applied units wait for retry(phase=release); the undelivered intent is cancelled
-				publishErr := events.Publish(
-					ctx,
-					call.Tx,
-					call.Principal.TenantID,
-					kindRestriction,
-					id,
-					events.RestrictionCommandsCancelled,
-					events.CommandsCancelled{
-						RestrictionID: id,
-						CommandIDs:    []uuid.UUID{cmd},
-						UnitID:        nil,
-					},
-				)
-				if publishErr != nil {
-					return apperr.Wrap(publishErr, "events.Publish")
-				}
-
-				_, execErr := call.Tx.Exec(
-					ctx,
-					`UPDATE restrictions.restriction_commands SET status = 'cancelled', updated_at = $2 WHERE command_id = $1 AND
-						status = 'requested'`,
-					cmd,
-					call.Now,
-				)
-				if execErr != nil {
-					return apperr.Wrap(execErr, "update restrictions.restriction_commands")
-				}
-
-				err = set(`pending_reason = $3`, reason)
-			}
-		}
-
+		err := m.releaseUnit(ctx, call, id, pendingUnit.unit, pendingUnit.apply, remove)
 		if err != nil {
 			return err
 		}
 	}
 
 	return finishRelease(ctx, call.Tx, id, call.Now)
+}
+
+// releaseUnit starts a unit's release by how far its apply went. An undelivered apply is finalised as cancelled (the
+// zero-delivery evidence); a unit that never applied needs no release; one whose apply result is unknown waits for
+// reconciling; an applied unit gets the remove command, or, while offline, waits for a release retry.
+func (m Restrictions) releaseUnit(
+	ctx context.Context,
+	call *ops.Call,
+	restriction, unit uuid.UUID,
+	apply string,
+	remove []byte,
+) error {
+	set := func(sql string, args ...any) error {
+		_, err := call.Tx.Exec(
+			ctx,
+			`UPDATE restrictions.restriction_units SET `+sql+` WHERE restriction_id = $1 AND unit_id = $2`,
+			append([]any{restriction, unit}, args...)...)
+
+		return apperr.Wrap(err, "update restrictions.restriction_units")
+	}
+
+	switch apply {
+	case applyNotSent:
+		err := cancelUndelivered(ctx, call, restriction, unit)
+		if err != nil {
+			return err
+		}
+
+		return set(
+			`apply_state = 'not_applied', release_state = 'not_required', pending_reason = NULL`,
+		)
+	case "not_applied":
+		return set(`release_state = 'not_required', pending_reason = NULL`)
+	case applySentUnknown:
+		return set(`release_state = 'waiting_reconcile'`)
+	case stateApplied:
+		cmd, delivered, reason, err := m.send(ctx, call, restriction, unit, remove)
+		if err != nil {
+			return err
+		}
+
+		if delivered {
+			return set(
+				`release_state = 'requested', release_command_ids = release_command_ids || $3::uuid, pending_reason = NULL`,
+				cmd,
+			)
+		}
+
+		err = cancelCommand(ctx, call, restriction, cmd)
+		if err != nil {
+			return err
+		}
+
+		return set(`pending_reason = $3`, reason)
+	}
+
+	return nil
+}
+
+// cancelUndelivered cancels a unit's requested commands of the restriction that were never delivered, and tells
+// equipment, which cancels them by the same rule.
+func cancelUndelivered(ctx context.Context, call *ops.Call, restriction, unit uuid.UUID) error {
+	err := events.Publish(
+		ctx,
+		call.Tx,
+		call.Principal.TenantID,
+		kindRestriction,
+		restriction,
+		events.RestrictionCommandsCancelled,
+		events.CommandsCancelled{RestrictionID: restriction, UnitID: &unit, CommandIDs: nil},
+	)
+	if err != nil {
+		return apperr.Wrap(err, "events.Publish")
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`UPDATE restrictions.restriction_commands SET status = 'cancelled', updated_at = $3
+		WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested' AND NOT delivered`,
+		restriction,
+		unit,
+		call.Now,
+	)
+
+	return apperr.Wrap(err, "update restrictions.restriction_commands")
+}
+
+// cancelCommand cancels one undelivered command, and tells equipment.
+func cancelCommand(ctx context.Context, call *ops.Call, restriction, command uuid.UUID) error {
+	err := events.Publish(
+		ctx,
+		call.Tx,
+		call.Principal.TenantID,
+		kindRestriction,
+		restriction,
+		events.RestrictionCommandsCancelled,
+		events.CommandsCancelled{
+			RestrictionID: restriction,
+			CommandIDs:    []uuid.UUID{command},
+			UnitID:        nil,
+		},
+	)
+	if err != nil {
+		return apperr.Wrap(err, "events.Publish")
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`UPDATE restrictions.restriction_commands SET status = 'cancelled', updated_at = $2 WHERE command_id = $1 AND
+			status = 'requested'`,
+		command,
+		call.Now,
+	)
+
+	return apperr.Wrap(err, "update restrictions.restriction_commands")
 }
 
 // finishRelease sets a release_requested restriction released once every unit is released / not_required (D03).
@@ -280,57 +301,79 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, when
 	}
 
 	if kind == actionApplyRestriction {
-		_, execErr := tx.Exec(
-			ctx,
-			`UPDATE restrictions.restriction_units ru SET apply_state = 'applied', observed_at = $3, pending_reason = NULL,
-				observed_restriction = jsonb_build_object('restrictionId', r.id, 'rulesVersion', r.rules_version, 'policy',
-				r.policy, 'observedAt', $3::timestamptz)
-			FROM restrictions.restrictions r WHERE r.id = ru.restriction_id AND ru.restriction_id = $1 AND ru.unit_id = $2`,
-			restriction,
-			unit,
-			when,
-		)
-		if execErr != nil {
-			return apperr.Wrap(execErr, "update restrictions.restriction_units")
-		}
-
-		var observed []byte
-
-		scanErr := tx.QueryRow(ctx, `SELECT observed_restriction FROM restrictions.restriction_units WHERE restriction_id = $1
-			AND unit_id = $2`, restriction, unit).
-			Scan(&observed)
-		if scanErr != nil {
-			return apperr.Wrap(scanErr, "select restrictions.restriction_units")
-		}
-		// the unit's observedRestriction is owned by equipment (IR184)
-		publishErr := publish(
-			ctx,
-			tx,
-			restriction,
-			"unit",
-			unit,
-			events.UnitRestrictionApplied,
-			events.UnitRestriction{UnitID: unit, RestrictionID: restriction, Observed: observed},
-		)
-		if publishErr != nil {
-			return publishErr
-		}
-
-		_, err = tx.Exec(
-			ctx,
-			`UPDATE restrictions.restrictions r SET version = version + 1, updated_at = $2,
-			state = CASE WHEN r.state = 'requested' AND NOT EXISTS (SELECT 1 FROM restrictions.restriction_units ru WHERE
-			ru.restriction_id = r.id AND ru.apply_state <> 'applied')
-				THEN 'applied' ELSE r.state END
-			WHERE r.id = $1`,
-			restriction,
-			when,
-		)
-
-		return apperr.Wrap(err, "update restrictions.restrictions")
+		return unitApplied(ctx, tx, restriction, unit, when)
 	}
 
-	_, execErr = tx.Exec(
+	return unitReleased(ctx, tx, restriction, unit, when)
+}
+
+// unitApplied records that a unit applied the restriction: its observed restriction (owned by equipment, IR184, so
+// published), and the restriction applied once every unit has.
+func unitApplied(
+	ctx context.Context,
+	tx pgx.Tx,
+	restriction, unit uuid.UUID,
+	when time.Time,
+) error {
+	_, execErr := tx.Exec(
+		ctx,
+		`UPDATE restrictions.restriction_units ru SET apply_state = 'applied', observed_at = $3, pending_reason = NULL,
+			observed_restriction = jsonb_build_object('restrictionId', r.id, 'rulesVersion', r.rules_version, 'policy',
+			r.policy, 'observedAt', $3::timestamptz)
+		FROM restrictions.restrictions r WHERE r.id = ru.restriction_id AND ru.restriction_id = $1 AND ru.unit_id = $2`,
+		restriction,
+		unit,
+		when,
+	)
+	if execErr != nil {
+		return apperr.Wrap(execErr, "update restrictions.restriction_units")
+	}
+
+	var observed []byte
+
+	scanErr := tx.QueryRow(ctx, `SELECT observed_restriction FROM restrictions.restriction_units WHERE restriction_id = $1
+		AND unit_id = $2`, restriction, unit).
+		Scan(&observed)
+	if scanErr != nil {
+		return apperr.Wrap(scanErr, "select restrictions.restriction_units")
+	}
+	// the unit's observedRestriction is owned by equipment (IR184)
+	publishErr := publish(
+		ctx,
+		tx,
+		restriction,
+		"unit",
+		unit,
+		events.UnitRestrictionApplied,
+		events.UnitRestriction{UnitID: unit, RestrictionID: restriction, Observed: observed},
+	)
+	if publishErr != nil {
+		return publishErr
+	}
+
+	_, err := tx.Exec(
+		ctx,
+		`UPDATE restrictions.restrictions r SET version = version + 1, updated_at = $2,
+		state = CASE WHEN r.state = 'requested' AND NOT EXISTS (SELECT 1 FROM restrictions.restriction_units ru WHERE
+		ru.restriction_id = r.id AND ru.apply_state <> 'applied')
+			THEN 'applied' ELSE r.state END
+		WHERE r.id = $1`,
+		restriction,
+		when,
+	)
+
+	return apperr.Wrap(err, "update restrictions.restrictions")
+}
+
+// unitReleased records that a unit removed the restriction, published to equipment, and the restriction released once
+// every unit has (or needed no release).
+func unitReleased(
+	ctx context.Context,
+	tx pgx.Tx,
+	restriction, unit uuid.UUID,
+	when time.Time,
+) error {
+	_, execErr := tx.Exec(
 		ctx,
 		`UPDATE restrictions.restriction_units SET release_state = 'released', observed_restriction = NULL, observed_at = $3,
 			pending_reason = NULL
@@ -356,7 +399,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, when
 		return publishErr
 	}
 
-	_, err = tx.Exec(
+	_, err := tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions r SET version = version + 1, updated_at = $2,
 		state = CASE WHEN r.state = 'release_requested' AND NOT EXISTS (SELECT 1 FROM restrictions.restriction_units ru

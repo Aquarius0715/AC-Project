@@ -34,7 +34,7 @@ func (in *ExceptionInput) Validate() map[string]string {
 		fieldErrs["until"] = apperr.KeyRequired
 	}
 
-	trimReason(&in.Reason, "reason", fieldErrs)
+	trimReason(&in.Reason, fieldErrs)
 
 	return fieldErrs
 }
@@ -291,7 +291,7 @@ func (in *OverrideInput) Validate() map[string]string {
 		fieldErrs[keyRestrictionID] = apperr.KeyRequired
 	}
 
-	trimReason(&in.Reason, "reason", fieldErrs)
+	trimReason(&in.Reason, fieldErrs)
 
 	return fieldErrs
 }
@@ -515,101 +515,12 @@ func (m Restrictions) reconcile(
 	}
 
 	for _, unit := range targets {
-		if unit.ApplyState != applySentUnknown {
-			return nil, apperr.Fields(
-				map[string]string{keyUnitIDs: "errors.reconcile_not_needed"},
-			)
-		}
-
-		var open bool
-
-		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1
-			AND unit_id = $2 AND status = 'requested')`, restriction.ID, unit.UnitID).
-			Scan(&open)
+		raw, observed, err := m.freshObservation(ctx, call, restriction, unit)
 		if err != nil {
-			return nil, apperr.Wrap(err, "select restrictions.restriction_commands")
+			return nil, err
 		}
 
-		if open {
-			return nil, apperr.E(apperr.Conflict, "errors.command_pending")
-		}
-
-		_, conn, power, bound, err := m.Devices.BoundDevice(ctx, call, unit.UnitID)
-		if err != nil {
-			return nil, apperr.Wrap(err, "restrictions.Devices.BoundDevice")
-		}
-
-		if !bound || conn != connectionOnline || power == powerOff {
-			return nil, apperr.E(apperr.Offline, "errors.device_offline")
-		}
-
-		raw, observedAt, err := m.Units.Observation(
-			ctx,
-			call,
-			unit.UnitID,
-		) // equipment's observation (IR194)
-		if err != nil {
-			return nil, apperr.Wrap(err, "restrictions.Units.Observation")
-		}
-
-		if observedAt == nil || call.Now.Sub(*observedAt) > IntentTTL {
-			return nil, apperr.E(apperr.Timeout, "errors.observation_stale")
-		}
-
-		var observed observation
-		if len(raw) > 0 {
-			_ = json.Unmarshal(raw, &observed)
-		}
-
-		releasing := unit.ReleaseState == "waiting_reconcile"
-		set := func(sql string, args ...any) error {
-			_, err := call.Tx.Exec(
-				ctx,
-				`UPDATE restrictions.restriction_units SET
-					`+sql+`, observed_at = $3, pending_reason = NULL WHERE restriction_id `+
-					`= $1 AND unit_id = $2`,
-				append([]any{restriction.ID, unit.UnitID, call.Now}, args...)...)
-
-			return apperr.Wrap(err, "update restrictions.restriction_units")
-		}
-
-		switch {
-		case observed.RestrictionID == nil:
-			if releasing {
-				err = set(
-					`apply_state = 'not_applied', release_state = 'not_required', observed_restriction = NULL`,
-				)
-			} else {
-				err = set(`apply_state = 'not_applied', observed_restriction = NULL`)
-			}
-		case *observed.RestrictionID == restriction.ID && observed.RulesVersion == restriction.RulesVersion:
-			err = set(`apply_state = 'applied', observed_restriction = $4`, raw)
-			if err != nil {
-				return nil, err
-			}
-
-			if releasing {
-				cmd, delivered, _, err := m.send(ctx, call, restriction.ID, unit.UnitID, remove)
-				if err != nil {
-					return nil, err
-				}
-
-				if !delivered {
-					return nil, apperr.E(apperr.Conflict, "errors.unit_busy")
-				}
-
-				setErr := set(
-					`release_state = 'requested', release_command_ids = release_command_ids || $4::uuid`,
-					cmd,
-				)
-				if setErr != nil { // was assigned and dropped (staticcheck SA4006)
-					return nil, setErr
-				}
-			}
-		default:
-			return nil, apperr.E(apperr.Conflict, "errors.observation_mismatch")
-		}
-
+		err = m.reconcileUnit(ctx, call, restriction, unit, raw, observed, remove)
 		if err != nil {
 			return nil, err
 		}
@@ -648,6 +559,146 @@ func (m Restrictions) reconcile(
 	return project(call, restriction), err
 }
 
+// commandPending is whether a command of the restriction for the unit is still requested.
+func commandPending(
+	ctx context.Context,
+	call *ops.Call,
+	restriction, unit uuid.UUID,
+) (bool, error) {
+	var open bool
+
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1
+		AND unit_id = $2 AND status = 'requested')`, restriction, unit).
+		Scan(&open)
+	if err != nil {
+		return false, apperr.Wrap(err, "select restrictions.restriction_commands")
+	}
+
+	return open, nil
+}
+
+// freshObservation is the current observation of a sent_unknown unit that can be reconciled now (D03): no command of it
+// is still requested.
+func (m Restrictions) freshObservation(
+	ctx context.Context,
+	call *ops.Call,
+	restriction Restriction,
+	unit Unit,
+) ([]byte, observation, error) {
+	if unit.ApplyState != applySentUnknown {
+		return nil, observation{}, apperr.Fields(
+			map[string]string{keyUnitIDs: "errors.reconcile_not_needed"},
+		)
+	}
+
+	open, err := commandPending(ctx, call, restriction.ID, unit.UnitID)
+	if err != nil {
+		return nil, observation{}, err
+	}
+
+	if open {
+		return nil, observation{}, apperr.E(apperr.Conflict, "errors.command_pending")
+	}
+
+	raw, err := m.currentObservation(ctx, call, unit.UnitID)
+	if err != nil {
+		return nil, observation{}, err
+	}
+
+	var observed observation
+	if len(raw) > 0 {
+		err := json.Unmarshal(raw, &observed)
+		if err != nil {
+			return nil, observation{}, apperr.Wrap(err, "json.Unmarshal")
+		}
+	}
+
+	return raw, observed, nil
+}
+
+// currentObservation is the equipment's observation of a unit (IR194) whose device is bound, online and powered
+// (OFFLINE), taken at most IntentTTL ago (TIMEOUT, D03).
+func (m Restrictions) currentObservation(
+	ctx context.Context,
+	call *ops.Call,
+	unit uuid.UUID,
+) ([]byte, error) {
+	_, conn, power, bound, err := m.Devices.BoundDevice(ctx, call, unit)
+	if err != nil {
+		return nil, apperr.Wrap(err, "restrictions.Devices.BoundDevice")
+	}
+
+	if !bound || conn != connectionOnline || power == powerOff {
+		return nil, apperr.E(apperr.Offline, "errors.device_offline")
+	}
+
+	raw, observedAt, err := m.Units.Observation(ctx, call, unit)
+	if err != nil {
+		return nil, apperr.Wrap(err, "restrictions.Units.Observation")
+	}
+
+	if observedAt == nil || call.Now.Sub(*observedAt) > IntentTTL {
+		return nil, apperr.E(apperr.Timeout, "errors.observation_stale")
+	}
+
+	return raw, nil
+}
+
+// reconcileUnit records a unit's fresh observation. Nothing observed means not applied; this restriction at its rules
+// version means applied and, while the restriction is being released, the unit's remove command is sent; anything
+// else is a mismatch.
+func (m Restrictions) reconcileUnit(
+	ctx context.Context,
+	call *ops.Call,
+	restriction Restriction,
+	unit Unit,
+	raw []byte,
+	observed observation,
+	remove []byte,
+) error {
+	releasing := unit.ReleaseState == releaseWaitingReconcile
+	set := func(sql string, args ...any) error {
+		_, err := call.Tx.Exec(
+			ctx,
+			`UPDATE restrictions.restriction_units SET
+				`+sql+`, observed_at = $3, pending_reason = NULL WHERE restriction_id `+
+				`= $1 AND unit_id = $2`,
+			append([]any{restriction.ID, unit.UnitID, call.Now}, args...)...)
+
+		return apperr.Wrap(err, "update restrictions.restriction_units")
+	}
+
+	switch {
+	case observed.RestrictionID == nil && releasing:
+		return set(
+			`apply_state = 'not_applied', release_state = 'not_required', observed_restriction = NULL`,
+		)
+	case observed.RestrictionID == nil:
+		return set(`apply_state = 'not_applied', observed_restriction = NULL`)
+	case *observed.RestrictionID != restriction.ID || observed.RulesVersion != restriction.RulesVersion:
+		return apperr.E(apperr.Conflict, "errors.observation_mismatch")
+	}
+
+	err := set(`apply_state = 'applied', observed_restriction = $4`, raw)
+	if err != nil || !releasing {
+		return err
+	}
+
+	cmd, delivered, _, err := m.send(ctx, call, restriction.ID, unit.UnitID, remove)
+	if err != nil {
+		return err
+	}
+
+	if !delivered {
+		return apperr.E(apperr.Conflict, "errors.unit_busy")
+	}
+
+	return set(
+		`release_state = 'requested', release_command_ids = release_command_ids || $4::uuid`,
+		cmd,
+	)
+}
+
 // RetryInput is restrictions.retry input.
 type RetryInput struct {
 	RestrictionID         uuid.UUID   `json:"restrictionId"`
@@ -676,7 +727,7 @@ func (in *RetryInput) Validate() map[string]string {
 		fieldErrs["confirmedRulesVersion"] = apperr.KeyRequired
 	}
 
-	trimReason(&in.Reason, "reason", fieldErrs)
+	trimReason(&in.Reason, fieldErrs)
 
 	return fieldErrs
 }
@@ -712,14 +763,14 @@ func (in *RetryInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/restrictions/{restrictionId}/retry [post]
-func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput) (any, error) {
-	restriction, err := lockCurrent(ctx, c, input.RestrictionID)
+func (m Restrictions) retry(ctx context.Context, call *ops.Call, input *RetryInput) (any, error) {
+	restriction, err := lockCurrent(ctx, call, input.RestrictionID)
 	if err != nil {
 		return nil, err
 	}
 
-	if input.Phase == phaseApply && !c.Principal.Permissions["restriction.write"] ||
-		input.Phase == phaseRelease && !overrideOnlyAllowed(c, restriction) {
+	if input.Phase == phaseApply && !call.Principal.Permissions["restriction.write"] ||
+		input.Phase == phaseRelease && !overrideOnlyAllowed(call, restriction) {
 		return nil, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
@@ -734,166 +785,195 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, input *RetryInput)
 		return nil, err
 	}
 
+	err = retryAllowed(ctx, call, restriction, input.Phase)
+	if err != nil {
+		return nil, err
+	}
+
+	action, err := commandAction(restriction, input.Phase)
+	if err != nil {
+		return nil, err
+	}
+
+	retryUnit := m.retryRelease
 	if input.Phase == phaseApply {
-		if restriction.State != stateRequested {
-			return nil, apperr.E(apperr.Conflict, "errors.restriction_state")
-		}
-
-		paid, err := causesPaid(ctx, c, restriction.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		if paid || exempted(restriction, c.Now) {
-			return nil, apperr.E(apperr.Conflict, "errors.restriction_not_applicable")
-		}
-	} else if restriction.State != stateReleaseRequested {
-		return nil, apperr.E(apperr.Conflict, "errors.restriction_state")
-	}
-
-	action, marshalErr := json.Marshal(
-		map[string]any{
-			keyKind:          actionApplyRestriction,
-			keyRestrictionID: restriction.ID,
-			keyRulesVersion:  restriction.RulesVersion,
-			keyPolicy:        restriction.Policy,
-		},
-	)
-	if marshalErr != nil {
-		return nil, apperr.Wrap(marshalErr, "json.Marshal")
-	}
-
-	if input.Phase == phaseRelease {
-		marshaled, marshalErr := json.Marshal(
-			map[string]any{
-				keyKind:          actionRemoveRestriction,
-				keyRestrictionID: restriction.ID,
-				keyRulesVersion:  restriction.RulesVersion,
-			},
-		)
-		if marshalErr != nil {
-			return nil, apperr.Wrap(marshalErr, "json.Marshal")
-		}
-
-		action = marshaled
+		retryUnit = m.retryApply
 	}
 
 	changed := false
 
 	for _, unit := range targets {
-		var open bool
-
-		err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1
-			AND unit_id = $2 AND status = 'requested')`, restriction.ID, unit.UnitID).
-			Scan(&open)
-		if err != nil {
-			return nil, apperr.Wrap(err, "select restrictions.restriction_commands")
-		}
-
-		if input.Phase == phaseApply {
-			switch {
-			case unit.ApplyState == stateApplied:
-				continue
-			case unit.ApplyState == applySentUnknown:
-				return nil, apperr.E(apperr.Conflict, "errors.reconcile_required")
-			case open:
-				return nil, apperr.E(apperr.Conflict, "errors.command_pending")
-			}
-
-			cmd, delivered, reason, err := m.send(ctx, c, restriction.ID, unit.UnitID, action)
-			if err != nil {
-				return nil, err
-			}
-
-			state := applyNotSent
-			if delivered {
-				state = applySentUnknown
-			}
-
-			_, execErr := c.Tx.Exec(
-				ctx,
-				`UPDATE restrictions.restriction_units SET apply_state = $3, apply_command_ids = apply_command_ids || $4::uuid,
-					pending_reason = $5
-				WHERE restriction_id = $1 AND unit_id = $2`,
-				restriction.ID,
-				unit.UnitID,
-				state,
-				cmd,
-				reason,
-			)
-			if execErr != nil {
-				return nil, apperr.Wrap(execErr, "update restrictions.restriction_units")
-			}
-
-			changed = true
-
-			continue
-		}
-
-		switch {
-		case unit.ReleaseState == stateReleased || unit.ReleaseState == "not_required":
-			continue
-		case unit.ReleaseState == "waiting_reconcile":
-			return nil, apperr.E(apperr.Conflict, "errors.reconcile_required")
-		case unit.ReleaseState == stateRequested || open:
-			return nil, apperr.E(apperr.Conflict, "errors.command_pending")
-		case unit.ApplyState != stateApplied:
-			return nil, apperr.E(apperr.Conflict, "errors.reconcile_required")
-		}
-
-		cmd, delivered, _, err := m.send(ctx, c, restriction.ID, unit.UnitID, action)
+		retried, err := retryUnit(ctx, call, restriction, unit, action)
 		if err != nil {
 			return nil, err
 		}
 
-		if !delivered {
-			return nil, apperr.E(apperr.Offline, "errors.device_offline")
-		}
-
-		_, execErr := c.Tx.Exec(
-			ctx,
-			`UPDATE restrictions.restriction_units SET release_state = 'requested', release_command_ids = release_command_ids ||
-				$3::uuid, pending_reason = NULL
-			WHERE restriction_id = $1 AND unit_id = $2`,
-			restriction.ID,
-			unit.UnitID,
-			cmd,
-		)
-		if execErr != nil {
-			return nil, apperr.Wrap(execErr, "update restrictions.restriction_units")
-		}
-
-		changed = true
+		changed = changed || retried
 	}
 
 	if !changed { // every target already succeeded: existing result, no resend
-		return project(c, restriction), nil
+		return project(call, restriction), nil
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE restrictions.restrictions SET version = version + 1, updated_at = $2 WHERE id = $1`,
 		restriction.ID,
-		c.Now,
+		call.Now,
 	)
 	if execErr != nil {
 		return nil, apperr.Wrap(execErr, "update restrictions.restrictions")
 	}
 
 	next := restriction.Version + 1
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:          "restrictions.retry",
 			TargetKind:      kindRestriction,
 			TargetID:        restriction.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
+			PreviousVersion: call.ExpectedVersion,
 			NextVersion:     &next,
 			Reason:          input.Reason, Result: "", Before: nil, After: nil,
 		},
 	)
-	restriction, err = load(ctx, c, restriction.ID, false)
+	restriction, err = load(ctx, call, restriction.ID, false)
 
-	return project(c, restriction), err
+	return project(call, restriction), err
+}
+
+// retryAllowed checks the restriction's state for a retry: an apply retry needs a requested restriction whose causes
+// are unpaid and that exempts no one now, a release retry a restriction being released.
+func retryAllowed(
+	ctx context.Context,
+	call *ops.Call,
+	restriction Restriction,
+	phase string,
+) error {
+	if phase != phaseApply {
+		if restriction.State != stateReleaseRequested {
+			return apperr.E(apperr.Conflict, "errors.restriction_state")
+		}
+
+		return nil
+	}
+
+	if restriction.State != stateRequested {
+		return apperr.E(apperr.Conflict, "errors.restriction_state")
+	}
+
+	paid, err := causesPaid(ctx, call, restriction.ID)
+	if err != nil {
+		return err
+	}
+
+	if paid || exempted(restriction, call.Now) {
+		return apperr.E(apperr.Conflict, "errors.restriction_not_applicable")
+	}
+
+	return nil
+}
+
+// commandAction is the command of a phase: the restriction to apply with its policy, or its removal.
+func commandAction(restriction Restriction, phase string) ([]byte, error) {
+	action := map[string]any{
+		keyKind:          actionApplyRestriction,
+		keyRestrictionID: restriction.ID,
+		keyRulesVersion:  restriction.RulesVersion,
+		keyPolicy:        restriction.Policy,
+	}
+	if phase == phaseRelease {
+		action = map[string]any{
+			keyKind:          actionRemoveRestriction,
+			keyRestrictionID: restriction.ID,
+			keyRulesVersion:  restriction.RulesVersion,
+		}
+	}
+
+	encoded, err := json.Marshal(action)
+
+	return encoded, apperr.Wrap(err, "json.Marshal")
+}
+
+// retryApply sends the apply command again to a unit that has not applied the restriction and reports whether it did.
+// A unit that applied it is left as it is, one whose result is unknown must be reconciled first, and one with a
+// command still requested waits for it.
+func (m Restrictions) retryApply(
+	ctx context.Context,
+	call *ops.Call,
+	restriction Restriction,
+	unit Unit,
+	action []byte,
+) (bool, error) {
+	open, err := commandPending(ctx, call, restriction.ID, unit.UnitID)
+	if err != nil {
+		return false, err
+	}
+
+	switch {
+	case unit.ApplyState == stateApplied:
+		return false, nil
+	case unit.ApplyState == applySentUnknown:
+		return false, apperr.E(apperr.Conflict, "errors.reconcile_required")
+	case open:
+		return false, apperr.E(apperr.Conflict, "errors.command_pending")
+	}
+
+	err = m.requestApply(ctx, call, restriction.ID, unit.UnitID, action)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// retryRelease sends the remove command again to a unit that still applies the restriction and reports whether it
+// did. A released unit, or one that needs no release, is left as it is.
+func (m Restrictions) retryRelease(
+	ctx context.Context,
+	call *ops.Call,
+	restriction Restriction,
+	unit Unit,
+	action []byte,
+) (bool, error) {
+	open, err := commandPending(ctx, call, restriction.ID, unit.UnitID)
+	if err != nil {
+		return false, err
+	}
+
+	switch {
+	case unit.ReleaseState == stateReleased || unit.ReleaseState == "not_required":
+		return false, nil
+	case unit.ReleaseState == releaseWaitingReconcile:
+		return false, apperr.E(apperr.Conflict, "errors.reconcile_required")
+	case unit.ReleaseState == stateRequested || open:
+		return false, apperr.E(apperr.Conflict, "errors.command_pending")
+	case unit.ApplyState != stateApplied:
+		return false, apperr.E(apperr.Conflict, "errors.reconcile_required")
+	}
+
+	cmd, delivered, _, err := m.send(ctx, call, restriction.ID, unit.UnitID, action)
+	if err != nil {
+		return false, err
+	}
+
+	if !delivered {
+		return false, apperr.E(apperr.Offline, "errors.device_offline")
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`UPDATE restrictions.restriction_units SET release_state = 'requested', release_command_ids = release_command_ids ||
+			$3::uuid, pending_reason = NULL
+		WHERE restriction_id = $1 AND unit_id = $2`,
+		restriction.ID,
+		unit.UnitID,
+		cmd,
+	)
+	if err != nil {
+		return false, apperr.Wrap(err, "update restrictions.restriction_units")
+	}
+
+	return true, nil
 }
 
 // RegisterActions binds the exception, release and recovery operations.

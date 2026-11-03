@@ -118,7 +118,7 @@ func overdueContract(t *testing.T, srv *apiserver.Server, units ...string) (stri
 }
 
 func scheduleBody(k, inv string, units []string, extra map[string]string) string {
-	f := map[string]string{
+	bodyFields := map[string]string{
 		fieldContractID:              `"` + k + `"`,
 		fieldExpectedContractVersion: "1",
 		fieldCauseInvoiceIDs:         `["` + inv + `"]`,
@@ -128,10 +128,10 @@ func scheduleBody(k, inv string, units []string, extra map[string]string) string
 		fieldReason:                  `"Invoice overdue"`,
 		fieldRulesVersion:            `"rules-1"`,
 	}
-	maps.Copy(f, extra)
+	maps.Copy(bodyFields, extra)
 
-	parts := make([]string, 0, len(f))
-	for k, v := range f {
+	parts := make([]string, 0, len(bodyFields))
+	for k, v := range bodyFields {
 		parts = append(parts, `"`+k+`":`+v)
 	}
 

@@ -14,7 +14,7 @@ const fieldChannels = "channels"
 
 // alertPolicyBody builds an alert PolicyInput with overrides (raw JSON values).
 func alertPolicyBody(extra map[string]string) string {
-	f := map[string]string{
+	bodyFields := map[string]string{
 		fieldKind:     `"alert"`,
 		fieldName:     `"Server room too warm"`,
 		fieldTimezone: jsonKualaLumpur,
@@ -38,16 +38,16 @@ func alertPolicyBody(extra map[string]string) string {
 
 	for key, value := range extra {
 		if value == "" {
-			delete(f, key)
+			delete(bodyFields, key)
 
 			continue
 		}
 
-		f[key] = value
+		bodyFields[key] = value
 	}
 
-	parts := make([]string, 0, len(f))
-	for k, v := range f {
+	parts := make([]string, 0, len(bodyFields))
+	for k, v := range bodyFields {
 		parts = append(parts, `"`+k+`":`+v)
 	}
 

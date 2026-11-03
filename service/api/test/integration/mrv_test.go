@@ -39,7 +39,7 @@ func TestMRV(t *testing.T) {
 	base := asStr(t, data(resp)["id"])
 	org := seed.ID("org-customer-b").String()
 	cond := func(extra map[string]string) string {
-		f := map[string]string{
+		bodyFields := map[string]string{
 			fieldFrom: `"` + start.Format(
 				time.RFC3339,
 			) + `"`,
@@ -53,10 +53,10 @@ func TestMRV(t *testing.T) {
 			fieldBoundary:       `"AC input electricity"`,
 			fieldOrganizationID: `"` + org + `"`,
 		}
-		maps.Copy(f, extra)
+		maps.Copy(bodyFields, extra)
 
-		parts := make([]string, 0, len(f))
-		for k, v := range f {
+		parts := make([]string, 0, len(bodyFields))
+		for k, v := range bodyFields {
 			parts = append(parts, `"`+k+`":`+v)
 		}
 

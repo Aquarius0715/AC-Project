@@ -49,10 +49,11 @@ func parsePolicy(raw json.RawMessage) (Policy, bool) {
 	return policy, false
 }
 
-func trimReason(s *string, key string, fe map[string]string) {
+// trimReason trims an input's reason and checks its length (1 to maxReason characters).
+func trimReason(s *string, fe map[string]string) {
 	*s = strings.TrimSpace(*s)
-	if n := utf8.RuneCountInString(*s); n < 1 || n > 1000 {
-		fe[key] = apperr.KeyLength
+	if n := utf8.RuneCountInString(*s); n < 1 || n > maxReason {
+		fe["reason"] = apperr.KeyLength
 	}
 }
 
@@ -111,7 +112,7 @@ func (in *ScheduleInput) Validate() map[string]string {
 		fieldErrs[keyExecuteAfter] = apperr.KeyRequired
 	}
 
-	trimReason(&in.Reason, "reason", fieldErrs)
+	trimReason(&in.Reason, fieldErrs)
 
 	if in.RulesVersion = strings.TrimSpace(
 		in.RulesVersion,
@@ -178,130 +179,27 @@ func (m Restrictions) schedule(
 	call *ops.Call,
 	input *ScheduleInput,
 ) (Restriction, error) {
-	var (
-		version              int
-		rules                *string
-		planType             string
-		eligible             bool
-		customer, org        uuid.UUID
-		contractUnits        []uuid.UUID
-		termStart, termUntil time.Time
-	)
-
-	err := call.Tx.QueryRow(ctx, `SELECT k.version, k.plan_type, k.restriction_eligible, k.rules_version, k.customer_id,
-		k.customer_org_id, lower(k.term), upper(k.term),
-		COALESCE((SELECT array_agg(cu.unit_id) FROM billing.contract_units cu WHERE cu.contract_id = k.id AND
-		cu.contract_version = k.version), '{}')
-		FROM billing.contracts k WHERE k.id = $1 AND k.is_current FOR UPDATE`, input.ContractID).
-		Scan(&version, &planType, &eligible, &rules, &customer, &org, &termStart, &termUntil, &contractUnits)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Restriction{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-	}
-
-	if err != nil {
-		return Restriction{}, apperr.Wrap(err, "select billing.contracts")
-	}
-
-	if version != input.ExpectedContractVersion {
-		return Restriction{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-	}
-
-	if planType != "rto" || !eligible || rules == nil || call.Now.Before(termStart) ||
-		!call.Now.Before(termUntil) {
-		return Restriction{}, apperr.Fields(
-			map[string]string{"contractId": "errors.restriction_ineligible"},
-		)
-	}
-
-	if *rules != input.RulesVersion {
-		return Restriction{}, apperr.Fields(
-			map[string]string{keyRulesVersion: keyRulesVersionMismatch},
-		)
-	}
-
-	if input.ExecuteAfter.Before(call.Now.Add(24 * time.Hour)) {
-		return Restriction{}, apperr.Fields(
-			map[string]string{keyExecuteAfter: "errors.notice_24h"},
-		)
-	}
-
-	overdue, err := overdueInvoices(ctx, call, input.ContractID)
+	contract, err := scheduledContract(ctx, call, input)
 	if err != nil {
 		return Restriction{}, err
 	}
 
-	if len(overdue) == 0 {
-		return Restriction{}, apperr.E(apperr.Conflict, "errors.no_overdue_invoice")
+	err = checkCauses(ctx, call, input)
+	if err != nil {
+		return Restriction{}, err
 	}
 
-	if !sameSet(overdue, input.CauseInvoiceIDs) {
-		return Restriction{}, apperr.Fields(
-			map[string]string{"causeInvoiceIds": "errors.cause_invoices_mismatch"},
-		)
+	err = m.checkTargets(ctx, call, input, contract.units)
+	if err != nil {
+		return Restriction{}, err
 	}
 
-	for _, unitID := range input.UnitIDs {
-		if !slices.Contains(contractUnits, unitID) {
-			return Restriction{}, apperr.Fields(
-				map[string]string{keyUnitIDs: "errors.unit_not_in_contract"},
-			)
-		}
-
-		unitCaps, found, err := m.Units.RestrictionTarget(ctx, call, unitID)
-		if err != nil {
-			return Restriction{}, apperr.Wrap(err, "restrictions.Units.RestrictionTarget")
-		}
-
-		if !found || unitCaps.Archived {
-			return Restriction{}, apperr.E(apperr.Conflict, "errors.unit_archived")
-		}
-
-		if !unitCaps.Control ||
-			(input.policy.Kind == policyTemperatureLimit && !unitCaps.HasTemperature) {
-			return Restriction{}, apperr.Fields(
-				map[string]string{keyUnitIDs: "errors.unsupported_capability"},
-			)
-		}
-
-		if input.policy.Kind == policyTemperatureLimit {
-			v := *input.policy.MinimumCoolingSetpoint
-			if v < unitCaps.TempMin || v > unitCaps.TempMax ||
-				(unitCaps.Step > 0 && math.Abs(math.Remainder(v-unitCaps.TempMin, unitCaps.Step)) > 1e-9) {
-				return Restriction{}, apperr.Fields(
-					map[string]string{keyPolicy: "errors.setpoint_out_of_range"},
-				)
-			}
-		}
-	}
-	// one active restriction per unit (DDC-08 §3): schedules touching the same unit wait for each other here, in unit
-	// order, so two contracts sharing a unit cannot both pass the check below (the contract row lock only orders
-	// schedules of one contract)
-	_, execErr := call.Tx.Exec(
-		ctx,
-		`SELECT pg_advisory_xact_lock(hashtext('restrictions.unit:' || u::text)) FROM unnest($1::uuid[]) AS u ORDER BY u`,
-		input.UnitIDs,
-	)
-	if execErr != nil {
-		return Restriction{}, apperr.Wrap(execErr, "select unnest")
+	err = claimUnits(ctx, call, input.UnitIDs)
+	if err != nil {
+		return Restriction{}, err
 	}
 
-	var busy bool
-
-	scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_units ru JOIN
-		restrictions.restrictions r ON r.id = ru.restriction_id
-			WHERE ru.unit_id = ANY($1) AND (r.state NOT IN ('released','cancelled')
-			  OR jsonb_path_exists(r.recovery_cases, '$[*] ? (@.state != "resolved" && @.unitId == $u)', jsonb_build_object('u',
-			  ru.unit_id::text))))`, input.UnitIDs).
-		Scan(&busy)
-	if scanErr != nil {
-		return Restriction{}, apperr.Wrap(scanErr, "select restrictions.restriction_units")
-	}
-
-	if busy {
-		return Restriction{}, apperr.E(apperr.Conflict, "errors.restriction_exists")
-	}
-
-	recipients, err := noticeRecipients(ctx, call, org)
+	recipients, err := noticeRecipients(ctx, call, contract.org)
 	if err != nil {
 		return Restriction{}, err
 	}
@@ -314,87 +212,14 @@ func (m Restrictions) schedule(
 
 	restrictionID := uuid.New()
 
-	policy, marshalErr := json.Marshal(input.policy)
-	if marshalErr != nil {
-		return Restriction{}, apperr.Wrap(marshalErr, "json.Marshal")
+	err = insertRestriction(ctx, call, restrictionID, input, contract)
+	if err != nil {
+		return Restriction{}, err
 	}
 
-	_, execErr = call.Tx.Exec(
-		ctx,
-		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version,
-			notice_at, execute_after, reason,
-		policy, state, created_at, updated_at) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8,
-		$9, 'scheduled', $6, $6)`,
-		restrictionID,
-		input.ContractID,
-		version,
-		customer,
-		input.RulesVersion,
-		call.Now,
-		input.ExecuteAfter,
-		input.Reason,
-		policy,
-	)
-	if execErr != nil {
-		return Restriction{}, apperr.Wrap(execErr, "insert restrictions.restrictions")
-	}
-
-	for _, inv := range input.CauseInvoiceIDs {
-		_, err := call.Tx.Exec(
-			ctx,
-			`INSERT INTO restrictions.restriction_invoices (tenant_id, restriction_id, invoice_id) VALUES
-				(current_setting('app.tenant_id')::uuid, $1, $2)`,
-			restrictionID,
-			inv,
-		)
-		if err != nil {
-			return Restriction{}, apperr.Wrap(err, "insert restrictions.restriction_invoices")
-		}
-	}
-
-	for _, unitID := range input.UnitIDs {
-		_, err := call.Tx.Exec(
-			ctx,
-			`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state)
-			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'not_sent', 'none')`,
-			restrictionID,
-			unitID,
-		)
-		if err != nil {
-			return Restriction{}, apperr.Wrap(err, "insert restrictions.restriction_units")
-		}
-	}
-
-	notices := []uuid.UUID{}
-
-	for _, r := range recipients {
-		notificationID, err := m.Notify.Create(ctx, call, notify.New{
-			RecipientMembershipID: r,
-			Type:                  kindRestriction,
-			TemplateKey:           kindRestriction,
-			TargetKind:            kindRestriction,
-			TargetID:              restrictionID,
-			Severity:              "warning",
-			Params: map[string]any{
-				keyExecuteAfter: input.ExecuteAfter,
-				"policyKind":    input.policy.Kind,
-			}, Channel: "", SourceAlertID: nil,
-		})
-		if err != nil {
-			return Restriction{}, apperr.Wrap(err, "notify.Store.Create")
-		}
-
-		notices = append(notices, notificationID)
-	}
-
-	_, execErr = call.Tx.Exec(
-		ctx,
-		`UPDATE restrictions.restrictions SET notice_notification_ids = $2 WHERE id = $1`,
-		restrictionID,
-		notices,
-	)
-	if execErr != nil {
-		return Restriction{}, apperr.Wrap(execErr, "update restrictions.restrictions")
+	err = m.announce(ctx, call, restrictionID, input, recipients)
+	if err != nil {
+		return Restriction{}, err
 	}
 
 	call.Emit(
@@ -421,6 +246,277 @@ func (m Restrictions) schedule(
 	)
 
 	return load(ctx, call, restrictionID, false)
+}
+
+// noticePeriod is how long before its execution a restriction is announced at least (errors.notice_24h), and
+// setpointTolerance the floating-point slack allowed when a setpoint is matched to a unit's step.
+const (
+	noticePeriod      = 24 * time.Hour
+	setpointTolerance = 1e-9
+)
+
+// scheduleContract is what scheduling reads of the contract: its version, its customer and the customer's
+// organization, and its units.
+type scheduleContract struct {
+	version       int
+	customer, org uuid.UUID
+	units         []uuid.UUID
+}
+
+// scheduledContract reads and locks the current contract of a schedule and checks it: the expected version, an RTO
+// plan eligible for restriction within its term, the rules version shown, and an execution at least noticePeriod
+// after now.
+func scheduledContract(
+	ctx context.Context,
+	call *ops.Call,
+	input *ScheduleInput,
+) (scheduleContract, error) {
+	var (
+		contract             scheduleContract
+		rules                *string
+		planType             string
+		eligible             bool
+		termStart, termUntil time.Time
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT k.version, k.plan_type, k.restriction_eligible, k.rules_version, k.customer_id,
+		k.customer_org_id, lower(k.term), upper(k.term),
+		COALESCE((SELECT array_agg(cu.unit_id) FROM billing.contract_units cu WHERE cu.contract_id = k.id AND
+		cu.contract_version = k.version), '{}')
+		FROM billing.contracts k WHERE k.id = $1 AND k.is_current FOR UPDATE`, input.ContractID).
+		Scan(
+			&contract.version,
+			&planType,
+			&eligible,
+			&rules,
+			&contract.customer,
+			&contract.org,
+			&termStart,
+			&termUntil,
+			&contract.units,
+		)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return scheduleContract{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return scheduleContract{}, apperr.Wrap(err, "select billing.contracts")
+	}
+
+	switch {
+	case contract.version != input.ExpectedContractVersion:
+		return scheduleContract{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	case planType != "rto" || !eligible || rules == nil || call.Now.Before(termStart) || !call.Now.Before(termUntil):
+		return scheduleContract{}, apperr.Fields(
+			map[string]string{"contractId": "errors.restriction_ineligible"},
+		)
+	case *rules != input.RulesVersion:
+		return scheduleContract{}, apperr.Fields(
+			map[string]string{keyRulesVersion: keyRulesVersionMismatch},
+		)
+	case input.ExecuteAfter.Before(call.Now.Add(noticePeriod)):
+		return scheduleContract{}, apperr.Fields(
+			map[string]string{keyExecuteAfter: "errors.notice_24h"},
+		)
+	}
+
+	return contract, nil
+}
+
+// checkCauses checks the invoices a schedule names as its cause: exactly the contract's overdue invoices.
+func checkCauses(ctx context.Context, call *ops.Call, input *ScheduleInput) error {
+	overdue, err := overdueInvoices(ctx, call, input.ContractID)
+	if err != nil {
+		return err
+	}
+
+	if len(overdue) == 0 {
+		return apperr.E(apperr.Conflict, "errors.no_overdue_invoice")
+	}
+
+	if !sameSet(overdue, input.CauseInvoiceIDs) {
+		return apperr.Fields(map[string]string{"causeInvoiceIds": "errors.cause_invoices_mismatch"})
+	}
+
+	return nil
+}
+
+// checkTargets checks the units a schedule restricts: each is one of the contract's, not archived and controllable,
+// and for a temperature limit has a temperature setting that takes the policy's minimum cooling setpoint.
+func (m Restrictions) checkTargets(
+	ctx context.Context,
+	call *ops.Call,
+	input *ScheduleInput,
+	contractUnits []uuid.UUID,
+) error {
+	temperature := input.policy.Kind == policyTemperatureLimit
+
+	for _, unitID := range input.UnitIDs {
+		if !slices.Contains(contractUnits, unitID) {
+			return apperr.Fields(map[string]string{keyUnitIDs: "errors.unit_not_in_contract"})
+		}
+
+		unitCaps, found, err := m.Units.RestrictionTarget(ctx, call, unitID)
+		if err != nil {
+			return apperr.Wrap(err, "restrictions.Units.RestrictionTarget")
+		}
+
+		if !found || unitCaps.Archived {
+			return apperr.E(apperr.Conflict, "errors.unit_archived")
+		}
+
+		if !unitCaps.Control || (temperature && !unitCaps.HasTemperature) {
+			return apperr.Fields(map[string]string{keyUnitIDs: "errors.unsupported_capability"})
+		}
+
+		if temperature && !setpointFits(*input.policy.MinimumCoolingSetpoint, unitCaps) {
+			return apperr.Fields(map[string]string{keyPolicy: "errors.setpoint_out_of_range"})
+		}
+	}
+
+	return nil
+}
+
+// setpointFits is whether a unit's temperature setting takes a setpoint: within its range and on its step.
+func setpointFits(setpoint float64, unitCaps UnitCaps) bool {
+	return setpoint >= unitCaps.TempMin && setpoint <= unitCaps.TempMax &&
+		(unitCaps.Step <= 0 || math.Abs(math.Remainder(setpoint-unitCaps.TempMin, unitCaps.Step)) <= setpointTolerance)
+}
+
+// claimUnits keeps one active restriction per unit (DDC-08 §3). Schedules touching the same unit wait for each other
+// here, in unit order, so two contracts sharing a unit cannot both pass the check that follows (the contract row lock
+// only orders the schedules of one contract): a unit with an active restriction, or an unresolved recovery case, is
+// refused.
+func claimUnits(ctx context.Context, call *ops.Call, units []uuid.UUID) error {
+	_, err := call.Tx.Exec(
+		ctx,
+		`SELECT pg_advisory_xact_lock(hashtext('restrictions.unit:' || u::text)) FROM unnest($1::uuid[]) AS u ORDER BY u`,
+		units,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "select unnest")
+	}
+
+	var busy bool
+
+	err = call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_units ru JOIN
+		restrictions.restrictions r ON r.id = ru.restriction_id
+			WHERE ru.unit_id = ANY($1) AND (r.state NOT IN ('released','cancelled')
+			  OR jsonb_path_exists(r.recovery_cases, '$[*] ? (@.state != "resolved" && @.unitId == $u)', jsonb_build_object('u',
+			  ru.unit_id::text))))`, units).
+		Scan(&busy)
+	if err != nil {
+		return apperr.Wrap(err, "select restrictions.restriction_units")
+	}
+
+	if busy {
+		return apperr.E(apperr.Conflict, "errors.restriction_exists")
+	}
+
+	return nil
+}
+
+// insertRestriction stores a scheduled restriction with its cause invoices and its units, none sent yet.
+func insertRestriction(
+	ctx context.Context,
+	call *ops.Call,
+	restrictionID uuid.UUID,
+	input *ScheduleInput,
+	contract scheduleContract,
+) error {
+	policy, err := json.Marshal(input.policy)
+	if err != nil {
+		return apperr.Wrap(err, "json.Marshal")
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version,
+			notice_at, execute_after, reason,
+		policy, state, created_at, updated_at) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8,
+		$9, 'scheduled', $6, $6)`,
+		restrictionID,
+		input.ContractID,
+		contract.version,
+		contract.customer,
+		input.RulesVersion,
+		call.Now,
+		input.ExecuteAfter,
+		input.Reason,
+		policy,
+	)
+	if err != nil {
+		return apperr.Wrap(err, "insert restrictions.restrictions")
+	}
+
+	for _, inv := range input.CauseInvoiceIDs {
+		_, err := call.Tx.Exec(
+			ctx,
+			`INSERT INTO restrictions.restriction_invoices (tenant_id, restriction_id, invoice_id) VALUES
+				(current_setting('app.tenant_id')::uuid, $1, $2)`,
+			restrictionID,
+			inv,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "insert restrictions.restriction_invoices")
+		}
+	}
+
+	for _, unitID := range input.UnitIDs {
+		_, err := call.Tx.Exec(
+			ctx,
+			`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state)
+			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 'not_sent', 'none')`,
+			restrictionID,
+			unitID,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "insert restrictions.restriction_units")
+		}
+	}
+
+	return nil
+}
+
+// announce sends the restriction notice to the customer's recipients and records the notifications on the
+// restriction.
+func (m Restrictions) announce(
+	ctx context.Context,
+	call *ops.Call,
+	restrictionID uuid.UUID,
+	input *ScheduleInput,
+	recipients []uuid.UUID,
+) error {
+	notices := make([]uuid.UUID, 0, len(recipients))
+
+	for _, recipient := range recipients {
+		notificationID, err := m.Notify.Create(ctx, call, notify.New{
+			RecipientMembershipID: recipient,
+			Type:                  kindRestriction,
+			TemplateKey:           kindRestriction,
+			TargetKind:            kindRestriction,
+			TargetID:              restrictionID,
+			Severity:              "warning",
+			Params: map[string]any{
+				keyExecuteAfter: input.ExecuteAfter,
+				"policyKind":    input.policy.Kind,
+			}, Channel: "", SourceAlertID: nil,
+		})
+		if err != nil {
+			return apperr.Wrap(err, "notify.Store.Create")
+		}
+
+		notices = append(notices, notificationID)
+	}
+
+	_, err := call.Tx.Exec(
+		ctx,
+		`UPDATE restrictions.restrictions SET notice_notification_ids = $2 WHERE id = $1`,
+		restrictionID,
+		notices,
+	)
+
+	return apperr.Wrap(err, "update restrictions.restrictions")
 }
 
 // noticeRecipients returns the active client memberships of the customer organization (IR05 / IR19: clients read
@@ -533,7 +629,7 @@ func (m Restrictions) execute(
 	}
 
 	if call.Now.Before(restriction.ExecuteAfter) ||
-		call.Now.Before(restriction.NoticeAt.Add(24*time.Hour)) {
+		call.Now.Before(restriction.NoticeAt.Add(noticePeriod)) {
 		return restriction, apperr.E(apperr.Conflict, "errors.restriction_not_due")
 	}
 
@@ -542,38 +638,9 @@ func (m Restrictions) execute(
 		return restriction, apperr.E(apperr.Conflict, "errors.restriction_exempted")
 	}
 
-	var contractVersion int
-
-	scanErr := call.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT version FROM billing.contracts WHERE id = $1 AND is_current),
-		0)`, restriction.ContractID).
-		Scan(&contractVersion)
-	if scanErr != nil {
-		return restriction, apperr.Wrap(scanErr, "select billing.contracts")
-	}
-
-	evidence := 0 // the notices identity stored for the restriction at notice time (IR191)
-
-	if len(restriction.NoticeNotificationIDs) > 0 {
-		stored, err := ops.Query[int](
-			ctx,
-			call,
-			identity.QueryNotificationsStored,
-			identity.NotificationsStoredInput{
-				IDs:        restriction.NoticeNotificationIDs,
-				TargetID:   restriction.ID,
-				OccurredAt: restriction.NoticeAt,
-			},
-		)
-		if err != nil {
-			return restriction, err
-		}
-
-		evidence = stored
-	}
-
-	if evidence == 0 || evidence != len(restriction.NoticeNotificationIDs) ||
-		contractVersion != restriction.ContractVersion {
-		return restriction, apperr.E(apperr.Conflict, "errors.notice_invalid")
+	err = checkNotice(ctx, call, restriction)
+	if err != nil {
+		return restriction, err
 	}
 
 	paid, err := causesPaid(ctx, call, restriction.ID)
@@ -581,76 +648,19 @@ func (m Restrictions) execute(
 		return restriction, err
 	}
 
-	next := restriction.Version + 1
 	if paid { // all causes paid right before execution: cancel without apply requests (DD-A09)
-		_, err := call.Tx.Exec(
-			ctx,
-			`UPDATE restrictions.restrictions SET state = 'cancelled', version = version + 1, updated_at = $2 WHERE id = $1`,
-			restriction.ID,
-			call.Now,
-		)
-		if err != nil {
-			return restriction, apperr.Wrap(err, "update restrictions.restrictions")
-		}
-
-		call.Emit(
-			ops.Event{
-				AggregateType: kindRestriction,
-				AggregateID:   restriction.ID,
-				Type:          "RestrictionCancelled",
-				Payload:       map[string]any{keySource: "payment"},
-			},
-		)
-		call.Audit(
-			ops.AuditEntry{
-				Action:          opExecute,
-				TargetKind:      kindRestriction,
-				TargetID:        restriction.ID.String(),
-				PreviousVersion: call.ExpectedVersion,
-				NextVersion:     &next,
-				Reason:          "causes paid", Result: "", Before: nil, After: nil,
-			},
-		)
-
-		return load(ctx, call, restriction.ID, false)
+		return cancelPaid(ctx, call, restriction)
 	}
 
-	action, marshalErr := json.Marshal(
-		map[string]any{
-			keyKind:          actionApplyRestriction,
-			keyRestrictionID: restriction.ID,
-			keyRulesVersion:  restriction.RulesVersion,
-			keyPolicy:        restriction.Policy,
-		},
-	)
-	if marshalErr != nil {
-		return Restriction{}, apperr.Wrap(marshalErr, "json.Marshal")
+	action, err := commandAction(restriction, phaseApply)
+	if err != nil {
+		return Restriction{}, err
 	}
 
 	for _, unit := range restriction.PerUnit {
-		cmd, delivered, reason, err := m.send(ctx, call, restriction.ID, unit.UnitID, action)
+		err := m.requestApply(ctx, call, restriction.ID, unit.UnitID, action)
 		if err != nil {
 			return restriction, err
-		}
-
-		state := applyNotSent
-		if delivered {
-			state = applySentUnknown
-		}
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`UPDATE restrictions.restriction_units SET apply_state = $3, apply_command_ids = apply_command_ids || $4::uuid,
-				pending_reason = $5
-			WHERE restriction_id = $1 AND unit_id = $2`,
-			restriction.ID,
-			unit.UnitID,
-			state,
-			cmd,
-			reason,
-		)
-		if execErr != nil {
-			return restriction, apperr.Wrap(execErr, "update restrictions.restriction_units")
 		}
 	}
 
@@ -672,6 +682,8 @@ func (m Restrictions) execute(
 			Payload:       map[string]any{keyUnitIDs: restriction.UnitIDs},
 		},
 	)
+
+	next := restriction.Version + 1
 	call.Audit(
 		ops.AuditEntry{
 			Action:          opExecute,
@@ -683,6 +695,151 @@ func (m Restrictions) execute(
 	)
 
 	return load(ctx, call, restriction.ID, false)
+}
+
+// checkNotice checks the notice a restriction gave before it is executed (IR191): the contract is still at the version
+// the restriction was scheduled on, and identity stored every notice notification at notice time.
+func checkNotice(ctx context.Context, call *ops.Call, restriction Restriction) error {
+	var contractVersion int
+
+	err := call.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT version FROM billing.contracts WHERE id = $1 AND is_current),
+		0)`, restriction.ContractID).
+		Scan(&contractVersion)
+	if err != nil {
+		return apperr.Wrap(err, "select billing.contracts")
+	}
+
+	evidence := 0 // the notices identity stored for the restriction at notice time (IR191)
+
+	if len(restriction.NoticeNotificationIDs) > 0 {
+		stored, err := ops.Query[int](
+			ctx,
+			call,
+			identity.QueryNotificationsStored,
+			identity.NotificationsStoredInput{
+				IDs:        restriction.NoticeNotificationIDs,
+				TargetID:   restriction.ID,
+				OccurredAt: restriction.NoticeAt,
+			},
+		)
+		if err != nil {
+			return err
+		}
+
+		evidence = stored
+	}
+
+	if evidence == 0 || evidence != len(restriction.NoticeNotificationIDs) ||
+		contractVersion != restriction.ContractVersion {
+		return apperr.E(apperr.Conflict, "errors.notice_invalid")
+	}
+
+	return nil
+}
+
+// cancelPaid cancels a restriction whose causes were all paid right before its execution, without apply requests
+// (DD-A09).
+func cancelPaid(ctx context.Context, call *ops.Call, restriction Restriction) (Restriction, error) {
+	_, err := call.Tx.Exec(
+		ctx,
+		`UPDATE restrictions.restrictions SET state = 'cancelled', version = version + 1, updated_at = $2 WHERE id = $1`,
+		restriction.ID,
+		call.Now,
+	)
+	if err != nil {
+		return restriction, apperr.Wrap(err, "update restrictions.restrictions")
+	}
+
+	call.Emit(
+		ops.Event{
+			AggregateType: kindRestriction,
+			AggregateID:   restriction.ID,
+			Type:          "RestrictionCancelled",
+			Payload:       map[string]any{keySource: "payment"},
+		},
+	)
+
+	next := restriction.Version + 1
+	call.Audit(
+		ops.AuditEntry{
+			Action:          opExecute,
+			TargetKind:      kindRestriction,
+			TargetID:        restriction.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			NextVersion:     &next,
+			Reason:          "causes paid", Result: "", Before: nil, After: nil,
+		},
+	)
+
+	return load(ctx, call, restriction.ID, false)
+}
+
+// requestApply sends a unit the apply command and records it on the unit: sent with its result unknown, or not sent
+// and why.
+func (m Restrictions) requestApply(
+	ctx context.Context,
+	call *ops.Call,
+	restriction, unit uuid.UUID,
+	action []byte,
+) error {
+	cmd, delivered, reason, err := m.send(ctx, call, restriction, unit, action)
+	if err != nil {
+		return err
+	}
+
+	state := applyNotSent
+	if delivered {
+		state = applySentUnknown
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`UPDATE restrictions.restriction_units SET apply_state = $3, apply_command_ids = apply_command_ids || $4::uuid,
+			pending_reason = $5
+		WHERE restriction_id = $1 AND unit_id = $2`,
+		restriction,
+		unit,
+		state,
+		cmd,
+		reason,
+	)
+
+	return apperr.Wrap(err, "update restrictions.restriction_units")
+}
+
+// recordCommand keeps billing's own record of a restriction command (IR194): the restriction and unit it serves, its
+// kind and whether it was delivered.
+func recordCommand(
+	ctx context.Context,
+	call *ops.Call,
+	commandID, restriction, unit uuid.UUID,
+	action []byte,
+	delivered bool,
+) error {
+	var parsedAction struct {
+		Kind string `json:"kind"`
+	}
+
+	err := json.Unmarshal(action, &parsedAction)
+	if err != nil {
+		return apperr.Wrap(err, "json.Unmarshal")
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`INSERT INTO restrictions.restriction_commands (tenant_id, command_id, restriction_id, unit_id, kind, delivered,
+			status, requested_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, 'requested', $7, $7)`,
+		call.Principal.TenantID,
+		commandID,
+		restriction,
+		unit,
+		parsedAction.Kind,
+		delivered,
+		call.Now,
+	)
+
+	return apperr.Wrap(err, "insert restrictions.restriction_commands")
 }
 
 // send creates one restriction Command for a unit (D03): delivered when the bound device is online, powered and
@@ -738,7 +895,7 @@ func (m Restrictions) send(
 			CommandID:     commandID,
 			UnitID:        unit,
 			DeviceID:      device,
-			ActorID:       SystemActor,
+			ActorID:       systemActor(),
 			Action:        action,
 			RestrictionID: restriction,
 			Status:        status,
@@ -749,45 +906,30 @@ func (m Restrictions) send(
 			CorrelationID: call.CorrelationID,
 		},
 	)
-	if err == nil { // billing's own record of the command (IR194)
-		var parsedAction struct{ Kind string }
-
-		_ = json.Unmarshal(action, &parsedAction)
-		_, err = call.Tx.Exec(
-			ctx,
-			`INSERT INTO restrictions.restriction_commands (tenant_id, command_id, restriction_id, unit_id, kind, delivered,
-				status, requested_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, 'requested', $7, $7)`,
-			call.Principal.TenantID,
-			commandID,
-			restriction,
-			unit,
-			parsedAction.Kind,
-			reason == nil,
-			call.Now,
-		)
+	if err != nil {
+		return commandID, reason == nil, reason, apperr.Wrap(err, "events.Publish")
 	}
 
-	if err == nil {
-		call.Emit(
-			ops.Event{
-				AggregateType: "command",
-				AggregateID:   commandID,
-				Type:          "CommandRequested",
-				Payload: map[string]any{
-					"unitId":   unit,
-					"deviceId": device,
-					"action":   json.RawMessage(action),
-					"delivery": delivery,
-				},
+	err = recordCommand(ctx, call, commandID, restriction, unit, action, reason == nil)
+	if err != nil {
+		return commandID, reason == nil, reason, err
+	}
+
+	call.Emit(
+		ops.Event{
+			AggregateType: "command",
+			AggregateID:   commandID,
+			Type:          "CommandRequested",
+			Payload: map[string]any{
+				"unitId":   unit,
+				"deviceId": device,
+				"action":   json.RawMessage(action),
+				"delivery": delivery,
 			},
-		)
-	}
-
-	return commandID, reason == nil, reason, apperr.Wrap(
-		err,
-		"insert restrictions.restriction_commands",
+		},
 	)
+
+	return commandID, reason == nil, reason, nil
 }
 
 // CancelInput is restrictions.cancel input.
@@ -803,7 +945,7 @@ func (in *CancelInput) Validate() map[string]string {
 		fieldErrs[keyRestrictionID] = apperr.KeyRequired
 	}
 
-	trimReason(&in.Reason, "reason", fieldErrs)
+	trimReason(&in.Reason, fieldErrs)
 
 	return fieldErrs
 }

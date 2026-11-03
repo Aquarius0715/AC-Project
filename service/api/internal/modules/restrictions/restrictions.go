@@ -20,12 +20,17 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
-// SystemActor is the internal 'system-restriction' membership that owns restriction Commands (IR35); it matches
-// the fixture ID system-restriction under the seed namespace.
-var SystemActor = uuid.NewSHA1(
-	uuid.MustParse("6f1c3a52-6d0b-5c1e-9a57-0d1b7a4c2e10"),
-	[]byte("system-restriction"),
-)
+// systemActor is the internal 'system-restriction' membership that owns restriction Commands (IR35); it matches the
+// fixture ID system-restriction under the seed namespace.
+func systemActor() uuid.UUID {
+	return uuid.NewSHA1(
+		uuid.MustParse("6f1c3a52-6d0b-5c1e-9a57-0d1b7a4c2e10"),
+		[]byte("system-restriction"),
+	)
+}
+
+// maxReason is the longest reason a restriction action takes, in characters.
+const maxReason = 1000
 
 // IntentTTL is the lifetime of a restriction Command intent (D03).
 const IntentTTL = 30 * time.Second
@@ -203,19 +208,19 @@ func scan(row pgx.Row) (Restriction, error) {
 }
 
 // decorate loads per-unit state and the audit events.
-func decorate(ctx context.Context, call *ops.Call, x *Restriction) error {
+func decorate(ctx context.Context, call *ops.Call, restriction *Restriction) error {
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT unit_id, apply_state, release_state, apply_command_ids, release_command_ids, observed_restriction,
 			observed_at, evidence_id, pending_reason
 		FROM restrictions.restriction_units WHERE restriction_id = $1 ORDER BY unit_id`,
-		x.ID,
+		restriction.ID,
 	)
 	if err != nil {
 		return apperr.Wrap(err, "select restrictions.restriction_units")
 	}
 
-	x.PerUnit, x.UnitIDs = []Unit{}, []uuid.UUID{}
+	restriction.PerUnit, restriction.UnitIDs = []Unit{}, []uuid.UUID{}
 
 	for rows.Next() {
 		var (
@@ -245,8 +250,8 @@ func decorate(ctx context.Context, call *ops.Call, x *Restriction) error {
 			unit.ObservedRestriction = obs
 		}
 
-		x.PerUnit = append(x.PerUnit, unit)
-		x.UnitIDs = append(x.UnitIDs, unit.UnitID)
+		restriction.PerUnit = append(restriction.PerUnit, unit)
+		restriction.UnitIDs = append(restriction.UnitIDs, unit.UnitID)
 	}
 
 	rows.Close()
@@ -260,32 +265,40 @@ func decorate(ctx context.Context, call *ops.Call, x *Restriction) error {
 		ctx,
 		call,
 		kindRestriction,
-		x.ID.String(),
+		restriction.ID.String(),
 	) // identity's audit log (IR196)
 	if err != nil {
 		return apperr.Wrap(err, "audit.History")
 	}
 
-	x.Events = []Event{}
+	restriction.Events = []Event{}
 	for _, v := range hist {
-		x.Events = append(x.Events, Event(v))
+		restriction.Events = append(restriction.Events, Event(v))
 	}
 
 	return nil
 }
 
-// stateEvents maps audited actions to the state-change events clients may see (IR42).
-var stateEvents = map[string]string{
-	"restrictions.schedule": stateScheduled,
-	opExecute:               stateRequested,
-	"restriction.applied":   stateApplied,
-	"restrictions.cancel":   stateReleaseRequested,
-	"restrictions.release":  stateReleaseRequested,
-	"restrictions.override": stateReleaseRequested,
-	"restriction.released":  stateReleased,
-	"restrictions.defer":    "defer",
-	"restrictions.exempt":   "exempt",
-	"payments.release":      stateReleaseRequested,
+// stateEvent is the state-change event clients may see for an audited action (IR42), "" for an action they do not see.
+func stateEvent(action string) string {
+	switch action {
+	case "restrictions.schedule":
+		return stateScheduled
+	case opExecute:
+		return stateRequested
+	case "restriction.applied":
+		return stateApplied
+	case "restrictions.cancel", "restrictions.release", "restrictions.override", "payments.release":
+		return stateReleaseRequested
+	case "restriction.released":
+		return stateReleased
+	case "restrictions.defer":
+		return "defer"
+	case "restrictions.exempt":
+		return "exempt"
+	}
+
+	return ""
 }
 
 // maskForClient applies the client RestrictionDetail projection (IR42).
@@ -293,7 +306,7 @@ func maskForClient(restriction *Restriction) {
 	events := []Event{}
 
 	for _, event := range restriction.Events {
-		if _, ok := stateEvents[event.Action]; !ok || event.Result != "success" {
+		if stateEvent(event.Action) == "" || event.Result != "success" {
 			continue
 		}
 
@@ -441,19 +454,53 @@ func (m Restrictions) get(ctx context.Context, call *ops.Call, in *GetInput) (an
 	return project(call, x), nil
 }
 
-var states = []string{
-	stateScheduled,
-	stateRequested,
-	stateApplied,
-	stateReleaseRequested,
-	stateReleased,
-	stateCancelled,
+// listStates are the states restrictions.list filters by.
+func listStates() []string {
+	return []string{
+		stateScheduled,
+		stateRequested,
+		stateApplied,
+		stateReleaseRequested,
+		stateReleased,
+		stateCancelled,
+	}
 }
 
 type listFilter struct {
 	ContractID *uuid.UUID `json:"contractId,omitempty"`
 	InvoiceID  *uuid.UUID `json:"invoiceId,omitempty"`
 	Status     *string    `json:"status,omitempty"` // => state
+}
+
+// listWhere is the WHERE clause of restrictions.list's filters, with its arguments.
+func listWhere(filter listFilter) (string, []any) {
+	var args []any
+
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
+	conds := []string{"TRUE"}
+	if filter.ContractID != nil {
+		conds = append(conds, "r.contract_id = "+add(*filter.ContractID))
+	}
+
+	if filter.InvoiceID != nil {
+		conds = append(
+			conds,
+			"EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri WHERE ri.restriction_id = r.id AND ri.invoice_id = "+add(
+				*filter.InvoiceID,
+			)+")",
+		)
+	}
+
+	if filter.Status != nil {
+		conds = append(conds, "r.state = "+add(*filter.Status))
+	}
+
+	return strings.Join(conds, " AND "), args
 }
 
 func (m Restrictions) query(
@@ -484,33 +531,7 @@ func (m Restrictions) query(
 		return nil, nil, 0, 0, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	var args []any
-
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
-	}
-
-	conds := []string{"TRUE"}
-	if filter.ContractID != nil {
-		conds = append(conds, "r.contract_id = "+add(*filter.ContractID))
-	}
-
-	if filter.InvoiceID != nil {
-		conds = append(
-			conds,
-			"EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri WHERE ri.restriction_id = r.id AND ri.invoice_id = "+add(
-				*filter.InvoiceID,
-			)+")",
-		)
-	}
-
-	if filter.Status != nil {
-		conds = append(conds, "r.state = "+add(*filter.Status))
-	}
-
-	where := strings.Join(conds, " AND ")
+	where, args := listWhere(filter)
 
 	var total int
 
@@ -574,7 +595,7 @@ func decodeFilter(raw json.RawMessage, filter *listFilter) error {
 	dec.DisallowUnknownFields()
 
 	if dec.Decode(filter) != nil ||
-		(filter.Status != nil && !slices.Contains(states, *filter.Status)) {
+		(filter.Status != nil && !slices.Contains(listStates(), *filter.Status)) {
 		return apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
 	}
 
