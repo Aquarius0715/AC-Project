@@ -6,6 +6,7 @@
 package gateway
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -24,38 +25,46 @@ import (
 // Targets maps each domain to the base URL of its service.
 type Targets map[string]*url.URL
 
+// upstreamHeaderTimeout bounds the wait for a service's response headers, a little over its 30 s request timeout.
+const upstreamHeaderTimeout = 35 * time.Second
+
+var (
+	errTargetMissing  = errors.New("gateway: a service URL is required")
+	errTargetRelative = errors.New("gateway: a service URL is not absolute")
+)
+
 // TargetsFromEnv reads <DOMAIN>_API_URL for every domain (IDENTITY_API_URL, EQUIPMENT_API_URL, …).
 func TargetsFromEnv(getenv func(string) string) (Targets, error) {
 	targets := Targets{}
 
-	for _, d := range ops.Domains {
-		key := envKey(d)
+	for _, domain := range ops.Domains {
+		key := envKey(domain)
 
 		raw := getenv(key)
 		if raw == "" {
-			return nil, fmt.Errorf("gateway: %s is required", key)
+			return nil, fmt.Errorf("%w: %s", errTargetMissing, key)
 		}
 
 		u, err := url.Parse(raw)
 		if err != nil || u.Scheme == "" || u.Host == "" {
-			return nil, fmt.Errorf("gateway: %s is not an absolute URL", key)
+			return nil, fmt.Errorf("%w: %s", errTargetRelative, key)
 		}
 
-		targets[d] = u
+		targets[domain] = u
 	}
 
 	return targets, nil
 }
 
 func envKey(domain string) string {
-	b := []byte(domain)
-	for i, c := range b {
+	name := []byte(domain)
+	for i, c := range name {
 		if c >= 'a' && c <= 'z' {
-			b[i] = c - 32
+			name[i] = c - ('a' - 'A')
 		}
 	}
 
-	return string(b) + "_API_URL"
+	return string(name) + "_API_URL"
 }
 
 // setNotSniffedOrCached sets the two headers every gateway response carries: the browser keeps no copy of the body and
@@ -107,38 +116,8 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 
 	proxies := map[string]*httputil.ReverseProxy{}
 
-	for d, u := range targets {
-		reverseProxy := httputil.NewSingleHostReverseProxy(u)
-		// set field by field: a literal would have to name every field, Dial and DialTLS too, which are deprecated
-		transport := new(http.Transport)
-		transport.ResponseHeaderTimeout = 35 * time.Second
-		transport.MaxIdleConnsPerHost = 64
-		reverseProxy.Transport = transport
-		// the gateway's middleware sets the request ID and the two headers on every response; the upstream's copies of
-		// them are dropped here, or the proxy would add them a second time (IR407)
-		reverseProxy.ModifyResponse = func(resp *http.Response) error {
-			resp.Header.Del(echo.HeaderXRequestID)
-			resp.Header.Del("X-Content-Type-Options")
-			resp.Header.Del("Cache-Control")
-
-			return nil
-		}
-		reverseProxy.ErrorHandler = func(writer http.ResponseWriter, r *http.Request, err error) {
-			app.Logger.Error("upstream failed", "domain", d, "error", err)
-
-			domainErr := apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
-			domainErr.CorrelationID = writer.Header().Get(echo.HeaderXRequestID)
-			writer.Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-			writer.WriteHeader(domainErr.HTTPStatus())
-			_, _ = fmt.Fprintf(
-				writer,
-				`{"code":%q,"messageKey":%q,"fieldErrors":{},"correlationId":%q,"retryAfterSeconds":null}`,
-				domainErr.Code,
-				domainErr.MessageKey,
-				domainErr.CorrelationID,
-			)
-		}
-		proxies[d] = reverseProxy
+	for domain, target := range targets {
+		proxies[domain] = newProxy(app, domain, target)
 	}
 
 	app.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
@@ -158,13 +137,53 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 	return app
 }
 
-func forward(c *echo.Context, reverseProxy *httputil.ReverseProxy) error {
+// newProxy forwards the requests of one domain to its service at target; an upstream failure is UNAVAILABLE in the
+// DomainError shape.
+func newProxy(app *echo.Echo, domain string, target *url.URL) *httputil.ReverseProxy {
+	reverseProxy := httputil.NewSingleHostReverseProxy(target)
+	// set field by field: a literal would have to name every field, Dial and DialTLS too, which are deprecated
+	transport := new(http.Transport)
+	transport.ResponseHeaderTimeout = upstreamHeaderTimeout
+	transport.MaxIdleConnsPerHost = 64
+	reverseProxy.Transport = transport
+	// the gateway's middleware sets the request ID and the two headers on every response; the upstream's copies of
+	// them are dropped here, or the proxy would add them a second time (IR407)
+	reverseProxy.ModifyResponse = func(resp *http.Response) error {
+		resp.Header.Del(echo.HeaderXRequestID)
+		resp.Header.Del("X-Content-Type-Options")
+		resp.Header.Del("Cache-Control")
+
+		return nil
+	}
+	reverseProxy.ErrorHandler = func(writer http.ResponseWriter, _ *http.Request, err error) {
+		app.Logger.Error("upstream failed", "domain", domain, "error", err)
+
+		domainErr := apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
+		domainErr.CorrelationID = writer.Header().Get(echo.HeaderXRequestID)
+		writer.Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		writer.WriteHeader(domainErr.HTTPStatus())
+		_, _ = fmt.Fprintf(
+			writer,
+			`{"code":%q,"messageKey":%q,"fieldErrors":{},"correlationId":%q,"retryAfterSeconds":null}`,
+			domainErr.Code,
+			domainErr.MessageKey,
+			domainErr.CorrelationID,
+		)
+	}
+
+	return reverseProxy
+}
+
+func forward(ectx *echo.Context, reverseProxy *httputil.ReverseProxy) error {
 	if reverseProxy == nil {
 		return apperr.E(apperr.NotFound, apperr.KeyUnknownOperation)
 	}
 	// the services keep the correlation ID: forward the one this request got
-	c.Request().Header.Set(echo.HeaderXRequestID, c.Response().Header().Get(echo.HeaderXRequestID))
-	reverseProxy.ServeHTTP(c.Response(), c.Request())
+	ectx.Request().Header.Set(
+		echo.HeaderXRequestID,
+		ectx.Response().Header().Get(echo.HeaderXRequestID),
+	)
+	reverseProxy.ServeHTTP(ectx.Response(), ectx.Request())
 
 	return nil
 }

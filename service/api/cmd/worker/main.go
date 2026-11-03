@@ -150,7 +150,7 @@ func runMail(ctx context.Context) {
 	defer ticker.Stop()
 
 	for {
-		n, err := notify.DeliverAll(
+		sent, err := notify.DeliverAll(
 			ctx,
 			srv.DB,
 			sender,
@@ -160,8 +160,8 @@ func runMail(ctx context.Context) {
 		)
 		if err != nil {
 			log.Printf("notification worker: %v", err)
-		} else if n > 0 {
-			log.Printf("notification worker: %d e-mail(s) sent", n)
+		} else if sent > 0 {
+			log.Printf("notification worker: %d e-mail(s) sent", sent)
 		}
 
 		select {
@@ -217,17 +217,17 @@ func runHousekeeping(ctx context.Context) {
 			)
 		}
 
-		n, err := notify.SweepAll(
+		removed, err := notify.SweepAll(
 			ctx,
 			srv.DB,
 			now,
 		)
 		if err != nil { // notifications and sent e-mails older than 2 years
 			log.Printf("housekeeping: notifications: %v", err)
-		} else if n > 0 {
+		} else if removed > 0 {
 			log.Printf(
 				"housekeeping: removed %d notification and e-mail rows older than 2 years",
-				n,
+				removed,
 			)
 		}
 

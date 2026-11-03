@@ -18,26 +18,7 @@ func HTTPErrorHandler(ectx *echo.Context, err error) {
 		return
 	}
 
-	var domainErr *apperr.DomainError
-
-	var sc echo.HTTPStatusCoder // Echo's own errors (route not found, method not allowed, body limit) carry a status
-	switch {
-	case errors.As(err, &domainErr):
-	case errors.As(err, &sc):
-		switch sc.StatusCode() {
-		case http.StatusNotFound, http.StatusMethodNotAllowed:
-			domainErr = apperr.E(apperr.NotFound, apperr.KeyUnknownOperation)
-		case http.StatusRequestEntityTooLarge:
-			domainErr = apperr.E(apperr.Validation, apperr.KeyBodyTooLarge)
-		case http.StatusServiceUnavailable, http.StatusGatewayTimeout:
-			domainErr = apperr.E(apperr.Timeout, apperr.KeyTimeout)
-		default:
-			domainErr = apperr.From(err)
-		}
-	default:
-		domainErr = apperr.From(err)
-	}
-
+	domainErr := domainErrorOf(err)
 	if domainErr.CorrelationID == "" {
 		domainErr.CorrelationID = correlationID(
 			ectx,
@@ -60,4 +41,28 @@ func HTTPErrorHandler(ectx *echo.Context, err error) {
 	}
 
 	_ = ectx.JSON(domainErr.HTTPStatus(), domainErr)
+}
+
+// domainErrorOf is the DomainError an error answers with: the error itself, the nearest one for Echo's own errors
+// (unknown route, wrong method, body limit, timeout), else apperr.From's conversion.
+func domainErrorOf(err error) *apperr.DomainError {
+	if domainErr, ok := errors.AsType[*apperr.DomainError](err); ok {
+		return domainErr
+	}
+
+	var sc echo.HTTPStatusCoder // Echo's own errors (route not found, method not allowed, body limit) carry a status
+	if !errors.As(err, &sc) {
+		return apperr.From(err)
+	}
+
+	switch sc.StatusCode() {
+	case http.StatusNotFound, http.StatusMethodNotAllowed:
+		return apperr.E(apperr.NotFound, apperr.KeyUnknownOperation)
+	case http.StatusRequestEntityTooLarge:
+		return apperr.E(apperr.Validation, apperr.KeyBodyTooLarge)
+	case http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return apperr.E(apperr.Timeout, apperr.KeyTimeout)
+	}
+
+	return apperr.From(err)
 }

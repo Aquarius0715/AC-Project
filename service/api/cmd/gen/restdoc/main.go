@@ -39,15 +39,15 @@ type route struct {
 	Params     []param `json:"params"`
 }
 
-func typeName(p ops.Param) string {
+func typeName(parameter ops.Param) string {
 	switch {
-	case p.Sort:
+	case parameter.Sort:
 		return "string"
-	case p.Kind == ops.KindInteger:
+	case parameter.Kind == ops.KindInteger:
 		return "integer"
-	case p.Kind == ops.KindNumber:
+	case parameter.Kind == ops.KindNumber:
 		return "number"
-	case p.Kind == ops.KindBool:
+	case parameter.Kind == ops.KindBool:
 		return "boolean"
 	}
 
@@ -93,30 +93,30 @@ func main() {
 	out := map[string][]route{}
 
 	for _, operation := range srv.Registry.Operations() {
-		for _, rt := range operation.Spec.Routes {
-			binding, err := ops.NewBinding(operation, rt)
+		for _, catalogRoute := range operation.Spec.Routes {
+			binding, err := ops.NewBinding(operation, catalogRoute)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			r := route{
-				Method:     rt.Method,
-				Path:       rt.Path,
+			described := route{
+				Method:     catalogRoute.Method,
+				Path:       catalogRoute.Path,
 				Body:       binding.Body,
-				FixedField: rt.FixedField,
-				FixedValue: rt.FixedValue,
+				FixedField: catalogRoute.FixedField,
+				FixedValue: catalogRoute.FixedValue,
 				Params:     []param{},
 			}
 			for _, name := range binding.Path {
-				p := binding.Params[name]
-				r.Params = append(
-					r.Params,
+				parameter := binding.Params[name]
+				described.Params = append(
+					described.Params,
 					param{
 						Name:     name,
 						In:       "path",
-						Type:     typeName(p),
+						Type:     typeName(parameter),
 						Role:     "path",
-						Field:    strings.Join(p.At, "."),
+						Field:    strings.Join(parameter.At, "."),
 						Required: true, List: false,
 					},
 				)
@@ -126,29 +126,29 @@ func main() {
 				var query []ops.Param
 
 				for name, p := range binding.Params {
-					if name != rt.FixedField && !contains(binding.Path, name) {
+					if name != catalogRoute.FixedField && !contains(binding.Path, name) {
 						query = append(query, p)
 					}
 				}
 
 				sort.Slice(query, func(i, j int) bool { return query[i].Order < query[j].Order })
 
-				for _, p := range query {
-					r.Params = append(
-						r.Params,
+				for _, parameter := range query {
+					described.Params = append(
+						described.Params,
 						param{
-							Name:  p.Name,
+							Name:  parameter.Name,
 							In:    "query",
-							Type:  typeName(p),
-							List:  p.List,
-							Role:  p.Role,
-							Field: strings.Join(p.At, "."), Required: false,
+							Type:  typeName(parameter),
+							List:  parameter.List,
+							Role:  parameter.Role,
+							Field: strings.Join(parameter.At, "."), Required: false,
 						},
 					)
 				}
 			}
 
-			out[operation.Spec.Name] = append(out[operation.Spec.Name], r)
+			out[operation.Spec.Name] = append(out[operation.Spec.Name], described)
 		}
 	}
 

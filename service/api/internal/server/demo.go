@@ -118,18 +118,18 @@ type Generation struct {
 //	@Router			/v1/demo/advance-clock [post]
 func (d *demoOps) advance(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	input *AdvanceInput,
 ) (Generation, error) {
 	if !d.enabled {
 		return Generation{}, demoOnly()
 	}
 
-	if input.To.Before(c.Now) { // only forward jumps in the API demo (IR36)
+	if input.To.Before(call.Now) { // only forward jumps in the API demo (IR36)
 		return Generation{}, apperr.Fields(map[string]string{"to": "errors.clock_backwards"})
 	}
 
-	err := d.clock.Advance(ctx, input.To.Sub(c.Now))
+	err := d.clock.Advance(ctx, input.To.Sub(call.Now))
 	if err != nil {
 		return Generation{}, apperr.From(err)
 	}
@@ -379,7 +379,7 @@ func (d *demoOps) inTenant(
 	ctx context.Context,
 	now time.Time,
 	probe string,
-	id uuid.UUID,
+	probeID uuid.UUID,
 	callback func(pgx.Tx, uuid.UUID) error,
 ) error {
 	rows, err := d.m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
@@ -392,14 +392,14 @@ func (d *demoOps) inTenant(
 		return apperr.Wrap(err, "select platform.tenants")
 	}
 
-	for _, t := range tenants {
+	for _, tenant := range tenants {
 		found := false
 
 		err := d.m.Run(
 			ctx,
 			false,
 			&ops.Principal{
-				TenantID:          t,
+				TenantID:          tenant,
 				Principal:         authz.Principal{Role: "", Permissions: nil, ClientRole: ""},
 				MembershipID:      uuid.UUID{},
 				UserID:            uuid.UUID{},
@@ -413,7 +413,7 @@ func (d *demoOps) inTenant(
 			func(txn pgx.Tx) error {
 				var ok bool
 
-				err := txn.QueryRow(ctx, probe, id).Scan(&ok)
+				err := txn.QueryRow(ctx, probe, probeID).Scan(&ok)
 				if err != nil || !ok {
 					return apperr.Wrap(err, "queryrow (inTenant)")
 				}
@@ -429,7 +429,7 @@ func (d *demoOps) inTenant(
 					return apperr.Wrap(err, "select set_config")
 				}
 
-				return callback(txn, t)
+				return callback(txn, tenant)
 			},
 		)
 		if err != nil || found {
@@ -470,26 +470,31 @@ func (d *demoOps) inTenant(
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/demo/trigger [post]
-func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput) (Event, error) {
+func (d *demoOps) trigger(ctx context.Context, call *ops.Call, input *TriggerInput) (Event, error) {
 	if !d.enabled {
 		return Event{}, demoOnly()
 	}
 
-	out := Event{EventID: in.EventID, Generation: 1, OccurredAt: in.OccurredAt, Type: in.EventType}
-	switch in.EventType {
+	out := Event{
+		EventID:    input.EventID,
+		Generation: 1,
+		OccurredAt: input.OccurredAt,
+		Type:       input.EventType,
+	}
+	switch input.EventType {
 	case "command_sent":
 		return out, d.inTenant(
 			ctx,
 			call.Now,
 			`SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`,
-			*in.CommandID,
+			*input.CommandID,
 			func(tx pgx.Tx, _ uuid.UUID) error {
 				_, err := tx.Exec(
 					ctx,
 					`UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2, version = version + 1, updated_at =
 						$2 WHERE id = $1 AND status = 'requested'`,
-					*in.CommandID,
-					in.OccurredAt,
+					*input.CommandID,
+					input.OccurredAt,
 				)
 
 				return apperr.Wrap(err, "update control.commands")
@@ -500,9 +505,9 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 			ctx,
 			call.Now,
 			`SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`,
-			*in.CommandID,
+			*input.CommandID,
 			func(tx pgx.Tx, _ uuid.UUID) error {
-				_, err := control.Acknowledge(ctx, tx, *in.CommandID, in.OccurredAt)
+				_, err := control.Acknowledge(ctx, tx, *input.CommandID, input.OccurredAt)
 
 				return apperr.Wrap(err, "control.Acknowledge")
 			},
@@ -512,15 +517,15 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 			ctx,
 			call.Now,
 			`SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`,
-			*in.CommandID,
+			*input.CommandID,
 			func(txn pgx.Tx, _ uuid.UUID) error {
 				tag, err := txn.Exec(
 					ctx,
 					`UPDATE control.commands SET status = 'failed', failure_code = 'DEVICE_REJECTED', version = version + 1, updated_at
 						= $2
 				WHERE id = $1 AND status IN ('requested','sent')`,
-					*in.CommandID,
-					in.OccurredAt,
+					*input.CommandID,
+					input.OccurredAt,
 				)
 				if err != nil || tag.RowsAffected() == 0 {
 					return apperr.Wrap(err, "update control.commands")
@@ -529,11 +534,11 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 				auditResultErr := control.AuditResult(
 					ctx,
 					txn,
-					*in.CommandID,
+					*input.CommandID,
 					"system-iot",
 					"failed",
 					"DEVICE_REJECTED",
-					in.OccurredAt,
+					input.OccurredAt,
 				)
 				if auditResultErr != nil {
 					return apperr.Wrap(auditResultErr, "control.AuditResult")
@@ -542,30 +547,30 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 				return control.EndRestrictionCommands(
 					ctx,
 					txn,
-					[]uuid.UUID{*in.CommandID},
-					in.OccurredAt,
+					[]uuid.UUID{*input.CommandID},
+					input.OccurredAt,
 				)
 			},
 		)
 	}
 
-	switch in.EventType {
+	switch input.EventType {
 	case "device": // SR20 faults and recoveries, SR23 tamper Alert
 		signal := devices.Signal{
-			EventID:    in.EventID,
-			DeviceID:   *in.DeviceID,
-			BindingID:  in.BindingID,
-			Sequence:   int64(*in.Sequence),
-			Kind:       in.Kind,
-			Recovery:   in.Recovery,
-			OccurredAt: in.OccurredAt,
+			EventID:    input.EventID,
+			DeviceID:   *input.DeviceID,
+			BindingID:  input.BindingID,
+			Sequence:   int64(*input.Sequence),
+			Kind:       input.Kind,
+			Recovery:   input.Recovery,
+			OccurredAt: input.OccurredAt,
 		}
 
 		return out, d.inTenant(
 			ctx,
 			call.Now,
 			`SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1)`,
-			*in.DeviceID,
+			*input.DeviceID,
 			func(tx pgx.Tx, _ uuid.UUID) error {
 				_, err := devices.RecordSignal(
 					ctx,
@@ -583,22 +588,22 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 			ctx,
 			call.Now,
 			`SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE id = $1)`,
-			*in.OperationID,
+			*input.OperationID,
 			func(tx pgx.Tx, _ uuid.UUID) error {
 				return devices.FinishOperation(
 					ctx,
 					tx,
-					*in.OperationID,
-					in.Result == "succeeded",
-					in.OccurredAt,
+					*input.OperationID,
+					input.Result == "succeeded",
+					input.OccurredAt,
 					call.Now,
 				)
 			},
 		)
 	}
 
-	if in.EventType == "automation" { // a gateway's facts: the alert policies of the units, never an automation (IR529)
-		evaluationInput := in.Event
+	if input.EventType == "automation" { // a gateway's facts: the alert policies of the units, never an automation (IR529)
+		evaluationInput := input.Event
 		if evaluationInput.OccurredAt.After(call.Now) {
 			return out, apperr.Fields(map[string]string{"event.occurredAt": apperr.KeyRange})
 		}
@@ -612,8 +617,8 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 			call.Now,
 			`SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`,
 			evaluationInput.UnitIDs[0],
-			func(tx pgx.Tx, t uuid.UUID) error {
-				ic := &ops.Call{
+			func(tx pgx.Tx, tenant uuid.UUID) error {
+				systemCall := &ops.Call{
 					Tx:            tx,
 					Now:           call.Now,
 					CorrelationID: uuid.NewString(),
@@ -624,7 +629,7 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 							Permissions: nil,
 							ClientRole:  "",
 						},
-						TenantID: t,
+						TenantID: tenant,
 						UserID: seed.ID(
 							"system-demo",
 						),
@@ -638,14 +643,14 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 					}, Bearer: "", ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil,
 				}
 
-				_, err := d.notify(ctx, ic, evaluationInput)
+				_, err := d.notify(ctx, systemCall, evaluationInput)
 				if err != nil {
 					return err
 				}
 
 				if d.reg != nil &&
 					d.reg.Rec != nil { // the alerts' and notifications' events and audits, as a scheduler job's
-					return d.reg.Rec.Record(ctx, tx, ic, "demo.trigger")
+					return d.reg.Rec.Record(ctx, tx, systemCall, "demo.trigger")
 				}
 
 				return nil
@@ -653,9 +658,9 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 		)
 	}
 
-	if in.EventType == "state" {
+	if input.EventType == "state" {
 		// the device's state report: the unit's observed settings and when the device was last heard
-		if in.OccurredAt.After(call.Now) {
+		if input.OccurredAt.After(call.Now) {
 			return out, apperr.Fields(map[string]string{"occurredAt": apperr.KeyRange})
 		}
 
@@ -663,9 +668,9 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 			ctx,
 			call.Now,
 			`SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1 AND unit_id IS NOT NULL)`,
-			*in.DeviceID,
+			*input.DeviceID,
 			func(txn pgx.Tx, _ uuid.UUID) error {
-				reportedState := in.State
+				reportedState := input.State
 				if reportedState.Power == nil && reportedState.Celsius == nil &&
 					reportedState.Mode == nil &&
 					reportedState.FanLevel == nil {
@@ -675,8 +680,8 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 						ctx,
 						`UPDATE assets.units u SET last_seen_at = GREATEST(COALESCE(u.last_seen_at, $2), $2)
 					FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`,
-						*in.DeviceID,
-						in.OccurredAt,
+						*input.DeviceID,
+						input.OccurredAt,
 					)
 					if err != nil {
 						return apperr.Wrap(err, "update assets.units")
@@ -688,7 +693,7 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 							"celsius":    reportedState.Celsius,
 							"mode":       reportedState.Mode,
 							"fanLevel":   reportedState.FanLevel,
-							"observedAt": in.OccurredAt.UTC(),
+							"observedAt": input.OccurredAt.UTC(),
 						},
 					)
 
@@ -696,9 +701,9 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 						ctx,
 						`UPDATE assets.units u SET observed_state = $2, last_seen_at = GREATEST(COALESCE(u.last_seen_at, $3), $3)
 					FROM devices.devices d WHERE d.id = $1 AND u.id = d.unit_id`,
-						*in.DeviceID,
+						*input.DeviceID,
 						state,
-						in.OccurredAt,
+						input.OccurredAt,
 					)
 					if err != nil {
 						return apperr.Wrap(err, "update assets.units")
@@ -708,8 +713,8 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 				_, err := txn.Exec(
 					ctx,
 					`UPDATE devices.devices SET last_seen_at = GREATEST(COALESCE(last_seen_at, $2), $2) WHERE id = $1`,
-					*in.DeviceID,
-					in.OccurredAt,
+					*input.DeviceID,
+					input.OccurredAt,
 				)
 
 				return apperr.Wrap(err, "update devices.devices")
@@ -717,22 +722,22 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 		)
 	}
 
-	if in.EventType == "restriction_observation" { // SR26: a device reports which restriction it enforces
+	if input.EventType == "restriction_observation" { // SR26: a device reports which restriction it enforces
 		return out, d.inTenant(
 			ctx,
 			call.Now,
 			`SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`,
-			*in.UnitID,
+			*input.UnitID,
 			func(txn pgx.Tx, _ uuid.UUID) error {
 				var obsRaw any // the device observation itself (equipment data); restrictions reacts to it
-				if in.Observed != nil {
-					obsRaw, _ = json.Marshal(in.Observed)
+				if input.Observed != nil {
+					obsRaw, _ = json.Marshal(input.Observed)
 				}
 
 				_, err := txn.Exec(
 					ctx,
 					`UPDATE assets.units SET observed_restriction = $2, last_seen_at = $3 WHERE id = $1`,
-					*in.UnitID,
+					*input.UnitID,
 					obsRaw,
 					call.Now,
 				)
@@ -740,19 +745,19 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 					return apperr.Wrap(err, "update assets.units")
 				}
 
-				raw, _ := json.Marshal(in.Observed) // "null" when the device enforces none
+				raw, _ := json.Marshal(input.Observed) // "null" when the device enforces none
 
 				return events.Publish(
 					ctx,
 					txn,
 					call.Principal.TenantID,
 					"unit",
-					*in.UnitID,
+					*input.UnitID,
 					events.UnitRestrictionObserved,
 					events.Observation{
-						UnitID:   *in.UnitID,
+						UnitID:   *input.UnitID,
 						Observed: raw,
-						EventID:  in.EventID,
+						EventID:  input.EventID,
 						At:       call.Now,
 					},
 				) // billing updates recovery cases (IR185)
@@ -761,14 +766,14 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 	}
 
 	// telemetry: D07 / IR12 normalization, IR77 sequence latest+1, IR11 boundary from the sensor
-	rawMeasurement := in.Measurement
+	rawMeasurement := input.Measurement
 
 	return out, d.inTenant(
 		ctx,
 		call.Now,
 		`SELECT EXISTS (SELECT 1 FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id WHERE s.id = $1)`,
 		rawMeasurement.SensorID,
-		func(txn pgx.Tx, t uuid.UUID) error {
+		func(txn pgx.Tx, tenant uuid.UUID) error {
 			var (
 				metric, unit string
 				boundary     *string
@@ -837,7 +842,7 @@ func (d *demoOps) trigger(ctx context.Context, call *ops.Call, in *TriggerInput)
 				`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
 					raw_unit, origin, quality, quality_reason,
 			boundary_id, received_at, event_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-				t,
+				tenant,
 				rawMeasurement.UnitID,
 				rawMeasurement.SensorID,
 				rawMeasurement.Metric,

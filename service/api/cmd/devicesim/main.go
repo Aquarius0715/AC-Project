@@ -90,13 +90,13 @@ func main() {
 			id := seed.ID(devicesim.DeviceName(pattern)).String()
 			powerOff := pattern.PowerSignal == "off" ||
 				(pattern.State.Power != nil && !*pattern.State.Power)
-			m := devicesim.NewModule(*tenant, id, fleet.FirmwareOf(pattern), seedOf(id)).
+			fleetModule := devicesim.NewModule(*tenant, id, fleet.FirmwareOf(pattern), seedOf(id)).
 				Behave(pattern.Telemetry, pattern.Commands, powerOff).
 				Reports(pattern.State.Power, pattern.State.Celsius, pattern.State.Mode, pattern.State.FanLevel)
 
 				// the fleet's units show their state live
-			modules = append(modules, m)
-			beats[m] = pattern.Connection == "online"
+			modules = append(modules, fleetModule)
+			beats[fleetModule] = pattern.Connection == "online"
 		}
 	}
 	// the subscriptions are made on every connect: a clean session loses them when the broker restarts

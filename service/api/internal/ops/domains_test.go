@@ -1,34 +1,41 @@
-package ops
+package ops_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/pradita/ac-project/service/api/internal/ops"
+)
 
 func TestEveryOperationHasOneDomain(t *testing.T) {
-	err := CheckDomains()
+	t.Parallel()
+
+	err := ops.CheckDomains()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	counts := map[string]int{}
-	for name := range SpecByName() {
-		counts[DomainOf(name)]++
+	for name := range ops.SpecByName() {
+		counts[ops.DomainOf(name)]++
 	}
 
 	total := 0
 
-	for _, d := range Domains {
-		if counts[d] == 0 {
-			t.Errorf("domain %s owns no operation", d)
+	for _, domain := range ops.Domains {
+		if counts[domain] == 0 {
+			t.Errorf("domain %s owns no operation", domain)
 		}
 
-		total += counts[d]
+		total += counts[domain]
 	}
 
-	if total != len(SpecByName()) {
-		t.Fatalf("operations covered %d of %d", total, len(SpecByName()))
+	if total != len(ops.SpecByName()) {
+		t.Fatalf("operations covered %d of %d", total, len(ops.SpecByName()))
 	}
 
-	if DomainOf("jobs.list") != DomainMaintenance || DomainOf("units.list") != DomainEquipment ||
-		DomainOf("nope") != "" {
+	if ops.DomainOf("jobs.list") != ops.DomainMaintenance ||
+		ops.DomainOf("units.list") != ops.DomainEquipment ||
+		ops.DomainOf("nope") != "" {
 		t.Fatal("DomainOf")
 	}
 }

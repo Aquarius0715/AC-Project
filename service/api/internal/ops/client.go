@@ -27,6 +27,28 @@ func ClientRequest(operation, input string) (string, string, io.Reader) {
 		return http.MethodPost, "/v1/" + operation, strings.NewReader(input)
 	}
 
+	req, parsed := decodeClientInput(input)
+	route := pickRoute(spec.Routes, req)
+	path := fillPath(route, req)
+
+	if route.Method == http.MethodGet || route.Method == http.MethodDelete {
+		return route.Method, path + queryString(req, input, parsed), nil
+	}
+
+	if !parsed {
+		return route.Method, path, strings.NewReader(input)
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil { // decoded JSON always encodes again; the input as it is otherwise
+		return route.Method, path, strings.NewReader(input)
+	}
+
+	return route.Method, path, bytes.NewReader(body)
+}
+
+// decodeClientInput decodes the input object; parsed is false for input that is not one (it is sent as it is).
+func decodeClientInput(input string) (map[string]any, bool) {
 	var req map[string]any
 
 	dec := json.NewDecoder(strings.NewReader(input))
@@ -37,14 +59,18 @@ func ClientRequest(operation, input string) (string, string, io.Reader) {
 		req = map[string]any{}
 	}
 
-	route := pickRoute(spec.Routes, req)
+	return req, parsed
+}
 
+// fillPath takes the route's path parameters out of the input into the path, percent-encoded, and drops the route's
+// fixed field when the input holds its value.
+func fillPath(route Route, req map[string]any) string {
 	path := route.Path
-	for _, p := range PathParams(route.Path) {
+	for _, param := range PathParams(route.Path) {
 		path = strings.Replace(
 			path,
-			"{"+p+"}",
-			url.PathEscape(paramText(takeAt(req, strings.Split(p, ".")))),
+			"{"+param+"}",
+			url.PathEscape(paramText(takeAt(req, strings.Split(param, ".")))),
 			1,
 		)
 	}
@@ -53,28 +79,24 @@ func ClientRequest(operation, input string) (string, string, io.Reader) {
 		delete(req, f)
 	}
 
-	if route.Method == http.MethodGet || route.Method == http.MethodDelete {
-		params := url.Values{}
-		if parsed {
-			flattenQuery(params, "", req, true)
-		} else {
-			params.Set("_", input)
-		}
+	return path
+}
 
-		if len(params) > 0 {
-			path += "?" + params.Encode()
-		}
-
-		return route.Method, path, nil
+// queryString is the query string of a GET or DELETE route: the rest of the input, or input that is not an object as
+// the parameter "_".
+func queryString(req map[string]any, input string, parsed bool) string {
+	params := url.Values{}
+	if parsed {
+		flattenQuery(params, "", req, true)
+	} else {
+		params.Set("_", input)
 	}
 
-	if !parsed {
-		return route.Method, path, strings.NewReader(input)
+	if len(params) == 0 {
+		return ""
 	}
 
-	b, _ := json.Marshal(req)
-
-	return route.Method, path, bytes.NewReader(b)
+	return "?" + params.Encode()
 }
 
 // pickRoute prefers the route with the most path parameters the input holds and whose fixed field it matches.
@@ -85,28 +107,28 @@ func pickRoute(routes []Route, input map[string]any) Route {
 			continue
 		}
 
-		n := 0
+		held := 0
 
 		for _, p := range PathParams(route.Path) {
 			if lookupAt(input, strings.Split(p, ".")) == nil {
-				n = -1
+				held = -1
 
 				break
 			}
 
-			n++
+			held++
 		}
 
-		if n > score {
-			best, score = route, n
+		if held > score {
+			best, score = route, held
 		}
 	}
 
 	return best
 }
 
-func lookupAt(obj map[string]any, at []string) any {
-	for _, k := range at[:len(at)-1] {
+func lookupAt(obj map[string]any, fieldPath []string) any {
+	for _, k := range fieldPath[:len(fieldPath)-1] {
 		next, ok := obj[k].(map[string]any)
 		if !ok {
 			return nil
@@ -115,11 +137,11 @@ func lookupAt(obj map[string]any, at []string) any {
 		obj = next
 	}
 
-	return obj[at[len(at)-1]]
+	return obj[fieldPath[len(fieldPath)-1]]
 }
 
-func takeAt(obj map[string]any, at []string) any {
-	for _, k := range at[:len(at)-1] {
+func takeAt(obj map[string]any, fieldPath []string) any {
+	for _, k := range fieldPath[:len(fieldPath)-1] {
 		next, ok := obj[k].(map[string]any)
 		if !ok {
 			return nil
@@ -128,56 +150,65 @@ func takeAt(obj map[string]any, at []string) any {
 		obj = next
 	}
 
-	v := obj[at[len(at)-1]]
-	delete(obj, at[len(at)-1])
+	v := obj[fieldPath[len(fieldPath)-1]]
+	delete(obj, fieldPath[len(fieldPath)-1])
 
 	return v
 }
 
-func paramText(v any) string {
-	switch x := v.(type) {
+func paramText(value any) string {
+	switch typed := value.(type) {
 	case nil:
 		return ""
 	case string:
-		return x
+		return typed
 	case bool:
-		if x {
+		if typed {
 			return "true"
 		}
 
 		return "false"
 	case json.Number:
-		return x.String()
+		return typed.String()
 	}
 
-	b, _ := json.Marshal(v)
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return ""
+	}
 
-	return string(b)
+	return string(raw)
 }
 
 func flattenQuery(params url.Values, prefix string, obj map[string]any, top bool) {
-	for key, v := range obj {
-		switch x := v.(type) {
+	for key, value := range obj {
+		switch typed := value.(type) {
 		case nil:
 		case map[string]any:
-			switch {
-			case top && (key == "query" || key == "filters"):
-				flattenQuery(params, "", x, true)
-			case key == "sort":
-				params.Set("sort", paramText(x["field"])+":"+paramText(x["direction"]))
-			default:
-				flattenQuery(params, prefix+key+".", x, false)
-			}
+			flattenObject(params, prefix, key, typed, top)
 		case []any:
-			if len(x) == 0 { // the empty list
+			if len(typed) == 0 { // the empty list
 				params.Add(prefix+key, "")
 			}
 
-			for _, e := range x {
-				params.Add(prefix+key, paramText(e))
+			for _, item := range typed {
+				params.Add(prefix+key, paramText(item))
 			}
 		default:
-			params.Add(prefix+key, paramText(x))
+			params.Add(prefix+key, paramText(typed))
 		}
+	}
+}
+
+// flattenObject adds the fields of a nested object: the paging query and the filters by name at the top, sort as
+// field:direction, any other object as object.field.
+func flattenObject(params url.Values, prefix, key string, obj map[string]any, top bool) {
+	switch {
+	case top && (key == fieldQuery || key == fieldFilters):
+		flattenQuery(params, "", obj, true)
+	case key == paramSort:
+		params.Set(paramSort, paramText(obj[sortKeyField])+":"+paramText(obj[sortKeyDirection]))
+	default:
+		flattenQuery(params, prefix+key+".", obj, false)
 	}
 }

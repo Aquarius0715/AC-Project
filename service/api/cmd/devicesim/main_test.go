@@ -21,13 +21,13 @@ func TestClientTagIsShortAndStable(t *testing.T) {
 
 // TestSeedIsPerDevice: each device has its own seed, the same device always the same seed.
 func TestSeedIsPerDevice(t *testing.T) {
-	a, b := seedOf(
+	first, second := seedOf(
 		"71f1fdc1-0d2b-516c-8bfa-bd8dfecd338b",
 	), seedOf(
 		"88ee2ed2-79db-53b6-be15-a92f7829c53d",
 	)
-	if a == b || a != seedOf("71f1fdc1-0d2b-516c-8bfa-bd8dfecd338b") {
-		t.Errorf("seeds %d %d", a, b)
+	if first == second || first != seedOf("71f1fdc1-0d2b-516c-8bfa-bd8dfecd338b") {
+		t.Errorf("seeds %d %d", first, second)
 	}
 }
 

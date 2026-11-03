@@ -568,25 +568,29 @@ func (v maintenanceView) AddJobNote(
 }
 
 // registerCrossDomain binds the owner-side handlers of the adapters above.
-func registerCrossDomain(r *ops.Registry, eq equipmentView, mv maintenanceView) {
-	e := ops.DomainEquipment
-	ops.RegisterQuery(r, e, qUnitState, eq.unitState)
-	ops.RegisterQuery(r, e, qUnitsOfProperty, eq.unitsOfProperty)
-	ops.RegisterQuery(r, e, qOrgOfCustomer, eq.orgOfCustomer)
-	ops.RegisterQuery(r, e, qUnitsOfOrg, eq.unitsOfOrg)
-	ops.RegisterQuery(r, e, qUnitService, eq.unitService)
-	ops.RegisterQuery(r, e, qCustomerProfiles, eq.customerProfiles)
-	ops.RegisterQuery(r, e, qSiteAddress, eq.siteAddress)
-	ops.RegisterQuery(r, e, qWarrantyEnd, eq.warrantyEnd)
-	ops.RegisterQuery(r, e, qBriefUnits, eq.briefUnits)
-	ops.RegisterQuery(r, e, qCustomerOfOrg, eq.customerOfOrg)
-	ops.RegisterQuery(r, e, qCustomerState, eq.customerState)
-	ops.RegisterQuery(r, e, qRestrictionTarget, eq.restrictionTarget)
-	ops.RegisterQuery(r, e, qUnitObservation, eq.observation)
-	ops.RegisterQuery(r, e, qUnitSeverities, eq.unitSeverities)
-	ops.RegisterQuery(r, e, qRunHours, eq.runHours)
-	ops.RegisterQuery(r, e, qBoundDevice, eq.boundDevice)
-	ops.RegisterQuery(r, e, qOperationBusy, eq.operationBusy)
-	ops.RegisterQuery(r, ops.DomainMaintenance, qAcceptedJobs, mv.acceptedJobs)
-	ops.RegisterQuery(r, ops.DomainMaintenance, qRateAt, mv.rateAt)
+func registerCrossDomain(
+	r *ops.Registry,
+	equipment equipmentView,
+	maintenanceReads maintenanceView,
+) {
+	equipmentDomain := ops.DomainEquipment
+	ops.RegisterQuery(r, equipmentDomain, qUnitState, equipment.unitState)
+	ops.RegisterQuery(r, equipmentDomain, qUnitsOfProperty, equipment.unitsOfProperty)
+	ops.RegisterQuery(r, equipmentDomain, qOrgOfCustomer, equipment.orgOfCustomer)
+	ops.RegisterQuery(r, equipmentDomain, qUnitsOfOrg, equipment.unitsOfOrg)
+	ops.RegisterQuery(r, equipmentDomain, qUnitService, equipment.unitService)
+	ops.RegisterQuery(r, equipmentDomain, qCustomerProfiles, equipment.customerProfiles)
+	ops.RegisterQuery(r, equipmentDomain, qSiteAddress, equipment.siteAddress)
+	ops.RegisterQuery(r, equipmentDomain, qWarrantyEnd, equipment.warrantyEnd)
+	ops.RegisterQuery(r, equipmentDomain, qBriefUnits, equipment.briefUnits)
+	ops.RegisterQuery(r, equipmentDomain, qCustomerOfOrg, equipment.customerOfOrg)
+	ops.RegisterQuery(r, equipmentDomain, qCustomerState, equipment.customerState)
+	ops.RegisterQuery(r, equipmentDomain, qRestrictionTarget, equipment.restrictionTarget)
+	ops.RegisterQuery(r, equipmentDomain, qUnitObservation, equipment.observation)
+	ops.RegisterQuery(r, equipmentDomain, qUnitSeverities, equipment.unitSeverities)
+	ops.RegisterQuery(r, equipmentDomain, qRunHours, equipment.runHours)
+	ops.RegisterQuery(r, equipmentDomain, qBoundDevice, equipment.boundDevice)
+	ops.RegisterQuery(r, equipmentDomain, qOperationBusy, equipment.operationBusy)
+	ops.RegisterQuery(r, ops.DomainMaintenance, qAcceptedJobs, maintenanceReads.acceptedJobs)
+	ops.RegisterQuery(r, ops.DomainMaintenance, qRateAt, maintenanceReads.rateAt)
 }
