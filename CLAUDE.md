@@ -51,5 +51,5 @@ ESLint in `service/web` (npm workspaces).
 - Web (`service/web`): `npm run lint:strict`, `npm run typecheck` and `npm test` report 0 errors.
 - `sh scripts/check.sh` exits 0 before a commit. Capture its exit code; never pipe it.
 - The raw output of these commands is shown before asking for review.
-- While the lint backlog of November 2026 is being cleared, a change keeps the packages it touches at 0 issues. The
-  whole tree reaches 0 when the backlog is done, and CI then requires it.
+- While the lint backlog of November 2026 is being cleared, a Go change keeps the packages it touches at 0 issues and a
+  web change adds no finding. The whole tree reaches 0 when the backlog is done, and CI then requires it.

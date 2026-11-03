@@ -7,6 +7,7 @@
 // - Every rule of unicorn, sonarjs and security.
 // - vitest's recommended rules for the unit tests (playwright's come with the E2E config).
 // The scripts run ESLint with --max-warnings=0, so every finding fails the lint.
+import comments from "@eslint-community/eslint-plugin-eslint-comments/configs";
 import vitest from "@vitest/eslint-plugin";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
@@ -57,6 +58,7 @@ export function webConfig(tsconfigRootDir) {
     unicorn.configs.all,
     { plugins: { sonarjs }, rules: everyRule("sonarjs", sonarjs) },
     { plugins: { security }, rules: everyRule("security", security) },
+    comments.recommended,
     { files: ["**/__tests__/**", "**/*.test.{ts,tsx}"], ...vitest.configs.recommended },
     // Where a rule needs a fact of this project, or contradicts a contract or platform it has to follow:
     {
@@ -78,6 +80,65 @@ export function webConfig(tsconfigRootDir) {
         "unicorn/prefer-temporal": "off",
         // TypeScript's lib does not declare Iterator.concat yet, so a call to it does not type-check
         "unicorn/prefer-iterator-concat": "off",
+      },
+    },
+    // The repository's lint rules (CLAUDE.md):
+    {
+      rules: {
+        // 1: a suppression names its rule and says why, and a dependency array is never suppressed
+        "@eslint-community/eslint-comments/require-description": "error",
+        "@eslint-community/eslint-comments/no-restricted-disable": ["error", "react-hooks/exhaustive-deps"],
+        // 1: no assertion that narrows a type, and no double assertion through unknown or any
+        "@typescript-eslint/no-unsafe-type-assertion": "error",
+        "no-restricted-syntax": [
+          "error",
+          {
+            selector: "TSAsExpression > TSAsExpression[typeAnnotation.type=/^TS(?:Unknown|Any)Keyword$/]",
+            message: "Narrow the value with a runtime check or a Zod schema instead of asserting through unknown or any.",
+          },
+        ],
+        // 3: no raw HTML
+        "react/no-danger": "error",
+        // 4-2: the cyclomatic count adds every case of a flat switch or lookup, so it takes Go's limit (30);
+        // sonarjs/cognitive-complexity judges how hard the code is to follow
+        "sonarjs/cyclomatic-complexity": ["error", { threshold: 30 }],
+        // 2: the conventional short names stay short. props, ref, params, req, res and env are the platform's and
+        // React's; e, i, j, acc, prev, fn and el the usual names in handlers, loops, reducers and state updaters
+        "unicorn/name-replacements": [
+          "error",
+          {
+            replacements: {
+              acc: false,
+              args: false,
+              ctx: false,
+              db: false,
+              e: false,
+              el: false,
+              env: false,
+              fn: false,
+              i: false,
+              j: false,
+              params: false,
+              prev: false,
+              props: false,
+              ref: false,
+              refs: false,
+              req: false,
+              res: false,
+            },
+          },
+        ],
+      },
+    },
+    {
+      // 4-2: a test reads as one scenario from its set-up to its assertions; cutting it up only to meet a size or
+      // complexity limit hides its steps
+      files: ["**/__tests__/**", "**/*.test.{ts,tsx}", "e2e/**", "**/*.e2e.ts"],
+      rules: {
+        "sonarjs/cognitive-complexity": "off",
+        "sonarjs/cyclomatic-complexity": "off",
+        "sonarjs/max-lines": "off",
+        "sonarjs/max-lines-per-function": "off",
       },
     },
     {

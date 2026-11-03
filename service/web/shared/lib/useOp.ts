@@ -2,7 +2,7 @@
 
 // Data-source switch for screens: in the Phase 1A demo (DATA_SOURCE=mock) screens keep their fixture data; with
 // DATA_SOURCE=API the same screen reads the Core API through the BFF relay.
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { callOp, OpError } from "@ac/web/lib/ops";
 import type { OpArgs, OpCall } from "@ac/web/lib/opTypes";
 
@@ -52,21 +52,21 @@ The fetch result is stored with the request it answers; `loading` is derived (no
 export function useOp<T, R>(...[operation, input, mock, map, enabled = true]: [...OpCall, mock: R, map: (data: T) => R, enabled?: boolean]): { data: R; loading: boolean; error: OpError | null; source: "mock" | "api" | null } {
   const session = useBffSession();
   const rev = useRevision();
-  const key = JSON.stringify(input);
-  const request = `${operation}|${key}|${rev}`;
+  const request = `${operation}|${JSON.stringify(input)}|${rev}`;
   const [state, setState] = useState<{ request: string | null; data: R; error: OpError | null }>({ request: null, data: mock, error: null });
   const isActive = session?.dataSource === "api" && enabled;
+  // callers pass a new input object and an inline projection on every render: the read uses the latest of both, and
+  // the request (operation, input and revision) decides when it runs again
+  const read = useEffectEvent(() => callOp<T>(...([operation, input] as OpArgs<never>)).then(map));
   useEffect(() => {
     if (!isActive) return;
     let isLive = true;
-    callOp<T>(...([operation, JSON.parse(key)] as OpArgs<never>))
-      .then((d) => isLive && setState({ request, data: map(d), error: null }))
+    read()
+      .then((data) => isLive && setState({ request, data, error: null }))
       .catch((error: unknown) => isLive && setState((s) => ({ request, data: s.data, error: error instanceof OpError ? error : null })));
     return () => {
       isLive = false;
     };
-    // map is a pure projection supplied inline by the caller; request covers operation, input and revision
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, request]);
   if (session?.dataSource !== "api") return { data: mock, loading: false, error: null, source: session?.dataSource ?? null }; // live mock value
   return { data: state.data, loading: isActive && state.request !== request, error: state.request === request ? state.error : null, source: "api" };
