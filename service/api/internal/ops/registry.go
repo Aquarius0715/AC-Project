@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -131,44 +132,59 @@ type Denial struct {
 
 // deniedKinds names the audit target kind of an operation's resource, as the entries of its successful writes do; an
 // operation's own entry wins over its resource's (members.clearUnavailability names an unavailability, IR612).
-var deniedKinds = map[string]string{
-	"alerts":                      "alert",
-	"automations":                 "automation",
-	"commands":                    "command",
-	"contracts":                   "contract",
-	"devices":                     "device",
-	"invoices":                    "invoice",
-	"jobs":                        "job",
-	"members":                     "membership",
-	"payments":                    "payment",
-	"policies":                    "policy",
-	"restrictions":                "restriction",
-	"units":                       "unit",
-	"spaces":                      "space",
-	"properties":                  "property",
-	"customers":                   "customer",
-	"certificates":                "certificate",
-	"clientUsers":                 "user",
-	"partnerUsers":                "user",
-	"members.clearUnavailability": "unavailability",
+func deniedKinds() map[string]string {
+	return map[string]string{
+		"alerts":                      "alert",
+		"automations":                 "automation",
+		"commands":                    "command",
+		"contracts":                   "contract",
+		"devices":                     "device",
+		"invoices":                    "invoice",
+		"jobs":                        "job",
+		"members":                     "membership",
+		"payments":                    "payment",
+		"policies":                    "policy",
+		"restrictions":                "restriction",
+		"units":                       "unit",
+		"spaces":                      "space",
+		"properties":                  "property",
+		"customers":                   "customer",
+		"certificates":                "certificate",
+		"clientUsers":                 "user",
+		"partnerUsers":                "user",
+		"members.clearUnavailability": "unavailability",
+	}
 }
+
+// deniedKind is the audit target kind of the operation, else of its resource (deniedKinds), else the resource's name.
+func deniedKind(op string) string {
+	res, _, _ := strings.Cut(op, ".")
+	kinds := deniedKinds()
+
+	if kind := kinds[op]; kind != "" {
+		return kind
+	}
+
+	if kind := kinds[res]; kind != "" {
+		return kind
+	}
+
+	return res
+}
+
+// noTargetID is the target ID of a refused write whose input names no target.
+const noTargetID = "—"
 
 // deniedTarget is the target a refused write asked for: the input's id under the kind of the operation's resource,
 // else its <kind>Id, else the first other …Id field that holds a UUID, named by that field (propertyId: property).
 // An input without one records the resource's kind and "—". No other input value is kept.
 func deniedTarget(op string, input any) (string, string) {
-	res, _, _ := strings.Cut(op, ".")
+	kind := deniedKind(op)
 
-	kind := deniedKinds[op]
-	if kind == "" {
-		kind = deniedKinds[res]
+	raw, err := json.Marshal(input)
+	if err != nil {
+		return kind, noTargetID
 	}
-
-	if kind == "" {
-		kind = res
-	}
-
-	raw, _ := json.Marshal(input)
 
 	var fields map[string]any
 
@@ -204,63 +220,7 @@ func deniedTarget(op string, input any) (string, string) {
 		}
 	}
 
-	return kind, "—"
-}
-
-// recordDenied writes the audit entry of a write refused for permission (FORBIDDEN) or scope (NOT_FOUND), at most one
-// per actor and operation a minute (DenyLimit), so a flood of attempts cannot fill the log (IR603). A failure here is
-// logged and never answered: the caller gets the refusal.
-func (r *Registry) recordDenied(
-	ctx context.Context,
-	call *Call,
-	operation string,
-	in any,
-	err error,
-) {
-	deniedRecorder, ok := r.Rec.(DeniedRecorder)
-
-	domainErr := apperr.From(err)
-	if !ok || r.DB == nil || call.Principal == nil ||
-		(domainErr.Code != apperr.Forbidden && domainErr.Code != apperr.NotFound) {
-		return
-	}
-
-	if r.DenyLimit != nil {
-		wait, lerr := r.DenyLimit.Allow(
-			ctx,
-			call.Principal.TenantID.String()+":"+call.Principal.UserID.String()+":"+operation,
-		)
-		if lerr == nil &&
-			wait > 0 {
-			return
-		}
-	}
-
-	kind, targetID := deniedTarget(operation, in)
-
-	rerr := r.DB.Run(ctx, false, call.Principal, func(txn pgx.Tx) error {
-		if txn != nil {
-			_, err := txn.Exec(
-				ctx,
-				`SELECT set_config('app.now', $1, true)`,
-				call.Now.UTC().Format(time.RFC3339Nano),
-			)
-			if err != nil {
-				return apperr.Wrap(err, "select set_config")
-			}
-		}
-
-		return deniedRecorder.RecordDenied(
-			ctx,
-			txn,
-			call,
-			operation,
-			Denial{TargetKind: kind, TargetID: targetID, Reason: domainErr.MessageKey},
-		)
-	})
-	if rerr != nil {
-		slog.WarnContext(ctx, "ops: denied write not recorded", "op", operation, "err", rerr)
-	}
+	return kind, noTargetID
 }
 
 // Idempotency stores write results by Idempotency-Key (platform.idempotency_keys).
@@ -307,18 +267,6 @@ type Registry struct {
 	Jobs map[string][]Job
 }
 
-// Job is one scheduler job; it returns how many changes it made.
-type Job func(ctx context.Context, c *Call) (int, error)
-
-// AddJob adds a scheduler job of the domain.
-func (r *Registry) AddJob(domain string, j Job) {
-	if r.Jobs == nil {
-		r.Jobs = map[string][]Job{}
-	}
-
-	r.Jobs[domain] = append(r.Jobs[domain], j)
-}
-
 // NewRegistry creates an empty registry backed by the generated catalog.
 func NewRegistry() *Registry {
 	return &Registry{
@@ -339,6 +287,20 @@ func NewRegistry() *Registry {
 		Jobs:           nil,
 	}
 }
+
+// Job is one scheduler job; it returns how many changes it made.
+type Job func(ctx context.Context, c *Call) (int, error)
+
+// AddJob adds a scheduler job of the domain.
+func (r *Registry) AddJob(domain string, j Job) {
+	if r.Jobs == nil {
+		r.Jobs = map[string][]Job{}
+	}
+
+	r.Jobs[domain] = append(r.Jobs[domain], j)
+}
+
+var errInputType = errors.New("ops: input of another type")
 
 // Register binds a typed handler to a catalog operation. It panics on unknown or duplicate names so the catalog and
 // the code cannot drift.
@@ -365,8 +327,15 @@ func Register[I any, O any](
 		Spec:     spec,
 		Expr:     expr,
 		NewInput: func() any { return new(I) },
-		Result:   reflect.TypeOf((*O)(nil)).Elem(),
-		Handle:   func(ctx context.Context, c *Call, in any) (any, error) { return handler(ctx, c, in.(*I)) },
+		Result:   reflect.TypeFor[O](),
+		Handle: func(ctx context.Context, call *Call, in any) (any, error) {
+			input, ok := in.(*I)
+			if !ok { // NewInput made it: never another type
+				return nil, fmt.Errorf("%w: %s", errInputType, name)
+			}
+
+			return handler(ctx, call, input)
+		},
 	}
 }
 
@@ -424,10 +393,17 @@ func fail(_ *echo.Context, err error, corr string) error {
 	return de
 }
 
+// The write-version-catalog values the pipeline reads (VersionRule), and the field its refusals name.
+const (
+	branchAll            = "all"
+	ruleRequired         = "required"
+	fieldExpectedVersion = "expectedVersion"
+)
+
 // branchMatches evaluates a write-version-catalog branch against the decoded input.
 func branchMatches(branch string, input map[string]any) bool {
 	switch {
-	case branch == "all":
+	case branch == branchAll:
 		return true
 	case strings.HasSuffix(branch, " present"):
 		v, ok := input[strings.TrimSuffix(branch, " present")]
@@ -441,19 +417,17 @@ func branchMatches(branch string, input map[string]any) bool {
 		field, vals, _ := strings.Cut(branch, "=")
 
 		got, _ := input[field].(string)
-		for _, v := range strings.Split(vals, "|") {
-			if v == got {
-				return true
-			}
-		}
+
+		return slices.Contains(strings.Split(vals, "|"), got)
 	}
 
 	return false
 }
 
 // expectedVersion applies the write version catalog: a required version must be a positive integer header,
-// an omitted one must be absent (VALIDATION otherwise, write version catalog conflict_behavior).
-func expectedVersion(spec Spec, body []byte, header string) (*int, error) {
+// an omitted one must be absent (VALIDATION otherwise, write version catalog conflict_behavior). present is false
+// when the write carries no version.
+func expectedVersion(spec Spec, body []byte, header string) (int, bool, error) {
 	var input map[string]any
 
 	_ = json.Unmarshal(body, &input)
@@ -468,21 +442,23 @@ func expectedVersion(spec Spec, body []byte, header string) (*int, error) {
 	}
 
 	switch {
-	case rule == "required" && header == "":
-		return nil, apperr.Fields(map[string]string{"expectedVersion": apperr.KeyRequired})
-	case rule != "required" && header != "":
-		return nil, apperr.Fields(map[string]string{"expectedVersion": apperr.KeyNotAllowed})
+	case rule == ruleRequired && header == "":
+		return 0, false, apperr.Fields(map[string]string{fieldExpectedVersion: apperr.KeyRequired})
+	case rule != ruleRequired && header != "":
+		return 0, false, apperr.Fields(
+			map[string]string{fieldExpectedVersion: apperr.KeyNotAllowed},
+		)
 	case header == "":
-		return nil, nil
+		return 0, false, nil
 	}
 
 	version, err := strconv.Atoi(header)
 	if err != nil ||
 		version < 0 { // 0 names an absent row (IR120 item 7: a default rule without a stored setting)
-		return nil, apperr.Fields(map[string]string{"expectedVersion": apperr.KeyInvalid})
+		return 0, false, apperr.Fields(map[string]string{fieldExpectedVersion: apperr.KeyInvalid})
 	}
 
-	return &version, nil
+	return version, true, nil
 }
 
 // WriteLimiter bounds the writes of one caller (network architecture §6, IR375).
@@ -491,23 +467,25 @@ type WriteLimiter interface {
 	Allow(ctx context.Context, key string) (wait int, err error)
 }
 
-// fileBodies are the operations whose input carries BlobInput files (JPEG/PNG up to 5 MiB, sent base64 in JSON, so
-// about 6.7 MiB each): attachments.add and jobs.reportProblem one file, reports.signOff a signature and a site photo
-// (IR221), certificates.submit one PDF/JPEG/PNG of up to 10 MB, about 13.4 MB in JSON (IR133, IR277). Every other
-// operation keeps the 1 MiB body limit.
-var fileBodies = map[string]int64{
-	"attachments.add":     8 << 20,
-	"jobs.reportProblem":  8 << 20,
-	"reports.signOff":     16 << 20,
-	"certificates.submit": 16 << 20,
-}
+// The request body limits. Operations whose input carries BlobInput files (JPEG/PNG up to 5 MiB, sent base64 in
+// JSON, so about 6.7 MiB each) take more: attachments.add and jobs.reportProblem one file, reports.signOff a signature
+// and a site photo (IR221), certificates.submit one PDF/JPEG/PNG of up to 10 MB, about 13.4 MB in JSON (IR133, IR277).
+// Every other operation keeps the 1 MiB body limit.
+const (
+	defaultBodyLimit = 1 << 20
+	oneFileBodyLimit = 8 << 20
+	twoFileBodyLimit = 16 << 20
+)
 
 func bodyLimit(operation string) int64 {
-	if n, ok := fileBodies[operation]; ok {
-		return n
+	switch operation {
+	case "attachments.add", "jobs.reportProblem":
+		return oneFileBodyLimit
+	case "reports.signOff", "certificates.submit":
+		return twoFileBodyLimit
 	}
 
-	return 1 << 20
+	return defaultBodyLimit
 }
 
 func correlationID(c *echo.Context) string {
@@ -530,6 +508,83 @@ func readBody(c *echo.Context, operation string) ([]byte, error) {
 	return body, nil
 }
 
+// recordDenied writes the audit entry of a write refused for permission (FORBIDDEN) or scope (NOT_FOUND), at most one
+// per actor and operation a minute (DenyLimit), so a flood of attempts cannot fill the log (IR603). A failure here is
+// logged and never answered: the caller gets the refusal.
+func (r *Registry) recordDenied(
+	ctx context.Context,
+	call *Call,
+	operation string,
+	input any,
+	err error,
+) {
+	deniedRecorder, ok := r.Rec.(DeniedRecorder)
+
+	domainErr := apperr.From(err)
+	if !ok || r.DB == nil || call.Principal == nil ||
+		(domainErr.Code != apperr.Forbidden && domainErr.Code != apperr.NotFound) {
+		return
+	}
+
+	if r.deniedRecently(ctx, call.Principal, operation) {
+		return
+	}
+
+	kind, targetID := deniedTarget(operation, input)
+
+	rerr := r.DB.Run(ctx, false, call.Principal, func(txn pgx.Tx) error {
+		if txn != nil {
+			err := setAppNow(ctx, txn, call.Now)
+			if err != nil {
+				return err
+			}
+		}
+
+		return deniedRecorder.RecordDenied(
+			ctx,
+			txn,
+			call,
+			operation,
+			Denial{TargetKind: kind, TargetID: targetID, Reason: domainErr.MessageKey},
+		)
+	})
+	if rerr != nil {
+		slog.WarnContext(ctx, "ops: denied write not recorded", "op", operation, "err", rerr)
+	}
+}
+
+// deniedRecently says whether DenyLimit already counted a refusal of the operation for this actor within its minute.
+func (r *Registry) deniedRecently(
+	ctx context.Context,
+	principal *Principal,
+	operation string,
+) bool {
+	if r.DenyLimit == nil {
+		return false
+	}
+
+	wait, err := r.DenyLimit.Allow(
+		ctx,
+		principal.TenantID.String()+":"+principal.UserID.String()+":"+operation,
+	)
+
+	return err == nil && wait > 0
+}
+
+// setAppNow sets the business time of the transaction for SQL defaults and platform.app_now() (IR157).
+func setAppNow(ctx context.Context, txn pgx.Tx, now time.Time) error {
+	_, err := txn.Exec(
+		ctx,
+		`SELECT set_config('app.now', $1, true)`,
+		now.UTC().Format(time.RFC3339Nano),
+	)
+
+	return apperr.Wrap(err, "select set_config")
+}
+
+// metaCorrelationID is the ServiceResult meta field of the correlation ID.
+const metaCorrelationID = "correlationId"
+
 // run is the pipeline every route of an operation shares: decode and validate the JSON input, authorize, claim the
 // Idempotency-Key, check the expected version, run the handler in one transaction and write the ServiceResult.
 func (r *Registry) run(ectx *echo.Context, operation *Operation, body []byte, corr string) error {
@@ -544,115 +599,189 @@ func (r *Registry) run(ectx *echo.Context, operation *Operation, body []byte, co
 		body = []byte("{}")
 	}
 
+	input, err := decodeInput(operation, body)
+	if err != nil {
+		return fail(ectx, err, corr)
+	}
+
+	principal := PrincipalFrom(ctx)
+
+	cands, err := r.authorize(ctx, operation, principal, input, corr)
+	if err != nil {
+		return fail(ectx, err, corr)
+	}
+
+	key := ectx.Request().Header.Get("Idempotency-Key")
+	write := operation.Spec.Mode == Write
+
+	stored, err := r.claim(ectx, write, principal, name, key, body)
+	if err != nil {
+		return fail(ectx, err, corr)
+	}
+
+	if stored != nil {
+		return apperr.Wrap(ectx.JSONBlob(http.StatusOK, stored), "echo.Context.JSONBlob")
+	}
+
+	call, err := r.newCall(ectx, operation.Spec, principal, cands, body, corr)
+	if err != nil {
+		r.abort(ctx, write, principal, name, key)
+
+		return fail(ectx, err, corr)
+	}
+
+	out, cursor, err := r.execute(ctx, operation, call, input, write)
+	if err != nil {
+		r.abort(ctx, write, principal, name, key)
+
+		if write {
+			r.recordDenied(ctx, call, name, input, err)
+		}
+
+		return fail(ectx, err, corr)
+	}
+
+	return r.respond(ectx, call, write, name, key, out, cursor)
+}
+
+// decodeInput decodes the JSON input strictly (an unknown field is malformed input) and applies the input's own
+// field rules.
+func decodeInput(operation *Operation, body []byte) (any, error) {
 	input := operation.NewInput()
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
 
 	err := dec.Decode(input)
 	if err != nil {
-		return fail(ectx, apperr.Fields(map[string]string{"_": apperr.KeyMalformedInput}), corr)
+		return nil, apperr.Fields(map[string]string{"_": apperr.KeyMalformedInput})
 	}
 
-	if v, ok := input.(Validator); ok {
-		if fe := v.Validate(); len(fe) > 0 {
-			return fail(ectx, apperr.Fields(fe), corr)
+	if validator, ok := input.(Validator); ok {
+		if fieldErrs := validator.Validate(); len(fieldErrs) > 0 {
+			return nil, apperr.Fields(fieldErrs)
 		}
 	}
 
-	principal := PrincipalFrom(ctx)
+	return input, nil
+}
 
+// authorize returns the caller's alternatives of the operation's predicates: none is UNAUTHENTICATED for an anonymous
+// caller, else FORBIDDEN, and a refused write is recorded (IR603).
+func (r *Registry) authorize(
+	ctx context.Context,
+	operation *Operation,
+	principal *Principal,
+	input any,
+	corr string,
+) ([]authz.Alternative, error) {
 	var ap *authz.Principal
 	if principal != nil {
 		ap = &principal.Principal
 	}
 
 	cands := operation.Expr.Candidates(ap)
-	if len(cands) == 0 {
-		if principal == nil {
-			return fail(ectx, apperr.E(apperr.Unauthenticated, apperr.KeyUnauthenticated), corr)
-		}
-
-		denied := apperr.E(apperr.Forbidden, apperr.KeyForbidden)
-		if operation.Spec.Mode == Write {
-			r.recordDenied(
-				ctx,
-				&Call{
-					Principal:       principal,
-					Now:             r.Clock(),
-					CorrelationID:   corr,
-					Tx:              nil,
-					Bearer:          "",
-					Queries:         nil,
-					ExpectedVersion: nil,
-					Candidates:      nil,
-					Events:          nil,
-					Audits:          nil,
-				},
-				name,
-				input,
-				denied,
-			)
-		}
-
-		return fail(ectx, denied, corr)
+	if len(cands) > 0 {
+		return cands, nil
 	}
 
-	key := ectx.Request().Header.Get("Idempotency-Key")
+	if principal == nil {
+		return nil, apperr.E(apperr.Unauthenticated, apperr.KeyUnauthenticated)
+	}
 
-	write := operation.Spec.Mode == Write
-	if write {
-		if len(key) < 8 || len(key) > 128 { // platform.idempotency_keys CHECK (8–128)
-			return fail(
-				ectx,
-				apperr.Fields(map[string]string{"Idempotency-Key": apperr.KeyRequired}),
-				corr,
-			)
-		}
-		// the writes of one membership per minute, counted across instances and services (IR375). A store that does not
-		// answer lets the write through: the edge limits still hold, and a sign-in session is never blocked by the cache.
-		if r.Limit != nil && principal != nil {
-			wait, err := r.Limit.Allow(
-				ctx,
-				principal.TenantID.String()+":"+principal.MembershipID.String(),
-			)
-			if err != nil {
-				slog.WarnContext(ctx, "ops: write limit not checked", "err", err)
-			} else if wait > 0 {
-				ectx.Response().Header().Set("Retry-After", strconv.Itoa(wait))
+	denied := apperr.E(apperr.Forbidden, apperr.KeyForbidden)
+	if operation.Spec.Mode == Write {
+		r.recordDenied(
+			ctx,
+			&Call{
+				Principal:       principal,
+				Now:             r.Clock(),
+				CorrelationID:   corr,
+				Tx:              nil,
+				Bearer:          "",
+				Queries:         nil,
+				ExpectedVersion: nil,
+				Candidates:      nil,
+				Events:          nil,
+				Audits:          nil,
+			},
+			operation.Spec.Name,
+			input,
+			denied,
+		)
+	}
 
-				return fail(
-					ectx,
-					apperr.E(apperr.RateLimited, "error.rateLimited").RetryAfter(wait),
-					corr,
-				)
-			}
-		}
+	return nil, denied
+}
 
-		if r.Idem != nil {
-			sum := sha256.Sum256(append([]byte(name+"\n"), body...))
+// claim admits a write: it needs an Idempotency-Key, stays within its membership's write limit (IR375) and gets the
+// stored response when the same write completed before (D04). Reads pass.
+func (r *Registry) claim(
+	ectx *echo.Context,
+	write bool,
+	principal *Principal,
+	name, key string,
+	body []byte,
+) (json.RawMessage, error) {
+	if !write {
+		return nil, nil
+	}
 
-			stored, err := r.Idem.Begin(ctx, principal, name, key, hex.EncodeToString(sum[:]))
-			if err != nil {
-				return fail(ectx, err, corr)
-			}
+	if len(key) < 8 || len(key) > 128 { // platform.idempotency_keys CHECK (8–128)
+		return nil, apperr.Fields(map[string]string{"Idempotency-Key": apperr.KeyRequired})
+	}
 
-			if stored != nil {
-				return apperr.Wrap(ectx.JSONBlob(http.StatusOK, stored), "echo.Context.JSONBlob")
-			}
+	ctx := ectx.Request().Context()
+	// the writes of one membership per minute, counted across instances and services (IR375). A store that does not
+	// answer lets the write through: the edge limits still hold, and a sign-in session is never blocked by the cache.
+	if r.Limit != nil && principal != nil {
+		wait, err := r.Limit.Allow(
+			ctx,
+			principal.TenantID.String()+":"+principal.MembershipID.String(),
+		)
+		if err != nil {
+			slog.WarnContext(ctx, "ops: write limit not checked", "err", err)
+		} else if wait > 0 {
+			ectx.Response().Header().Set("Retry-After", strconv.Itoa(wait))
+
+			return nil, apperr.E(apperr.RateLimited, "error.rateLimited").RetryAfter(wait)
 		}
 	}
 
-	expected, err := expectedVersion(
-		operation.Spec,
+	if r.Idem == nil {
+		return nil, nil
+	}
+
+	sum := sha256.Sum256(append([]byte(name+"\n"), body...))
+
+	stored, err := r.Idem.Begin(ctx, principal, name, key, hex.EncodeToString(sum[:]))
+
+	return stored, apperr.Wrap(err, "ops.Idempotency.Begin")
+}
+
+// abort releases the Idempotency-Key of a write that did not commit, so the same intent can be sent again (D04).
+func (r *Registry) abort(ctx context.Context, write bool, principal *Principal, name, key string) {
+	if write && r.Idem != nil {
+		r.Idem.Abort(ctx, principal, name, key)
+	}
+}
+
+// newCall is the call of an admitted request: the caller, its token, the business time, the predicate alternatives
+// and the expected version the write version catalog asks for.
+func (r *Registry) newCall(
+	ectx *echo.Context,
+	spec Spec,
+	principal *Principal,
+	cands []authz.Alternative,
+	body []byte,
+	corr string,
+) (*Call, error) {
+	version, present, err := expectedVersion(
+		spec,
 		body,
 		ectx.Request().Header.Get("X-Expected-Version"),
 	)
 	if err != nil {
-		if write && r.Idem != nil {
-			r.Idem.Abort(ctx, principal, name, key)
-		}
-
-		return fail(ectx, err, corr)
+		return nil, err
 	}
 
 	bearer, _ := strings.CutPrefix(ectx.Request().Header.Get(echo.HeaderAuthorization), "Bearer ")
@@ -661,27 +790,39 @@ func (r *Registry) run(ectx *echo.Context, operation *Operation, body []byte, co
 		Now:             r.Clock(),
 		CorrelationID:   corr,
 		Candidates:      cands,
-		ExpectedVersion: expected,
+		ExpectedVersion: nil,
 		Bearer:          bearer,
 		Queries:         r, Tx: nil, Events: nil, Audits: nil,
 	}
 
+	if present {
+		call.ExpectedVersion = &version
+	}
+
+	return call, nil
+}
+
+// execute runs the handler in one transaction at the call's business time, records a write's audits and events, and
+// returns the result with the tenant's event position (Meta.eventCursor, D07).
+func (r *Registry) execute(
+	ctx context.Context,
+	operation *Operation,
+	call *Call,
+	input any,
+	write bool,
+) (any, int64, error) {
 	var (
 		out    any
 		cursor int64
 	)
 
-	err = r.DB.Run(ctx, !write, principal, func(txn pgx.Tx) error {
+	err := r.DB.Run(ctx, !write, call.Principal, func(txn pgx.Tx) error {
 		call.Tx = r.txFor(txn)
 		// business time of this transaction for SQL defaults and platform.app_now() (IR157)
 		if txn != nil {
-			_, err := txn.Exec(
-				ctx,
-				`SELECT set_config('app.now', $1, true)`,
-				call.Now.UTC().Format(time.RFC3339Nano),
-			)
+			err := setAppNow(ctx, txn, call.Now)
 			if err != nil {
-				return apperr.Wrap(err, "select set_config")
+				return err
 			}
 		}
 
@@ -693,39 +834,44 @@ func (r *Registry) run(ectx *echo.Context, operation *Operation, body []byte, co
 		}
 
 		if write && r.Rec != nil {
-			err := r.Rec.Record(ctx, txn, call, name)
+			err := r.Rec.Record(ctx, txn, call, operation.Spec.Name)
 			if err != nil {
 				return apperr.Wrap(err, "ops.Recorder.Record")
 			}
 		}
 
 		if txn != nil &&
-			principal != nil { // Meta.eventCursor: the tenant's event position of this snapshot (D07)
+			call.Principal != nil { // Meta.eventCursor: the tenant's event position of this snapshot (D07)
 			return txn.QueryRow(ctx, `SELECT count(*) FROM platform.outbox`).Scan(&cursor)
 		}
 
 		return nil
 	})
-	if err != nil {
-		if write && r.Idem != nil {
-			r.Idem.Abort(ctx, principal, name, key)
-		}
 
-		if write {
-			r.recordDenied(ctx, call, name, input, err)
-		}
+	return out, cursor, apperr.Wrap(err, "ops.Runner.Run")
+}
 
-		return fail(ectx, err, corr)
-	}
+// respond writes the ServiceResult; a write stores it under its Idempotency-Key and then lets its committed events
+// apply (inline mode).
+func (r *Registry) respond(
+	ectx *echo.Context,
+	call *Call,
+	write bool,
+	name, key string,
+	out any,
+	cursor int64,
+) error {
+	ctx := ectx.Request().Context()
+	corr := call.CorrelationID
 
 	resp, err := json.Marshal(
 		Result{
 			Data: out,
 			Meta: map[string]any{
-				"operation":     name,
-				"correlationId": corr,
-				"snapshotAt":    call.Now.UTC(),
-				"eventCursor":   cursor,
+				"operation":       name,
+				metaCorrelationID: corr,
+				"snapshotAt":      call.Now.UTC(),
+				"eventCursor":     cursor,
 			},
 		},
 	)
@@ -734,7 +880,7 @@ func (r *Registry) run(ectx *echo.Context, operation *Operation, body []byte, co
 	}
 
 	if write && r.Idem != nil {
-		err := r.Idem.Complete(ctx, principal, name, key, resp)
+		err := r.Idem.Complete(ctx, call.Principal, name, key, resp)
 		if err != nil {
 			return fail(ectx, err, corr)
 		}
@@ -747,11 +893,13 @@ func (r *Registry) run(ectx *echo.Context, operation *Operation, body []byte, co
 	return apperr.Wrap(ectx.JSONBlob(http.StatusOK, resp), "echo.Context.JSONBlob")
 }
 
-// txFor is the transaction a call runs in: tx itself unless WrapTx is set.
-func (r *Registry) txFor(tx pgx.Tx) pgx.Tx {
-	if r.WrapTx == nil || tx == nil {
-		return tx
+// txFor is the transaction a call runs in: txn itself unless WrapTx is set.
+func (r *Registry) txFor( //nolint:ireturn // pgx offers a transaction only as the pgx.Tx interface
+	txn pgx.Tx,
+) pgx.Tx {
+	if r.WrapTx == nil || txn == nil {
+		return txn
 	}
 
-	return r.WrapTx(tx)
+	return r.WrapTx(txn)
 }

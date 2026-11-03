@@ -18,6 +18,8 @@ const (
 )
 
 // Domains lists every domain in a stable order.
+//
+//nolint:gochecknoglobals // exported list that callers assign as a value (Config.Domains = ops.Domains)
 var Domains = []string{
 	DomainIdentity,
 	DomainEquipment,

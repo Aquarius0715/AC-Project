@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -42,6 +43,19 @@ const InternalTokenHeader = "X-Internal-Token"
 // BusinessNowHeader carries the caller's business time (IR157) so both sides read the same instant.
 const BusinessNowHeader = "X-Business-Now"
 
+// The limits of an internal query: how long the caller waits for the owning service, and the size of the answer it
+// reads and of the input the owner reads.
+const (
+	queryTimeout   = 20 * time.Second
+	maxQueryResult = 8 << 20
+	maxQueryInput  = 1 << 20
+)
+
+var (
+	errQueryOutsideRequest = errors.New("ops: query outside a request")
+	errUnknownQuery        = errors.New("ops: unknown query")
+)
+
 // RegisterQuery binds an internal query owned by domain.
 func RegisterQuery[I any, O any](
 	reg *Registry,
@@ -77,7 +91,7 @@ func RegisterQuery[I any, O any](
 // registry — in the caller's transaction when this process serves the owner's domain, otherwise over HTTP — and runs
 // local directly for calls without a registry (the scheduler worker). local must also be registered as the query
 // name of the owner's domain.
-func Delegate[I any, O any](
+func Delegate[I any, O any]( //nolint:ireturn // O is the query's own result type, chosen by the caller
 	ctx context.Context,
 	call *Call,
 	name string,
@@ -92,44 +106,46 @@ func Delegate[I any, O any](
 }
 
 // Query runs the internal query name for the call (modules use it; the registry comes with the call).
-func Query[O any](ctx context.Context, c *Call, name string, in any) (O, error) {
-	return Ask[O](ctx, c.Queries, c, name, in)
+func Query[O any]( //nolint:ireturn // O is the query's own result type, chosen by the caller
+	ctx context.Context,
+	call *Call,
+	name string,
+	in any,
+) (O, error) {
+	return Ask[O](ctx, call.Queries, call, name, in)
 }
 
 // Ask runs the internal query name for the caller and decodes its result.
-func Ask[O any](ctx context.Context, reg *Registry, call *Call, name string, in any) (O, error) {
+func Ask[O any]( //nolint:ireturn // O is the query's own result type, chosen by the caller
+	ctx context.Context,
+	reg *Registry,
+	call *Call,
+	name string,
+	in any,
+) (O, error) {
 	var out O
-	if reg == nil {
-		return out, fmt.Errorf("ops: query %s outside a request", name)
-	}
 
-	registered, ok := reg.queries[name]
-	if !ok {
-		return out, fmt.Errorf("ops: unknown query %s", name)
-	}
-
-	raw, err := json.Marshal(in)
+	registered, raw, err := findQuery(reg, name, in)
 	if err != nil {
-		return out, apperr.Wrap(err, "json.Marshal")
+		return out, err
 	}
 
-	var res any
 	if reg.domains == nil || reg.domains[registered.domain] {
-		res, err = registered.handle(ctx, call, raw)
+		res, err := registered.handle(ctx, call, raw)
 		if err != nil {
 			return out, err
 		}
 
-		if v, ok := res.(O); ok {
-			return v, nil
+		if typed, ok := res.(O); ok {
+			return typed, nil
 		}
 
-		b, err := json.Marshal(res)
+		encoded, err := json.Marshal(res)
 		if err != nil {
 			return out, apperr.Wrap(err, "json.Marshal")
 		}
 
-		return out, apperr.Wrap(json.Unmarshal(b, &out), "json.Unmarshal")
+		return out, apperr.Wrap(json.Unmarshal(encoded, &out), "json.Unmarshal")
 	}
 
 	if reg.Remote == nil {
@@ -142,6 +158,26 @@ func Ask[O any](ctx context.Context, reg *Registry, call *Call, name string, in 
 	}
 
 	return out, apperr.Wrap(json.Unmarshal(body, &out), "json.Unmarshal")
+}
+
+// findQuery returns the registered query name of reg and its input as JSON.
+func findQuery(reg *Registry, name string, input any) (query, json.RawMessage, error) {
+	var none query
+	if reg == nil {
+		return none, nil, fmt.Errorf("%w: %s", errQueryOutsideRequest, name)
+	}
+
+	registered, ok := reg.queries[name]
+	if !ok {
+		return none, nil, fmt.Errorf("%w: %s", errUnknownQuery, name)
+	}
+
+	raw, err := json.Marshal(input)
+	if err != nil {
+		return none, nil, apperr.Wrap(err, "json.Marshal")
+	}
+
+	return registered, raw, nil
 }
 
 // QueryTransport sends a query to the service of another domain.
@@ -173,6 +209,41 @@ func (h *HTTPQueries) Query(
 		return nil, apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 	}
 
+	req, err := newQueryRequest(ctx, call, base, name, input, h.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	client := h.Client
+	if client == nil {
+		client = &http.Client{
+			Timeout:       queryTimeout,
+			Transport:     nil,
+			CheckRedirect: nil,
+			Jar:           nil,
+		}
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	return queryResult(resp)
+}
+
+// newQueryRequest is the POST of a query to the owning service at base: the caller's tenant, and its membership and
+// token unless a worker asks, the internal token, the correlation ID and the business time.
+func newQueryRequest(
+	ctx context.Context,
+	call *Call,
+	base *url.URL,
+	name string,
+	input json.RawMessage,
+	token string,
+) (*http.Request, error) {
 	path := "/internal/v1/queries/" // the caller's user and membership
 	if call.Bearer == "" {
 		path = "/internal/v1/system/queries/" // no user: a worker of the tenant (IR195)
@@ -199,27 +270,17 @@ func (h *HTTPQueries) Query(
 		req.Header.Set("X-Membership-Id", call.Principal.MembershipID.String())
 	}
 
-	req.Header.Set(InternalTokenHeader, h.Token)
+	req.Header.Set(InternalTokenHeader, token)
 	req.Header.Set(echo.HeaderXRequestID, call.CorrelationID)
 	req.Header.Set(BusinessNowHeader, call.Now.UTC().Format(time.RFC3339Nano))
 
-	client := h.Client
-	if client == nil {
-		client = &http.Client{
-			Timeout:       20 * time.Second,
-			Transport:     nil,
-			CheckRedirect: nil,
-			Jar:           nil,
-		}
-	}
+	return req, nil
+}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+// queryResult reads the owning service's answer: the data of a success, a DomainError it refused with, anything else
+// UNAVAILABLE.
+func queryResult(resp *http.Response) (json.RawMessage, error) {
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxQueryResult))
 	if err != nil {
 		return nil, apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 	}
@@ -301,11 +362,7 @@ func (r *Registry) serveQuery(
 	principal *Principal,
 	bearer string,
 ) error {
-	if token == "" ||
-		subtle.ConstantTimeCompare(
-			[]byte(ectx.Request().Header.Get(InternalTokenHeader)),
-			[]byte(token),
-		) != 1 {
+	if !internalTokenValid(ectx, token) {
 		return apperr.E(apperr.Unauthenticated, apperr.KeyUnauthenticated)
 	}
 
@@ -318,21 +375,12 @@ func (r *Registry) serveQuery(
 
 	ctx := ectx.Request().Context()
 
-	raw, err := io.ReadAll(io.LimitReader(ectx.Request().Body, 1<<20))
+	raw, err := io.ReadAll(io.LimitReader(ectx.Request().Body, maxQueryInput))
 	if err != nil {
 		return apperr.E(apperr.Validation, apperr.KeyBodyTooLarge)
 	}
 
-	now := r.Clock()
-
-	t, parseErr := time.Parse(
-		time.RFC3339Nano,
-		ectx.Request().Header.Get(BusinessNowHeader),
-	)
-	if parseErr == nil {
-		now = t
-	}
-
+	now := r.businessNow(ectx)
 	call := &Call{
 		Principal:     principal,
 		Now:           now,
@@ -340,6 +388,7 @@ func (r *Registry) serveQuery(
 		Bearer:        bearer,
 		Queries:       r, Tx: nil, ExpectedVersion: nil, Candidates: nil, Events: nil, Audits: nil,
 	}
+
 	if r.BeforeDispatch != nil {
 		r.BeforeDispatch(ctx)
 	}
@@ -349,13 +398,9 @@ func (r *Registry) serveQuery(
 	err = r.DB.Run(ctx, true, principal, func(tx pgx.Tx) error {
 		call.Tx = r.txFor(tx)
 
-		_, err := tx.Exec(
-			ctx,
-			`SELECT set_config('app.now', $1, true)`,
-			now.UTC().Format(time.RFC3339Nano),
-		)
+		err := setAppNow(ctx, tx, now)
 		if err != nil {
-			return apperr.Wrap(err, "select set_config")
+			return err
 		}
 
 		var herr error
@@ -369,4 +414,26 @@ func (r *Registry) serveQuery(
 	}
 
 	return apperr.Wrap(ectx.JSON(http.StatusOK, map[string]any{"data": out}), "echo.Context.JSON")
+}
+
+// internalTokenValid compares X-Internal-Token with the internal token in constant time; without a token nobody is
+// admitted.
+func internalTokenValid(ectx *echo.Context, token string) bool {
+	return token != "" &&
+		subtle.ConstantTimeCompare(
+			[]byte(ectx.Request().Header.Get(InternalTokenHeader)),
+			[]byte(token),
+		) == 1
+}
+
+// businessNow is the caller's business time (X-Business-Now), else this process's clock.
+func (r *Registry) businessNow(ectx *echo.Context) time.Time {
+	now := r.Clock()
+
+	sent, err := time.Parse(time.RFC3339Nano, ectx.Request().Header.Get(BusinessNowHeader))
+	if err == nil {
+		return sent
+	}
+
+	return now
 }

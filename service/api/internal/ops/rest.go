@@ -150,33 +150,6 @@ func readsBody(mode Mode, method string) (bool, error) {
 	return false, nil
 }
 
-// check refuses path parameters and a fixed field that are not scalar input fields, and input fields a query string
-// cannot carry on a route that reads one.
-func (b *Binding) check() error {
-	for _, name := range append(slices.Clone(b.Path), b.Route.FixedField) {
-		if name == "" {
-			continue
-		}
-
-		if param, ok := b.Params[name]; !ok || param.List || param.Sort ||
-			slices.Contains(param.At, fieldFilters) {
-			return fmt.Errorf("%w: %s", errNotScalar, name)
-		}
-	}
-
-	if !b.Body && len(b.Opaque) > 0 {
-		return fmt.Errorf(
-			"%w: %s %s: %s",
-			errOpaqueQuery,
-			b.Route.Method,
-			b.Route.Path,
-			strings.Join(b.Opaque, ", "),
-		)
-	}
-
-	return nil
-}
-
 // parameters lists the input fields a query string or path can name: scalars and lists of scalars by their JSON
 // name, fields of a nested object as object.field, the paging query (embedded or as a field) as cursor, limit and
 // sort, and the catalogued filters by their own names (a filter named like an input field is left out).
@@ -276,6 +249,7 @@ func (set *paramSet) field(
 	}
 
 	key := prefix + name
+
 	switch elemType := scalarListElem(fieldType); {
 	case scalar(fieldType):
 		set.add(
@@ -644,6 +618,33 @@ func (b *Binding) Input(ectx *echo.Context, body []byte) ([]byte, error) {
 	return out, apperr.Wrap(err, "json.Marshal")
 }
 
+// check refuses path parameters and a fixed field that are not scalar input fields, and input fields a query string
+// cannot carry on a route that reads one.
+func (b *Binding) check() error {
+	for _, name := range append(slices.Clone(b.Path), b.Route.FixedField) {
+		if name == "" {
+			continue
+		}
+
+		if param, ok := b.Params[name]; !ok || param.List || param.Sort ||
+			slices.Contains(param.At, fieldFilters) {
+			return fmt.Errorf("%w: %s", errNotScalar, name)
+		}
+	}
+
+	if !b.Body && len(b.Opaque) > 0 {
+		return fmt.Errorf(
+			"%w: %s %s: %s",
+			errOpaqueQuery,
+			b.Route.Method,
+			b.Route.Path,
+			strings.Join(b.Opaque, ", "),
+		)
+	}
+
+	return nil
+}
+
 // bodyObject decodes the JSON object body with numbers kept as their text; an empty body is the empty object.
 func bodyObject(body []byte) (map[string]any, error) {
 	obj := map[string]any{}
@@ -666,15 +667,15 @@ func bodyObject(body []byte) (map[string]any, error) {
 // fixed field are not allowed.
 func (b *Binding) queryInput(obj map[string]any, query url.Values, fieldErrs map[string]string) {
 	for name, values := range query {
-		param, ok := b.Params[name]
-		if !ok || slices.Contains(b.Path, name) || name == b.Route.FixedField {
+		param, known := b.Params[name]
+		if !known || slices.Contains(b.Path, name) || name == b.Route.FixedField {
 			fieldErrs[name] = apperr.KeyNotAllowed
 
 			continue
 		}
 
-		value, ok := param.value(values)
-		if !ok {
+		value, valid := param.value(values)
+		if !valid {
 			fieldErrs[name] = apperr.KeyInvalid
 		} else if value != nil {
 			place(obj, param.At, value)

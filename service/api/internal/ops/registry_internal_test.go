@@ -537,15 +537,15 @@ func TestExpectedVersionRules(t *testing.T) {
 		},
 	}
 	for i, testCase := range cases {
-		got, err := expectedVersion(testCase.s, []byte(testCase.body), testCase.header)
+		got, present, err := expectedVersion(testCase.s, []byte(testCase.body), testCase.header)
 
 		var code apperr.Code
 		if err != nil {
 			code = apperr.From(err).Code
 		}
 
-		if code != testCase.want || (testCase.v != 0 && (got == nil || *got != testCase.v)) {
-			t.Errorf("case %d: %v %v", i, got, err)
+		if code != testCase.want || (testCase.v != 0 && (!present || got != testCase.v)) {
+			t.Errorf("case %d: %v %v %v", i, got, present, err)
 		}
 	}
 }
