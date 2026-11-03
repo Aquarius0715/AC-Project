@@ -20,7 +20,7 @@ import (
 // as a new account; disabling and removing stay its own. HQ's later end clears the revoke: the sign-in comes back
 // unless the company disabled the account, which it may then enable again.
 func TestHQRevokeTurnsSignInOff(t *testing.T) {
-	fake := &fakeIdP{
+	fake := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,
@@ -341,7 +341,7 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 // whose access ended by itself (the contractor's end is the day's last second) is no revoke: the sign-in is not
 // touched and the contractor can still give a new access end.
 func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
-	fake := &fakeIdP{
+	fake := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,

@@ -253,8 +253,10 @@ func TestMarkAllRead(t *testing.T) {
 	}
 
 	got := func(k string) string {
-		var out []string
-		for _, v := range asArr(t, data(res)[k]) {
+		listed := asArr(t, data(res)[k])
+
+		out := make([]string, 0, len(listed))
+		for _, v := range listed {
 			out = append(out, asStr(t, v))
 		}
 
@@ -555,8 +557,10 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		)
 	})
 
-	listed := func(template string) (hqOperator, asset bool) {
+	listed := func(template string) (bool, bool) {
 		t.Helper()
+
+		var hqOperator, asset bool
 
 		code, res := post(
 			srv,
@@ -575,7 +579,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			asset = asset || r["id"] == assetOnly
 		}
 
-		return
+		return hqOperator, asset
 	}
 	if op, asset := listed("alert"); !op || asset {
 		t.Errorf("alert recipients: hq-operator %v, asset.read only %v", op, asset)

@@ -34,7 +34,7 @@ func scheduleRule(u string, extra map[string]string) string {
 		f[key] = v
 	}
 
-	parts := []string{}
+	parts := make([]string, 0, len(f))
 	for k, v := range f {
 		parts = append(parts, `"`+k+`":`+v)
 	}

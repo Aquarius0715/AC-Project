@@ -115,7 +115,9 @@ func TestNotificationsAcrossServices(t *testing.T) {
 
 	id := asStr(t, data(res)["id"])
 
-	count := func() (n int) {
+	count := func() int {
+		var n int
+
 		ownerScan(
 			t,
 			`SELECT count(*) FROM notify.notifications WHERE target->>'id' = $1 AND recipient_membership_id = $2`,

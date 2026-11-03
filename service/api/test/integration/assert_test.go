@@ -44,6 +44,8 @@ func asNum(tb testing.TB, v any) float64 {
 }
 
 // as reads v as T and fails the test when v holds something else.
+//
+//nolint:ireturn // T is the caller's own type, not an interface
 func as[T any](tb testing.TB, v any) T {
 	tb.Helper()
 

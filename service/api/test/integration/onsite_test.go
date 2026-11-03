@@ -152,7 +152,7 @@ func TestOnSiteOperations(t *testing.T) {
 		t.Error("ack twice")
 	}
 
-	// pause before start, start, check-in, pause/resume
+	// a pause before the start, the start, check-in, pause/resume
 	if code, _ := write(
 		srv,
 		techInt(),

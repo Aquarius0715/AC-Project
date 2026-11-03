@@ -44,7 +44,7 @@ func alertPolicyBody(extra map[string]string) string {
 		f[k] = v
 	}
 
-	parts := []string{}
+	parts := make([]string, 0, len(f))
 	for k, v := range f {
 		parts = append(parts, `"`+k+`":`+v)
 	}
@@ -378,8 +378,10 @@ func TestPolicies(t *testing.T) {
 		`{"sort":{"field":"name","direction":"desc"},"limit":100}`,
 	)
 
-	names := []string{}
-	for _, it := range items(t, resp) {
+	rows := items(t, resp)
+
+	names := make([]string, 0, len(rows))
+	for _, it := range rows {
 		names = append(names, strings.ToLower(asStr(t, it["name"])))
 	}
 

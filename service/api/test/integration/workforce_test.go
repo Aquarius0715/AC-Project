@@ -315,7 +315,7 @@ func TestUnavailabilityListAndClear(t *testing.T) {
 		t.Errorf("a filter outside the catalog: %d %s", code, fields(res))
 	}
 
-	clear := func(a *actor, id, from string, version int) (int, map[string]any) {
+	clearUnavailability := func(a *actor, id, from string, version int) (int, map[string]any) {
 		return write(
 			srv,
 			a,
@@ -324,24 +324,24 @@ func TestUnavailabilityListAndClear(t *testing.T) {
 			version,
 		)
 	}
-	if code, _ := clear(contrA(), leave, "2026-09-17", 0); code != 422 {
+	if code, _ := clearUnavailability(contrA(), leave, "2026-09-17", 0); code != 422 {
 		t.Errorf("no expected version: %d", code)
 	}
 
-	if code, _ := clear(contrB(), leave, "2026-09-17", 1); code != 404 {
+	if code, _ := clearUnavailability(contrB(), leave, "2026-09-17", 1); code != 404 {
 		t.Errorf("another company: %d", code)
 	}
 
-	if code, m := clear(contrA(), leave, "2026-09-17", 2); code != 409 {
+	if code, m := clearUnavailability(contrA(), leave, "2026-09-17", 2); code != 409 {
 		t.Errorf("stale version: %d %v", code, m)
 	}
 
 	for name, from := range map[string]string{"before today": "2026-09-13", "after its last day": "2026-09-19"} {
-		code, m := clear(contrA(), leave, from, 1)
+		code, m := clearUnavailability(contrA(), leave, from, 1)
 		refusal(t, name, code, m, "from=error.range")
 	}
 
-	code, resp := clear(contrA(), leave, "2026-09-17", 1)
+	code, resp := clearUnavailability(contrA(), leave, "2026-09-17", 1)
 
 	r, _ := data(resp)["remaining"].(map[string]any)
 	if code != 200 || r == nil || r["from"] != "2026-09-16" || r["to"] != "2026-09-16" ||
@@ -349,11 +349,11 @@ func TestUnavailabilityListAndClear(t *testing.T) {
 		t.Fatalf("a new last day: %d %v", code, resp)
 	}
 
-	if code, _ := clear(contrA(), leave, "2026-09-16", 1); code != 409 {
+	if code, _ := clearUnavailability(contrA(), leave, "2026-09-16", 1); code != 409 {
 		t.Errorf("the version before the change: %d", code)
 	}
 
-	if code, res := clear(
+	if code, res := clearUnavailability(
 		contrA(),
 		leave,
 		"2026-09-16",
@@ -363,14 +363,14 @@ func TestUnavailabilityListAndClear(t *testing.T) {
 		t.Fatalf("from its first day: %d %v", code, res)
 	}
 
-	if code, _ := clear(contrA(), leave, "2026-09-16", 3); code != 404 {
+	if code, _ := clearUnavailability(contrA(), leave, "2026-09-16", 3); code != 404 {
 		t.Errorf("a removed row: %d", code)
 	}
 	// a row that started before today keeps its past days: cleared from today, it ends yesterday and leaves the list
-	code, resp = clear(contrA(), sick, "2026-09-10", 1)
+	code, resp = clearUnavailability(contrA(), sick, "2026-09-10", 1)
 	refusal(t, "its past first day", code, resp, "from=error.range")
 
-	code, resp = clear(contrA(), sick, "2026-09-14", 1)
+	code, resp = clearUnavailability(contrA(), sick, "2026-09-14", 1)
 	if r, _ := data(resp)["remaining"].(map[string]any); code != 200 || r == nil ||
 		r["from"] != "2026-09-10" ||
 		r["to"] != "2026-09-13" {

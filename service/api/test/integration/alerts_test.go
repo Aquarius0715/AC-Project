@@ -41,8 +41,10 @@ func TestAlerts(t *testing.T) {
 	norm := newAlert(t, unit, org, "normal", clock().Add(-time.Minute))
 
 	ids := func(m map[string]any) []string {
-		out := []string{}
-		for _, it := range items(t, m) {
+		rows := items(t, m)
+
+		out := make([]string, 0, len(rows))
+		for _, it := range rows {
 			out = append(out, asStr(t, it["id"]))
 		}
 

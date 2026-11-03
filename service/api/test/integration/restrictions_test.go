@@ -121,7 +121,7 @@ func scheduleBody(k, inv string, units []string, extra map[string]string) string
 	}
 	maps.Copy(f, extra)
 
-	parts := []string{}
+	parts := make([]string, 0, len(f))
 	for k, v := range f {
 		parts = append(parts, `"`+k+`":`+v)
 	}
@@ -1698,7 +1698,7 @@ func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 		t.Fatalf("execute: %d %v", code, res)
 	}
 
-	applies := []uuid.UUID{}
+	applies := make([]uuid.UUID, 0, 2)
 	for _, u := range []string{u1, u2} {
 		applies = append(
 			applies,

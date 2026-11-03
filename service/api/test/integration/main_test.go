@@ -32,6 +32,12 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// errNoTitleTable and errMissingTitles are the failures of the job event title check.
+var (
+	errNoTitleTable  = errors.New("jobEventTitle not found in partnerOverview.ts")
+	errMissingTitles = errors.New("no jobEventTitle in service/web/shared/lib/partnerOverview.ts")
+)
+
 // webTitles is the key set of jobEventTitle in service/web/shared/lib/partnerOverview.ts.
 func webTitles() (map[string]bool, error) {
 	src, err := os.ReadFile("../../../web/shared/lib/partnerOverview.ts")
@@ -43,7 +49,7 @@ func webTitles() (map[string]bool, error) {
 
 	start := strings.Index(s, "export const jobEventTitle")
 	if start < 0 {
-		return nil, errors.New("jobEventTitle not found in partnerOverview.ts")
+		return nil, errNoTitleTable
 	}
 
 	end := strings.Index(s[start:], "};")
@@ -92,10 +98,7 @@ func checkJobEventTitles() error {
 	slices.Sort(missing)
 
 	if len(missing) > 0 {
-		return fmt.Errorf(
-			"no jobEventTitle in service/web/shared/lib/partnerOverview.ts for %v",
-			missing,
-		)
+		return fmt.Errorf("%w for %v", errMissingTitles, missing)
 	}
 
 	return nil

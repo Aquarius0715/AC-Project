@@ -121,8 +121,11 @@ func TestFilterReminders(t *testing.T) {
 
 		return out
 	}
-	notes := func(alertID string) (total, recipients, email int) {
+	notes := func(alertID string) (int, int, int) {
 		t.Helper()
+
+		var total, recipients, email int
+
 		ownerScan(
 			t,
 			`SELECT count(*), count(DISTINCT recipient_membership_id), count(*) FILTER (WHERE channel = 'email') FROM
@@ -134,7 +137,7 @@ func TestFilterReminders(t *testing.T) {
 			&email,
 		)
 
-		return
+		return total, recipients, email
 	}
 	settings := func(body string) {
 		t.Helper()
@@ -153,8 +156,7 @@ func TestFilterReminders(t *testing.T) {
 
 	unit := poweredUnit(t, "Reminder AC", 210*time.Hour, 10*time.Hour) // 200 h, never cleaned
 
-	var units []string
-
+	units := make([]string, 0, 2)
 	units = append(units, unit)
 
 	t.Cleanup(func() { // later tests see neither the units nor their open reminders

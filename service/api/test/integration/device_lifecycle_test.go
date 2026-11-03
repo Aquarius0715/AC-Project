@@ -564,12 +564,18 @@ func TestDeviceEvents(t *testing.T) {
 		t.Error("old heartbeat does not restore the fault")
 	}
 	// tamper recovery clears the observed tamper only; the event inherits the fault's alerts (SR23), the alert stays
-	clear := uuid.NewString()
-	if code, m := signal(clear, "restored", 2, rec("tamper", tamperID, "clear"), 30); code != 200 {
+	clearEvent := uuid.NewString()
+	if code, m := signal(
+		clearEvent,
+		"restored",
+		2,
+		rec("tamper", tamperID, "clear"),
+		30,
+	); code != 200 {
 		t.Fatalf("tamper restored: %d %v", code, m)
 	}
 
-	_, inherited, _, evidence := eventOf(clear)
+	_, inherited, _, evidence := eventOf(clearEvent)
 	if _, _, tm, _ := state(); tm != "clear" || len(inherited) != 1 ||
 		inherited[0].String() != alert ||
 		evidence != "tamper_signal" {
@@ -582,7 +588,7 @@ func TestDeviceEvents(t *testing.T) {
 		t.Errorf("tamper recovery does not resolve the alert: %s", status)
 	}
 	// the recovery is evidence a resolution of the tamper alert may cite (IR327)
-	clearID, _, _, _ := eventOf(clear)
+	clearID, _, _, _ := eventOf(clearEvent)
 
 	if _, res := post(
 		srv,

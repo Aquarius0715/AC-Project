@@ -279,7 +279,8 @@ func TestCertificateReminders(t *testing.T) {
 	if at, _ := time.Parse(
 		time.RFC3339,
 		asStr(t, params["at"]),
-	); params["targetName"] != "Test user · Indoor AC" || !at.Equal(clock().Add(20*day)) || params["status"] != "expiring" ||
+	); params["targetName"] != "Test user · Indoor AC" || !at.Equal(clock().Add(20*day)) ||
+		params["status"] != "expiring" ||
 		mine["severity"] != "normal" ||
 		mine["templateKey"] != "certificate_expiry" {
 		t.Errorf("notification: %v", mine)

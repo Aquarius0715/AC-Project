@@ -391,8 +391,10 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 			t.Fatalf("jobs.events: %d %v", code, res)
 		}
 
-		var out []string
-		for _, e := range asArr(t, data(res)["items"]) {
+		events := asArr(t, data(res)["items"])
+
+		out := make([]string, 0, len(events))
+		for _, e := range events {
 			out = append(out, asStr(t, asObj(t, e)["action"]))
 		}
 

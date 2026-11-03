@@ -30,7 +30,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		}
 		maps.Copy(f, extra)
 
-		parts := []string{}
+		parts := make([]string, 0, len(f))
 		for k, v := range f {
 			parts = append(parts, `"`+k+`":`+v)
 		}
@@ -224,7 +224,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		}
 		maps.Copy(f, extra)
 
-		parts := []string{}
+		parts := make([]string, 0, len(f))
 		for kk, v := range f {
 			parts = append(parts, `"`+kk+`":`+v)
 		}

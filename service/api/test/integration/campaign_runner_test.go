@@ -12,6 +12,9 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+// eachDevice is the expected result of each campaign device, in the devices' order.
+func eachDevice(results ...string) string { return strings.Join(results, " ") }
+
 // BR-A20 / IR339: the equipment scheduler runs firmware campaigns. The customers hear of the update 24 h before
 // the start, once. The campaign starts at startAt. Each wave installs inside the window once the waves before it
 // reached 95 % success, and skips devices that are offline, tampered or busy. A new failure above the auto-pause
@@ -21,7 +24,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	srv := serverWith(t, true)
 	ctx := context.Background()
 
-	var units, devs []string
+	units, devs := make([]string, 0, 6), make([]string, 0, 6)
 
 	for range 6 {
 		u := boundUnit(t, srv, "online")
@@ -114,7 +117,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	statuses := func() string {
 		r := results()
 
-		out := []string{}
+		out := make([]string, 0, len(r))
 		for _, x := range r {
 			out = append(out, strings.TrimSuffix(x.status+":"+x.key, ":"))
 		}
@@ -236,7 +239,14 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	tick(2 * time.Minute)
 
 	if st, _ := state(); st != "running" || audits("firmwareCampaigns.start") != 1 ||
-		statuses() != "installing installing pending pending pending pending" {
+		statuses() != eachDevice(
+			"installing",
+			"installing",
+			"pending",
+			"pending",
+			"pending",
+			"pending",
+		) {
 		t.Fatalf("start: %s %s", st, statuses())
 	}
 
@@ -260,8 +270,14 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	)
 	tick(time.Minute)
 
-	if got := statuses(); got != "succeeded succeeded skipped:errors.device_offline skipped:errors.tamper_unresolved "+
-		"skipped:errors.device_busy installing" {
+	if got := statuses(); got != eachDevice(
+		"succeeded",
+		"succeeded",
+		"skipped:errors.device_offline",
+		"skipped:errors.tamper_unresolved",
+		"skipped:errors.device_busy",
+		"installing",
+	) {
 		t.Fatalf("second wave: %s", got)
 	}
 
@@ -302,7 +318,14 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 
 	tick(time.Minute)
 
-	if got := statuses(); got != "succeeded succeeded pending pending pending pending" {
+	if got := statuses(); got != eachDevice(
+		"succeeded",
+		"succeeded",
+		"pending",
+		"pending",
+		"pending",
+		"pending",
+	) {
 		t.Fatalf("paused campaign installs nothing: %s", got)
 	}
 	// Retry and Resume: the four install again; one does not answer and fails with TIMEOUT, a new failure pauses again
@@ -314,7 +337,14 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 
 	tick(time.Minute)
 
-	if got := statuses(); got != "succeeded succeeded installing installing installing installing" {
+	if got := statuses(); got != eachDevice(
+		"succeeded",
+		"succeeded",
+		"installing",
+		"installing",
+		"installing",
+		"installing",
+	) {
 		t.Fatalf("resumed: %s", got)
 	}
 
@@ -328,7 +358,14 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	tick(time.Second)
 
 	if st, _ := state(); st != "paused" || results()[5].key != "errors.install_timeout" ||
-		statuses() != "succeeded succeeded succeeded succeeded succeeded failed:errors.install_timeout" {
+		statuses() != eachDevice(
+			"succeeded",
+			"succeeded",
+			"succeeded",
+			"succeeded",
+			"succeeded",
+			"failed:errors.install_timeout",
+		) {
 		t.Fatalf("timeout: %s %s", st, statuses())
 	}
 	// resumed without a retry, no new failure pauses it, and the wave waits below 95 %
@@ -376,7 +413,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 	ctx := context.Background()
 	tenant := seed.ID("tenant-a")
 
-	var units, devs []string
+	units, devs := make([]string, 0, 4), make([]string, 0, 4)
 
 	for range 4 {
 		u := boundUnit(t, srv, "online")
@@ -471,8 +508,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := []string{}
-
+	got := make([]string, 0, len(devs))
 	for _, d := range devs {
 		var result, key string
 		ownerScan(

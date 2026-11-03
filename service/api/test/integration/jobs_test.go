@@ -44,7 +44,7 @@ func jobBody(unit string, extra map[string]string) string {
 		f[key] = v
 	}
 
-	parts := []string{}
+	parts := make([]string, 0, len(f))
 	for k, v := range f {
 		parts = append(parts, `"`+k+`":`+v)
 	}
@@ -458,8 +458,10 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	_, resp = post(srv, customerB(), "jobs.events", `{"jobId":"`+job+`","query":{}}`)
 
-	acts := []string{}
-	for _, e := range items(t, resp) {
+	events := items(t, resp)
+
+	acts := make([]string, 0, len(events))
+	for _, e := range events {
 		acts = append(acts, asStr(t, e["action"]))
 		if n, ok := e["note"].(map[string]any); ok && n["visibility"] == "internal" {
 			t.Fatal("client sees internal note")

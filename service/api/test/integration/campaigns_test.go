@@ -16,7 +16,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 	srv := server(t)
 	model := seed.ID("ventilation-demo").String()
 
-	var devs []string
+	devs := make([]string, 0, 3)
 
 	for range 3 {
 		u := newUnit(t, srv, "FW AC")
@@ -43,7 +43,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 		}
 		maps.Copy(f, extra)
 
-		parts := []string{}
+		parts := make([]string, 0, len(f))
 		for k, v := range f {
 			parts = append(parts, `"`+k+`":`+v)
 		}

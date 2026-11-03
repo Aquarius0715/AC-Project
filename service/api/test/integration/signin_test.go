@@ -35,7 +35,9 @@ func TestLastSignIn(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	read := func() (last, auth *time.Time) {
+	read := func() (*time.Time, *time.Time) {
+		var last, auth *time.Time
+
 		err := owner.QueryRow(ctx, `SELECT last_sign_in_at, sign_in_auth_time FROM identity.users WHERE id = $1`, user).
 			Scan(&last, &auth)
 		if err != nil {

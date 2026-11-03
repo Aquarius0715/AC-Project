@@ -59,7 +59,7 @@ func TestMembersSave(t *testing.T) {
 			base[key] = v
 		}
 
-		parts := []string{}
+		parts := make([]string, 0, len(base))
 		for k, v := range base {
 			parts = append(parts, `"`+k+`":`+v)
 		}

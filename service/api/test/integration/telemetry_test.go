@@ -469,8 +469,10 @@ func TestLatestMeasurements(t *testing.T) {
 			doc = items(t, resp)[0]
 		}
 
-		var out []map[string]any
-		for _, x := range asArr(t, doc["latestMeasurements"]) {
+		measurements := asArr(t, doc["latestMeasurements"])
+
+		out := make([]map[string]any, 0, len(measurements))
+		for _, x := range measurements {
 			out = append(out, asObj(t, x))
 		}
 
@@ -478,7 +480,7 @@ func TestLatestMeasurements(t *testing.T) {
 	}
 	got := latest("units.get", `{"id":"`+unit+`"}`)
 
-	var seen []string
+	seen := make([]string, 0, len(got))
 	for _, x := range got {
 		seen = append(seen, asStr(t, x["metric"])+"="+asStr(t, x["quality"]))
 	}

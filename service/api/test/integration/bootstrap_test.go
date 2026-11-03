@@ -138,7 +138,7 @@ func TestBootstrapAdmin(t *testing.T) {
 	)
 
 	// the identity consumer opens the account; the administrator then works in Access & roles
-	fake := &fakeIdP{
+	fake := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,

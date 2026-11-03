@@ -339,6 +339,7 @@ func TestLastIdentityAdminAtOnce(t *testing.T) {
 	identityAdmins(t)
 
 	op, rm := seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()
+
 	dropIdentityWrite := func(b map[string]any) { withoutIdentityWrite(t, b) }
 	for round := range 5 {
 		opBody, opVer := adminSave(t, srv, op, dropIdentityWrite)

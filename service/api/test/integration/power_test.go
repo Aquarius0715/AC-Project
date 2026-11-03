@@ -127,7 +127,7 @@ func TestEffectivePowerSR27(t *testing.T) {
 			func(u, x string) { reading(u, x, time.Second, 1, "measured", "valid", nil) },
 			"unknown",
 		},
-		{"no measurement", 10 * time.Second, "online", func(u, x string) {}, "unknown"},
+		{"no measurement", 10 * time.Second, "online", func(_, _ string) {}, "unknown"},
 		{"no fallback to older valid", 10 * time.Second, "online", func(u, x string) {
 			reading(u, x, 20*time.Second, 1, "measured", "valid", 1.2)
 			reading(u, x, 5*time.Second, 2, "measured", "missing", nil)
@@ -144,7 +144,7 @@ func TestEffectivePowerSR27(t *testing.T) {
 			"reading from an unknown sensor",
 			10 * time.Second,
 			"online",
-			func(u, x string) { reading(u, uuid.NewString(), time.Second, 1, "measured", "valid", 1.0) },
+			func(u, _ string) { reading(u, uuid.NewString(), time.Second, 1, "measured", "valid", 1.0) },
 			"unknown",
 		},
 	}

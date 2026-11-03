@@ -86,8 +86,11 @@ func TestSearchIsLiteral(t *testing.T) {
 	}
 
 	// the term's own % and _ are matched as written
-	found := func(op, field, term string) (out []string) {
-		for _, item := range search(op, term) {
+	found := func(op, field, term string) []string {
+		rows := search(op, term)
+
+		out := make([]string, 0, len(rows))
+		for _, item := range rows {
 			out = append(out, asStr(t, item[field]))
 		}
 

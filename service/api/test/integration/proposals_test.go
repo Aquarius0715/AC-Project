@@ -1241,8 +1241,10 @@ func TestPartnerProposalEndsWithClientProposal(t *testing.T) {
 	)
 	unit := seed.ID("unit-non-rto").String()
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	sent := func(slotHour int) (job, offer, partner string) {
+	sent := func(slotHour int) (string, string, string) {
 		t.Helper()
+
+		var job, offer, partner string
 
 		_, m := write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
 
@@ -1308,7 +1310,9 @@ func TestPartnerProposalEndsWithClientProposal(t *testing.T) {
 
 		return job, offer, partner
 	}
-	status := func(partner string) (st string) {
+	status := func(partner string) string {
+		var st string
+
 		ownerScan(
 			t,
 			`SELECT status FROM maintenance.partner_slot_proposals WHERE id = $1`,
@@ -1316,7 +1320,7 @@ func TestPartnerProposalEndsWithClientProposal(t *testing.T) {
 			&st,
 		)
 
-		return
+		return st
 	}
 
 	// HQ withdraws the proposal: the agreed time stays, and the contractor accepts the offer
@@ -1393,8 +1397,10 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 	)
 	unit := seed.ID("unit-non-rto").String()
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	proposed := func(slotHour int) (job, offer, partner string) {
+	proposed := func(slotHour int) (string, string, string) {
 		t.Helper()
+
+		var job, offer, partner string
 
 		_, m := write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
 

@@ -1203,7 +1203,13 @@ func TestReleaseQualificationEnded(t *testing.T) {
 			t.Fatalf("approve: %d %v", code, reply)
 		}
 	}
-	state := func() (status string, assignment *string, reason *string) {
+	state := func() (string, *string, *string) {
+		var (
+			status     string
+			assignment *string
+			reason     *string
+		)
+
 		ownerScan(
 			t,
 			`SELECT j.status, j.assignment_id::text, a.reason FROM maintenance.jobs j JOIN maintenance.assignments a ON a.job_id
@@ -1214,7 +1220,7 @@ func TestReleaseQualificationEnded(t *testing.T) {
 			&reason,
 		)
 
-		return
+		return status, assignment, reason
 	}
 	before := countNotes(t, job, "contractor-a", "job_update")
 

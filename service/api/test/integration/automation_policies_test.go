@@ -35,7 +35,7 @@ func autoPolicyBody(extra map[string]string) string {
 		f[k] = v
 	}
 
-	parts := []string{}
+	parts := make([]string, 0, len(f))
 	for k, v := range f {
 		parts = append(parts, `"`+k+`":`+v)
 	}

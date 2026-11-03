@@ -243,7 +243,9 @@ func TestUnitAccessProjection(t *testing.T) {
 		clock().Add(-time.Hour),
 	)
 
-	count := func(table string) (n int) {
+	count := func(table string) int {
+		var n int
+
 		drainEvents(t)
 		ownerScan(
 			t,

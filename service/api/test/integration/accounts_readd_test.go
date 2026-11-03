@@ -22,7 +22,7 @@ import (
 // errors.email_taken, for the company and for another one. HQ giving the removed person a membership points the
 // account at it too.
 func TestPersonAddedAgain(t *testing.T) {
-	fake := &fakeIdP{
+	fake := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,
@@ -266,7 +266,7 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 // TestAccountSwitchedByMembership (IR462): disabling a demo-style account — no provider subject stored — turns it off
 // by the person's ID; when the account signs in with another membership, enabling this one leaves it alone.
 func TestAccountSwitchedByMembership(t *testing.T) {
-	fake := &fakeIdP{
+	fake := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,
@@ -369,7 +369,7 @@ func TestClientAddedAgain(t *testing.T) {
 	srv := serverCfg(
 		t,
 		func(config *apiserver.Config) {
-			config.IdentityProvider = &fakeIdP{
+			config.IdentityProvider = &fakeIDP{
 				mu:         sync.Mutex{},
 				subjects:   nil,
 				err:        nil,
@@ -464,7 +464,7 @@ func TestClientAddedAgain(t *testing.T) {
 // nothing recorded; once it answers, the set-up e-mail sent again opens the account. An account the provider lost is
 // opened anew when the person is added again.
 func TestAccountProviderTrouble(t *testing.T) {
-	fake := &fakeIdP{
+	fake := &fakeIDP{
 		failing:    true,
 		mu:         sync.Mutex{},
 		subjects:   nil,
@@ -508,8 +508,11 @@ func TestAccountProviderTrouble(t *testing.T) {
 
 		return asStr(t, data(res)["id"]), asStr(t, data(res)["membershipId"])
 	}
-	account := func(membership string) (sub, signIn string) {
+	account := func(membership string) (string, string) {
 		t.Helper()
+
+		var sub, signIn string
+
 		ownerScan(
 			t,
 			`SELECT coalesce(u.cognito_sub, ''), coalesce(u.sign_in_membership_id::text, '') FROM identity.users u JOIN
@@ -519,7 +522,7 @@ func TestAccountProviderTrouble(t *testing.T) {
 			&signIn,
 		)
 
-		return
+		return sub, signIn
 	}
 	id, membership := add()
 
@@ -598,8 +601,7 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 		"cap-"+uuid.NewString()[:8]+"@example.com",
 	)
 
-	var ids []uuid.UUID
-
+	ids := make([]uuid.UUID, 0, 2*identity.AccountsPerOrgPerDay)
 	for _, org := range []string{"org-contractor-b", "org-customer-b"} {
 		for idx := range identity.AccountsPerOrgPerDay { // ended memberships added 1 h to 1 h 29 min ago
 			id := uuid.New()

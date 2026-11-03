@@ -306,11 +306,11 @@ func TestScheduleDraftPreview(t *testing.T) {
 	}
 }
 
-// strings2 replaces the first occurrence of old in s.
-func strings2(s, old, new string) string {
+// strings2 replaces the first occurrence of old in s with replacement.
+func strings2(s, old, replacement string) string {
 	for i := 0; i+len(old) <= len(s); i++ {
 		if s[i:i+len(old)] == old {
-			return s[:i] + new + s[i+len(old):]
+			return s[:i] + replacement + s[i+len(old):]
 		}
 	}
 

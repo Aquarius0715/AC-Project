@@ -83,8 +83,10 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 			t.Fatalf("units.list as %s: %d %v", a.membership, code, res)
 		}
 
-		var got []string
-		for _, it := range items(t, res) {
+		rows := items(t, res)
+
+		got := make([]string, 0, len(rows))
+		for _, it := range rows {
 			got = append(got, name[asStr(t, it["id"])])
 		}
 

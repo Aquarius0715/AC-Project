@@ -30,8 +30,8 @@ func TestReplicas(t *testing.T) {
 
 			source := replica.Source
 			if source == "monitoring.measurements" { // only minute-slot power samples are captured
-				source = "(SELECT * FROM monitoring.measurements WHERE metric = 'power' AND observed_at = date_trunc('minute', " +
-					"observed_at)) m"
+				source = "(SELECT " + cols + " FROM monitoring.measurements WHERE metric = 'power' AND observed_at = " +
+					"date_trunc('minute', observed_at)) m"
 			}
 
 			var diff int

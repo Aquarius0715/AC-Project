@@ -178,7 +178,8 @@ func TestUnitsImport(t *testing.T) {
 		"header only": `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n",` +
 			`"mapping":{"property":"a","unit_name":"a","model_code":"b"}}`,
 		"too many rows": `{"customerId":"` + cust + `","fileName":"a.csv",` +
-			`"csvText":` + jsonStr(t, "p,u,m\n"+strings.Repeat("x,y,z\n", 1001)) + `,"mapping":{"property":"p","unit_name":"u",` +
+			`"csvText":` + jsonStr(t, "p,u,m\n"+strings.Repeat("x,y,z\n", 1001)) + `,"mapping":{"property":"p",` +
+			`"unit_name":"u",` +
 			`"model_code":"m"}}`,
 		"bad quoting": `{"customerId":"` + cust + `","fileName":"a.csv",` +
 			`"csvText":` + jsonStr(t, "p,u,m\n\"x,y\n") + `,"mapping":{"property":"p","unit_name":"u","model_code":"m"}}`,

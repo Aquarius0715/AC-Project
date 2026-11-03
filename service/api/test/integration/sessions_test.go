@@ -185,8 +185,10 @@ func TestRevokeSessions(t *testing.T) {
 		t.Fatalf("revoke: %d %v", code, resp)
 	}
 
-	var ids []string
-	for _, v := range asArr(t, data(resp)["membershipIds"]) {
+	revokedIDs := asArr(t, data(resp)["membershipIds"])
+
+	ids := make([]string, 0, len(revokedIDs))
+	for _, v := range revokedIDs {
 		ids = append(ids, asStr(t, v))
 	}
 
@@ -264,8 +266,14 @@ func TestRevokeSessions(t *testing.T) {
 	}
 }
 
-// fakeIdP records the subjects whose identity-provider sessions were ended.
-type fakeIdP struct {
+// errProviderDown and errIdentityProviderDown are the failures of an identity provider that does not answer.
+var (
+	errProviderDown         = errors.New("provider unavailable")
+	errIdentityProviderDown = errors.New("identity provider unavailable")
+)
+
+// fakeIDP records the subjects whose identity-provider sessions were ended.
+type fakeIDP struct {
 	mu       sync.Mutex
 	subjects []string
 	err      error
@@ -282,12 +290,12 @@ type fakeIdP struct {
 	generation int
 }
 
-func (f *fakeIdP) CreateAccount(_ context.Context, account idp.Account) (string, error) {
+func (f *fakeIDP) CreateAccount(_ context.Context, account idp.Account) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	if f.failing {
-		return "", errors.New("provider unavailable")
+		return "", errProviderDown
 	}
 
 	f.created = append(f.created, account)
@@ -298,12 +306,12 @@ func (f *fakeIdP) CreateAccount(_ context.Context, account idp.Account) (string,
 	return "sub-" + account.Email, nil
 }
 
-func (f *fakeIdP) UpdateAccount(_ context.Context, subject string, account idp.Account) error {
+func (f *fakeIDP) UpdateAccount(_ context.Context, subject string, account idp.Account) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	if f.failing {
-		return errors.New("provider unavailable")
+		return errProviderDown
 	}
 
 	if f.lost[subject] {
@@ -315,7 +323,7 @@ func (f *fakeIdP) UpdateAccount(_ context.Context, subject string, account idp.A
 	return nil
 }
 
-func (f *fakeIdP) SendSetup(_ context.Context, subject string, _ idp.Account) error {
+func (f *fakeIDP) SendSetup(_ context.Context, subject string, _ idp.Account) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -324,7 +332,7 @@ func (f *fakeIdP) SendSetup(_ context.Context, subject string, _ idp.Account) er
 	return nil
 }
 
-func (f *fakeIdP) SetEnabled(_ context.Context, subject string, enabled bool) error {
+func (f *fakeIDP) SetEnabled(_ context.Context, subject string, enabled bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -333,7 +341,7 @@ func (f *fakeIdP) SetEnabled(_ context.Context, subject string, enabled bool) er
 	return nil
 }
 
-func (f *fakeIdP) EndSessions(_ context.Context, subject string) error {
+func (f *fakeIDP) EndSessions(_ context.Context, subject string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -342,7 +350,7 @@ func (f *fakeIdP) EndSessions(_ context.Context, subject string) error {
 	return f.err
 }
 
-func (f *fakeIdP) take() []string {
+func (f *fakeIDP) take() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -357,7 +365,7 @@ func (f *fakeIdP) take() []string {
 // The event is applied once. A provider that fails is logged and the event is still done, so it does not hold up
 // the identity consumer's other events; the Core API refuses the old sign-ins either way (IR384).
 func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
-	idp := &fakeIdP{
+	idp := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,
@@ -430,7 +438,7 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 		func() { owner(t, `UPDATE identity.users SET cognito_sub = NULL WHERE id = $1`, user) },
 	)
 
-	idp.err = errors.New("identity provider unavailable")
+	idp.err = errIdentityProviderDown
 
 	revoke()
 

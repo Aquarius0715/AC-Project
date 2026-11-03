@@ -120,7 +120,7 @@ func TestPaymentSimulation(t *testing.T) {
 
 	pay := asStr(t, data(resp)["id"])
 
-	ev := func(event string) string {
+	ev := func(_ string) string { // the event's name only labels the call
 		return `,"eventId":"` + uuid.NewString() + `","paymentReference":"REF-` + pay[:8] + `"`
 	}
 	if code, _ := sim(

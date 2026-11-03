@@ -109,8 +109,10 @@ func TestAlertEvidence(t *testing.T) {
 	}
 
 	kinds := func(m map[string]any) string {
-		got := []string{}
-		for _, it := range items(t, m) {
+		rows := items(t, m)
+
+		got := make([]string, 0, len(rows))
+		for _, it := range rows {
 			got = append(got, asStr(t, it["kind"])+":"+asStr(t, it["id"]))
 		}
 

@@ -361,7 +361,9 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 			time.RFC3339,
 		) + `","quality":"` + quality + `"}],"phase":"condition"}`
 
-		operation, code := "automations.fire", 0
+		var code int
+
+		operation := "automations.fire"
 		if simulate {
 			operation = "automations.simulate"
 			code, _ = post(srv, customerB(), operation, body)

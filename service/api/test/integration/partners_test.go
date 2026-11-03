@@ -1034,8 +1034,11 @@ func TestCancelEndsContractorAccess(t *testing.T) {
 		t.Fatalf("accept: %d %v", code, res)
 	}
 
-	access := func() (until time.Time) {
+	access := func() time.Time {
 		t.Helper()
+
+		var until time.Time
+
 		drainEvents(t)
 		ownerScan(
 			t,

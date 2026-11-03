@@ -572,7 +572,7 @@ func TestPartnerUserAccess(t *testing.T) {
 // opens the provider account and sends the set-up e-mail; the first sign-in makes the account active; the access end
 // moves within a year; removing the account turns its sign-in off.
 func TestPartnerAccountCreated(t *testing.T) {
-	fake := &fakeIdP{
+	fake := &fakeIDP{
 		mu:         sync.Mutex{},
 		subjects:   nil,
 		err:        nil,
@@ -982,7 +982,9 @@ func TestNotificationMailRetry(t *testing.T) {
 		clock(),
 	)
 
-	state := func() (st, reason string) {
+	state := func() (string, string) {
+		var st, reason string
+
 		ownerScan(
 			t,
 			`SELECT state, COALESCE(failure_reason, '') FROM notify.deliveries WHERE notification_id = $1 AND channel = 'email'`,
@@ -991,7 +993,7 @@ func TestNotificationMailRetry(t *testing.T) {
 			&reason,
 		)
 
-		return
+		return st, reason
 	}
 	deliver := func(sender *fakeMail, when time.Time) int {
 		t.Helper()
@@ -1018,7 +1020,7 @@ func TestNotificationMailRetry(t *testing.T) {
 
 		return n
 	}
-	deliver(&fakeMail{err: errors.New("smtp down"), sent: nil}, clock())
+	deliver(&fakeMail{err: errSMTPDown, sent: nil}, clock())
 
 	if st, reason := state(); st != "failed" || reason != "smtp down" {
 		t.Fatalf("after a failing send: %s %s", st, reason)
@@ -1039,6 +1041,9 @@ func TestNotificationMailRetry(t *testing.T) {
 }
 
 type sentMail struct{ to, subject, body string }
+
+// errSMTPDown is the failure of a mail server that does not answer.
+var errSMTPDown = errors.New("smtp down")
 
 // fakeMail records what the worker sends, or fails every send with err.
 type fakeMail struct {
@@ -1110,7 +1115,9 @@ func TestNotificationMail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state := func(id string) (st, reason string) {
+	state := func(id string) (string, string) {
+		var st, reason string
+
 		ownerScan(
 			t,
 			`SELECT state, COALESCE(failure_reason, '') FROM notify.deliveries WHERE notification_id = $1 AND channel = 'email'`,
@@ -1119,7 +1126,7 @@ func TestNotificationMail(t *testing.T) {
 			&reason,
 		)
 
-		return
+		return st, reason
 	}
 	if st, _ := state(active); st != "sent" {
 		t.Errorf("active recipient: %s", st)

@@ -596,8 +596,10 @@ func TestForecastWithoutReadings(t *testing.T) {
 	)
 	fc, _ := data(res)["energyForecast"].(map[string]any)
 
-	warnings := []string{}
-	for _, w := range asArr(t, fc["qualityWarnings"]) {
+	raw := asArr(t, fc["qualityWarnings"])
+
+	warnings := make([]string, 0, len(raw))
+	for _, w := range raw {
 		warnings = append(warnings, asStr(t, w))
 	}
 

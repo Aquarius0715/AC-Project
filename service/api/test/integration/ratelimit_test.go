@@ -15,10 +15,13 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
+// errStoreDown is the failure of a rate-limit store that does not answer.
+var errStoreDown = errors.New("connection refused")
+
 type downStore struct{}
 
 func (downStore) Incr(context.Context, string, time.Duration) (int64, error) {
-	return 0, errors.New("connection refused")
+	return 0, errStoreDown
 }
 
 // TestWriteLimit: one membership's writes per minute are bounded, across every operation (network architecture §6,
