@@ -32,7 +32,7 @@ func RegisterQueries(r *ops.Registry) {
 		ops.DomainEnergy,
 		QueryActuals,
 		func(ctx context.Context, call *ops.Call, input *ActualsInput) (Actuals, error) {
-			f, err := DefaultFactor(ctx, call)
+			factor, _, err := DefaultFactor(ctx, call)
 			if err != nil {
 				return Actuals{}, err
 			}
@@ -43,7 +43,7 @@ func RegisterQueries(r *ops.Registry) {
 				input.UnitIDs,
 				input.From,
 				input.To,
-				f,
+				factor,
 				nil,
 			)
 			if err != nil {

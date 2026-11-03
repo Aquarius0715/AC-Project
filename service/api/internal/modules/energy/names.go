@@ -14,6 +14,9 @@ const (
 	methodPeriodComparison = "demo_period_comparison"
 	stateDemoPurchased     = "demo_purchased"
 	stateDemoRequested     = "demo_requested"
+	stateDemoRetired       = "demo_retired"
+	stateFailed            = "failed"
+	attemptFailed          = "failed"
 	statusPending          = "pending"
 )
 

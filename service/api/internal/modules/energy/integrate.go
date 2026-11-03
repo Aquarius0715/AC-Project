@@ -15,8 +15,8 @@ import (
 // Boundary is the 1A actual-data boundary (IR11).
 const Boundary = "ac_input_electricity"
 
-// TariffMYRPerKWh is the fictional fixed tariff (D07).
-var TariffMYRPerKWh = big.NewRat(1, 2)
+// slotsPerHour is the one-minute slots of an hour: a slot's kW sample counts as kW × 1/60 h (D07).
+const slotsPerHour = 60
 
 // Integration is the D07 60-second slot integration of power samples over units × [from, to).
 type Integration struct {
@@ -94,7 +94,10 @@ func Integrate(
 		default:
 			out.ValidSlots++
 
-			sum.Add(sum, new(big.Rat).Quo(new(big.Rat).SetFloat64(*value), big.NewRat(60, 1)))
+			sum.Add(
+				sum,
+				new(big.Rat).Quo(new(big.Rat).SetFloat64(*value), big.NewRat(slotsPerHour, 1)),
+			)
 		}
 	}
 

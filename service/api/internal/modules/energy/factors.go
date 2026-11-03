@@ -2,7 +2,6 @@ package energy
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -27,7 +26,7 @@ type Factor struct {
 	UpdatedAt    time.Time `json:"updatedAt"`
 	Region       string    `json:"region"`
 	Year         int       `json:"year"`
-	KgCO2ePerKWh float64   `json:"kgCO2ePerKWh"`
+	KgCO2ePerKWh float64   `json:"kgCO2ePerKWh"` //nolint:tagliatelle // EmissionFactor's field name (CO2)
 	Source       string    `json:"source"`
 	IsDemo       bool      `json:"isDemo"`
 }
@@ -58,7 +57,7 @@ func scanFactor(r pgx.Row) (Factor, error) {
 // LoadFactor returns a factor version (current when version is nil).
 func LoadFactor(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	factorID uuid.UUID,
 	version *int,
 ) (Factor, error) {
@@ -72,12 +71,39 @@ func LoadFactor(
 		}
 	}
 
-	x, err := scanFactor(c.Tx.QueryRow(ctx, stmt, args...))
+	x, err := scanFactor(call.Tx.QueryRow(ctx, stmt, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return x, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	return x, err
+}
+
+// factorFilter is the filters of emissionFactors.list.
+type factorFilter struct {
+	Region *string `json:"region,omitempty"`
+	Year   *int    `json:"year,omitempty"`
+}
+
+// where is the filter's WHERE clause over the current factors, with its arguments.
+func (filter factorFilter) where() (string, []any) {
+	args := []any{}
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
+	conds := []string{"f.is_current"}
+	if filter.Region != nil {
+		conds = append(conds, "f.region = "+add(*filter.Region))
+	}
+
+	if filter.Year != nil {
+		conds = append(conds, "f.year = "+add(*filter.Year))
+	}
+
+	return strings.Join(conds, " AND "), args
 }
 
 // listFactors serves factors.list.
@@ -113,20 +139,13 @@ func listFactors(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Factor], error) {
-	var filter struct {
-		Region *string `json:"region,omitempty"`
-		Year   *int    `json:"year,omitempty"`
-	}
+	var filter factorFilter
 
-	if len(query.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
-		dec.DisallowUnknownFields()
-
-		if dec.Decode(&filter) != nil {
-			return paging.Page[Factor]{}, apperr.Fields(
-				map[string]string{keyFilters: apperr.KeyInvalid},
-			)
-		}
+	err := decodeStrict(query.Filters, &filter)
+	if err != nil {
+		return paging.Page[Factor]{}, apperr.Fields(
+			map[string]string{keyFilters: apperr.KeyInvalid},
+		)
 	}
 
 	order, err := paging.OrderBy(
@@ -149,23 +168,7 @@ func listFactors(
 		return paging.Page[Factor]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	args := []any{}
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
-	}
-
-	conds := []string{"f.is_current"}
-	if filter.Region != nil {
-		conds = append(conds, "f.region = "+add(*filter.Region))
-	}
-
-	if filter.Year != nil {
-		conds = append(conds, "f.year = "+add(*filter.Year))
-	}
-
-	where := strings.Join(conds, " AND ")
+	where, args := filter.where()
 
 	var total int
 
@@ -220,7 +223,7 @@ type FactorInput struct {
 	ID           *uuid.UUID `json:"id,omitempty"`
 	Region       string     `json:"region"`
 	Year         int        `json:"year"`
-	KgCO2ePerKWh float64    `json:"kgCO2ePerKWh"`
+	KgCO2ePerKWh float64    `json:"kgCO2ePerKWh"` //nolint:tagliatelle // FactorInput's field name (CO2)
 	Source       string     `json:"source"`
 	IsDemo       bool       `json:"isDemo"`
 }

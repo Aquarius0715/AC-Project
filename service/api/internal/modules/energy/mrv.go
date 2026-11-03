@@ -66,7 +66,7 @@ func (in *Conditions) check(fieldErrs map[string]string, prefix string) {
 		fieldErrs[prefix+"factorId"] = apperr.KeyRequired
 	}
 
-	if !slices.Contains(boundaries, in.BoundaryID) {
+	if !slices.Contains(boundaryIDs(), in.BoundaryID) {
 		fieldErrs[prefix+"boundaryId"] = apperr.KeyInvalid
 	}
 
@@ -157,12 +157,20 @@ func preview(ctx context.Context, call *ops.Call, input *Conditions) (Preview, e
 		return Preview{}, err
 	}
 
-	f, err := LoadFactor(ctx, call, input.FactorID, &input.FactorVersion)
+	factor, err := LoadFactor(ctx, call, input.FactorID, &input.FactorVersion)
 	if err != nil {
 		return Preview{}, err
 	}
 
-	s, integration, err := Compute(ctx, call, input.UnitIDs, input.From, input.To, &f, &baseline)
+	computed, integration, err := Compute(
+		ctx,
+		call,
+		input.UnitIDs,
+		input.From,
+		input.To,
+		&factor,
+		&baseline,
+	)
 	if err != nil {
 		return Preview{}, err
 	}
@@ -174,7 +182,7 @@ func preview(ctx context.Context, call *ops.Call, input *Conditions) (Preview, e
 
 	return Preview{
 		Conditions: *input,
-		Summary:    s,
+		Summary:    computed,
 		Incomplete: incomplete,
 		Scope:      "scope_2",
 		IsDemo:     true,
@@ -296,16 +304,16 @@ func LoadReport(
 	reportID uuid.UUID,
 	version *int,
 ) (Report, error) {
-	reportVersion := 0
+	var reportVersion int
 	if version != nil {
 		reportVersion = *version
 	} else {
-		var err error
-
-		reportVersion, err = latestVersion(ctx, call, reportID)
+		latest, err := latestVersion(ctx, call, reportID)
 		if err != nil {
 			return Report{}, err
 		}
+
+		reportVersion = latest
 	}
 
 	report, err := scanReport(

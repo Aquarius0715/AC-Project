@@ -118,96 +118,45 @@ func LoadBaseline(
 	return x, err
 }
 
-// listBaselines serves baselines.list.
-//
-//	@Summary		baselines.list (read)
-//	@ID				baselines.list
-//	@Description	Authorization: client:self | admin:energy.read | admin:mrv.read; IR90 client only when all unitIds \
-//	@Description	in scope
-//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
-//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-A13, DD-C06, DD-A14, DD-C01 · Query: filters \
-//	@Description	unitId,unitIds,from,to,customerId,propertyId,method,boundaryId · sort \
-//	@Description	id,createdAt,updatedAt,periodFrom (default createdAt desc;id desc)
-//	@Tags			baselines
-//	@Accept			json
-//	@Produce		json
-//	@Param			cursor		query		string		false	"page cursor: nextCursor of the previous page (D12)"
-//	@Param			limit		query		integer		false	"page size 1–100, default 25"
-//	@Param			sort		query		string		false	"field:direction — fields id,createdAt,updatedAt,periodFrom; default createdAt desc;id desc"
-//	@Param			unitId		query		string		false	"filter → unitIds contains"
-//	@Param			unitIds		query		[]string	false	"filter → unitIds intersection nonempty (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
-//	@Param			from		query		string		false	"filter → [from,to) on period.from"
-//	@Param			to			query		string		false	"filter → [from,to) on period.from"
-//	@Param			customerId	query		string		false	"filter → any of unitIds belongs to the customer"
-//	@Param			propertyId	query		string		false	"filter → any of unitIds is in the property"
-//	@Param			method		query		string		false	"filter → method"
-//	@Param			boundaryId	query		string		false	"filter → boundaryId"
-//	@Success		200			{object}	ops.Envelope{data=BaselinePage}
-//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
-//	@Security		BearerAuth
-//	@Router			/v1/baselines [get]
-func listBaselines(
-	ctx context.Context,
-	call *ops.Call,
-	query *paging.Query,
-) (paging.Page[Baseline], error) {
-	var filter struct {
-		UnitID     *uuid.UUID   `json:"unitId,omitempty"`
-		UnitIDs    *[]uuid.UUID `json:"unitIds,omitempty"` // the unit sets intersect
-		From       *time.Time   `json:"from,omitempty"`    // [from, to) on period.from
-		To         *time.Time   `json:"to,omitempty"`
-		CustomerID *uuid.UUID   `json:"customerId,omitempty"` // any unit belongs to the customer
-		PropertyID *uuid.UUID   `json:"propertyId,omitempty"` // any unit is in the property
-		Method     *string      `json:"method,omitempty"`
-		BoundaryID *string      `json:"boundaryId,omitempty"`
+// baselineFilter is the filters of baselines.list.
+type baselineFilter struct {
+	UnitID     *uuid.UUID   `json:"unitId,omitempty"`
+	UnitIDs    *[]uuid.UUID `json:"unitIds,omitempty"` // the unit sets intersect
+	From       *time.Time   `json:"from,omitempty"`    // [from, to) on period.from
+	To         *time.Time   `json:"to,omitempty"`
+	CustomerID *uuid.UUID   `json:"customerId,omitempty"` // any unit belongs to the customer
+	PropertyID *uuid.UUID   `json:"propertyId,omitempty"` // any unit is in the property
+	Method     *string      `json:"method,omitempty"`
+	BoundaryID *string      `json:"boundaryId,omitempty"`
+}
+
+// baselineFilterOf decodes and checks the filters of baselines.list: known fields only, a known method and boundary,
+// and a range whose end comes after its start.
+func baselineFilterOf(raw json.RawMessage) (baselineFilter, error) {
+	var filter baselineFilter
+
+	if len(raw) == 0 {
+		return filter, nil
 	}
 
-	if len(query.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
-		dec.DisallowUnknownFields()
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	dec.DisallowUnknownFields()
 
-		if dec.Decode(&filter) != nil ||
-			(filter.Method != nil && !slices.Contains(methods, *filter.Method)) ||
-			(filter.BoundaryID != nil && !slices.Contains(boundaries, *filter.BoundaryID)) {
-			return paging.Page[Baseline]{}, apperr.Fields(
-				map[string]string{keyFilters: apperr.KeyInvalid},
-			)
-		}
-
-		if filter.From != nil && filter.To != nil && !filter.From.Before(*filter.To) {
-			return paging.Page[Baseline]{}, apperr.Fields(
-				map[string]string{"filters.to": apperr.KeyRange},
-			)
-		}
+	if dec.Decode(&filter) != nil ||
+		(filter.Method != nil && !slices.Contains(baselineMethods(), *filter.Method)) ||
+		(filter.BoundaryID != nil && !slices.Contains(boundaryIDs(), *filter.BoundaryID)) {
+		return baselineFilter{}, apperr.Fields(map[string]string{keyFilters: apperr.KeyInvalid})
 	}
 
-	order, err := paging.OrderBy(
-		query.Sort,
-		map[string]string{
-			"id":         "b.id",
-			keyCreatedAt: "b.created_at",
-			keyUpdatedAt: "b.created_at",
-			"periodFrom": "lower(b.period)",
-		},
-		"b.created_at DESC, b.id DESC",
-	)
-	if err != nil {
-		return paging.Page[Baseline]{}, apperr.Wrap(err, "paging.OrderBy")
+	if filter.From != nil && filter.To != nil && !filter.From.Before(*filter.To) {
+		return baselineFilter{}, apperr.Fields(map[string]string{"filters.to": apperr.KeyRange})
 	}
 
-	window, err := paging.Resolve(*query, filter, call.Principal.ScopeVersion, 1)
-	if err != nil {
-		return paging.Page[Baseline]{}, apperr.Wrap(err, "paging.Resolve")
-	}
+	return filter, nil
+}
 
+// where is the filter's WHERE clause over the current baselines the caller may see, with its arguments.
+func (filter baselineFilter) where(call *ops.Call) (string, []any) {
 	args := []any{}
 	add := func(v any) string {
 		args = append(args, v)
@@ -259,7 +208,75 @@ func listBaselines(
 		conds = append(conds, "b.boundary_id = "+add(*filter.BoundaryID))
 	}
 
-	where := strings.Join(conds, " AND ")
+	return strings.Join(conds, " AND "), args
+}
+
+// listBaselines serves baselines.list.
+//
+//	@Summary		baselines.list (read)
+//	@ID				baselines.list
+//	@Description	Authorization: client:self | admin:energy.read | admin:mrv.read; IR90 client only when all unitIds \
+//	@Description	in scope
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A13, DD-C06, DD-A14, DD-C01 · Query: filters \
+//	@Description	unitId,unitIds,from,to,customerId,propertyId,method,boundaryId · sort \
+//	@Description	id,createdAt,updatedAt,periodFrom (default createdAt desc;id desc)
+//	@Tags			baselines
+//	@Accept			json
+//	@Produce		json
+//	@Param			cursor		query		string		false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit		query		integer		false	"page size 1–100, default 25"
+//	@Param			sort		query		string		false	"field:direction — fields id,createdAt,updatedAt,periodFrom; default createdAt desc;id desc"
+//	@Param			unitId		query		string		false	"filter → unitIds contains"
+//	@Param			unitIds		query		[]string	false	"filter → unitIds intersection nonempty (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+//	@Param			from		query		string		false	"filter → [from,to) on period.from"
+//	@Param			to			query		string		false	"filter → [from,to) on period.from"
+//	@Param			customerId	query		string		false	"filter → any of unitIds belongs to the customer"
+//	@Param			propertyId	query		string		false	"filter → any of unitIds is in the property"
+//	@Param			method		query		string		false	"filter → method"
+//	@Param			boundaryId	query		string		false	"filter → boundaryId"
+//	@Success		200			{object}	ops.Envelope{data=BaselinePage}
+//	@Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/baselines [get]
+func listBaselines(
+	ctx context.Context,
+	call *ops.Call,
+	query *paging.Query,
+) (paging.Page[Baseline], error) {
+	filter, err := baselineFilterOf(query.Filters)
+	if err != nil {
+		return paging.Page[Baseline]{}, err
+	}
+
+	order, err := paging.OrderBy(
+		query.Sort,
+		map[string]string{
+			"id":         "b.id",
+			keyCreatedAt: "b.created_at",
+			keyUpdatedAt: "b.created_at",
+			"periodFrom": "lower(b.period)",
+		},
+		"b.created_at DESC, b.id DESC",
+	)
+	if err != nil {
+		return paging.Page[Baseline]{}, apperr.Wrap(err, "paging.OrderBy")
+	}
+
+	window, err := paging.Resolve(*query, filter, call.Principal.ScopeVersion, 1)
+	if err != nil {
+		return paging.Page[Baseline]{}, apperr.Wrap(err, "paging.Resolve")
+	}
+
+	where, args := filter.where(call)
 
 	var total int
 
@@ -309,9 +326,17 @@ func listBaselines(
 	}, nil
 }
 
-var (
-	methods    = []string{"demo_fixed", methodPeriodComparison}
-	boundaries = []string{"ac_input_electricity", "whole_building_electricity"}
+// baselineMethods are the methods of a baseline, and boundaryIDs the measurement boundaries it can be drawn on.
+func baselineMethods() []string { return []string{"demo_fixed", methodPeriodComparison} }
+
+func boundaryIDs() []string { return []string{"ac_input_electricity", "whole_building_electricity"} }
+
+// The longest texts and unit list a baseline takes (DD-A13).
+const (
+	maxBaselineUnits = 100
+	maxBoundaryText  = 500
+	maxAssumptions   = 2000
+	maxSourceText    = 500
 )
 
 // BaselineInput is BaselineInput.
@@ -340,7 +365,7 @@ func (in *BaselineInput) Validate() map[string]string {
 		seen[u] = true
 	}
 
-	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > 100 {
+	if len(in.UnitIDs) == 0 || len(in.UnitIDs) > maxBaselineUnits {
 		fieldErrs[keyUnitIDs] = apperr.KeyInvalid
 	}
 
@@ -348,19 +373,19 @@ func (in *BaselineInput) Validate() map[string]string {
 		fieldErrs["period"] = keyEnergyRange
 	}
 
-	if !slices.Contains(boundaries, in.BoundaryID) {
+	if !slices.Contains(boundaryIDs(), in.BoundaryID) {
 		fieldErrs["boundaryId"] = apperr.KeyInvalid
 	}
 
-	text := func(k string, s *string, max int) {
+	text := func(k string, s *string, limit int) {
 		*s = strings.TrimSpace(*s)
-		if n := utf8.RuneCountInString(*s); n < 1 || n > max {
+		if n := utf8.RuneCountInString(*s); n < 1 || n > limit {
 			fieldErrs[k] = apperr.KeyLength
 		}
 	}
-	text("boundary", &in.Boundary, 500)
-	text("assumptions", &in.Assumptions, 2000)
-	text("source", &in.Source, 500)
+	text("boundary", &in.Boundary, maxBoundaryText)
+	text("assumptions", &in.Assumptions, maxAssumptions)
+	text("source", &in.Source, maxSourceText)
 
 	switch in.Method {
 	case "demo_fixed":
@@ -384,18 +409,56 @@ func (in *BaselineInput) Validate() map[string]string {
 }
 
 type measuredQuality struct {
-	Kind           string  `json:"kind"`
-	Coverage       float64 `json:"coverage"`
-	ExpectedSlots  int     `json:"expectedSlots"`
-	ValidSlots     int     `json:"validSlots"`
-	SourceSnapshot struct {
-		Generation  int       `json:"generation"`
-		EventCursor int       `json:"eventCursor"`
-		SnapshotAt  time.Time `json:"snapshotAt"`
-	} `json:"sourceSnapshot"`
+	Kind           string         `json:"kind"`
+	Coverage       float64        `json:"coverage"`
+	ExpectedSlots  int            `json:"expectedSlots"`
+	ValidSlots     int            `json:"validSlots"`
+	SourceSnapshot sourceSnapshot `json:"sourceSnapshot"`
+}
+
+// sourceSnapshot is where a measured baseline's readings were read: the data generation, the outbox position and the
+// time.
+type sourceSnapshot struct {
+	Generation  int       `json:"generation"`
+	EventCursor int       `json:"eventCursor"`
+	SnapshotAt  time.Time `json:"snapshotAt"`
 }
 
 const modeledQuality = `{"kind":"modeled","coverage":null,"expectedSlots":null,"validSlots":null,"sourceSnapshot":null}`
+
+// measuredBaseline integrates a period-comparison baseline's units over its period (SR29): the measured kWh, and the
+// quality that records the coverage and the source snapshot.
+func measuredBaseline(
+	ctx context.Context,
+	call *ops.Call,
+	input *BaselineInput,
+) ([]byte, *float64, error) {
+	integration, err := Integrate(ctx, call, input.UnitIDs, input.Period.From, input.Period.To)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	measured := measuredQuality{
+		Kind:           "measured",
+		ExpectedSlots:  integration.ExpectedSlots,
+		ValidSlots:     integration.ValidSlots,
+		Coverage:       float64(integration.ValidSlots) / float64(integration.ExpectedSlots),
+		SourceSnapshot: sourceSnapshot{Generation: 1, EventCursor: 0, SnapshotAt: call.Now},
+	}
+
+	err = call.Tx.QueryRow(ctx, `SELECT count(*) FROM platform.outbox`).
+		Scan(&measured.SourceSnapshot.EventCursor)
+	if err != nil {
+		return nil, nil, apperr.Wrap(err, "select platform.outbox")
+	}
+
+	quality, err := json.Marshal(measured)
+	if err != nil {
+		return nil, nil, apperr.Wrap(err, "json.Marshal")
+	}
+
+	return quality, Float(integration.KWh), nil
+}
 
 // saveBaseline stores a new baseline or version (SR29): demo_fixed keeps the entered value as modeled; demo_period_
 // comparison integrates the measured slots of the period now (D07) and saves kind=measured with coverage and the
@@ -455,42 +518,10 @@ func saveBaseline(ctx context.Context, call *ops.Call, input *BaselineInput) (Ba
 
 	quality, value := []byte(modeledQuality), input.BaselineKWh
 	if input.Method == methodPeriodComparison {
-		integration, err := Integrate(ctx, call, input.UnitIDs, input.Period.From, input.Period.To)
+		quality, value, err = measuredBaseline(ctx, call, input)
 		if err != nil {
 			return Baseline{}, err
 		}
-
-		measured := measuredQuality{
-			Kind:          "measured",
-			ExpectedSlots: integration.ExpectedSlots,
-			ValidSlots:    integration.ValidSlots,
-			Coverage: float64(
-				integration.ValidSlots,
-			) / float64(
-				integration.ExpectedSlots,
-			),
-			SourceSnapshot: *new(struct {
-				Generation  int       `json:"generation"`
-				EventCursor int       `json:"eventCursor"`
-				SnapshotAt  time.Time `json:"snapshotAt"`
-			}),
-		}
-
-		measured.SourceSnapshot.Generation, measured.SourceSnapshot.SnapshotAt = 1, call.Now
-
-		scanErr := call.Tx.QueryRow(ctx, `SELECT count(*) FROM platform.outbox`).
-			Scan(&measured.SourceSnapshot.EventCursor)
-		if scanErr != nil {
-			return Baseline{}, apperr.Wrap(scanErr, "select platform.outbox")
-		}
-
-		marshaled, marshalErr := json.Marshal(measured)
-		if marshalErr != nil {
-			return Baseline{}, apperr.Wrap(marshalErr, "json.Marshal")
-		}
-
-		quality = marshaled
-		value = Float(integration.KWh)
 	}
 
 	if version > 1 {

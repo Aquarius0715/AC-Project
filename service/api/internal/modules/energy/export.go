@@ -23,10 +23,12 @@ type ExportInput struct {
 	Format      string      `json:"format"`
 }
 
-var (
-	monthRe  = regexp.MustCompile(`^[0-9]{4}-(0[1-9]|1[0-2])$`)
-	sections = []string{"energy_cost", "month_comparison", "co2_offsets", "alerts_maintenance"}
-)
+var monthRe = regexp.MustCompile(`^[0-9]{4}-(0[1-9]|1[0-2])$`)
+
+// reportSections are the sections an energy report can have.
+func reportSections() []string {
+	return []string{"energy_cost", "month_comparison", "co2_offsets", "alerts_maintenance"}
+}
 
 // Validate implements ops.Validator.
 func (in *ExportInput) Validate() map[string]string {
@@ -50,7 +52,7 @@ func (in *ExportInput) Validate() map[string]string {
 
 	seenSections := map[string]bool{}
 	for _, s := range in.Sections {
-		if !slices.Contains(sections, s) || seenSections[s] {
+		if !slices.Contains(reportSections(), s) || seenSections[s] {
 			fieldErrs["sections"] = apperr.KeyInvalid
 		}
 
@@ -114,55 +116,17 @@ func f1(p *float64) string {
 //	@Security		BearerAuth
 //	@Router			/v1/energy/report [get]
 func exportReport(ctx context.Context, call *ops.Call, input *ExportInput) (ReportFile, error) {
-	tz := "Asia/Kuala_Lumpur"
-	if call.Principal.Timezone != "" { // from identity with the principal (IR189)
-		tz = call.Principal.Timezone
-	}
-
-	loc, err := time.LoadLocation(tz)
+	start, end, err := reportMonth(call, input.Month)
 	if err != nil {
-		loc = time.UTC
+		return ReportFile{}, err
 	}
 
-	start, _ := time.ParseInLocation("2006-01", input.Month, loc)
-
-	end := start.AddDate(0, 1, 0)
-	if end.After(call.Now) {
-		return ReportFile{}, apperr.Fields(map[string]string{"month": "errors.month_not_ended"})
-	}
-
-	var own int
-
-	scanErr := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_properties WHERE id = ANY($1) AND customer_org_id =
-		$2
-		AND NOT archived`, input.PropertyIDs, call.Principal.OrgID).
-		Scan(&own)
-	if scanErr != nil {
-		return ReportFile{}, apperr.Wrap(scanErr, "select energy.ref_properties")
-	}
-
-	if own != len(input.PropertyIDs) {
-		return ReportFile{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-	}
-
-	rows, err := call.Tx.Query(
-		ctx,
-		`SELECT id FROM energy.ref_units WHERE property_id = ANY($1) AND NOT archived ORDER BY id`,
-		input.PropertyIDs,
-	)
+	units, err := reportUnits(ctx, call, input.PropertyIDs)
 	if err != nil {
-		return ReportFile{}, apperr.Wrap(err, "select energy.ref_units")
+		return ReportFile{}, err
 	}
 
-	units, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
-	if err != nil {
-		return ReportFile{}, apperr.Wrap(err, "select energy.ref_units")
-	}
-
-	var builder strings.Builder
-	builder.WriteString("section,metric,value\n")
-
-	factor, err := DefaultFactor(ctx, call)
+	factor, _, err := DefaultFactor(ctx, call)
 	if err != nil {
 		return ReportFile{}, err
 	}
@@ -172,77 +136,15 @@ func exportReport(ctx context.Context, call *ops.Call, input *ExportInput) (Repo
 		return ReportFile{}, err
 	}
 
-	for _, s := range input.Sections {
-		switch s {
-		case "energy_cost":
-			amount := "n/a"
-			if month.Totals.AmountMinor != nil {
-				amount = fmt.Sprintf("%.2f MYR", float64(*month.Totals.AmountMinor)/100)
-			}
+	scope := reportScope{units: units, start: start, end: end, factor: factor, month: month}
 
-			fmt.Fprintf(
-				&builder,
-				"energy_cost,kWh,%s\nenergy_cost,cost,%s\n",
-				f1(month.Totals.KWh),
-				amount,
-			)
-		case "month_comparison":
-			prev, _, err := Compute(
-				ctx,
-				call,
-				units,
-				start.AddDate(0, -1, 0).UTC(),
-				start.UTC(),
-				factor,
-				nil,
-			)
-			if err != nil {
-				return ReportFile{}, err
-			}
+	var builder strings.Builder
+	builder.WriteString("section,metric,value\n")
 
-			fmt.Fprintf(
-				&builder,
-				"month_comparison,previous_kWh,%s\nmonth_comparison,current_kWh,%s\n",
-				f1(prev.Totals.KWh),
-				f1(month.Totals.KWh),
-			)
-		case "co2_offsets":
-			var retired float64
-
-			err := call.Tx.QueryRow(ctx, `SELECT COALESCE(sum(r.amount_kg), 0)::float8 FROM energy.offset_records r JOIN
-				energy.ref_customers cu ON cu.id = r.customer_id
-				WHERE cu.organization_id = $1 AND r.state = 'demo_retired' AND r.updated_at >= $2 AND r.updated_at <
-				$3`, call.Principal.OrgID, start, end).
-				Scan(&retired)
-			if err != nil {
-				return ReportFile{}, apperr.Wrap(err, "select energy.offset_records")
-			}
-
-			fmt.Fprintf(
-				&builder,
-				"co2_offsets,emissions_kg,%s\nco2_offsets,demo_retired_kg,%.1f\n",
-				f1(month.Totals.EmissionsKg),
-				retired,
-			)
-		case "alerts_maintenance":
-			var alerts, jobs int
-
-			err := call.Tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM energy.ref_alerts WHERE unit_id = ANY($1) AND detected_at
-				>=
-				$2 AND detected_at < $3),
-				(SELECT count(*) FROM energy.ref_jobs WHERE unit_id = ANY($1) AND status = 'completed' AND updated_at >= $2 AND
-				updated_at < $3)`, units, start, end).
-				Scan(&alerts, &jobs)
-			if err != nil {
-				return ReportFile{}, apperr.Wrap(err, "select energy.ref_alerts")
-			}
-
-			fmt.Fprintf(
-				&builder,
-				"alerts_maintenance,alerts,%d\nalerts_maintenance,completed_jobs,%d\n",
-				alerts,
-				jobs,
-			)
+	for _, section := range input.Sections {
+		err := scope.write(ctx, call, &builder, section)
+		if err != nil {
+			return ReportFile{}, err
 		}
 	}
 
@@ -259,4 +161,154 @@ func exportReport(ctx context.Context, call *ops.Call, input *ExportInput) (Repo
 		GeneratedAt: call.Now,
 		IsDemo:      true,
 	}, nil
+}
+
+// reportMonth is the month a report covers in the user's timezone (from identity with the principal, IR189; Kuala
+// Lumpur by default, UTC for a zone this server does not know): its start and its end, once it has ended.
+func reportMonth(call *ops.Call, month string) (time.Time, time.Time, error) {
+	tz := "Asia/Kuala_Lumpur"
+	if call.Principal.Timezone != "" {
+		tz = call.Principal.Timezone
+	}
+
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		loc = time.UTC
+	}
+
+	start, err := time.ParseInLocation("2006-01", month, loc)
+	if err != nil {
+		return time.Time{}, time.Time{}, apperr.Fields(
+			map[string]string{"month": apperr.KeyInvalid},
+		)
+	}
+
+	end := start.AddDate(0, 1, 0)
+	if end.After(call.Now) {
+		return time.Time{}, time.Time{}, apperr.Fields(
+			map[string]string{"month": "errors.month_not_ended"},
+		)
+	}
+
+	return start, end, nil
+}
+
+// reportUnits are the units of a report's properties, which must all be the caller's own and not archived.
+func reportUnits(ctx context.Context, call *ops.Call, properties []uuid.UUID) ([]uuid.UUID, error) {
+	var own int
+
+	err := call.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_properties WHERE id = ANY($1) AND customer_org_id =
+		$2
+		AND NOT archived`, properties, call.Principal.OrgID).
+		Scan(&own)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select energy.ref_properties")
+	}
+
+	if own != len(properties) {
+		return nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	rows, err := call.Tx.Query(
+		ctx,
+		`SELECT id FROM energy.ref_units WHERE property_id = ANY($1) AND NOT archived ORDER BY id`,
+		properties,
+	)
+	if err != nil {
+		return nil, apperr.Wrap(err, "select energy.ref_units")
+	}
+
+	units, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+
+	return units, apperr.Wrap(err, "select energy.ref_units")
+}
+
+// reportScope is what a report's sections read: its units and month, the factor, and the month's summary.
+type reportScope struct {
+	units      []uuid.UUID
+	start, end time.Time
+	factor     *Factor
+	month      Summary
+}
+
+// write writes the rows of one section.
+func (scope reportScope) write(
+	ctx context.Context,
+	call *ops.Call,
+	builder *strings.Builder,
+	section string,
+) error {
+	switch section {
+	case "energy_cost":
+		amount := "n/a"
+		if scope.month.Totals.AmountMinor != nil {
+			amount = fmt.Sprintf("%.2f MYR", float64(*scope.month.Totals.AmountMinor)/senPerRinggit)
+		}
+
+		fmt.Fprintf(
+			builder,
+			"energy_cost,kWh,%s\nenergy_cost,cost,%s\n",
+			f1(scope.month.Totals.KWh),
+			amount,
+		)
+	case "month_comparison":
+		prev, _, err := Compute(
+			ctx,
+			call,
+			scope.units,
+			scope.start.AddDate(0, -1, 0).UTC(),
+			scope.start.UTC(),
+			scope.factor,
+			nil,
+		)
+		if err != nil {
+			return err
+		}
+
+		fmt.Fprintf(
+			builder,
+			"month_comparison,previous_kWh,%s\nmonth_comparison,current_kWh,%s\n",
+			f1(prev.Totals.KWh),
+			f1(scope.month.Totals.KWh),
+		)
+	case "co2_offsets":
+		var retired float64
+
+		err := call.Tx.QueryRow(ctx, `SELECT COALESCE(sum(r.amount_kg), 0)::float8 FROM energy.offset_records r JOIN
+			energy.ref_customers cu ON cu.id = r.customer_id
+			WHERE cu.organization_id = $1 AND r.state = 'demo_retired' AND r.updated_at >= $2 AND r.updated_at <
+			$3`, call.Principal.OrgID, scope.start, scope.end).
+			Scan(&retired)
+		if err != nil {
+			return apperr.Wrap(err, "select energy.offset_records")
+		}
+
+		fmt.Fprintf(
+			builder,
+			"co2_offsets,emissions_kg,%s\nco2_offsets,demo_retired_kg,%.1f\n",
+			f1(scope.month.Totals.EmissionsKg),
+			retired,
+		)
+	case "alerts_maintenance":
+		var alerts, jobs int
+
+		err := call.Tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM energy.ref_alerts WHERE unit_id = ANY($1) AND detected_at
+			>=
+			$2 AND detected_at < $3),
+			(SELECT count(*) FROM energy.ref_jobs WHERE unit_id = ANY($1) AND status = 'completed' AND updated_at >= $2 AND
+			updated_at < $3)`, scope.units, scope.start, scope.end).
+			Scan(&alerts, &jobs)
+		if err != nil {
+			return apperr.Wrap(err, "select energy.ref_alerts")
+		}
+
+		fmt.Fprintf(
+			builder,
+			"alerts_maintenance,alerts,%d\nalerts_maintenance,completed_jobs,%d\n",
+			alerts,
+			jobs,
+		)
+	}
+
+	return nil
 }

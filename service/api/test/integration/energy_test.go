@@ -386,7 +386,7 @@ func TestEnergySummary(t *testing.T) {
 	owner(
 		t,
 		`UPDATE energy.emission_factors SET is_current = false WHERE id = $1 AND is_current`,
-		energy.DefaultFactorID,
+		energy.DefaultFactorID(),
 	)
 
 	_, resp = post(srv, hq(), "energy.summary", body(end, ""))
@@ -395,7 +395,7 @@ func TestEnergySummary(t *testing.T) {
 		t,
 		`UPDATE energy.emission_factors SET is_current = true WHERE id = $1 AND version = (SELECT max(version) FROM
 			energy.emission_factors WHERE id = $1)`,
-		energy.DefaultFactorID,
+		energy.DefaultFactorID(),
 	)
 
 	if tot := asObj(t, data(resp)["totals"]); tot["emissionsKg"] != nil ||

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -65,12 +66,12 @@ func (in *QuoteInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 
 	in.Purpose = strings.TrimSpace(in.Purpose)
-	if n := utf8.RuneCountInString(in.Purpose); n < 1 || n > 1000 {
+	if n := utf8.RuneCountInString(in.Purpose); n < 1 || n > maxPurpose {
 		fieldErrs["purpose"] = apperr.KeyLength
 	}
 
-	if math.IsNaN(in.AmountKg) || in.AmountKg <= 0 || in.AmountKg > 100000 ||
-		math.Abs(in.AmountKg*1000-math.Round(in.AmountKg*1000)) > 1e-6 {
+	if math.IsNaN(in.AmountKg) || in.AmountKg <= 0 || in.AmountKg > maxOffsetKg ||
+		math.Abs(in.AmountKg*gramsPerKg-math.Round(in.AmountKg*gramsPerKg)) > gramTolerance {
 		fieldErrs["amountKg"] = apperr.KeyRange
 	}
 
@@ -356,7 +357,7 @@ func decorateRecord(ctx context.Context, call *ops.Call, record *Record) error {
 		return apperr.Wrap(rowsErr, "select energy.offset_attempts")
 	}
 
-	if record.State != "demo_retired" && len(record.Attempts) > 0 {
+	if record.State != stateDemoRetired && len(record.Attempts) > 0 {
 		id := record.Attempts[len(record.Attempts)-1].ID
 		record.CurrentAttemptID = &id
 	}
@@ -404,6 +405,85 @@ func loadRecord(ctx context.Context, call *ops.Call, id uuid.UUID, lock bool) (R
 	return record, decorateRecord(ctx, call, &record)
 }
 
+// recordFilter is the filters of offsetRecords.list.
+type recordFilter struct {
+	CustomerID *uuid.UUID `json:"customerId,omitempty"`
+	Status     *string    `json:"status,omitempty"` // => state
+	From       *time.Time `json:"from,omitempty"`   // [from, to) on createdAt
+	To         *time.Time `json:"to,omitempty"`
+}
+
+// recordStates are the states of an offset record.
+func recordStates() []string {
+	return []string{stateDemoRequested, stateDemoPurchased, stateDemoRetired, stateFailed}
+}
+
+// recordFilterOf decodes and checks the filters of offsetRecords.list: known fields only, a known state, and a range
+// whose end comes after its start.
+func recordFilterOf(raw []byte) (recordFilter, error) {
+	var filter recordFilter
+
+	err := decodeStrict(raw, &filter)
+	if err != nil || (filter.Status != nil && !slices.Contains(recordStates(), *filter.Status)) {
+		return recordFilter{}, apperr.Fields(map[string]string{keyFilters: apperr.KeyInvalid})
+	}
+
+	if filter.From != nil && filter.To != nil && !filter.From.Before(*filter.To) {
+		return recordFilter{}, apperr.Fields(map[string]string{"filters.to": apperr.KeyRange})
+	}
+
+	return filter, nil
+}
+
+// where is the filter's WHERE clause over the records the caller may see, with its arguments: a client sees only its
+// own customer's records whose quote units are all its own (IR90, REV19-030).
+func (filter recordFilter) where(call *ops.Call) (string, []any) {
+	var args []any
+
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
+	conds := []string{"TRUE"}
+	if call.Principal.Role == authz.RoleClient { // IR90 / REV19-030: every quote unit must be the client's
+		conds = append(
+			conds,
+			"cu.organization_id = "+add(call.Principal.OrgID),
+			"NOT EXISTS (SELECT 1 FROM energy.offset_quotes q, unnest(q.unit_ids) uid LEFT JOIN energy.ref_units u ON u.id = "+
+				"uid WHERE q.id = r.quote_id AND u.customer_org_id IS DISTINCT FROM cu.organization_id)",
+		)
+	}
+
+	if filter.CustomerID != nil {
+		conds = append(conds, "r.customer_id = "+add(*filter.CustomerID))
+	}
+
+	if filter.Status != nil {
+		conds = append(conds, "r.state = "+add(*filter.Status))
+	}
+
+	if filter.From != nil {
+		conds = append(conds, "r.created_at >= "+add(*filter.From))
+	}
+
+	if filter.To != nil {
+		conds = append(conds, "r.created_at < "+add(*filter.To))
+	}
+
+	return strings.Join(conds, " AND "), args
+}
+
+// maxPurpose is the longest purpose of an offset request in characters, maxOffsetKg the largest amount, and
+// gramsPerKg with gramTolerance the precision of an amount: whole grams, within floating-point slack.
+const (
+	maxPurpose    = 1000
+	maxOffsetKg   = 100000
+	gramsPerKg    = 1000
+	gramTolerance = 1e-6
+)
+
 // listRecords serves offsets.list.
 //
 //	@Summary		offsets.list (read)
@@ -439,29 +519,9 @@ func listRecords(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Record], error) {
-	var filter struct {
-		CustomerID *uuid.UUID `json:"customerId,omitempty"`
-		Status     *string    `json:"status,omitempty"` // => state
-		From       *time.Time `json:"from,omitempty"`   // [from, to) on createdAt
-		To         *time.Time `json:"to,omitempty"`
-	}
-
-	err := decodeStrict(
-		query.Filters,
-		&filter,
-	)
-	if err != nil ||
-		(filter.Status != nil &&
-			!strings.Contains(" demo_requested demo_purchased demo_retired failed ", " "+*filter.Status+" ")) {
-		return paging.Page[Record]{}, apperr.Fields(
-			map[string]string{keyFilters: apperr.KeyInvalid},
-		)
-	}
-
-	if filter.From != nil && filter.To != nil && !filter.From.Before(*filter.To) {
-		return paging.Page[Record]{}, apperr.Fields(
-			map[string]string{"filters.to": apperr.KeyRange},
-		)
+	filter, err := recordFilterOf(query.Filters)
+	if err != nil {
+		return paging.Page[Record]{}, err
 	}
 
 	order, err := paging.OrderBy(
@@ -482,41 +542,7 @@ func listRecords(
 		return paging.Page[Record]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	var args []any
-
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
-	}
-
-	conds := []string{"TRUE"}
-	if call.Principal.Role == authz.RoleClient { // IR90 / REV19-030: every quote unit must be the client's
-		conds = append(
-			conds,
-			"cu.organization_id = "+add(call.Principal.OrgID),
-			"NOT EXISTS (SELECT 1 FROM energy.offset_quotes q, unnest(q.unit_ids) uid LEFT JOIN energy.ref_units u ON u.id = "+
-				"uid WHERE q.id = r.quote_id AND u.customer_org_id IS DISTINCT FROM cu.organization_id)",
-		)
-	}
-
-	if filter.CustomerID != nil {
-		conds = append(conds, "r.customer_id = "+add(*filter.CustomerID))
-	}
-
-	if filter.Status != nil {
-		conds = append(conds, "r.state = "+add(*filter.Status))
-	}
-
-	if filter.From != nil {
-		conds = append(conds, "r.created_at >= "+add(*filter.From))
-	}
-
-	if filter.To != nil {
-		conds = append(conds, "r.created_at < "+add(*filter.To))
-	}
-
-	where := strings.Join(conds, " AND ")
+	where, args := filter.where(call)
 
 	var total int
 
@@ -671,80 +697,8 @@ func simulate(ctx context.Context, call *ops.Call, input *SimulateInput) (Record
 		return Record{}, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
-	conflict := apperr.E(apperr.Conflict, "errors.offset_state")
-
 	if input.Event == eventRequest {
-		quote, err := scanQuote(
-			call.Tx.QueryRow(
-				ctx,
-				"SELECT "+quoteCols+" FROM energy.offset_quotes q WHERE q.id = $1 FOR UPDATE",
-				*input.QuoteID,
-			),
-		)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Record{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-		}
-
-		if err != nil {
-			return Record{}, err
-		}
-
-		if client {
-			_, _, err := customerOf(ctx, call, &quote.CustomerID)
-			if err != nil {
-				return Record{}, err
-			}
-		}
-
-		if quote.Version != *input.QuoteVersion {
-			return Record{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-		}
-
-		var used bool
-
-		scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.offset_records WHERE quote_id = $1)`, quote.ID).
-			Scan(&used)
-		if scanErr != nil {
-			return Record{}, apperr.Wrap(scanErr, "select energy.offset_records")
-		}
-
-		if used || !call.Now.Before(quote.ExpiresAt) {
-			return Record{}, apperr.E(apperr.Conflict, "errors.quote_unavailable")
-		}
-
-		var recordID uuid.UUID
-
-		scanErr = call.Tx.QueryRow(ctx, `INSERT INTO energy.offset_records (tenant_id, quote_id, customer_id, amount_kg,
-			state,
-			created_at, updated_at)
-			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'demo_requested', $4, $4) RETURNING
-			id`, quote.ID, quote.CustomerID, quote.AmountKg, call.Now).
-			Scan(&recordID)
-		if scanErr != nil {
-			return Record{}, apperr.Wrap(scanErr, "insert energy.offset_records")
-		}
-
-		newAttemptErr := newAttempt(ctx, call, recordID, "purchase")
-		if newAttemptErr != nil {
-			return Record{}, newAttemptErr
-		}
-
-		nextVersion := 1
-		call.Audit(
-			ops.AuditEntry{
-				Action:          "offsets.request",
-				TargetKind:      "offset_record",
-				TargetID:        recordID.String(),
-				NextVersion:     &nextVersion,
-				PreviousVersion: nil,
-				Reason:          "",
-				Result:          "",
-				Before:          nil,
-				After:           nil,
-			},
-		)
-
-		return loadRecord(ctx, call, recordID, false)
+		return requestOffset(ctx, call, input, client)
 	}
 
 	record, err := loadRecord(ctx, call, *input.RecordID, true)
@@ -753,24 +707,9 @@ func simulate(ctx context.Context, call *ops.Call, input *SimulateInput) (Record
 	}
 
 	if input.EventID != nil { // same eventId: stored result when identical, CONFLICT otherwise (SR18)
-		var (
-			att  uuid.UUID
-			kind string
-		)
-
-		err := call.Tx.QueryRow(ctx, `SELECT id, completed_event FROM energy.offset_attempts WHERE completed_event_id =
-			$1`, *input.EventID).
-			Scan(&att, &kind)
-		if err == nil {
-			if att == *input.AttemptID && kind == input.Event {
-				return record, nil
-			}
-
-			return record, conflict
-		}
-
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return record, apperr.Wrap(err, "select energy.offset_attempts")
+		replay, err := replayedEvent(ctx, call, input)
+		if err != nil || replay {
+			return record, err
 		}
 	}
 
@@ -779,9 +718,139 @@ func simulate(ctx context.Context, call *ops.Call, input *SimulateInput) (Record
 	}
 
 	if record.CurrentAttemptID == nil || *record.CurrentAttemptID != *input.AttemptID {
-		return record, conflict
+		return record, apperr.E(apperr.Conflict, "errors.offset_state")
 	}
 
+	err = advanceRecord(ctx, call, input, record)
+	if err != nil {
+		return record, err
+	}
+
+	next := record.Version + 1
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "offsets." + input.Event,
+			TargetKind:      "offset_record",
+			TargetID:        record.ID.String(),
+			PreviousVersion: call.ExpectedVersion,
+			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
+		},
+	)
+
+	return loadRecord(ctx, call, record.ID, false)
+}
+
+// requestOffset starts an offset record from a quote: a client's own quote, at the version shown, not used yet and not
+// expired. The record starts demo_requested with its purchase attempt.
+func requestOffset(
+	ctx context.Context,
+	call *ops.Call,
+	input *SimulateInput,
+	client bool,
+) (Record, error) {
+	quote, err := scanQuote(
+		call.Tx.QueryRow(
+			ctx,
+			"SELECT "+quoteCols+" FROM energy.offset_quotes q WHERE q.id = $1 FOR UPDATE",
+			*input.QuoteID,
+		),
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Record{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	if err != nil {
+		return Record{}, err
+	}
+
+	if client {
+		_, _, err := customerOf(ctx, call, &quote.CustomerID)
+		if err != nil {
+			return Record{}, err
+		}
+	}
+
+	if quote.Version != *input.QuoteVersion {
+		return Record{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	var used bool
+
+	scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM energy.offset_records WHERE quote_id = $1)`, quote.ID).
+		Scan(&used)
+	if scanErr != nil {
+		return Record{}, apperr.Wrap(scanErr, "select energy.offset_records")
+	}
+
+	if used || !call.Now.Before(quote.ExpiresAt) {
+		return Record{}, apperr.E(apperr.Conflict, "errors.quote_unavailable")
+	}
+
+	var recordID uuid.UUID
+
+	scanErr = call.Tx.QueryRow(ctx, `INSERT INTO energy.offset_records (tenant_id, quote_id, customer_id, amount_kg,
+		state,
+		created_at, updated_at)
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'demo_requested', $4, $4) RETURNING
+		id`, quote.ID, quote.CustomerID, quote.AmountKg, call.Now).
+		Scan(&recordID)
+	if scanErr != nil {
+		return Record{}, apperr.Wrap(scanErr, "insert energy.offset_records")
+	}
+
+	newAttemptErr := newAttempt(ctx, call, recordID, "purchase")
+	if newAttemptErr != nil {
+		return Record{}, newAttemptErr
+	}
+
+	nextVersion := 1
+	call.Audit(
+		ops.AuditEntry{
+			Action:          "offsets.request",
+			TargetKind:      "offset_record",
+			TargetID:        recordID.String(),
+			NextVersion:     &nextVersion,
+			PreviousVersion: nil,
+			Reason:          "",
+			Result:          "",
+			Before:          nil,
+			After:           nil,
+		},
+	)
+
+	return loadRecord(ctx, call, recordID, false)
+}
+
+// replayedEvent is whether the event ID already completed this attempt with this event, so the stored result answers;
+// the same ID used for another attempt or event is a conflict (SR18).
+func replayedEvent(ctx context.Context, call *ops.Call, input *SimulateInput) (bool, error) {
+	var (
+		attempt uuid.UUID
+		event   string
+	)
+
+	err := call.Tx.QueryRow(ctx, `SELECT id, completed_event FROM energy.offset_attempts WHERE completed_event_id =
+		$1`, *input.EventID).
+		Scan(&attempt, &event)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, apperr.Wrap(err, "select energy.offset_attempts")
+	}
+
+	if attempt == *input.AttemptID && event == input.Event {
+		return true, nil
+	}
+
+	return false, apperr.E(apperr.Conflict, "errors.offset_state")
+}
+
+// advanceRecord moves a record on by the event of its current attempt: a confirmed purchase starts the retirement
+// attempt, a retirement retires the record with its demo references, a failure fails it, and a retry of a failure
+// starts the failed stage again.
+func advanceRecord(ctx context.Context, call *ops.Call, input *SimulateInput, record Record) error {
 	cur := record.Attempts[len(record.Attempts)-1]
 	finish := func(status string) error {
 		_, err := call.Tx.Exec(
@@ -819,7 +888,7 @@ func simulate(ctx context.Context, call *ops.Call, input *SimulateInput) (Record
 		cur.Status == statusPending:
 		finishErr := finish("succeeded")
 		if finishErr != nil {
-			return record, finishErr
+			return finishErr
 		}
 
 		var ref *string
@@ -829,27 +898,27 @@ func simulate(ctx context.Context, call *ops.Call, input *SimulateInput) (Record
 
 		setStateErr := setState(stateDemoPurchased, ref, nil, nil)
 		if setStateErr != nil {
-			return record, setStateErr
+			return setStateErr
 		}
 
-		err = newAttempt(ctx, call, record.ID, "retirement")
+		return newAttempt(ctx, call, record.ID, "retirement")
 	case input.Event == "retire" && record.State == stateDemoPurchased && cur.Stage == "retirement" &&
 		cur.Status == statusPending:
 		finishErr := finish("succeeded")
 		if finishErr != nil {
-			return record, finishErr
+			return finishErr
 		}
 
-		err = setState("demo_retired", nil, demoRef("DEMO-RET"), demoRef("DEMO-CERT"))
+		return setState(stateDemoRetired, nil, demoRef("DEMO-RET"), demoRef("DEMO-CERT"))
 	case input.Event == "fail" && (record.State == stateDemoRequested || record.State == stateDemoPurchased) &&
 		cur.Status == statusPending:
-		finishErr := finish("failed")
+		finishErr := finish(attemptFailed)
 		if finishErr != nil {
-			return record, finishErr
+			return finishErr
 		}
 
-		err = setState("failed", nil, nil, nil)
-	case input.Event == eventRetry && record.State == "failed" && cur.Status == "failed":
+		return setState(stateFailed, nil, nil, nil)
+	case input.Event == eventRetry && record.State == stateFailed && cur.Status == attemptFailed:
 		next := stateDemoRequested
 		if cur.Stage == "retirement" {
 			next = stateDemoPurchased
@@ -857,30 +926,13 @@ func simulate(ctx context.Context, call *ops.Call, input *SimulateInput) (Record
 
 		setStateErr := setState(next, nil, nil, nil)
 		if setStateErr != nil {
-			return record, setStateErr
+			return setStateErr
 		}
 
-		err = newAttempt(ctx, call, record.ID, cur.Stage)
+		return newAttempt(ctx, call, record.ID, cur.Stage)
 	default:
-		return record, conflict
+		return apperr.E(apperr.Conflict, "errors.offset_state")
 	}
-
-	if err != nil {
-		return record, err
-	}
-
-	next := record.Version + 1
-	call.Audit(
-		ops.AuditEntry{
-			Action:          "offsets." + input.Event,
-			TargetKind:      "offset_record",
-			TargetID:        record.ID.String(),
-			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
-		},
-	)
-
-	return loadRecord(ctx, call, record.ID, false)
 }
 
 // RegisterOffsets binds offsets.*.
