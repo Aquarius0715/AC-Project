@@ -55,22 +55,22 @@ type notifPolicy struct {
 	timezone   string
 }
 
-func cmp(op string, a, b float64) bool {
+func cmp(op string, value, threshold float64) bool {
 	switch op {
 	case "gt":
-		return a > b
+		return value > threshold
 	case "gte":
-		return a >= b
+		return value >= threshold
 	case "lt":
-		return a < b
+		return value < threshold
 	}
 
-	return a <= b
+	return value <= threshold
 }
 
-// inWindow reports whether at falls into the active window in tz (nil window: always). An end before the start runs
+// inWindow reports whether when falls into the active window in tz (nil window: always). An end before the start runs
 // past midnight and the weekdays are start days: 22:00–06:00 on Monday covers Monday 22:00 to Tuesday 06:00.
-func inWindow(activeWindow *ActiveWindow, at time.Time, tz string) bool {
+func inWindow(activeWindow *ActiveWindow, when time.Time, tz string) bool {
 	if activeWindow == nil {
 		return true
 	}
@@ -80,29 +80,30 @@ func inWindow(activeWindow *ActiveWindow, at time.Time, tz string) bool {
 		return false
 	}
 
-	l := at.In(loc)
+	local := when.In(loc)
 
-	wd := int(l.Weekday())
-	if wd == 0 {
-		wd = 7
+	weekday := int(local.Weekday())
+	if weekday == 0 {
+		weekday = 7
 	}
 
-	hm := l.Format("15:04")
+	timeOfDay := local.Format("15:04")
 	if activeWindow.StartLocal < activeWindow.EndLocal {
-		return slices.Contains(activeWindow.Weekdays, wd) && hm >= activeWindow.StartLocal &&
-			hm < activeWindow.EndLocal
+		return slices.Contains(activeWindow.Weekdays, weekday) &&
+			timeOfDay >= activeWindow.StartLocal &&
+			timeOfDay < activeWindow.EndLocal
 	}
 
-	if hm >= activeWindow.StartLocal {
-		return slices.Contains(activeWindow.Weekdays, wd)
+	if timeOfDay >= activeWindow.StartLocal {
+		return slices.Contains(activeWindow.Weekdays, weekday)
 	}
 
-	prev := wd - 1 // the morning part belongs to the window that started the day before
+	prev := weekday - 1 // the morning part belongs to the window that started the day before
 	if prev == 0 {
 		prev = 7
 	}
 
-	return hm < activeWindow.EndLocal && slices.Contains(activeWindow.Weekdays, prev)
+	return timeOfDay < activeWindow.EndLocal && slices.Contains(activeWindow.Weekdays, prev)
 }
 
 // policiesOf returns the notification candidates of a unit: attached alert policies plus the tenant default policy
@@ -125,21 +126,21 @@ func policiesOf(ctx context.Context, call *ops.Call, unit, org uuid.UUID) ([]not
 
 	for rows.Next() {
 		var (
-			p           notifPolicy
+			policy      notifPolicy
 			cond, rules []byte
 		)
 
 		err := rows.Scan(
-			&p.id,
-			&p.isDefault,
-			&p.enabled,
-			&p.owner,
+			&policy.id,
+			&policy.isDefault,
+			&policy.enabled,
+			&policy.owner,
 			&cond,
 			&rules,
-			&p.recipients,
-			&p.channels,
-			&p.cooldown,
-			&p.timezone,
+			&policy.recipients,
+			&policy.channels,
+			&policy.cooldown,
+			&policy.timezone,
 		)
 		if err != nil {
 			rows.Close()
@@ -147,16 +148,16 @@ func policiesOf(ctx context.Context, call *ops.Call, unit, org uuid.UUID) ([]not
 			return nil, apperr.Wrap(err, "select monitoring.alert_policies")
 		}
 
-		if p.isDefault {
+		if policy.isDefault {
 			var rs []DefaultAlertRule
 
 			_ = json.Unmarshal(rules, &rs)
 			for _, defaultAlertRule := range rs {
-				p.conds, p.ruleKeys = append(
-					p.conds,
+				policy.conds, policy.ruleKeys = append(
+					policy.conds,
 					defaultAlertRule.AlertCondition,
 				), append(
-					p.ruleKeys,
+					policy.ruleKeys,
 					defaultAlertRule.RuleKey,
 				)
 			}
@@ -164,10 +165,10 @@ func policiesOf(ctx context.Context, call *ops.Call, unit, org uuid.UUID) ([]not
 			var a AlertCondition
 
 			_ = json.Unmarshal(cond, &a)
-			p.conds, p.ruleKeys = []AlertCondition{a}, []string{""}
+			policy.conds, policy.ruleKeys = []AlertCondition{a}, []string{""}
 		}
 
-		out = append(out, p)
+		out = append(out, policy)
 	}
 
 	rows.Close()
@@ -182,7 +183,7 @@ func policiesOf(ctx context.Context, call *ops.Call, unit, org uuid.UUID) ([]not
 			continue
 		}
 
-		rs, err := call.Tx.Query(
+		settingRows, err := call.Tx.Query(
 			ctx,
 			`SELECT s.rule_key FROM monitoring.default_rule_settings s JOIN assets.customers cu ON cu.id = s.customer_id
 			WHERE s.policy_id = $1 AND cu.organization_id = $2 AND NOT s.enabled`,
@@ -194,7 +195,7 @@ func policiesOf(ctx context.Context, call *ops.Call, unit, org uuid.UUID) ([]not
 		}
 
 		switchedOff, err := pgx.CollectRows(
-			rs,
+			settingRows,
 			pgx.RowTo[string],
 		) // a failed read must not turn a switched-off rule back on
 		if err != nil {
@@ -228,10 +229,10 @@ func policiesOf(ctx context.Context, call *ops.Call, unit, org uuid.UUID) ([]not
 func recipientsOf(
 	ctx context.Context,
 	call *ops.Call,
-	p notifPolicy,
+	policy notifPolicy,
 	org uuid.UUID,
 ) ([]uuid.UUID, []string, error) {
-	if p.isDefault {
+	if policy.isDefault {
 		ids, err := ops.Query[[]uuid.UUID](
 			ctx,
 			call,
@@ -248,8 +249,8 @@ func recipientsOf(
 		return ids, []string{"inApp"}, err
 	}
 
-	if len(p.recipients) == 0 {
-		return []uuid.UUID{}, p.channels, nil
+	if len(policy.recipients) == 0 {
+		return []uuid.UUID{}, policy.channels, nil
 	}
 
 	clients, err := ops.Query[[]uuid.UUID](
@@ -257,7 +258,7 @@ func recipientsOf(
 		call,
 		identity.QueryMembers,
 		identity.MembersInput{
-			IDs:            p.recipients,
+			IDs:            policy.recipients,
 			Role:           "client",
 			OrganizationID: &org,
 			Permission:     "",
@@ -273,7 +274,7 @@ func recipientsOf(
 		call,
 		identity.QueryMembers,
 		identity.MembersInput{
-			IDs:            p.recipients,
+			IDs:            policy.recipients,
 			Role:           "admin",
 			Permission:     "alert.read",
 			OrganizationID: nil,
@@ -290,20 +291,21 @@ func recipientsOf(
 		func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) },
 	)
 
-	return ids, p.channels, nil
+	return ids, policy.channels, nil
 }
 
 // freshValue is a fact's value when it can decide at the tick: valid quality, a number, observed at most 120 s before
 // the tick and not after it (late or future observations decide nothing, D08).
 func freshValue(f fact, at time.Time) (float64, bool) {
-	var v float64
-	if f.Quality != "valid" || string(f.Value) == "null" || json.Unmarshal(f.Value, &v) != nil ||
+	var value float64
+	if f.Quality != "valid" || string(f.Value) == "null" ||
+		json.Unmarshal(f.Value, &value) != nil ||
 		f.ObservedAt.After(at) ||
 		at.Sub(f.ObservedAt) > 120*time.Second {
 		return 0, false
 	}
 
-	return v, true
+	return value, true
 }
 
 // recovered reports whether v is past the recovery threshold: below it for a high limit, above it for a low one (D08).
@@ -325,7 +327,7 @@ func recoverAlert(
 	unit, policy uuid.UUID,
 	ruleKey string,
 	cnd AlertCondition,
-	v float64,
+	value float64,
 	when time.Time,
 	eventID uuid.UUID,
 ) error {
@@ -342,7 +344,7 @@ func recoverAlert(
 	reason := fmt.Sprintf(
 		"Recovered: %s %s %s %s for %d s (D08)",
 		cnd.Metric,
-		strconv.FormatFloat(v, 'f', -1, 64),
+		strconv.FormatFloat(value, 'f', -1, 64),
 		dir,
 		strconv.FormatFloat(cnd.RecoveryThreshold, 'f', -1, 64),
 		cnd.DurationSeconds,
@@ -370,16 +372,16 @@ func recoverAlert(
 	var ids []uuid.UUID
 
 	for rows.Next() {
-		var id uuid.UUID
+		var alertID uuid.UUID
 
-		err := rows.Scan(&id)
+		err := rows.Scan(&alertID)
 		if err != nil {
 			rows.Close()
 
 			return apperr.Wrap(err, "update monitoring.alerts")
 		}
 
-		ids = append(ids, id)
+		ids = append(ids, alertID)
 	}
 
 	rows.Close()
@@ -445,19 +447,19 @@ func (n Notifier) Evaluate(
 
 	out := []json.RawMessage{}
 
-	for _, p := range pols {
+	for _, policy := range pols {
 		if fire { // sustained recovery resolves the policy's open Alert (D08)
-			for idx, cnd := range p.conds {
+			for idx, cnd := range policy.conds {
 				if f, ok := byMetric[cnd.Metric]; ok {
-					if v, ok := freshValue(f, when); ok && recovered(cnd, v) {
+					if value, ok := freshValue(f, when); ok && recovered(cnd, value) {
 						err := recoverAlert(
 							ctx,
 							call,
 							unit,
-							p.id,
-							p.ruleKeys[idx],
+							policy.id,
+							policy.ruleKeys[idx],
 							cnd,
-							v,
+							value,
 							when,
 							eventID,
 						)
@@ -471,7 +473,7 @@ func (n Notifier) Evaluate(
 
 		outcome := Outcome{
 			UnitID:          unit,
-			PolicyID:        p.id,
+			PolicyID:        policy.id,
 			Decision:        "",
 			Reason:          nil,
 			NotificationIDs: nil,
@@ -483,19 +485,19 @@ func (n Notifier) Evaluate(
 
 		hitKey := ""
 
-		if !p.enabled {
+		if !policy.enabled {
 			reason = "disabled"
 		} else {
 			reason = "not_due"
 
-			for idx, cnd := range p.conds {
-				f, ok := byMetric[cnd.Metric]
-				if !ok {
+			for idx, cnd := range policy.conds {
+				f, present := byMetric[cnd.Metric]
+				if !present {
 					continue
 				}
 
-				v, ok := freshValue(f, when)
-				if !ok {
+				value, present := freshValue(f, when)
+				if !present {
 					if reason == "not_due" {
 						reason = "quality"
 					}
@@ -503,10 +505,10 @@ func (n Notifier) Evaluate(
 					continue
 				}
 
-				if cmp(cnd.Operator, v, cnd.Threshold) &&
-					inWindow(cnd.ActiveWindow, when, p.timezone) {
-					cc := p.conds[idx]
-					hit, hitKey, reason = &cc, p.ruleKeys[idx], ""
+				if cmp(cnd.Operator, value, cnd.Threshold) &&
+					inWindow(cnd.ActiveWindow, when, policy.timezone) {
+					cc := policy.conds[idx]
+					hit, hitKey, reason = &cc, policy.ruleKeys[idx], ""
 
 					break
 				}
@@ -519,7 +521,7 @@ func (n Notifier) Evaluate(
 				call,
 				identity.QueryMembers,
 				identity.MembersInput{
-					IDs:            []uuid.UUID{p.owner},
+					IDs:            []uuid.UUID{policy.owner},
 					Role:           "",
 					OrganizationID: nil,
 					Permission:     "",
@@ -536,23 +538,23 @@ func (n Notifier) Evaluate(
 		}
 
 		if reason == "" &&
-			p.cooldown > 0 { // cooldown since the last created notification of this policy and unit
+			policy.cooldown > 0 { // cooldown since the last created notification of this policy and unit
 			var last *time.Time
 
 			err := call.Tx.QueryRow(ctx, `SELECT max(occurred_at) FROM monitoring.alert_notifications WHERE policy_id = $1 AND
-				unit_id = $2`, p.id, unit).
+				unit_id = $2`, policy.id, unit).
 				Scan(&last)
 			if err != nil {
 				return nil, apperr.Wrap(err, "select monitoring.alert_notifications")
 			}
 
-			if last != nil && when.Sub(*last) < time.Duration(p.cooldown)*time.Minute {
+			if last != nil && when.Sub(*last) < time.Duration(policy.cooldown)*time.Minute {
 				reason = "cooldown"
 			}
 		}
 
 		if reason == "" &&
-			p.cooldown == 0 {
+			policy.cooldown == 0 {
 			// without a cooldown (the default policy) a policy notifies once per open alert: nothing more while the
 			// alert it notified about stays open; a recurrence after it resolved opens a new alert and notifies again (IR600,
 			// DEC-90)
@@ -567,7 +569,7 @@ func (n Notifier) Evaluate(
 				ON
 				n.alert_id = a.id AND n.policy_id = a.policy_id
 				WHERE a.unit_id = $1 AND a.policy_id = $2 AND a.rule_key IS NOT DISTINCT FROM $3 AND a.type = 'sensor' AND a.status
-				<> 'resolved')`, unit, p.id, key).
+				<> 'resolved')`, unit, policy.id, key).
 				Scan(&told)
 			if err != nil {
 				return nil, apperr.Wrap(err, "select monitoring.alerts")
@@ -583,7 +585,7 @@ func (n Notifier) Evaluate(
 			channels []string
 		)
 		if reason == "" {
-			recips, channels, err = recipientsOf(ctx, call, p, org)
+			recips, channels, err = recipientsOf(ctx, call, policy, org)
 			if err != nil {
 				return nil, err
 			}
@@ -600,13 +602,13 @@ func (n Notifier) Evaluate(
 		}
 
 		if fire && reason == "" {
-			alert, err := sourceAlert(ctx, call, unit, org, p.id, hitKey, hit, when)
+			alert, err := sourceAlert(ctx, call, unit, org, policy.id, hitKey, hit, when)
 			if err != nil {
 				return nil, err
 			}
 
 			if outcome.Decision == "failed" {
-				fid, err := deliveryFailure(ctx, call, alert, p.id, eventID, when)
+				fid, err := deliveryFailure(ctx, call, alert, policy.id, eventID, when)
 				if err != nil {
 					return nil, err
 				}
@@ -618,7 +620,7 @@ func (n Notifier) Evaluate(
 
 				for _, r := range recips {
 					for _, ch := range channels {
-						id, err := n.Notify.Create(ctx, call, notify.New{
+						notificationID, err := n.Notify.Create(ctx, call, notify.New{
 							RecipientMembershipID: r,
 							Channel:               ch,
 							Type:                  typ,
@@ -638,9 +640,9 @@ func (n Notifier) Evaluate(
 							`INSERT INTO monitoring.alert_notifications (tenant_id, notification_id, alert_id, policy_id, unit_id,
 								occurred_at)
 							VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,
-							id,
+							notificationID,
 							alert,
-							p.id,
+							policy.id,
 							unit,
 							call.Now,
 						)
@@ -651,7 +653,7 @@ func (n Notifier) Evaluate(
 							)
 						}
 
-						outcome.NotificationIDs = append(outcome.NotificationIDs, id)
+						outcome.NotificationIDs = append(outcome.NotificationIDs, notificationID)
 					}
 				}
 			}
@@ -696,19 +698,19 @@ func sourceAlert(
 		key = &ruleKey
 	}
 
-	var id uuid.UUID
+	var alertID uuid.UUID
 
 	err := call.Tx.QueryRow(ctx, `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND rule_key IS
 		NOT
 		DISTINCT FROM $3 AND type = 'sensor' AND status <> 'resolved'`,
 		unit, policy, key).
-		Scan(&id)
+		Scan(&alertID)
 	if err == nil {
-		return id, nil
+		return alertID, nil
 	}
 
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return id, apperr.Wrap(err, "select monitoring.alerts")
+		return alertID, apperr.Wrap(err, "select monitoring.alerts")
 	}
 
 	err = call.Tx.QueryRow(ctx, `INSERT INTO monitoring.alerts (tenant_id, unit_id, customer_org_id, policy_id, rule_key,
@@ -719,7 +721,7 @@ func sourceAlert(
 		AND p.type = 'sensor' ORDER BY p.detected_at DESC, p.id DESC LIMIT 1))
 		ON CONFLICT DO NOTHING RETURNING
 		id`, unit, org, policy, key, cnd.Severity, "Demo event: "+cnd.Metric+" "+cnd.Operator+" threshold", when).
-		Scan(&id)
+		Scan(&alertID)
 	if errors.Is(
 		err,
 		pgx.ErrNoRows,
@@ -728,10 +730,10 @@ func sourceAlert(
 			NOT
 			DISTINCT FROM $3 AND type = 'sensor' AND status <> 'resolved'`,
 			unit, policy, key).
-			Scan(&id)
+			Scan(&alertID)
 	}
 
-	return id, apperr.Wrap(err, "select monitoring.alerts")
+	return alertID, apperr.Wrap(err, "select monitoring.alerts")
 }
 
 // deliveryFailure appends one no_recipient DeliveryFailure per alert/event/policy (SR12; repeats add none).
@@ -749,10 +751,10 @@ func deliveryFailure(
 		return uuid.Nil, apperr.Wrap(scanErr, "select monitoring.alerts")
 	}
 
-	var fs []map[string]any
+	var failures []map[string]any
 
-	_ = json.Unmarshal(raw, &fs)
-	for _, f := range fs {
+	_ = json.Unmarshal(raw, &failures)
+	for _, f := range failures {
 		if f["eventId"] == eventID.String() && f["policyId"] == policy.String() {
 			id, _ := uuid.Parse(f["id"].(string))
 
@@ -760,11 +762,11 @@ func deliveryFailure(
 		}
 	}
 
-	id := uuid.New()
-	fs = append(
-		fs,
+	failureID := uuid.New()
+	failures = append(
+		failures,
 		map[string]any{
-			"id":            id,
+			"id":            failureID,
 			"policyId":      policy,
 			"eventId":       eventID,
 			"occurredAt":    when,
@@ -772,7 +774,7 @@ func deliveryFailure(
 			"deliveryState": "failed",
 		},
 	)
-	b, _ := json.Marshal(fs)
+	b, _ := json.Marshal(failures)
 	_, err := call.Tx.Exec(
 		ctx,
 		`UPDATE monitoring.alerts SET delivery_failures = $2, updated_at = $3 WHERE id = $1`,
@@ -781,5 +783,5 @@ func deliveryFailure(
 		when,
 	)
 
-	return id, apperr.Wrap(err, "update monitoring.alerts")
+	return failureID, apperr.Wrap(err, "update monitoring.alerts")
 }

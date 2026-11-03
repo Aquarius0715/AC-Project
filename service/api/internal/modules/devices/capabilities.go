@@ -411,7 +411,7 @@ func (m Capabilities) save(
 		return Capability{}, apperr.E(apperr.Conflict, "error.duplicateModel")
 	}
 
-	id, version := uuid.Must(uuid.NewV7()), 1
+	modelID, version := uuid.Must(uuid.NewV7()), 1
 	reason := ""
 
 	var before map[string]any
@@ -449,7 +449,7 @@ func (m Capabilities) save(
 			return Capability{}, apperr.Wrap(execErr, "update devices.capabilities")
 		}
 
-		id, version = *input.ID, cur+1
+		modelID, version = *input.ID, cur+1
 		if input.ChangeReason != nil {
 			reason = *input.ChangeReason
 		}
@@ -463,7 +463,7 @@ func (m Capabilities) save(
 		modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
 		VALUES ($1,$2,current_setting('app.tenant_id')::uuid,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true) RETURNING
 		`+capCols,
-			id,
+			modelID,
 			version,
 			input.Manufacturer,
 			input.Model,
@@ -484,7 +484,7 @@ func (m Capabilities) save(
 	}
 
 	if version > 1 && m.Units != nil {
-		_, err := m.Units.MoveToCapabilityVersion(ctx, call, id, version)
+		_, err := m.Units.MoveToCapabilityVersion(ctx, call, modelID, version)
 		if err != nil {
 			return Capability{}, apperr.Wrap(
 				err,
@@ -503,22 +503,22 @@ func (m Capabilities) save(
 	call.Emit(
 		ops.Event{
 			AggregateType: "capability",
-			AggregateID:   id,
+			AggregateID:   modelID,
 			Type:          "CapabilityChanged",
 			Payload:       map[string]int{"version": version},
 		},
 	)
 
-	b, a := ops.Changes(before, capability.fields())
+	changedBefore, a := ops.Changes(before, capability.fields())
 	call.Audit(
 		ops.AuditEntry{
 			Action:          "capabilities.save",
 			TargetKind:      "capability",
-			TargetID:        id.String(),
+			TargetID:        modelID.String(),
 			PreviousVersion: prev,
 			NextVersion:     &version,
 			Reason:          reason,
-			Before:          b,
+			Before:          changedBefore,
 			After:           a, Result: "",
 		},
 	)
@@ -536,14 +536,14 @@ func Register(r *ops.Registry, m Capabilities) {
 func LoadCapability(
 	ctx context.Context,
 	c *ops.Call,
-	id uuid.UUID,
+	modelID uuid.UUID,
 	version int,
 ) (Capability, bool, error) {
 	capability, err := scanCap(
 		c.Tx.QueryRow(
 			ctx,
 			`SELECT `+capCols+` FROM devices.capabilities WHERE id = $1 AND version = $2`,
-			id,
+			modelID,
 			version,
 		),
 	)

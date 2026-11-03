@@ -16,7 +16,7 @@ import (
 // alerts on maintenance's (IR239).
 func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
-		events.FilterCleaningDue: func(ctx context.Context, tx pgx.Tx, event events.Event) error {
+		events.FilterCleaningDue: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
 			var filterReminder events.FilterReminder
 
 			decodeErr := event.Decode(&filterReminder)
@@ -27,7 +27,7 @@ func EventHandlers() map[string]events.Handler {
 			failures := "[]"
 
 			if filterReminder.NoRecipient {
-				b, _ := json.Marshal(
+				failureJSON, _ := json.Marshal(
 					[]map[string]any{
 						{
 							"id":            uuid.New(),
@@ -39,10 +39,10 @@ func EventHandlers() map[string]events.Handler {
 						},
 					},
 				)
-				failures = string(b)
+				failures = string(failureJSON)
 			}
 			// a replay, or an open reminder Alert of the unit (alerts_one_open_per_rule), adds none
-			_, err := tx.Exec(
+			_, err := txn.Exec(
 				ctx,
 				`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, rule_key, type, severity, status,
 					cause_code, evidence_kind, evidence_text,

@@ -88,7 +88,7 @@ func (m *Module) historyAccess(
 	}
 
 	switch call.Principal.Role {
-	case "technician":
+	case roleTechnician:
 		if unit == nil {
 			return "", nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
@@ -105,7 +105,7 @@ func (m *Module) historyAccess(
 		}
 
 		return "b.unit_id = $2", []any{*unit}, nil // only history of the current binding's unit
-	case "client":
+	case roleClient:
 		return "b.customer_org_id = $2", []any{call.Principal.OrgID}, nil
 	}
 
@@ -120,23 +120,23 @@ type historyFilter struct {
 }
 
 func decodeHistory(query paging.Query, period bool) (historyFilter, error) {
-	var f historyFilter
+	var filter historyFilter
 	if !query.HasFilters() {
-		return f, nil
+		return filter, nil
 	}
 
 	dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 	dec.DisallowUnknownFields()
 
-	if !period || dec.Decode(&f) != nil {
-		return f, apperr.Fields(map[string]string{"query.filters": apperr.KeyInvalid})
+	if !period || dec.Decode(&filter) != nil {
+		return filter, apperr.Fields(map[string]string{"query.filters": apperr.KeyInvalid})
 	}
 
-	if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
-		return f, apperr.Fields(map[string]string{"query.filters.to": apperr.KeyRange})
+	if filter.From != nil && filter.To != nil && !filter.From.Before(*filter.To) {
+		return filter, apperr.Fields(map[string]string{"query.filters.to": apperr.KeyRange})
 	}
 
-	return f, nil
+	return filter, nil
 }
 
 func historyPage[T any](
@@ -160,13 +160,13 @@ func historyPageOf[T any](
 	ctx context.Context,
 	call *ops.Call,
 	query paging.Query,
-	f historyFilter,
+	filter historyFilter,
 	sel, from, where string,
 	args []any,
 	order string,
 	scan func(pgx.Row) (T, error),
 ) (paging.Page[T], error) {
-	window, err := paging.Resolve(query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(query, filter, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[T]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -424,9 +424,9 @@ func (m *Module) withNotes(ctx context.Context, call *ops.Call, evs []DeviceEven
 		return nil
 	}
 
-	ids, at := make([]uuid.UUID, len(evs)), make(map[uuid.UUID]int, len(evs))
+	ids, indexOf := make([]uuid.UUID, len(evs)), make(map[uuid.UUID]int, len(evs))
 	for i := range evs {
-		ids[i], at[evs[i].ID] = evs[i].ID, i
+		ids[i], indexOf[evs[i].ID] = evs[i].ID, i
 	}
 
 	rows, err := call.Tx.Query(
@@ -452,7 +452,7 @@ func (m *Module) withNotes(ctx context.Context, call *ops.Call, evs []DeviceEven
 			return apperr.Wrap(err, "select devices.device_event_notes")
 		}
 
-		if i, ok := at[event]; ok {
+		if i, ok := indexOf[event]; ok {
 			evs[i].ResponseNotes = append(evs[i].ResponseNotes, responseNote)
 		}
 	}
@@ -511,19 +511,19 @@ func (m *Module) events(
 		return paging.Page[DeviceEvent]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	f, err := decodeHistory(input.Query, true)
+	filter, err := decodeHistory(input.Query, true)
 	if err != nil {
 		return paging.Page[DeviceEvent]{}, err
 	}
 
 	where, args := "e.device_id = $1 AND "+scope, append([]any{input.device()}, sargs...)
-	if f.From != nil {
-		args = append(args, *f.From)
+	if filter.From != nil {
+		args = append(args, *filter.From)
 		where += fmt.Sprintf(" AND e.occurred_at >= $%d", len(args))
 	}
 
-	if f.To != nil {
-		args = append(args, *f.To)
+	if filter.To != nil {
+		args = append(args, *filter.To)
 		where += fmt.Sprintf(" AND e.occurred_at < $%d", len(args))
 	}
 
@@ -531,7 +531,7 @@ func (m *Module) events(
 		ctx,
 		call,
 		input.Query,
-		f,
+		filter,
 		evCols,
 		evFrom,
 		where,
@@ -610,12 +610,12 @@ func (m *Module) addResponseNote(
 		return DeviceEvent{}, err
 	}
 
-	var v int
+	var version int
 
 	err = call.Tx.QueryRow(ctx, "SELECT e.version "+evFrom+" WHERE e.id = $3 AND e.device_id = $1 AND "+scope+
 		" FOR UPDATE OF e",
 		append(append([]any{input.DeviceID}, sargs...), input.EventID)...).
-		Scan(&v)
+		Scan(&version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return DeviceEvent{}, apperr.E(
 			apperr.NotFound,
@@ -627,7 +627,7 @@ func (m *Module) addResponseNote(
 		return DeviceEvent{}, apperr.Wrap(err, "select devices.device_events")
 	}
 
-	if v != *call.ExpectedVersion {
+	if version != *call.ExpectedVersion {
 		return DeviceEvent{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
@@ -645,7 +645,7 @@ func (m *Module) addResponseNote(
 
 	scanErr := call.Tx.QueryRow(ctx, `UPDATE devices.device_events SET version = version + 1 WHERE id = $1 RETURNING
 		version`, input.EventID).
-		Scan(&v)
+		Scan(&version)
 	if scanErr != nil {
 		return DeviceEvent{}, apperr.Wrap(scanErr, "update devices.device_events")
 	}
@@ -656,12 +656,12 @@ func (m *Module) addResponseNote(
 			TargetKind:      "device_event",
 			TargetID:        input.EventID.String(),
 			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &v, Reason: "", Result: "", Before: nil, After: nil,
+			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 	call.Emit(
 		ops.Event{
-			AggregateType: "device",
+			AggregateType: entityDevice,
 			AggregateID:   input.DeviceID,
 			Type:          "DeviceEventNoted",
 			Payload:       map[string]any{"eventId": input.EventID},

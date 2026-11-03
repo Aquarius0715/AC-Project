@@ -272,13 +272,13 @@ func visible(ctx context.Context, call *ops.Call, run Run) (bool, error) {
 		return true, nil
 	}
 
-	var ok bool
+	var assigned bool
 
 	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND
 		technician_membership_id = $2)`, run.JobID, call.Principal.MembershipID).
-		Scan(&ok)
+		Scan(&assigned)
 
-	return ok, apperr.Wrap(err, "select assets.unit_assignment_access")
+	return assigned, apperr.Wrap(err, "select assets.unit_assignment_access")
 }
 
 // RunIDInput is diagnosticRuns.get input.
@@ -479,14 +479,14 @@ func (m Diagnostics) list(
 }
 
 // runAcknowledged moves a run when its start or end command is acknowledged (IR139 item 2).
-func runAcknowledged(ctx context.Context, txn pgx.Tx, command uuid.UUID, at time.Time) error {
+func runAcknowledged(ctx context.Context, txn pgx.Tx, command uuid.UUID, when time.Time) error {
 	_, execErr := txn.Exec(
 		ctx,
 		`UPDATE control.diagnostic_runs SET state = 'running', started_at = $2::timestamptz, end_at = $2::timestamptz +
 			make_interval(mins => duration_minutes),
 		version = version + 1, updated_at = $2 WHERE start_command_id = $1 AND state = 'awaiting_start'`,
 		command,
-		at,
+		when,
 	)
 	if execErr != nil {
 		return apperr.Wrap(execErr, "update control.diagnostic_runs")
@@ -497,7 +497,7 @@ func runAcknowledged(ctx context.Context, txn pgx.Tx, command uuid.UUID, at time
 		`UPDATE control.diagnostic_runs SET state = 'completed', version = version + 1, updated_at = $2 WHERE end_command_id =
 			$1 AND state = 'end_requested'`,
 		command,
-		at,
+		when,
 	)
 
 	return apperr.Wrap(err, "update control.diagnostic_runs")
@@ -506,7 +506,7 @@ func runAcknowledged(ctx context.Context, txn pgx.Tx, command uuid.UUID, at time
 // AdvanceRuns is the worker step of IR139 item 2: failed starts / ends from expired commands, and end commands at
 // endAt.
 func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
-	n := 0
+	advanced := 0
 
 	tag, err := call.Tx.Exec(
 		ctx,
@@ -519,7 +519,7 @@ func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
 		return 0, apperr.Wrap(err, "update control.diagnostic_runs")
 	}
 
-	n += int(tag.RowsAffected())
+	advanced += int(tag.RowsAffected())
 
 	tag, err = call.Tx.Exec(
 		ctx,
@@ -529,10 +529,10 @@ func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
 		call.Now,
 	)
 	if err != nil {
-		return n, apperr.Wrap(err, "update control.diagnostic_runs")
+		return advanced, apperr.Wrap(err, "update control.diagnostic_runs")
 	}
 
-	n += int(tag.RowsAffected())
+	advanced += int(tag.RowsAffected())
 
 	rows, err := call.Tx.Query(
 		ctx,
@@ -540,7 +540,7 @@ func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
 		call.Now,
 	)
 	if err != nil {
-		return n, apperr.Wrap(err, "select control.diagnostic_runs")
+		return advanced, apperr.Wrap(err, "select control.diagnostic_runs")
 	}
 
 	var due []Run
@@ -550,7 +550,7 @@ func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
 		if err != nil {
 			rows.Close()
 
-			return n, err
+			return advanced, err
 		}
 
 		due = append(due, run)
@@ -560,7 +560,7 @@ func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
 
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return n, apperr.Wrap(rowsErr, "select control.diagnostic_runs")
+		return advanced, apperr.Wrap(rowsErr, "select control.diagnostic_runs")
 	}
 
 	for _, run := range due {
@@ -568,7 +568,7 @@ func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
 
 		policy, err := m.Restrictions.UnitPolicy(ctx, call, run.UnitID)
 		if err != nil {
-			return n, apperr.Wrap(err, "control.Restrictions.UnitPolicy")
+			return advanced, apperr.Wrap(err, "control.Restrictions.UnitPolicy")
 		}
 
 		state, code := "", ""
@@ -580,11 +580,11 @@ func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
 		} else {
 			dev, conn, power, bound, err := m.Devices.BoundDevice(ctx, call, run.UnitID)
 			if err != nil {
-				return n, apperr.Wrap(err, "control.Devices.BoundDevice")
+				return advanced, apperr.Wrap(err, "control.Devices.BoundDevice")
 			} else if Deliverable(bound, conn, power) != nil {
 				state, code = "end_failed", "OFFLINE"
 			} else {
-				var id uuid.UUID
+				var endCommandID uuid.UUID
 
 				err := call.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id,
 					source,
@@ -594,12 +594,12 @@ func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
 					run.TenantID, run.UnitID, dev, run.ActorMembershipID, []byte(run.EndAction), run.ID, run.JobID, run.Reason,
 					call.Now,
 					call.Now.Add(CommandTTL), "tick-"+call.Now.Format(time.RFC3339)).
-					Scan(&id)
+					Scan(&endCommandID)
 				if err != nil {
-					return n, apperr.Wrap(err, "insert control.commands")
+					return advanced, apperr.Wrap(err, "insert control.commands")
 				}
 
-				state, cmd = "end_requested", &id
+				state, cmd = "end_requested", &endCommandID
 			}
 		}
 
@@ -615,13 +615,13 @@ func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
 			call.Now,
 		)
 		if execErr != nil {
-			return n, apperr.Wrap(execErr, "update control.diagnostic_runs")
+			return advanced, apperr.Wrap(execErr, "update control.diagnostic_runs")
 		}
 
-		n++
+		advanced++
 	}
 
-	return n, nil
+	return advanced, nil
 }
 
 // RegisterDiagnostics binds the diagnostic run operations.

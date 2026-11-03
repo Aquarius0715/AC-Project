@@ -35,7 +35,7 @@ func EventHandlers() map[string]events.Handler {
 
 			return apperr.Wrap(err, "update control.automations")
 		},
-		events.RestrictionCommandRequested: func(ctx context.Context, tx pgx.Tx, event events.Event) error {
+		events.RestrictionCommandRequested: func(ctx context.Context, txn pgx.Tx, event events.Event) error {
 			var restrictionCommand events.RestrictionCommand
 
 			decodeErr := event.Decode(&restrictionCommand)
@@ -43,7 +43,7 @@ func EventHandlers() map[string]events.Handler {
 				return apperr.Wrap(decodeErr, "events.Event.Decode")
 			}
 
-			_, err := tx.Exec(
+			_, err := txn.Exec(
 				ctx,
 				`INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action,
 					restriction_id, status, delivery,
@@ -128,22 +128,22 @@ func publishRestrictionCommands(
 
 	for rows.Next() {
 		var (
-			t, id  uuid.UUID
-			status string
+			tenantID, id uuid.UUID
+			status       string
 		)
 
-		err := rows.Scan(&t, &id, &status)
+		err := rows.Scan(&tenantID, &id, &status)
 		if err != nil {
 			rows.Close()
 
 			return apperr.Wrap(err, "select control.commands")
 		}
 
-		if _, ok := byTenant[t]; !ok {
-			order = append(order, t)
+		if _, ok := byTenant[tenantID]; !ok {
+			order = append(order, tenantID)
 		}
 
-		byTenant[t] = append(byTenant[t], id)
+		byTenant[tenantID] = append(byTenant[tenantID], id)
 		statuses[id] = status
 	}
 
@@ -154,20 +154,20 @@ func publishRestrictionCommands(
 		return apperr.Wrap(rowsErr, "select control.commands")
 	}
 
-	for _, t := range order {
-		st := map[uuid.UUID]string{}
-		for _, id := range byTenant[t] {
-			st[id] = statuses[id]
+	for _, tenantID := range order {
+		tenantStatuses := map[uuid.UUID]string{}
+		for _, id := range byTenant[tenantID] {
+			tenantStatuses[id] = statuses[id]
 		}
 
 		err := events.Publish(
 			ctx,
 			txn,
-			t,
+			tenantID,
 			"command",
-			byTenant[t][0],
+			byTenant[tenantID][0],
 			eventType,
-			events.Commands{CommandIDs: byTenant[t], At: when, Statuses: st},
+			events.Commands{CommandIDs: byTenant[tenantID], At: when, Statuses: tenantStatuses},
 		)
 		if err != nil {
 			return apperr.Wrap(err, "events.Publish")

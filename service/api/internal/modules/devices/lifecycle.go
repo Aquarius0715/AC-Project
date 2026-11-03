@@ -75,6 +75,13 @@ type Lifecycle struct {
 	Guard OperationGuard
 }
 
+// pendingOperation is a queued or running DeviceOperation the scheduler job moves (unit only for a queued one).
+type pendingOperation struct {
+	id, device uuid.UUID
+	unit       *uuid.UUID
+	kind       string
+}
+
 // Advance is the equipment scheduler job of device operations. An operation still queued or running at expiresAt
 // (60 s after creation) fails with TIMEOUT, and a timed-out check leaves the device in error. A queued operation
 // starts at the first tick one second after its creation: the mutual exclusion is checked again (a normal Command
@@ -82,6 +89,22 @@ type Lifecycle struct {
 // a firmware update of a device that is no longer online fails with OFFLINE (IR94), otherwise it runs and a check
 // sets the device connecting. The device version changes only with the device fields.
 func (l Lifecycle) Advance(ctx context.Context, call *ops.Call) (int, error) {
+	expired, err := expireOperations(ctx, call)
+	if err != nil {
+		return 0, err
+	}
+
+	started, err := l.startOperations(ctx, call)
+	if err != nil {
+		return 0, err
+	}
+
+	return expired + started, nil
+}
+
+// expireOperations fails the operations still queued or running at expiresAt with TIMEOUT (a timed-out check leaves
+// the device in error) and returns how many it failed.
+func expireOperations(ctx context.Context, call *ops.Call) (int, error) {
 	rows, err := call.Tx.Query(
 		ctx,
 		`UPDATE devices.device_operations SET status = 'failed', failure_code = 'TIMEOUT', finished_at = expires_at, version =
@@ -93,44 +116,32 @@ func (l Lifecycle) Advance(ctx context.Context, call *ops.Call) (int, error) {
 		return 0, apperr.Wrap(err, "update devices.device_operations")
 	}
 
-	type op struct {
-		id, device uuid.UUID
-		unit       *uuid.UUID
-		kind       string
-	}
+	expired, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (pendingOperation, error) {
+		var operation pendingOperation
 
-	expired, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (op, error) {
-		var o op
-
-		return o, r.Scan(&o.id, &o.device, &o.kind)
+		return operation, row.Scan(&operation.id, &operation.device, &operation.kind)
 	})
 	if err != nil {
 		return 0, apperr.Wrap(err, "update devices.device_operations")
 	}
 
-	for _, o := range expired {
-		if o.kind == "check" {
-			err := setConnection(ctx, call.Tx, o.device, "error", nil, call.Now)
+	for _, operation := range expired {
+		if operation.kind == kindCheck {
+			err := setConnection(ctx, call.Tx, operation.device, connError, nil, call.Now)
 			if err != nil {
 				return 0, err
 			}
 		}
 
-		call.Emit(
-			ops.Event{
-				AggregateType: "device",
-				AggregateID:   o.device,
-				Type:          "DeviceOperationFinished",
-				Payload: map[string]any{
-					"operationId": o.id,
-					"status":      "failed",
-					"failureCode": "TIMEOUT",
-				},
-			},
-		)
+		operationFailed(call, operation, "TIMEOUT")
 	}
 
-	rows, err = call.Tx.Query(
+	return len(expired), nil
+}
+
+// startOperations moves the queued operations whose start tick came and returns how many it moved.
+func (l Lifecycle) startOperations(ctx context.Context, call *ops.Call) (int, error) {
+	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT id, device_id, unit_id, kind FROM devices.device_operations WHERE status = 'queued' AND created_at <= $1
 		ORDER BY created_at, id FOR UPDATE`,
@@ -140,116 +151,128 @@ func (l Lifecycle) Advance(ctx context.Context, call *ops.Call) (int, error) {
 		return 0, apperr.Wrap(err, "select devices.device_operations")
 	}
 
-	due, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (op, error) {
-		var o op
+	due, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (pendingOperation, error) {
+		var operation pendingOperation
 
-		return o, r.Scan(&o.id, &o.device, &o.unit, &o.kind)
+		return operation, row.Scan(
+			&operation.id,
+			&operation.device,
+			&operation.unit,
+			&operation.kind,
+		)
 	})
 	if err != nil {
 		return 0, apperr.Wrap(err, "select devices.device_operations")
 	}
 
-	for _, o := range due {
-		failure, err := l.startFailure(ctx, call, o.id, o.device, o.unit, o.kind)
+	for _, operation := range due {
+		err := l.startDue(ctx, call, operation)
 		if err != nil {
 			return 0, err
 		}
-
-		if failure != "" {
-			_, err := call.Tx.Exec(
-				ctx,
-				`UPDATE devices.device_operations SET status = 'failed', failure_code = $2, finished_at = $3, version = version + 1,
-					updated_at = $3 WHERE id = $1`,
-				o.id,
-				failure,
-				call.Now,
-			)
-			if err != nil {
-				return 0, apperr.Wrap(err, "update devices.device_operations")
-			}
-
-			call.Emit(
-				ops.Event{
-					AggregateType: "device",
-					AggregateID:   o.device,
-					Type:          "DeviceOperationFinished",
-					Payload: map[string]any{
-						"operationId": o.id,
-						"status":      "failed",
-						"failureCode": failure,
-					},
-				},
-			)
-
-			continue
-		}
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`UPDATE devices.device_operations SET status = 'running', started_at = $2, version = version + 1, updated_at = $2
-				WHERE id = $1`,
-			o.id,
-			call.Now,
-		)
-		if execErr != nil {
-			return 0, apperr.Wrap(execErr, "update devices.device_operations")
-		}
-
-		if o.kind == "check" {
-			err := setConnection(ctx, call.Tx, o.device, "connecting", nil, call.Now)
-			if err != nil {
-				return 0, err
-			}
-		}
-
-		call.Emit(
-			ops.Event{
-				AggregateType: "device",
-				AggregateID:   o.device,
-				Type:          "DeviceOperationStarted",
-				Payload:       map[string]any{"operationId": o.id},
-			},
-		)
 	}
 
-	return len(expired) + len(due), nil
+	return len(due), nil
+}
+
+// startDue fails a due operation with its start failure, or runs it (a check sets the device connecting).
+func (l Lifecycle) startDue(ctx context.Context, call *ops.Call, operation pendingOperation) error {
+	failure, err := l.startFailure(
+		ctx,
+		call,
+		operation.id,
+		operation.device,
+		operation.unit,
+		operation.kind,
+	)
+	if err != nil {
+		return err
+	}
+
+	if failure != "" {
+		_, err := call.Tx.Exec(
+			ctx,
+			`UPDATE devices.device_operations SET status = 'failed', failure_code = $2, finished_at = $3, version = version + 1,
+				updated_at = $3 WHERE id = $1`,
+			operation.id,
+			failure,
+			call.Now,
+		)
+		if err != nil {
+			return apperr.Wrap(err, "update devices.device_operations")
+		}
+
+		operationFailed(call, operation, failure)
+
+		return nil
+	}
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`UPDATE devices.device_operations SET status = 'running', started_at = $2, version = version + 1, updated_at = $2
+			WHERE id = $1`,
+		operation.id,
+		call.Now,
+	)
+	if execErr != nil {
+		return apperr.Wrap(execErr, "update devices.device_operations")
+	}
+
+	if operation.kind == kindCheck {
+		err := setConnection(ctx, call.Tx, operation.device, connConnecting, nil, call.Now)
+		if err != nil {
+			return err
+		}
+	}
+
+	call.Emit(
+		ops.Event{
+			AggregateType: entityDevice,
+			AggregateID:   operation.device,
+			Type:          "DeviceOperationStarted",
+			Payload:       map[string]any{fieldOperationID: operation.id},
+		},
+	)
+
+	return nil
+}
+
+// operationFailed emits DeviceOperationFinished of an operation the scheduler job failed with failureCode.
+func operationFailed(call *ops.Call, operation pendingOperation, failureCode string) {
+	call.Emit(
+		ops.Event{
+			AggregateType: entityDevice,
+			AggregateID:   operation.device,
+			Type:          "DeviceOperationFinished",
+			Payload: map[string]any{
+				fieldOperationID: operation.id,
+				fieldStatus:      statusFailed,
+				"failureCode":    failureCode,
+			},
+		},
+	)
 }
 
 // startFailure is the failure code of an operation at its start tick ("" when it may run).
 func (l Lifecycle) startFailure(
 	ctx context.Context,
 	call *ops.Call,
-	id, device uuid.UUID,
+	operationID, device uuid.UUID,
 	unit *uuid.UUID,
 	kind string,
 ) (string, error) {
 	if unit != nil {
-		var other bool
-
-		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND id <> $2
-			AND
-			status IN ('queued','running') AND expires_at > $3)`,
-			*unit, id, call.Now).
-			Scan(&other)
+		busy, err := l.unitBusy(ctx, call, operationID, *unit)
 		if err != nil {
-			return "", apperr.Wrap(err, "select devices.device_operations")
+			return "", err
 		}
 
-		if !other && l.Guard != nil {
-			busy, err := l.Guard.OperationConflict(ctx, call, *unit)
-			if err != nil {
-				return "", apperr.Wrap(err, "devices.OperationGuard.OperationConflict")
-			}
-
-			other = busy
-		}
-
-		if other {
+		if busy {
 			return string(apperr.Conflict), nil
 		}
 	}
 
-	if kind == "firmware" {
+	if kind == kindFirmware {
 		var conn string
 
 		err := call.Tx.QueryRow(ctx, `SELECT connection FROM devices.devices WHERE id = $1`, device).
@@ -258,12 +281,42 @@ func (l Lifecycle) startFailure(
 			return "", apperr.Wrap(err, "select devices.devices")
 		}
 
-		if conn != "online" {
+		if conn != connOnline {
 			return string(apperr.Offline), nil
 		}
 	}
 
 	return "", nil
+}
+
+// unitBusy reports other work on the unit of an operation at its start: another open operation, else the control
+// work the guard reports.
+func (l Lifecycle) unitBusy(
+	ctx context.Context,
+	call *ops.Call,
+	operationID, unit uuid.UUID,
+) (bool, error) {
+	var other bool
+
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND id <> $2
+		AND
+		status IN ('queued','running') AND expires_at > $3)`,
+		unit, operationID, call.Now).
+		Scan(&other)
+	if err != nil {
+		return false, apperr.Wrap(err, "select devices.device_operations")
+	}
+
+	if other || l.Guard == nil {
+		return other, nil
+	}
+
+	busy, err := l.Guard.OperationConflict(ctx, call, unit)
+	if err != nil {
+		return false, apperr.Wrap(err, "devices.OperationGuard.OperationConflict")
+	}
+
+	return busy, nil
 }
 
 // FinishOperation applies the device's result to a running operation (IR67, demo.trigger operation): a queued,
@@ -273,7 +326,7 @@ func (l Lifecycle) startFailure(
 func FinishOperation(
 	ctx context.Context,
 	txn pgx.Tx,
-	id uuid.UUID,
+	operationID uuid.UUID,
 	succeeded bool,
 	when, now time.Time,
 ) error {
@@ -285,7 +338,7 @@ func FinishOperation(
 	)
 
 	err := txn.QueryRow(ctx, `SELECT device_id, kind, status, target_version, expires_at FROM devices.device_operations
-		WHERE id = $1 FOR UPDATE`, id).
+		WHERE id = $1 FOR UPDATE`, operationID).
 		Scan(&device, &kind, &status, &target, &expires)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return apperr.E(apperr.NotFound, apperr.KeyNotFound)
@@ -295,22 +348,22 @@ func FinishOperation(
 		return apperr.Wrap(err, "select devices.device_operations")
 	}
 
-	if status != "running" || !expires.After(now) {
+	if status != statusRunning || !expires.After(now) {
 		return apperr.E(apperr.Conflict, "errors.operation_not_running")
 	}
 
-	result, code := "succeeded", (*string)(nil)
+	result, code := statusSucceeded, (*string)(nil)
 
 	if !succeeded {
 		u := string(apperr.Unavailable)
-		result, code = "failed", &u
+		result, code = statusFailed, &u
 	}
 
 	_, execErr := txn.Exec(
 		ctx,
 		`UPDATE devices.device_operations SET status = $2, failure_code = $3, finished_at = $4, version = version + 1,
 			updated_at = $5 WHERE id = $1`,
-		id,
+		operationID,
 		result,
 		code,
 		when,
@@ -320,22 +373,38 @@ func FinishOperation(
 		return apperr.Wrap(execErr, "update devices.device_operations")
 	}
 
+	return applyResult(ctx, txn, device, kind, target, succeeded, when, now)
+}
+
+// applyResult applies a finished operation's result to its device: a check sets the connection, a succeeded firmware
+// update installs the target version.
+func applyResult(
+	ctx context.Context,
+	txn pgx.Tx,
+	device uuid.UUID,
+	kind string,
+	target *string,
+	succeeded bool,
+	when, now time.Time,
+) error {
 	switch {
-	case kind == "check" && succeeded:
-		return setConnection(ctx, txn, device, "online", &when, now)
-	case kind == "check":
-		return setConnection(ctx, txn, device, "error", nil, now)
+	case kind == kindCheck && succeeded:
+		return setConnection(ctx, txn, device, connOnline, &when, now)
+	case kind == kindCheck:
+		return setConnection(ctx, txn, device, connError, nil, now)
 	case succeeded && target != nil:
-		_, err = txn.Exec(
+		_, err := txn.Exec(
 			ctx,
 			`UPDATE devices.devices SET firmware_version = $2, version = version + 1, updated_at = $3 WHERE id = $1`,
 			device,
 			*target,
 			now,
 		)
+
+		return apperr.Wrap(err, "update devices.devices")
 	}
 
-	return apperr.Wrap(err, "update devices.devices")
+	return nil
 }
 
 // Recovery is DeviceRecovery of service-contracts.ts.
@@ -356,21 +425,46 @@ type Signal struct {
 	OccurredAt time.Time
 }
 
+// The state axes of a device and the kinds of the signals that change them (SR20).
+const (
+	axisConnection = "connection"
+	axisPower      = "power"
+	axisTamper     = "tamper"
+
+	signalCommunicationLost = "communication_lost"
+	signalPowerLost         = "power_lost"
+	signalTamper            = "tamper"
+	signalRestored          = "restored"
+)
+
 // FaultAxis is the state axis of each fault kind and RecoveredValue the value restored gives back on an axis (SR20);
 // each axis has one evidence source (REV18-040).
 var (
 	FaultAxis = map[string]string{
-		"communication_lost": "connection",
-		"power_lost":         "power",
-		"tamper":             "tamper",
+		signalCommunicationLost: axisConnection,
+		signalPowerLost:         axisPower,
+		signalTamper:            axisTamper,
 	}
-	RecoveredValue = map[string]string{"connection": "online", "power": "on", "tamper": "clear"}
-	evidenceOf     = map[string]string{
-		"connection": "heartbeat",
-		"power":      "power_signal",
-		"tamper":     "tamper_signal",
+	RecoveredValue = map[string]string{
+		axisConnection: connOnline,
+		axisPower:      "on",
+		axisTamper:     "clear",
 	}
 )
+
+// evidenceOf is the evidence source of an axis ("" for an unknown one).
+func evidenceOf(axis string) string {
+	switch axis {
+	case axisConnection:
+		return "heartbeat"
+	case axisPower:
+		return "power_signal"
+	case axisTamper:
+		return "tamper_signal"
+	}
+
+	return ""
+}
 
 func sameID(a, b *uuid.UUID) bool {
 	return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
@@ -395,41 +489,20 @@ func RecordSignal(
 
 	var recovery []byte
 
-	if signal.Kind == "restored" {
+	if signal.Kind == signalRestored {
 		axis = signal.Recovery.Axis
-		recovery, _ = json.Marshal(signal.Recovery)
-	}
 
-	var seen struct {
-		device  uuid.UUID
-		kind    string
-		binding *uuid.UUID
-		seq     int64
-		rec     []byte
-	}
-
-	err := txn.QueryRow(ctx, `SELECT device_id, event_type, binding_id, sequence, recovery FROM devices.device_events WHERE
-		event_id = $1`, signal.EventID).
-		Scan(&seen.device, &seen.kind, &seen.binding, &seen.seq, &seen.rec)
-	if err == nil {
-		var prev *Recovery
-		if len(seen.rec) > 0 {
-			_ = json.Unmarshal(seen.rec, &prev)
+		recoveryJSON, err := json.Marshal(signal.Recovery)
+		if err != nil {
+			return false, apperr.Wrap(err, "json.Marshal")
 		}
 
-		if seen.device != signal.DeviceID || seen.kind != signal.Kind ||
-			!sameID(seen.binding, signal.BindingID) ||
-			seen.seq != signal.Sequence ||
-			(prev == nil) != (signal.Recovery == nil) ||
-			(prev != nil && *prev != *signal.Recovery) {
-			return false, apperr.E(apperr.Conflict, "errors.event_id_reused")
-		}
-
-		return false, nil
+		recovery = recoveryJSON
 	}
 
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return false, apperr.Wrap(err, "select devices.device_events")
+	stored, err := storedSignal(ctx, txn, signal)
+	if stored || err != nil {
+		return false, err
 	}
 
 	var (
@@ -467,62 +540,30 @@ func RecordSignal(
 		return false, nil // an old heartbeat does not restore the device (SR20)
 	}
 
-	evidence, alertIDs := evidenceOf[axis], []uuid.UUID{}
+	evidence, alertIDs := evidenceOf(axis), []uuid.UUID{}
 
-	if signal.Kind == "restored" {
-		var (
-			src      uuid.UUID
-			restored *time.Time
-		)
-
-		err := txn.QueryRow(ctx, `SELECT id, restored_at, evidence_source, alert_ids FROM devices.device_events WHERE
-			device_id
-			= $1 AND binding_id IS NOT DISTINCT FROM $2
-			AND axis = $3 AND event_type <> 'restored' ORDER BY sequence DESC LIMIT 1 FOR
-			UPDATE`, signal.DeviceID, signal.BindingID, axis).
-			Scan(&src, &restored, &evidence, &alertIDs)
-		if errors.Is(err, pgx.ErrNoRows) ||
-			(err == nil && (src != signal.Recovery.SourceEventID || restored != nil)) {
-			return false, apperr.E(apperr.Conflict, "errors.recovery_source_not_current")
-		}
-
+	if signal.Kind == signalRestored {
+		err := restoreFault(ctx, txn, signal, axis, &evidence, &alertIDs)
 		if err != nil {
-			return false, apperr.Wrap(err, "select devices.device_events")
-		}
-
-		_, execErr := txn.Exec(
-			ctx,
-			`UPDATE devices.device_events SET restored_at = $2, version = version + 1 WHERE id = $1`,
-			src,
-			signal.OccurredAt,
-		)
-		if execErr != nil {
-			return false, apperr.Wrap(execErr, "update devices.device_events")
+			return false, err
 		}
 	}
 
-	if signal.Kind == "tamper" && unit != nil && binding != nil {
-		var org uuid.UUID
-
-		err := txn.QueryRow(ctx, `SELECT customer_org_id FROM devices.device_bindings WHERE id = $1`, *binding).
-			Scan(&org)
-		if err != nil {
-			return false, apperr.Wrap(err, "select devices.device_bindings")
-		}
-
-		a, err := alerts.TamperAlert(
+	if signal.Kind == signalTamper && unit != nil && binding != nil {
+		alertID, err := openTamperAlert(
 			ctx,
 			txn,
+			alerts,
+			*binding,
 			*unit,
-			org,
-			"Device "+serial+" reported its cover opened while powered (tamper_signal)",
+			serial,
 			signal.OccurredAt,
 		)
 		if err != nil {
-			return false, apperr.Wrap(err, "devices.AlertOpener.TamperAlert")
+			return false, err
 		}
 
-		alertIDs = []uuid.UUID{a}
+		alertIDs = []uuid.UUID{alertID}
 	}
 
 	_, execErr := txn.Exec(
@@ -551,16 +592,136 @@ func RecordSignal(
 		return false, apperr.Wrap(execErr, "insert devices.device_events")
 	}
 
-	restored := signal.Kind == "restored"
+	err = applySignal(ctx, txn, signal, axis, now)
+
+	return err == nil, err
+}
+
+// storedSignal reports whether a DeviceEvent with the signal's eventId is stored already: the same content is a
+// repeat that changes nothing, other content is CONFLICT.
+func storedSignal(ctx context.Context, txn pgx.Tx, signal Signal) (bool, error) {
+	var seen struct {
+		device  uuid.UUID
+		kind    string
+		binding *uuid.UUID
+		seq     int64
+		rec     []byte
+	}
+
+	err := txn.QueryRow(ctx, `SELECT device_id, event_type, binding_id, sequence, recovery FROM devices.device_events WHERE
+		event_id = $1`, signal.EventID).
+		Scan(&seen.device, &seen.kind, &seen.binding, &seen.seq, &seen.rec)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, apperr.Wrap(err, "select devices.device_events")
+	}
+
+	var prev *Recovery
+	if len(seen.rec) > 0 {
+		_ = json.Unmarshal(seen.rec, &prev)
+	}
+
+	if seen.device != signal.DeviceID || seen.kind != signal.Kind ||
+		!sameID(seen.binding, signal.BindingID) ||
+		seen.seq != signal.Sequence ||
+		(prev == nil) != (signal.Recovery == nil) ||
+		(prev != nil && *prev != *signal.Recovery) {
+		return true, apperr.E(apperr.Conflict, "errors.event_id_reused")
+	}
+
+	return true, nil
+}
+
+// restoreFault gives the current unresolved fault of the axis its restoredAt (CONFLICT unless the restored signal
+// names it) and reads the evidence source and alertIds the restored event inherits from it.
+func restoreFault(
+	ctx context.Context,
+	txn pgx.Tx,
+	signal Signal,
+	axis string,
+	evidence *string,
+	alertIDs *[]uuid.UUID,
+) error {
+	var (
+		src      uuid.UUID
+		restored *time.Time
+	)
+
+	err := txn.QueryRow(ctx, `SELECT id, restored_at, evidence_source, alert_ids FROM devices.device_events WHERE
+		device_id
+		= $1 AND binding_id IS NOT DISTINCT FROM $2
+		AND axis = $3 AND event_type <> 'restored' ORDER BY sequence DESC LIMIT 1 FOR
+		UPDATE`, signal.DeviceID, signal.BindingID, axis).
+		Scan(&src, &restored, evidence, alertIDs)
+	if errors.Is(err, pgx.ErrNoRows) ||
+		(err == nil && (src != signal.Recovery.SourceEventID || restored != nil)) {
+		return apperr.E(apperr.Conflict, "errors.recovery_source_not_current")
+	}
+
+	if err != nil {
+		return apperr.Wrap(err, "select devices.device_events")
+	}
+
+	_, execErr := txn.Exec(
+		ctx,
+		`UPDATE devices.device_events SET restored_at = $2, version = version + 1 WHERE id = $1`,
+		src,
+		signal.OccurredAt,
+	)
+
+	return apperr.Wrap(execErr, "update devices.device_events")
+}
+
+// openTamperAlert opens the tamper Alert of the unit for the customer org of the device's binding.
+func openTamperAlert(
+	ctx context.Context,
+	txn pgx.Tx,
+	alerts AlertOpener,
+	binding, unit uuid.UUID,
+	serial string,
+	occurredAt time.Time,
+) (uuid.UUID, error) {
+	var org uuid.UUID
+
+	err := txn.QueryRow(ctx, `SELECT customer_org_id FROM devices.device_bindings WHERE id = $1`, binding).
+		Scan(&org)
+	if err != nil {
+		return uuid.Nil, apperr.Wrap(err, "select devices.device_bindings")
+	}
+
+	alertID, err := alerts.TamperAlert(
+		ctx,
+		txn,
+		unit,
+		org,
+		"Device "+serial+" reported its cover opened while powered (tamper_signal)",
+		occurredAt,
+	)
+	if err != nil {
+		return uuid.Nil, apperr.Wrap(err, "devices.AlertOpener.TamperAlert")
+	}
+
+	return alertID, nil
+}
+
+// applySignal moves the device's axis: the connection goes offline (online again when restored), the power signal off
+// and the tamper state detected, or back to their RecoveredValue.
+func applySignal(ctx context.Context, txn pgx.Tx, signal Signal, axis string, now time.Time) error {
+	var err error
+
+	restored := signal.Kind == signalRestored
 	switch {
-	case axis == "connection" && restored:
-		err = setConnection(ctx, txn, signal.DeviceID, "online", &signal.OccurredAt, now)
-	case axis == "connection":
-		err = setConnection(ctx, txn, signal.DeviceID, "offline", nil, now)
+	case axis == axisConnection && restored:
+		err = setConnection(ctx, txn, signal.DeviceID, connOnline, &signal.OccurredAt, now)
+	case axis == axisConnection:
+		err = setConnection(ctx, txn, signal.DeviceID, connOffline, nil, now)
 	default:
-		col, value := map[string]string{"power": "power_signal", "tamper": "tamper"}[axis], map[string]string{
-			"power":  "off",
-			"tamper": "detected",
+		col, value := map[string]string{axisPower: "power_signal", axisTamper: "tamper"}[axis], map[string]string{
+			axisPower:  "off",
+			axisTamper: tamperDetected,
 		}[axis]
 		if restored {
 			value = RecoveredValue[axis]
@@ -575,5 +736,5 @@ func RecordSignal(
 		)
 	}
 
-	return err == nil, apperr.Wrap(err, "update devices.devices")
+	return apperr.Wrap(err, "update devices.devices")
 }

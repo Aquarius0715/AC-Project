@@ -22,14 +22,14 @@ func (Alerts) TamperAlert(
 	text string,
 	when time.Time,
 ) (uuid.UUID, error) {
-	var id uuid.UUID
+	var alertID uuid.UUID
 
 	err := txn.QueryRow(ctx, `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id IS NULL AND type = 'tamper'
 		AND cause_code = 'unknown' AND status <> 'resolved'`,
 		unit).
-		Scan(&id)
+		Scan(&alertID)
 	if err == nil || !errors.Is(err, pgx.ErrNoRows) {
-		return id, apperr.Wrap(err, "select monitoring.alerts")
+		return alertID, apperr.Wrap(err, "select monitoring.alerts")
 	}
 
 	err = txn.QueryRow(ctx, `INSERT INTO monitoring.alerts (tenant_id, unit_id, customer_org_id, type, severity, status,
@@ -41,15 +41,15 @@ func (Alerts) TamperAlert(
 			p.cause_code = 'unknown' ORDER BY p.detected_at DESC, p.id DESC LIMIT 1),
 			$4, $4)
 		ON CONFLICT DO NOTHING RETURNING id`, unit, org, text, when).
-		Scan(&id)
+		Scan(&alertID)
 	if errors.Is(
 		err,
 		pgx.ErrNoRows,
 	) { // a concurrent tamper event opened it first (alerts_one_open_per_rule)
 		err = txn.QueryRow(ctx, `SELECT id FROM monitoring.alerts WHERE unit_id = $1 AND policy_id IS NULL AND type = 'tamper'
 			AND cause_code = 'unknown' AND status <> 'resolved'`, unit).
-			Scan(&id)
+			Scan(&alertID)
 	}
 
-	return id, apperr.Wrap(err, "select monitoring.alerts")
+	return alertID, apperr.Wrap(err, "select monitoring.alerts")
 }

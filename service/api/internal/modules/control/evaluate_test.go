@@ -8,10 +8,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const kl = "Asia/Kuala_Lumpur"
+const kualaLumpur = "Asia/Kuala_Lumpur"
 
 func TestCompare(t *testing.T) {
-	for _, c := range []struct {
+	for _, testCase := range []struct {
 		op   string
 		a, b float64
 		want bool
@@ -26,8 +26,8 @@ func TestCompare(t *testing.T) {
 		{"lte", 2, 1, false},
 		{"other", 1, 2, true},
 	} {
-		if got := compare(c.op, c.a, c.b); got != c.want {
-			t.Errorf("compare(%s, %v, %v) = %v", c.op, c.a, c.b, got)
+		if got := compare(testCase.op, testCase.a, testCase.b); got != testCase.want {
+			t.Errorf("compare(%s, %v, %v) = %v", testCase.op, testCase.a, testCase.b, got)
 		}
 	}
 }
@@ -49,7 +49,7 @@ func TestConditionMetric(t *testing.T) {
 
 // facts of one unit at 2026-09-14 09:00 Kuala Lumpur (01:00Z, a Monday).
 func testFacts(unit uuid.UUID, when time.Time) map[string]Fact {
-	f := func(metric, value, unitName string, observed time.Time) Fact {
+	fact := func(metric, value, unitName string, observed time.Time) Fact {
 		return Fact{
 			UnitID:     unit,
 			Metric:     metric,
@@ -69,17 +69,17 @@ func testFacts(unit uuid.UUID, when time.Time) map[string]Fact {
 			ObservedAt: time.Time{},
 			Quality:    "",
 		}, // overwritten below to keep the literal readable
-		unit.String() + "/tariff":   f("tariff", "0.6", "MYR_per_kWh", when),
-		unit.String() + "/solar":    f("solar", "3", "kW", when),
-		unit.String() + "/battery":  f("battery", "0.5", "kW", when),
-		unit.String() + "/location": f("location", `"arrival"`, "event", when),
-		unit.String() + "/weather_temperature": f(
+		unit.String() + "/tariff":   fact("tariff", "0.6", "MYR_per_kWh", when),
+		unit.String() + "/solar":    fact("solar", "3", "kW", when),
+		unit.String() + "/battery":  fact("battery", "0.5", "kW", when),
+		unit.String() + "/location": fact("location", `"arrival"`, "event", when),
+		unit.String() + "/weather_temperature": fact(
 			"weather_temperature",
 			"31",
 			"°C",
 			when.Add(-10*time.Minute),
 		), // within the 30-minute TTL
-		unit.String() + "/occupied": f("occupied", "true", "boolean", when),
+		unit.String() + "/occupied": fact("occupied", "true", "boolean", when),
 	}
 }
 
@@ -96,7 +96,7 @@ func TestMatchConditions(t *testing.T) {
 		Quality:    "valid",
 	}
 
-	m := func(cond string) string { return match(json.RawMessage(cond), unit, facts, when, kl) }
+	matchCond := func(cond string) string { return match(json.RawMessage(cond), unit, facts, when, kualaLumpur) }
 	for cond, want := range map[string]string{
 		`{"type":"peak","active":true}`: "", `{"type":"peak","active":false}`: "no_match",
 		`{"type":"occupancy","occupied":true}`: "", `{"type":"occupancy","occupied":false}`: "no_match",
@@ -111,7 +111,7 @@ func TestMatchConditions(t *testing.T) {
 		`{"type":"weather","operator":"gt","value":30}`: "", `{"type":"weather","operator":"lt","value":30}`: "no_match",
 		`{"type":"unknown"}`: "no_match",
 	} {
-		if got := m(cond); got != want {
+		if got := matchCond(cond); got != want {
 			t.Errorf("match(%s) = %q, want %q", cond, got, want)
 		}
 	}
@@ -132,7 +132,7 @@ func TestMatchConditions(t *testing.T) {
 		other,
 		facts,
 		when,
-		kl,
+		kualaLumpur,
 	); got != "missing_data" {
 		t.Errorf("no fact for the unit: %q", got)
 	}
@@ -142,7 +142,7 @@ func TestMatchConditions(t *testing.T) {
 		unit,
 		facts,
 		when.Add(2*time.Minute),
-		kl,
+		kualaLumpur,
 	); got != "stale" {
 		t.Errorf("a location event of another minute is stale: %q", got)
 	}
@@ -152,7 +152,7 @@ func TestMatchConditions(t *testing.T) {
 		unit,
 		facts,
 		when.Add(10*time.Minute),
-		kl,
+		kualaLumpur,
 	); got != "stale" {
 		t.Errorf("a tariff older than its TTL is stale: %q", got)
 	}
@@ -180,7 +180,7 @@ func TestExtrasMatch(t *testing.T) {
 			`"occupied":false}]`: "no_match", `[{"type":"weather","operator":"gt",` +
 			`"value":30}]`: "", `[]`: "", `{"type":"weekday"}`: "",
 	} {
-		if got := extrasMatch(json.RawMessage(raw), unit, facts, sunday, kl); got != want {
+		if got := extrasMatch(json.RawMessage(raw), unit, facts, sunday, kualaLumpur); got != want {
 			t.Errorf("extrasMatch(%s) = %q, want %q", raw, got, want)
 		}
 	}
@@ -200,7 +200,7 @@ func TestExtrasMatch(t *testing.T) {
 		uuid.New(),
 		facts,
 		sunday,
-		kl,
+		kualaLumpur,
 	); got != "missing_data" {
 		t.Errorf("missing occupancy data never matches: %q", got)
 	}

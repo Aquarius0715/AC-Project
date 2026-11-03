@@ -84,19 +84,19 @@ func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, er
 
 	for rows.Next() {
 		var (
-			raw   []byte
-			tz    string
-			units []uuid.UUID
+			raw      []byte
+			timezone string
+			units    []uuid.UUID
 		)
 
-		err := rows.Scan(&raw, &tz, &units)
+		err := rows.Scan(&raw, &timezone, &units)
 		if err != nil {
 			rows.Close()
 
 			return 0, apperr.Wrap(err, "select control.automations")
 		}
 
-		loc, err := time.LoadLocation(tz)
+		loc, err := time.LoadLocation(timezone)
 		if err != nil {
 			continue
 		}
@@ -113,18 +113,18 @@ func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, er
 
 			key := scheduleRef(scheduledOccurrence.Phase, scheduledOccurrence.At)
 
-			t := ticks[key]
-			if t == nil {
-				t = &tick{
+			scheduleTick := ticks[key]
+			if scheduleTick == nil {
+				scheduleTick = &tick{
 					at:    scheduledOccurrence.At.UTC(),
 					phase: scheduledOccurrence.Phase,
 					units: map[uuid.UUID]bool{},
 				}
-				ticks[key] = t
+				ticks[key] = scheduleTick
 			}
 
 			for _, u := range units {
-				t.units[u] = true
+				scheduleTick.units[u] = true
 			}
 		}
 	}
@@ -141,13 +141,13 @@ func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, er
 		order = append(order, t)
 	}
 
-	sort.Slice(order, func(i, j int) bool {
-		if !order[i].at.Equal(order[j].at) {
-			return order[i].at.Before(order[j].at)
+	sort.Slice(order, func(left, right int) bool {
+		if !order[left].at.Equal(order[right].at) {
+			return order[left].at.Before(order[right].at)
 		}
 
-		return order[i].phase == "schedule_end" &&
-			order[j].phase != "schedule_end" // end, then the next start
+		return order[left].phase == "schedule_end" &&
+			order[right].phase != "schedule_end" // end, then the next start
 	})
 
 	last := map[uuid.UUID]time.Time{} // the last minute the tick passed for each unit (IR473)
@@ -162,22 +162,27 @@ func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, er
 
 	created := 0
 
-	for _, t := range order {
+	for _, scheduleTick := range order {
 		input := &EvaluationInput{
-			EventID:    uuid.NewSHA1(call.Principal.TenantID, []byte(scheduleRef(t.phase, t.at))),
-			OccurredAt: t.at,
-			Phase:      t.phase, UnitIDs: nil, Facts: nil,
+			EventID: uuid.NewSHA1(
+				call.Principal.TenantID,
+				[]byte(scheduleRef(scheduleTick.phase, scheduleTick.at)),
+			),
+			OccurredAt: scheduleTick.at,
+			Phase:      scheduleTick.phase,
+			UnitIDs:    nil,
+			Facts:      nil,
 		}
-		for u := range t.units {
-			if !t.at.Equal(last[u]) {
+		for unitID := range scheduleTick.units {
+			if !scheduleTick.at.Equal(last[unitID]) {
 				continue // passed over: a later minute sets the unit's state
 			}
 
-			_, found, err := m.Units.Target(ctx, call, u)
+			_, found, err := m.Units.Target(ctx, call, unitID)
 			if err != nil {
 				return created, apperr.Wrap(err, "control.Units.Target")
 			} else if found { // an archived or removed unit is skipped, not an error of the tick
-				input.UnitIDs = append(input.UnitIDs, u)
+				input.UnitIDs = append(input.UnitIDs, unitID)
 			}
 		}
 
@@ -201,7 +206,7 @@ func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, er
 						Action:          "automations.schedule",
 						TargetKind:      "automation",
 						TargetID:        decision.RuleID.String(),
-						Reason:          t.phase,
+						Reason:          scheduleTick.phase,
 						PreviousVersion: nil,
 						NextVersion:     nil,
 						Result:          "",

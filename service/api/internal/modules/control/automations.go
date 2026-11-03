@@ -131,20 +131,20 @@ func scanAutomation(row pgx.Row) (Automation, error) {
 		return automation, apperr.Wrap(err, "scan (scanAutomation)")
 	}
 
-	var d definition
+	var decoded definition
 
-	_ = json.Unmarshal(def, &d)
+	_ = json.Unmarshal(def, &decoded)
 
-	automation.Weekdays = d.Weekdays
-	automation.StartLocal = d.StartLocal
-	automation.EndLocal = d.EndLocal
-	automation.EndsNextDay = d.EndsNextDay
-	automation.StartAction = d.StartAction
-	automation.EndAction = d.EndAction
-	automation.Condition = d.Condition
-	automation.Action = d.Action
+	automation.Weekdays = decoded.Weekdays
+	automation.StartLocal = decoded.StartLocal
+	automation.EndLocal = decoded.EndLocal
+	automation.EndsNextDay = decoded.EndsNextDay
+	automation.StartAction = decoded.StartAction
+	automation.EndAction = decoded.EndAction
+	automation.Condition = decoded.Condition
+	automation.Action = decoded.Action
 
-	automation.OnlyIf = d.OnlyIf
+	automation.OnlyIf = decoded.OnlyIf
 	if len(automation.OnlyIf) == 0 {
 		automation.OnlyIf = json.RawMessage("[]")
 	}
@@ -165,7 +165,7 @@ func scanAutomation(row pgx.Row) (Automation, error) {
 func (m Automations) load(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	automationID uuid.UUID,
 	lock bool,
 ) (Automation, error) {
 	q := "SELECT " + automationCols + " FROM control.automations a WHERE a.id = $1"
@@ -173,7 +173,7 @@ func (m Automations) load(
 		q += " FOR UPDATE OF a"
 	}
 
-	x, err := scanAutomation(call.Tx.QueryRow(ctx, q, id))
+	x, err := scanAutomation(call.Tx.QueryRow(ctx, q, automationID))
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && x.customerOrg != call.Principal.OrgID) {
 		return Automation{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
@@ -216,7 +216,7 @@ func (m Automations) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Automation], error) {
-	var f struct {
+	var filters struct {
 		Kind    *string    `json:"kind,omitempty"`
 		Enabled *bool      `json:"enabled,omitempty"`
 		UnitID  *uuid.UUID `json:"unitId,omitempty"`
@@ -226,7 +226,8 @@ func (m Automations) list(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil || (f.Kind != nil && *f.Kind != "schedule" && *f.Kind != "event") {
+		if dec.Decode(&filters) != nil ||
+			(filters.Kind != nil && *filters.Kind != "schedule" && *filters.Kind != "event") {
 			return paging.Page[Automation]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
@@ -248,7 +249,7 @@ func (m Automations) list(
 		return paging.Page[Automation]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Automation]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -261,19 +262,19 @@ func (m Automations) list(
 	}
 
 	conds := []string{"a.customer_org_id = $1"}
-	if f.Kind != nil {
-		conds = append(conds, "a.kind = "+add(*f.Kind))
+	if filters.Kind != nil {
+		conds = append(conds, "a.kind = "+add(*filters.Kind))
 	}
 
-	if f.Enabled != nil {
-		conds = append(conds, "a.enabled = "+add(*f.Enabled))
+	if filters.Enabled != nil {
+		conds = append(conds, "a.enabled = "+add(*filters.Enabled))
 	}
 
-	if f.UnitID != nil {
+	if filters.UnitID != nil {
 		conds = append(
 			conds,
 			"EXISTS (SELECT 1 FROM control.automation_units u WHERE u.automation_id = a.id AND u.unit_id = "+add(
-				*f.UnitID,
+				*filters.UnitID,
 			)+")",
 		)
 	}
@@ -377,20 +378,20 @@ func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondit
 	}
 
 	seen := map[string]bool{}
-	for _, x := range out {
-		if seen[x.Type] {
+	for _, extra := range out {
+		if seen[extra.Type] {
 			return nil, "errors.duplicate_condition"
 		}
 
-		seen[x.Type] = true
-		switch x.Type {
+		seen[extra.Type] = true
+		switch extra.Type {
 		case "weekday":
 			if kind == "schedule" {
 				return nil, "errors.weekday_on_schedule"
 			}
 
 			days := map[int]bool{}
-			for _, d := range x.Weekdays {
+			for _, d := range extra.Weekdays {
 				if d < 1 || d > 7 || days[d] {
 					return nil, apperr.KeyInvalid
 				}
@@ -398,30 +399,32 @@ func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondit
 				days[d] = true
 			}
 
-			if len(x.Weekdays) == 0 || x.Occupied != nil || x.Metric != nil || x.Operator != nil ||
-				x.Value != nil {
+			if len(extra.Weekdays) == 0 || extra.Occupied != nil || extra.Metric != nil ||
+				extra.Operator != nil ||
+				extra.Value != nil {
 				return nil, apperr.KeyInvalid
 			}
 		case "occupancy":
-			if x.Occupied == nil || x.Weekdays != nil || x.Metric != nil || x.Operator != nil ||
-				x.Value != nil {
+			if extra.Occupied == nil || extra.Weekdays != nil || extra.Metric != nil ||
+				extra.Operator != nil ||
+				extra.Value != nil {
 				return nil, apperr.KeyInvalid
 			}
 		case "weather":
-			if x.Metric == nil || *x.Metric != "temperature" || x.Operator == nil ||
-				!slices.Contains([]string{"gt", "gte", "lt", "lte"}, *x.Operator) ||
-				x.Value == nil ||
-				*x.Value < -50 ||
-				*x.Value > 100 ||
-				x.Weekdays != nil ||
-				x.Occupied != nil {
+			if extra.Metric == nil || *extra.Metric != "temperature" || extra.Operator == nil ||
+				!slices.Contains([]string{"gt", "gte", "lt", "lte"}, *extra.Operator) ||
+				extra.Value == nil ||
+				*extra.Value < -50 ||
+				*extra.Value > 100 ||
+				extra.Weekdays != nil ||
+				extra.Occupied != nil {
 				return nil, apperr.KeyInvalid
 			}
 		default:
 			return nil, apperr.KeyInvalid
 		}
 
-		if x.Type == conditionType {
+		if extra.Type == conditionType {
 			return nil, "errors.duplicate_condition"
 		}
 	}
@@ -443,45 +446,48 @@ type condition struct {
 }
 
 func parseCondition(raw json.RawMessage) (condition, bool) {
-	var x condition
+	var cond condition
 
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
 	dec.DisallowUnknownFields()
 
-	if len(raw) == 0 || dec.Decode(&x) != nil {
-		return x, false
+	if len(raw) == 0 || dec.Decode(&cond) != nil {
+		return cond, false
 	}
 
-	switch x.Type {
+	switch cond.Type {
 	case "occupancy":
-		return x, x.Occupied != nil && x.Event == nil && x.LocalTime == nil && x.Metric == nil &&
-			x.Operator == nil &&
-			x.Value == nil
+		return cond, cond.Occupied != nil && cond.Event == nil && cond.LocalTime == nil &&
+			cond.Metric == nil &&
+			cond.Operator == nil &&
+			cond.Value == nil
 	case "location":
-		return x, x.Event != nil && (*x.Event == "arrival" || *x.Event == "departure") &&
-			x.Occupied == nil &&
-			x.LocalTime == nil &&
-			x.Metric == nil &&
-			x.Operator == nil &&
-			x.Value == nil
+		return cond, cond.Event != nil &&
+			(*cond.Event == "arrival" || *cond.Event == "departure") &&
+			cond.Occupied == nil &&
+			cond.LocalTime == nil &&
+			cond.Metric == nil &&
+			cond.Operator == nil &&
+			cond.Value == nil
 	case "pattern":
-		return x, x.LocalTime != nil && hhmm.MatchString(*x.LocalTime) && x.Occupied == nil &&
-			x.Event == nil &&
-			x.Metric == nil &&
-			x.Operator == nil &&
-			x.Value == nil
+		return cond, cond.LocalTime != nil && hhmm.MatchString(*cond.LocalTime) &&
+			cond.Occupied == nil &&
+			cond.Event == nil &&
+			cond.Metric == nil &&
+			cond.Operator == nil &&
+			cond.Value == nil
 	case "weather":
-		return x, x.Metric != nil && *x.Metric == "temperature" && x.Operator != nil &&
-			slices.Contains([]string{"gt", "gte", "lt", "lte"}, *x.Operator) &&
-			x.Value != nil &&
-			*x.Value >= -50 &&
-			*x.Value <= 100 &&
-			x.Occupied == nil &&
-			x.Event == nil &&
-			x.LocalTime == nil
+		return cond, cond.Metric != nil && *cond.Metric == "temperature" && cond.Operator != nil &&
+			slices.Contains([]string{"gt", "gte", "lt", "lte"}, *cond.Operator) &&
+			cond.Value != nil &&
+			*cond.Value >= -50 &&
+			*cond.Value <= 100 &&
+			cond.Occupied == nil &&
+			cond.Event == nil &&
+			cond.LocalTime == nil
 	}
 
-	return x, false
+	return cond, false
 }
 
 func minutesOf(s string) int {
@@ -612,35 +618,35 @@ func validSchedule(
 	}
 
 	if fieldErrs["startLocal"] == "" && fieldErrs["endLocal"] == "" && endsNextDay != nil {
-		s, e := minutesOf(startLocal), minutesOf(endLocal)
+		startMinute, endMinute := minutesOf(startLocal), minutesOf(endLocal)
 		switch {
-		case s == e:
+		case startMinute == endMinute:
 			fieldErrs["endLocal"] = "errors.same_as_start"
-		case e < s && !*endsNextDay:
+		case endMinute < startMinute && !*endsNextDay:
 			fieldErrs["endsNextDay"] = "errors.overnight_required"
-		case e > s && *endsNextDay:
+		case endMinute > startMinute && *endsNextDay:
 			fieldErrs["endsNextDay"] = "errors.over_24_hours"
 		}
 	}
 }
 
-// occurrences lists the schedule's start/end instants from the start day d0 for days days, with the wall time
+// occurrences lists the schedule's start/end instants from the start day firstDay for days days, with the wall time
 // problems found (nonexistent or ambiguous local times, D09).
 func occurrences(
 	def definition,
 	loc *time.Location,
-	d0 time.Time,
+	firstDay time.Time,
 	days int,
 ) ([]ScheduledOccurrence, bool) {
 	var out []ScheduledOccurrence
 
 	bad := false
 
-	at := func(day time.Time, hm string) time.Time {
+	instantOf := func(day time.Time, hm string) time.Time {
 		h, mi := minutesOf(hm)/60, minutesOf(hm)%60
-		t := time.Date(day.Year(), day.Month(), day.Day(), h, mi, 0, 0, loc)
+		instant := time.Date(day.Year(), day.Month(), day.Day(), h, mi, 0, 0, loc)
 
-		lt := t.In(loc)
+		lt := instant.In(loc)
 		if lt.Hour() != h || lt.Minute() != mi || lt.Day() != day.Day() { // nonexistent
 			bad = true
 		}
@@ -649,7 +655,7 @@ func occurrences(
 			-2 * time.Hour, -time.Hour, -30 * time.Minute, 30 * time.Minute, time.Hour,
 			2 * time.Hour,
 		} {
-			u := t.Add(dd).In(loc)
+			u := instant.Add(dd).In(loc)
 			if u.Year() == day.Year() && u.Month() == day.Month() && u.Day() == day.Day() &&
 				u.Hour() == h &&
 				u.Minute() == mi { // ambiguous
@@ -657,10 +663,10 @@ func occurrences(
 			}
 		}
 
-		return t
+		return instant
 	}
 	for i := range days {
-		day := time.Date(d0.Year(), d0.Month(), d0.Day()+i, 12, 0, 0, 0, loc)
+		day := time.Date(firstDay.Year(), firstDay.Month(), firstDay.Day()+i, 12, 0, 0, 0, loc)
 
 		wd := int(day.Weekday())
 		if wd == 0 {
@@ -680,12 +686,12 @@ func occurrences(
 			out,
 			ScheduledOccurrence{
 				Phase:  "schedule_start",
-				At:     at(day, def.StartLocal).UTC(),
+				At:     instantOf(day, def.StartLocal).UTC(),
 				Action: def.StartAction, AutomationID: nil,
 			},
 			ScheduledOccurrence{
 				Phase:  "schedule_end",
-				At:     at(end, def.EndLocal).UTC(),
+				At:     instantOf(end, def.EndLocal).UTC(),
 				Action: def.EndAction, AutomationID: nil,
 			},
 		)
@@ -734,8 +740,8 @@ func (m Automations) save(
 	call *ops.Call,
 	input *AutomationInput,
 ) (Automation, error) {
-	for _, u := range input.UnitIDs { // own, not archived units whose capabilities support every action
-		target, found, err := m.Units.Target(ctx, call, u)
+	for _, unitID := range input.UnitIDs { // own, not archived units whose capabilities support every action
+		target, found, err := m.Units.Target(ctx, call, unitID)
 		if err != nil {
 			return Automation{}, apperr.Wrap(err, "control.Units.Target")
 		}
@@ -746,7 +752,7 @@ func (m Automations) save(
 
 		var archived bool
 
-		scanErr := call.Tx.QueryRow(ctx, `SELECT archived FROM assets.units WHERE id = $1`, u).
+		scanErr := call.Tx.QueryRow(ctx, `SELECT archived FROM assets.units WHERE id = $1`, unitID).
 			Scan(&archived)
 		if scanErr != nil {
 			return Automation{}, apperr.Wrap(scanErr, "select assets.units")
@@ -810,8 +816,8 @@ func (m Automations) save(
 	raw, _ := json.Marshal(def)
 
 	var (
-		id   uuid.UUID
-		prev *int
+		automationID uuid.UUID
+		prev         *int
 	)
 
 	version := 1
@@ -824,7 +830,7 @@ func (m Automations) save(
 			call.Principal.OrgID, input.Kind, input.Name, call.Principal.MembershipID, call.Principal.UserID, input.Timezone,
 			input.Enabled,
 			input.Priority, raw, call.Now).
-			Scan(&id)
+			Scan(&automationID)
 		if err != nil {
 			return Automation{}, apperr.Wrap(err, "insert control.automations")
 		}
@@ -868,16 +874,16 @@ func (m Automations) save(
 			return cur, apperr.Wrap(execErr, "delete control.automation_units")
 		}
 
-		id, prev, version = cur.ID, call.ExpectedVersion, cur.Version+1
+		automationID, prev, version = cur.ID, call.ExpectedVersion, cur.Version+1
 	}
 
-	for _, u := range input.UnitIDs {
+	for _, unitID := range input.UnitIDs {
 		_, err := call.Tx.Exec(
 			ctx,
 			`INSERT INTO control.automation_units (tenant_id, automation_id, unit_id) VALUES
 				(current_setting('app.tenant_id')::uuid, $1, $2)`,
-			id,
-			u,
+			automationID,
+			unitID,
 		)
 		if err != nil {
 			return Automation{}, apperr.Wrap(err, "insert control.automation_units")
@@ -888,13 +894,13 @@ func (m Automations) save(
 		ops.AuditEntry{
 			Action:          "automations.save",
 			TargetKind:      "automation",
-			TargetID:        id.String(),
+			TargetID:        automationID.String(),
 			PreviousVersion: prev,
 			NextVersion:     &version, Reason: "", Result: "", Before: nil, After: nil,
 		},
 	)
 
-	return m.load(ctx, call, id, false)
+	return m.load(ctx, call, automationID, false)
 }
 
 // ScheduleDraft is the unsaved schedule of the editor (automations.nextRuns draft, IR214).
@@ -992,9 +998,9 @@ func (m Automations) nextRuns(
 	input *NextRunsInput,
 ) ([]ScheduledOccurrence, error) {
 	var (
-		id  *uuid.UUID
-		def definition
-		tz  string
+		automationID *uuid.UUID
+		def          definition
+		timezone     string
 	)
 
 	if input.Draft != nil {
@@ -1007,9 +1013,9 @@ func (m Automations) nextRuns(
 			StartAction: scheduleDraft.StartAction,
 			EndAction:   scheduleDraft.EndAction, Condition: nil, Action: nil, OnlyIf: nil,
 		}
-		tz = scheduleDraft.Timezone
+		timezone = scheduleDraft.Timezone
 
-		loc, _ := time.LoadLocation(tz)
+		loc, _ := time.LoadLocation(timezone)
 		if _, bad := occurrences(def, loc, call.Now.In(loc), 367); bad {
 			return nil, apperr.Fields(
 				map[string]string{"draft.startLocal": "errors.local_time_invalid"},
@@ -1033,16 +1039,16 @@ func (m Automations) nextRuns(
 			StartAction: automation.StartAction,
 			EndAction:   automation.EndAction, Condition: nil, Action: nil, OnlyIf: nil,
 		}
-		tz, id = automation.Timezone, &automation.ID
+		timezone, automationID = automation.Timezone, &automation.ID
 	}
 
-	loc, _ := time.LoadLocation(tz)
+	loc, _ := time.LoadLocation(timezone)
 	occ, _ := occurrences(def, loc, call.Now.In(loc).AddDate(0, 0, -1), 30)
 
 	out := []ScheduledOccurrence{}
 	for _, o := range occ {
 		if o.At.After(call.Now) && len(out) < input.Count {
-			o.AutomationID = id
+			o.AutomationID = automationID
 			out = append(out, o)
 		}
 	}

@@ -90,16 +90,16 @@ func (Policies) Owners(
 
 	for rows.Next() {
 		var (
-			id          uuid.UUID
+			policyID    uuid.UUID
 			policyOwner PolicyOwner
 		)
 
-		err := rows.Scan(&id, &policyOwner.CustomerID, &policyOwner.Kind)
+		err := rows.Scan(&policyID, &policyOwner.CustomerID, &policyOwner.Kind)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select monitoring.alert_policies")
 		}
 
-		out[id] = policyOwner
+		out[policyID] = policyOwner
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select monitoring.alert_policies")
@@ -136,7 +136,7 @@ type DefaultAlertRule struct {
 
 func rule(
 	key, name, cat, metric, operation string,
-	th, rec float64,
+	threshold, rec float64,
 	dur int,
 	sev string,
 ) DefaultAlertRule {
@@ -144,7 +144,7 @@ func rule(
 		AlertCondition: AlertCondition{
 			Metric:            metric,
 			Operator:          operation,
-			Threshold:         th,
+			Threshold:         threshold,
 			RecoveryThreshold: rec,
 			DurationSeconds:   dur,
 			Severity:          sev, ActiveWindow: nil,
@@ -262,16 +262,16 @@ func (a *AlertCondition) validate(
 	if activeWindow := a.ActiveWindow; activeWindow != nil {
 		seen := map[int]bool{}
 
-		ok := len(activeWindow.Weekdays) >= 1 && len(activeWindow.Weekdays) <= 7
+		valid := len(activeWindow.Weekdays) >= 1 && len(activeWindow.Weekdays) <= 7
 		for _, d := range activeWindow.Weekdays {
 			if d < 1 || d > 7 || seen[d] {
-				ok = false
+				valid = false
 			}
 
 			seen[d] = true
 		}
 
-		if !ok {
+		if !valid {
 			fieldErrs[prefix+"activeWindow.weekdays"] = apperr.KeyInvalid
 		}
 
@@ -333,7 +333,7 @@ type Policy struct {
 
 // MarshalJSON implements json.Marshaler.
 func (p Policy) MarshalJSON() ([]byte, error) {
-	m := map[string]any{
+	fields := map[string]any{
 		"id":                p.ID,
 		"tenantId":          p.TenantID,
 		"version":           p.Version,
@@ -351,19 +351,19 @@ func (p Policy) MarshalJSON() ([]byte, error) {
 	}
 	switch p.Kind {
 	case "alert":
-		m["customerId"], m["recipientMembershipIds"], m["channels"] = p.CustomerID, p.RecipientMembershipIDs, p.Channels
-		m["escalateAfterMinutes"], m["cooldownMinutes"] = p.EscalateAfterMinutes, p.CooldownMinutes
-		m["metric"], m["operator"] = p.Condition.Metric, p.Condition.Operator
-		m["threshold"], m["recoveryThreshold"] = p.Condition.Threshold, p.Condition.RecoveryThreshold
-		m["durationSeconds"], m["activeWindow"] = p.Condition.DurationSeconds, p.Condition.ActiveWindow
-		m["severity"] = p.Condition.Severity
+		fields["customerId"], fields["recipientMembershipIds"], fields["channels"] = p.CustomerID, p.RecipientMembershipIDs, p.Channels
+		fields["escalateAfterMinutes"], fields["cooldownMinutes"] = p.EscalateAfterMinutes, p.CooldownMinutes
+		fields["metric"], fields["operator"] = p.Condition.Metric, p.Condition.Operator
+		fields["threshold"], fields["recoveryThreshold"] = p.Condition.Threshold, p.Condition.RecoveryThreshold
+		fields["durationSeconds"], fields["activeWindow"] = p.Condition.DurationSeconds, p.Condition.ActiveWindow
+		fields["severity"] = p.Condition.Severity
 	case "default_alert":
-		m["customerId"], m["rules"], m["ruleSettings"] = nil, p.Rules, p.RuleSettings
+		fields["customerId"], fields["rules"], fields["ruleSettings"] = nil, p.Rules, p.RuleSettings
 	case "automation":
-		m["condition"], m["action"] = p.AutoCondition, p.Action
+		fields["condition"], fields["action"] = p.AutoCondition, p.Action
 	}
 
-	out, err := json.Marshal(m)
+	out, err := json.Marshal(fields)
 
 	return out, apperr.Wrap(err, "json.Marshal")
 }
@@ -521,12 +521,12 @@ func (m Policies) clientCustomer(ctx context.Context, c *ops.Call) (uuid.UUID, e
 func (m Policies) decorate(
 	ctx context.Context,
 	call *ops.Call,
-	ps []Policy,
+	policies []Policy,
 	settingsFor *uuid.UUID,
 ) error {
 	var alertIDs []uuid.UUID
 
-	for _, p := range ps {
+	for _, p := range policies {
 		if p.Kind == "alert" {
 			alertIDs = append(alertIDs, p.ID)
 		}
@@ -538,30 +538,30 @@ func (m Policies) decorate(
 			return apperr.Wrap(err, "monitoring.PolicyUnits.AttachedUnits")
 		}
 
-		for i := range ps {
-			if u, ok := att[ps[i].ID]; ok {
-				ps[i].UnitIDs = u
+		for i := range policies {
+			if u, ok := att[policies[i].ID]; ok {
+				policies[i].UnitIDs = u
 			}
 		}
 	}
 
-	for idx := range ps {
-		if ps[idx].Kind != "default_alert" {
+	for idx := range policies {
+		if policies[idx].Kind != "default_alert" {
 			continue
 		}
 
-		q := `SELECT id, tenant_id, version, created_at, updated_at, policy_id, rule_key, customer_id, enabled,
+		stmt := `SELECT id, tenant_id, version, created_at, updated_at, policy_id, rule_key, customer_id, enabled,
 			changed_by_membership_id, reason
 			FROM monitoring.default_rule_settings WHERE policy_id = $1`
-		args := []any{ps[idx].ID}
+		args := []any{policies[idx].ID}
 
 		if settingsFor != nil {
-			q += " AND customer_id = $2"
+			stmt += " AND customer_id = $2"
 
 			args = append(args, *settingsFor)
 		}
 
-		rows, err := call.Tx.Query(ctx, q+" ORDER BY customer_id, rule_key", args...)
+		rows, err := call.Tx.Query(ctx, stmt+" ORDER BY customer_id, rule_key", args...)
 		if err != nil {
 			return apperr.Wrap(err, "query (decorate)")
 		}
@@ -588,7 +588,7 @@ func (m Policies) decorate(
 				return apperr.Wrap(err, "query (decorate)")
 			}
 
-			ps[idx].RuleSettings = append(ps[idx].RuleSettings, ruleSetting)
+			policies[idx].RuleSettings = append(policies[idx].RuleSettings, ruleSetting)
 		}
 
 		rows.Close()
@@ -644,7 +644,7 @@ func (m Policies) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Policy], error) {
-	var f struct {
+	var filters struct {
 		Kind       *string    `json:"kind,omitempty"`
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
 		PropertyID *uuid.UUID `json:"propertyId,omitempty"`
@@ -656,14 +656,14 @@ func (m Policies) list(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil {
+		if dec.Decode(&filters) != nil {
 			return paging.Page[Policy]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
 		}
 	}
 
-	if f.Kind != nil && kindRank[*f.Kind] == 0 && *f.Kind != "default_alert" {
+	if filters.Kind != nil && kindRank[*filters.Kind] == 0 && *filters.Kind != "default_alert" {
 		return paging.Page[Policy]{}, apperr.Fields(
 			map[string]string{"filters.kind": apperr.KeyInvalid},
 		)
@@ -703,14 +703,14 @@ func (m Policies) list(
 		}
 	}
 
-	window, err := paging.Resolve(*query, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Policy]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
 	kinds := grantedKinds(call)
-	if f.Kind != nil {
-		kinds = map[string]bool{*f.Kind: kinds[*f.Kind]}
+	if filters.Kind != nil {
+		kinds = map[string]bool{*filters.Kind: kinds[*filters.Kind]}
 	}
 
 	own, err := m.clientCustomer(ctx, call)
@@ -719,20 +719,20 @@ func (m Policies) list(
 	}
 	// unit filters: the units in question (nil = no unit filter)
 	var units []uuid.UUID
-	if f.UnitID != nil {
-		units = []uuid.UUID{*f.UnitID}
+	if filters.UnitID != nil {
+		units = []uuid.UUID{*filters.UnitID}
 	}
 
-	if f.PropertyID != nil {
-		pu, err := m.Units.UnitsOfProperty(ctx, call, *f.PropertyID)
+	if filters.PropertyID != nil {
+		propertyUnits, err := m.Units.UnitsOfProperty(ctx, call, *filters.PropertyID)
 		if err != nil {
 			return paging.Page[Policy]{}, apperr.Wrap(err, "monitoring.PolicyUnits.UnitsOfProperty")
 		}
 
 		if units == nil {
-			units = pu
+			units = propertyUnits
 		} else {
-			units = intersect(units, pu)
+			units = intersect(units, propertyUnits)
 		}
 	}
 
@@ -747,28 +747,28 @@ func (m Policies) list(
 			return fmt.Sprintf("$%d", len(args))
 		}
 
-		var ks []string
+		var alertKinds []string
 
 		for _, k := range []string{"alert", "default_alert"} {
 			if kinds[k] && (k != "default_alert" || units == nil) {
-				ks = append(ks, k)
+				alertKinds = append(alertKinds, k)
 			}
 		}
 
-		conds := []string{"p.kind = ANY(" + add(ks) + ")"}
+		conds := []string{"p.kind = ANY(" + add(alertKinds) + ")"}
 		if own != uuid.Nil || call.Principal.Role == "client" {
 			conds = append(conds, "(p.kind = 'default_alert' OR p.customer_id = "+add(own)+")")
 		}
 
-		if f.CustomerID != nil {
+		if filters.CustomerID != nil {
 			conds = append(
 				conds,
-				"(p.kind = 'default_alert' OR p.customer_id = "+add(*f.CustomerID)+")",
+				"(p.kind = 'default_alert' OR p.customer_id = "+add(*filters.CustomerID)+")",
 			)
 		}
 
-		if f.Enabled != nil {
-			conds = append(conds, "p.enabled = "+add(*f.Enabled))
+		if filters.Enabled != nil {
+			conds = append(conds, "p.enabled = "+add(*filters.Enabled))
 		}
 
 		if units != nil {
@@ -814,15 +814,15 @@ func (m Policies) list(
 	}
 
 	if kinds["automation"] {
-		autos, err := m.automationPolicies(ctx, call, f.Enabled)
+		autos, err := m.automationPolicies(ctx, call, filters.Enabled)
 		if err != nil {
 			return paging.Page[Policy]{}, err
 		}
 
 		var custOrg uuid.UUID
 
-		if f.CustomerID != nil {
-			org, _, found, err := m.Units.CustomerState(ctx, call, *f.CustomerID)
+		if filters.CustomerID != nil {
+			org, _, found, err := m.Units.CustomerState(ctx, call, *filters.CustomerID)
 			if err != nil {
 				return paging.Page[Policy]{}, apperr.Wrap(
 					err,
@@ -840,7 +840,7 @@ func (m Policies) list(
 				continue
 			}
 
-			if f.CustomerID != nil {
+			if filters.CustomerID != nil {
 				orgs, err := m.Units.OrgsOfUnits(ctx, call, policy.UnitIDs)
 				if err != nil {
 					return paging.Page[Policy]{}, apperr.Wrap(
@@ -878,7 +878,7 @@ func (m Policies) list(
 		page = append(page, all[window.Offset:end]...)
 	}
 
-	settingsFor := f.CustomerID
+	settingsFor := filters.CustomerID
 	if call.Principal.Role == "client" {
 		settingsFor = &own
 	}
@@ -896,15 +896,15 @@ func (m Policies) list(
 	}, nil
 }
 
-func intersect(a, b []uuid.UUID) []uuid.UUID {
+func intersect(ids, others []uuid.UUID) []uuid.UUID {
 	input := map[uuid.UUID]bool{}
-	for _, x := range b {
+	for _, x := range others {
 		input[x] = true
 	}
 
 	out := []uuid.UUID{}
 
-	for _, x := range a {
+	for _, x := range ids {
 		if input[x] {
 			out = append(out, x)
 		}
@@ -967,7 +967,7 @@ func (m Policies) load(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool
 func (m Policies) loadKinds(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	policyID uuid.UUID,
 	lock bool,
 	kinds map[string]bool,
 ) (Policy, error) {
@@ -980,7 +980,7 @@ func (m Policies) loadKinds(
 		call.Tx.QueryRow(
 			ctx,
 			"SELECT "+alertPolicyCols+" FROM monitoring.alert_policies p WHERE p.id = $1"+suffix,
-			id,
+			policyID,
 		),
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -988,7 +988,7 @@ func (m Policies) loadKinds(
 			call.Tx.QueryRow(
 				ctx,
 				"SELECT "+autoPolicyCols+" FROM control.automation_policies p WHERE p.id = $1"+suffix,
-				id,
+				policyID,
 			),
 		)
 	}
@@ -1060,14 +1060,14 @@ func (m Policies) get(ctx context.Context, call *ops.Call, in *PolicyIDInput) (P
 		settingsFor = &own
 	}
 
-	ps := []Policy{policy}
+	policies := []Policy{policy}
 
-	decorateErr := m.decorate(ctx, call, ps, settingsFor)
+	decorateErr := m.decorate(ctx, call, policies, settingsFor)
 	if decorateErr != nil {
 		return policy, decorateErr
 	}
 
-	return ps[0], nil
+	return policies[0], nil
 }
 
 // ---- policies.save ----
@@ -1115,16 +1115,16 @@ func (in *SaveInput) Validate() map[string]string {
 			fieldErrs["rules"] = apperr.KeyFixedRules
 		}
 
-		for i, defaultAlertRule := range in.Rules {
-			if i < len(DefaultRules) &&
-				(defaultAlertRule.RuleKey != DefaultRules[i].RuleKey || defaultAlertRule.Name != DefaultRules[i].Name ||
-					defaultAlertRule.Category != DefaultRules[i].Category) {
+		for idx, defaultAlertRule := range in.Rules {
+			if idx < len(DefaultRules) &&
+				(defaultAlertRule.RuleKey != DefaultRules[idx].RuleKey || defaultAlertRule.Name != DefaultRules[idx].Name ||
+					defaultAlertRule.Category != DefaultRules[idx].Category) {
 				fieldErrs["rules"] = apperr.KeyFixedRules
 			}
 
-			if i < len(DefaultRules) {
-				metrics := map[string]bool{DefaultRules[i].Metric: true}
-				defaultAlertRule.validate(metrics, fmt.Sprintf("rules.%d.", i), fieldErrs)
+			if idx < len(DefaultRules) {
+				metrics := map[string]bool{DefaultRules[idx].Metric: true}
+				defaultAlertRule.validate(metrics, fmt.Sprintf("rules.%d.", idx), fieldErrs)
 			}
 		}
 
@@ -1214,13 +1214,13 @@ func (in *SaveInput) Validate() map[string]string {
 
 		seen := map[string]bool{}
 
-		ok := len(in.Channels) >= 1 && len(in.Channels) <= 3
+		valid := len(in.Channels) >= 1 && len(in.Channels) <= 3
 		for _, ch := range in.Channels {
-			ok = ok && channelSet[ch] && !seen[ch]
+			valid = valid && channelSet[ch] && !seen[ch]
 			seen[ch] = true
 		}
 
-		if !ok || !seen["inApp"] {
+		if !valid || !seen["inApp"] {
 			fieldErrs["channels"] = apperr.KeyInvalid
 		}
 
@@ -1288,23 +1288,27 @@ func hasDup(ids []uuid.UUID) bool {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/policies [post]
-func (m Policies) save(ctx context.Context, call *ops.Call, in *SaveInput) (Policy, error) {
-	if !grantedKinds(call)[in.Kind] {
+func (m Policies) save(ctx context.Context, call *ops.Call, input *SaveInput) (Policy, error) {
+	if !grantedKinds(call)[input.Kind] {
 		return Policy{}, apperr.E(apperr.Forbidden, apperr.KeyForbidden)
 	}
 
-	switch in.Kind {
+	switch input.Kind {
 	case "default_alert":
-		return m.saveDefault(ctx, call, in)
+		return m.saveDefault(ctx, call, input)
 	case "automation":
-		return m.saveAutomation(ctx, call, in)
+		return m.saveAutomation(ctx, call, input)
 	}
 
-	return m.saveAlert(ctx, call, in)
+	return m.saveAlert(ctx, call, input)
 }
 
-func (m Policies) saveDefault(ctx context.Context, call *ops.Call, in *SaveInput) (Policy, error) {
-	policy, err := m.load(ctx, call, *in.ID, true)
+func (m Policies) saveDefault(
+	ctx context.Context,
+	call *ops.Call,
+	input *SaveInput,
+) (Policy, error) {
+	policy, err := m.load(ctx, call, *input.ID, true)
 	if err != nil {
 		return policy, err
 	}
@@ -1317,7 +1321,7 @@ func (m Policies) saveDefault(ctx context.Context, call *ops.Call, in *SaveInput
 		return policy, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	rules, _ := json.Marshal(in.Rules)
+	rules, _ := json.Marshal(input.Rules)
 
 	_, execErr := call.Tx.Exec(
 		ctx,
@@ -1333,8 +1337,8 @@ func (m Policies) saveDefault(ctx context.Context, call *ops.Call, in *SaveInput
 	return m.finishSave(ctx, call, policy.ID, "PolicyChanged", call.ExpectedVersion)
 }
 
-func (m Policies) saveAlert(ctx context.Context, call *ops.Call, in *SaveInput) (Policy, error) {
-	cond := in.condition()
+func (m Policies) saveAlert(ctx context.Context, call *ops.Call, input *SaveInput) (Policy, error) {
+	cond := input.condition()
 
 	if call.Principal.Role == "client" {
 		fe := map[string]string{}
@@ -1349,12 +1353,12 @@ func (m Policies) saveAlert(ctx context.Context, call *ops.Call, in *SaveInput) 
 			return Policy{}, err
 		}
 
-		if *in.CustomerID != own {
+		if *input.CustomerID != own {
 			return Policy{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 	}
 
-	org, active, found, err := m.Units.CustomerState(ctx, call, *in.CustomerID)
+	org, active, found, err := m.Units.CustomerState(ctx, call, *input.CustomerID)
 	if err != nil {
 		return Policy{}, apperr.Wrap(err, "monitoring.PolicyUnits.CustomerState")
 	}
@@ -1367,7 +1371,7 @@ func (m Policies) saveAlert(ctx context.Context, call *ops.Call, in *SaveInput) 
 		return Policy{}, apperr.Fields(map[string]string{"customerId": apperr.KeyInactiveCustomer})
 	}
 
-	bad, err := m.Recipients.NonReaders(ctx, call, in.RecipientMembershipIDs, org)
+	bad, err := m.Recipients.NonReaders(ctx, call, input.RecipientMembershipIDs, org)
 	if err != nil {
 		return Policy{}, apperr.Wrap(err, "monitoring.Recipients.NonReaders")
 	}
@@ -1380,27 +1384,27 @@ func (m Policies) saveAlert(ctx context.Context, call *ops.Call, in *SaveInput) 
 
 	condJSON, _ := json.Marshal(cond)
 
-	if in.ID == nil {
-		var id uuid.UUID
+	if input.ID == nil {
+		var policyID uuid.UUID
 
 		err := call.Tx.QueryRow(ctx, `INSERT INTO monitoring.alert_policies (tenant_id, kind, customer_id, name,
 			owner_membership_id, created_by_user_id, timezone,
 			enabled, priority, condition, recipient_membership_ids, channels, escalate_after_minutes, cooldown_minutes)
 			VALUES (current_setting('app.tenant_id')::uuid, 'alert', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING
 			id`,
-			*in.CustomerID, *in.Name, call.Principal.MembershipID, call.Principal.UserID, *in.Timezone, *in.Enabled,
-			*in.Priority,
+			*input.CustomerID, *input.Name, call.Principal.MembershipID, call.Principal.UserID, *input.Timezone, *input.Enabled,
+			*input.Priority,
 			condJSON,
-			in.RecipientMembershipIDs, in.Channels, *in.EscalateAfterMinutes, *in.CooldownMinutes).
-			Scan(&id)
+			input.RecipientMembershipIDs, input.Channels, *input.EscalateAfterMinutes, *input.CooldownMinutes).
+			Scan(&policyID)
 		if err != nil {
 			return Policy{}, apperr.Wrap(err, "insert monitoring.alert_policies")
 		}
 
-		return m.finishSave(ctx, call, id, "PolicyCreated", nil)
+		return m.finishSave(ctx, call, policyID, "PolicyCreated", nil)
 	}
 
-	policy, err := m.load(ctx, call, *in.ID, true)
+	policy, err := m.load(ctx, call, *input.ID, true)
 	if err != nil {
 		return policy, err
 	}
@@ -1409,7 +1413,7 @@ func (m Policies) saveAlert(ctx context.Context, call *ops.Call, in *SaveInput) 
 		return policy, apperr.Fields(map[string]string{"kind": apperr.KeyKindFixed})
 	}
 
-	if policy.CustomerID == nil || *policy.CustomerID != *in.CustomerID {
+	if policy.CustomerID == nil || *policy.CustomerID != *input.CustomerID {
 		return policy, apperr.Fields(map[string]string{"customerId": "error.ownerFixed"})
 	}
 
@@ -1424,15 +1428,15 @@ func (m Policies) saveAlert(ctx context.Context, call *ops.Call, in *SaveInput) 
 		1, updated_at = platform.app_now()
 		WHERE id = $1`,
 		policy.ID,
-		*in.Name,
-		*in.Timezone,
-		*in.Enabled,
-		*in.Priority,
+		*input.Name,
+		*input.Timezone,
+		*input.Enabled,
+		*input.Priority,
 		condJSON,
-		in.RecipientMembershipIDs,
-		in.Channels,
-		*in.EscalateAfterMinutes,
-		*in.CooldownMinutes,
+		input.RecipientMembershipIDs,
+		input.Channels,
+		*input.EscalateAfterMinutes,
+		*input.CooldownMinutes,
 	)
 	if execErr != nil {
 		return policy, apperr.Wrap(execErr, "update monitoring.alert_policies")
@@ -1456,7 +1460,7 @@ var autoConditionTypes = map[string]bool{
 
 // validAutoCondition checks an automation Condition of DD-A11 (occupancy, tariff, peak, solar, battery).
 func validAutoCondition(raw json.RawMessage) bool {
-	var c struct {
+	var condition struct {
 		Type     string   `json:"type"`
 		Occupied *bool    `json:"occupied,omitempty"`
 		Active   *bool    `json:"active,omitempty"`
@@ -1468,31 +1472,34 @@ func validAutoCondition(raw json.RawMessage) bool {
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
 	dec.DisallowUnknownFields()
 
-	if len(raw) == 0 || dec.Decode(&c) != nil || !autoConditionTypes[c.Type] {
+	if len(raw) == 0 || dec.Decode(&condition) != nil || !autoConditionTypes[condition.Type] {
 		return false
 	}
 
 	compare := func(unit string) bool {
-		return c.Operator != nil && operators[*c.Operator] && c.Value != nil &&
-			!math.IsNaN(*c.Value) &&
-			!math.IsInf(*c.Value, 0) &&
-			c.Unit != nil &&
-			*c.Unit == unit &&
-			c.Occupied == nil &&
-			c.Active == nil
+		return condition.Operator != nil && operators[*condition.Operator] &&
+			condition.Value != nil &&
+			!math.IsNaN(*condition.Value) &&
+			!math.IsInf(*condition.Value, 0) &&
+			condition.Unit != nil &&
+			*condition.Unit == unit &&
+			condition.Occupied == nil &&
+			condition.Active == nil
 	}
 
-	switch c.Type {
+	switch condition.Type {
 	case "occupancy":
-		return c.Occupied != nil && c.Active == nil && c.Operator == nil && c.Value == nil &&
-			c.Unit == nil
+		return condition.Occupied != nil && condition.Active == nil && condition.Operator == nil &&
+			condition.Value == nil &&
+			condition.Unit == nil
 	case "peak":
-		return c.Active != nil && c.Occupied == nil && c.Operator == nil && c.Value == nil &&
-			c.Unit == nil
+		return condition.Active != nil && condition.Occupied == nil && condition.Operator == nil &&
+			condition.Value == nil &&
+			condition.Unit == nil
 	case "tariff":
-		return compare("MYR_per_kWh") && *c.Value >= 0
+		return compare("MYR_per_kWh") && *condition.Value >= 0
 	default: // solar, battery
-		return compare("kW") && *c.Value >= 0
+		return compare("kW") && *condition.Value >= 0
 	}
 }
 
@@ -1500,10 +1507,10 @@ func validAutoCondition(raw json.RawMessage) bool {
 func (m Policies) saveAutomation(
 	ctx context.Context,
 	call *ops.Call,
-	in *SaveInput,
+	input *SaveInput,
 ) (Policy, error) {
-	action, _ := control.ParseAction(in.Action)
-	for _, u := range in.UnitIDs {
+	action, _ := control.ParseAction(input.Action)
+	for _, u := range input.UnitIDs {
 		caps, found, err := m.Caps.UnitCaps(ctx, call, u)
 		if err != nil {
 			return Policy{}, apperr.Wrap(err, "monitoring.UnitCaps.UnitCaps")
@@ -1518,22 +1525,22 @@ func (m Policies) saveAutomation(
 		}
 	}
 
-	id := uuid.Nil
+	policyID := uuid.Nil
 
 	var prev *int
 
-	if in.ID == nil {
+	if input.ID == nil {
 		err := call.Tx.QueryRow(ctx, `INSERT INTO control.automation_policies (tenant_id, name, owner_membership_id,
 			created_by_user_id, timezone, enabled, priority, condition, action)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-			*in.Name, call.Principal.MembershipID, call.Principal.UserID, *in.Timezone, *in.Enabled, *in.Priority,
-			[]byte(in.Condition), []byte(in.Action)).
-			Scan(&id)
+			*input.Name, call.Principal.MembershipID, call.Principal.UserID, *input.Timezone, *input.Enabled, *input.Priority,
+			[]byte(input.Condition), []byte(input.Action)).
+			Scan(&policyID)
 		if err != nil {
 			return Policy{}, apperr.Wrap(err, "insert control.automation_policies")
 		}
 	} else {
-		policy, err := m.load(ctx, call, *in.ID, true)
+		policy, err := m.load(ctx, call, *input.ID, true)
 		if err != nil {
 			return policy, err
 		}
@@ -1552,12 +1559,12 @@ func (m Policies) saveAutomation(
 				= $7,
 			disabled_reason = NULL, version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 			policy.ID,
-			*in.Name,
-			*in.Timezone,
-			*in.Enabled,
-			*in.Priority,
-			[]byte(in.Condition),
-			[]byte(in.Action),
+			*input.Name,
+			*input.Timezone,
+			*input.Enabled,
+			*input.Priority,
+			[]byte(input.Condition),
+			[]byte(input.Action),
 		)
 		if execErr != nil {
 			return policy, apperr.Wrap(execErr, "update control.automation_policies")
@@ -1572,16 +1579,16 @@ func (m Policies) saveAutomation(
 			return policy, apperr.Wrap(execErr, "delete control.automation_policy_units")
 		}
 
-		id, prev = policy.ID, call.ExpectedVersion
+		policyID, prev = policy.ID, call.ExpectedVersion
 	}
 
-	for _, u := range in.UnitIDs {
+	for _, unitID := range input.UnitIDs {
 		_, err := call.Tx.Exec(
 			ctx,
 			`INSERT INTO control.automation_policy_units (tenant_id, policy_id, unit_id) VALUES
 				(current_setting('app.tenant_id')::uuid, $1, $2)`,
-			id,
-			u,
+			policyID,
+			unitID,
 		)
 		if err != nil {
 			return Policy{}, apperr.Wrap(err, "insert control.automation_policy_units")
@@ -1593,7 +1600,7 @@ func (m Policies) saveAutomation(
 		event = "PolicyChanged"
 	}
 
-	return m.finishSave(ctx, call, id, event, prev)
+	return m.finishSave(ctx, call, policyID, event, prev)
 }
 
 func (m Policies) finishSave(
