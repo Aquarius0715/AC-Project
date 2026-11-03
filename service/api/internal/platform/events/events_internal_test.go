@@ -225,10 +225,20 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 	}
 	drainExpect(t, other, 2, false, "independent consumer")
 	// replaying an event that is already recorded does nothing
+	checkReplayIgnored(t, consumer, first, tenant, typ)
+	handler.expectSeen(t, "replay", 1, 2)
+
+	_ = second
+}
+
+// checkReplayIgnored applies an event the consumer has recorded already: the handler does not run again.
+func checkReplayIgnored(t *testing.T, consumer *Consumer, eventID, tenant uuid.UUID, typ string) {
+	t.Helper()
+
 	done, applyErr := consumer.apply(
 		context.Background(),
 		Event{
-			ID:            first,
+			ID:            eventID,
 			TenantID:      tenant,
 			Type:          typ,
 			Payload:       []byte(`{"n":9}`),
@@ -244,10 +254,6 @@ func TestConsumerOrderDedupAndRetry(t *testing.T) {
 	if applyErr != nil || done {
 		t.Fatalf("replay: done=%v err=%v", done, applyErr)
 	}
-
-	handler.expectSeen(t, "replay", 1, 2)
-
-	_ = second
 }
 
 // TestConsumerDeadLetters (IR427): an event that fails MaxAttempts times, 1, 2, 4 and 8 minutes apart, is recorded as
@@ -296,9 +302,11 @@ func TestConsumerDeadLetters(t *testing.T) {
 	}
 
 	clock = clock.Add(8*time.Minute - time.Second)
+
 	drainExpect(t, consumer, 0, false, "before the last pause")
 
 	clock = clock.Add(time.Second)
+
 	drainExpect(t, consumer, 1, false, "fifth attempt")
 
 	if !slices.Equal(applied, []int{2}) {
@@ -391,71 +399,23 @@ func countAs(
 func TestHousekeep(t *testing.T) {
 	runner := testDB(t)
 	tenant := firstTenant(t, runner)
-
-	day := func(d int) time.Time { return time.Date(2000, 1, d, 0, 0, 0, 0, time.UTC) }
-	typ := "Old" + uuid.NewString()[:8]
-	applied, needed, gone := uuid.New(), uuid.New(), uuid.New()
-	consumerA, consumerB := "test-"+uuid.NewString(), "test-"+uuid.NewString()
-	key := "hk-" + uuid.NewString()
-
-	for _, eventID := range []uuid.UUID{applied, needed} {
-		execAs(
-			t,
-			runner,
-			nil,
-			`INSERT INTO platform.outbox (id, tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
-				occurred_at)
-			VALUES ($1, $2, 'test', $1, $3, '{}', 'corr', $4)`,
-			eventID,
-			tenant,
-			typ,
-			day(10),
-		)
+	rows := sweptRows{
+		typ:       "Old" + uuid.NewString()[:8],
+		consumerA: "test-" + uuid.NewString(),
+		consumerB: "test-" + uuid.NewString(),
+		applied:   uuid.New(),
+		needed:    uuid.New(),
+		gone:      uuid.New(),
+		key:       "hk-" + uuid.NewString(),
 	}
 
-	execAs(
-		t,
-		runner,
-		nil,
-		`INSERT INTO platform.processed_events (consumer, event_id, processed_at) VALUES ($1, $2, $4), ($3, $2, $4), ($1, $5,
-			$4), ($1, $6, $7)`,
-		consumerA,
-		applied,
-		consumerB,
-		day(10),
-		needed,
-		gone,
-		day(1),
-	) // b has not applied "needed"; "gone" left the outbox and is 19 days old
-	execAs(
-		t,
-		runner,
-		nil,
-		`INSERT INTO platform.event_failures (consumer, event_id, attempts, last_error, last_attempt_at) VALUES ($1, $2, 1,
-			'x', $3)`,
-		consumerA,
-		gone,
-		day(10),
-	)
-	execAs(
-		t,
-		runner,
-		tenantPrincipal(tenant),
-		`INSERT INTO platform.idempotency_keys (tenant_id, membership_id, key, operation, request_hash, status, created_at,
-			expires_at)
-		VALUES ($1, $2, $3, 'test', '\x00', 'completed', $4, $5)`,
-		tenant,
-		uuid.New(),
-		key,
-		day(1),
-		day(2),
-	)
+	rows.insert(t, runner, tenant)
 
 	noop := func(context.Context, pgx.Tx, Event) error { return nil }
 	consumers := []*Consumer{
 		{
-			Name:      consumerA,
-			Handlers:  map[string]Handler{typ: noop},
+			Name:      rows.consumerA,
+			Handlers:  map[string]Handler{rows.typ: noop},
 			DB:        nil,
 			Batch:     0,
 			Logf:      nil,
@@ -463,8 +423,8 @@ func TestHousekeep(t *testing.T) {
 			SplitFrom: "",
 		},
 		{
-			Name:      consumerB,
-			Handlers:  map[string]Handler{typ: noop},
+			Name:      rows.consumerB,
+			Handlers:  map[string]Handler{rows.typ: noop},
 			DB:        nil,
 			Batch:     0,
 			Logf:      nil,
@@ -473,12 +433,12 @@ func TestHousekeep(t *testing.T) {
 		},
 	}
 
-	swept, err := Housekeep(context.Background(), runner, day(20), consumers)
+	swept, err := Housekeep(context.Background(), runner, housekeepDay(20), consumers)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	checkSwept(t, runner, tenant, sweptRows{applied: applied, needed: needed, gone: gone, key: key})
+	checkSwept(t, runner, tenant, rows)
 
 	if swept.Outbox < 1 || swept.Processed < 1 || swept.Failures < 1 || swept.IdempotencyKeys < 1 {
 		t.Errorf("counts: %+v", swept)
@@ -489,16 +449,79 @@ func TestHousekeep(t *testing.T) {
 		runner,
 		nil,
 		`DELETE FROM platform.processed_events WHERE consumer = ANY($1)`,
-		[]string{consumerA, consumerB},
+		[]string{rows.consumerA, rows.consumerB},
 	)
-	execAs(t, runner, nil, `DELETE FROM platform.outbox WHERE id = $1`, needed)
+	execAs(t, runner, nil, `DELETE FROM platform.outbox WHERE id = $1`, rows.needed)
 }
 
-// sweptRows are the rows TestHousekeep writes: the events applied by both consumers, needed by one of them, and gone
-// from the outbox, and the expired idempotency key.
+// housekeepDay is day d of January 2000, the clock of TestHousekeep.
+func housekeepDay(d int) time.Time { return time.Date(2000, 1, d, 0, 0, 0, 0, time.UTC) }
+
+// sweptRows are the rows TestHousekeep writes: events of one type applied by both consumers (applied), not yet by
+// consumer B (needed) and gone from the outbox (gone), and an expired idempotency key.
 type sweptRows struct {
+	typ                   string
+	consumerA, consumerB  string
 	applied, needed, gone uuid.UUID
 	key                   string
+}
+
+// insert writes the rows at housekeepDay 10 (the idempotency key expired on day 2).
+func (rows sweptRows) insert(t *testing.T, runner testRunner, tenant uuid.UUID) {
+	t.Helper()
+
+	for _, eventID := range []uuid.UUID{rows.applied, rows.needed} {
+		execAs(
+			t,
+			runner,
+			nil,
+			`INSERT INTO platform.outbox (id, tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
+				occurred_at)
+			VALUES ($1, $2, 'test', $1, $3, '{}', 'corr', $4)`,
+			eventID,
+			tenant,
+			rows.typ,
+			housekeepDay(10),
+		)
+	}
+
+	execAs(
+		t,
+		runner,
+		nil,
+		`INSERT INTO platform.processed_events (consumer, event_id, processed_at) VALUES ($1, $2, $4), ($3, $2, $4), ($1, $5,
+			$4), ($1, $6, $7)`,
+		rows.consumerA,
+		rows.applied,
+		rows.consumerB,
+		housekeepDay(10),
+		rows.needed,
+		rows.gone,
+		housekeepDay(1),
+	) // b has not applied "needed"; "gone" left the outbox and is 19 days old
+	execAs(
+		t,
+		runner,
+		nil,
+		`INSERT INTO platform.event_failures (consumer, event_id, attempts, last_error, last_attempt_at) VALUES ($1, $2, 1,
+			'x', $3)`,
+		rows.consumerA,
+		rows.gone,
+		housekeepDay(10),
+	)
+	execAs(
+		t,
+		runner,
+		tenantPrincipal(tenant),
+		`INSERT INTO platform.idempotency_keys (tenant_id, membership_id, key, operation, request_hash, status, created_at,
+			expires_at)
+		VALUES ($1, $2, $3, 'test', '\x00', 'completed', $4, $5)`,
+		tenant,
+		uuid.New(),
+		rows.key,
+		housekeepDay(1),
+		housekeepDay(2),
+	)
 }
 
 // checkSwept checks what Housekeep left of the rows of TestHousekeep.

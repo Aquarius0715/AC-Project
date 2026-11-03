@@ -20,6 +20,9 @@ import (
 // PrincipalPath is identity-api's internal endpoint (never routed by the gateway).
 const PrincipalPath = "/internal/v1/principal"
 
+// fetchTimeout bounds one request to identity-api when RemoteSource has no Client of its own.
+const fetchTimeout = 5 * time.Second
+
 // PrincipalDTO is the wire form of ops.Principal between identity-api and the other services.
 type PrincipalDTO struct {
 	UserID       uuid.UUID              `json:"userId"`
@@ -182,7 +185,7 @@ func (r *RemoteSource) fetch(
 	client := r.Client
 	if client == nil {
 		client = &http.Client{
-			Timeout:       5 * time.Second,
+			Timeout:       fetchTimeout,
 			Transport:     nil,
 			CheckRedirect: nil,
 			Jar:           nil,
@@ -193,7 +196,7 @@ func (r *RemoteSource) fetch(
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrUnavailable, err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	switch res.StatusCode {
 	case http.StatusOK:

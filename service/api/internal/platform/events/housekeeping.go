@@ -85,7 +85,18 @@ func Housekeep(
 		return swept, apperr.Wrap(err, "ops.Runner.Run")
 	}
 
-	var tenants []uuid.UUID
+	swept.IdempotencyKeys, err = sweepIdempotencyKeys(ctx, runner, now)
+
+	return swept, err
+}
+
+// sweepIdempotencyKeys deletes the idempotency keys past their expiry, tenant by tenant (the table has row-level
+// security), and returns how many it deleted, also when a tenant fails.
+func sweepIdempotencyKeys(ctx context.Context, runner ops.Runner, now time.Time) (int64, error) {
+	var (
+		tenants []uuid.UUID
+		swept   int64
+	)
 
 	runErr := runner.Run(ctx, true, nil, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
@@ -123,7 +134,7 @@ func Housekeep(
 					`DELETE FROM platform.idempotency_keys WHERE expires_at < $1`,
 					now,
 				)
-				swept.IdempotencyKeys += tag.RowsAffected()
+				swept += tag.RowsAffected()
 
 				return apperr.Wrap(err, "delete platform.idempotency_keys")
 			},

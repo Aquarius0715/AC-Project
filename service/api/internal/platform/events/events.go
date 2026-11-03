@@ -98,24 +98,11 @@ func (c *Consumer) Drain(ctx context.Context) (int, error) {
 			return applied, nil
 		}
 
-		for _, event := range pending {
-			if c.retryWait(event) > 0 {
-				return applied, nil // its retry is not due: the events after it wait too
-			}
+		batchApplied, stopped, err := c.applyBatch(ctx, pending)
+		applied += batchApplied
 
-			done, err := c.apply(ctx, event)
-			if err != nil {
-				stopErr := c.failure(ctx, event, err)
-				if stopErr != nil {
-					return applied, stopErr
-				}
-
-				continue
-			}
-
-			if done {
-				applied++
-			}
+		if stopped {
+			return applied, err
 		}
 
 		if len(pending) < batch {
@@ -208,6 +195,34 @@ func (c *Consumer) failed(ctx context.Context, event Event, cause error) (bool, 
 	})
 
 	return dead, apperr.Wrap(err, "ops.Runner.Run")
+}
+
+// applyBatch applies the pending events in order and returns how many it applied. It stops at an event still waiting
+// for its retry and at the first failure, which it returns; stopped tells the drain to stop there too.
+func (c *Consumer) applyBatch(ctx context.Context, pending []Event) (int, bool, error) {
+	applied := 0
+
+	for _, event := range pending {
+		if c.retryWait(event) > 0 {
+			return applied, true, nil // its retry is not due: the events after it wait too
+		}
+
+		done, err := c.apply(ctx, event)
+		if err != nil {
+			stopErr := c.failure(ctx, event, err)
+			if stopErr != nil {
+				return applied, true, stopErr
+			}
+
+			continue
+		}
+
+		if done {
+			applied++
+		}
+	}
+
+	return applied, false, nil
 }
 
 // failure records the failed attempt of the event. It returns the error that stops the drain, or nil once the event

@@ -16,6 +16,22 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
+// The reasons a token that parsed is refused (the middleware logs them, never the token).
+var (
+	errAudience     = errors.New("audience")
+	errNotAccess    = errors.New("not an access token")
+	errNoSubject    = errors.New("no subject")
+	errClaimsFormat = errors.New("claims are not a JSON object")
+	errNoIssuer     = errors.New("OIDC_ISSUER is required")
+)
+
+// The JWKS refresh of NewVerifierFromEnv (keyfunc.Override).
+const (
+	jwksRefreshUnknownKID = 10 * time.Second
+	jwksRefreshInterval   = 15 * time.Minute
+	jwksRateLimitWaitMax  = 15 * time.Second
+)
+
 // OIDCVerifier verifies RS256 access tokens from Cognito (production) or Keycloak (local): issuer, audience
 // (one of the app clients), expiry, the token type and the signature against the JWKS (container design §4:
 // OIDC_ISSUER, OIDC_JWKS_URL, OIDC_APP_CLIENT_ID, OIDC_ADMIN_CLIENT_ID).
@@ -29,7 +45,7 @@ type OIDCVerifier struct {
 // Verify implements Verifier and returns the `sub` claim with the `auth_time` claim, which Cognito and Keycloak put
 // in access tokens (IR268).
 func (v *OIDCVerifier) Verify(_ context.Context, token string) (Identity, error) {
-	t, err := jwt.Parse(
+	parsed, err := jwt.Parse(
 		token,
 		v.Keyfunc,
 		jwt.WithIssuer(
@@ -42,18 +58,22 @@ func (v *OIDCVerifier) Verify(_ context.Context, token string) (Identity, error)
 		return Identity{}, apperr.Wrap(err, "jwt.Parse")
 	}
 
-	claims := t.Claims.(jwt.MapClaims)
+	claims, isMap := parsed.Claims.(jwt.MapClaims)
+	if !isMap {
+		return Identity{}, errClaimsFormat
+	}
+
 	if !audienceOK(claims, v.Audiences) {
-		return Identity{}, errors.New("audience")
+		return Identity{}, errAudience
 	}
 
 	if !accessToken(claims) {
-		return Identity{}, errors.New("not an access token")
+		return Identity{}, errNotAccess
 	}
 
 	sub, _ := claims["sub"].(string)
 	if sub == "" {
-		return Identity{}, errors.New("no subject")
+		return Identity{}, errNoSubject
 	}
 
 	client, _ := claims["azp"].(string) // Keycloak; Cognito's access tokens name it client_id
@@ -127,12 +147,12 @@ func audienceOK(mapClaims jwt.MapClaims, allowed []string) bool {
 }
 
 // NewVerifierFromEnv builds the OIDC verifier from the environment.
-func NewVerifierFromEnv(ctx context.Context) (Verifier, error) {
+func NewVerifierFromEnv(ctx context.Context) (*OIDCVerifier, error) {
 	iss := os.Getenv("OIDC_ISSUER")
 	jwks := os.Getenv("OIDC_JWKS_URL")
 
 	if iss == "" {
-		return nil, errors.New("OIDC_ISSUER is required")
+		return nil, errNoIssuer
 	}
 
 	if jwks == "" {
@@ -141,10 +161,10 @@ func NewVerifierFromEnv(ctx context.Context) (Verifier, error) {
 	// keys of a token with an unknown key ID are fetched again at most every 10 s (the library default is 5 min):
 	// a service that started before the identity provider, or one whose provider was recreated with new keys,
 	// accepts tokens again within seconds instead of refusing every request for minutes (CI e2e, IR419)
-	k, err := keyfunc.NewDefaultOverrideCtx(ctx, []string{jwks}, keyfunc.Override{
-		RefreshUnknownKID:         rate.NewLimiter(rate.Every(10*time.Second), 1),
-		RefreshInterval:           15 * time.Minute,
-		RateLimitWaitMax:          15 * time.Second,
+	keys, err := keyfunc.NewDefaultOverrideCtx(ctx, []string{jwks}, keyfunc.Override{
+		RefreshUnknownKID:         rate.NewLimiter(rate.Every(jwksRefreshUnknownKID), 1),
+		RefreshInterval:           jwksRefreshInterval,
+		RateLimitWaitMax:          jwksRateLimitWaitMax,
 		Client:                    nil,
 		HTTPTimeout:               0,
 		NoErrorReturnFirstHTTPReq: nil,
@@ -161,6 +181,6 @@ func NewVerifierFromEnv(ctx context.Context) (Verifier, error) {
 		Issuer:      iss,
 		Audiences:   []string{os.Getenv("OIDC_APP_CLIENT_ID"), admin},
 		AdminClient: admin,
-		Keyfunc:     k.Keyfunc,
+		Keyfunc:     keys.Keyfunc,
 	}, nil
 }
