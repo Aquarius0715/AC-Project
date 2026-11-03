@@ -64,7 +64,7 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	id, membership := data(resp)["id"].(string), data(resp)["membershipId"].(string)
+	id, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
 
 	drain()
 	// signed in once, an hour into the membership (the test clock stands still)
@@ -262,7 +262,7 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 		t.Fatalf("members.save: %d %v", code, m)
 	}
 
-	membership := data(m)["id"].(string)
+	membership := asStr(t, data(m)["id"])
 
 	var mv int
 	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &mv)
@@ -373,7 +373,7 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	id, membership := data(resp)["id"].(string), data(resp)["membershipId"].(string)
+	id, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
 
 	err := srv.DrainEvents(context.Background())
 	if err != nil {

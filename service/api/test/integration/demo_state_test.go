@@ -58,7 +58,7 @@ func TestDemoStateReport(t *testing.T) {
 
 	_, res := post(srv, &hq, "units.get", `{"id":"`+unit.String()+`"}`)
 
-	o := data(res)["observedState"].(map[string]any)
+	o := asObj(t, data(res)["observedState"])
 	if o["power"] != false || o["celsius"] != 27.0 || o["mode"] != "dry" ||
 		o["fanLevel"] != "high" ||
 		o["observedAt"] != when.Format(time.RFC3339) {
@@ -81,7 +81,7 @@ func TestDemoStateReport(t *testing.T) {
 	}
 
 	_, res = post(srv, &hq, "units.get", `{"id":"`+unit.String()+`"}`)
-	if o := data(res)["observedState"].(map[string]any); o["power"] != false ||
+	if o := asObj(t, data(res)["observedState"]); o["power"] != false ||
 		o["celsius"] != 27.0 ||
 		o["mode"] != "dry" ||
 		o["observedAt"] != when.Format(time.RFC3339) {

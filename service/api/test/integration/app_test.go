@@ -255,10 +255,10 @@ func TestSessionGet(t *testing.T) {
 	srv := server(t)
 	code, res := post(srv, &hq, "session.get", `{}`)
 
-	doc := res["data"].(map[string]any)
+	doc := asObj(t, res["data"])
 	if code != 200 || doc["role"] != "admin" ||
 		doc["membershipId"] != seed.ID("hq-operator").String() ||
-		len(doc["permissions"].([]any)) == 0 ||
+		len(asArr(t, doc["permissions"])) == 0 ||
 		doc["clientRole"] != nil {
 		t.Fatalf("%d %v", code, res)
 	}
@@ -282,7 +282,7 @@ func TestSessionGet(t *testing.T) {
 		&contrA,
 		"session.get",
 		`{}`,
-	); c["data"].(map[string]any)["organizationId"] != seed.ID("org-contractor-a").
+	); asObj(t, c["data"])["organizationId"] != seed.ID("org-contractor-a").
 		String() { // IR276: the own company
 		t.Errorf("contractor session organization: %v", c["data"])
 	}
@@ -292,9 +292,9 @@ func TestSessionGet(t *testing.T) {
 		&customerA,
 		"session.get",
 		`{}`,
-	); c["data"].(map[string]any)["clientRole"] != "owner" ||
-		c["data"].(map[string]any)["organizationName"] == "" ||
-		c["data"].(map[string]any)["customerId"] != seed.ID("cust-a").
+	); asObj(t, c["data"])["clientRole"] != "owner" ||
+		asObj(t, c["data"])["organizationName"] == "" ||
+		asObj(t, c["data"])["customerId"] != seed.ID("cust-a").
 			String() { // IR243: the client's customer
 		t.Errorf("client owner session: %v", c["data"])
 	}
@@ -303,7 +303,7 @@ func TestSessionGet(t *testing.T) {
 		t.Errorf("HQ session customer: %v", doc["customerId"])
 	}
 
-	meta := res["meta"].(map[string]any) // Meta of service-contracts.ts
+	meta := asObj(t, res["meta"]) // Meta of service-contracts.ts
 	if meta["snapshotAt"] != clock.Format(time.RFC3339) || meta["correlationId"] == "" ||
 		meta["eventCursor"] == nil {
 		t.Errorf("meta: %v", meta)
@@ -329,7 +329,7 @@ func TestUnitsListScopes(t *testing.T) {
 	total := func(a *actor) int {
 		_, m := post(srv, a, "units.list", `{"limit":1}`)
 
-		return int(m["data"].(map[string]any)["total"].(float64))
+		return int(asNum(t, asObj(t, m["data"])["total"]))
 	}
 
 	hqN, aN, bN := total(&hq), total(&customerA), total(&customerB)
@@ -355,7 +355,7 @@ func TestUnitsListScopes(t *testing.T) {
 	// internal technicians: Membership.scopes; external technicians: only units of their own Assignments (IR49(b))
 	seen := map[string]bool{}
 	for _, u := range tech {
-		seen[u["id"].(string)] = true
+		seen[asStr(t, u["id"])] = true
 	}
 
 	if seen[seed.ID("unit-other-customer").String()] {
@@ -374,9 +374,9 @@ func TestUnitsListScopes(t *testing.T) {
 	// paging
 	code, res := post(srv, &hq, "units.list", `{"limit":2}`)
 
-	doc := res["data"].(map[string]any)
+	doc := asObj(t, res["data"])
 	if code != 200 || len(items(res)) != 2 || doc["nextCursor"] == nil ||
-		int(doc["total"].(float64)) != hqN {
+		int(asNum(t, doc["total"])) != hqN {
 		t.Fatalf("page 1: %d %v", code, doc)
 	}
 
@@ -384,7 +384,7 @@ func TestUnitsListScopes(t *testing.T) {
 		srv,
 		&hq,
 		"units.list",
-		`{"limit":2,"cursor":"`+doc["nextCursor"].(string)+`"}`,
+		`{"limit":2,"cursor":"`+asStr(t, doc["nextCursor"])+`"}`,
 	)
 	if code != 200 || len(items(res)) == 0 {
 		t.Fatalf("page 2: %d", code)
@@ -470,7 +470,7 @@ func TestUnitsGet(t *testing.T) {
 		"units.get",
 		`{"id":"`+id+`"}`,
 	); code != 200 ||
-		res["data"].(map[string]any)["displayName"] != "Bedroom AC" {
+		asObj(t, res["data"])["displayName"] != "Bedroom AC" {
 		t.Fatalf("own unit: %d", code)
 	}
 

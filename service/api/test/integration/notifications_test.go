@@ -34,7 +34,7 @@ func TestNotificationsInbox(t *testing.T) {
 		t.Fatalf("schedule: %d %v", code, res)
 	}
 
-	rid := data(res)["id"].(string)
+	rid := asStr(t, data(res)["id"])
 	// a notification whose target customer-b cannot read is hidden (IR58)
 	hidden := uuid.NewString()
 	owner(
@@ -59,13 +59,13 @@ func TestNotificationsInbox(t *testing.T) {
 	var n map[string]any
 
 	for _, it := range items(res) {
-		if it["target"].(map[string]any)["id"] == rid {
+		if asObj(t, it["target"])["id"] == rid {
 			n = it
 		}
 	}
 
 	if n == nil || n["deliveryState"] != "simulated" ||
-		n["params"].(map[string]any)["targetName"] == "" ||
+		asObj(t, n["params"])["targetName"] == "" ||
 		n["severity"] != "warning" {
 		t.Fatalf("restriction notice: %v", res)
 	}
@@ -102,7 +102,7 @@ func TestNotificationsInbox(t *testing.T) {
 		"notifications.list",
 		`{"filters":{"from":"2026-09-14T00:00:00Z","to":"2026-09-01T00:00:00Z"}}`,
 	); code != 422 ||
-		resp["fieldErrors"].(map[string]any)["filters.to"] != apperr.KeyRange {
+		asObj(t, resp["fieldErrors"])["filters.to"] != apperr.KeyRange {
 		t.Errorf("a reversed period: %d %v", code, resp)
 	}
 
@@ -117,7 +117,7 @@ func TestNotificationsInbox(t *testing.T) {
 		t.Error("severity sort")
 	}
 
-	id := n["id"].(string)
+	id := asStr(t, n["id"])
 	if code, _ := write(
 		srv,
 		&customerB,
@@ -249,8 +249,8 @@ func TestMarkAllRead(t *testing.T) {
 
 	got := func(k string) string {
 		var out []string
-		for _, v := range data(res)[k].([]any) {
-			out = append(out, v.(string))
+		for _, v := range asArr(t, data(res)[k]) {
+			out = append(out, asStr(t, v))
 		}
 
 		return strings.Join(out, ",")
@@ -320,7 +320,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		}
 	}
 
-	recipient := items(resp)[0]["id"].(string)
+	recipient := asStr(t, items(resp)[0]["id"])
 
 	if code, _ := post(srv, &customerB, "notifications.recipients", body("inApp")); code != 403 {
 		t.Error("client lists reminder recipients")
@@ -379,7 +379,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 
 	code, resp = preview(recipient)
 	if code != 200 || data(resp)["deliveryState"] != "preview" ||
-		data(resp)["params"].(map[string]any)["message"] != "Please pay" ||
+		asObj(t, data(resp)["params"])["message"] != "Please pay" ||
 		data(resp)["type"] != "payment_reminder" {
 		t.Fatalf("preview: %d %v", code, resp)
 	}
@@ -413,7 +413,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			`"recipientMembershipId":"`+recipient+`","message":"Please `+
 			`pay"}`,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["target"] != apperr.KeyInvalid {
+		asObj(t, res["fieldErrors"])["target"] != apperr.KeyInvalid {
 		t.Errorf("a payment reminder about a job: %d %v", code, res)
 	}
 
@@ -453,7 +453,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 				`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
 				`"recipientMembershipId":"`+recipient+`",`+body+`}`,
 		); code != 422 ||
-			res["fieldErrors"].(map[string]any)[field] != apperr.KeyLength {
+			asObj(t, res["fieldErrors"])[field] != apperr.KeyLength {
 			t.Errorf("%s too long: %d %v", field, code, res)
 		}
 	}
@@ -485,7 +485,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	if code, m := alertPreview(
 		`,"message":"Please check the unit"`,
 	); code != 200 || data(m)["type"] != "fault" || data(m)["severity"] != "warning" ||
-		data(m)["params"].(map[string]any)["status"] != "open" {
+		asObj(t, data(m)["params"])["status"] != "open" {
 		t.Errorf("alert preview: %d %v", code, m)
 	}
 
@@ -902,7 +902,7 @@ func TestContractorInbox(t *testing.T) {
 
 	seen := map[string]bool{}
 	for _, it := range items(resp) {
-		seen[it["id"].(string)] = true
+		seen[asStr(t, it["id"])] = true
 	}
 
 	if !seen[offered] || seen[other] || seen[unit] {
@@ -943,7 +943,7 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
 
-	job := data(m)["id"].(string)
+	job := asStr(t, data(m)["id"])
 	if code, res := write(
 		srv,
 		&hq,

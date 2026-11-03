@@ -164,7 +164,7 @@ func TestMembersSaveNewUser(t *testing.T) {
 		t.Fatalf("a new technician: %d %v", code, resp)
 	}
 
-	membership := data(resp)["id"].(string)
+	membership := asStr(t, data(resp)["id"])
 
 	var status, user string
 	ownerScan(

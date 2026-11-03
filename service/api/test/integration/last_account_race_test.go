@@ -308,7 +308,7 @@ func adminSave(
 			t.Fatal(err)
 		}
 
-		return string(b), int(it["version"].(float64))
+		return string(b), int(asNum(t, it["version"]))
 	}
 
 	t.Fatalf("membership %s not listed", id)

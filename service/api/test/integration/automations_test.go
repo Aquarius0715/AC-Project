@@ -134,7 +134,7 @@ func TestAutomationSchedules(t *testing.T) {
 		t.Fatalf("save: %d %v", code, resp)
 	}
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 	code, resp = post(
 		srv,
 		&customerB,
@@ -142,15 +142,15 @@ func TestAutomationSchedules(t *testing.T) {
 		`{"automationId":"`+id+`","count":8}`,
 	)
 
-	list := resp["data"].([]any)
+	list := asArr(t, resp["data"])
 	if code != 200 || len(list) != 8 {
 		t.Fatalf("nextRuns: %d %v", code, resp)
 	}
 
-	first := list[0].(map[string]any)
+	first := asObj(t, list[0])
 	// clock 2026-09-14T01:00Z is Monday 09:00 in KL: the first run is Monday 22:00 KL = 14:00Z start
 	if first["phase"] != "schedule_start" || first["at"] != "2026-09-14T14:00:00Z" ||
-		list[1].(map[string]any)["at"] != "2026-09-14T22:00:00Z" {
+		asObj(t, list[1])["at"] != "2026-09-14T22:00:00Z" {
 		t.Errorf("first runs: %v", list[:2])
 	}
 
@@ -299,7 +299,7 @@ func TestAutomationEvents(t *testing.T) {
 		srv,
 		&customerB,
 		"automations.nextRuns",
-		`{"automationId":"`+data(resp)["id"].(string)+`","count":8}`,
+		`{"automationId":"`+asStr(t, data(resp)["id"])+`","count":8}`,
 	); code != 422 ||
 		fields(res) != "automationId=errors.not_schedule" {
 		t.Errorf("event rules have no next runs: %d %s", code, fields(res))

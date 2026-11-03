@@ -76,13 +76,13 @@ func TestContractsAndInvoices(t *testing.T) {
 	}
 
 	code, resp := write(srv, &hq, "contracts.save", body(nil), 0)
-	if code != 200 || data(resp)["version"].(float64) != 1 ||
-		len(data(resp)["unitIds"].([]any)) != 1 ||
+	if code != 200 || asNum(t, data(resp)["version"]) != 1 ||
+		len(asArr(t, data(resp)["unitIds"])) != 1 ||
 		data(resp)["customerOrgId"] != seed.ID("org-customer-b").String() {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	key := data(resp)["id"].(string)
+	key := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		&hq,
@@ -90,7 +90,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		body(map[string]string{"id": `"` + key + `"`, "priceMinor": "15000"}),
 		1,
 	); code != 200 ||
-		data(res)["version"].(float64) != 2 {
+		asNum(t, data(res)["version"]) != 2 {
 		t.Fatalf("revise: %d %v", code, res)
 	}
 
@@ -147,7 +147,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		"contracts.list",
 		`{"filters":{"unitId":"`+unit+`"}}`,
 	); len(items(res)) != 1 ||
-		items(res)[0]["priceMinor"].(float64) != 15000 {
+		asNum(t, items(res)[0]["priceMinor"]) != 15000 {
 		t.Fatalf("client contracts: %v", res)
 	}
 
@@ -191,7 +191,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		"contracts.list",
 		`{"filters":{"customerId":"`+cust+`","unitId":"`+unit+`"}}`,
 	); len(
-		items(res)[0]["activeRestrictionIds"].([]any),
+		asArr(t, items(res)[0]["activeRestrictionIds"]),
 	) != 1 {
 		t.Fatal("active restriction listed")
 	}
@@ -261,11 +261,11 @@ func TestContractsAndInvoices(t *testing.T) {
 
 	code, resp = inv(nil)
 	if code != 200 || data(resp)["status"] != "unpaid" ||
-		!strings.HasPrefix(data(resp)["number"].(string), "INV-202608-") {
+		!strings.HasPrefix(asStr(t, data(resp)["number"]), "INV-202608-") {
 		t.Fatalf("invoice: %d %v", code, resp)
 	}
 
-	invoice := data(resp)["id"].(string)
+	invoice := asStr(t, data(resp)["id"])
 
 	if code, _ := inv(nil); code != 409 {
 		t.Error("same period twice")
@@ -285,7 +285,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		"invoices.get",
 		`{"id":"`+invoice+`"}`,
 	); code != 200 ||
-		len(data(res)["paymentRefs"].([]any)) != 0 {
+		len(asArr(t, data(res)["paymentRefs"])) != 0 {
 		t.Fatalf("client invoice detail: %d %v", code, res)
 	}
 
@@ -394,7 +394,7 @@ func TestContractsAndInvoices(t *testing.T) {
 	}
 
 	code, resp = remind(seed.ID("customer-b").String(), "email", 1)
-	if code != 200 || data(resp)["invoiceVersion"].(float64) != 2 ||
+	if code != 200 || asNum(t, data(resp)["invoiceVersion"]) != 2 ||
 		data(resp)["notificationId"] == nil {
 		t.Fatalf("remind: %d %v", code, resp)
 	}

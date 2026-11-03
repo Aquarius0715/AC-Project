@@ -111,7 +111,7 @@ func TestAlertEvidence(t *testing.T) {
 	kinds := func(m map[string]any) string {
 		got := []string{}
 		for _, it := range items(m) {
-			got = append(got, it["kind"].(string)+":"+it["id"].(string))
+			got = append(got, asStr(t, it["kind"])+":"+asStr(t, it["id"]))
 		}
 
 		return strings.Join(got, ",")
@@ -137,7 +137,7 @@ func TestAlertEvidence(t *testing.T) {
 	if it := byID(
 		resp,
 		after,
-	); it["metric"] != "temperature" || it["value"].(float64) != 26 || it["unit"] != "°C" || it["origin"] != "measured" ||
+	); it["metric"] != "temperature" || asNum(t, it["value"]) != 26 || it["unit"] != "°C" || it["origin"] != "measured" ||
 		it["quality"] != "valid" ||
 		it["eventType"] != nil {
 		t.Errorf("remeasurement fields: %v", it)
@@ -156,7 +156,7 @@ func TestAlertEvidence(t *testing.T) {
 		&hq,
 		"alerts.evidence",
 		`{"alertId":"`+free+`","query":{"limit":1}}`,
-	); code != 200 || len(items(res)) != 1 || data(res)["total"].(float64) != 4 ||
+	); code != 200 || len(items(res)) != 1 || asNum(t, data(res)["total"]) != 4 ||
 		data(res)["nextCursor"] == nil {
 		t.Errorf("paged: %d %v", code, res)
 	}
@@ -190,7 +190,7 @@ func TestAlertEvidence(t *testing.T) {
 		"alerts.evidence",
 		`{"alertId":"00000000-0000-0000-0000-000000000000","query":{}}`,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["alertId"] != apperr.KeyRequired {
+		asObj(t, res["fieldErrors"])["alertId"] != apperr.KeyRequired {
 		t.Errorf("no alert: %d %v", code, res)
 	}
 
@@ -252,7 +252,7 @@ func TestAlertEvidence(t *testing.T) {
 			free,
 			1,
 			c.ids...); code != 422 ||
-			m["fieldErrors"].(map[string]any)["resolutionEvidenceIds"] != c.key {
+			asObj(t, m["fieldErrors"])["resolutionEvidenceIds"] != c.key {
 			t.Errorf("%s: %d %v", name, code, m)
 		}
 	}

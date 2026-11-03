@@ -52,12 +52,12 @@ func TestAutomationPolicies(t *testing.T) {
 
 	code, resp := write(srv, &hq, "policies.save", autoPolicyBody(nil), 0)
 	if code != 200 || data(resp)["kind"] != "automation" ||
-		len(data(resp)["unitIds"].([]any)) != 2 ||
-		data(resp)["action"].(map[string]any)["celsius"].(float64) != 26 {
+		len(asArr(t, data(resp)["unitIds"])) != 2 ||
+		asNum(t, asObj(t, data(resp)["action"])["celsius"]) != 26 {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 
 	valid := map[string]map[string]string{
 		"occupancy": {
@@ -192,9 +192,9 @@ func TestAutomationPolicies(t *testing.T) {
 		),
 		1,
 	)
-	if code != 200 || len(data(resp)["unitIds"].([]any)) != 1 ||
+	if code != 200 || len(asArr(t, data(resp)["unitIds"])) != 1 ||
 		data(resp)["disabledReason"] != nil ||
-		data(resp)["version"].(float64) != 2 {
+		asNum(t, data(resp)["version"]) != 2 {
 		t.Fatalf("update: %d %v", code, resp)
 	}
 
@@ -226,7 +226,7 @@ func TestAutomationPolicies(t *testing.T) {
 	ids := func(m map[string]any) map[string]bool {
 		out := map[string]bool{}
 		for _, it := range items(m) {
-			out[it["id"].(string)] = true
+			out[asStr(t, it["id"])] = true
 		}
 
 		return out

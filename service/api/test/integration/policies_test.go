@@ -73,11 +73,11 @@ func TestPolicies(t *testing.T) {
 	)
 	if code != 200 || data(resp)["kind"] != "alert" || data(resp)["name"] != "Warm room" ||
 		data(resp)["metric"] != "temperature" ||
-		len(data(resp)["unitIds"].([]any)) != 0 {
+		len(asArr(t, data(resp)["unitIds"])) != 0 {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	pid := data(resp)["id"].(string)
+	pid := asStr(t, data(resp)["id"])
 	if code, res := post(
 		srv,
 		&customerA,
@@ -93,18 +93,18 @@ func TestPolicies(t *testing.T) {
 	}
 	// default policy: clients see it with only their own settings; HQ sees all settings
 	_, resp = post(srv, &customerA, "policies.get", `{"policyId":"`+def+`"}`)
-	if len(data(resp)["rules"].([]any)) != 6 || data(resp)["customerId"] != nil {
+	if len(asArr(t, data(resp)["rules"])) != 6 || data(resp)["customerId"] != nil {
 		t.Fatalf("default policy: %v", resp)
 	}
 
-	for _, rs := range data(resp)["ruleSettings"].([]any) {
-		if rs.(map[string]any)["customerId"] != seed.ID("cust-a").String() {
+	for _, rs := range asArr(t, data(resp)["ruleSettings"]) {
+		if asObj(t, rs)["customerId"] != seed.ID("cust-a").String() {
 			t.Fatal("client sees another customer's rule setting")
 		}
 	}
 
 	_, resp = post(srv, &customerB, "policies.get", `{"policyId":"`+def+`"}`)
-	if len(data(resp)["ruleSettings"].([]any)) != 0 {
+	if len(asArr(t, data(resp)["ruleSettings"])) != 0 {
 		t.Fatal("customer-b sees customer-a's setting")
 	}
 
@@ -189,7 +189,7 @@ func TestPolicies(t *testing.T) {
 			alertPolicyBody(e),
 			0,
 		); code != 422 ||
-			res["fieldErrors"].(map[string]any)[field] != key {
+			asObj(t, res["fieldErrors"])[field] != key {
 			t.Errorf("%s: %d %v, want %s", name, code, res["fieldErrors"], want[name])
 		}
 	}
@@ -207,7 +207,7 @@ func TestPolicies(t *testing.T) {
 		t.Fatalf("hq create: %d %v", code, resp)
 	}
 
-	hqPolicy := data(resp)["id"].(string)
+	hqPolicy := asStr(t, data(resp)["id"])
 
 	if code, _ := write(
 		srv,
@@ -256,8 +256,8 @@ func TestPolicies(t *testing.T) {
 		&customerA,
 		map[string]string{"threshold": "30", "recoveryThreshold": "27"},
 		1,
-	); code != 200 || data(res)["threshold"].(float64) != 30 ||
-		data(res)["version"].(float64) != 2 {
+	); code != 200 || asNum(t, data(res)["threshold"]) != 30 ||
+		asNum(t, data(res)["version"]) != 2 {
 		t.Fatalf("update: %d %v", code, res)
 	}
 
@@ -307,7 +307,7 @@ func TestPolicies(t *testing.T) {
 	ids := func(m map[string]any) map[string]bool {
 		out := map[string]bool{}
 		for _, it := range items(m) {
-			out[it["id"].(string)] = true
+			out[asStr(t, it["id"])] = true
 		}
 
 		return out
@@ -325,7 +325,7 @@ func TestPolicies(t *testing.T) {
 			t.Fatal("client list leaks")
 		}
 
-		if it["id"] == pid && len(it["unitIds"].([]any)) != 1 {
+		if it["id"] == pid && len(asArr(t, it["unitIds"])) != 1 {
 			t.Fatal("derived unitIds")
 		}
 	}
@@ -381,7 +381,7 @@ func TestPolicies(t *testing.T) {
 
 	names := []string{}
 	for _, it := range items(resp) {
-		names = append(names, strings.ToLower(it["name"].(string)))
+		names = append(names, strings.ToLower(asStr(t, it["name"])))
 	}
 
 	for i := 1; i < len(names); i++ {
@@ -420,10 +420,10 @@ func TestPolicies(t *testing.T) {
 	// default limits (HQ): fixed keys and order, validated conditions
 	_, resp = post(srv, &hq, "policies.get", `{"policyId":"`+def+`"}`)
 	dv := ver(resp)
-	rules := data(resp)["rules"].([]any)
+	rules := asArr(t, data(resp)["rules"])
 	raw, _ := json.Marshal(rules)
-	rules[0].(map[string]any)["threshold"] = 1200.0
-	rules[0].(map[string]any)["recoveryThreshold"] = 1000.0
+	asObj(t, rules[0])["threshold"] = 1200.0
+	asObj(t, rules[0])["recoveryThreshold"] = 1000.0
 
 	changed, _ := json.Marshal(rules)
 	if code, res := write(
@@ -433,7 +433,7 @@ func TestPolicies(t *testing.T) {
 		`{"kind":"default_alert","id":"`+def+`","rules":`+string(changed)+`}`,
 		dv,
 	); code != 200 ||
-		data(res)["rules"].([]any)[0].(map[string]any)["threshold"].(float64) != 1200 {
+		asNum(t, asObj(t, asArr(t, data(res)["rules"])[0])["threshold"]) != 1200 {
 		t.Fatalf("default limits: %d %v", code, res)
 	}
 
@@ -444,7 +444,7 @@ func TestPolicies(t *testing.T) {
 		`"ruleKey":"dust_pm25"`,
 		1,
 	)
-	rules[1].(map[string]any)["metric"] = "temperature"
+	asObj(t, rules[1])["metric"] = "temperature"
 	wrongMetric, _ := json.Marshal(rules)
 	want = map[string]string{ // the field each case is refused for
 		"five rules":     "rules=error.fixedRules",
@@ -526,7 +526,7 @@ func TestPolicies(t *testing.T) {
 		"refrigerant_low_pressure",
 		false,
 		versionZero,
-	); code != 200 || data(res)["version"].(float64) != 1 ||
+	); code != 200 || asNum(t, data(res)["version"]) != 1 ||
 		data(res)["reason"] != "test" {
 		t.Fatalf("first switch: %d %v", code, res)
 	}
@@ -548,13 +548,13 @@ func TestPolicies(t *testing.T) {
 		true,
 		1,
 	); code != 200 || data(res)["enabled"] != true ||
-		data(res)["version"].(float64) != 2 {
+		asNum(t, data(res)["version"]) != 2 {
 		t.Fatalf("hq switch: %d", code)
 	}
 
 	_, resp = post(srv, &customerA, "policies.get", `{"policyId":"`+def+`"}`)
-	for _, rs := range data(resp)["ruleSettings"].([]any) {
-		if rs.(map[string]any)["ruleKey"] == "refrigerant_low_pressure" {
+	for _, rs := range asArr(t, data(resp)["ruleSettings"]) {
+		if asObj(t, rs)["ruleKey"] == "refrigerant_low_pressure" {
 			t.Fatal("customer-a unchanged by customer-b's switch")
 		}
 	}
@@ -709,7 +709,7 @@ func TestPolicies(t *testing.T) {
 	}
 
 	_, u = post(srv, &customerA, "units.get", `{"id":"`+unit+`"}`)
-	if len(data(u)["alertPolicyIds"].([]any)) != 0 || ver(u) != uv+1 {
+	if len(asArr(t, data(u)["alertPolicyIds"])) != 0 || ver(u) != uv+1 {
 		t.Fatalf("unit detached with a new version: %v %d", data(u)["alertPolicyIds"], ver(u))
 	}
 
@@ -739,7 +739,7 @@ func TestPolicySaveRefusals(t *testing.T) {
 	owner(t, `UPDATE assets.customers SET status = 'active' WHERE id = $1`, seed.ID("cust-a"))
 
 	if code != 422 ||
-		res["fieldErrors"].(map[string]any)["customerId"] != apperr.KeyInactiveCustomer {
+		asObj(t, res["fieldErrors"])["customerId"] != apperr.KeyInactiveCustomer {
 		t.Errorf("inactive customer: %d %v", code, res)
 	}
 
@@ -748,7 +748,7 @@ func TestPolicySaveRefusals(t *testing.T) {
 		t.Fatalf("automation policy: %d %v", code, res)
 	}
 
-	id, v := data(res)["id"].(string), ver(res)
+	id, v := asStr(t, data(res)["id"]), ver(res)
 	if code, resp := write(
 		srv,
 		&hq,
@@ -756,7 +756,7 @@ func TestPolicySaveRefusals(t *testing.T) {
 		alertPolicyBody(map[string]string{"id": `"` + id + `"`}),
 		v,
 	); code != 422 ||
-		resp["fieldErrors"].(map[string]any)["kind"] != apperr.KeyKindFixed {
+		asObj(t, resp["fieldErrors"])["kind"] != apperr.KeyKindFixed {
 		t.Errorf("alert save over an automation policy: %d %v", code, resp)
 	}
 

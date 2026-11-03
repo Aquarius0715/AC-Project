@@ -74,7 +74,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		t.Fatalf("property create: %d %v", code, resp)
 	}
 
-	prop := data(resp)["id"].(string)
+	prop := asStr(t, data(resp)["id"])
 	// names are unique among non-archived siblings, trimmed and case-insensitive (IR208); the duplicate is rolled back
 	if code, res := write(
 		srv,
@@ -108,8 +108,8 @@ func TestAssetWritesLifecycle(t *testing.T) {
 			"properties.save",
 			bad,
 			0,
-		); code != 422 || len(res["fieldErrors"].(map[string]any)) != 1 ||
-			res["fieldErrors"].(map[string]any)[field] == nil {
+		); code != 422 || len(asObj(t, res["fieldErrors"])) != 1 ||
+			asObj(t, res["fieldErrors"])[field] == nil {
 			t.Errorf(
 				"property validation %s: %d %v, want %s",
 				bad[:40],
@@ -184,7 +184,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		t.Fatalf("floor: %d %v", code, resp)
 	}
 
-	floor := data(resp)["id"].(string)
+	floor := asStr(t, data(resp)["id"])
 
 	code, resp = write(
 		srv,
@@ -197,7 +197,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		t.Fatalf("room: %d", code)
 	}
 
-	room := data(resp)["id"].(string)
+	room := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		&hq,
@@ -276,7 +276,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		srv,
 		&hq,
 		"spaces.archive",
-		`{"id":"`+data(resp)["id"].(string)+`","reason":"test cleanup"}`,
+		`{"id":"`+asStr(t, data(resp)["id"])+`","reason":"test cleanup"}`,
 		1,
 	); code != 200 {
 		t.Errorf("room 1F archive: %d", code)
@@ -301,11 +301,11 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	code, resp = write(srv, &hq, "units.save", unitBody("", room, ""), 0)
 	if code != 200 || data(resp)["displayName"] != "Server AC" ||
-		int(data(resp)["capabilityVersion"].(float64)) != 3 {
+		int(asNum(t, data(resp)["capabilityVersion"])) != 3 {
 		t.Fatalf("unit create: %d %v", code, resp)
 	}
 
-	unit := data(resp)["id"].(string)
+	unit := asStr(t, data(resp)["id"])
 
 	if code, res := write(
 		srv,
@@ -395,7 +395,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		t.Fatalf("second unit: %d %v", code, resp)
 	}
 
-	second := data(resp)["id"].(string)
+	second := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		&hq,
@@ -452,7 +452,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		early,
 		4,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["warrantyEndsAt"] != apperr.KeyRange {
+		asObj(t, res["fieldErrors"])["warrantyEndsAt"] != apperr.KeyRange {
 		t.Errorf("warranty before installation: %d %v", code, res)
 	}
 	// the stored warranty end counts too (an installation in 2027 would be refused as future, so the end moves back)
@@ -474,7 +474,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		),
 		4,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["warrantyEndsAt"] != apperr.KeyRange {
+		asObj(t, res["fieldErrors"])["warrantyEndsAt"] != apperr.KeyRange {
 		t.Errorf("an installation after the stored warranty end: %d %v", code, res)
 	}
 
@@ -510,9 +510,9 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	}
 
 	if moved == nil || moved["reason"] != "moved to floor" ||
-		moved["maskedBefore"].(map[string]any)["spaceId"] != room ||
-		moved["maskedAfter"].(map[string]any)["spaceId"] != floor ||
-		len(moved["maskedAfter"].(map[string]any)) != 1 {
+		asObj(t, moved["maskedBefore"])["spaceId"] != room ||
+		asObj(t, moved["maskedAfter"])["spaceId"] != floor ||
+		len(asObj(t, moved["maskedAfter"])) != 1 {
 		t.Fatalf("relocation audit: %v", am)
 	}
 

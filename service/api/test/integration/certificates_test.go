@@ -90,7 +90,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		),
 		0,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["file"] != apperr.KeyInvalidFile {
+		asObj(t, res["fieldErrors"])["file"] != apperr.KeyInvalidFile {
 		t.Fatalf("a file over 10 MB is a field error, not a body error: %d %v", code, res)
 	}
 
@@ -101,7 +101,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		t.Fatalf("submit: %d %v", code, resp)
 	}
 
-	cert := data(resp)["id"].(string)
+	cert := asStr(t, data(resp)["id"])
 	// the uploaded document opens for HQ and for the company that sent it, before it is verified (IR436)
 	for _, a := range []*actor{&hq, &contrA} {
 		code, res := post(srv, a, "certificates.getContent", `{"certificateId":"`+cert+`"}`)
@@ -182,7 +182,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		t.Fatalf("renewal: %d %v", code, resp)
 	}
 
-	renewal := data(resp)["id"].(string)
+	renewal := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		&hq,
@@ -238,7 +238,7 @@ func TestCertificatesAndParts(t *testing.T) {
 
 		out := map[string]string{}
 		for _, it := range items(m) {
-			out[it["id"].(string)] = it["status"].(string)
+			out[asStr(t, it["id"])] = asStr(t, it["status"])
 		}
 
 		return out
@@ -369,7 +369,7 @@ func TestCertificateCreatesMissingGrant(t *testing.T) {
 		srv,
 		&hq,
 		"certificates.verify",
-		`{"certificateId":"`+data(res)["id"].(string)+`","decision":"approve"}`,
+		`{"certificateId":"`+asStr(t, data(res)["id"])+`","decision":"approve"}`,
 		1,
 	); code != 200 {
 		t.Fatalf("approve: %d %v", code, resp)

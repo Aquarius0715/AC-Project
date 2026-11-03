@@ -28,7 +28,7 @@ func TestSpaceArchiveRacesAUnitAdd(t *testing.T) {
 			t.Fatalf("round %d: space: %d %v", round, code, res)
 		}
 
-		space := data(res)["id"].(string)
+		space := asStr(t, data(res)["id"])
 
 		var (
 			archived, added int

@@ -21,8 +21,8 @@ func TestDeviceHistory(t *testing.T) {
 		`{"serial":"HI-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+unit+`"}`,
 		0,
 	)
-	dev := data(resp)["id"].(string)
-	sensor := data(resp)["sensors"].([]any)[0].(map[string]any)["id"].(string)
+	dev := asStr(t, data(resp)["id"])
+	sensor := asStr(t, asObj(t, asArr(t, data(resp)["sensors"])[0])["id"])
 
 	write(
 		srv,
@@ -120,8 +120,8 @@ func TestDeviceHistory(t *testing.T) {
 		&hq,
 		"  cover reattached  ",
 		1,
-	); code != 200 || len(data(res)["responseNotes"].([]any)) != 1 ||
-		data(res)["responseNotes"].([]any)[0].(map[string]any)["message"] != "cover reattached" {
+	); code != 200 || len(asArr(t, data(res)["responseNotes"])) != 1 ||
+		asObj(t, asArr(t, data(res)["responseNotes"])[0])["message"] != "cover reattached" {
 		t.Fatalf("note: %d %v", code, res)
 	}
 
@@ -204,12 +204,15 @@ func TestDeviceBindingRefusals(t *testing.T) {
 	}
 	first, second := register("BA"), register("BB")
 
-	sensor := second["sensors"].([]any)[0].(map[string]any)["id"].(string)
+	sensor := asStr(t, asObj(t, asArr(t, second["sensors"])[0])["id"])
 	if code, res := write(
 		srv,
 		&hq,
 		"devices.calibrate",
-		`{"deviceId":"`+second["id"].(string)+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C",`+
+		`{"deviceId":"`+asStr(
+			t,
+			second["id"],
+		)+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C",`+
 			`"referenceValue":25,"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z"}`,
 		1,
 	); code != 409 ||
@@ -221,7 +224,7 @@ func TestDeviceBindingRefusals(t *testing.T) {
 		srv,
 		&hq,
 		"devices.bind",
-		`{"deviceId":"`+first["id"].(string)+`","unitId":"`+unit+`","reason":"install"}`,
+		`{"deviceId":"`+asStr(t, first["id"])+`","unitId":"`+unit+`","reason":"install"}`,
 		1,
 	); code != 200 {
 		t.Fatalf("bind: %d %v", code, res)
@@ -231,7 +234,7 @@ func TestDeviceBindingRefusals(t *testing.T) {
 		srv,
 		&hq,
 		"devices.bind",
-		`{"deviceId":"`+second["id"].(string)+`","unitId":"`+unit+`","reason":"install"}`,
+		`{"deviceId":"`+asStr(t, second["id"])+`","unitId":"`+unit+`","reason":"install"}`,
 		1,
 	); code != 409 ||
 		res["messageKey"] != "error.unitHasDevice" {

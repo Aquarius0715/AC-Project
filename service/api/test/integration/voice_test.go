@@ -30,7 +30,7 @@ func TestVoiceAndExport(t *testing.T) {
 	}
 
 	code, res = say(&customerA, "set living room to 24 degrees", "en", "")
-	if code != 200 || data(res)["kind"] != "change" || data(res)["celsius"].(float64) != 24 ||
+	if code != 200 || data(res)["kind"] != "change" || asNum(t, data(res)["celsius"]) != 24 ||
 		data(res)["expectedVersion"] == nil ||
 		data(res)["unitId"] != seed.ID("unit-non-rto").String() {
 		t.Fatalf("change: %d %v", code, res)
@@ -70,11 +70,11 @@ func TestVoiceAndExport(t *testing.T) {
 	// HQ sees both customers' bedrooms → candidates, then a selection
 	code, res = say(&hq, "temperature bedroom", "en", "")
 	if code != 200 || data(res)["kind"] != "candidates" ||
-		len(data(res)["candidates"].([]any)) < 2 {
+		len(asArr(t, data(res)["candidates"])) < 2 {
 		t.Fatalf("candidates: %d %v", code, res)
 	}
 
-	label := data(res)["candidates"].([]any)[0].(map[string]any)["pathLabel"].(string)
+	label := asStr(t, asObj(t, asArr(t, data(res)["candidates"])[0])["pathLabel"])
 	if label == "" {
 		t.Error("path label")
 	}
@@ -131,7 +131,7 @@ func TestVoiceAndExport(t *testing.T) {
 	code, res = exp(&customerA, "2026-08", homeA, all, "csv")
 	if code != 200 || data(res)["fileName"] != "energy-report-2026-08.csv" ||
 		data(res)["mime"] != "text/csv" ||
-		data(res)["size"].(float64) <= 0 {
+		asNum(t, data(res)["size"]) <= 0 {
 		t.Fatalf("export: %d %v", code, res)
 	}
 

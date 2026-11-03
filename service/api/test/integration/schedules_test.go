@@ -71,7 +71,7 @@ func TestScheduleAutomationsFire(t *testing.T) {
 		t.Fatalf("save: %d %v", code, res)
 	}
 
-	id := data(res)["id"].(string)
+	id := asStr(t, data(res)["id"])
 
 	if n := len(automationCommands(t, unit)); n != 0 {
 		t.Fatalf("saving sends no command: %d", n)
@@ -93,7 +93,7 @@ func TestScheduleAutomationsFire(t *testing.T) {
 		_ = json.Unmarshal([]byte(cs[0]), &a)
 	}
 
-	if len(cs) != 1 || a["kind"] != "set_temperature" || a["celsius"].(float64) != 25 {
+	if len(cs) != 1 || a["kind"] != "set_temperature" || asNum(t, a["celsius"]) != 25 {
 		t.Fatalf("start command: %v", cs)
 	}
 
@@ -200,7 +200,7 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 		t.Fatalf("save: %d %v", code, res)
 	}
 
-	id := data(res)["id"].(string)
+	id := asStr(t, data(res)["id"])
 
 	t.Cleanup(func() { write(srv, &customerB, "automations.delete", `{"id":"`+id+`"}`, 1) })
 	setWatermark(t, clock)
@@ -269,10 +269,10 @@ func TestScheduleDraftPreview(t *testing.T) {
 		t.Fatalf("eight occurrences: %v", res)
 	}
 
-	first := list[0].(map[string]any)
+	first := asObj(t, list[0])
 	if first["automationId"] != nil || first["phase"] != "schedule_start" ||
 		first["at"] != "2026-09-14T10:00:00Z" ||
-		list[1].(map[string]any)["at"] != "2026-09-14T14:00:00Z" {
+		asObj(t, list[1])["at"] != "2026-09-14T14:00:00Z" {
 		t.Fatalf("Monday 18:00 → 22:00 Kuala Lumpur: %v", list[:2])
 	}
 	// the field each case is refused for
@@ -369,7 +369,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 		t.Fatalf("location rule: %d %v", code, resp)
 	}
 
-	loc := data(resp)["id"].(string)
+	loc := asStr(t, data(resp)["id"])
 
 	code, resp = write(
 		srv,
@@ -382,7 +382,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 		t.Fatalf("schedule rule: %d %v", code, resp)
 	}
 
-	sched := data(resp)["id"].(string)
+	sched := asStr(t, data(resp)["id"])
 	get := func(id string) map[string]any {
 		t.Helper()
 
@@ -408,7 +408,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 	if r := get(
 		loc,
 	); r["enabled"] != false || r["disabledReason"] != "consent_revoked" ||
-		r["version"].(float64) != 2 {
+		asNum(t, r["version"]) != 2 {
 		t.Fatalf("withdrawn: %v", r)
 	}
 
@@ -478,7 +478,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 			base+`,"onlyIf":`+extra+`}`,
 			0,
 		); code != 422 ||
-			resp["fieldErrors"].(map[string]any)["onlyIf"] == nil {
+			asObj(t, resp["fieldErrors"])["onlyIf"] == nil {
 			t.Errorf("%s: %d %v", name, code, resp)
 		}
 	}
@@ -501,11 +501,11 @@ func TestAutomationExtraConditions(t *testing.T) {
 		base+`,"onlyIf":[{"type":"weekday","weekdays":[1]},{"type":"occupancy","occupied":true}]}`,
 		0,
 	)
-	if code != 200 || len(data(res)["onlyIf"].([]any)) != 2 || data(res)["lastRun"] != nil {
+	if code != 200 || len(asArr(t, data(res)["onlyIf"])) != 2 || data(res)["lastRun"] != nil {
 		t.Fatalf("save: %d %v", code, res)
 	}
 
-	id := data(res)["id"].(string)
+	id := asStr(t, data(res)["id"])
 	fact := func(metric, value, unit string) string {
 		return `{"unitId":"` + unitID + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unit +
 			`","observedAt":"` +
@@ -540,7 +540,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 			t.Fatalf("fire: %d %v", code, resp)
 		}
 
-		return data(resp)["results"].([]any)[0].(map[string]any)
+		return asObj(t, asArr(t, data(resp)["results"])[0])
 	}
 	last := func() map[string]any {
 		t.Helper()
@@ -631,7 +631,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 		base+`,"id":"`+id+`","onlyIf":[{"type":"weekday","weekdays":[6,7]}]}`,
 		1,
 	)
-	if code != 200 || len(data(res)["onlyIf"].([]any)) != 1 {
+	if code != 200 || len(asArr(t, data(res)["onlyIf"])) != 1 {
 		t.Fatalf("weekend only: %d %v", code, res)
 	}
 
@@ -650,7 +650,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 		t.Fatalf("schedule with onlyIf: %d %v", code, res)
 	}
 
-	sid := data(res)["id"].(string)
+	sid := asStr(t, data(res)["id"])
 	before := len(automationCommands(t, unitID))
 	setWatermark(t, clock)
 
@@ -715,7 +715,7 @@ func TestScheduleBoundaries(t *testing.T) {
 			t.Fatalf("save %s–%s: %d %v", start, end, code, res)
 		}
 
-		return data(res)["id"].(string)
+		return asStr(t, data(res)["id"])
 	}
 	// an archived unit and a rule with an unknown time zone: nothing is sent, the tick goes on
 	archived, lost := boundUnit(t, srv, "online"), boundUnit(t, srv, "online")

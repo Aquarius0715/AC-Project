@@ -62,7 +62,7 @@ func TestWithdrawRollsBackWhenTheJobCannotBeUpdated(t *testing.T) {
 		`"}`
 	_, res := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
 
-	job := data(res)["id"].(string)
+	job := asStr(t, data(res)["id"])
 	if code, resp := write(
 		srv,
 		&hq,

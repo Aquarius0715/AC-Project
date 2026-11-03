@@ -52,7 +52,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		t.Fatalf("schedule: %d %v", code, res)
 	}
 
-	camp := data(res)["id"].(string)
+	camp := asStr(t, data(res)["id"])
 
 	t.Cleanup(func() {
 		owner(
@@ -64,7 +64,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 
 	base, _ := time.Parse(
 		time.RFC3339Nano,
-		data(res)["createdAt"].(string),
+		asStr(t, data(res)["createdAt"]),
 	) // the server's business time
 	kl := time.FixedZone("MYT", 8*3600)
 	window := func(from, to int) { // the install window in whole Kuala Lumpur hours around base
@@ -223,7 +223,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 
 	seen := false
 	for _, it := range items(res) {
-		seen = seen || it["target"].(map[string]any)["id"] == units[0]
+		seen = seen || asObj(t, it["target"])["id"] == units[0]
 	}
 
 	if !seen {
@@ -357,13 +357,13 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	}
 	// the campaign as HQ reads it: every result has its time
 	_, res = post(srv, &hq, "firmwareCampaigns.get", `{"id":"`+camp+`"}`)
-	for _, r := range data(res)["results"].([]any) {
-		if r.(map[string]any)["at"] == nil {
+	for _, r := range asArr(t, data(res)["results"]) {
+		if asObj(t, r)["at"] == nil {
 			t.Errorf("result without a time: %v", r)
 		}
 	}
 
-	if p := data(res)["progress"].(map[string]any); p["succeeded"].(float64) != 6 {
+	if p := asObj(t, data(res)["progress"]); asNum(t, p["succeeded"]) != 6 {
 		t.Errorf("progress: %v", p)
 	}
 }
@@ -407,7 +407,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		t.Fatalf("schedule: %d %v", code, res)
 	}
 
-	camp := data(res)["id"].(string)
+	camp := asStr(t, data(res)["id"])
 
 	t.Cleanup(func() {
 		owner(
@@ -417,7 +417,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		)
 	})
 
-	base, _ := time.Parse(time.RFC3339Nano, data(res)["createdAt"].(string))
+	base, _ := time.Parse(time.RFC3339Nano, asStr(t, data(res)["createdAt"]))
 	owner(
 		t,
 		`UPDATE devices.firmware_campaigns SET start_at = $2, notice_sent_at = $2 WHERE id = $1`,
@@ -445,7 +445,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		t,
 		`UPDATE devices.devices SET unit_id = $2 WHERE id = $1`,
 		devs[1],
-		data(om)["id"].(string),
+		asStr(t, data(om)["id"]),
 	)
 
 	cmd := uuid.NewString()

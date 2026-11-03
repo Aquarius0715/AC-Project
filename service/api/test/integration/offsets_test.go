@@ -51,11 +51,11 @@ func TestOffsets(t *testing.T) {
 	code, resp := quote(&customerB, "")
 	if code != 200 || data(resp)["provider"] != "unselected" ||
 		data(resp)["estimatedAmountMinor"] != nil ||
-		data(resp)["marketConcept"].(map[string]any)["stage"] != "future_concept" {
+		asObj(t, data(resp)["marketConcept"])["stage"] != "future_concept" {
 		t.Fatalf("quote: %d %v", code, resp)
 	}
 
-	qid := data(resp)["id"].(string)
+	qid := asStr(t, data(resp)["id"])
 
 	sim := func(a *actor, body string, v int) (int, map[string]any) {
 		return write(srv, a, "offsets.simulate", body, v)
@@ -91,12 +91,12 @@ func TestOffsets(t *testing.T) {
 		0,
 	)
 	if code != 200 || data(resp)["state"] != "demo_requested" ||
-		len(data(resp)["attempts"].([]any)) != 1 {
+		len(asArr(t, data(resp)["attempts"])) != 1 {
 		t.Fatalf("request: %d %v", code, resp)
 	}
 
-	rid := data(resp)["id"].(string)
-	att := data(resp)["currentAttemptId"].(string)
+	rid := asStr(t, data(resp)["id"])
+	att := asStr(t, data(resp)["currentAttemptId"])
 
 	if code, _ := sim(
 		&customerB,
@@ -149,11 +149,11 @@ func TestOffsets(t *testing.T) {
 	code, resp = retry(att, 2)
 	if code != 200 || data(resp)["state"] != "demo_requested" ||
 		data(resp)["currentAttemptId"] == att ||
-		len(data(resp)["attempts"].([]any)) != 2 {
+		len(asArr(t, data(resp)["attempts"])) != 2 {
 		t.Fatalf("retry: %d %v", code, resp)
 	}
 
-	att2 := data(resp)["currentAttemptId"].(string)
+	att2 := asStr(t, data(resp)["currentAttemptId"])
 
 	if code, _ := sim(&hq, ev("purchase_confirm", att, uuid.NewString()), 3); code != 409 {
 		t.Error("old attempt")
@@ -164,7 +164,7 @@ func TestOffsets(t *testing.T) {
 		t.Fatalf("purchase: %d %v", code, resp)
 	}
 
-	att3 := data(resp)["currentAttemptId"].(string)
+	att3 := asStr(t, data(resp)["currentAttemptId"])
 	if code, _ := sim(&hq, ev("purchase_confirm", att3, uuid.NewString()), 4); code != 409 {
 		t.Error("wrong stage")
 	}
@@ -176,9 +176,9 @@ func TestOffsets(t *testing.T) {
 		t.Fatalf("retire: %d %v", code, resp)
 	}
 
-	if h := data(resp)["eventHistory"].([]any); len(h) != 4 ||
-		h[0].(map[string]any)["action"] != "offsets.request" ||
-		h[3].(map[string]any)["action"] != "offsets.purchase_confirm" {
+	if h := asArr(t, data(resp)["eventHistory"]); len(h) != 4 ||
+		asObj(t, h[0])["action"] != "offsets.request" ||
+		asObj(t, h[3])["action"] != "offsets.purchase_confirm" {
 		t.Errorf("event history (the retire audit is written with the response): %v", h)
 	}
 
@@ -187,20 +187,20 @@ func TestOffsets(t *testing.T) {
 	}
 	// a failed retirement retries the retirement: back to demo_purchased with a new retirement attempt, then retired
 	_, resp = quote(&customerB, "")
-	q2 := data(resp)["id"].(string)
+	q2 := asStr(t, data(resp)["id"])
 	_, resp = sim(
 		&customerB,
 		`{"event":"request","quoteId":"`+q2+`","quoteVersion":1,"demoConfirmed":true}`,
 		0,
 	)
-	rid2 := data(resp)["id"].(string)
+	rid2 := asStr(t, data(resp)["id"])
 	ev2 := func(event, attempt string) string {
 		return `{"event":"` + event + `","recordId":"` + rid2 + `","attemptId":"` + attempt + `","eventId":"` +
 			uuid.NewString() + `","demoConfirmed":true}`
 	}
-	_, resp = sim(&hq, ev2("purchase_confirm", data(resp)["currentAttemptId"].(string)), 1)
+	_, resp = sim(&hq, ev2("purchase_confirm", asStr(t, data(resp)["currentAttemptId"])), 1)
 
-	retirement := data(resp)["currentAttemptId"].(string)
+	retirement := asStr(t, data(resp)["currentAttemptId"])
 	if code, res := sim(
 		&hq,
 		ev2("fail", retirement),
@@ -217,13 +217,13 @@ func TestOffsets(t *testing.T) {
 	)
 	if code != 200 || data(resp)["state"] != "demo_purchased" ||
 		data(resp)["currentAttemptId"] == retirement ||
-		len(data(resp)["attempts"].([]any)) != 3 {
+		len(asArr(t, data(resp)["attempts"])) != 3 {
 		t.Fatalf("retry the retirement: %d %v", code, resp)
 	}
 
 	if code, res := sim(
 		&hq,
-		ev2("retire", data(resp)["currentAttemptId"].(string)),
+		ev2("retire", asStr(t, data(resp)["currentAttemptId"])),
 		4,
 	); code != 200 || data(res)["state"] != "demo_retired" ||
 		data(res)["purchaseRef"] == nil {
@@ -263,8 +263,8 @@ func TestOffsets(t *testing.T) {
 	}
 
 	for _, it := range items(resp) { // a customer never sees an actor's name (IR305)
-		for _, e := range it["eventHistory"].([]any) {
-			if e.(map[string]any)["actorName"] != nil {
+		for _, e := range asArr(t, it["eventHistory"]) {
+			if asObj(t, e)["actorName"] != nil {
 				t.Errorf("client event history shows a name: %v", e)
 			}
 		}
@@ -288,7 +288,7 @@ func TestOffsets(t *testing.T) {
 		"offsets.list",
 		`{"filters":{"from":"2026-09-14T00:00:00Z","to":"2026-09-01T00:00:00Z"}}`,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["filters.to"] != apperr.KeyRange {
+		asObj(t, res["fieldErrors"])["filters.to"] != apperr.KeyRange {
 		t.Errorf("a reversed created period: %d %v", code, res)
 	}
 
@@ -305,8 +305,8 @@ func TestOffsets(t *testing.T) {
 	named := false // HQ sees who acted
 
 	for _, it := range items(resp) {
-		for _, e := range it["eventHistory"].([]any) {
-			named = named || e.(map[string]any)["actorName"] != nil
+		for _, e := range asArr(t, it["eventHistory"]) {
+			named = named || asObj(t, e)["actorName"] != nil
 		}
 	}
 
@@ -338,7 +338,10 @@ func TestOffsets(t *testing.T) {
 
 	if code, _ := sim(
 		&hq,
-		`{"event":"request","quoteId":"`+data(resp)["id"].(string)+`","quoteVersion":1,"demoConfirmed":true}`,
+		`{"event":"request","quoteId":"`+asStr(
+			t,
+			data(resp)["id"],
+		)+`","quoteVersion":1,"demoConfirmed":true}`,
 		0,
 	); code != 409 {
 		t.Error("expired quote")

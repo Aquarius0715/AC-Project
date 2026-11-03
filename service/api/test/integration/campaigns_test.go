@@ -27,7 +27,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 			`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+u+`"}`,
 			0,
 		)
-		devs = append(devs, `"`+data(res)["id"].(string)+`"`)
+		devs = append(devs, `"`+asStr(t, data(res)["id"])+`"`)
 	}
 
 	start := clock.Add(48 * time.Hour).Format(time.RFC3339)
@@ -53,15 +53,15 @@ func TestFirmwareCampaigns(t *testing.T) {
 
 	code, resp := write(srv, &hq, "firmwareCampaigns.schedule", body(nil), 0)
 	if code != 200 || data(resp)["state"] != "scheduled" ||
-		len(data(resp)["results"].([]any)) != 3 ||
-		!strings.HasPrefix(data(resp)["checksum"].(string), "sha256:") ||
+		len(asArr(t, data(resp)["results"])) != 3 ||
+		!strings.HasPrefix(asStr(t, data(resp)["checksum"]), "sha256:") ||
 		data(resp)["createdByMembershipId"] != seed.ID("hq-operator").
 			String() { // who scheduled it (Figma 04-9 "Created", IR344)
 		t.Fatalf("schedule: %d %v", code, resp)
 	}
 
-	camp := data(resp)["id"].(string)
-	if data(resp)["progress"].(map[string]any)["pending"].(float64) != 3 {
+	camp := asStr(t, data(resp)["id"])
+	if asNum(t, asObj(t, data(resp)["progress"])["pending"]) != 3 {
 		t.Fatal("progress")
 	}
 	// a device with an unresolved tamper, and one on a unit of another model (cap-split-std, SPL-100)
@@ -73,7 +73,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 		`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+tu+`"}`,
 		0,
 	)
-	tampered := data(tm)["id"].(string)
+	tampered := asStr(t, data(tm)["id"])
 	owner(t, `UPDATE devices.devices SET tamper = 'detected' WHERE id = $1`, tampered)
 
 	_, om := write(
@@ -94,12 +94,15 @@ func TestFirmwareCampaigns(t *testing.T) {
 		srv,
 		&hq,
 		"devices.register",
-		`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+data(om)["id"].(string)+`"}`,
+		`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+asStr(
+			t,
+			data(om)["id"],
+		)+`"}`,
 		0,
 	)
 	for name, c := range map[string]struct{ device, key string }{
 		"tampered device": {tampered, apperr.KeyTamperUnresolved},
-		"other model":     {data(od)["id"].(string), "error.otherModel"},
+		"other model":     {asStr(t, data(od)["id"]), "error.otherModel"},
 	} {
 		if code, res := write(
 			srv,
@@ -108,7 +111,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 			body(map[string]string{"deviceIds": `["` + c.device + `"]`}),
 			0,
 		); code != 422 ||
-			res["fieldErrors"].(map[string]any)["deviceIds"] != c.key {
+			asObj(t, res["fieldErrors"])["deviceIds"] != c.key {
 			t.Errorf("%s: %d %v", name, code, res)
 		}
 	}
@@ -222,7 +225,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 		`,"deviceId":`+devs[0],
 		3,
 	); code != 200 ||
-		data(res)["progress"].(map[string]any)["failed"].(float64) != 0 {
+		asNum(t, asObj(t, data(res)["progress"])["failed"]) != 0 {
 		t.Fatalf("retry: %d %v", code, res)
 	}
 

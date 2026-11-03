@@ -21,7 +21,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	job := assignedNow(t, srv)
 	write(srv, &techInt, "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 2)
 	_, res := write(srv, &techInt, "jobs.saveDraft", draftBody(job, "normal", nil), 0)
-	rep := data(res)["id"].(string)
+	rep := asStr(t, data(res)["id"])
 	img, jpg := tinyPNG(t), tinyJPEG(t)
 	flood := pngHeader(50000, 50000) // 2.5 gigapixels declared in a few dozen bytes (IR389)
 	add := func(file string, v int) (int, map[string]any) {
@@ -88,7 +88,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		t.Fatalf("add: %d %v", code, res)
 	}
 
-	att := data(res)["id"].(string)
+	att := asStr(t, data(res)["id"])
 	// the draft moved to version 2; link the photo as evidence
 	body := strings.Replace(
 		draftBody(
@@ -102,12 +102,12 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	)
 
 	code, res = write(srv, &techInt, "jobs.saveDraft", body, 2)
-	if code != 200 || len(data(res)["attachmentRefs"].([]any)) != 1 {
+	if code != 200 || len(asArr(t, data(res)["attachmentRefs"])) != 1 {
 		t.Fatalf("draft with attachment: %d %v", code, res)
 	}
 	// the finding keeps its linked photo (InspectionItem.evidenceIds, IR352)
-	for _, it := range data(res)["items"].([]any) {
-		if x := it.(map[string]any); x["componentKey"] == "filter" {
+	for _, it := range asArr(t, data(res)["items"]) {
+		if x := asObj(t, it); x["componentKey"] == "filter" {
 			if ev, _ := x["evidenceIds"].([]any); len(ev) != 1 || ev[0] != att {
 				t.Errorf("filter evidence: %v", x["evidenceIds"])
 			}
@@ -153,8 +153,8 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 
 	so, _ := data(res)["signOff"].(map[string]any)
 	if code != 200 || so["signerName"] != "Aisha" || so["signatureAttachmentId"] == nil ||
-		so["reportVersion"].(float64) != 3 ||
-		data(res)["version"].(float64) != 3 {
+		asNum(t, so["reportVersion"]) != 3 ||
+		asNum(t, data(res)["version"]) != 3 {
 		t.Fatalf("signOff: %d %v", code, res)
 	}
 
@@ -168,7 +168,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		3,
 		3,
 	); code != 200 ||
-		data(resp)["signOff"].(map[string]any)["sitePhotoAttachmentId"] == nil {
+		asObj(t, data(resp)["signOff"])["sitePhotoAttachmentId"] == nil {
 		t.Fatalf("absent sign-off: %d %v", code, resp)
 	}
 	// getContent

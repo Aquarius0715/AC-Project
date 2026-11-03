@@ -23,7 +23,7 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 		`{"serial":"AX-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+unit+`"}`,
 		0,
 	)
-	dev := data(res)["id"].(string)
+	dev := asStr(t, data(res)["id"])
 	write(
 		srv,
 		&hq,

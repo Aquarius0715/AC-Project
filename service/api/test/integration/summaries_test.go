@@ -26,8 +26,8 @@ func TestSummariesCustomer(t *testing.T) {
 	_, all := post(srv, &customerA, "units.list", `{"limit":1}`)
 
 	_, on := post(srv, &customerA, "units.list", `{"filters":{"status":"online"},"limit":1}`)
-	if count(resp, "total") != int(data(all)["total"].(float64)) ||
-		count(resp, "online") != int(data(on)["total"].(float64)) {
+	if count(resp, "total") != int(asNum(t, data(all)["total"])) ||
+		count(resp, "online") != int(asNum(t, data(on)["total"])) {
 		t.Errorf(
 			"counts differ from units.list: %v / %v / %v",
 			resp,
@@ -193,7 +193,7 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 		"jobs.list",
 		`{"filters":{"unitIds":["`+unit+`"],"status":"assigned"}}`,
 	)
-	if int(data(list)["total"].(float64)) != count(m2, "assignedCount") {
+	if int(asNum(t, data(list)["total"])) != count(m2, "assignedCount") {
 		t.Error("summary and list disagree")
 	}
 

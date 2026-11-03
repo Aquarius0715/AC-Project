@@ -17,7 +17,7 @@ func TestEffectivePowerSR27(t *testing.T) {
 	power := func(u string) string {
 		_, m := post(srv, &hq, "units.get", `{"id":"`+u+`"}`)
 
-		return data(m)["effectivePowerState"].(string)
+		return asStr(t, data(m)["effectivePowerState"])
 	}
 	setup := func(observedAgo time.Duration, connection string) (string, string) {
 		unit := newUnit(t, srv, "Power AC")

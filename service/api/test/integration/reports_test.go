@@ -71,13 +71,13 @@ func TestWorkReports(t *testing.T) {
 
 	// first draft (all results null)
 	code, resp := write(srv, &techInt, "jobs.saveDraft", draftBody(job, "", nil), 0)
-	if code != 200 || data(resp)["version"].(float64) != 1 ||
-		len(data(resp)["items"].([]any)) != 18 {
+	if code != 200 || asNum(t, data(resp)["version"]) != 1 ||
+		len(asArr(t, data(resp)["items"])) != 18 {
 		t.Fatalf("first draft: %d %v", code, resp)
 	}
 
-	rep := data(resp)["id"].(string)
-	firstFilter := data(resp)["items"].([]any)[0].(map[string]any)
+	rep := asStr(t, data(resp)["id"])
+	firstFilter := asObj(t, asArr(t, data(resp)["items"])[0])
 
 	if code, _ := write(srv, &techInt, "jobs.saveDraft", draftBody(job, "", nil), 0); code != 409 {
 		t.Error("second draft without reportId")
@@ -196,19 +196,19 @@ func TestWorkReports(t *testing.T) {
 		"refrigerant": `[{"refrigerant":"R32","cylinderId":"C-1","recoveredKg":0.2,"chargedKg":0.3,"leakCheck":"pass",` +
 			`"leakCheckMethod":"soap"}]`,
 	}), 1)
-	if code != 200 || data(resp)["version"].(float64) != 2 ||
-		data(resp)["items"].([]any)[0].(map[string]any)["id"] != firstFilter["id"] {
+	if code != 200 || asNum(t, data(resp)["version"]) != 2 ||
+		asObj(t, asArr(t, data(resp)["items"])[0])["id"] != firstFilter["id"] {
 		t.Fatalf("second save: %d %v", code, resp)
 	}
 
-	ms := data(resp)["measurements"].([]any)
-	if ms[0].(map[string]any)["quality"] != "suspect" ||
-		ms[1].(map[string]any)["quality"] != "missing" ||
-		ms[0].(map[string]any)["sensorId"] != firstFilter["id"] {
+	ms := asArr(t, data(resp)["measurements"])
+	if asObj(t, ms[0])["quality"] != "suspect" ||
+		asObj(t, ms[1])["quality"] != "missing" ||
+		asObj(t, ms[0])["sensorId"] != firstFilter["id"] {
 		t.Fatalf("measurement quality: %v", ms)
 	}
 
-	if data(resp)["parts"].([]any)[0].(map[string]any)["name"] != "Filter" {
+	if asObj(t, asArr(t, data(resp)["parts"])[0])["name"] != "Filter" {
 		t.Error("part name trimmed")
 	}
 	// submit: unit mismatch and version checks
@@ -219,7 +219,7 @@ func TestWorkReports(t *testing.T) {
 		`{"jobId":"`+job+`","reportVersion":2}`,
 		3,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["measurements"] == nil {
+		asObj(t, res["fieldErrors"])["measurements"] == nil {
 		t.Fatalf("submit with unit mismatch: %d %v", code, res)
 	}
 
@@ -252,7 +252,7 @@ func TestWorkReports(t *testing.T) {
 		`{"jobId":"`+job+`","reportVersion":3}`,
 		3,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["items"] == nil {
+		asObj(t, res["fieldErrors"])["items"] == nil {
 		t.Fatalf("attention without reason: %d %v", code, res)
 	}
 
@@ -279,7 +279,7 @@ func TestWorkReports(t *testing.T) {
 		`{"jobId":"`+job+`","reportVersion":4}`,
 		3,
 	); code != 422 ||
-		len(res["fieldErrors"].(map[string]any)) < 2 {
+		len(asObj(t, res["fieldErrors"])) < 2 {
 		t.Fatalf("short text and no next action: %d %v", code, res)
 	}
 
@@ -293,8 +293,8 @@ func TestWorkReports(t *testing.T) {
 
 	code, resp = write(srv, &techInt, "jobs.submit", `{"jobId":"`+job+`","reportVersion":5}`, 3)
 	if code != 200 || data(resp)["status"] != "submitted" ||
-		data(resp)["timeOnSite"].(map[string]any)["finishedAt"] == nil ||
-		len(data(resp)["reportRefs"].([]any)) != 1 {
+		asObj(t, data(resp)["timeOnSite"])["finishedAt"] == nil ||
+		len(asArr(t, data(resp)["reportRefs"])) != 1 {
 		t.Fatalf("submit: %d %v", code, resp)
 	}
 	// reads
@@ -310,7 +310,7 @@ func TestWorkReports(t *testing.T) {
 		&hq,
 		5,
 	); code != 200 ||
-		data(m)["reviewAvailability"].(map[string]any)["allowed"] != true {
+		asObj(t, data(m)["reviewAvailability"])["allowed"] != true {
 		t.Fatalf("hq report: %d %v", code, m)
 	}
 
@@ -318,7 +318,7 @@ func TestWorkReports(t *testing.T) {
 		&techInt,
 		5,
 	); code != 200 ||
-		data(m)["reviewAvailability"].(map[string]any)["reason"] != "permission_denied" {
+		asObj(t, data(m)["reviewAvailability"])["reason"] != "permission_denied" {
 		t.Fatalf("technician report: %d %v", code, m)
 	}
 	// a reviewer never accepts a report they wrote (IR31): the same user through another membership is still its author
@@ -339,8 +339,8 @@ func TestWorkReports(t *testing.T) {
 	if code, m := getRep(
 		&hq,
 		5,
-	); code != 200 || data(m)["reviewAvailability"].(map[string]any)["allowed"] != false ||
-		data(m)["reviewAvailability"].(map[string]any)["reason"] != "self_authored" {
+	); code != 200 || asObj(t, data(m)["reviewAvailability"])["allowed"] != false ||
+		asObj(t, data(m)["reviewAvailability"])["reason"] != "self_authored" {
 		t.Errorf("self-authored report: %d %v", code, m)
 	}
 
@@ -419,7 +419,7 @@ func TestWorkReports(t *testing.T) {
 		5,
 	); code != 200 ||
 		data(res)["status"] != "in_progress" ||
-		data(res)["draftReportRef"].(map[string]any)["reportVersion"].(float64) != 6 {
+		asNum(t, asObj(t, data(res)["draftReportRef"])["reportVersion"]) != 6 {
 		t.Fatalf("resumeRework: %d %v", code, res)
 	}
 
@@ -430,8 +430,8 @@ func TestWorkReports(t *testing.T) {
 	if _, m := getRep(
 		&hq,
 		5,
-	); len(data(m)["reviewHistory"].([]any)) != 1 ||
-		data(m)["reviewAvailability"].(map[string]any)["reason"] != "not_current" {
+	); len(asArr(t, data(m)["reviewHistory"])) != 1 ||
+		asObj(t, data(m)["reviewAvailability"])["reason"] != "not_current" {
 		t.Fatalf("history after return: %v", m)
 	}
 
@@ -459,7 +459,7 @@ func TestWorkReports(t *testing.T) {
 		jobBody(seed.ID("unit-non-rto").String(), map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	other := data(resp)["id"].(string)
+	other := asStr(t, data(resp)["id"])
 
 	free := func() bool {
 		_, res := post(
@@ -544,7 +544,7 @@ func TestWorkReports(t *testing.T) {
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); code != 200 || data(res)["assignment"] == nil ||
-		data(res)["assignment"].(map[string]any)["status"] != "completed" {
+		asObj(t, data(res)["assignment"])["status"] != "completed" {
 		t.Fatalf("the detail keeps the completed assignment: %d %v", code, res)
 	}
 
@@ -646,7 +646,7 @@ func TestContractorReview(t *testing.T) {
 	unit := seed.ID("unit-non-rto").String()
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, res := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	job := data(res)["id"].(string)
+	job := asStr(t, data(res)["id"])
 	write(
 		srv,
 		&hq,
@@ -709,7 +709,7 @@ func TestContractorReview(t *testing.T) {
 	write(srv, &techA, "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 4)
 	_, res = write(srv, &techA, "jobs.saveDraft", draftBody(job, "normal", nil), 0)
 
-	rep := data(res)["id"].(string)
+	rep := asStr(t, data(res)["id"])
 
 	if code, resp := write(
 		srv,
@@ -727,7 +727,7 @@ func TestContractorReview(t *testing.T) {
 		"reports.get",
 		`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":1}`,
 	); code != 200 ||
-		data(resp)["reviewAvailability"].(map[string]any)["allowed"] != true {
+		asObj(t, data(resp)["reviewAvailability"])["allowed"] != true {
 		t.Fatalf("contractor reads submitted report: %d %v", code, resp)
 	}
 

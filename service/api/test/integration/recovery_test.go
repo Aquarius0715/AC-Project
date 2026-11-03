@@ -56,9 +56,9 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 
 	res = get()
 
-	cases := data(res)["recoveryCases"].([]any)
+	cases := asArr(t, data(res)["recoveryCases"])
 	if data(res)["state"] != "released" || len(cases) != 1 ||
-		cases[0].(map[string]any)["state"] != "pending" {
+		asObj(t, cases[0])["state"] != "pending" {
 		t.Fatalf("recovery case: %v", res)
 	}
 
@@ -76,7 +76,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 
 	observe(old) // the same observation updates the open case
 
-	if len(data(get())["recoveryCases"].([]any)) != 1 {
+	if len(asArr(t, data(get())["recoveryCases"])) != 1 {
 		t.Error("one case per unit / restriction / rules version")
 	}
 
@@ -95,7 +95,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 		&hq,
 		"units.get",
 		`{"id":"`+unit+`"}`,
-	); data(resp)["controlAvailability"].(map[string]any)["state"] != "blocked" {
+	); asObj(t, data(resp)["controlAvailability"])["state"] != "blocked" {
 		t.Errorf("control blocked while a case is open: %v", data(resp)["controlAvailability"])
 	}
 
@@ -130,8 +130,8 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	code, res := reconcile(&overrider) // override-only may handle terminal recovery (IR03)
 
 	c0, _ := data(res)["recoveryCases"].([]any)
-	if code != 200 || len(c0) != 1 || c0[0].(map[string]any)["state"] != "removing" ||
-		len(c0[0].(map[string]any)["commandIds"].([]any)) != 1 {
+	if code != 200 || len(c0) != 1 || asObj(t, c0[0])["state"] != "removing" ||
+		len(asArr(t, asObj(t, c0[0])["commandIds"])) != 1 {
 		t.Fatalf("reconcile terminal: %d %v", code, res)
 	}
 
@@ -141,11 +141,11 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 
 	ackCommand(
 		t,
-		c0[0].(map[string]any)["commandIds"].([]any)[0].(string),
+		asStr(t, asArr(t, asObj(t, c0[0])["commandIds"])[0]),
 		clock.Add(3*time.Second),
 	)
 
-	if st := data(get())["recoveryCases"].([]any)[0].(map[string]any)["state"]; st != "resolved" {
+	if st := asObj(t, asArr(t, data(get())["recoveryCases"])[0])["state"]; st != "resolved" {
 		t.Errorf("resolved after acknowledgement: %v", st)
 	}
 
@@ -165,9 +165,9 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 
 	code, res = reconcile(&restrMgr)
 
-	cs := data(res)["recoveryCases"].([]any)
-	if code != 200 || len(cs) != 2 || cs[1].(map[string]any)["state"] != "resolved" ||
-		len(cs[1].(map[string]any)["commandIds"].([]any)) != 0 {
+	cs := asArr(t, data(res)["recoveryCases"])
+	if code != 200 || len(cs) != 2 || asObj(t, cs[1])["state"] != "resolved" ||
+		len(asArr(t, asObj(t, cs[1])["commandIds"])) != 0 {
 		t.Fatalf("null observation: %d %v", code, res)
 	}
 
@@ -183,7 +183,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 		&hq,
 		"units.get",
 		`{"id":"`+unit+`"}`,
-	); data(m)["controlAvailability"].(map[string]any)["state"] != "available" {
+	); asObj(t, data(m)["controlAvailability"])["state"] != "available" {
 		t.Error("control available after every case is resolved")
 	}
 

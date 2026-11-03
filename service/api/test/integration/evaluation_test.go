@@ -37,7 +37,7 @@ func TestAutomationEvaluation(t *testing.T) {
 			0,
 		)
 
-		return data(res)["id"].(string)
+		return asStr(t, data(res)["id"])
 	}
 	occ := rule(
 		`"`+unitID+`","`+off+`"`,
@@ -63,8 +63,8 @@ func TestAutomationEvaluation(t *testing.T) {
 			`],"phase":"` + phase + `"}`
 	}
 	decision := func(m map[string]any, unit string) map[string]any {
-		for _, r := range data(m)["results"].([]any) {
-			if x := r.(map[string]any); x["unitId"] == unit {
+		for _, r := range asArr(t, data(m)["results"]) {
+			if x := asObj(t, r); x["unitId"] == unit {
 				return x
 			}
 		}
@@ -185,7 +185,7 @@ func TestAutomationEvaluation(t *testing.T) {
 		0,
 	)
 
-	sid := data(resp)["id"].(string)
+	sid := asStr(t, data(resp)["id"])
 	if _, res := post(
 		srv,
 		&customerB,
@@ -252,7 +252,7 @@ func TestAutomationEvaluation(t *testing.T) {
 		t.Fatalf("fire: %d %v", code, resp)
 	}
 
-	cmd := decision(resp, unitID)["commandId"].(string)
+	cmd := asStr(t, decision(resp, unitID)["commandId"])
 
 	var source, actor string
 	ownerScan(

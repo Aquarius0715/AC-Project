@@ -29,7 +29,7 @@ func TestProposalRefusalsByState(t *testing.T) {
 		`"}`
 	_, m := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
 
-	job := data(m)["id"].(string)
+	job := asStr(t, data(m)["id"])
 	if code, res := write(
 		srv,
 		&hq,

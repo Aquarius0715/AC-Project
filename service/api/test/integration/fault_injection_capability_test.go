@@ -19,7 +19,7 @@ func TestCapabilityVersionRollsBackWhenThePreviousVersionCannotBeRetired(t *test
 		t.Fatalf("create: %d %v", code, res)
 	}
 
-	id := data(res)["id"].(string)
+	id := asStr(t, data(res)["id"])
 
 	versions := func() (int, int) {
 		var n, top int

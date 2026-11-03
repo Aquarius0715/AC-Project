@@ -39,7 +39,7 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 	elig := func(a *actor, start, end int) (int, map[string]any) {
 		return post(
 			srv,
@@ -110,16 +110,16 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 	}
 
 	c := capOf(&hq, "2026-09-14")
-	if c == nil || c["availableMinutes"].(float64) != 480 ||
-		c["assignedMinutes"].(float64) != 240 ||
-		c["utilization"].(float64) != 50 {
+	if c == nil || asNum(t, c["availableMinutes"]) != 480 ||
+		asNum(t, c["assignedMinutes"]) != 240 ||
+		asNum(t, c["utilization"]) != 50 {
 		t.Fatalf("capacity: %v", c)
 	}
 
 	if c := capOf(
 		&hq,
 		"2026-09-13",
-	); c["availableMinutes"].(float64) != 0 ||
+	); asNum(t, c["availableMinutes"]) != 0 ||
 		c["utilization"] != nil {
 		t.Fatalf("sunday: %v", c)
 	}
@@ -170,7 +170,7 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 		`{"membershipId":"`+tech.String()+`","from":"2026-09-14","to":"2026-09-15","type":"training","note":" course "}`,
 		0,
 	)
-	if code != 200 || len(data(resp)["conflictingAssignmentIds"].([]any)) != 1 ||
+	if code != 200 || len(asArr(t, data(resp)["conflictingAssignmentIds"])) != 1 ||
 		data(resp)["note"] != "course" {
 		t.Fatalf("unavailability: %d %v", code, resp)
 	}
@@ -179,7 +179,7 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 		&hq,
 		"2026-09-14",
 	); c["unavailability"] != "training" ||
-		c["availableMinutes"].(float64) != 0 {
+		asNum(t, c["availableMinutes"]) != 0 {
 		t.Fatalf("capacity while unavailable: %v", c)
 	}
 
@@ -191,7 +191,7 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 		0,
 	)
 
-	job = data(resp)["id"].(string)
+	job = asStr(t, data(resp)["id"])
 
 	if _, m := elig(&hq, 25, 27); has(m, tech) {
 		t.Error("unavailable technician is not eligible")
@@ -229,7 +229,7 @@ func TestUnavailabilityListAndClear(t *testing.T) {
 			t.Fatalf("set %s: %d %v", body, code, m)
 		}
 
-		return data(m)["id"].(string)
+		return asStr(t, data(m)["id"])
 	}
 	leave := set(
 		`{"membershipId":"` + tech.String() + `","from":"2026-09-16","to":"2026-09-18","type":"annual_leave"}`,
@@ -255,7 +255,7 @@ func TestUnavailabilityListAndClear(t *testing.T) {
 
 		for _, it := range items(res) {
 			if it["organizationId"] == orgA.String() {
-				out = append(out, it["id"].(string))
+				out = append(out, asStr(t, it["id"]))
 			}
 		}
 
@@ -345,7 +345,7 @@ func TestUnavailabilityListAndClear(t *testing.T) {
 
 	r, _ := data(resp)["remaining"].(map[string]any)
 	if code != 200 || r == nil || r["from"] != "2026-09-16" || r["to"] != "2026-09-16" ||
-		r["version"].(float64) != 2 {
+		asNum(t, r["version"]) != 2 {
 		t.Fatalf("a new last day: %d %v", code, resp)
 	}
 

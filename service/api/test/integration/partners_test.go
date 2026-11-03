@@ -65,7 +65,7 @@ func TestContractorRegister(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := p["id"].(string)
+	id := asStr(t, p["id"])
 
 	if code, _ := write(srv, &hq, "contractors.save", body(""), 0); code != 409 {
 		t.Error("second profile")
@@ -80,7 +80,7 @@ func TestContractorRegister(t *testing.T) {
 			`","id":"`+id+`"}`,
 		1,
 	); code != 200 ||
-		data(res)["delegation"].(map[string]any)["to"] != until {
+		asObj(t, data(res)["delegation"])["to"] != until {
 		t.Fatalf("update: %d %v", code, res)
 	}
 
@@ -95,7 +95,7 @@ func TestContractorRegister(t *testing.T) {
 		other,
 		2,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["organizationId"] != "error.organizationFixed" {
+		asObj(t, res["fieldErrors"])["organizationId"] != "error.organizationFixed" {
 		t.Errorf("a profile keeps its organization: %d %v", code, res)
 	}
 
@@ -240,8 +240,8 @@ func TestContractorRegister(t *testing.T) {
 	}
 
 	code, resp = rc(clock.Add(24*time.Hour).Format(time.RFC3339), line)
-	if code != 200 || data(resp)["version"].(float64) != 1 ||
-		data(resp)["lines"].([]any)[0].(map[string]any)["note"] != "base" {
+	if code != 200 || asNum(t, data(resp)["version"]) != 1 ||
+		asObj(t, asArr(t, data(resp)["lines"])[0])["note"] != "base" {
 		t.Fatalf("rate card: %d %v", code, resp)
 	}
 
@@ -249,8 +249,8 @@ func TestContractorRegister(t *testing.T) {
 		clock.Add(48*time.Hour).Format(time.RFC3339),
 		`[{"workType":"repair_base","amountMinor":45000,"note":"   "}]`,
 	); code != 200 ||
-		data(res)["version"].(float64) != 2 ||
-		data(res)["lines"].([]any)[0].(map[string]any)["note"] != nil {
+		asNum(t, data(res)["version"]) != 2 ||
+		asObj(t, asArr(t, data(res)["lines"])[0])["note"] != nil {
 		t.Fatalf("rate card v2, a blank note is none: %d %v", code, res)
 	}
 
@@ -270,7 +270,7 @@ func TestContractorRegister(t *testing.T) {
 		"rateCards.list",
 		`{"filters":{"contractorOrgId":"`+org+`"}}`,
 	); len(items(res)) != 2 ||
-		items(res)[0]["version"].(float64) != 2 {
+		asNum(t, items(res)[0]["version"]) != 2 {
 		t.Fatalf("rate card list: %v", res)
 	}
 
@@ -341,7 +341,7 @@ func TestSLAScorecard(t *testing.T) {
 			`"}`,
 		0,
 	); code != 200 ||
-		data(resp)["version"].(float64) != 1 {
+		asNum(t, data(resp)["version"]) != 1 {
 		t.Fatalf("save targets: %d %v", code, resp)
 	}
 
@@ -368,7 +368,7 @@ func TestSLAScorecard(t *testing.T) {
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	job := data(res)["id"].(string)
+	job := asStr(t, data(res)["id"])
 	created := clock.Add(-10 * time.Hour)
 	owner(
 		t,
@@ -399,7 +399,7 @@ func TestSLAScorecard(t *testing.T) {
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	onTime := data(res)["id"].(string)
+	onTime := asStr(t, data(res)["id"])
 	owner(
 		t,
 		`UPDATE maintenance.jobs SET created_at = $2, contractor_org_id = $3 WHERE id = $1`,
@@ -427,7 +427,7 @@ func TestSLAScorecard(t *testing.T) {
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	overdue := data(res)["id"].(string)
+	overdue := asStr(t, data(res)["id"])
 	owner(
 		t,
 		`UPDATE maintenance.jobs SET created_at = $2, due_at = $3 WHERE id = $1`,
@@ -448,7 +448,7 @@ func TestSLAScorecard(t *testing.T) {
 			jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 			0,
 		)
-		id := data(res)["id"].(string)
+		id := asStr(t, data(res)["id"])
 		cancelled[id] = after
 		owner(
 			t,
@@ -480,9 +480,9 @@ func TestSLAScorecard(t *testing.T) {
 	sc := data(res)
 	kinds := map[string]map[string]any{}
 
-	for _, b := range sc["breaches"].([]any) {
-		bm := b.(map[string]any)
-		kinds[bm["jobId"].(string)+":"+bm["kind"].(string)] = bm
+	for _, b := range asArr(t, sc["breaches"]) {
+		bm := asObj(t, b)
+		kinds[asStr(t, bm["jobId"])+":"+asStr(t, bm["kind"])] = bm
 	}
 	// the screens phrase a breach from its kind and minutes (IR291); detail stays English
 	if r := kinds[job+":response"]; r == nil || r["detail"] != "response 6 h 10 min vs 4 h" ||
@@ -506,9 +506,9 @@ func TestSLAScorecard(t *testing.T) {
 		t.Errorf("a response within the target is a breach: %v", kinds[onTime+":response"])
 	}
 
-	if share := sc["totals"].(map[string]any)["responseWithinTarget"]; share == nil ||
-		share.(float64) <= 0 ||
-		share.(float64) >= 100 {
+	if share := asObj(t, sc["totals"])["responseWithinTarget"]; share == nil ||
+		asNum(t, share) <= 0 ||
+		asNum(t, share) >= 100 {
 		t.Errorf("response share with one answer in time and misses: %v", share)
 	}
 
@@ -518,16 +518,16 @@ func TestSLAScorecard(t *testing.T) {
 		}
 	}
 
-	if sc["totals"].(map[string]any)["ratingCount"].(float64) < 1 ||
-		len(sc["customers"].([]any)) == 0 {
+	if asNum(t, asObj(t, sc["totals"])["ratingCount"]) < 1 ||
+		len(asArr(t, sc["customers"])) == 0 {
 		t.Fatalf("totals: %v", sc)
 	}
 	// IR236: the targets per plan type in effect now (general's saved row starts in an hour: default until then) and the
 	// scheduled row; each customer row names its plan type
 	var general, scheduled map[string]any
 
-	for _, x := range sc["targets"].([]any) {
-		tv := x.(map[string]any)
+	for _, x := range asArr(t, sc["targets"]) {
+		tv := asObj(t, x)
 		switch {
 		case tv["planType"] == "general" && tv["state"] != "scheduled":
 			general = tv
@@ -536,26 +536,26 @@ func TestSLAScorecard(t *testing.T) {
 		}
 	}
 
-	if general == nil || general["state"] != "default" || general["responseHours"].(float64) != 4 ||
+	if general == nil || general["state"] != "default" || asNum(t, general["responseHours"]) != 4 ||
 		general["effectiveFrom"] != nil ||
-		len(sc["targets"].([]any)) != 5 {
+		len(asArr(t, sc["targets"])) != 5 {
 		t.Fatalf("targets in effect: %v", sc["targets"])
 	}
 
-	if scheduled == nil || scheduled["responseHours"].(float64) != 2 ||
-		scheduled["version"].(float64) != 1 ||
+	if scheduled == nil || asNum(t, scheduled["responseHours"]) != 2 ||
+		asNum(t, scheduled["version"]) != 1 ||
 		scheduled["effectiveFrom"] == nil {
 		t.Fatalf("scheduled targets: %v", sc["targets"])
 	}
 
-	if cm := sc["customers"].([]any)[0].(map[string]any); cm["planType"] == nil ||
+	if cm := asObj(t, asArr(t, sc["customers"])[0]); cm["planType"] == nil ||
 		cm["planType"] == "" {
 		t.Errorf("customer plan type: %v", cm)
 	}
 
-	for _, cm := range sc["customers"].([]any) {
-		if cm.(map[string]any)["customerId"] == seed.ID("cust-a").String() &&
-			cm.(map[string]any)["status"] != "breached" {
+	for _, cm := range asArr(t, sc["customers"]) {
+		if asObj(t, cm)["customerId"] == seed.ID("cust-a").String() &&
+			asObj(t, cm)["status"] != "breached" {
 			t.Errorf("customer-a status: %v", cm)
 		}
 	}
@@ -566,8 +566,8 @@ func TestSLAScorecard(t *testing.T) {
 		"sla.scorecard",
 		period+`,"contractorOrgId":"`+seed.ID("org-contractor-b").String()+`"}`,
 	)
-	for _, b := range data(res)["breaches"].([]any) {
-		if b.(map[string]any)["jobId"] == job {
+	for _, b := range asArr(t, data(res)["breaches"]) {
+		if asObj(t, b)["jobId"] == job {
 			t.Error("contractor filter")
 		}
 	}
@@ -616,8 +616,8 @@ func TestSLAScorecard(t *testing.T) {
 		if it["organizationId"] == seed.ID("org-contractor-a").String() {
 			seen = true
 
-			k := it["kpis"].(map[string]any)
-			if k["ratingCount"].(float64) < 1 || k["offerAcceptance"] == nil {
+			k := asObj(t, it["kpis"])
+			if asNum(t, k["ratingCount"]) < 1 || k["offerAcceptance"] == nil {
 				t.Errorf("kpis: %v", k)
 			}
 		}
@@ -718,9 +718,9 @@ func TestContractorQualityMetrics(t *testing.T) {
 	sc := data(res)
 	breaches := map[string]bool{}
 
-	for _, b := range sc["breaches"].([]any) {
-		bm := b.(map[string]any)
-		breaches[bm["jobId"].(string)+":"+bm["kind"].(string)] = true
+	for _, b := range asArr(t, sc["breaches"]) {
+		bm := asObj(t, b)
+		breaches[asStr(t, bm["jobId"])+":"+asStr(t, bm["kind"])] = true
 	}
 
 	if !breaches[late+":arrival"] || breaches[good+":arrival"] ||
@@ -729,13 +729,13 @@ func TestContractorQualityMetrics(t *testing.T) {
 		t.Errorf("arrival and first-time-fix breaches: %v", sc["breaches"])
 	}
 
-	totals := sc["totals"].(map[string]any)
+	totals := asObj(t, sc["totals"])
 	if totals["arrivalInWindow"] != 50.0 || totals["firstTimeFix"] != 50.0 {
 		t.Errorf("totals: %v", totals)
 	}
 
-	if cm := sc["customers"].([]any); len(cm) != 1 ||
-		cm[0].(map[string]any)["status"] != "breached" {
+	if cm := asArr(t, sc["customers"]); len(cm) != 1 ||
+		asObj(t, cm[0])["status"] != "breached" {
 		t.Errorf("customer status: %v", cm)
 	}
 	// the contractor's 90-day KPIs count the same jobs
@@ -757,7 +757,7 @@ func TestContractorQualityMetrics(t *testing.T) {
 			continue
 		}
 
-		k := it["kpis"].(map[string]any)
+		k := asObj(t, it["kpis"])
 
 		share := func(name string) float64 {
 			v, _ := k[name].(float64)
@@ -793,7 +793,7 @@ func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	job := data(res)["id"].(string)
+	job := asStr(t, data(res)["id"])
 	owner(
 		t,
 		`UPDATE maintenance.jobs SET created_at = $2, status = 'completed', completed_at = $3 WHERE id = $1`,
@@ -846,8 +846,8 @@ func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
 
 		found := false
 
-		for _, b := range data(resp)["breaches"].([]any) {
-			b := b.(map[string]any)
+		for _, b := range asArr(t, data(resp)["breaches"]) {
+			b := asObj(t, b)
 			if b["jobId"] == visit {
 				t.Errorf("the plan's visit is a %v breach", b["kind"])
 			}
@@ -896,7 +896,7 @@ func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
 		_, m := post(srv, &hq, "contractors.list", `{"limit":100}`)
 		for _, it := range items(m) {
 			if it["organizationId"] == org.String() {
-				return it["kpis"].(map[string]any)["offerAcceptance"]
+				return asObj(t, it["kpis"])["offerAcceptance"]
 			}
 		}
 
@@ -915,7 +915,7 @@ func TestOfferAcceptanceIgnoresCancelledJobs(t *testing.T) {
 			0,
 		)
 
-		job := data(resp)["id"].(string)
+		job := asStr(t, data(resp)["id"])
 		if code, res := write(
 			srv,
 			&hq,
@@ -987,7 +987,7 @@ func TestCancelEndsContractorAccess(t *testing.T) {
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
 
-	job := data(m)["id"].(string)
+	job := asStr(t, data(m)["id"])
 	if code, res := write(
 		srv,
 		&hq,

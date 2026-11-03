@@ -42,7 +42,7 @@ func TestBusinessEventNotifications(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 	if countNotes(t, job, "hq-operator", "job_update") != 1 ||
 		countNotes(t, job, "customer-a", "job_update") != 0 {
 		t.Errorf(

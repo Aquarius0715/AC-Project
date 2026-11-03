@@ -186,8 +186,8 @@ func TestRevokeSessions(t *testing.T) {
 	}
 
 	var ids []string
-	for _, v := range data(resp)["membershipIds"].([]any) {
-		ids = append(ids, v.(string))
+	for _, v := range asArr(t, data(resp)["membershipIds"]) {
+		ids = append(ids, asStr(t, v))
 	}
 
 	if got := strings.Join(
@@ -218,7 +218,7 @@ func TestRevokeSessions(t *testing.T) {
 		}
 	}
 	// a sign-in in the revocation's own second: auth_time has whole seconds, so it cannot be told from one just before
-	revokedAt, err := time.Parse(time.RFC3339Nano, data(resp)["revokedAt"].(string))
+	revokedAt, err := time.Parse(time.RFC3339Nano, asStr(t, data(resp)["revokedAt"]))
 	if err != nil {
 		t.Fatal(err)
 	}

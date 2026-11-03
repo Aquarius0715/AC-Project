@@ -28,14 +28,14 @@ func TestTelemetry(t *testing.T) {
 		"telemetry.series",
 		`{`+rng+`,"unitIds":["`+online+`"],"metric":"co2","query":{}}`,
 	)
-	if code != 200 || len(items(res)) != 1 || items(res)[0]["value"].(float64) != 800 ||
+	if code != 200 || len(items(res)) != 1 || asNum(t, items(res)[0]["value"]) != 800 ||
 		items(res)[0]["id"] != seed.ID("m-sensor-online-co2-1").String() ||
 		items(res)[0]["id"] != items(res)[0]["eventId"] ||
 		items(res)[0]["isDemo"] != true {
 		t.Fatalf("series: %d %v", code, res)
 	}
 
-	if a := data(res)["allergenObservation"].(map[string]any); a["availability"] != "available" ||
+	if a := asObj(t, data(res)["allergenObservation"]); a["availability"] != "available" ||
 		a["substance"] == nil {
 		t.Fatalf("allergen: %v", a)
 	}
@@ -46,7 +46,7 @@ func TestTelemetry(t *testing.T) {
 		"telemetry.series",
 		`{`+rng+`,"unitIds":["`+nonRTO+`"],"metric":"co2","query":{}}`,
 	)
-	if a := data(res)["allergenObservation"].(map[string]any); a["availability"] != "unsupported" ||
+	if a := asObj(t, data(res)["allergenObservation"]); a["availability"] != "unsupported" ||
 		a["substance"] != nil ||
 		len(items(res)) != 0 {
 		t.Fatalf("unsupported allergen: %v", res)
@@ -60,7 +60,7 @@ func TestTelemetry(t *testing.T) {
 			String()+
 			`"],"metric":"temperature","query":{}}`,
 	)
-	if a := data(res)["allergenObservation"].(map[string]any); a["availability"] != "not_measured" ||
+	if a := asObj(t, data(res)["allergenObservation"]); a["availability"] != "not_measured" ||
 		len(items(res)) != 1 {
 		t.Fatalf("not measured: %v", res)
 	}
@@ -74,8 +74,8 @@ func TestTelemetry(t *testing.T) {
 			`"],"metric":"temperature","query":{"limit":2}}`,
 	)
 	if data(res)["allergenObservation"] != nil || len(items(res)) != 2 ||
-		data(res)["total"].(float64) != 3 ||
-		items(res)[0]["value"].(float64) != 29 ||
+		asNum(t, data(res)["total"]) != 3 ||
+		asNum(t, items(res)[0]["value"]) != 29 ||
 		data(res)["nextCursor"] == nil {
 		t.Fatalf("multi-unit: %v", res)
 	}
@@ -170,7 +170,7 @@ func TestTelemetry(t *testing.T) {
 		"telemetry.summary",
 		`{`+rng+`,"unitIds":["`+online+`","`+nonRTO+`"]}`,
 	)
-	if code != 200 || len(data(res)["measurements"].([]any)) != 8 || data(res)["energy"] != nil ||
+	if code != 200 || len(asArr(t, data(res)["measurements"])) != 8 || data(res)["energy"] != nil ||
 		data(res)["asOf"] != to {
 		t.Fatalf("summary: %d %v", code, res)
 	}
@@ -181,7 +181,7 @@ func TestTelemetry(t *testing.T) {
 		"telemetry.summary",
 		`{`+rng+`,"unitIds":["`+online+`"],"metric":"power"}`,
 	)
-	if len(data(res)["measurements"].([]any)) != 1 {
+	if len(asArr(t, data(res)["measurements"])) != 1 {
 		t.Fatal("summary metric")
 	}
 
@@ -220,12 +220,12 @@ func TestVentilation(t *testing.T) {
 	)
 
 	co2, _ := data(res)["co2AtLog"].(map[string]any)
-	if code != 200 || co2 == nil || co2["value"].(float64) != 800 || co2["unit"] != "ppm" ||
+	if code != 200 || co2 == nil || asNum(t, co2["value"]) != 800 || co2["unit"] != "ppm" ||
 		data(res)["loggedAt"] != clock.Format(time.RFC3339) {
 		t.Fatalf("log: %d %v", code, res)
 	}
 
-	first := data(res)["id"].(string)
+	first := asStr(t, data(res)["id"])
 
 	code, res = logv(
 		&customerA,
@@ -274,7 +274,7 @@ func TestVentilation(t *testing.T) {
 	ids := func(m map[string]any) map[string]bool {
 		out := map[string]bool{}
 		for _, it := range items(m) {
-			out[it["id"].(string)] = true
+			out[asStr(t, it["id"])] = true
 			if it["spaceId"] == roomB && m != nil {
 				out["roomB"] = true
 			}
@@ -470,8 +470,8 @@ func TestLatestMeasurements(t *testing.T) {
 		}
 
 		var out []map[string]any
-		for _, x := range doc["latestMeasurements"].([]any) {
-			out = append(out, x.(map[string]any))
+		for _, x := range asArr(t, doc["latestMeasurements"]) {
+			out = append(out, asObj(t, x))
 		}
 
 		return out
@@ -480,13 +480,13 @@ func TestLatestMeasurements(t *testing.T) {
 
 	var seen []string
 	for _, x := range got {
-		seen = append(seen, x["metric"].(string)+"="+x["quality"].(string))
+		seen = append(seen, asStr(t, x["metric"])+"="+asStr(t, x["quality"]))
 	}
 
 	if strings.Join(seen, ",") != "co2=valid,humidity=missing,pm25=stale,temperature=stale" ||
-		got[0]["value"].(float64) != 1000 ||
+		asNum(t, got[0]["value"]) != 1000 ||
 		got[1]["value"] != nil ||
-		got[3]["value"].(float64) != 28 ||
+		asNum(t, got[3]["value"]) != 28 ||
 		got[0]["unitId"] != unit {
 		t.Fatalf("latest: %v", got)
 	}
@@ -495,7 +495,7 @@ func TestLatestMeasurements(t *testing.T) {
 		"units.list",
 		`{"limit":10,"filters":{"unitIds":["`+unit+`"]}}`,
 	); len(l) != 4 ||
-		l[0]["value"].(float64) != 1000 {
+		asNum(t, l[0]["value"]) != 1000 {
 		t.Fatalf("units.list carries the same readings: %v", l)
 	}
 	// history keeps the stored quality
@@ -527,7 +527,7 @@ func TestLatestMeasurements(t *testing.T) {
 		t.Fatalf("room: %d %v", code, res)
 	}
 
-	room := data(res)["id"].(string)
+	room := asStr(t, data(res)["id"])
 	owner(t, `UPDATE assets.units SET space_id = $2 WHERE id = $1`, unit, room)
 
 	vent := func() any {
@@ -546,7 +546,7 @@ func TestLatestMeasurements(t *testing.T) {
 
 		return data(resp)["co2AtLog"]
 	}
-	if co2, _ := vent().(map[string]any); co2 == nil || co2["value"].(float64) != 1000 ||
+	if co2, _ := vent().(map[string]any); co2 == nil || asNum(t, co2["value"]) != 1000 ||
 		co2["observedAt"] != clock.Add(-30*time.Second).Format(time.RFC3339) {
 		t.Fatalf("co2AtLog: %v", co2)
 	}
@@ -621,7 +621,7 @@ func TestBucketedSeries(t *testing.T) {
 		)
 	}
 
-	b := func(i int) map[string]any { return bs[i].(map[string]any) }
+	b := func(i int) map[string]any { return asObj(t, bs[i]) }
 	if b(0)["start"] != from.UTC().Format(time.RFC3339) || b(0)["value"] != 22.0 ||
 		b(0)["count"] != 5.0 {
 		t.Errorf("the first stretch averages its five valid readings: %v", b(0))
@@ -641,8 +641,8 @@ func TestBucketedSeries(t *testing.T) {
 		&customerB,
 		"telemetry.series",
 		body(`,"bucketMinutes":60`),
-	); code != 200 || len(data(res)["buckets"].([]any)) != 1 ||
-		data(res)["buckets"].([]any)[0].(map[string]any)["count"] != 6.0 {
+	); code != 200 || len(asArr(t, data(res)["buckets"])) != 1 ||
+		asObj(t, asArr(t, data(res)["buckets"])[0])["count"] != 6.0 {
 		t.Errorf("one hourly stretch of six valid readings: %d %v", code, res)
 	}
 

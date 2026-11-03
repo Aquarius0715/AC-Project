@@ -90,7 +90,7 @@ func TestCommands(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 
 	if code, res := cmd(
 		&hq,
@@ -160,7 +160,7 @@ func TestCommands(t *testing.T) {
 		t.Fatalf("second command: %d %v", code, resp)
 	}
 
-	id2 := data(resp)["id"].(string)
+	id2 := asStr(t, data(resp)["id"])
 	// IR453: a tick just after expiresAt leaves the command for an acknowledgement still on its way; the grace after
 	// it expires the command
 	_, schedTickErr := schedTick(ctx, srv, clock.Add(32*time.Second))
@@ -355,7 +355,7 @@ func TestCommandHistory(t *testing.T) {
 		t.Fatalf("technician command: %d %v", code, resp)
 	}
 
-	tech := data(resp)["id"].(string)
+	tech := asStr(t, data(resp)["id"])
 
 	free()
 
@@ -372,7 +372,7 @@ func TestCommandHistory(t *testing.T) {
 		t.Fatalf("client command: %d %v", code, resp)
 	}
 
-	own := data(resp)["id"].(string)
+	own := asStr(t, data(resp)["id"])
 
 	free()
 	// list reads the unit's history: rows is the first page (ordering checks), byID every page — the test database
@@ -386,7 +386,7 @@ func TestCommandHistory(t *testing.T) {
 
 		for page := 0; ; page++ {
 			for _, it := range items(res) {
-				byID[it["id"].(string)] = it
+				byID[asStr(t, it["id"])] = it
 			}
 
 			next, _ := data(res)["nextCursor"].(string)
@@ -419,7 +419,7 @@ func TestCommandHistory(t *testing.T) {
 	}
 
 	for i := 1; i < len(rows); i++ {
-		if rows[i-1]["requestedAt"].(string) < rows[i]["requestedAt"].(string) {
+		if asStr(t, rows[i-1]["requestedAt"]) < asStr(t, rows[i]["requestedAt"]) {
 			t.Fatalf("newest first: %v before %v", rows[i-1]["requestedAt"], rows[i]["requestedAt"])
 		}
 	}

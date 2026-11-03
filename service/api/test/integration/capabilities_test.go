@@ -52,11 +52,11 @@ func TestCapabilities(t *testing.T) {
 	model := "TA-" + uuid.NewString()[:6]
 
 	code, resp = write(srv, &hq, "capabilities.save", capBody("", model, ""), 0)
-	if code != 200 || ver(resp) != 1 || len(data(resp)["sensors"].([]any)) != 2 {
+	if code != 200 || ver(resp) != 1 || len(asArr(t, data(resp)["sensors"])) != 2 {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 
 	if code, _ := write(
 		srv,
@@ -174,7 +174,7 @@ func TestCapabilities(t *testing.T) {
 		capBody(id, model, ""),
 		1,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["changeReason"] != apperr.KeyRequired {
+		asObj(t, res["fieldErrors"])["changeReason"] != apperr.KeyRequired {
 		t.Errorf("update without a change reason: %d %v", code, res)
 	}
 
@@ -215,15 +215,15 @@ func TestCapabilities(t *testing.T) {
 	}
 
 	if saved == nil || saved["reason"] != "added fan mode" ||
-		saved["maskedBefore"].(map[string]any)["modes"] != `["cool","dry"]` ||
-		saved["maskedAfter"].(map[string]any)["modes"] != `["cool","dry","fan"]` ||
-		len(saved["maskedAfter"].(map[string]any)) != 1 {
+		asObj(t, saved["maskedBefore"])["modes"] != `["cool","dry"]` ||
+		asObj(t, saved["maskedAfter"])["modes"] != `["cool","dry","fan"]` ||
+		len(asObj(t, saved["maskedAfter"])) != 1 {
 		t.Fatalf("capability audit: %v", am)
 	}
 
 	if unit != "" {
 		_, g := post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
-		if int(data(g)["capabilityVersion"].(float64)) != 2 {
+		if int(asNum(t, data(g)["capabilityVersion"])) != 2 {
 			t.Fatalf("unit capability version: %v", data(g)["capabilityVersion"])
 		}
 	}

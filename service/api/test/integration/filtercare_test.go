@@ -68,8 +68,8 @@ func TestFilterCare(t *testing.T) {
 	}
 
 	st := statusOf(&customerB)
-	if st["runHoursSinceCleaning"].(float64) != 200 || st["status"] != "due_soon" ||
-		st["thresholdHours"].(float64) != 250 ||
+	if asNum(t, st["runHoursSinceCleaning"]) != 200 || st["status"] != "due_soon" ||
+		asNum(t, st["thresholdHours"]) != 250 ||
 		st["lastCleanedAt"] != nil {
 		t.Fatalf("due soon: %v", st)
 	}
@@ -98,8 +98,8 @@ func TestFilterCare(t *testing.T) {
 		&customerB,
 		"filterCare.getSettings",
 		`{}`,
-	); code != 200 || data(res)["version"].(float64) != 0 || data(res)["thresholdHours"] != nil ||
-		data(res)["fallbackDays"].(float64) != 30 ||
+	); code != 200 || asNum(t, data(res)["version"]) != 0 || data(res)["thresholdHours"] != nil ||
+		asNum(t, data(res)["fallbackDays"]) != 30 ||
 		data(res)["recipients"] != "owners" {
 		t.Fatalf("default settings: %d %v", code, res)
 	}
@@ -111,7 +111,7 @@ func TestFilterCare(t *testing.T) {
 		`{"thresholdHours":100,"fallbackDays":14,"recipients":"all_users","channels":["inApp","email"]}`,
 		0,
 	); code != 200 ||
-		data(res)["version"].(float64) != 1 {
+		asNum(t, data(res)["version"]) != 1 {
 		t.Fatalf("save settings: %d %v", code, res)
 	}
 
@@ -120,9 +120,9 @@ func TestFilterCare(t *testing.T) {
 		&customerB,
 		"filterCare.getSettings",
 		`{}`,
-	); data(res)["version"].(float64) != 1 || data(res)["thresholdHours"].(float64) != 100 ||
+	); asNum(t, data(res)["version"]) != 1 || asNum(t, data(res)["thresholdHours"]) != 100 ||
 		data(res)["recipients"] != "all_users" ||
-		len(data(res)["channels"].([]any)) != 2 {
+		len(asArr(t, data(res)["channels"])) != 2 {
 		t.Fatalf("saved settings: %v", res)
 	}
 
@@ -133,7 +133,7 @@ func TestFilterCare(t *testing.T) {
 	if st := statusOf(
 		&customerB,
 	); st["status"] != "overdue" ||
-		st["thresholdHours"].(float64) != 100 {
+		asNum(t, st["thresholdHours"]) != 100 {
 		t.Fatalf("overdue: %v", st)
 	}
 
@@ -185,7 +185,7 @@ func TestFilterCare(t *testing.T) {
 	if st := statusOf(
 		&customerB,
 	); st["status"] != "due_soon" ||
-		st["runHoursSinceCleaning"].(float64) != 90 {
+		asNum(t, st["runHoursSinceCleaning"]) != 90 {
 		t.Fatalf("run time since a cleaning while running: %v", st)
 	}
 
@@ -199,7 +199,7 @@ func TestFilterCare(t *testing.T) {
 	if st := statusOf(
 		&customerB,
 	); st["status"] != "overdue" ||
-		st["runHoursSinceCleaning"].(float64) != 200 {
+		asNum(t, st["runHoursSinceCleaning"]) != 200 {
 		t.Fatalf("run time since an older cleaning: %v", st)
 	}
 

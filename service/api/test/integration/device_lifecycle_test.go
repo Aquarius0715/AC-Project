@@ -91,10 +91,10 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 		base, _ = time.Parse(
 			time.RFC3339Nano,
-			data(resp)["createdAt"].(string),
+			asStr(t, data(resp)["createdAt"]),
 		) // the server's business time (a shared demo cluster may run ahead of clock)
 
-		return data(resp)["id"].(string)
+		return asStr(t, data(resp)["id"])
 	}
 	// check: queued until the tick one second after creation, then running and connecting
 	check := start("check")
@@ -233,7 +233,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		t.Fatalf("firmware v1: %d %v", code, res)
 	}
 
-	back := data(res)["id"].(string)
+	back := asStr(t, data(res)["id"])
 
 	tick(base.Add(time.Second))
 	result(back, "failed", base.Add(5*time.Second))
@@ -686,7 +686,7 @@ func TestDeviceEvents(t *testing.T) {
 			`","bindingId":"`+uuid.NewString()+`","kind":"tamper","sequence":9}`,
 		0,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["bindingId"] == nil {
+		asObj(t, res["fieldErrors"])["bindingId"] == nil {
 		t.Errorf("binding mismatch: %d %v", code, res)
 	}
 

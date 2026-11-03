@@ -68,7 +68,7 @@ func TestUnitsCoverage(t *testing.T) {
 
 		out := map[string]map[string]any{}
 		for _, it := range items(res) {
-			out[it["unitId"].(string)] = it
+			out[asStr(t, it["unitId"])] = it
 		}
 
 		return out
@@ -81,7 +81,7 @@ func TestUnitsCoverage(t *testing.T) {
 	}
 
 	if lobby := all[seed.ID("unit-limited").String()]; lobby["status"] != "contract" ||
-		len(lobby["contractIds"].([]any)) == 0 {
+		len(asArr(t, lobby["contractIds"])) == 0 {
 		t.Fatalf("contract coverage: %v", lobby)
 	}
 	// a job completed under warranty whose accepted report lists replaced parts is claimable until a claim is filed
@@ -101,8 +101,8 @@ func TestUnitsCoverage(t *testing.T) {
 	)
 
 	claimable := func() bool {
-		for _, j := range byUnit(`{"filters":{"customerId":"` + seed.ID("cust-a").String() +
-			`"},"limit":100}`)[seed.ID("unit-non-rto").String()]["claimableJobIds"].([]any) {
+		for _, j := range asArr(t, byUnit(`{"filters":{"customerId":"` + seed.ID("cust-a").String() +
+			`"},"limit":100}`)[seed.ID("unit-non-rto").String()]["claimableJobIds"]) {
 			if j == job {
 				return true
 			}

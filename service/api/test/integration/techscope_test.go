@@ -85,7 +85,7 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 
 		var got []string
 		for _, it := range items(res) {
-			got = append(got, name[it["id"].(string)])
+			got = append(got, name[asStr(t, it["id"])])
 		}
 
 		sort.Strings(got)

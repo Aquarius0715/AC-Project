@@ -137,7 +137,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		uv,
 		jv,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["endAction"] != apperr.KeyUnsupportedAction {
+		asObj(t, res["fieldErrors"])["endAction"] != apperr.KeyUnsupportedAction {
 		t.Errorf("an end action the unit does not support: %d %v", code, res)
 	}
 
@@ -150,9 +150,9 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	r1 := data(resp)["id"].(string)
+	r1 := asStr(t, data(resp)["id"])
 
-	start := data(resp)["startCommandId"].(string)
+	start := asStr(t, data(resp)["startCommandId"])
 
 	if code, res := write(
 		srv,
@@ -189,7 +189,11 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Fatalf("end requested: %v", resp)
 	}
 
-	if !ackCommand(t, data(resp)["endCommandId"].(string), clock.Add(6*time.Minute+3*time.Second)) {
+	if !ackCommand(
+		t,
+		asStr(t, data(resp)["endCommandId"]),
+		clock.Add(6*time.Minute+3*time.Second),
+	) {
 		t.Fatal("end ack")
 	}
 
@@ -207,7 +211,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Fatalf("second run: %d %v", code, resp)
 	}
 
-	r2 := data(resp)["id"].(string)
+	r2 := asStr(t, data(resp)["id"])
 
 	_, err = schedTick(
 		ctx,
@@ -233,8 +237,8 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Fatalf("third run: %d %v", code, resp)
 	}
 
-	r3 := data(resp)["id"].(string)
-	ackCommand(t, data(resp)["startCommandId"].(string), clock.Add(time.Second))
+	r3 := asStr(t, data(resp)["id"])
+	ackCommand(t, asStr(t, data(resp)["startCommandId"]), clock.Add(time.Second))
 
 	rid := uuid.NewString()
 	owner(
@@ -283,8 +287,8 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Fatalf("fourth run: %d %v", code, resp)
 	}
 
-	r4 := data(resp)["id"].(string)
-	ackCommand(t, data(resp)["startCommandId"].(string), clock.Add(time.Second))
+	r4 := asStr(t, data(resp)["id"])
+	ackCommand(t, asStr(t, data(resp)["startCommandId"]), clock.Add(time.Second))
 	owner(t, `UPDATE devices.devices SET connection = 'offline' WHERE unit_id = $1`, unit)
 
 	_, err = schedTick(ctx, srv, clock.Add(3*time.Minute))

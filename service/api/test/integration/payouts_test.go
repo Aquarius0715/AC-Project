@@ -107,9 +107,9 @@ func TestPayouts(t *testing.T) {
 	}
 
 	stmtOf := func(m map[string]any) map[string]any {
-		for _, x := range m["data"].([]any) {
-			if x.(map[string]any)["contractorOrgId"] == org.String() {
-				return x.(map[string]any)
+		for _, x := range asArr(t, m["data"]) {
+			if asObj(t, x)["contractorOrgId"] == org.String() {
+				return asObj(t, x)
 			}
 		}
 
@@ -118,12 +118,12 @@ func TestPayouts(t *testing.T) {
 	_, resp := gen("2026-07")
 
 	july := stmtOf(resp)
-	if july == nil || july["netMinor"].(float64) != 45000 ||
+	if july == nil || asNum(t, july["netMinor"]) != 45000 ||
 		july["payDate"] != "2026-08-15T00:00:00Z" {
 		t.Fatalf("july: %v", resp)
 	}
 
-	jid := july["id"].(string)
+	jid := asStr(t, july["id"])
 	if code, _ := post(srv, &contrB, "payouts.get", `{"id":"`+jid+`"}`); code != 404 {
 		t.Error("contractor sees a draft")
 	}
@@ -161,7 +161,7 @@ func TestPayouts(t *testing.T) {
 		t.Errorf("approve twice: %d %v", code, res)
 	}
 	// question on the July line, answered with an adjustment
-	line := july["lines"].([]any)[0].(map[string]any)["id"].(string)
+	line := asStr(t, asObj(t, asArr(t, july["lines"])[0])["id"])
 
 	if code, _ := write(
 		srv,
@@ -202,7 +202,7 @@ func TestPayouts(t *testing.T) {
 		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"Travel was not included"}`,
 		2,
 	); code != 200 ||
-		data(res)["queries"].([]any)[0].(map[string]any)["state"] != "open" {
+		asObj(t, asArr(t, data(res)["queries"])[0])["state"] != "open" {
 		t.Fatalf("query: %d %v", code, res)
 	}
 
@@ -218,7 +218,7 @@ func TestPayouts(t *testing.T) {
 
 	_, resp = post(srv, &hq, "payouts.get", `{"id":"`+jid+`"}`)
 
-	q := data(resp)["queries"].([]any)[0].(map[string]any)["id"].(string)
+	q := asStr(t, asObj(t, asArr(t, data(resp)["queries"])[0])["id"])
 	if code, res := write(
 		srv,
 		&hq,
@@ -248,7 +248,7 @@ func TestPayouts(t *testing.T) {
 		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"Added travel","adjustmentMinor":12000}`,
 		3,
 	); code != 200 ||
-		data(res)["queries"].([]any)[0].(map[string]any)["state"] != "adjusted" {
+		asObj(t, asArr(t, data(res)["queries"])[0])["state"] != "adjusted" {
 		t.Fatalf("resolve: %d %v", code, res)
 	}
 
@@ -289,9 +289,9 @@ func TestPayouts(t *testing.T) {
 
 	var q2 string
 
-	for _, x := range data(resp)["queries"].([]any) { // both were asked at the test clock: pick the open one
-		if x := x.(map[string]any); x["state"] == "open" {
-			q2 = x["id"].(string)
+	for _, x := range asArr(t, data(resp)["queries"]) { // both were asked at the test clock: pick the open one
+		if x := asObj(t, x); x["state"] == "open" {
+			q2 = asStr(t, x["id"])
 		}
 	}
 
@@ -308,9 +308,9 @@ func TestPayouts(t *testing.T) {
 	_, resp = gen("2026-08")
 
 	aug := stmtOf(resp)
-	if aug == nil || aug["grossMinor"].(float64) != 30000+45000+12000 ||
-		aug["deductionsMinor"].(float64) != 5000+3000 ||
-		len(aug["lines"].([]any)) != 5 {
+	if aug == nil || asNum(t, aug["grossMinor"]) != 30000+45000+12000 ||
+		asNum(t, aug["deductionsMinor"]) != 5000+3000 ||
+		len(asArr(t, aug["lines"])) != 5 {
 		t.Fatalf("august: %v", aug)
 	}
 	// regenerating keeps the approved July statement and replaces the August draft
@@ -323,7 +323,7 @@ func TestPayouts(t *testing.T) {
 	if a2 := stmtOf(
 		resp,
 	); a2 == nil || a2["id"] == aug["id"] ||
-		a2["grossMinor"].(float64) != 87000 {
+		asNum(t, a2["grossMinor"]) != 87000 {
 		t.Fatalf("august regenerated: %v", a2)
 	}
 	// paying: not before the pay date, not a draft
@@ -446,16 +446,16 @@ func TestPayoutWithoutRateCard(t *testing.T) {
 		t.Fatalf("generate: %d %v", code, res)
 	}
 
-	for _, x := range res["data"].([]any) {
-		st := x.(map[string]any)
+	for _, x := range asArr(t, res["data"]) {
+		st := asObj(t, x)
 		if st["contractorOrgId"] != org.String() {
 			continue
 		}
 
-		lines := st["lines"].([]any)
-		if l := lines[0].(map[string]any); len(lines) != 1 || l["note"] != "no rate card" ||
-			l["amountMinor"].(float64) != 0 ||
-			st["netMinor"].(float64) != 0 {
+		lines := asArr(t, st["lines"])
+		if l := asObj(t, lines[0]); len(lines) != 1 || l["note"] != "no rate card" ||
+			asNum(t, l["amountMinor"]) != 0 ||
+			asNum(t, st["netMinor"]) != 0 {
 			t.Errorf("statement without a rate card: %v", st)
 		}
 

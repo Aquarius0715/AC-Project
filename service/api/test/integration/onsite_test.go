@@ -29,7 +29,7 @@ func assignedNow(t *testing.T, srv *apiserver.Server) string {
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	if code, res := write(
@@ -112,7 +112,7 @@ func TestOnSiteOperations(t *testing.T) {
 	clientName := func() any {
 		_, m := post(srv, &customerA, "jobs.get", `{"jobId":"`+job+`"}`)
 
-		return data(m)["assignment"].(map[string]any)["technicianName"]
+		return asObj(t, data(m)["assignment"])["technicianName"]
 	}
 	if n := clientName(); n != nil {
 		t.Errorf("technician name before acceptance: %v", n)
@@ -138,7 +138,7 @@ func TestOnSiteOperations(t *testing.T) {
 		&hq,
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); data(m)["assignment"].(map[string]any)["technicianName"] != nil {
+	); asObj(t, data(m)["assignment"])["technicianName"] != nil {
 		t.Error("only the client projection carries the name")
 	}
 
@@ -235,7 +235,7 @@ func TestOnSiteOperations(t *testing.T) {
 
 	tos, _ := data(resp)["timeOnSite"].(map[string]any)
 	if code != 200 || tos["arrivedAt"] == nil || tos["checkInMethod"] != "location_qr" ||
-		tos["distanceMeters"].(float64) != 200 {
+		asNum(t, tos["distanceMeters"]) != 200 {
 		t.Fatalf("checkIn: %d %v", code, resp)
 	}
 
@@ -266,7 +266,7 @@ func TestOnSiteOperations(t *testing.T) {
 		`{"jobId":"`+job+`","paused":true}`,
 		5,
 	); code != 200 ||
-		len(data(res)["timeOnSite"].(map[string]any)["pauses"].([]any)) != 1 {
+		len(asArr(t, asObj(t, data(res)["timeOnSite"])["pauses"])) != 1 {
 		t.Fatalf("pause: %d %v", code, res)
 	}
 
@@ -287,7 +287,7 @@ func TestOnSiteOperations(t *testing.T) {
 		`{"jobId":"`+job+`","paused":false}`,
 		6,
 	); code != 200 ||
-		data(res)["timeOnSite"].(map[string]any)["pauses"].([]any)[0].(map[string]any)["to"] == nil {
+		asObj(t, asArr(t, asObj(t, data(res)["timeOnSite"])["pauses"])[0])["to"] == nil {
 		t.Fatalf("resume: %d", code)
 	}
 
@@ -312,7 +312,7 @@ func TestOnSiteOperations(t *testing.T) {
 		2,
 	); code != 200 ||
 		data(res)["status"] != "in_progress" ||
-		data(res)["timeOnSite"].(map[string]any)["checkInReason"] != "QR label damaged" {
+		asObj(t, data(res)["timeOnSite"])["checkInReason"] != "QR label damaged" {
 		t.Fatalf("manual checkIn: %d %v", code, res)
 	}
 

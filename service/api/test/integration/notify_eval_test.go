@@ -71,8 +71,8 @@ func TestAutomationNotifications(t *testing.T) {
 		) + `","unitIds":["` + unitID + `","` + lonely + `"],"facts":[` + facts + `],"phase":"condition"}`
 	}
 	outcome := func(m map[string]any, unit, pol string) map[string]any {
-		for _, n := range data(m)["notifications"].([]any) {
-			if x := n.(map[string]any); x["unitId"] == unit && x["policyId"] == pol {
+		for _, n := range asArr(t, data(m)["notifications"]) {
+			if x := asObj(t, n); x["unitId"] == unit && x["policyId"] == pol {
 				return x
 			}
 		}
@@ -88,8 +88,8 @@ func TestAutomationNotifications(t *testing.T) {
 		t.Fatalf("simulate: %d %v", code, resp)
 	}
 
-	for _, r := range data(resp)["results"].([]any) {
-		if x := r.(map[string]any); x["reason"] != "no_control_action" {
+	for _, r := range asArr(t, data(resp)["results"]) {
+		if x := asObj(t, r); x["reason"] != "no_control_action" {
 			t.Errorf("alert-only units: %v", x)
 		}
 	}
@@ -128,14 +128,14 @@ func TestAutomationNotifications(t *testing.T) {
 
 	created := outcome(resp, unitID, withRecipient)
 	if code != 200 || created["decision"] != "created" ||
-		len(created["notificationIds"].([]any)) != 2 ||
-		len(created["failureIds"].([]any)) != 0 {
+		len(asArr(t, created["notificationIds"])) != 2 ||
+		len(asArr(t, created["failureIds"])) != 0 {
 		t.Fatalf("fire: %d %v", code, resp)
 	}
 
 	failed := outcome(resp, lonely, noRecipient)
-	if failed["decision"] != "failed" || len(failed["failureIds"].([]any)) != 1 ||
-		len(failed["notificationIds"].([]any)) != 0 {
+	if failed["decision"] != "failed" || len(asArr(t, failed["failureIds"])) != 1 ||
+		len(asArr(t, failed["notificationIds"])) != 0 {
 		t.Errorf("no recipient: %v", failed)
 	}
 
@@ -188,7 +188,7 @@ func TestAutomationNotifications(t *testing.T) {
 		lonely,
 		noRecipient,
 	); again["decision"] != "failed" ||
-		len(again["failureIds"].([]any)) != 1 {
+		len(asArr(t, again["failureIds"])) != 1 {
 		t.Fatalf("second event: %v", again)
 	}
 
@@ -528,7 +528,7 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 		"session.get",
 		`{}`,
 	) // the business time of the server (a shared demo cluster may run ahead of clock)
-	now, _ := time.Parse(time.RFC3339Nano, sess["meta"].(map[string]any)["snapshotAt"].(string))
+	now, _ := time.Parse(time.RFC3339Nano, asStr(t, asObj(t, sess["meta"])["snapshotAt"]))
 	tenant, cust := seed.ID("tenant-a"), seed.ID("cust-b")
 	pol := uuid.NewString()
 	cond, _ := json.Marshal(

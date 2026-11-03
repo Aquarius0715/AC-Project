@@ -40,7 +40,7 @@ func newInvoice(t *testing.T, srv *apiserver.Server) (string, string) {
 		t.Fatalf("contract: %d %v", code, res)
 	}
 
-	key := data(res)["id"].(string)
+	key := asStr(t, data(res)["id"])
 
 	code, res = write(
 		srv,
@@ -59,7 +59,7 @@ func newInvoice(t *testing.T, srv *apiserver.Server) (string, string) {
 		t.Fatalf("invoice: %d %v", code, res)
 	}
 
-	return key, data(res)["id"].(string)
+	return key, asStr(t, data(res)["id"])
 }
 
 func TestPaymentSimulation(t *testing.T) {
@@ -118,7 +118,7 @@ func TestPaymentSimulation(t *testing.T) {
 		t.Fatalf("initiate: %d %v", code, resp)
 	}
 
-	pay := data(resp)["id"].(string)
+	pay := asStr(t, data(resp)["id"])
 
 	ev := func(event string) string {
 		return `,"eventId":"` + uuid.NewString() + `","paymentReference":"REF-` + pay[:8] + `"`
@@ -144,7 +144,7 @@ func TestPaymentSimulation(t *testing.T) {
 		`{"event":"processing","paymentId":"`+pay+`","eventId":"`+e1+`","paymentReference":"REF-`+pay[:8]+`"}`,
 		2,
 	); code != 200 ||
-		data(m)["version"].(float64) != 2 {
+		asNum(t, data(m)["version"]) != 2 {
 		t.Fatalf("same event replay: %d %v", code, m)
 	}
 
@@ -209,7 +209,7 @@ func TestPaymentSimulation(t *testing.T) {
 		t.Fatalf("second initiate: %d %v", code, resp)
 	}
 
-	pay = data(resp)["id"].(string)
+	pay = asStr(t, data(resp)["id"])
 	sim(`{"event":"processing","paymentId":"`+pay+`"`+ev("processing")+`}`, 1)
 
 	if code, m := sim(
@@ -230,7 +230,7 @@ func TestPaymentSimulation(t *testing.T) {
 		"invoices.get",
 		`{"id":"`+inv+`"}`,
 	); data(res)["status"] != "paid" ||
-		len(data(res)["paymentRefs"].([]any)) != 2 {
+		len(asArr(t, data(res)["paymentRefs"])) != 2 {
 		t.Fatalf("paid: %v", res)
 	}
 
@@ -252,7 +252,7 @@ func TestPaymentSimulation(t *testing.T) {
 		t.Fatalf("initiate another invoice: %d %v", code, resp)
 	}
 
-	pay2 := data(resp)["id"].(string)
+	pay2 := asStr(t, data(resp)["id"])
 	sim(
 		`{"event":"processing","paymentId":"`+pay2+`","eventId":"`+uuid.NewString()+`","paymentReference":"P-`+pay2[:8]+`"}`,
 		1,
@@ -379,7 +379,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	reason := func(who *actor) any {
 		_, d := post(srv, who, "invoices.get", `{"id":"`+inv+`"}`)
 
-		return data(d)["paymentRefs"].([]any)[0].(map[string]any)["confirmationReason"]
+		return asObj(t, asArr(t, data(d)["paymentRefs"])[0])["confirmationReason"]
 	}
 	if r := reason(&hq); r != "bank transfer seen" {
 		t.Errorf("hq confirmation reason %v", r)
@@ -430,7 +430,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		t.Fatalf("initiate: %d %v", code, res)
 	}
 
-	pay := data(res)["id"].(string)
+	pay := asStr(t, data(res)["id"])
 
 	confirm := func(v int) (int, map[string]any) {
 		return write(
@@ -510,7 +510,7 @@ func TestManualAfterFailedPayment(t *testing.T) {
 		t.Fatalf("initiate: %d %v", code, res)
 	}
 
-	pay := data(res)["id"].(string)
+	pay := asStr(t, data(res)["id"])
 
 	manual := func(v int) (int, map[string]any) {
 		return write(
@@ -566,7 +566,7 @@ func TestInvoiceOnePaymentAtATime(t *testing.T) {
 		t.Fatalf("initiate: %d %v", code, m)
 	}
 
-	pay := data(m)["id"].(string)
+	pay := asStr(t, data(m)["id"])
 	if code, m := sim(
 		initiate,
 		invoiceVersion(),

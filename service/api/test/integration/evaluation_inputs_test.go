@@ -82,7 +82,7 @@ func TestEvaluationInputValidation(t *testing.T) {
 		},
 	} {
 		code, m := post(srv, &customerB, "automations.simulate", body(c.fields))
-		if code != 422 || m["fieldErrors"].(map[string]any)[c.field] == nil {
+		if code != 422 || asObj(t, m["fieldErrors"])[c.field] == nil {
 			t.Errorf("%s: %d %v", name, code, m)
 		}
 	}
@@ -122,7 +122,7 @@ func TestEvaluationInputValidation(t *testing.T) {
 			},
 		),
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["occurredAt"] != "errors.not_current_tick" {
+		asObj(t, res["fieldErrors"])["occurredAt"] != "errors.not_current_tick" {
 		t.Fatalf("simulate outside the current tick: %d %v", code, res)
 	}
 }
@@ -154,7 +154,7 @@ func TestEvaluationFireReplay(t *testing.T) {
 			`","metric":"occupied","value":` + occupied + `,"unit":"boolean","observedAt":"` + at +
 			`","quality":"valid"}],"phase":"condition"}`
 	}
-	decision := func(m map[string]any) map[string]any { return data(m)["results"].([]any)[0].(map[string]any) }
+	decision := func(m map[string]any) map[string]any { return asObj(t, asArr(t, data(m)["results"])[0]) }
 	e1 := uuid.NewString()
 
 	code, first := write(srv, &customerB, "automations.fire", input(e1, "true", at), 0)
@@ -216,7 +216,7 @@ func TestEvaluationFireReplay(t *testing.T) {
 		input(uuid.NewString(), "true", clock.Add(-time.Minute).Format(time.RFC3339)),
 		0,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["occurredAt"] != "errors.not_current_tick" {
+		asObj(t, res["fieldErrors"])["occurredAt"] != "errors.not_current_tick" {
 		t.Fatalf("a past tick: %d %v", code, res)
 	}
 

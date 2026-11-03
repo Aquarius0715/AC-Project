@@ -30,7 +30,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 	unit := seed.ID("unit-non-rto").String()
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, resp := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 	s2 := slotJSON(49, 2)
 	offerBody := func(extra map[string]string) string {
 		f := map[string]string{
@@ -164,7 +164,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 
 	code, resp = acc(&contrA, "terms-v1", 2)
 	if code != 200 || data(resp)["decision"] != "accept" ||
-		data(resp)["jobVersion"].(float64) != 3 ||
+		asNum(t, data(resp)["jobVersion"]) != 3 ||
 		len(data(resp)) != 4 {
 		t.Fatalf("accept: %d %v", code, resp)
 	}
@@ -243,7 +243,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		&contrA,
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); data(g)["assignment"].(map[string]any)["acknowledgement"] != "pending" {
+	); asObj(t, data(g)["assignment"])["acknowledgement"] != "pending" {
 		t.Errorf("the assignment waits for the technician: %v", data(g)["assignment"])
 	}
 
@@ -259,7 +259,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	key := data(resp)["id"].(string)
+	key := asStr(t, data(resp)["id"])
 
 	s1 := slotJSON(25, 2)
 	if code, _ := asg(&hq, key, "tech-external-a", s1, 1, ""); code != 403 {
@@ -362,7 +362,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	l := data(resp)["id"].(string)
+	l := asStr(t, data(resp)["id"])
 
 	owner(t, `UPDATE maintenance.jobs SET status = 'requested' WHERE id = $1`, key)
 	owner(
@@ -385,7 +385,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		jobBody(other, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	if code, _ := asg(&hq, data(resp)["id"].(string), "tech-internal-a", s1, 1, ""); code != 403 {
+	if code, _ := asg(&hq, asStr(t, data(resp)["id"]), "tech-internal-a", s1, 1, ""); code != 403 {
 		t.Error("technician out of scope")
 	}
 
@@ -402,7 +402,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 	}), 0)
 	if code, _ := asg(
 		&hq,
-		data(resp)["id"].(string),
+		asStr(t, data(resp)["id"]),
 		"tech-internal-a",
 		lateSlot,
 		1,
@@ -413,7 +413,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 
 	// decline and expiry
 	_, resp = write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	job = data(resp)["id"].(string)
+	job = asStr(t, data(resp)["id"])
 
 	write(srv, &hq, "jobs.offer", offerBody(nil), 1)
 	ownerScan(
@@ -501,7 +501,7 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	job := data(res)["id"].(string)
+	job := asStr(t, data(res)["id"])
 	owner(
 		t,
 		`INSERT INTO maintenance.slot_proposals (tenant_id, job_id, source, slot, hold, message, reply_by, status)
@@ -619,7 +619,7 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 			b,
 			1,
 		); code != 422 ||
-			resp["fieldErrors"].(map[string]any)["_"] != apperr.KeyMalformedInput {
+			asObj(t, resp["fieldErrors"])["_"] != apperr.KeyMalformedInput {
 			t.Errorf("%s with the other decision's field: %d %v", op, code, resp)
 		}
 	}
@@ -631,7 +631,7 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		`{"jobId":"`+job+`","offerId":"`+uuid.NewString()+`"}`,
 		1,
 	); code != 422 ||
-		resp["fieldErrors"].(map[string]any)["reason"] != apperr.KeyLength {
+		asObj(t, resp["fieldErrors"])["reason"] != apperr.KeyLength {
 		t.Errorf("decline without a reason: %d %v", code, resp)
 	}
 
@@ -642,7 +642,7 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		`{"jobId":"`+job+`","offerId":"`+uuid.NewString()+`"}`,
 		1,
 	); code != 422 ||
-		resp["fieldErrors"].(map[string]any)["termsVersion"] != apperr.KeyRequired {
+		asObj(t, resp["fieldErrors"])["termsVersion"] != apperr.KeyRequired {
 		t.Errorf("accept without terms: %d %v", code, resp)
 	}
 
@@ -671,7 +671,7 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 	}
 	// contractor outside the access window
 	_, res = write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	j2 := data(res)["id"].(string)
+	j2 := asStr(t, data(res)["id"])
 	write(
 		srv,
 		&hq,
@@ -757,7 +757,7 @@ func TestAssignWithinAccess(t *testing.T) {
 		t.Fatalf("create: %d %v", code, res)
 	}
 
-	job := data(res)["id"].(string)
+	job := asStr(t, data(res)["id"])
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 
 	assign := func(from, to int) (int, map[string]any) {
@@ -829,7 +829,7 @@ func TestReleaseEndedAccess(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	if code, res := write(
@@ -949,7 +949,7 @@ func TestReleaseEndedAccessContractor(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		&hq,
@@ -1118,7 +1118,7 @@ func TestReleaseQualificationEnded(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		&hq,
@@ -1197,7 +1197,7 @@ func TestReleaseQualificationEnded(t *testing.T) {
 			srv,
 			&hq,
 			"certificates.verify",
-			`{"certificateId":"`+data(res)["id"].(string)+`","decision":"approve"}`,
+			`{"certificateId":"`+asStr(t, data(res)["id"])+`","decision":"approve"}`,
 			1,
 		); code != 200 {
 			t.Fatalf("approve: %d %v", code, reply)
@@ -1265,7 +1265,7 @@ func TestPastSlotsRefused(t *testing.T) {
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
 	)
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 	// the client's preferred times have all passed
 	owner(
 		t,
@@ -1326,7 +1326,7 @@ func TestPastSlotsRefused(t *testing.T) {
 		0,
 	)
 
-	later := data(resp)["id"].(string)
+	later := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		&hq,
@@ -1367,7 +1367,7 @@ func TestExtensionRefreezesTechnicianHistory(t *testing.T) {
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
 
-	job := data(m)["id"].(string)
+	job := asStr(t, data(m)["id"])
 	if code, res := write(
 		srv,
 		&hq,

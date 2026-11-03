@@ -44,7 +44,7 @@ func TestUnitsImport(t *testing.T) {
 		t.Fatalf("property: %d %v", code, resp)
 	}
 
-	propID := data(resp)["id"].(string)
+	propID := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		&hq,
@@ -129,8 +129,8 @@ func TestUnitsImport(t *testing.T) {
 	}
 
 	p := data(resp)
-	if p["readyCount"].(float64) != 2 || p["warningCount"].(float64) != 3 ||
-		p["errorCount"].(float64) != 8 {
+	if asNum(t, p["readyCount"]) != 2 || asNum(t, p["warningCount"]) != 3 ||
+		asNum(t, p["errorCount"]) != 8 {
 		t.Fatalf(
 			"counts: %v %v %v / rows %v",
 			p["readyCount"],
@@ -140,13 +140,13 @@ func TestUnitsImport(t *testing.T) {
 		)
 	}
 
-	previewID := p["previewId"].(string)
+	previewID := asStr(t, p["previewId"])
 	keys := map[string]string{}
 
-	for _, r := range p["rows"].([]any) {
-		row := r.(map[string]any)
+	for _, r := range asArr(t, p["rows"]) {
+		row := asObj(t, r)
 		if k, ok := row["messageKey"].(string); ok {
-			keys[row["unitName"].(string)] = k
+			keys[asStr(t, row["unitName"])] = k
 		}
 	}
 
@@ -213,7 +213,7 @@ func TestUnitsImport(t *testing.T) {
 		t.Fatalf("preview again: %d %v", code, resp)
 	}
 
-	previewID = data(resp)["previewId"].(string)
+	previewID = asStr(t, data(resp)["previewId"])
 
 	code, resp = write(
 		srv,
@@ -227,9 +227,9 @@ func TestUnitsImport(t *testing.T) {
 	}
 
 	imp := data(resp)
-	if len(imp["createdUnitIds"].([]any)) != 5 || len(imp["createdSpaceIds"].([]any)) != 1 ||
-		len(imp["createdPropertyIds"].([]any)) != 1 ||
-		len(imp["skippedRowNumbers"].([]any)) != 8 ||
+	if len(asArr(t, imp["createdUnitIds"])) != 5 || len(asArr(t, imp["createdSpaceIds"])) != 1 ||
+		len(asArr(t, imp["createdPropertyIds"])) != 1 ||
+		len(asArr(t, imp["skippedRowNumbers"])) != 8 ||
 		imp["state"] != "imported" {
 		t.Fatalf("import result: %v", imp)
 	}
@@ -256,9 +256,9 @@ func TestUnitsImport(t *testing.T) {
 	for _, u := range items(resp) {
 		switch u["displayName"] {
 		case "Desk AC 1":
-			desk = u["id"].(string)
+			desk = asStr(t, u["id"])
 		case "Serial AC":
-			serialUnit = u["id"].(string)
+			serialUnit = asStr(t, u["id"])
 		}
 	}
 	// CSV dates are Kuala Lumpur calendar dates
@@ -294,7 +294,7 @@ func TestUnitsImport(t *testing.T) {
 	}
 
 	// undo: stale version, success, twice
-	importID := imp["id"].(string)
+	importID := asStr(t, imp["id"])
 	if code, _ := write(
 		srv,
 		&hq,
@@ -377,11 +377,11 @@ func TestUnitsImport(t *testing.T) {
 		srv,
 		&hq,
 		"units.importCommit",
-		`{"previewId":"`+data(resp)["previewId"].(string)+`","customerId":"`+cust+`"}`,
+		`{"previewId":"`+asStr(t, data(resp)["previewId"])+`","customerId":"`+cust+`"}`,
 		0,
 	)
 	imp2 := data(resp)
-	unit := imp2["createdUnitIds"].([]any)[0].(string)
+	unit := asStr(t, asArr(t, imp2["createdUnitIds"])[0])
 	owner(
 		t,
 		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
@@ -398,7 +398,7 @@ func TestUnitsImport(t *testing.T) {
 		srv,
 		&hq,
 		"units.importUndo",
-		`{"importId":"`+imp2["id"].(string)+`","reason":"x"}`,
+		`{"importId":"`+asStr(t, imp2["id"])+`","reason":"x"}`,
 		1,
 	); code != 409 ||
 		res["messageKey"] != "error.importUnitInUse" {
@@ -416,7 +416,7 @@ func TestUnitsImport(t *testing.T) {
 		srv,
 		&hq,
 		"units.importUndo",
-		`{"importId":"`+imp2["id"].(string)+`","reason":"x"}`,
+		`{"importId":"`+asStr(t, imp2["id"])+`","reason":"x"}`,
 		1,
 	); code != 409 ||
 		res["messageKey"] != "error.undoWindowClosed" {
@@ -435,7 +435,7 @@ func TestUnitsImport(t *testing.T) {
 		srv,
 		&hq,
 		"units.importCommit",
-		`{"previewId":"`+data(resp)["previewId"].(string)+`","customerId":"`+cust+`"}`,
+		`{"previewId":"`+asStr(t, data(resp)["previewId"])+`","customerId":"`+cust+`"}`,
 		0,
 	); code != 409 {
 		t.Error("expired preview")
@@ -478,7 +478,7 @@ func TestUnitsImportRefusals(t *testing.T) {
 	if code, m := preview(
 		`"Property,Unit`,
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["csvText"] != apperr.KeyMalformedCsv {
+		asObj(t, m["fieldErrors"])["csvText"] != apperr.KeyMalformedCsv {
 		t.Errorf("a header that is not CSV: %d %v", code, m)
 	}
 	// a long unit name and a tampered device are row errors
@@ -505,10 +505,10 @@ func TestUnitsImportRefusals(t *testing.T) {
 
 	keys := map[string]string{}
 
-	for _, r := range data(resp)["rows"].([]any) {
-		row := r.(map[string]any)
+	for _, r := range asArr(t, data(resp)["rows"]) {
+		row := asObj(t, r)
 		if k, ok := row["messageKey"].(string); ok {
-			keys[row["unitName"].(string)] = k
+			keys[asStr(t, row["unitName"])] = k
 		}
 	}
 
@@ -522,7 +522,7 @@ func TestUnitsImportRefusals(t *testing.T) {
 		t.Fatalf("preview: %d %v", code, resp)
 	}
 
-	stale := data(resp)["previewId"].(string)
+	stale := asStr(t, data(resp)["previewId"])
 
 	if code, res := write(
 		srv,
@@ -557,7 +557,7 @@ func TestUnitsImportRefusals(t *testing.T) {
 		srv,
 		&hq,
 		"units.importCommit",
-		`{"previewId":"`+data(resp)["previewId"].(string)+`","customerId":"`+cust.String()+`"}`,
+		`{"previewId":"`+asStr(t, data(resp)["previewId"])+`","customerId":"`+cust.String()+`"}`,
 		0,
 	)
 	owner(t, `UPDATE assets.customers SET status = 'active' WHERE id = $1`, cust)
@@ -585,7 +585,7 @@ func TestUnitsImportRevalidation(t *testing.T) {
 			srv,
 			&hq,
 			"units.importCommit",
-			`{"previewId":"`+data(pm)["previewId"].(string)+`","customerId":"`+cust+`"}`,
+			`{"previewId":"`+asStr(t, data(pm)["previewId"])+`","customerId":"`+cust+`"}`,
 			0,
 		)
 
@@ -597,8 +597,8 @@ func TestUnitsImportRevalidation(t *testing.T) {
 	code, resp, p := commit(
 		header + twin + ",,,Twin AC 1,SPL-100,,,\n" + twin + ",,,Twin AC 2,SPL-100,,,\n",
 	)
-	if code != 200 || len(data(resp)["createdPropertyIds"].([]any)) != 1 ||
-		len(data(resp)["createdUnitIds"].([]any)) != 2 {
+	if code != 200 || len(asArr(t, data(resp)["createdPropertyIds"])) != 1 ||
+		len(asArr(t, data(resp)["createdUnitIds"])) != 2 {
 		t.Fatalf("one new property for two rows: %d %v (preview %v)", code, resp, p["rows"])
 	}
 
@@ -625,7 +625,7 @@ func TestUnitsImportRevalidation(t *testing.T) {
 			header+twin+",,,Late AC,SPL-100,"+serial+",,\n",
 		)+`,"mapping":`+mapping+`}`,
 	)
-	if data(pm)["readyCount"].(float64) != 1 {
+	if asNum(t, data(pm)["readyCount"]) != 1 {
 		t.Fatalf("preview with a free serial: %v", pm)
 	}
 
@@ -646,7 +646,7 @@ func TestUnitsImportRevalidation(t *testing.T) {
 		srv,
 		&hq,
 		"units.importCommit",
-		`{"previewId":"`+data(pm)["previewId"].(string)+`","customerId":"`+cust+`"}`,
+		`{"previewId":"`+asStr(t, data(pm)["previewId"])+`","customerId":"`+cust+`"}`,
 		0,
 	); code != 409 ||
 		res["messageKey"] != apperr.KeyPreviewExpired {

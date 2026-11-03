@@ -65,10 +65,10 @@ func TestJobsCreate(t *testing.T) {
 
 	j := data(resp)
 	if code != 200 || j["status"] != "requested" || j["origin"] != "client_request" ||
-		len(j["preferredSlots"].([]any)) != 3 ||
+		len(asArr(t, j["preferredSlots"])) != 3 ||
 		j["dueAt"] != clock.Add(27*time.Hour).Format(time.RFC3339) ||
 		j["contactWindow"] != "Weekdays 09:00-18:00" ||
-		j["preferenceRound"].(float64) != 1 {
+		asNum(t, j["preferenceRound"]) != 1 {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
@@ -95,7 +95,7 @@ func TestJobsCreate(t *testing.T) {
 		srv,
 		&restrMgr,
 		"jobs.get",
-		`{"jobId":"`+j["id"].(string)+`"}`,
+		`{"jobId":"`+asStr(t, j["id"])+`"}`,
 	); code != 200 ||
 		data(res)["contactWindow"] != "Weekdays 09:00-18:00" {
 		t.Errorf("HQ reader without job.write: %d %v", code, data(res)["contactWindow"])
@@ -114,7 +114,7 @@ func TestJobsCreate(t *testing.T) {
 		),
 		0,
 	)
-	if code != 200 || len(data(resp)["preferredSlots"].([]any)) != 1 ||
+	if code != 200 || len(asArr(t, data(resp)["preferredSlots"])) != 1 ||
 		data(resp)["dueAt"] != clock.Add(48*time.Hour).Format(time.RFC3339) {
 		t.Fatalf("hq create: %d %v", code, resp)
 	}
@@ -259,7 +259,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		jobBody(unit, map[string]string{"contactWindow": `"Mornings"`}),
 		0,
 	)
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 
 	newAlert(t, unit, seed.ID("org-customer-b").String(), "warning", clock.Add(-time.Minute))
 
@@ -366,7 +366,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		"cancelled":        9,
 	}
 	for _, it := range items(resp) {
-		if r := rank[it["status"].(string)]; r < last {
+		if r := rank[asStr(t, it["status"])]; r < last {
 			t.Fatal("status rank order")
 		} else {
 			last = r
@@ -460,7 +460,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	acts := []string{}
 	for _, e := range items(resp) {
-		acts = append(acts, e["action"].(string))
+		acts = append(acts, asStr(t, e["action"]))
 		if n, ok := e["note"].(map[string]any); ok && n["visibility"] == "internal" {
 			t.Fatal("client sees internal note")
 		}
@@ -636,7 +636,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	// client cancels a requested job; offers and assignments of an offered job are closed by HQ cancel
 	_, resp = write(srv, &customerB, "jobs.create", jobBody(unit, nil), 0)
 
-	j2 := data(resp)["id"].(string)
+	j2 := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		&customerB,
@@ -665,7 +665,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	j3 := data(resp)["id"].(string)
+	j3 := asStr(t, data(resp)["id"])
 	owner(t, `UPDATE maintenance.jobs SET status = 'offered' WHERE id = $1`, j3)
 	owner(
 		t,

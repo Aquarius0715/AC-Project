@@ -17,15 +17,17 @@ func TestUnitDetail(t *testing.T) {
 
 	doc := data(res)
 	if code != 200 || doc["capabilities"] == nil ||
-		doc["effectiveControlPolicy"].(map[string]any)["state"] != "unrestricted" ||
-		doc["controlAvailability"].(map[string]any)["state"] != "available" ||
-		len(doc["components"].([]any)) != 18 { // indoor 8 + outdoor 5 + electrical 5 (serviceScope)
+		asObj(t, doc["effectiveControlPolicy"])["state"] != "unrestricted" ||
+		asObj(t, doc["controlAvailability"])["state"] != "available" ||
+		len(
+			asArr(t, doc["components"]),
+		) != 18 { // indoor 8 + outdoor 5 + electrical 5 (serviceScope)
 		t.Fatalf("detail: %d %v", code, res)
 	}
 
-	loc := doc["location"].(map[string]any)
+	loc := asObj(t, doc["location"])
 
-	path := loc["pathLabels"].([]any)
+	path := asArr(t, loc["pathLabels"])
 	if len(path) != 3 || path[0] != "Home A" || path[1] != "1F" || path[2] != "Bedroom" {
 		t.Errorf("path labels: %v", path)
 	}
@@ -36,14 +38,14 @@ func TestUnitDetail(t *testing.T) {
 	// the seeded applied temperature limit restricts the Lobby AC (IR46)
 	_, res = post(srv, &customerA, "units.get", `{"id":"`+seed.ID("unit-limited").String()+`"}`)
 
-	p := data(res)["effectiveControlPolicy"].(map[string]any)
+	p := asObj(t, data(res)["effectiveControlPolicy"])
 	if p["state"] != "restricted" || p["phase"] != "applied" ||
 		p["reasonKey"] != "control.restriction_active" ||
-		p["policy"].(map[string]any)["kind"] != "temperature_limit" {
+		asObj(t, p["policy"])["kind"] != "temperature_limit" {
 		t.Errorf("restricted policy: %v", p)
 	}
 
-	if path := data(res)["location"].(map[string]any)["pathLabels"].([]any); len(path) != 1 {
+	if path := asArr(t, asObj(t, data(res)["location"])["pathLabels"]); len(path) != 1 {
 		t.Errorf("unit without space: %v", path)
 	}
 }

@@ -41,7 +41,7 @@ func TestAlerts(t *testing.T) {
 	ids := func(m map[string]any) []string {
 		out := []string{}
 		for _, it := range items(m) {
-			out = append(out, it["id"].(string))
+			out = append(out, asStr(t, it["id"]))
 		}
 
 		return out
@@ -105,7 +105,7 @@ func TestAlerts(t *testing.T) {
 	}
 
 	_, g := post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
-	if data(g)["activeAlertCount"].(float64) != 2 { // IR51: normal alerts are not counted
+	if asNum(t, data(g)["activeAlertCount"]) != 2 { // IR51: normal alerts are not counted
 		t.Fatalf("activeAlertCount: %v", data(g)["activeAlertCount"])
 	}
 	// acknowledge → resolve, with state and version rules
@@ -218,7 +218,7 @@ func TestAlerts(t *testing.T) {
 	}
 
 	_, g = post(srv, &hq, "units.get", `{"id":"`+unit+`"}`)
-	if data(g)["activeAlertCount"].(float64) != 0 { // only the normal alert is left open (IR51)
+	if asNum(t, data(g)["activeAlertCount"]) != 0 { // only the normal alert is left open (IR51)
 		t.Fatal("resolved alerts are not active")
 	}
 }

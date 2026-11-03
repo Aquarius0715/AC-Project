@@ -96,7 +96,7 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	readings := func() int {
 		_, m := post(srv, &techB, "units.list", `{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`)
 
-		return len(items(m)[0]["latestMeasurements"].([]any))
+		return len(asArr(t, items(m)[0]["latestMeasurements"]))
 	}
 	if n := readings(); n != 0 {
 		t.Fatalf("latestMeasurements before the work window: %d", n)

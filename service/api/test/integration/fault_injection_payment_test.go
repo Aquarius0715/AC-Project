@@ -18,7 +18,7 @@ func TestManualPaymentRollsBackWhenTheInvoiceCannotBePaid(t *testing.T) {
 	ref := "BANK-" + uuid.NewString()[:8]
 	body := `{"invoiceId":"` + inv + `","paymentReference":"` + ref + `","confirmedAmountMinor":` + fmt.Sprintf(
 		"%.0f",
-		amount.(float64),
+		asNum(t, amount),
 	) + `,"currency":"MYR","reason":"bank transfer seen"}`
 
 	broken := injectAt(t, "UPDATE billing.invoices SET status = 'paid'")

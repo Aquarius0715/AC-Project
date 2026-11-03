@@ -77,8 +77,8 @@ func TestDeniedWritesAudited(t *testing.T) {
 	e := got[0]
 	if e["actorRoleAtTime"] != "contractor" || e["result"] != "denied" ||
 		e["reason"] != apperr.KeyForbidden ||
-		e["targetRef"].(map[string]any)["kind"] != "unit" ||
-		e["targetRef"].(map[string]any)["id"] != unit ||
+		asObj(t, e["targetRef"])["kind"] != "unit" ||
+		asObj(t, e["targetRef"])["id"] != unit ||
 		e["correlationId"] == "" {
 		t.Errorf(
 			"the denied entry names the actor, the operation, the target and the refusal: %v",
@@ -89,7 +89,7 @@ func TestDeniedWritesAudited(t *testing.T) {
 	// scope: a contractor reviewing a job HQ keeps in-house (NOT_FOUND) — the job it asked for is the target
 	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
 
-	job := data(m)["id"].(string)
+	job := asStr(t, data(m)["id"])
 	if code, res := write(
 		srv,
 		&contrA,
@@ -103,12 +103,12 @@ func TestDeniedWritesAudited(t *testing.T) {
 	var target any
 
 	for _, a := range denied("jobs.review", contractor) {
-		if a["targetRef"].(map[string]any)["id"] == job {
+		if asObj(t, a["targetRef"])["id"] == job {
 			target = a["targetRef"]
 		}
 	}
 
-	if target == nil || target.(map[string]any)["kind"] != "job" {
+	if target == nil || asObj(t, target)["kind"] != "job" {
 		t.Errorf("the scope refusal records the job asked for: %v", target)
 	}
 	// a refused read is not audited

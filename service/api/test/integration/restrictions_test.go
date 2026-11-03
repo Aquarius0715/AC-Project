@@ -83,7 +83,7 @@ func overdueContract(t *testing.T, srv *apiserver.Server, units ...string) (stri
 		t.Fatalf("contract: %d %v", code, res)
 	}
 
-	key := data(res)["id"].(string)
+	key := asStr(t, data(res)["id"])
 
 	code, res = write(
 		srv,
@@ -102,7 +102,7 @@ func overdueContract(t *testing.T, srv *apiserver.Server, units ...string) (stri
 		t.Fatalf("invoice: %d %v", code, res)
 	}
 
-	inv := data(res)["id"].(string)
+	inv := asStr(t, data(res)["id"])
 	owner(t, `UPDATE billing.invoices SET due_at = $2 WHERE id = $1`, inv, clock.Add(-time.Hour))
 
 	return key, inv
@@ -254,12 +254,12 @@ func TestRestrictionLifecycle(t *testing.T) {
 		0,
 	)
 	if code != 200 || data(resp)["state"] != "scheduled" ||
-		len(data(resp)["noticeNotificationIds"].([]any)) == 0 ||
+		len(asArr(t, data(resp)["noticeNotificationIds"])) == 0 ||
 		data(resp)["noticeAt"] != clock.Format(time.RFC3339) {
 		t.Fatalf("schedule: %d %v", code, resp)
 	}
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 
 	if code, _ := write(
 		srv,
@@ -271,7 +271,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Error("second active restriction on a unit")
 	}
 	// the customer's notice is in their inbox (noticeNotificationIds, FR-C12)
-	notice := data(resp)["noticeNotificationIds"].([]any)
+	notice := asArr(t, data(resp)["noticeNotificationIds"])
 	nc, inbox := post(
 		srv,
 		&customerB,
@@ -323,14 +323,14 @@ func TestRestrictionLifecycle(t *testing.T) {
 	}
 
 	code, resp = exec("rules-1", 1)
-	if code != 200 || data(resp)["state"] != "requested" || data(resp)["version"].(float64) != 2 {
+	if code != 200 || data(resp)["state"] != "requested" || asNum(t, data(resp)["version"]) != 2 {
 		t.Fatalf("execute: %d %v", code, resp)
 	}
 
 	on, off := unitState(resp, online), unitState(resp, offline)
 	if on["applyState"] != "sent_unknown" || off["applyState"] != "not_sent" ||
 		off["pendingReason"] != "offline" ||
-		len(off["applyCommandIds"].([]any)) != 1 {
+		len(asArr(t, off["applyCommandIds"])) != 1 {
 		t.Fatalf("per unit: %v %v", on, off)
 	}
 
@@ -338,7 +338,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 	ownerScan(
 		t,
 		`SELECT status, delivery FROM control.commands WHERE id = $1`,
-		[]any{off["applyCommandIds"].([]any)[0]},
+		[]any{asArr(t, off["applyCommandIds"])[0]},
 		&status,
 		&delivery,
 	)
@@ -351,7 +351,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Error("execute twice")
 	}
 
-	if !ackCommand(t, on["applyCommandIds"].([]any)[0].(string), clock.Add(time.Second)) {
+	if !ackCommand(t, asStr(t, asArr(t, on["applyCommandIds"])[0]), clock.Add(time.Second)) {
 		t.Fatal("ack apply")
 	}
 
@@ -409,7 +409,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		"restrictions.list",
 		`{"filters":{"contractId":"`+key+`","invoiceId":"`+inv+`"}}`,
 	); len(items(res)) != 1 ||
-		len(items(res)[0]["events"].([]any)) < 2 {
+		len(asArr(t, items(res)[0]["events"])) < 2 {
 		t.Fatalf("manager list: %v", res)
 	}
 
@@ -432,8 +432,8 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Fatalf("client forInvoice: %v", resp)
 	}
 
-	for _, e := range items(resp)[0]["events"].([]any) {
-		if ev := e.(map[string]any); ev["actorId"] != "masked" || ev["actorName"] != nil ||
+	for _, e := range asArr(t, items(resp)[0]["events"]) {
+		if ev := asObj(t, e); ev["actorId"] != "masked" || ev["actorName"] != nil ||
 			ev["reason"] != nil {
 			t.Errorf("unmasked event %v", ev)
 		}
@@ -470,12 +470,12 @@ func TestRestrictionLifecycle(t *testing.T) {
 
 	code, resp = cancel(3)
 	if code != 200 || data(resp)["state"] != "release_requested" ||
-		data(resp)["releaseIntent"].(map[string]any)["source"] != "cancel" {
+		asObj(t, data(resp)["releaseIntent"])["source"] != "cancel" {
 		t.Fatalf("cancel: %d %v", code, resp)
 	}
 
 	on, off = unitState(resp, online), unitState(resp, offline)
-	if on["releaseState"] != "requested" || len(on["releaseCommandIds"].([]any)) != 1 ||
+	if on["releaseState"] != "requested" || len(asArr(t, on["releaseCommandIds"])) != 1 ||
 		off["applyState"] != "not_applied" ||
 		off["releaseState"] != "not_required" {
 		t.Fatalf("release eval: %v %v", on, off)
@@ -484,7 +484,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 	ownerScan(
 		t,
 		`SELECT status FROM control.commands WHERE id = $1`,
-		[]any{off["applyCommandIds"].([]any)[0]},
+		[]any{asArr(t, off["applyCommandIds"])[0]},
 		&status,
 	)
 
@@ -497,7 +497,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Error("cancel idempotent while release_requested")
 	}
 
-	if !ackCommand(t, on["releaseCommandIds"].([]any)[0].(string), clock.Add(2*time.Second)) {
+	if !ackCommand(t, asStr(t, asArr(t, on["releaseCommandIds"])[0]), clock.Add(2*time.Second)) {
 		t.Fatal("ack remove")
 	}
 
@@ -524,7 +524,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		0,
 	)
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		&restrMgr,
@@ -543,7 +543,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		scheduleBody(key, inv, []string{unit}, nil),
 		0,
 	)
-	id = data(resp)["id"].(string)
+	id = asStr(t, data(resp)["id"])
 	due(t, id)
 	owner(t, `UPDATE billing.invoices SET status = 'paid', paid_at = $2 WHERE id = $1`, inv, clock)
 
@@ -555,7 +555,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		1,
 	); code != 200 ||
 		data(res)["state"] != "cancelled" ||
-		len(unitState(res, unit)["applyCommandIds"].([]any)) != 0 {
+		len(asArr(t, unitState(res, unit)["applyCommandIds"])) != 0 {
 		t.Fatalf("execute after payment: %d %v", code, res)
 	}
 
@@ -568,7 +568,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		scheduleBody(key, inv, []string{unit}, nil),
 		0,
 	)
-	id = data(resp)["id"].(string)
+	id = asStr(t, data(resp)["id"])
 	due(t, id)
 	owner(
 		t,
@@ -613,7 +613,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		`{"restrictionId":"`+id+`","confirmedRulesVersion":"rules-1"}`,
 		1,
 	)
-	cmd := unitState(resp, unit)["applyCommandIds"].([]any)[0].(string)
+	cmd := asStr(t, asArr(t, unitState(resp, unit)["applyCommandIds"])[0])
 	ackCommand(t, cmd, clock.Add(time.Second))
 
 	_, resp = post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
@@ -636,7 +636,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	_, resp = post(srv, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`)
 	if data(resp)["state"] != "release_requested" ||
 		unitState(resp, unit)["releaseState"] != "requested" ||
-		data(resp)["releaseIntent"].(map[string]any)["source"] != "payment" {
+		asObj(t, data(resp)["releaseIntent"])["source"] != "payment" {
 		t.Fatalf("payment release: %v", resp)
 	}
 
@@ -697,7 +697,7 @@ func executed(
 		t.Fatalf("schedule: %d %v", code, res)
 	}
 
-	id := data(res)["id"].(string)
+	id := asStr(t, data(res)["id"])
 	due(t, id)
 
 	code, res = write(
@@ -805,7 +805,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 
 	code, resp := retry(&restrMgr, "apply", "rules-1", offline)
 	if code != 200 || unitState(resp, offline)["applyState"] != "sent_unknown" ||
-		len(unitState(resp, offline)["applyCommandIds"].([]any)) != 2 {
+		len(asArr(t, unitState(resp, offline)["applyCommandIds"])) != 2 {
 		t.Fatalf("retry apply: %d %v", code, resp)
 	}
 
@@ -871,7 +871,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	)
 	if code != 200 || data(resp)["state"] != "release_requested" ||
 		data(resp)["graceUntil"] == nil ||
-		data(resp)["releaseIntent"].(map[string]any)["source"] != "exception" ||
+		asObj(t, data(resp)["releaseIntent"])["source"] != "exception" ||
 		unitState(resp, online)["releaseState"] != "requested" ||
 		unitState(resp, offline)["releaseState"] != "requested" {
 		t.Fatalf("defer: %d %v", code, resp)
@@ -1095,7 +1095,7 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 	)
 	if code != 200 || data(res)["projection"] != "release" ||
 		data(res)["state"] != "release_requested" ||
-		data(res)["releaseIntent"].(map[string]any)["source"] != "override" {
+		asObj(t, data(res)["releaseIntent"])["source"] != "override" {
 		t.Fatalf("override: %d %v", code, res)
 	}
 
@@ -1162,7 +1162,7 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 			`","reason":"hospital"}`,
 		ver(get()),
 	)
-	if code != 200 || data(resp)["exception"].(map[string]any)["reason"] != "hospital" ||
+	if code != 200 || asObj(t, data(resp)["exception"])["reason"] != "hospital" ||
 		unitState(resp, unit)["releaseState"] != "waiting_reconcile" {
 		t.Fatalf("exempt: %d %v", code, resp)
 	}
@@ -1173,8 +1173,8 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 		"restrictions.forInvoice",
 		`{"invoiceId":"`+inv+`","query":{"filters":{"status":"release_requested"}}}`,
 	); len(items(res)) != 1 ||
-		items(res)[0]["exception"].(map[string]any)["reason"] != nil ||
-		items(res)[0]["releaseIntent"].(map[string]any)["actorMembershipId"] != "masked" {
+		asObj(t, items(res)[0]["exception"])["reason"] != nil ||
+		asObj(t, items(res)[0]["releaseIntent"])["actorMembershipId"] != "masked" {
 		t.Fatalf("client mask: %v", res)
 	}
 	// query catalog: contractId => contractId, status => state; the invoice is the path, not a filter
@@ -1229,7 +1229,7 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 	actions := func(events []any) map[string]bool {
 		out := map[string]bool{}
 		for _, e := range events {
-			out[e.(map[string]any)["action"].(string)] = true
+			out[asStr(t, asObj(t, e)["action"])] = true
 		}
 
 		return out
@@ -1237,14 +1237,14 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 
 	_, cm := post(srv, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{}}`)
 	if hq := actions(
-		data(get())["events"].([]any),
+		asArr(t, data(get())["events"]),
 	); !hq["restrictions.reconcile"] ||
 		len(items(cm)) != 1 {
 		t.Fatalf("HQ history and client read: %v %v", hq, cm)
 	}
 
 	if client := actions(
-		items(cm)[0]["events"].([]any),
+		asArr(t, items(cm)[0]["events"]),
 	); client["restrictions.reconcile"] ||
 		!client["restrictions.exempt"] {
 		t.Errorf("client history: %v", client)
@@ -1271,7 +1271,7 @@ func TestRestrictionScheduleRefusals(t *testing.T) {
 	owner(t, `UPDATE billing.contracts SET restriction_eligible = false WHERE id = $1`, key)
 
 	if code, m := schedule(); code != 422 ||
-		m["fieldErrors"].(map[string]any)["contractId"] != "errors.restriction_ineligible" {
+		asObj(t, m["fieldErrors"])["contractId"] != "errors.restriction_ineligible" {
 		t.Errorf("ineligible contract: %d %v", code, m)
 	}
 
@@ -1330,7 +1330,7 @@ func TestRestrictionScheduleRefusals(t *testing.T) {
 	)
 
 	if code != 422 ||
-		res["fieldErrors"].(map[string]any)["unitIds"] != "errors.unsupported_capability" {
+		asObj(t, res["fieldErrors"])["unitIds"] != "errors.unsupported_capability" {
 		t.Errorf("temperature limit on a fan-only model: %d %v", code, res)
 	}
 
@@ -1371,7 +1371,7 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 		0,
 	)
 
-	scheduled := data(resp)["id"].(string)
+	scheduled := asStr(t, data(resp)["id"])
 	if code, res := reconcile(
 		scheduled,
 		u1,
@@ -1408,7 +1408,7 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 		u2,
 		ver(get2()),
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["unitIds"] != "errors.reconcile_not_needed" {
+		asObj(t, res["fieldErrors"])["unitIds"] != "errors.reconcile_not_needed" {
 		t.Errorf("reconcile twice: %d %v", code, res)
 	}
 	// releasing while the apply's answer is unknown, and the device still carries it: the remove goes out now
@@ -1443,7 +1443,7 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 	code, resp := reconcile(id3, u3, ver(get3()))
 	if code != 200 || unitState(resp, u3)["applyState"] != "applied" ||
 		unitState(resp, u3)["releaseState"] != "requested" ||
-		len(unitState(resp, u3)["releaseCommandIds"].([]any)) != 1 {
+		len(asArr(t, unitState(resp, u3)["releaseCommandIds"])) != 1 {
 		t.Fatalf("reconcile while releasing: %d %v", code, resp)
 	}
 
@@ -1579,7 +1579,7 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 			t.Fatalf("round %d: second invoice: %d %v", round, code, res)
 		}
 
-		inv2 := data(res)["id"].(string)
+		inv2 := asStr(t, data(res)["id"])
 		owner(
 			t,
 			`UPDATE billing.invoices SET due_at = $2 WHERE id = $1`,
@@ -1603,7 +1603,7 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 			t.Fatalf("round %d: schedule: %d %v", round, code, res)
 		}
 
-		r := data(res)["id"].(string)
+		r := asStr(t, data(res)["id"])
 		bodies := map[string]int{}
 
 		for _, inv := range []string{inv1, inv2} {
@@ -1655,7 +1655,7 @@ func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 		scheduleBody(k, inv, []string{u1, u2}, nil),
 		0,
 	)
-	id := data(res)["id"].(string)
+	id := asStr(t, data(res)["id"])
 	due(t, id)
 
 	code, res := write(
@@ -1673,7 +1673,7 @@ func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 	for _, u := range []string{u1, u2} {
 		applies = append(
 			applies,
-			uuid.MustParse(unitState(res, u)["applyCommandIds"].([]any)[0].(string)),
+			uuid.MustParse(asStr(t, asArr(t, unitState(res, u)["applyCommandIds"])[0])),
 		)
 	}
 

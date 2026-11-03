@@ -23,7 +23,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		"session.get",
 		`{}`,
 	) // the business time of the server (a shared demo cluster may run ahead of clock)
-	now, _ := time.Parse(time.RFC3339Nano, sess["meta"].(map[string]any)["snapshotAt"].(string))
+	now, _ := time.Parse(time.RFC3339Nano, asStr(t, asObj(t, sess["meta"])["snapshotAt"]))
 	at := now.Format(time.RFC3339)
 
 	if code, resp := write(
@@ -99,9 +99,9 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		}
 	}
 	caseState := func() string {
-		cases := data(get())["recoveryCases"].([]any)
+		cases := asArr(t, data(get())["recoveryCases"])
 
-		return cases[len(cases)-1].(map[string]any)["state"].(string)
+		return asStr(t, asObj(t, cases[len(cases)-1])["state"])
 	}
 
 	observe(id)
@@ -176,14 +176,14 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 
 	code, res := reconcile()
 
-	cases := data(res)["recoveryCases"].([]any)
-	if code != 200 || cases[len(cases)-1].(map[string]any)["state"] != "removing" {
+	cases := asArr(t, data(res)["recoveryCases"])
+	if code != 200 || asObj(t, cases[len(cases)-1])["state"] != "removing" {
 		t.Fatalf("reconcile: %d %v", code, res)
 	}
 
-	cmds := cases[len(cases)-1].(map[string]any)["commandIds"].([]any)
+	cmds := asArr(t, asObj(t, cases[len(cases)-1])["commandIds"])
 
-	cmd := cmds[len(cmds)-1].(string)
+	cmd := asStr(t, cmds[len(cmds)-1])
 	if code, resp := write(
 		srv,
 		&customerB,
@@ -202,14 +202,14 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 
 	code, res = reconcile()
 
-	cases = data(res)["recoveryCases"].([]any)
-	if code != 200 || cases[len(cases)-1].(map[string]any)["state"] != "removing" ||
-		len(cases[len(cases)-1].(map[string]any)["commandIds"].([]any)) != 2 {
+	cases = asArr(t, data(res)["recoveryCases"])
+	if code != 200 || asObj(t, cases[len(cases)-1])["state"] != "removing" ||
+		len(asArr(t, asObj(t, cases[len(cases)-1])["commandIds"])) != 2 {
 		t.Fatalf("reconcile again: %d %v", code, res)
 	}
 
-	cmds = cases[len(cases)-1].(map[string]any)["commandIds"].([]any)
-	ackCommand(t, cmds[len(cmds)-1].(string), clock.Add(5*time.Second))
+	cmds = asArr(t, asObj(t, cases[len(cases)-1])["commandIds"])
+	ackCommand(t, asStr(t, cmds[len(cmds)-1]), clock.Add(5*time.Second))
 
 	if caseState() != "resolved" {
 		t.Fatalf("resolved after the acknowledgement: %v", get())

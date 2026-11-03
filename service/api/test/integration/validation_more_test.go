@@ -48,7 +48,7 @@ func TestCommandCreateValidation(t *testing.T) {
 			c.body,
 			0,
 		); code != 422 ||
-			resp["fieldErrors"].(map[string]any)[c.field] == nil {
+			asObj(t, resp["fieldErrors"])[c.field] == nil {
 			t.Errorf("%s: %d %v", name, code, resp)
 		}
 	}
@@ -68,7 +68,7 @@ func TestCommandCreateValidation(t *testing.T) {
 		)+`}`,
 		0,
 	); code != 422 ||
-		resp["fieldErrors"].(map[string]any)["reason"] != apperr.KeyRequired {
+		asObj(t, resp["fieldErrors"])["reason"] != apperr.KeyRequired {
 		t.Errorf("technician without a reason: %d %v", code, resp)
 	}
 
@@ -101,9 +101,9 @@ func TestCommandCreateValidation(t *testing.T) {
 	id := data(res)["id"]
 	_, res = post(srv, &customerA, "units.get", `{"id":"`+unit+`"}`)
 
-	pending := data(res)["pendingCommands"].([]any)
-	if len(pending) != 1 || pending[0].(map[string]any)["id"] != id ||
-		(pending[0].(map[string]any)["status"] != "requested" && pending[0].(map[string]any)["status"] != "sent") {
+	pending := asArr(t, data(res)["pendingCommands"])
+	if len(pending) != 1 || asObj(t, pending[0])["id"] != id ||
+		(asObj(t, pending[0])["status"] != "requested" && asObj(t, pending[0])["status"] != "sent") {
 		t.Fatalf("pendingCommands: %v", pending)
 	}
 
@@ -143,7 +143,7 @@ func TestRestrictionInputValidation(t *testing.T) {
 			c.body,
 			1,
 		); code != 422 ||
-			res["fieldErrors"].(map[string]any)[c.field] == nil {
+			asObj(t, res["fieldErrors"])[c.field] == nil {
 			t.Errorf("%s: %d %v", name, code, res)
 		}
 	}

@@ -57,7 +57,7 @@ func TestClientUsers(t *testing.T) {
 		t.Fatalf("invite: %d %v", code, resp)
 	}
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 
 	if code, res := save(
 		&hq,
@@ -145,7 +145,7 @@ func TestClientUsers(t *testing.T) {
 		srv,
 		&customerB,
 		"clientUsers.resendInvite",
-		`{"id":"`+seedOwner["id"].(string)+`"}`,
+		`{"id":"`+asStr(t, seedOwner["id"])+`"}`,
 		0,
 	); code != 409 {
 		t.Error("resend to an active user")
@@ -164,13 +164,16 @@ func TestClientUsers(t *testing.T) {
 	upd := func(target map[string]any, role, status string, v int) (int, map[string]any) {
 		return save(
 			&hq,
-			`{"id":"`+target["id"].(string)+`","customerId":"`+cust+`","email":"`+target["email"].(string)+`","clientRole":"`+
+			`{"id":"`+asStr(
+				t,
+				target["id"],
+			)+`","customerId":"`+cust+`","email":"`+asStr(t, target["email"])+`","clientRole":"`+
 				role+`","status":"`+status+`","reason":"admin change"}`,
 			v,
 		)
 	}
 
-	ov := int(seedOwner["version"].(float64))
+	ov := int(asNum(t, seedOwner["version"]))
 	if code, _ := upd(seedOwner, "member", "active", ov); code != 409 {
 		t.Error("demote the last owner")
 	}
@@ -183,7 +186,7 @@ func TestClientUsers(t *testing.T) {
 		srv,
 		&hq,
 		"clientUsers.remove",
-		`{"id":"`+seedOwner["id"].(string)+`","reason":"leaving"}`,
+		`{"id":"`+asStr(t, seedOwner["id"])+`","reason":"leaving"}`,
 		ov,
 	); code != 409 {
 		t.Error("remove the last owner")
@@ -274,8 +277,8 @@ func TestTwoFactor(t *testing.T) {
 	}
 
 	code, resp = write(srv, &techB, "twoFactor.enable", `{"code":"123456"}`, 0)
-	if code != 200 || len(data(resp)["recoveryCodes"].([]any)) != 8 ||
-		data(resp)["recoveryCodesLeft"].(float64) != 8 {
+	if code != 200 || len(asArr(t, data(resp)["recoveryCodes"])) != 8 ||
+		asNum(t, data(resp)["recoveryCodesLeft"]) != 8 {
 		t.Fatalf("enable: %d %v", code, resp)
 	}
 
@@ -371,7 +374,7 @@ func TestClientUserMembershipSync(t *testing.T) {
 		"active",
 		1,
 	); code != 422 ||
-		res["fieldErrors"].(map[string]any)["customerId"] != apperr.KeyImmutable {
+		asObj(t, res["fieldErrors"])["customerId"] != apperr.KeyImmutable {
 		t.Errorf("move a user to another customer: %d %v", code, res)
 	}
 	// the e-mail of a signed-in user is the sign-in identity's: HQ cannot change it either (IR422)
@@ -461,7 +464,7 @@ func TestClientUsersByOwner(t *testing.T) {
 		t.Fatalf("owner invites an owner: %d %v", code, resp)
 	}
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 	// the account exists from the start (IR461): its e-mail is fixed, its role can change
 	if code, m := save(
 		`{"id":"`+id+`","customerId":"`+cust+`","email":"fixed-`+email+`","clientRole":"member","reason":"typo"}`,
@@ -498,9 +501,15 @@ func TestClientUsersByOwner(t *testing.T) {
 		}
 	}
 
-	sv := int(self["version"].(float64))
+	sv := int(asNum(t, self["version"]))
 	if code, res := save(
-		`{"id":"`+self["id"].(string)+`","customerId":"`+cust+`","email":"`+self["email"].(string)+`","clientRole":"owner",`+
+		`{"id":"`+asStr(
+			t,
+			self["id"],
+		)+`","customerId":"`+cust+`","email":"`+asStr(
+			t,
+			self["email"],
+		)+`","clientRole":"owner",`+
 			`"status":"disabled","reason":"x"}`,
 		sv,
 	); code != 409 ||
@@ -512,7 +521,7 @@ func TestClientUsersByOwner(t *testing.T) {
 		srv,
 		&customerB,
 		"clientUsers.remove",
-		`{"id":"`+self["id"].(string)+`","reason":"x"}`,
+		`{"id":"`+asStr(t, self["id"])+`","reason":"x"}`,
 		sv,
 	); code != 409 ||
 		res["messageKey"] != "errors.own_account" {
@@ -612,7 +621,7 @@ func TestClientAccountCreated(t *testing.T) {
 		t.Fatalf("add: %d %v", code, res)
 	}
 
-	membership := data(res)["membershipId"].(string)
+	membership := asStr(t, data(res)["membershipId"])
 
 	t.Cleanup(func() { // later tests count customer B's owners: this one ends before them
 		owner(
@@ -683,7 +692,7 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 		t.Fatalf("members.save: %d %v", code, res)
 	}
 
-	membership := data(res)["id"].(string)
+	membership := asStr(t, data(res)["id"])
 
 	var (
 		id string

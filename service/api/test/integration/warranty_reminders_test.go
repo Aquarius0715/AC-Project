@@ -194,7 +194,7 @@ func TestWarrantyReminders(t *testing.T) {
 	var mine map[string]any
 
 	for _, it := range items(resp) {
-		if it["target"].(map[string]any)["id"] == near {
+		if asObj(t, it["target"])["id"] == near {
 			mine = it
 		}
 	}
@@ -203,10 +203,10 @@ func TestWarrantyReminders(t *testing.T) {
 		t.Fatalf("not listed: %v", resp)
 	}
 
-	params := mine["params"].(map[string]any)
+	params := asObj(t, mine["params"])
 	if at, _ := time.Parse(
 		time.RFC3339,
-		params["at"].(string),
+		asStr(t, params["at"]),
 	); !at.Equal(clock.Add(20*day)) || params["status"] != "expiring" ||
 		mine["templateKey"] != "warranty_expiring" {
 		t.Errorf("notification: %v", mine)

@@ -133,7 +133,7 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		t.Fatalf("customer create: %d %v", code, resp)
 	}
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 
 	if code, _ := write(srv, &hq, "customers.save", body, 0); code != 409 {
 		t.Fatalf("one customer per organization: %d", code)
@@ -190,7 +190,7 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		t.Fatalf("room: %d", code)
 	}
 
-	room := data(resp)["id"].(string)
+	room := asStr(t, data(resp)["id"])
 
 	newName := "Den " + uuid.NewString()[:6]
 	if code, res := write(
@@ -234,7 +234,7 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		0,
 	)
 
-	sib := data(resp)["id"].(string)
+	sib := asStr(t, data(resp)["id"])
 	if code, _ := write(
 		srv,
 		&hq,
@@ -293,7 +293,7 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		t.Fatalf("property: %d", code)
 	}
 
-	prop := data(resp)["id"].(string)
+	prop := asStr(t, data(resp)["id"])
 
 	office := "Office " + uuid.NewString()[:6]
 	if code, res := write(
@@ -322,7 +322,7 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		t.Fatalf("unit: %d %v", code, resp)
 	}
 
-	unit := data(resp)["id"].(string)
+	unit := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		&customerB,

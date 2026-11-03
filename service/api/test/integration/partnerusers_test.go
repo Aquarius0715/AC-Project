@@ -79,7 +79,7 @@ func TestPartnerUsers(t *testing.T) {
 		t.Fatalf("invite: %d %v", code, resp)
 	}
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 
 	if code, res := save(
 		&contrA,
@@ -170,7 +170,7 @@ func TestPartnerUsers(t *testing.T) {
 		`{"id":"`+id+`"}`,
 		0,
 	); code != 200 || data(res)["deliveryState"] != "queued" ||
-		data(res)["target"].(map[string]any)["kind"] != "partner_user" {
+		asObj(t, data(res)["target"])["kind"] != "partner_user" {
 		t.Fatalf("resend: %d %v", code, res)
 	}
 
@@ -178,7 +178,7 @@ func TestPartnerUsers(t *testing.T) {
 		srv,
 		&contrA,
 		"partnerUsers.resendInvite",
-		`{"id":"`+tech["id"].(string)+`"}`,
+		`{"id":"`+asStr(t, tech["id"])+`"}`,
 		0,
 	); code != 409 {
 		t.Error("resend to an active account")
@@ -271,10 +271,10 @@ func TestPartnerUsers(t *testing.T) {
 		t.Error("company B changes company A's invite")
 	}
 	// the caller's own account is not changed here
-	sv := int(self["version"].(float64))
+	sv := int(asNum(t, self["version"]))
 	if code, res := upd(
-		self["id"].(string),
-		self["email"].(string),
+		asStr(t, self["id"]),
+		asStr(t, self["email"]),
 		"contractor",
 		"disabled",
 		sv,
@@ -287,7 +287,7 @@ func TestPartnerUsers(t *testing.T) {
 		srv,
 		&contrA,
 		"partnerUsers.remove",
-		`{"id":"`+self["id"].(string)+`","reason":"leaving"}`,
+		`{"id":"`+asStr(t, self["id"])+`","reason":"leaving"}`,
 		sv,
 	); code != 409 ||
 		res["messageKey"] != "errors.own_account" {
@@ -387,7 +387,7 @@ func TestPartnerUserAccess(t *testing.T) {
 		t.Fatalf("members.save: %d %v", code, resp)
 	}
 
-	membership := uuid.MustParse(data(resp)["id"].(string))
+	membership := uuid.MustParse(asStr(t, data(resp)["id"]))
 	firstSignIn(
 		t,
 		srv,
@@ -628,7 +628,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	id, membership := data(resp)["id"].(string), data(resp)["membershipId"].(string)
+	id, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
 
 	var (
 		role, employment string
@@ -817,7 +817,7 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	id, membership := data(resp)["id"].(string), data(resp)["membershipId"].(string)
+	id, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
 	owner(
 		t,
 		`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '2 days', valid_until = $2::timestamptz -
@@ -1204,7 +1204,7 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 		t.Fatalf("members.save: %d %v", code, m)
 	}
 
-	membership := data(m)["id"].(string)
+	membership := asStr(t, data(m)["id"])
 	firstSignIn(t, srv, membership) // an active account (IR462)
 
 	var (
@@ -1297,7 +1297,7 @@ func TestContractorAddedTechnicianAssigned(t *testing.T) {
 		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	tech := data(resp)["membershipId"].(string)
+	tech := asStr(t, data(resp)["membershipId"])
 	// HQ verified the technician's certificates (the unit's service scope needs all three)
 	for _, code := range []string{"demo_indoor", "demo_outdoor", "demo_electrical"} {
 		owner(
@@ -1320,7 +1320,7 @@ func TestContractorAddedTechnicianAssigned(t *testing.T) {
 		0,
 	)
 
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		&hq,

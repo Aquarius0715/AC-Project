@@ -37,7 +37,7 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 		"session.get",
 		`{}`,
 	) // the business time of the server (a shared demo cluster may run ahead of clock)
-	now, _ := time.Parse(time.RFC3339Nano, sess["meta"].(map[string]any)["snapshotAt"].(string))
+	now, _ := time.Parse(time.RFC3339Nano, asStr(t, asObj(t, sess["meta"])["snapshotAt"]))
 
 	ask := func(token, input string) (int, map[string]any) {
 		req, _ := http.NewRequest(
@@ -101,7 +101,7 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 	}
 
 	if f := fault(); f["bindingId"] != binding || f["faultId"] != nil ||
-		f["sequence"].(float64) != 0 {
+		asNum(t, f["sequence"]) != 0 {
 		t.Fatalf("a device without faults: %v", f)
 	}
 
@@ -110,7 +110,7 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 	f := fault()
 
 	id, _ := f["faultId"].(string)
-	if id == "" || f["sequence"].(float64) != 10 || connection() != "offline" {
+	if id == "" || asNum(t, f["sequence"]) != 10 || connection() != "offline" {
 		t.Fatalf("after the loss: %v, connection %s", f, connection())
 	}
 
@@ -118,7 +118,7 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 		`"sequence":11,"kind":"restored","recovery":{"axis":"connection","sourceEventId":"` + id + `","value":"online"}`,
 	)
 
-	if f := fault(); f["faultId"] != nil || f["sequence"].(float64) != 11 ||
+	if f := fault(); f["faultId"] != nil || asNum(t, f["sequence"]) != 11 ||
 		connection() != "online" {
 		t.Fatalf("after the recovery: %v, connection %s", f, connection())
 	}

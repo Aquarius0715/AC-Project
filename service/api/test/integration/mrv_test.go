@@ -35,7 +35,7 @@ func TestMRV(t *testing.T) {
 			`"method":"demo_fixed","baselineKWh":10}`,
 		0,
 	)
-	base := data(resp)["id"].(string)
+	base := asStr(t, data(resp)["id"])
 	org := seed.ID("org-customer-b").String()
 	cond := func(extra map[string]string) string {
 		f := map[string]string{
@@ -64,8 +64,8 @@ func TestMRV(t *testing.T) {
 
 	code, resp := post(srv, &hq, "mrv.preview", cond(nil))
 	if code != 200 || data(resp)["incomplete"] != false || data(resp)["scope"] != "scope_2" ||
-		data(resp)["summary"].(map[string]any)["totals"].(map[string]any)["savedKWh"].(float64) != 5 ||
-		data(resp)["summary"].(map[string]any)["totals"].(map[string]any)["emissionsKg"].(float64) != 2.5 {
+		asNum(t, asObj(t, asObj(t, data(resp)["summary"])["totals"])["savedKWh"]) != 5 ||
+		asNum(t, asObj(t, asObj(t, data(resp)["summary"])["totals"])["emissionsKg"]) != 2.5 {
 		t.Fatalf("preview: %d %v", code, resp)
 	}
 
@@ -127,7 +127,7 @@ func TestMRV(t *testing.T) {
 		t.Fatalf("draft: %d %v", code, resp)
 	}
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 
 	review := func(rv, v int) (int, map[string]any) {
 		return write(
@@ -146,8 +146,8 @@ func TestMRV(t *testing.T) {
 
 	code, resp = review(1, 1)
 	if code != 200 || data(resp)["status"] != "demo_reviewed" || ver(resp) != 2 ||
-		len(data(resp)["reviewHistory"].([]any)) != 1 ||
-		data(resp)["reviewHistory"].([]any)[0].(map[string]any)["reportVersion"].(float64) != 1 {
+		len(asArr(t, data(resp)["reviewHistory"])) != 1 ||
+		asNum(t, asObj(t, asArr(t, data(resp)["reviewHistory"])[0])["reportVersion"]) != 1 {
 		t.Fatalf("review: %d %v", code, resp)
 	}
 
@@ -187,7 +187,7 @@ func TestMRV(t *testing.T) {
 		&hq,
 		"mrv.versions",
 		`{"id":"`+id+`","query":{}}`,
-	); len(items(res)) != 3 || items(res)[0]["version"].(float64) != 1 ||
+	); len(items(res)) != 3 || asNum(t, items(res)[0]["version"]) != 1 ||
 		items(res)[1]["status"] != "demo_reviewed" {
 		t.Errorf("versions: %v", res)
 	}
@@ -198,7 +198,7 @@ func TestMRV(t *testing.T) {
 		"mrv.get",
 		`{"id":"`+id+`","reportVersion":1}`,
 	); data(res)["status"] != "draft" ||
-		len(data(res)["reviewHistory"].([]any)) != 0 {
+		len(asArr(t, data(res)["reviewHistory"])) != 0 {
 		t.Errorf("old version: %v", res)
 	}
 

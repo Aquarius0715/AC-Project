@@ -265,7 +265,7 @@ func TestCertificateReminders(t *testing.T) {
 	var mine map[string]any
 
 	for _, it := range items(res) {
-		if target := it["target"].(map[string]any); target["kind"] == "certificate" &&
+		if target := asObj(t, it["target"]); target["kind"] == "certificate" &&
 			target["id"] == late {
 			mine = it
 		}
@@ -275,10 +275,10 @@ func TestCertificateReminders(t *testing.T) {
 		t.Fatalf("the reminder is not listed: %v", res)
 	}
 
-	params := mine["params"].(map[string]any)
+	params := asObj(t, mine["params"])
 	if at, _ := time.Parse(
 		time.RFC3339,
-		params["at"].(string),
+		asStr(t, params["at"]),
 	); params["targetName"] != "Test user · Indoor AC" || !at.Equal(clock.Add(20*day)) || params["status"] != "expiring" ||
 		mine["severity"] != "normal" ||
 		mine["templateKey"] != "certificate_expiry" {
@@ -289,8 +289,8 @@ func TestCertificateReminders(t *testing.T) {
 		srv,
 		&contrA,
 		"notifications.markRead",
-		`{"id":"`+mine["id"].(string)+`"}`,
-		int(mine["version"].(float64)),
+		`{"id":"`+asStr(t, mine["id"])+`"}`,
+		int(asNum(t, mine["version"])),
 	); code != 200 ||
 		data(resp)["readAt"] == nil {
 		t.Errorf("markRead: %d %v", code, resp)

@@ -113,7 +113,7 @@ func TestNotificationsAcrossServices(t *testing.T) {
 		t.Fatalf("create on billing-api: %d %v", code, res)
 	}
 
-	id := data(res)["id"].(string)
+	id := asStr(t, data(res)["id"])
 
 	count := func() (n int) {
 		ownerScan(
@@ -168,7 +168,7 @@ func TestDirectoryAcrossServices(t *testing.T) {
 		t.Fatalf("another contractor's technician (identity.technician over HTTP): %d %v", code, m)
 	}
 
-	cert := data(res)["id"].(string)
+	cert := asStr(t, data(res)["id"])
 	if code, resp := write(
 		maint,
 		&hq,

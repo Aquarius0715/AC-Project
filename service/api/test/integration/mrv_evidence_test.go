@@ -127,7 +127,7 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 	ids := func(m map[string]any) []string {
 		out := []string{}
 		for _, it := range items(m) {
-			out = append(out, it["id"].(string))
+			out = append(out, asStr(t, it["id"]))
 		}
 
 		return out

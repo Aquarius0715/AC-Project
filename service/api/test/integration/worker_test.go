@@ -18,7 +18,7 @@ func TestWorkerTickExpiresOffers(t *testing.T) {
 	unit := seed.ID("unit-non-rto").String()
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, res := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	job := data(res)["id"].(string)
+	job := asStr(t, data(res)["id"])
 	write(
 		srv,
 		&hq,
@@ -55,7 +55,7 @@ func TestWorkerTickExpiresOffers(t *testing.T) {
 
 	_, res = post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
 	if data(res)["status"] != "requested" || data(res)["contractorOrgId"] != nil ||
-		data(res)["version"].(float64) != 3 {
+		asNum(t, data(res)["version"]) != 3 {
 		t.Fatalf("expired: %v", res)
 	}
 
@@ -152,7 +152,7 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 	offered := func() string {
 		_, m := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
 
-		job := data(m)["id"].(string)
+		job := asStr(t, data(m)["id"])
 		if code, res := write(
 			srv,
 			&hq,

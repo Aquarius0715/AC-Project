@@ -19,7 +19,7 @@ func TestCancelRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
 	)
-	job := data(res)["id"].(string)
+	job := asStr(t, data(res)["id"])
 	owner(
 		t,
 		`UPDATE maintenance.jobs SET status = 'on_hold', hold_reason = 'parts' WHERE id = $1`,

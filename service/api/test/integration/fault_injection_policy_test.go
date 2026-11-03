@@ -21,7 +21,7 @@ func TestAutomationPolicyEditRollsBackWhenItCannotBeWritten(t *testing.T) {
 		t.Fatalf("create: %d %v", code, created)
 	}
 
-	id := data(created)["id"].(string)
+	id := asStr(t, data(created)["id"])
 
 	t.Cleanup(func() {
 		owner(t, `DELETE FROM control.automation_policy_units WHERE policy_id = $1`, id)

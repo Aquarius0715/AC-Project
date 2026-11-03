@@ -83,7 +83,7 @@ func TestDemoOperations(t *testing.T) {
 		srv,
 		tele("25", "°C", sensor),
 	); code != 200 || data(m)["type"] != "telemetry" ||
-		data(m)["generation"].(float64) != 1 {
+		asNum(t, data(m)["generation"]) != 1 {
 		t.Fatalf("telemetry: %d %v", code, m)
 	}
 	// IR12 normalization: causes in priority order, a cause keeps a null input suspect, otherwise null is missing
@@ -236,7 +236,7 @@ func TestDemoOperations(t *testing.T) {
 			srv,
 			c.body,
 		); code != 422 ||
-			m["fieldErrors"].(map[string]any)[c.field] != c.key {
+			asObj(t, m["fieldErrors"])[c.field] != c.key {
 			t.Errorf("%s: %d %v", name, code, m)
 		}
 	}
@@ -250,7 +250,7 @@ func TestDemoOperations(t *testing.T) {
 			1,
 		),
 	); code != 422 ||
-		resp["fieldErrors"].(map[string]any)["measurement"] != "errors.sensor_mismatch" {
+		asObj(t, resp["fieldErrors"])["measurement"] != "errors.sensor_mismatch" {
 		t.Errorf("another metric than the sensor's: %d %v", code, resp)
 	}
 	// IR77: a measurement's own sequence is kept; without one it is the sensor's latest + 1
@@ -293,7 +293,7 @@ func TestDemoOperations(t *testing.T) {
 		t.Fatalf("command: %d %v", code, res)
 	}
 
-	cmd := data(res)["id"].(string)
+	cmd := asStr(t, data(res)["id"])
 	keepObserved(t, cmd)
 	// a requested command is marked sent by the device's sent event (commands.create sends at once, so set it back)
 	owner(
@@ -350,7 +350,7 @@ func TestDemoOperations(t *testing.T) {
 	}
 	// the acknowledged setting becomes the observed state without a unit version change
 	_, g2 := post(srv, &customerB, "units.get", `{"id":"`+unit+`"}`)
-	if obs := data(g2)["observedState"].(map[string]any); obs["power"] != true ||
+	if obs := asObj(t, data(g2)["observedState"]); obs["power"] != true ||
 		obs["observedAt"] != clock.Add(time.Second).Format(time.RFC3339Nano) {
 		t.Errorf("observedState after ack: %v", obs)
 	}
@@ -377,7 +377,7 @@ func TestDemoOperations(t *testing.T) {
 		`{"to":"`+clock.Add(time.Hour).Format(time.RFC3339)+`"}`,
 		0,
 	); code != 200 ||
-		data(resp)["generation"].(float64) != 1 {
+		asNum(t, data(resp)["generation"]) != 1 {
 		t.Fatalf("advance: %d %v", code, resp)
 	}
 	// rows created after the jump carry the scenario clock (platform.app_now, IR157)
@@ -412,7 +412,7 @@ func commandTrail(t *testing.T, srv *apiserver.Server, created map[string]any) [
 	t.Helper()
 	drainEvents(t)
 
-	corr := created["meta"].(map[string]any)["correlationId"].(string)
+	corr := asStr(t, asObj(t, created["meta"])["correlationId"])
 	day := `"from":"` + clock.Add(-24*time.Hour).
 		Format(time.RFC3339) +
 		`","to":"` + clock.Add(24*time.Hour).
@@ -431,10 +431,10 @@ func commandTrail(t *testing.T, srv *apiserver.Server, created map[string]any) [
 			continue
 		}
 
-		e := a["result"].(string) + " " +
+		e := asStr(t, a["result"]) + " " +
 			map[bool]string{
 				true:  "customer-b",
-				false: a["actorId"].(string),
+				false: asStr(t, a["actorId"]),
 			}[a["actorId"] == seed.ID("user-customer-b").String()]
 		if a["result"] != "pending" {
 			reason, _ := a["reason"].(string)

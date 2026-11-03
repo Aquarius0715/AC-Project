@@ -21,7 +21,7 @@ func TestInquiries(t *testing.T) {
 		scheduleBody(k, inv, []string{u}, nil),
 		0,
 	)
-	rid := data(resp)["id"].(string)
+	rid := asStr(t, data(resp)["id"])
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"bad subject":              "subjectType=error.invalid",
 		"blank message":            "message=error.length",
@@ -86,7 +86,7 @@ func TestInquiries(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 
 	var received int
 	ownerScan(
@@ -243,7 +243,7 @@ func TestAuditList(t *testing.T) {
 		t.Errorf("system actor: %v", res)
 	}
 
-	corr := items(resp)[0]["correlationId"].(string)
+	corr := asStr(t, items(resp)[0]["correlationId"])
 	if _, res := post(
 		srv,
 		&hq,

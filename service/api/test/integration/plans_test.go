@@ -57,12 +57,12 @@ func TestPlans(t *testing.T) {
 	}
 
 	code, resp := write(srv, &hq, "plans.save", body(""), 0)
-	if code != 200 || data(resp)["anchorDay"].(float64) != 24 || data(resp)["timezone"] != "UTC" ||
-		len(data(resp)["generatedOccurrences"].([]any)) != 0 {
+	if code != 200 || asNum(t, data(resp)["anchorDay"]) != 24 || data(resp)["timezone"] != "UTC" ||
+		len(asArr(t, data(resp)["generatedOccurrences"])) != 0 {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	plan := data(resp)["id"].(string)
+	plan := asStr(t, data(resp)["id"])
 	// update: interval only keeps the anchor; unit is fixed; version
 	if code, res := write(
 		srv,
@@ -73,8 +73,8 @@ func TestPlans(t *testing.T) {
 		)+`"}`,
 		1,
 	); code != 200 ||
-		data(res)["recurrence"].(map[string]any)["intervalMonths"].(float64) != 1 ||
-		data(res)["version"].(float64) != 2 {
+		asNum(t, asObj(t, data(res)["recurrence"])["intervalMonths"]) != 1 ||
+		asNum(t, data(res)["version"]) != 2 {
 		t.Fatalf("update: %d %v", code, res)
 	}
 
@@ -125,11 +125,11 @@ func TestPlans(t *testing.T) {
 		}
 
 		p := save("", 3, next, 0)
-		if p = save(p["id"].(string), 3, later, 1); p["anchorDay"].(float64) != 29 {
+		if p = save(asStr(t, p["id"]), 3, later, 1); asNum(t, p["anchorDay"]) != 29 {
 			t.Errorf("re-anchored: %v", p)
 		}
 
-		if p = save(p["id"].(string), 6, later, 2); p["anchorDay"].(float64) != 29 {
+		if p = save(asStr(t, p["id"]), 6, later, 2); asNum(t, p["anchorDay"]) != 29 {
 			t.Errorf("anchor kept: %v", p)
 		}
 	}
@@ -150,17 +150,17 @@ func TestPlans(t *testing.T) {
 	code, resp = gen(next, 2)
 	if code != 200 || data(resp)["type"] != "periodic" || data(resp)["origin"] != "periodic_plan" ||
 		data(resp)["symptom"] != "Scheduled periodic maintenance" ||
-		data(resp)["requestedSlot"].(map[string]any)["endAt"] != next.Add(time.Hour).
+		asObj(t, data(resp)["requestedSlot"])["endAt"] != next.Add(time.Hour).
 			Format(time.RFC3339) ||
-		len(data(resp)["preferredSlots"].([]any)) != 0 {
+		len(asArr(t, data(resp)["preferredSlots"])) != 0 {
 		t.Fatalf("generate: %d %v", code, resp)
 	}
 
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 
 	_, resp = post(srv, &hq, "plans.get", `{"id":"`+plan+`"}`)
 	if data(resp)["nextDueAt"] != next.AddDate(0, 1, 0).Format(time.RFC3339) ||
-		data(resp)["generatedOccurrences"].([]any)[0].(map[string]any)["jobId"] != job ||
+		asObj(t, asArr(t, data(resp)["generatedOccurrences"])[0])["jobId"] != job ||
 		ver(resp) != 3 {
 		t.Fatalf("plan after generate: %v", resp)
 	}

@@ -18,7 +18,7 @@ func TestHoldRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 		jobBody(seed.ID("unit-non-rto").String(), nil),
 		0,
 	)
-	job := data(res)["id"].(string)
+	job := asStr(t, data(res)["id"])
 	owner(t, `UPDATE maintenance.jobs SET status = 'in_progress' WHERE id = $1`, job)
 	_, res = post(srv, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
 	version := ver(res)

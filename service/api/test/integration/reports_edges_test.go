@@ -77,7 +77,7 @@ func TestWorkReportEdges(t *testing.T) {
 		t.Fatalf("first draft: %d %v", code, res)
 	}
 
-	rep := data(res)["id"].(string)
+	rep := asStr(t, data(res)["id"])
 
 	elsewhere := `[{"componentGroup":"indoor","componentKey":"filter","result":null,"reason":null,` +
 		`"evidenceIds":["` + uuid.NewString() + `"]}]`
@@ -88,7 +88,7 @@ func TestWorkReportEdges(t *testing.T) {
 		draftBody(job, "", map[string]string{"reportId": `"` + rep + `"`, "items": elsewhere}),
 		1,
 	); code != 422 ||
-		resp["fieldErrors"].(map[string]any)["items"] != apperr.KeyOtherReportAttachment {
+		asObj(t, resp["fieldErrors"])["items"] != apperr.KeyOtherReportAttachment {
 		t.Errorf("an item citing another report's attachment: %d %v", code, resp)
 	}
 	// an empty reason is no reason; a measurement saved again by its ID keeps it and counts a version
@@ -108,26 +108,29 @@ func TestWorkReportEdges(t *testing.T) {
 		t.Fatalf("second draft: %d %v", code, res)
 	}
 
-	for _, it := range data(res)["items"].([]any) {
-		if it := it.(map[string]any); it["componentKey"] == "filter" && it["reason"] != nil {
+	for _, it := range asArr(t, data(res)["items"]) {
+		if it := asObj(t, it); it["componentKey"] == "filter" && it["reason"] != nil {
 			t.Errorf("empty reason kept: %v", it)
 		}
 	}
 
-	first := data(res)["measurements"].([]any)[0].(map[string]any)
+	first := asObj(t, asArr(t, data(res)["measurements"])[0])
 
 	code, res = write(srv, &techInt, "jobs.saveDraft", draftBody(job, "normal", map[string]string{
 		"reportId": `"` + rep + `"`,
-		"measurements": `[{"id":"` + first["id"].(string) + `","componentKey":"filter","metric":"temperature","value":21,` +
+		"measurements": `[{"id":"` + asStr(
+			t,
+			first["id"],
+		) + `","componentKey":"filter","metric":"temperature","value":21,` +
 			`"unit":"°C","observedAt":"` + now + `"}]`,
 	}), 2)
 	if code != 200 {
 		t.Fatalf("third draft: %d %v", code, res)
 	}
 
-	if again := data(res)["measurements"].([]any)[0].(map[string]any); again["id"] != first["id"] ||
-		again["version"].(float64) != 2 ||
-		again["value"].(float64) != 21 ||
+	if again := asObj(t, asArr(t, data(res)["measurements"])[0]); again["id"] != first["id"] ||
+		asNum(t, again["version"]) != 2 ||
+		asNum(t, again["value"]) != 21 ||
 		again["createdAt"] != first["createdAt"] {
 		t.Errorf("measurement corrected in place: %v → %v", first, again)
 	}
@@ -166,8 +169,8 @@ func TestWorkReportEdges(t *testing.T) {
 		t.Fatalf("submit: %d %v", code, res)
 	}
 
-	if tos := data(res)["timeOnSite"].(map[string]any); tos["onSiteMinutes"].(float64) != 25 ||
-		tos["pauses"].([]any)[1].(map[string]any)["to"] == nil {
+	if tos := asObj(t, data(res)["timeOnSite"]); asNum(t, tos["onSiteMinutes"]) != 25 ||
+		asObj(t, asArr(t, tos["pauses"])[1])["to"] == nil {
 		t.Errorf("time on site without the pauses: %v", tos)
 	}
 

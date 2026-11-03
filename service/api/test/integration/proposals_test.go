@@ -56,7 +56,7 @@ func TestSlotProposals(t *testing.T) {
 	}
 
 	_, resp := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"bad hold":                    "hold=error.invalid",
 		"contractor with a member":    "hold=error.invalid",
@@ -131,7 +131,7 @@ func TestSlotProposals(t *testing.T) {
 	// a contractor hold may name the contractor's own technician, who must be qualified for the slot; withdrawn again
 	{
 		_, m := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-		other := data(m)["id"].(string)
+		other := asStr(t, data(m)["id"])
 
 		named := `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").
 			String() +
@@ -145,7 +145,7 @@ func TestSlotProposals(t *testing.T) {
 			stamp(48),
 			1,
 		); code != 200 ||
-			data(res)["slotProposal"].(map[string]any)["status"] != "pending" {
+			asObj(t, data(res)["slotProposal"])["status"] != "pending" {
 			t.Fatalf("contractor hold with its technician: %d %v", code, res)
 		}
 
@@ -167,7 +167,7 @@ func TestSlotProposals(t *testing.T) {
 		stamp(48),
 		1,
 	); code != 200 ||
-		data(res)["slotProposal"].(map[string]any)["status"] != "pending" {
+		asObj(t, data(res)["slotProposal"])["status"] != "pending" {
 		t.Fatalf("propose: %d %v", code, res)
 	}
 
@@ -239,7 +239,7 @@ func TestSlotProposals(t *testing.T) {
 		`{"jobId":"`+job+`","proposalId":"`+p1+`"}`,
 		2,
 	); code != 200 ||
-		data(res)["slotProposal"].(map[string]any)["status"] != "withdrawn" {
+		asObj(t, data(res)["slotProposal"])["status"] != "withdrawn" {
 		t.Fatalf("withdraw: %d %v", code, res)
 	}
 
@@ -264,7 +264,7 @@ func TestSlotProposals(t *testing.T) {
 		4,
 	); code != 200 ||
 		data(res)["status"] != "assigned" ||
-		data(res)["scheduledSlot"].(map[string]any)["startAt"] != stamp(97) {
+		asObj(t, data(res)["scheduledSlot"])["startAt"] != stamp(97) {
 		t.Fatalf("accept internal hold: %d %v", code, res)
 	}
 
@@ -274,7 +274,7 @@ func TestSlotProposals(t *testing.T) {
 
 	// contractor hold without an Offer: accepting creates the Offer at the slot
 	_, resp = write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	j2 := data(resp)["id"].(string)
+	j2 := asStr(t, data(resp)["id"])
 	propose(j2, slotJSON(98, 2), contractorHold, stamp(48), 1)
 
 	p3 := proposalOf(j2)
@@ -294,15 +294,15 @@ func TestSlotProposals(t *testing.T) {
 		&hq,
 		"jobs.get",
 		`{"jobId":"`+j2+`"}`,
-	); data(res)["offer"].(map[string]any)["visitSlot"].(map[string]any)["startAt"] != stamp(
+	); asObj(t, asObj(t, data(res)["offer"])["visitSlot"])["startAt"] != stamp(
 		98,
 	) ||
-		data(res)["offer"].(map[string]any)["offerExpiresAt"] != stamp(24) {
+		asObj(t, data(res)["offer"])["offerExpiresAt"] != stamp(24) {
 		t.Fatalf("offer at the proposal slot, open for 24 hours: %v", data(res)["offer"])
 	}
 	// a slot that starts sooner than that closes the offer at its start
 	_, resp = write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	soon := data(resp)["id"].(string)
+	soon := asStr(t, data(resp)["id"])
 	propose(soon, slotJSON(98, 2), contractorHold, stamp(48), 1)
 	owner(
 		t,
@@ -328,7 +328,7 @@ func TestSlotProposals(t *testing.T) {
 		&hq,
 		"jobs.get",
 		`{"jobId":"`+soon+`"}`,
-	); data(res)["offer"].(map[string]any)["offerExpiresAt"] != stamp(
+	); asObj(t, data(res)["offer"])["offerExpiresAt"] != stamp(
 		10,
 	) {
 		t.Errorf("offer closes at the slot start: %v", data(res)["offer"])
@@ -336,7 +336,7 @@ func TestSlotProposals(t *testing.T) {
 
 	// decline with three new preferred times
 	_, resp = write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	j3 := data(resp)["id"].(string)
+	j3 := asStr(t, data(resp)["id"])
 	propose(j3, slotJSON(99, 2), internalHold, stamp(48), 1)
 	newSlots := `[` + slotJSON(120, 2) + `,` + slotJSON(144, 2) + `,` + slotJSON(168, 2) + `]`
 	// the new times follow the request's slot rules (IR113): a time today is refused
@@ -359,14 +359,14 @@ func TestSlotProposals(t *testing.T) {
 		`"decision":"decline","declineReason":"too_late","comment":" evenings only ","preferredSlots":`+newSlots,
 		2,
 	); code != 200 ||
-		data(res)["preferenceRound"].(float64) != 2 ||
+		asNum(t, data(res)["preferenceRound"]) != 2 ||
 		data(res)["status"] != "requested" {
 		t.Fatalf("decline with slots: %d %v", code, res)
 	}
 
 	// expiry by the worker
 	_, resp = write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	j4 := data(resp)["id"].(string)
+	j4 := asStr(t, data(resp)["id"])
 	propose(j4, slotJSON(100, 2), internalHold, stamp(2), 1)
 
 	_, err := schedTick(context.Background(), srv, clock.Add(2*time.Hour))
@@ -379,7 +379,7 @@ func TestSlotProposals(t *testing.T) {
 		&hq,
 		"jobs.get",
 		`{"jobId":"`+j4+`"}`,
-	); data(m)["slotProposal"].(map[string]any)["status"] != "expired" {
+	); asObj(t, data(m)["slotProposal"])["status"] != "expired" {
 		t.Fatal("expired proposal")
 	}
 
@@ -400,7 +400,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 	unit := seed.ID("unit-non-rto").String()
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, resp := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 	write(
 		srv,
 		&hq,
@@ -503,8 +503,8 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		t.Fatalf("offer projection: %d %v", code, res)
 	} else if o := data(
 		res,
-	); o["partnerSlotProposal"] == nil || o["partnerSlotProposal"].(map[string]any)["id"] != partner ||
-		o["partnerSlotProposal"].(map[string]any)["status"] != "pending" ||
+	); o["partnerSlotProposal"] == nil || asObj(t, o["partnerSlotProposal"])["id"] != partner ||
+		asObj(t, o["partnerSlotProposal"])["status"] != "pending" ||
 		o["offeredAt"] == nil || o["accessValidFrom"] != stamp(0) ||
 		o["accessValidUntil"] != stamp(200) {
 		t.Fatalf("offer projection fields: %v", o)
@@ -541,7 +541,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		)+`"}`,
 		3,
 	); code != 200 ||
-		data(res)["slotProposal"].(map[string]any)["source"] != "contractor" {
+		asObj(t, data(res)["slotProposal"])["source"] != "contractor" {
 		t.Fatalf("send to client: %d %v", code, res)
 	}
 
@@ -579,7 +579,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		&hq,
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); data(m)["offer"].(map[string]any)["visitSlot"].(map[string]any)["startAt"] != stamp(
+	); asObj(t, asObj(t, data(m)["offer"])["visitSlot"])["startAt"] != stamp(
 		101,
 	) {
 		t.Fatal("offer visit slot moved")
@@ -597,7 +597,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 
 	// keep and withdraw paths on another offer
 	_, resp = write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	j2 := data(resp)["id"].(string)
+	j2 := asStr(t, data(resp)["id"])
 	write(
 		srv,
 		&hq,
@@ -772,7 +772,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		2,
 	); code != 200 ||
 		data(res)["status"] != "requested" || data(res)["assignmentId"] != nil ||
-		data(res)["preferenceRound"].(float64) != 2 {
+		asNum(t, data(res)["preferenceRound"]) != 2 {
 		t.Fatalf("reschedule: %d %v", code, res)
 	}
 
@@ -791,7 +791,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		srv,
 		&customerA,
 		"jobs.requestReschedule",
-		`{"jobId":"`+data(resp)["id"].(string)+`","preferredSlots":`+three+`}`,
+		`{"jobId":"`+asStr(t, data(resp)["id"])+`","preferredSlots":`+three+`}`,
 		1,
 	); code != 409 {
 		t.Error("client_request jobs are not rescheduled")
@@ -865,7 +865,7 @@ func TestRescheduleAfterContractorAssignment(t *testing.T) {
 		0,
 	)
 
-	job := data(resp)["id"].(string)
+	job := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		&hq,
@@ -997,7 +997,7 @@ func TestRescheduleAfterContractorAssignment(t *testing.T) {
 		&hq,
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); data(res)["offer"].(map[string]any)["visitSlot"].(map[string]any)["startAt"] != stamp(
+	); asObj(t, asObj(t, data(res)["offer"])["visitSlot"])["startAt"] != stamp(
 		97,
 	) {
 		t.Errorf("the accepted offer's visit: %v", data(res)["offer"])
@@ -1026,7 +1026,7 @@ func TestPartnerProposalRefusals(t *testing.T) {
 		return ver(m)
 	}
 	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
-	job := data(m)["id"].(string)
+	job := asStr(t, data(m)["id"])
 	write(
 		srv,
 		&hq,
@@ -1069,7 +1069,7 @@ func TestPartnerProposalRefusals(t *testing.T) {
 	if code, m := pp(
 		slotJSON(3, 1),
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["slot"] != apperr.KeySlotRules {
+		asObj(t, m["fieldErrors"])["slot"] != apperr.KeySlotRules {
 		t.Errorf("a time today: %d %v", code, m)
 	}
 
@@ -1115,7 +1115,7 @@ func TestPartnerProposalRefusals(t *testing.T) {
 	if code, m := resolve(
 		stamp(24 * 8),
 	); code != 422 ||
-		m["fieldErrors"].(map[string]any)["replyBy"] != apperr.KeyRange {
+		asObj(t, m["fieldErrors"])["replyBy"] != apperr.KeyRange {
 		t.Errorf("reply by in 8 days: %d %v", code, m)
 	}
 	// HQ's own proposal is pending: the contractor's time waits
@@ -1240,7 +1240,7 @@ func TestPartnerProposalEndsWithClientProposal(t *testing.T) {
 
 		_, m := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
 
-		job = data(m)["id"].(string)
+		job = asStr(t, data(m)["id"])
 		if code, res := write(
 			srv,
 			&hq,
@@ -1392,7 +1392,7 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 
 		_, m := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
 
-		job = data(m)["id"].(string)
+		job = asStr(t, data(m)["id"])
 		if code, res := write(
 			srv,
 			&hq,
@@ -1544,7 +1544,7 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
 
-	job := data(m)["id"].(string)
+	job := asStr(t, data(m)["id"])
 	if code, res := write(
 		srv,
 		&hq,
@@ -1664,7 +1664,7 @@ func TestAcceptRechecksHold(t *testing.T) {
 	srv := server(t)
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
-	job := data(m)["id"].(string)
+	job := asStr(t, data(m)["id"])
 
 	hold := `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `"}`
 	if code, res := write(
@@ -1751,7 +1751,7 @@ func TestAcceptedProposalExtendsAccess(t *testing.T) {
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
 
-	job := data(m)["id"].(string)
+	job := asStr(t, data(m)["id"])
 	if code, res := write(
 		srv,
 		&hq,
@@ -1871,7 +1871,7 @@ func TestProposalReplyByBeforeSlot(t *testing.T) {
 	srv := server(t)
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
-	job := data(m)["id"].(string)
+	job := asStr(t, data(m)["id"])
 	hold := `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `"}`
 
 	propose := func(replyBy string) (int, map[string]any) {

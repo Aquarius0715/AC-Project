@@ -35,7 +35,7 @@ func newUnit(t *testing.T, s *apiserver.Server, name string) string {
 		t.Fatalf("unit: %d %v", code, res)
 	}
 
-	return data(res)["id"].(string)
+	return asStr(t, data(res)["id"])
 }
 
 // assign creates a job on unit with an assignment for membership whose window is [from, until).
@@ -108,14 +108,14 @@ func TestDevicesRegisterListGet(t *testing.T) {
 
 	// the write answers Device; calibrations and the running operation are devices.get's (IR392)
 	_, detail := doc["activeOperation"]
-	if doc["serial"] != strings.ToUpper(serial) || len(doc["sensors"].([]any)) != 2 ||
+	if doc["serial"] != strings.ToUpper(serial) || len(asArr(t, doc["sensors"])) != 2 ||
 		doc["unitId"] != nil ||
 		doc["targetUnitId"] != unit ||
 		detail {
 		t.Fatalf("device (unbound until bind, D05): %v", doc)
 	}
 
-	dev := doc["id"].(string)
+	dev := asStr(t, doc["id"])
 	if code, _ := post(srv, &customerB, "devices.get", `{"id":"`+dev+`"}`); code != 404 {
 		t.Error("unbound devices are visible only to the creator and HQ")
 	}
@@ -241,7 +241,7 @@ func TestTechnicianWriteTable(t *testing.T) {
 	}
 
 	u1 := newUnit(t, srv, "Tech AC")
-	if code, m := reg(u1, ""); code != 422 || m["fieldErrors"].(map[string]any)["jobId"] == nil {
+	if code, m := reg(u1, ""); code != 422 || asObj(t, m["fieldErrors"])["jobId"] == nil {
 		t.Fatalf("jobId required: %d %v", code, m)
 	}
 
@@ -348,8 +348,8 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		`{"serial":"OP-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+u1+`"}`,
 		0,
 	)
-	dev := data(resp)["id"].(string)
-	sensor := data(resp)["sensors"].([]any)[0].(map[string]any)["id"].(string)
+	dev := asStr(t, data(resp)["id"])
+	sensor := asStr(t, asObj(t, asArr(t, data(resp)["sensors"])[0])["id"])
 
 	if code, _ := write(srv, &hq, "devices.check", `{"id":"`+dev+`"}`, 1); code != 409 {
 		t.Error("operations need a bound device")

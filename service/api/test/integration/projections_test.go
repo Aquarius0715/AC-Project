@@ -101,7 +101,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	unit := seed.ID("unit-non-rto").String()
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, res := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	job := data(res)["id"].(string)
+	job := asStr(t, data(res)["id"])
 	write(
 		srv,
 		&hq,
@@ -133,7 +133,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	// offer projection before acceptance
 	o := listJob(srv, &contrA, job)
 	if o == nil || o["projection"] != "offer" || o["status"] != "offered" || o["severity"] != nil ||
-		len(o["requiredQualifications"].([]any)) == 0 ||
+		len(asArr(t, o["requiredQualifications"])) == 0 ||
 		o["unitId"] != nil {
 		t.Fatalf("offer projection: %v", o)
 	}
@@ -251,22 +251,22 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		&hq,
 		"jobs.addNote",
 		`{"jobId":"`+job+`","message":"Check parts stock","visibility":"internal"}`,
-		int(listJob(srv, &contrA, job)["version"].(float64)),
+		int(asNum(t, listJob(srv, &contrA, job)["version"])),
 	); code != 200 {
 		t.Fatalf("internal note: %d", code)
 	}
 
 	_, all := post(srv, &contrA, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
 	_, seen := post(srv, &customerA, "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
-	es := listJob(srv, &contrA, job)["eventSummary"].(map[string]any)
+	es := asObj(t, listJob(srv, &contrA, job)["eventSummary"])
 
 	newest := items(all)[len(items(all))-1]
 	if es["count"] != float64(len(items(all))) ||
 		es["customerVisible"] != float64(len(items(seen))) ||
 		es["customerVisible"] == es["count"] ||
 		es["notes"] != float64(1) ||
-		es["latest"].(map[string]any)["action"] != newest["action"] ||
-		es["latest"].(map[string]any)["occurredAt"] != newest["occurredAt"] {
+		asObj(t, es["latest"])["action"] != newest["action"] ||
+		asObj(t, es["latest"])["occurredAt"] != newest["occurredAt"] {
 		t.Fatalf(
 			"event summary: %v (contractor reads %d, customer %d)",
 			es,
@@ -275,7 +275,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		)
 	}
 
-	if cs := listJob(srv, &customerA, job)["eventSummary"].(map[string]any); cs["count"] != float64(
+	if cs := asObj(t, listJob(srv, &customerA, job)["eventSummary"]); cs["count"] != float64(
 		len(items(seen)),
 	) ||
 		cs["count"] != cs["customerVisible"] ||
@@ -301,8 +301,8 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 
 	h := data(res)
 	if code != 200 || h["projection"] != "history" || h["dueAt"] != nil || h["severity"] != nil ||
-		len(h["ownDecisionEvents"].([]any)) != 1 ||
-		h["redactedReportSummary"].(map[string]any)["hasReport"] != false {
+		len(asArr(t, h["ownDecisionEvents"])) != 1 ||
+		asObj(t, h["redactedReportSummary"])["hasReport"] != false {
 		t.Fatalf("history: %d %v", code, res)
 	}
 
@@ -370,7 +370,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 
 	// expired unanswered offers disappear
 	_, res = write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
-	j2 := data(res)["id"].(string)
+	j2 := asStr(t, data(res)["id"])
 	write(
 		srv,
 		&hq,
@@ -404,7 +404,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
 		0,
 	)
-	key := data(res)["id"].(string)
+	key := asStr(t, data(res)["id"])
 	write(
 		srv,
 		&hq,
@@ -497,7 +497,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		"jobs.get",
 		`{"jobId":"`+key+`"}`,
 	); code != 200 || data(resp)["projection"] != "history" ||
-		len(data(resp)["ownDecisionEvents"].([]any)) != 0 {
+		len(asArr(t, data(resp)["ownDecisionEvents"])) != 0 {
 		t.Fatalf("technician history: %d %v", code, resp)
 	}
 

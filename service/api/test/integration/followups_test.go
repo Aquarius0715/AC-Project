@@ -19,7 +19,7 @@ func completedJob(t *testing.T, s *apiserver.Server) string {
 	t.Helper()
 
 	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
-	job := data(m)["id"].(string)
+	job := asStr(t, data(m)["id"])
 	owner(
 		t,
 		`UPDATE maintenance.jobs SET status = 'completed', completed_at = $2 WHERE id = $1`,
@@ -64,7 +64,7 @@ func TestRateAndReportProblem(t *testing.T) {
 	code, resp := rate(&customerA, `"stars":2,"tags":["On time"],"comment":"  slow  "`, 1)
 
 	r, _ := data(resp)["rating"].(map[string]any)
-	if code != 200 || r["stars"].(float64) != 2 || r["comment"] != "slow" ||
+	if code != 200 || asNum(t, r["stars"]) != 2 || r["comment"] != "slow" ||
 		data(resp)["customerConfirmedAt"] == nil {
 		t.Fatalf("rate: %d %v", code, resp)
 	}
@@ -83,8 +83,8 @@ func TestRateAndReportProblem(t *testing.T) {
 		`"stars":3,"tags":[],"comment":"   "`,
 		2,
 	); code != 200 ||
-		data(res)["rating"].(map[string]any)["ratedAt"] != r["ratedAt"] ||
-		data(res)["rating"].(map[string]any)["comment"] != nil {
+		asObj(t, data(res)["rating"])["ratedAt"] != r["ratedAt"] ||
+		asObj(t, data(res)["rating"])["comment"] != nil {
 		t.Fatalf("re-rate keeps ratedAt, a blank comment is none: %d %v", code, res)
 	}
 
@@ -165,11 +165,11 @@ func TestRateAndReportProblem(t *testing.T) {
 	if code != 200 || data(resp)["followUpOfJobId"] != job ||
 		data(resp)["followUpClass"] != "pending" ||
 		data(resp)["status"] != "requested" ||
-		len(data(resp)["preferredSlots"].([]any)) != 1 {
+		len(asArr(t, data(resp)["preferredSlots"])) != 1 {
 		t.Fatalf("reportProblem: %d %v", code, resp)
 	}
 
-	follow := data(resp)["id"].(string)
+	follow := asStr(t, data(resp)["id"])
 
 	var attachments int
 	ownerScan(
@@ -190,11 +190,11 @@ func TestRateAndReportProblem(t *testing.T) {
 	_, g := post(srv, &hq, "jobs.get", `{"jobId":"`+follow+`"}`)
 
 	photos, _ := data(g)["problemPhotos"].([]any)
-	if len(photos) != 1 || photos[0].(map[string]any)["name"] != "leak.png" {
+	if len(photos) != 1 || asObj(t, photos[0])["name"] != "leak.png" {
 		t.Fatalf("problemPhotos: %v", data(g)["problemPhotos"])
 	}
 
-	pid := photos[0].(map[string]any)["id"].(string)
+	pid := asStr(t, asObj(t, photos[0])["id"])
 	for _, a := range []*actor{&hq, &customerA} {
 		if code, res := post(
 			srv,
@@ -220,7 +220,7 @@ func TestRateAndReportProblem(t *testing.T) {
 		`"reasonCode":"other","details":"Another issue with the louver","photos":[],"preferredSlot":null`,
 		4,
 	); code != 200 ||
-		len(data(m)["preferredSlots"].([]any)) != 0 {
+		len(asArr(t, data(m)["preferredSlots"])) != 0 {
 		t.Fatalf("reportProblem without slot: %d %v", code, m)
 	}
 
@@ -277,7 +277,7 @@ func TestRateAndReportProblem(t *testing.T) {
 	for name, a := range map[string]*actor{"hq": &hq, "client": &customerA} {
 		row := summary(a)
 
-		at, _ := time.Parse(time.RFC3339, row["createdAt"].(string))
+		at, _ := time.Parse(time.RFC3339, asStr(t, row["createdAt"]))
 		if row["projection"] != "summary" || row["followUpOfJobId"] != job ||
 			row["followUpClass"] != "pending" ||
 			!at.Equal(created) {
@@ -369,7 +369,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		`{"jobId":"`+job+`","costLines":`+lines+`}`,
 		1,
 	); code != 200 ||
-		len(data(res)["costs"].([]any)) != 2 {
+		len(asArr(t, data(res)["costs"])) != 2 {
 		t.Fatalf("saveCost: %d %v", code, res)
 	}
 	// IR42: clients see customer lines only
@@ -378,8 +378,8 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		&customerA,
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); len(data(res)["costs"].([]any)) != 1 ||
-		data(res)["costs"].([]any)[0].(map[string]any)["description"] != "Parts" {
+	); len(asArr(t, data(res)["costs"])) != 1 ||
+		asObj(t, asArr(t, data(res)["costs"])[0])["description"] != "Parts" {
 		t.Fatalf("client costs: %v", data(res)["costs"])
 	}
 	// IR442: the client's history leaves out HQ's cost record (counted out of total too); HQ sees it
@@ -392,11 +392,11 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		}
 
 		var out []string
-		for _, e := range data(res)["items"].([]any) {
-			out = append(out, e.(map[string]any)["action"].(string))
+		for _, e := range asArr(t, data(res)["items"]) {
+			out = append(out, asStr(t, asObj(t, e)["action"]))
 		}
 
-		return out, data(res)["total"].(float64)
+		return out, asNum(t, data(res)["total"])
 	}
 	if got, total := actions(
 		&customerA,
@@ -417,7 +417,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 
 		_, m := post(srv, a, "jobs.get", `{"jobId":"`+job+`"}`)
 
-		return data(m)["eventCursor"].(float64)
+		return asNum(t, data(m)["eventCursor"])
 	}
 	if got := cursor(&customerA); got != clientTotal || len(clientEvents) >= len(hqEvents) {
 		t.Errorf(
@@ -486,7 +486,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		claim,
 		2,
 	); code != 200 ||
-		data(res)["warrantyClaims"].([]any)[0].(map[string]any)["state"] != "filed" {
+		asObj(t, asArr(t, data(res)["warrantyClaims"])[0])["state"] != "filed" {
 		t.Fatalf("claim: %d %v", code, res)
 	}
 
@@ -511,7 +511,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, m := write(srv, &customerA, "jobs.create", jobBody(unit, nil), 0)
 
-	j2 := data(m)["id"].(string)
+	j2 := asStr(t, data(m)["id"])
 	if code, _ := write(
 		srv,
 		&hq,
@@ -548,7 +548,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		"jobs.get",
 		`{"jobId":"`+j2+`"}`,
 	); data(res)["offer"] == nil ||
-		data(res)["offer"].(map[string]any)["decision"] != nil {
+		asObj(t, data(res)["offer"])["decision"] != nil {
 		t.Fatal("hq sees the open offer")
 	}
 
@@ -604,7 +604,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		&hq,
 		"jobs.get",
 		`{"jobId":"`+j2+`"}`,
-	); data(res)["offer"].(map[string]any)["accessValidUntil"] != stamp(
+	); asObj(t, data(res)["offer"])["accessValidUntil"] != stamp(
 		200,
 	) { // the write answers MaintenanceJob (IR392)
 		t.Fatalf("extended access: %v", data(res)["offer"])
@@ -616,7 +616,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		"jobs.get",
 		`{"jobId":"`+j2+`"}`,
 	); data(res)["offer"] == nil ||
-		len(data(res)["costs"].([]any)) != 0 {
+		len(asArr(t, data(res)["costs"])) != 0 {
 		t.Fatalf("contractor detail: %v", res)
 	}
 
@@ -665,7 +665,7 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 	stamp := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, m := write(srv, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
 
-	job := data(m)["id"].(string)
+	job := asStr(t, data(m)["id"])
 	if code, res := write(
 		srv,
 		&hq,

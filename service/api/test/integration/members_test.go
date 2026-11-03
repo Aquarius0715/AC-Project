@@ -127,12 +127,12 @@ func TestMembersSave(t *testing.T) {
 
 	code, resp := write(srv, &hq, "members.save", body(nil), 0)
 	if code != 200 || data(resp)["role"] != "technician" ||
-		len(data(resp)["scopes"].([]any)) != 1 ||
-		data(resp)["scopeVersion"].(float64) != 1 {
+		len(asArr(t, data(resp)["scopes"])) != 1 ||
+		asNum(t, data(resp)["scopeVersion"]) != 1 {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 	// update: permissions change bumps scopeVersion; role is fixed
 	if code, res := write(
 		srv,
@@ -147,8 +147,8 @@ func TestMembersSave(t *testing.T) {
 		),
 		1,
 	); code != 200 ||
-		data(res)["scopeVersion"].(float64) != 2 ||
-		data(res)["version"].(float64) != 2 {
+		asNum(t, data(res)["scopeVersion"]) != 2 ||
+		asNum(t, data(res)["version"]) != 2 {
 		t.Fatalf("update: %d %v", code, res)
 	}
 
@@ -165,7 +165,7 @@ func TestMembersSave(t *testing.T) {
 		),
 		2,
 	); code != 200 ||
-		data(res)["scopeVersion"].(float64) != 2 {
+		asNum(t, data(res)["scopeVersion"]) != 2 {
 		t.Fatalf("same permissions keep scopeVersion: %d %v", code, res)
 	}
 
@@ -204,8 +204,8 @@ func TestMembersSave(t *testing.T) {
 		),
 		3,
 	); code != 200 ||
-		data(res)["scopes"].([]any)[0].(map[string]any)["kind"] != "property" ||
-		data(res)["scopeVersion"].(float64) != 3 {
+		asObj(t, asArr(t, data(res)["scopes"])[0])["kind"] != "property" ||
+		asNum(t, data(res)["scopeVersion"]) != 3 {
 		t.Fatalf("property scope: %d %v", code, res)
 	}
 
@@ -259,11 +259,17 @@ func TestMembersSave(t *testing.T) {
 
 	perms, _ := json.Marshal(me["permissions"])
 	selfBody := func(p string) string {
-		return `{"id":"` + me["id"].(string) + `","userId":"` + me["userId"].(string) + `","organizationId":"` + operation +
+		return `{"id":"` + asStr(
+			t,
+			me["id"],
+		) + `","userId":"` + asStr(t, me["userId"]) + `","organizationId":"` + operation +
 			`","role":"admin","employment":null,"permissions":` + p +
 			`,"scopes":[{"kind":"tenant","id":"` + seed.ID("tenant-a").
 			String() +
-			`"}],"validFrom":"` + me["validFrom"].(string) + `","validUntil":null,"reason":"self"}`
+			`"}],"validFrom":"` + asStr(
+			t,
+			me["validFrom"],
+		) + `","validUntil":null,"reason":"self"}`
 	}
 
 	withOverride := strings.Replace(string(perms), `[`, `["restriction.override",`, 1)
@@ -272,7 +278,7 @@ func TestMembersSave(t *testing.T) {
 		&hq,
 		"members.save",
 		selfBody(withOverride),
-		int(me["version"].(float64)),
+		int(asNum(t, me["version"])),
 	); code != 403 {
 		t.Error("self promotion")
 	}
@@ -313,7 +319,7 @@ func TestMembersSave(t *testing.T) {
 		&hq,
 		"members.save",
 		selfBody(withoutIdentity),
-		int(me["version"].(float64)),
+		int(asNum(t, me["version"])),
 	); code != 409 {
 		t.Errorf("last identity.write holder: %d %v", code, res)
 	}
@@ -369,8 +375,8 @@ func TestMembersList(t *testing.T) {
 	for _, it := range items(resp) {
 		if it["role"] != "technician" ||
 			it["organizationId"] != seed.ID("org-contractor-a").String() ||
-			len(it["permissions"].([]any)) != 0 ||
-			len(it["scopes"].([]any)) != 0 {
+			len(asArr(t, it["permissions"])) != 0 ||
+			len(asArr(t, it["scopes"])) != 0 {
 			t.Fatalf("contractor projection: %v", it)
 		}
 	}
@@ -459,10 +465,10 @@ func TestMembersListCarriesEachMembersOwn(t *testing.T) {
 	grants := map[string]map[string]string{} // member → test grant code → revokedAt
 
 	for _, it := range items(res) {
-		id := it["id"].(string)
-		for _, q := range it["qualifications"].([]any) {
-			g := q.(map[string]any)
-			if code := g["code"].(string); strings.HasPrefix(code, "test.ir496.") {
+		id := asStr(t, it["id"])
+		for _, q := range asArr(t, it["qualifications"]) {
+			g := asObj(t, q)
+			if code := asStr(t, g["code"]); strings.HasPrefix(code, "test.ir496.") {
 				if grants[id] == nil {
 					grants[id] = map[string]string{}
 				}

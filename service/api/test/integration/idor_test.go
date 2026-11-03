@@ -80,7 +80,7 @@ func TestForeignTargets(t *testing.T) {
 		t.Fatalf("customer A's automation: %d %v", code, resp)
 	}
 
-	autoA := data(resp)["id"].(string)
+	autoA := asStr(t, data(resp)["id"])
 
 	code, resp = write(
 		srv,
@@ -93,7 +93,7 @@ func TestForeignTargets(t *testing.T) {
 		t.Fatalf("customer A's quote: %d %v", code, resp)
 	}
 
-	quoteA := data(resp)["id"].(string)
+	quoteA := asStr(t, data(resp)["id"])
 	done := completedJob(t, srv) // customer A's completed job
 
 	// work in progress on customer A's unit: assigned to the internal technician, started, with a draft report
@@ -105,7 +105,7 @@ func TestForeignTargets(t *testing.T) {
 		t.Fatalf("draft report: %d %v", code, resp)
 	}
 
-	repW := data(resp)["id"].(string)
+	repW := asStr(t, data(resp)["id"])
 	runW := uuid.NewString()
 	owner(
 		t,
@@ -147,7 +147,7 @@ func TestForeignTargets(t *testing.T) {
 		t.Fatalf("contractor A's certificate: %d %v", code, resp)
 	}
 
-	certA := data(resp)["id"].(string)
+	certA := asStr(t, data(resp)["id"])
 
 	code, resp = write(
 		srv,
@@ -160,7 +160,7 @@ func TestForeignTargets(t *testing.T) {
 		t.Fatalf("contractor A's unavailable days: %d %v", code, resp)
 	}
 
-	unavA := data(resp)["id"].(string)
+	unavA := asStr(t, data(resp)["id"])
 
 	t.Cleanup(func() { owner(t, `DELETE FROM maintenance.unavailability WHERE id = $1`, unavA) })
 
@@ -1022,8 +1022,8 @@ func TestForeignTargets(t *testing.T) {
 		"notifications.markAllRead",
 		`{"ids":["`+notifA+`"]}`,
 		0,
-	); code != 200 || len(data(res)["markedIds"].([]any)) != 0 ||
-		len(data(res)["skippedIds"].([]any)) != 1 {
+	); code != 200 || len(asArr(t, data(res)["markedIds"])) != 0 ||
+		len(asArr(t, data(res)["skippedIds"])) != 1 {
 		t.Errorf("notifications.markAllRead as customer-b: %d %v", code, res)
 	}
 
@@ -1101,7 +1101,7 @@ func TestTechnicianRebind(t *testing.T) {
 			0,
 		)
 
-		return data(res)["id"].(string)
+		return asStr(t, data(res)["id"])
 	}
 	unitOf := func(dev string) string {
 		var u *string

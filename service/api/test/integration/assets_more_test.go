@@ -147,7 +147,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 	}
 
 	code, resp := set(&customerA, `"`+pA+`","`+pA2+`"`, v)
-	if code != 200 || len(data(resp)["alertPolicyIds"].([]any)) != 2 {
+	if code != 200 || len(asArr(t, data(resp)["alertPolicyIds"])) != 2 {
 		t.Fatalf("attach: %d %v", code, resp)
 	}
 
@@ -157,7 +157,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		`"`+pA2+`"`,
 		v,
 	); code != 200 ||
-		len(data(m)["alertPolicyIds"].([]any)) != 1 {
+		len(asArr(t, data(m)["alertPolicyIds"])) != 1 {
 		t.Fatalf("replace: %d", code)
 	} else {
 		v++
@@ -193,7 +193,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		t.Error("stale version")
 	}
 
-	if code, m := set(&hq, ``, v); code != 200 || len(data(m)["alertPolicyIds"].([]any)) != 0 {
+	if code, m := set(&hq, ``, v); code != 200 || len(asArr(t, data(m)["alertPolicyIds"])) != 0 {
 		t.Fatalf("detach all: %d", code)
 	}
 
@@ -215,7 +215,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 			t.Fatalf("unit: %d %v", code, res)
 		}
 
-		return data(res)["id"].(string)
+		return asStr(t, data(res)["id"])
 	}
 
 	u1 := mk()
@@ -344,7 +344,7 @@ func TestOrganizations(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := data(resp)["id"].(string)
+	id := asStr(t, data(resp)["id"])
 	// a second customer with the same billing name (trimmed, case-insensitive) is CONFLICT; other kinds may share it
 	// (IR208)
 	if code, res := write(

@@ -55,7 +55,7 @@ func TestArchiveRulesD05(t *testing.T) {
 		srv,
 		&hq,
 		"devices.bind",
-		`{"deviceId":"`+data(res)["id"].(string)+`","unitId":"`+u2+`","reason":"install"}`,
+		`{"deviceId":"`+asStr(t, data(res)["id"])+`","unitId":"`+u2+`","reason":"install"}`,
 		1,
 	)
 
@@ -98,16 +98,25 @@ func TestArchiveRulesD05(t *testing.T) {
 	)
 	cb := items(c)[0]
 
-	body := `{"id":"` + cb["id"].(string) + `","name":"` + cb["name"].(string) + `","organizationId":"` +
+	body := `{"id":"` + asStr(
+		t,
+		cb["id"],
+	) + `","name":"` + asStr(
+		t,
+		cb["name"],
+	) + `","organizationId":"` +
 		seed.ID("org-customer-b").
 			String() +
-		`","serviceProfile":"` + cb["serviceProfile"].(string) + `","status":"inactive"}`
+		`","serviceProfile":"` + asStr(
+		t,
+		cb["serviceProfile"],
+	) + `","status":"inactive"}`
 	if code, resp := write(
 		srv,
 		&hq,
 		"customers.save",
 		body,
-		int(cb["version"].(float64)),
+		int(asNum(t, cb["version"])),
 	); code != 409 ||
 		resp["messageKey"] != apperr.KeyCustomerActive {
 		t.Fatalf("deactivation with units: %d %v", code, resp)
@@ -140,7 +149,7 @@ func TestArchiveRulesD05(t *testing.T) {
 		srv,
 		&hq,
 		"customers.save",
-		`{"id":"`+data(nc)["id"].(string)+`","name":"Contract only",`+
+		`{"id":"`+asStr(t, data(nc)["id"])+`","name":"Contract only",`+
 			`"organizationId":"`+org+`","serviceProfile":"general",`+
 			`"status":"inactive"}`,
 		1,

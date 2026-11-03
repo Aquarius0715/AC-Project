@@ -33,7 +33,7 @@ func TestAutomationDecideReasons(t *testing.T) {
 			t.Fatalf("rule: %d %v", code, res)
 		}
 
-		return data(res)["id"].(string), ver(res)
+		return asStr(t, data(res)["id"]), ver(res)
 	}
 	remove := func(id string, v int) {
 		t.Helper()
@@ -62,7 +62,7 @@ func TestAutomationDecideReasons(t *testing.T) {
 			t.Fatalf("simulate: %d %v", code, res)
 		}
 
-		d := data(res)["results"].([]any)[0].(map[string]any)
+		d := asObj(t, asArr(t, data(res)["results"])[0])
 		if d["decision"] != "suppressed" {
 			t.Fatalf("decision %v", d)
 		}

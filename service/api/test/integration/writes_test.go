@@ -40,7 +40,7 @@ func TestWritesGetResult(t *testing.T) {
 
 	code, m := get(&techB, "preferences.update", key)
 	if code != 200 || data(m)["state"] != "succeeded" ||
-		data(m)["result"].(map[string]any)["locale"] != "en" {
+		asObj(t, data(m)["result"])["locale"] != "en" {
 		t.Fatalf("succeeded: %d %v", code, m)
 	}
 

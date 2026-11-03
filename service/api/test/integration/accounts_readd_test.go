@@ -99,7 +99,7 @@ func TestPersonAddedAgain(t *testing.T) {
 		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	first, firstMembership := data(resp)["id"].(string), data(resp)["membershipId"].(string)
+	first, firstMembership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
 
 	drain()
 
@@ -136,7 +136,7 @@ func TestPersonAddedAgain(t *testing.T) {
 		t.Fatalf("added again: %d %v", code, resp)
 	}
 
-	again, membership := data(resp)["id"].(string), data(resp)["membershipId"].(string)
+	again, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
 
 	var (
 		same, signIn string
@@ -193,7 +193,7 @@ func TestPersonAddedAgain(t *testing.T) {
 		t.Fatalf("HQ: %d %v", code, resp)
 	}
 
-	hqMembership := data(resp)["id"].(string)
+	hqMembership := asStr(t, data(resp)["id"])
 
 	drain()
 
@@ -401,7 +401,7 @@ func TestClientAddedAgain(t *testing.T) {
 		t.Fatalf("add: %d %v", code, res)
 	}
 
-	first := data(res)["membershipId"].(string)
+	first := asStr(t, data(res)["membershipId"])
 
 	err := srv.DrainEvents(context.Background())
 	if err != nil {
@@ -412,7 +412,7 @@ func TestClientAddedAgain(t *testing.T) {
 		srv,
 		&customerB,
 		"clientUsers.remove",
-		`{"id":"`+data(res)["id"].(string)+`","reason":"should be an owner"}`,
+		`{"id":"`+asStr(t, data(res)["id"])+`","reason":"should be an owner"}`,
 		1,
 	); code != 200 {
 		t.Fatalf("remove: %d %v", code, resp)
@@ -430,7 +430,7 @@ func TestClientAddedAgain(t *testing.T) {
 		t.Fatalf("added again: %d %v", code, res)
 	}
 
-	again := data(res)["membershipId"].(string)
+	again := asStr(t, data(res)["membershipId"])
 
 	t.Cleanup(func() { // later tests count customer B's owners: this one ends before them
 		owner(
@@ -506,7 +506,7 @@ func TestAccountProviderTrouble(t *testing.T) {
 			t.Fatalf("add: %d %v", code, res)
 		}
 
-		return data(res)["id"].(string), data(res)["membershipId"].(string)
+		return asStr(t, data(res)["id"]), asStr(t, data(res)["membershipId"])
 	}
 	account := func(membership string) (sub, signIn string) {
 		t.Helper()
@@ -679,7 +679,7 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 		srv,
 		&hq,
 		"clientUsers.remove",
-		`{"id":"`+data(res)["id"].(string)+`","reason":"cap test"}`,
+		`{"id":"`+asStr(t, data(res)["id"])+`","reason":"cap test"}`,
 		1,
 	); code != 200 {
 		t.Errorf("remove: %d %v", code, resp)
