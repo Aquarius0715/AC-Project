@@ -36,13 +36,13 @@ func (in *ListAttachmentsInput) Validate() map[string]string {
 	fieldErrs := map[string]string{}
 	seen := map[uuid.UUID]bool{}
 
-	ok := len(in.UnitIDs) >= 1 && len(in.UnitIDs) <= 500
+	valid := len(in.UnitIDs) >= 1 && len(in.UnitIDs) <= 500
 	for _, u := range in.UnitIDs {
-		ok = ok && u != uuid.Nil && !seen[u]
+		valid = valid && u != uuid.Nil && !seen[u]
 		seen[u] = true
 	}
 
-	if !ok {
+	if !valid {
 		fieldErrs["unitIds"] = apperr.KeyInvalid
 	}
 

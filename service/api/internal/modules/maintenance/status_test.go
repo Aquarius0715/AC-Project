@@ -11,7 +11,7 @@ func TestReadStatus(t *testing.T) {
 	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
 
 	day := 24 * time.Hour
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		stored  string
 		expires time.Time
 		want    string
@@ -24,8 +24,8 @@ func TestReadStatus(t *testing.T) {
 		"rejected stays":   {"rejected", now.Add(31 * day), "rejected"},
 		"pending stays":    {"pending_verification", now.Add(-day), "pending_verification"},
 	} {
-		if got := readStatus(c.stored, c.expires, now); got != c.want {
-			t.Errorf("%s: %s, want %s", name, got, c.want)
+		if got := readStatus(testCase.stored, testCase.expires, now); got != testCase.want {
+			t.Errorf("%s: %s, want %s", name, got, testCase.want)
 		}
 	}
 }
@@ -36,7 +36,7 @@ func TestReminderStage(t *testing.T) {
 	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
 
 	day := 24 * time.Hour
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		expires time.Time
 		want    int
 	}{
@@ -50,8 +50,8 @@ func TestReminderStage(t *testing.T) {
 		"an hour":           {now.Add(time.Hour), 7},
 		"expired is past 7": {now.Add(-day), 7},
 	} {
-		if got := reminderStage(c.expires, now); got != c.want {
-			t.Errorf("%s: %d, want %d", name, got, c.want)
+		if got := reminderStage(testCase.expires, now); got != testCase.want {
+			t.Errorf("%s: %d, want %d", name, got, testCase.want)
 		}
 	}
 }
@@ -69,7 +69,7 @@ func TestContentMatches(t *testing.T) {
 	}, []byte(
 		"%PDF-1.7",
 	)
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		mime string
 		b    []byte
 		want bool
@@ -82,8 +82,8 @@ func TestContentMatches(t *testing.T) {
 		"short":          {"image/png", png[:4], false},
 		"other type":     {"image/gif", []byte("GIF89a"), false},
 	} {
-		if got := ContentMatches(c.mime, c.b); got != c.want {
-			t.Errorf("%s: %v, want %v", name, got, c.want)
+		if got := ContentMatches(testCase.mime, testCase.b); got != testCase.want {
+			t.Errorf("%s: %v, want %v", name, got, testCase.want)
 		}
 	}
 }

@@ -130,22 +130,23 @@ func TestTargetViews(t *testing.T) {
 		},
 	}
 
-	v := targetViews(all, now)
-	if len(v) != len(planTypes)+2 {
-		t.Fatalf("views: %+v", v)
+	views := targetViews(all, now)
+	if len(views) != len(planTypes)+2 {
+		t.Fatalf("views: %+v", views)
 	}
 
-	if v[0].PlanType != "rto" || v[0].State != "in_effect" || v[0].Version != 2 ||
-		v[0].EffectiveFrom == nil {
-		t.Errorf("rto in effect: %+v", v[0])
+	if views[0].PlanType != "rto" || views[0].State != "in_effect" || views[0].Version != 2 ||
+		views[0].EffectiveFrom == nil {
+		t.Errorf("rto in effect: %+v", views[0])
 	}
 
-	if v[1].PlanType != "general" || v[1].State != "default" || v[1].EffectiveFrom != nil ||
-		v[1].ResponseHours != DefaultSLA.ResponseHours {
-		t.Errorf("general default: %+v", v[1])
+	if views[1].PlanType != "general" || views[1].State != "default" ||
+		views[1].EffectiveFrom != nil ||
+		views[1].ResponseHours != DefaultSLA.ResponseHours {
+		t.Errorf("general default: %+v", views[1])
 	}
 
-	later := v[len(planTypes):]
+	later := views[len(planTypes):]
 	if later[0].PlanType != "rto" || later[0].Version != 3 || later[1].PlanType != "general" ||
 		later[0].State != "scheduled" ||
 		later[1].State != "scheduled" {
@@ -168,7 +169,7 @@ func TestCustomerStatus(t *testing.T) {
 		ResponseHours:          0,
 		EffectiveFrom:          time.Time{},
 	}
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		m    Metrics
 		want string
 	}{
@@ -227,8 +228,8 @@ func TestCustomerStatus(t *testing.T) {
 			}, "on_track",
 		},
 	} {
-		if got := customerStatus(c.m, tgt); got != c.want {
-			t.Errorf("%s: %s, want %s", name, got, c.want)
+		if got := customerStatus(testCase.m, tgt); got != testCase.want {
+			t.Errorf("%s: %s, want %s", name, got, testCase.want)
 		}
 	}
 }

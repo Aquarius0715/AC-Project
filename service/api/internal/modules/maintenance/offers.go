@@ -95,37 +95,37 @@ func (r jobRow) current(c *ops.Call) error {
 // load locks a job for update like lock, without the version. A handler whose scope check needs the row checks the
 // scope first and the version after it (current), so a caller outside the scope gets NOT_FOUND / FORBIDDEN for any
 // version and learns nothing of the job (IR366).
-func (m Delivery) load(ctx context.Context, call *ops.Call, id uuid.UUID) (jobRow, error) {
+func (m Delivery) load(ctx context.Context, call *ops.Call, jobID uuid.UUID) (jobRow, error) {
 	var (
-		r      jobRow
-		pref   []byte
-		ss, se *time.Time
+		job                  jobRow
+		pref                 []byte
+		schedStart, schedEnd *time.Time
 	)
 
 	err := call.Tx.QueryRow(ctx, `SELECT status, unit_id, contractor_org_id, plan_id, occurrence_at, lower(requested_slot),
 		upper(requested_slot), preferred_slots,
 		lower(scheduled_slot), upper(scheduled_slot), assignment_id, version FROM maintenance.jobs WHERE id = $1 FOR
-		UPDATE`, id).
-		Scan(&r.status, &r.unit, &r.contractor, &r.planID, &r.occurrence, &r.requested.StartAt, &r.requested.EndAt, &pref,
-			&ss, &se, &r.assignment, &r.version)
+		UPDATE`, jobID).
+		Scan(&job.status, &job.unit, &job.contractor, &job.planID, &job.occurrence, &job.requested.StartAt, &job.requested.EndAt, &pref,
+			&schedStart, &schedEnd, &job.assignment, &job.version)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return r, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		return job, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
 
 	if err != nil {
-		return r, apperr.Wrap(err, "select maintenance.jobs")
+		return job, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
-	if ss != nil && se != nil {
-		r.scheduled = &Slot{*ss, *se}
+	if schedStart != nil && schedEnd != nil {
+		job.scheduled = &Slot{*schedStart, *schedEnd}
 	}
 
-	unmarshalSlotsErr := unmarshalSlots(pref, &r.preferred)
+	unmarshalSlotsErr := unmarshalSlots(pref, &job.preferred)
 	if unmarshalSlotsErr != nil {
-		return r, unmarshalSlotsErr
+		return job, unmarshalSlotsErr
 	}
 
-	return r, nil
+	return job, nil
 }
 
 func sameSlot(a, b Slot) bool { return a.StartAt.Equal(b.StartAt) && a.EndAt.Equal(b.EndAt) }
@@ -134,34 +134,34 @@ func sameSlot(a, b Slot) bool { return a.StartAt.Equal(b.StartAt) && a.EndAt.Equ
 func (m Delivery) agreed(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
-	r jobRow,
+	jobID uuid.UUID,
+	job jobRow,
 	slot Slot,
 ) (bool, error) {
-	for _, p := range r.preferred {
+	for _, p := range job.preferred {
 		if sameSlot(p, slot) {
 			return true, nil
 		}
 	}
 
-	var n int
+	var count int
 
 	err := call.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'accepted'
 		AND slot = tstzrange($2, $3)`,
-		id, slot.StartAt, slot.EndAt).
-		Scan(&n)
+		jobID, slot.StartAt, slot.EndAt).
+		Scan(&count)
 	if err != nil {
 		return false, apperr.Wrap(err, "select maintenance.slot_proposals")
 	}
 
-	if n > 0 {
+	if count > 0 {
 		return true, nil
 	}
 
-	if r.planID != nil && r.occurrence != nil {
-		dur := r.requested.EndAt.Sub(r.requested.StartAt)
+	if job.planID != nil && job.occurrence != nil {
+		dur := job.requested.EndAt.Sub(job.requested.StartAt)
 
-		return sameSlot(Slot{*r.occurrence, r.occurrence.Add(dur)}, slot), nil
+		return sameSlot(Slot{*job.occurrence, job.occurrence.Add(dur)}, slot), nil
 	}
 
 	return false, nil
@@ -252,12 +252,12 @@ func (m Delivery) offer(ctx context.Context, c *ops.Call, in *OfferInput) (Maint
 }
 
 // offerJob is offer answering the job with its detail extras.
-func (m Delivery) offerJob(ctx context.Context, call *ops.Call, in *OfferInput) (Job, error) {
-	if !call.Now.Before(in.OfferExpiresAt) {
+func (m Delivery) offerJob(ctx context.Context, call *ops.Call, input *OfferInput) (Job, error) {
+	if !call.Now.Before(input.OfferExpiresAt) {
 		return Job{}, apperr.Fields(map[string]string{"offerExpiresAt": apperr.KeyPast})
 	}
 
-	kind, status, found, err := m.Directory.OrgState(ctx, call, in.ContractorOrgID)
+	kind, status, found, err := m.Directory.OrgState(ctx, call, input.ContractorOrgID)
 	if err != nil {
 		return Job{}, apperr.Wrap(err, "maintenance.Directory.OrgState")
 	}
@@ -269,18 +269,18 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, in *OfferInput) 
 	var suspended bool
 
 	scanErr := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $1 AND
-		status = 'suspended')`, in.ContractorOrgID).
+		status = 'suspended')`, input.ContractorOrgID).
 		Scan(&suspended)
 	if scanErr != nil {
 		return Job{}, apperr.Wrap(scanErr, "select maintenance.contractors")
 	}
 
-	r, err := m.lock(ctx, call, in.JobID)
+	job, err := m.lock(ctx, call, input.JobID)
 	if err != nil {
 		return Job{}, err
 	}
 
-	if r.status != "requested" {
+	if job.status != "requested" {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -288,7 +288,7 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, in *OfferInput) 
 		return Job{}, apperr.E(apperr.Conflict, "errors.contractor_suspended")
 	}
 
-	ok, err := m.agreed(ctx, call, in.JobID, r, in.VisitSlot)
+	ok, err := m.agreed(ctx, call, input.JobID, job, input.VisitSlot)
 	if err != nil {
 		return Job{}, err
 	}
@@ -303,15 +303,15 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, in *OfferInput) 
 			offer_expires_at,
 		access_valid_from, access_valid_until) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, tstzrange($4, $5),
 		$6, $7, $8, $9)`,
-		in.JobID,
-		in.ContractorOrgID,
-		in.TermsVersion,
-		in.VisitSlot.StartAt,
-		in.VisitSlot.EndAt,
+		input.JobID,
+		input.ContractorOrgID,
+		input.TermsVersion,
+		input.VisitSlot.StartAt,
+		input.VisitSlot.EndAt,
 		call.Now,
-		in.OfferExpiresAt,
-		in.AccessValidFrom,
-		in.AccessValidUntil,
+		input.OfferExpiresAt,
+		input.AccessValidFrom,
+		input.AccessValidUntil,
 	)
 	if execErr != nil {
 		return Job{}, apperr.Wrap(execErr, "insert maintenance.offers")
@@ -321,19 +321,19 @@ func (m Delivery) offerJob(ctx context.Context, call *ops.Call, in *OfferInput) 
 		ctx,
 		`UPDATE maintenance.jobs SET status = 'offered', contractor_org_id = $2, version = version + 1, updated_at =
 			platform.app_now() WHERE id = $1`,
-		in.JobID,
-		in.ContractorOrgID,
+		input.JobID,
+		input.ContractorOrgID,
 	)
 	if execErr != nil {
 		return Job{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
-	eventErr := m.Jobs.event(ctx, call, in.JobID, "job.offered", nil)
+	eventErr := m.Jobs.event(ctx, call, input.JobID, "job.offered", nil)
 	if eventErr != nil {
 		return Job{}, eventErr
 	}
 
-	return m.Jobs.finish(ctx, call, in.JobID, "jobs.offer", "JobOffered", "")
+	return m.Jobs.finish(ctx, call, input.JobID, "jobs.offer", "JobOffered", "")
 }
 
 // ---- jobs.accept / jobs.decline ----
@@ -426,7 +426,7 @@ func (m Delivery) decide(
 		) // declined / decided offers are only reachable through the IR01 receipt
 	}
 
-	r, err := m.lock(ctx, call, job)
+	locked, err := m.lock(ctx, call, job)
 	if err != nil {
 		return Receipt{}, err
 	}
@@ -435,7 +435,7 @@ func (m Delivery) decide(
 		return Receipt{}, apperr.E(apperr.Conflict, "errors.offer_expired")
 	}
 
-	if r.status != "offered" {
+	if locked.status != "offered" {
 		return Receipt{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
@@ -500,13 +500,13 @@ func (m Delivery) decide(
 		}
 	}
 
-	var v int
+	var version int
 
 	scanErr := call.Tx.QueryRow(ctx, `UPDATE maintenance.jobs SET status = $2, contractor_org_id =
 		`+contractor+`, version `+
 		`= version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, job, next).
-		Scan(&v)
+		Scan(&version)
 	if scanErr != nil {
 		return Receipt{}, apperr.Wrap(scanErr, "update maintenance.jobs")
 	}
@@ -520,25 +520,16 @@ func (m Delivery) decide(
 	}
 
 	call.Emit(
-		ops.Event{
-			AggregateType: "job",
-			AggregateID:   job,
-			Type:          "Offer" + strings.ToUpper(done[:1]) + done[1:],
-			Payload:       map[string]any{"offerId": offer},
-		},
+		outboxEvent(
+			"job",
+			job,
+			"Offer"+strings.ToUpper(done[:1])+done[1:],
+			map[string]any{"offerId": offer},
+		),
 	)
-	call.Audit(
-		ops.AuditEntry{
-			Action:          "jobs." + decision,
-			TargetKind:      "job",
-			TargetID:        job.String(),
-			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &v,
-			Reason:          reason, Result: "", Before: nil, After: nil,
-		},
-	)
+	call.Audit(auditEntry("jobs."+decision, "job", job, call.ExpectedVersion, &version, reason))
 
-	return Receipt{JobID: job, JobVersion: v, OfferID: offer, Decision: decision}, nil
+	return Receipt{JobID: job, JobVersion: version, OfferID: offer, Decision: decision}, nil
 }
 
 // accept serves jobs.accept.
@@ -684,27 +675,27 @@ func (m Delivery) assign(
 }
 
 // assignJob is assign answering the job with its detail extras.
-func (m Delivery) assignJob(ctx context.Context, c *ops.Call, input *AssignInput) (Job, error) {
-	r, err := m.load(ctx, c, input.JobID)
+func (m Delivery) assignJob(ctx context.Context, call *ops.Call, input *AssignInput) (Job, error) {
+	locked, err := m.load(ctx, call, input.JobID)
 	if err != nil {
 		return Job{}, err
 	}
 
 	slot := Slot{input.StartAt, input.EndAt}
-	contractor := c.Principal.Role == "contractor"
+	contractor := call.Principal.Role == "contractor"
 	// scope: HQ internal jobs; contractor its accepted Offer within the access window
 	var visit Slot
 
 	if contractor {
 		var from, until time.Time
 
-		err := c.Tx.QueryRow(ctx, `SELECT lower(visit_slot), upper(visit_slot), access_valid_from, access_valid_until FROM
+		err := call.Tx.QueryRow(ctx, `SELECT lower(visit_slot), upper(visit_slot), access_valid_from, access_valid_until FROM
 			maintenance.offers
 			WHERE job_id = $1 AND contractor_org_id = $2 AND decision = 'accept' ORDER BY decided_at DESC LIMIT
-			1`, input.JobID, c.Principal.OrgID).
+			1`, input.JobID, call.Principal.OrgID).
 			Scan(&visit.StartAt, &visit.EndAt, &from, &until)
-		if errors.Is(err, pgx.ErrNoRows) || r.contractor == nil ||
-			*r.contractor != c.Principal.OrgID {
+		if errors.Is(err, pgx.ErrNoRows) || locked.contractor == nil ||
+			*locked.contractor != call.Principal.OrgID {
 			return Job{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 		}
 
@@ -712,22 +703,22 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, input *AssignInput
 			return Job{}, apperr.Wrap(err, "select maintenance.offers")
 		}
 
-		if c.Now.Before(from) || !c.Now.Before(until) {
+		if call.Now.Before(from) || !call.Now.Before(until) {
 			return Job{}, apperr.E(apperr.Forbidden, "errors.access_window")
 		}
-	} else if r.contractor != nil {
+	} else if locked.contractor != nil {
 		return Job{}, apperr.E(apperr.Forbidden, "errors.internal_job_only")
 	}
 
-	currentErr := r.current(c)
+	currentErr := locked.current(call)
 	if currentErr != nil {
 		return Job{}, currentErr
 	}
 
 	checkTechnicianErr := m.checkTechnician(
 		ctx,
-		c,
-		r.unit,
+		call,
+		locked.unit,
 		input.TechnicianMembershipID,
 		contractor,
 		nil,
@@ -737,32 +728,32 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, input *AssignInput
 	}
 	// state and slot rules (IR113 / IR49 / IR123 item 4)
 	switch {
-	case (r.status == "requested" && !contractor) || (r.status == "accepted" && contractor):
+	case (locked.status == "requested" && !contractor) || (locked.status == "accepted" && contractor):
 		if !slot.EndAt.After(
-			c.Now,
+			call.Now,
 		) { // a time already over cannot be worked (IR456): HQ proposes another
 			return Job{}, apperr.Fields(map[string]string{"endAt": apperr.KeyPast})
 		}
 
-		ok := contractor && sameSlot(visit, slot)
+		agreed := contractor && sameSlot(visit, slot)
 		if !contractor {
-			ok, err = m.agreed(ctx, c, input.JobID, r, slot)
+			agreed, err = m.agreed(ctx, call, input.JobID, locked, slot)
 			if err != nil {
 				return Job{}, err
 			}
 		}
 
-		if !ok {
+		if !agreed {
 			return Job{}, apperr.Fields(map[string]string{"startAt": "errors.slot_not_agreed"})
 		}
-	case r.status == "assigned":
-		if r.scheduled == nil || !sameSlot(*r.scheduled, slot) {
+	case locked.status == "assigned":
+		if locked.scheduled == nil || !sameSlot(*locked.scheduled, slot) {
 			return Job{}, apperr.Fields(map[string]string{"startAt": "errors.slot_not_agreed"})
 		}
-	case r.status == "in_progress" || r.status == "rework_requested" || r.status == "on_hold":
+	case locked.status == "in_progress" || locked.status == "rework_requested" || locked.status == "on_hold":
 		// D06 extension / reassignment
-		if r.scheduled == nil || !slot.StartAt.Equal(r.scheduled.StartAt) ||
-			slot.EndAt.Before(r.scheduled.EndAt) {
+		if locked.scheduled == nil || !slot.StartAt.Equal(locked.scheduled.StartAt) ||
+			slot.EndAt.Before(locked.scheduled.EndAt) {
 			return Job{}, apperr.Fields(map[string]string{"endAt": "errors.extension_only"})
 		}
 
@@ -773,14 +764,20 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, input *AssignInput
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
-	checkQualifiedErr := m.checkQualified(ctx, c, r.unit, input.TechnicianMembershipID, slot)
+	checkQualifiedErr := m.checkQualified(
+		ctx,
+		call,
+		locked.unit,
+		input.TechnicianMembershipID,
+		slot,
+	)
 	if checkQualifiedErr != nil {
 		return Job{}, checkQualifiedErr
 	}
 
 	createAssignmentErr := m.createAssignment(
 		ctx,
-		c,
+		call,
 		input.JobID,
 		input.TechnicianMembershipID,
 		slot,
@@ -790,28 +787,28 @@ func (m Delivery) assignJob(ctx context.Context, c *ops.Call, input *AssignInput
 		return Job{}, createAssignmentErr
 	}
 
-	job, err := m.Jobs.scoped(ctx, c, input.JobID)
+	job, err := m.Jobs.scoped(ctx, call, input.JobID)
 	if err != nil {
 		return job, err
 	}
 
-	c.Emit(
-		ops.Event{
-			AggregateType: "job",
-			AggregateID:   input.JobID,
-			Type:          "JobAssigned",
-			Payload:       map[string]any{"technicianMembershipId": input.TechnicianMembershipID},
-		},
+	call.Emit(
+		outboxEvent(
+			"job",
+			input.JobID,
+			"JobAssigned",
+			map[string]any{"technicianMembershipId": input.TechnicianMembershipID},
+		),
 	)
-	c.Audit(
-		ops.AuditEntry{
-			Action:          "jobs.assign",
-			TargetKind:      "job",
-			TargetID:        input.JobID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &job.Version,
-			Reason:          deref(input.Reason), Result: "", Before: nil, After: nil,
-		},
+	call.Audit(
+		auditEntry(
+			"jobs.assign",
+			"job",
+			input.JobID,
+			call.ExpectedVersion,
+			&job.Version,
+			deref(input.Reason),
+		),
 	)
 
 	return job, nil
@@ -916,7 +913,7 @@ func (m Delivery) checkQualified(
 		return apperr.Wrap(err, "maintenance.ServiceUnits.UnitService")
 	}
 
-	ok, err := m.Directory.Qualified(
+	qualified, err := m.Directory.Qualified(
 		ctx,
 		call,
 		membership,
@@ -928,7 +925,7 @@ func (m Delivery) checkQualified(
 		return apperr.Wrap(err, "maintenance.Directory.Qualified")
 	}
 
-	if !ok {
+	if !qualified {
 		return apperr.E(apperr.Forbidden, "errors.qualification_missing")
 	}
 

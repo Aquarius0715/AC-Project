@@ -16,7 +16,7 @@ import (
 func TestSubmitErrors(t *testing.T) {
 	now := time.Date(2026, 9, 15, 1, 0, 0, 0, time.UTC)
 	str := func(s string) *string { return &s }
-	at := func(h int) *time.Time {
+	inHours := func(h int) *time.Time {
 		v := now.Add(time.Duration(h) * time.Hour)
 
 		return &v
@@ -125,7 +125,7 @@ func TestSubmitErrors(t *testing.T) {
 		t.Fatalf("a complete draft: %v", fieldErrs)
 	}
 
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		change func(*Report)
 		want   map[string]string
 	}{
@@ -148,11 +148,13 @@ func TestSubmitErrors(t *testing.T) {
 		"short work text": {func(r *Report) { r.WorkText = "Done." }, map[string]string{"workText": apperr.KeyLength}},
 		"no next action":  {func(r *Report) { r.NextAction = nil }, map[string]string{"nextAction": apperr.KeyRequired}},
 		"follow-up no note": {
-			func(r *Report) { r.NextAction = &NextAction{Kind: "follow_up", Date: at(48), Note: nil} },
+			func(r *Report) { r.NextAction = &NextAction{Kind: "follow_up", Date: inHours(48), Note: nil} },
 			map[string]string{"nextAction": apperr.KeyInvalid},
 		},
 		"follow-up past": {
-			func(r *Report) { r.NextAction = &NextAction{Kind: "follow_up", Date: at(-1), Note: str("check again")} },
+			func(r *Report) {
+				r.NextAction = &NextAction{Kind: "follow_up", Date: inHours(-1), Note: str("check again")}
+			},
 			map[string]string{"nextAction": apperr.KeyInvalid},
 		},
 		"zero parts":     {func(r *Report) { r.Parts[0].Quantity = 0 }, map[string]string{"parts": apperr.KeyRange}},
@@ -173,10 +175,10 @@ func TestSubmitErrors(t *testing.T) {
 		}, map[string]string{"measurements": "errors.unit_mismatch"}},
 	} {
 		r := valid()
-		c.change(&r)
+		testCase.change(&r)
 
-		if fe := submitErrors(&r, components, now); !maps.Equal(fe, c.want) {
-			t.Errorf("%s: %v want %v", name, fe, c.want)
+		if fe := submitErrors(&r, components, now); !maps.Equal(fe, testCase.want) {
+			t.Errorf("%s: %v want %v", name, fe, testCase.want)
 		}
 	}
 
@@ -184,7 +186,7 @@ func TestSubmitErrors(t *testing.T) {
 
 	follow.NextAction = &NextAction{
 		Kind: "follow_up",
-		Date: at(48),
+		Date: inHours(48),
 		Note: str("replace the drain pan"),
 	}
 	if fe := submitErrors(&follow, components, now); len(fe) != 0 {

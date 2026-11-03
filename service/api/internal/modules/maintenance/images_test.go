@@ -47,25 +47,25 @@ func pngHeader(w, h uint32) []byte {
 }
 
 // jpegSized is a real JPEG whose frame header (SOF0) declares w×h pixels.
-func jpegSized(t *testing.T, w, h uint16) []byte {
+func jpegSized(t *testing.T, width, height uint16) []byte {
 	t.Helper()
-	b := tinyJPEG(t)
+	content := tinyJPEG(t)
 
-	idx := bytes.Index(b, []byte{0xFF, 0xC0})
+	idx := bytes.Index(content, []byte{0xFF, 0xC0})
 	if idx < 0 {
 		t.Fatal("no SOF0 marker")
 	}
 
-	binary.BigEndian.PutUint16(b[idx+5:], h)
-	binary.BigEndian.PutUint16(b[idx+7:], w)
+	binary.BigEndian.PutUint16(content[idx+5:], height)
+	binary.BigEndian.PutUint16(content[idx+7:], width)
 
-	return b
+	return content
 }
 
 // TestImageSizeOK: an image is read only as far as its header, and refused when it is not the declared type or
 // declares more than 16,384 pixels a side or 50 megapixels (IR389), however few bytes it has.
 func TestImageSizeOK(t *testing.T) {
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		mime string
 		b    []byte
 		want bool
@@ -81,8 +81,8 @@ func TestImageSizeOK(t *testing.T) {
 		"signature only":        {"image/png", []byte("\x89PNG\r\n\x1a\nx"), false},
 		"pdf":                   {"application/pdf", []byte("%PDF-1.7"), false},
 	} {
-		if got := ImageSizeOK(c.mime, c.b); got != c.want {
-			t.Errorf("%s: %v, want %v", name, got, c.want)
+		if got := ImageSizeOK(testCase.mime, testCase.b); got != testCase.want {
+			t.Errorf("%s: %v, want %v", name, got, testCase.want)
 		}
 	}
 	// ValidBlob applies it: a few hundred bytes that declare a pixel flood are refused

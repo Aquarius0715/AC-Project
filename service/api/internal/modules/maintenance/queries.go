@@ -30,13 +30,13 @@ type StatusCountsInput struct {
 }
 
 // RegisterQueries binds maintenance's internal queries.
-func RegisterQueries(reg *ops.Registry, m Jobs) {
+func RegisterQueries(reg *ops.Registry, jobs Jobs) {
 	ops.RegisterQuery(
 		reg,
 		ops.DomainMaintenance,
 		QueryCountJobs,
 		func(ctx context.Context, c *ops.Call, in *CountJobsInput) (JobCounts, error) {
-			return m.CountJobs(ctx, c, in.Filters)
+			return jobs.CountJobs(ctx, c, in.Filters)
 		},
 	)
 	ops.RegisterQuery(reg, ops.DomainMaintenance, QueryStatusCounts, statusCounts)
@@ -68,16 +68,16 @@ func statusCounts(
 
 	for rows.Next() {
 		var (
-			s string
-			k int
+			status string
+			count  int
 		)
 
-		err := rows.Scan(&s, &k)
+		err := rows.Scan(&status, &count)
 		if err != nil {
 			return nil, apperr.Wrap(err, "select maintenance.jobs")
 		}
 
-		out[s] = k
+		out[status] = count
 	}
 
 	return out, apperr.Wrap(rows.Err(), "select maintenance.jobs")

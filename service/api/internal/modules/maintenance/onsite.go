@@ -41,18 +41,18 @@ type OnSite struct {
 func (m OnSite) lockOwn(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	jobID uuid.UUID,
 ) (string, TimeOnSite, error) {
 	var (
-		status string
-		unit   uuid.UUID
-		v      int
-		raw    []byte
+		status  string
+		unit    uuid.UUID
+		version int
+		raw     []byte
 	)
 
 	err := call.Tx.QueryRow(ctx, `SELECT status, unit_id, version, time_on_site FROM maintenance.jobs WHERE id = $1 FOR
-		UPDATE`, id).
-		Scan(&status, &unit, &v, &raw)
+		UPDATE`, jobID).
+		Scan(&status, &unit, &version, &raw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", TimeOnSite{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
@@ -61,12 +61,12 @@ func (m OnSite) lockOwn(
 		return "", TimeOnSite{}, apperr.Wrap(err, "select maintenance.jobs")
 	}
 
-	technicianJobErr := m.Access.TechnicianJob(ctx, call, id, unit)
+	technicianJobErr := m.Access.TechnicianJob(ctx, call, jobID, unit)
 	if technicianJobErr != nil {
 		return "", TimeOnSite{}, technicianJobErr
 	}
 
-	if v != *call.ExpectedVersion {
+	if version != *call.ExpectedVersion {
 		return "", TimeOnSite{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
@@ -97,7 +97,7 @@ func (m OnSite) lockOwn(
 func (m OnSite) save(
 	ctx context.Context,
 	call *ops.Call,
-	id uuid.UUID,
+	jobID uuid.UUID,
 	status string,
 	timeOnSite TimeOnSite,
 	action, event, reason string,
@@ -109,7 +109,7 @@ func (m OnSite) save(
 		`UPDATE maintenance.jobs SET status = $2, time_on_site = $3, started_at = COALESCE(started_at, $4), version = version
 			+ 1,
 		updated_at = platform.app_now() WHERE id = $1`,
-		id,
+		jobID,
 		status,
 		raw,
 		timeOnSite.StartedAt,
@@ -118,33 +118,19 @@ func (m OnSite) save(
 		return Job{}, apperr.Wrap(err, "update maintenance.jobs")
 	}
 
-	err = m.Jobs.event(ctx, call, id, action, nil)
+	err = m.Jobs.event(ctx, call, jobID, action, nil)
 	if err != nil {
 		return Job{}, err
 	}
 
-	job, err := m.Jobs.scoped(ctx, call, id)
+	job, err := m.Jobs.scoped(ctx, call, jobID)
 	if err != nil {
 		return job, err
 	}
 
-	call.Emit(
-		ops.Event{
-			AggregateType: "job",
-			AggregateID:   id,
-			Type:          event,
-			Payload:       map[string]any{"status": job.Status},
-		},
-	)
+	call.Emit(outboxEvent("job", jobID, event, map[string]any{"status": job.Status}))
 	call.Audit(
-		ops.AuditEntry{
-			Action:          "jobs." + action[4:],
-			TargetKind:      "job",
-			TargetID:        id.String(),
-			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &job.Version,
-			Reason:          reason, Result: "", Before: nil, After: nil,
-		},
+		auditEntry("jobs."+action[4:], "job", jobID, call.ExpectedVersion, &job.Version, reason),
 	)
 
 	return job, nil
@@ -202,8 +188,8 @@ func (m OnSite) start(ctx context.Context, c *ops.Call, in *StartInput) (Mainten
 }
 
 // startJob is start answering the job with its detail extras.
-func (m OnSite) startJob(ctx context.Context, call *ops.Call, in *StartInput) (Job, error) {
-	status, timeOnSite, err := m.lockOwn(ctx, call, in.JobID)
+func (m OnSite) startJob(ctx context.Context, call *ops.Call, input *StartInput) (Job, error) {
+	status, timeOnSite, err := m.lockOwn(ctx, call, input.JobID)
 	if err != nil {
 		return Job{}, err
 	}
@@ -215,7 +201,16 @@ func (m OnSite) startJob(ctx context.Context, call *ops.Call, in *StartInput) (J
 	now := call.Now
 	timeOnSite.StartedAt = &now
 
-	return m.save(ctx, call, in.JobID, "in_progress", timeOnSite, "job.started", "JobStarted", "")
+	return m.save(
+		ctx,
+		call,
+		input.JobID,
+		"in_progress",
+		timeOnSite,
+		"job.started",
+		"JobStarted",
+		"",
+	)
 }
 
 // CheckInInput is jobs.checkIn input.
@@ -297,8 +292,8 @@ func (m OnSite) checkIn(
 }
 
 // checkInJob is checkIn answering the job with its detail extras.
-func (m OnSite) checkInJob(ctx context.Context, c *ops.Call, input *CheckInInput) (Job, error) {
-	status, timeOnSite, err := m.lockOwn(ctx, c, input.JobID)
+func (m OnSite) checkInJob(ctx context.Context, call *ops.Call, input *CheckInInput) (Job, error) {
+	status, timeOnSite, err := m.lockOwn(ctx, call, input.JobID)
 	if err != nil {
 		return Job{}, err
 	}
@@ -306,7 +301,7 @@ func (m OnSite) checkInJob(ctx context.Context, c *ops.Call, input *CheckInInput
 	if input.Method == "location_qr" {
 		var unit uuid.UUID
 
-		err := c.Tx.QueryRow(ctx, `SELECT unit_id FROM maintenance.jobs WHERE id = $1`, input.JobID).
+		err := call.Tx.QueryRow(ctx, `SELECT unit_id FROM maintenance.jobs WHERE id = $1`, input.JobID).
 			Scan(&unit)
 		if err != nil {
 			return Job{}, apperr.Wrap(err, "select maintenance.jobs")
@@ -321,7 +316,7 @@ func (m OnSite) checkInJob(ctx context.Context, c *ops.Call, input *CheckInInput
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyInvalidState)
 	}
 
-	now := c.Now
+	now := call.Now
 	method := input.Method
 
 	timeOnSite.ArrivedAt, timeOnSite.CheckInMethod, timeOnSite.Distance = &now, &method, input.DistanceMeters
@@ -335,7 +330,7 @@ func (m OnSite) checkInJob(ctx context.Context, c *ops.Call, input *CheckInInput
 
 	return m.save(
 		ctx,
-		c,
+		call,
 		input.JobID,
 		"in_progress",
 		timeOnSite,
@@ -396,8 +391,8 @@ func (m OnSite) pause(ctx context.Context, c *ops.Call, in *PauseInput) (Mainten
 }
 
 // pauseJob is pause answering the job with its detail extras.
-func (m OnSite) pauseJob(ctx context.Context, c *ops.Call, input *PauseInput) (Job, error) {
-	status, timeOnSite, err := m.lockOwn(ctx, c, input.JobID)
+func (m OnSite) pauseJob(ctx context.Context, call *ops.Call, input *PauseInput) (Job, error) {
+	status, timeOnSite, err := m.lockOwn(ctx, call, input.JobID)
 	if err != nil {
 		return Job{}, err
 	}
@@ -407,7 +402,7 @@ func (m OnSite) pauseJob(ctx context.Context, c *ops.Call, input *PauseInput) (J
 	}
 
 	open := len(timeOnSite.Pauses) > 0 && timeOnSite.Pauses[len(timeOnSite.Pauses)-1].To == nil
-	now := c.Now
+	now := call.Now
 
 	switch {
 	case *input.Paused && open, !*input.Paused && !open:
@@ -423,7 +418,7 @@ func (m OnSite) pauseJob(ctx context.Context, c *ops.Call, input *PauseInput) (J
 		action = "job.paused"
 	}
 
-	return m.save(ctx, c, input.JobID, status, timeOnSite, action, "JobPauseChanged", "")
+	return m.save(ctx, call, input.JobID, status, timeOnSite, action, "JobPauseChanged", "")
 }
 
 // AckInput is jobs.acknowledgeAssignment input.
@@ -492,16 +487,20 @@ func (in *AckInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/assignment/acknowledge [post]
-func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, input *AckInput) (Assignment, error) {
+func (m OnSite) acknowledge(
+	ctx context.Context,
+	call *ops.Call,
+	input *AckInput,
+) (Assignment, error) {
 	var (
 		aid uuid.UUID
 		ack string
 		end time.Time
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT id, acknowledgement, upper(scheduled) FROM maintenance.assignments WHERE job_id = $1
+	err := call.Tx.QueryRow(ctx, `SELECT id, acknowledgement, upper(scheduled) FROM maintenance.assignments WHERE job_id = $1
 		AND technician_membership_id = $2
-		AND status = 'active' AND created_at <= $3 FOR UPDATE`, input.JobID, c.Principal.MembershipID, c.Now).
+		AND status = 'active' AND created_at <= $3 FOR UPDATE`, input.JobID, call.Principal.MembershipID, call.Now).
 		Scan(&aid, &ack, &end)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Assignment{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
@@ -511,19 +510,19 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, input *AckInput) (
 		return Assignment{}, apperr.Wrap(err, "select maintenance.assignments")
 	}
 
-	if !c.Now.Before(end) {
+	if !call.Now.Before(end) {
 		return Assignment{}, apperr.E(apperr.Forbidden, "errors.assignment_ended")
 	}
 
-	var v int
+	var version int
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, input.JobID).
-		Scan(&v)
+	scanErr := call.Tx.QueryRow(ctx, `SELECT version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, input.JobID).
+		Scan(&version)
 	if scanErr != nil {
 		return Assignment{}, apperr.Wrap(scanErr, "select maintenance.jobs")
 	}
 
-	if v != *c.ExpectedVersion {
+	if version != *call.ExpectedVersion {
 		return Assignment{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
@@ -543,14 +542,14 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, input *AckInput) (
 		}
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.assignments SET acknowledgement = $2, acknowledged_at = $3, cant_make_reason = $4,
 		alternative_slot = CASE WHEN $5::timestamptz IS NULL THEN NULL ELSE tstzrange($5, $6) END, version = version + 1,
 		updated_at = platform.app_now() WHERE id = $1`,
 		aid,
 		value,
-		c.Now,
+		call.Now,
 		input.Reason,
 		altStart,
 		altEnd,
@@ -559,7 +558,7 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, input *AckInput) (
 		return Assignment{}, apperr.Wrap(execErr, "update maintenance.assignments")
 	}
 
-	_, execErr = c.Tx.Exec(
+	_, execErr = call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET version = version + 1, updated_at = platform.app_now() WHERE id = $1`,
 		input.JobID,
@@ -568,45 +567,45 @@ func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, input *AckInput) (
 		return Assignment{}, apperr.Wrap(execErr, "update maintenance.jobs")
 	}
 
-	eventErr := m.Jobs.event(ctx, c, input.JobID, "assignment."+value, nil)
+	eventErr := m.Jobs.event(ctx, call, input.JobID, "assignment."+value, nil)
 	if eventErr != nil {
 		return Assignment{}, eventErr
 	}
 
-	job, err := m.Jobs.scoped(ctx, c, input.JobID)
+	job, err := m.Jobs.scoped(ctx, call, input.JobID)
 	if err != nil {
 		return Assignment{}, err
 	}
 
-	c.Emit(
-		ops.Event{
-			AggregateType: "job",
-			AggregateID:   input.JobID,
-			Type:          "AssignmentAcknowledged",
-			Payload:       map[string]any{"acknowledgement": value},
-		},
+	call.Emit(
+		outboxEvent(
+			"job",
+			input.JobID,
+			"AssignmentAcknowledged",
+			map[string]any{"acknowledgement": value},
+		),
 	)
-	c.Audit(
-		ops.AuditEntry{
-			Action:          "jobs.acknowledgeAssignment",
-			TargetKind:      "job",
-			TargetID:        input.JobID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &job.Version,
-			Reason:          deref(input.Reason), Result: "", Before: nil, After: nil,
-		},
+	call.Audit(
+		auditEntry(
+			"jobs.acknowledgeAssignment",
+			"job",
+			input.JobID,
+			call.ExpectedVersion,
+			&job.Version,
+			deref(input.Reason),
+		),
 	)
 
-	a, err := m.Jobs.activeAssignment(
+	active, err := m.Jobs.activeAssignment(
 		ctx,
-		c,
+		call,
 		input.JobID,
 	) // the result is the Assignment (service-contracts)
-	if err != nil || a == nil {
+	if err != nil || active == nil {
 		return Assignment{}, err
 	}
 
-	return *a, nil
+	return *active, nil
 }
 
 // RegisterOnSite binds the technician on-site operations.

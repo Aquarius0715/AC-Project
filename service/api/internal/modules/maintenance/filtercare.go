@@ -231,7 +231,7 @@ func (m FilterCare) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[FilterStatus], error) {
-	var f struct {
+	var filters struct {
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
 		PropertyID *uuid.UUID `json:"propertyId,omitempty"`
 		SpaceID    *uuid.UUID `json:"spaceId,omitempty"`
@@ -243,8 +243,8 @@ func (m FilterCare) list(
 		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil ||
-			(f.Status != nil && filterRank[*f.Status] == 0 && *f.Status != "unknown") {
+		if dec.Decode(&filters) != nil ||
+			(filters.Status != nil && filterRank[*filters.Status] == 0 && *filters.Status != "unknown") {
 			return paging.Page[FilterStatus]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
@@ -263,7 +263,14 @@ func (m FilterCare) list(
 		desc = query.Sort.Direction == "desc"
 	}
 
-	units, err := m.Units.BriefUnits(ctx, call, f.CustomerID, f.PropertyID, f.SpaceID, f.UnitID)
+	units, err := m.Units.BriefUnits(
+		ctx,
+		call,
+		filters.CustomerID,
+		filters.PropertyID,
+		filters.SpaceID,
+		filters.UnitID,
+	)
 	if err != nil {
 		return paging.Page[FilterStatus]{}, apperr.Wrap(err, "maintenance.FilterUnits.BriefUnits")
 	}
@@ -295,19 +302,19 @@ func (m FilterCare) list(
 			return paging.Page[FilterStatus]{}, err
 		}
 
-		if f.Status == nil || filterStatus.Status == *f.Status {
+		if filters.Status == nil || filterStatus.Status == *filters.Status {
 			out = append(out, filterStatus)
 		}
 	}
 
-	sort.SliceStable(out, func(i, j int) bool {
+	sort.SliceStable(out, func(left, right int) bool {
 		if query.Sort == nil || query.Sort.Field == "status" {
-			if a, b := filterRank[out[i].Status], filterRank[out[j].Status]; a != b {
+			if a, b := filterRank[out[left].Status], filterRank[out[right].Status]; a != b {
 				return (a > b) == desc
 			}
 		}
 
-		less := out[i].UnitID.String() < out[j].UnitID.String()
+		less := out[left].UnitID.String() < out[right].UnitID.String()
 		if query.Sort != nil && query.Sort.Field == "id" && desc {
 			return !less
 		}
@@ -315,7 +322,7 @@ func (m FilterCare) list(
 		return less
 	})
 
-	return pageOf(out, *query, f, call.Principal.ScopeVersion)
+	return pageOf(out, *query, filters, call.Principal.ScopeVersion)
 }
 
 // MarkInput is filterCare.markCleaned input.
@@ -417,27 +424,8 @@ func (m FilterCare) markCleaned(
 		return filterStatus, clearRemindersErr
 	}
 
-	call.Emit(
-		ops.Event{
-			AggregateType: "unit",
-			AggregateID:   input.UnitID,
-			Type:          "FilterCleaned",
-			Payload:       nil,
-		},
-	)
-	call.Audit(
-		ops.AuditEntry{
-			Action:          "filterCare.markCleaned",
-			TargetKind:      "unit",
-			TargetID:        input.UnitID.String(),
-			PreviousVersion: nil,
-			NextVersion:     nil,
-			Reason:          "",
-			Result:          "",
-			Before:          nil,
-			After:           nil,
-		},
-	)
+	call.Emit(outboxEvent("unit", input.UnitID, "FilterCleaned", nil))
+	call.Audit(auditEntry("filterCare.markCleaned", "unit", input.UnitID, nil, nil, ""))
 
 	return filterStatus, nil
 }
@@ -467,13 +455,13 @@ func (in *SettingsInput) Validate() map[string]string {
 
 	seen := map[string]bool{}
 
-	ok := len(in.Channels) >= 1 && len(in.Channels) <= 2
+	valid := len(in.Channels) >= 1 && len(in.Channels) <= 2
 	for _, ch := range in.Channels {
-		ok = ok && (ch == "inApp" || ch == "email") && !seen[ch]
+		valid = valid && (ch == "inApp" || ch == "email") && !seen[ch]
 		seen[ch] = true
 	}
 
-	if !ok || !slices.Contains(in.Channels, "inApp") {
+	if !valid || !slices.Contains(in.Channels, "inApp") {
 		fieldErrs["channels"] = apperr.KeyInvalid
 	}
 
@@ -549,24 +537,17 @@ func (m FilterCare) saveSettings(
 	}
 
 	call.Emit(
-		ops.Event{
-			AggregateType: "filter_care_settings",
-			AggregateID:   filterSettings.ID,
-			Type:          "FilterCareSettingsSaved", Payload: nil,
-		},
+		outboxEvent("filter_care_settings", filterSettings.ID, "FilterCareSettingsSaved", nil),
 	)
 	call.Audit(
-		ops.AuditEntry{
-			Action:          "filterCare.saveSettings",
-			TargetKind:      "filter_care_settings",
-			TargetID:        filterSettings.ID.String(),
-			NextVersion:     &filterSettings.Version,
-			PreviousVersion: nil,
-			Reason:          "",
-			Result:          "",
-			Before:          nil,
-			After:           nil,
-		},
+		auditEntry(
+			"filterCare.saveSettings",
+			"filter_care_settings",
+			filterSettings.ID,
+			nil,
+			&filterSettings.Version,
+			"",
+		),
 	)
 
 	return filterSettings, nil
@@ -658,14 +639,14 @@ func (m FilterCare) Remind(ctx context.Context, call *ops.Call) (int, error) {
 	}
 
 	cache := map[uuid.UUID]FilterSettings{}
-	n := 0
+	count := 0
 
 	for _, unitBrief := range units {
 		set, ok := cache[unitBrief.OrgID]
 		if !ok {
 			cust, found, err := m.Units.CustomerOfOrg(ctx, call, unitBrief.OrgID)
 			if err != nil {
-				return n, apperr.Wrap(err, "maintenance.FilterUnits.CustomerOfOrg")
+				return count, apperr.Wrap(err, "maintenance.FilterUnits.CustomerOfOrg")
 			}
 
 			if !found {
@@ -674,7 +655,7 @@ func (m FilterCare) Remind(ctx context.Context, call *ops.Call) (int, error) {
 
 			set, err = m.settings(ctx, call, cust)
 			if err != nil {
-				return n, err
+				return count, err
 			}
 
 			cache[unitBrief.OrgID] = set
@@ -682,23 +663,23 @@ func (m FilterCare) Remind(ctx context.Context, call *ops.Call) (int, error) {
 
 		filterStatus, err := m.status(ctx, call, unitBrief, set)
 		if err != nil {
-			return n, err
+			return count, err
 		}
 
 		k, err := clearReminders(ctx, call, unitBrief.ID, filterStatus.LastCleanedAt)
-		if n += k; err != nil {
-			return n, err
+		if count += k; err != nil {
+			return count, err
 		}
 
 		if filterStatus.Status == "overdue" {
 			k, err := remind(ctx, call, unitBrief, set, filterStatus)
-			if n += k; err != nil {
-				return n, err
+			if count += k; err != nil {
+				return count, err
 			}
 		}
 	}
 
-	return n, nil
+	return count, nil
 }
 
 // clearReminders ends the open reminders of the unit whose cycle a later cleaning ended (last = the unit's last
@@ -729,18 +710,15 @@ func clearReminders(
 
 		return e, r.Scan(&e.id, &e.org)
 	})
-	for _, e := range list {
-		call.Emit(ops.Event{
-			AggregateType: "alert",
-			AggregateID:   e.id,
-			Type:          events.FilterCleaningCleared,
-			Payload: events.FilterReminder{
-				AlertID:       e.id,
+	for _, cleared := range list {
+		call.Emit(
+			outboxEvent("alert", cleared.id, events.FilterCleaningCleared, events.FilterReminder{
+				AlertID:       cleared.id,
 				UnitID:        unit,
-				CustomerOrgID: e.org,
+				CustomerOrgID: cleared.org,
 				At:            call.Now, Evidence: "", NoRecipient: false,
-			},
-		})
+			}),
+		)
 	}
 
 	return len(list), err
@@ -755,13 +733,13 @@ func remind(
 	set FilterSettings,
 	filterStatus FilterStatus,
 ) (int, error) {
-	id := uuid.Must(uuid.NewV7())
+	alertID := uuid.Must(uuid.NewV7())
 
 	tag, err := call.Tx.Exec(
 		ctx,
 		`INSERT INTO maintenance.filter_reminders (id, tenant_id, unit_id, customer_org_id, cycle_from, raised_at)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
-		id,
+		alertID,
 		unitBrief.ID,
 		unitBrief.OrgID,
 		filterStatus.LastCleanedAt,
@@ -800,7 +778,7 @@ func remind(
 				TargetKind:            "unit",
 				TargetID:              unitBrief.ID,
 				Severity:              "normal",
-				SourceAlertID:         &id,
+				SourceAlertID:         &alertID,
 				Params:                map[string]any{"status": "open", "message": evidence},
 			})
 			if err != nil {
@@ -814,39 +792,22 @@ func remind(
 	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.filter_reminders SET notifications = $2 WHERE id = $1`,
-		id,
+		alertID,
 		sent,
 	)
 	if execErr != nil {
 		return 0, apperr.Wrap(execErr, "update maintenance.filter_reminders")
 	}
 
-	call.Emit(ops.Event{
-		AggregateType: "alert",
-		AggregateID:   id,
-		Type:          events.FilterCleaningDue,
-		Payload: events.FilterReminder{
-			AlertID:       id,
-			UnitID:        unitBrief.ID,
-			CustomerOrgID: unitBrief.OrgID,
-			Evidence:      evidence,
-			NoRecipient:   sent == 0,
-			At:            call.Now,
-		},
-	})
-	call.Audit(
-		ops.AuditEntry{
-			Action:          "filterCare.remind",
-			TargetKind:      "unit",
-			TargetID:        unitBrief.ID.String(),
-			Reason:          "cleaning due",
-			PreviousVersion: nil,
-			NextVersion:     nil,
-			Result:          "",
-			Before:          nil,
-			After:           nil,
-		},
-	)
+	call.Emit(outboxEvent("alert", alertID, events.FilterCleaningDue, events.FilterReminder{
+		AlertID:       alertID,
+		UnitID:        unitBrief.ID,
+		CustomerOrgID: unitBrief.OrgID,
+		Evidence:      evidence,
+		NoRecipient:   sent == 0,
+		At:            call.Now,
+	}))
+	call.Audit(auditEntry("filterCare.remind", "unit", unitBrief.ID, nil, nil, "cleaning due"))
 
 	return 1, nil
 }

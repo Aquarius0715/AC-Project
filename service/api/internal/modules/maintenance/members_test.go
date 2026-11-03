@@ -16,7 +16,7 @@ func TestUnionMinutes(t *testing.T) {
 			EndAt:   base.Add(time.Duration(toMin) * time.Minute),
 		}
 	}
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		slots []Slot
 		want  int
 	}{
@@ -28,8 +28,8 @@ func TestUnionMinutes(t *testing.T) {
 		"apart":       {[]Slot{slot(60, 120), slot(180, 210)}, 90},
 		"unsorted":    {[]Slot{slot(300, 330), slot(60, 120), slot(100, 130)}, 100},
 	} {
-		if got := unionMinutes(c.slots); got != c.want {
-			t.Errorf("%s: %d want %d", name, got, c.want)
+		if got := unionMinutes(testCase.slots); got != testCase.want {
+			t.Errorf("%s: %d want %d", name, got, testCase.want)
 		}
 	}
 }

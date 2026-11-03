@@ -34,45 +34,45 @@ var rankOf = func() map[string]int {
 
 // sortItems applies the IR23/IR34 order: desc reverses the rank only, null last both ways, ties id asc.
 func sortItems(items []listItem, field string, desc bool) {
-	slices.SortStableFunc(items, func(a, b listItem) int {
-		var d int
+	slices.SortStableFunc(items, func(left, right listItem) int {
+		var diff int
 
 		switch field {
 		case "status":
-			d = a.rank - b.rank
+			diff = left.rank - right.rank
 		case "severity":
 			switch {
-			case a.sev < 0 && b.sev < 0:
-			case a.sev < 0:
+			case left.sev < 0 && right.sev < 0:
+			case left.sev < 0:
 				return 1
-			case b.sev < 0:
+			case right.sev < 0:
 				return -1
 			default:
-				d = a.sev - b.sev
+				diff = left.sev - right.sev
 			}
 		case "dueAt":
 			switch {
-			case a.due == nil && b.due == nil:
-			case a.due == nil:
+			case left.due == nil && right.due == nil:
+			case left.due == nil:
 				return 1
-			case b.due == nil:
+			case right.due == nil:
 				return -1
 			default:
-				d = a.due.Compare(*b.due)
+				diff = left.due.Compare(*right.due)
 			}
 		case "id":
-			d = strings.Compare(a.id, b.id)
+			diff = strings.Compare(left.id, right.id)
 		}
 
 		if desc {
-			d = -d
+			diff = -diff
 		}
 
-		if d == 0 && field != "id" {
-			d = strings.Compare(a.id, b.id)
+		if diff == 0 && field != "id" {
+			diff = strings.Compare(left.id, right.id)
 		}
 
-		return d
+		return diff
 	})
 }
 
@@ -132,7 +132,7 @@ type SiteAddresses interface {
 
 // offers returns the contractor's JobOfferSummary rows valid now (IR124 item 2); job limits the result to one job.
 func (m Jobs) offers(ctx context.Context, call *ops.Call, job *uuid.UUID) ([]OfferSummary, error) {
-	q := `SELECT j.id, j.version, j.type, j.unit_id, lower(j.requested_slot), upper(j.requested_slot), j.due_at, j.origin,
+	stmt := `SELECT j.id, j.version, j.type, j.unit_id, lower(j.requested_slot), upper(j.requested_slot), j.due_at, j.origin,
 		o.id, o.decision, o.offer_expires_at, o.terms_version, lower(o.visit_slot), upper(o.visit_slot), o.offered_at,
 		o.access_valid_from, o.access_valid_until
 		FROM maintenance.offers o JOIN maintenance.jobs j ON j.id = o.job_id
@@ -141,12 +141,12 @@ func (m Jobs) offers(ctx context.Context, call *ops.Call, job *uuid.UUID) ([]Off
 	args := []any{call.Principal.OrgID, call.Now}
 
 	if job != nil {
-		q += " AND j.id = $3"
+		stmt += " AND j.id = $3"
 
 		args = append(args, *job)
 	}
 
-	rows, err := call.Tx.Query(ctx, q, args...)
+	rows, err := call.Tx.Query(ctx, stmt, args...)
 	if err != nil {
 		return nil, apperr.Wrap(err, "query (offers)")
 	}
@@ -249,17 +249,17 @@ func (m Jobs) histories(ctx context.Context, call *ops.Call, job *uuid.UUID) ([]
 		kind, owner = "membership", call.Principal.MembershipID
 	}
 
-	q := `SELECT job_id, as_of, type, status, contractor_org_id, completed_at, has_report, acceptance, decision_event_ids
+	stmt := `SELECT job_id, as_of, type, status, contractor_org_id, completed_at, has_report, acceptance, decision_event_ids
 		FROM maintenance.job_history_snapshots WHERE owner_kind = $1 AND owner_id = $2`
 	args := []any{kind, owner}
 
 	if job != nil {
-		q += " AND job_id = $3"
+		stmt += " AND job_id = $3"
 
 		args = append(args, *job)
 	}
 
-	rows, err := call.Tx.Query(ctx, q, args...)
+	rows, err := call.Tx.Query(ctx, stmt, args...)
 	if err != nil {
 		return nil, apperr.Wrap(err, "query (histories)")
 	}
@@ -358,16 +358,17 @@ func (f *listFilters) statusOK(s string) bool {
 		(f.Statuses == nil || slices.Contains(*f.Statuses, s))
 }
 
-func inPeriod(f *listFilters, t *time.Time) bool {
-	if f.From == nil && f.To == nil {
+func inPeriod(filters *listFilters, when *time.Time) bool {
+	if filters.From == nil && filters.To == nil {
 		return true
 	}
 
-	if t == nil {
+	if when == nil {
 		return false
 	}
 
-	return (f.From == nil || !t.Before(*f.From)) && (f.To == nil || t.Before(*f.To))
+	return (filters.From == nil || !when.Before(*filters.From)) &&
+		(filters.To == nil || when.Before(*filters.To))
 }
 
 // periodTime is the time a history counts at in a period (IR29, IR614): its frozen completion, or, without one
@@ -385,9 +386,9 @@ func periodTime(h History) *time.Time {
 func (m Jobs) extraProjections(
 	ctx context.Context,
 	call *ops.Call,
-	f *listFilters,
+	filters *listFilters,
 ) ([]listItem, error) {
-	if f.private() {
+	if filters.private() {
 		return nil, nil
 	}
 
@@ -401,11 +402,11 @@ func (m Jobs) extraProjections(
 
 		for _, offerSummary := range offers {
 			start := offerSummary.RequestedSlot.StartAt
-			if !f.statusOK(offerSummary.Status) || !inPeriod(f, &start) ||
-				(f.Origin != nil && *f.Origin != offerSummary.Origin) ||
-				(f.Type != nil && *f.Type != offerSummary.Type) ||
-				(f.OrganizationID != nil && *f.OrganizationID != call.Principal.OrgID) ||
-				(f.OverdueOnly != nil && *f.OverdueOnly && !call.Now.After(offerSummary.DueAt)) {
+			if !filters.statusOK(offerSummary.Status) || !inPeriod(filters, &start) ||
+				(filters.Origin != nil && *filters.Origin != offerSummary.Origin) ||
+				(filters.Type != nil && *filters.Type != offerSummary.Type) ||
+				(filters.OrganizationID != nil && *filters.OrganizationID != call.Principal.OrgID) ||
+				(filters.OverdueOnly != nil && *filters.OverdueOnly && !call.Now.After(offerSummary.DueAt)) {
 				continue
 			}
 
@@ -429,10 +430,11 @@ func (m Jobs) extraProjections(
 	}
 
 	for _, history := range hs {
-		if !f.statusOK(history.Status) || !inPeriod(f, periodTime(history)) || f.Origin != nil ||
-			(f.Type != nil && *f.Type != history.Type) ||
-			(f.OverdueOnly != nil && *f.OverdueOnly) ||
-			(f.OrganizationID != nil && (history.ContractorOrgID == nil || *history.ContractorOrgID != *f.OrganizationID)) {
+		if !filters.statusOK(history.Status) || !inPeriod(filters, periodTime(history)) ||
+			filters.Origin != nil ||
+			(filters.Type != nil && *filters.Type != history.Type) ||
+			(filters.OverdueOnly != nil && *filters.OverdueOnly) ||
+			(filters.OrganizationID != nil && (history.ContractorOrgID == nil || *history.ContractorOrgID != *filters.OrganizationID)) {
 			continue
 		}
 
@@ -452,8 +454,12 @@ func (m Jobs) extraProjections(
 }
 
 // projection resolves jobs.get for contractors and technicians: detail, then offer, then history (IR124 item 5).
-func (m Jobs) projection(ctx context.Context, c *ops.Call, id uuid.UUID) (any, string, error) {
-	j, err := m.detail(ctx, c, id)
+func (m Jobs) projection(
+	ctx context.Context,
+	call *ops.Call,
+	jobID uuid.UUID,
+) (any, string, error) {
+	j, err := m.detail(ctx, call, jobID)
 	if err == nil {
 		return j, "detail", nil
 	}
@@ -462,8 +468,8 @@ func (m Jobs) projection(ctx context.Context, c *ops.Call, id uuid.UUID) (any, s
 		return nil, "", err
 	}
 
-	if c.Principal.Role == "contractor" {
-		offers, err := m.offers(ctx, c, &id)
+	if call.Principal.Role == "contractor" {
+		offers, err := m.offers(ctx, call, &jobID)
 		if err != nil {
 			return nil, "", err
 		}
@@ -473,13 +479,13 @@ func (m Jobs) projection(ctx context.Context, c *ops.Call, id uuid.UUID) (any, s
 		}
 	}
 
-	hs, err := m.histories(ctx, c, &id)
+	histories, err := m.histories(ctx, call, &jobID)
 	if err != nil {
 		return nil, "", err
 	}
 
-	if len(hs) > 0 {
-		return hs[0], "history", nil
+	if len(histories) > 0 {
+		return histories[0], "history", nil
 	}
 
 	return nil, "", apperr.E(apperr.NotFound, apperr.KeyNotFound)
@@ -490,7 +496,7 @@ func (m Jobs) projection(ctx context.Context, c *ops.Call, id uuid.UUID) (any, s
 // FreezeEnded stores a JobHistorySnapshot for every contractor access window and technician viewing window that has
 // ended by now and has none yet. It runs in the worker tick (one transaction per tenant).
 func FreezeEnded(ctx context.Context, txn pgx.Tx, now time.Time) (int, error) {
-	n := 0
+	count := 0
 	// contractors: accepted Offers whose access window ended
 	tag, err := txn.Exec(
 		ctx,
@@ -514,10 +520,10 @@ func FreezeEnded(ctx context.Context, txn pgx.Tx, now time.Time) (int, error) {
 		return 0, apperr.Wrap(err, "insert maintenance.job_history_snapshots")
 	}
 
-	n += int(tag.RowsAffected())
+	count += int(tag.RowsAffected())
 	t, err := freezeTechnicians(ctx, txn, now, nil)
 
-	return n + t, err
+	return count + t, err
 }
 
 // freezeTechnicians stores the technicians' snapshots whose viewing window has ended: the active Assignment's
@@ -529,7 +535,7 @@ func freezeTechnicians(
 	now time.Time,
 	job *uuid.UUID,
 ) (int, error) {
-	q := `INSERT INTO maintenance.job_history_snapshots (tenant_id, job_id, owner_kind, owner_id, owner_user_id, as_of,
+	stmt := `INSERT INTO maintenance.job_history_snapshots (tenant_id, job_id, owner_kind, owner_id, owner_user_id, as_of,
 		type, status,
 			contractor_org_id, completed_at, has_report, acceptance)
 		SELECT DISTINCT ON (a.job_id, a.technician_membership_id) j.tenant_id, j.id, 'membership', a.technician_membership_id,
@@ -551,12 +557,12 @@ func freezeTechnicians(
 	args := []any{now}
 
 	if job != nil {
-		q += " AND a.job_id = $2"
+		stmt += " AND a.job_id = $2"
 
 		args = append(args, *job)
 	}
 
-	tag, err := txn.Exec(ctx, q+`
+	tag, err := txn.Exec(ctx, stmt+`
 		ORDER BY a.job_id, a.technician_membership_id, CASE WHEN a.status IN ('revoked', 'completed') THEN a.updated_at ELSE
 		upper(a.scheduled) END DESC, a.updated_at DESC
 		ON CONFLICT (job_id, owner_kind, owner_id) DO NOTHING`, args...)
@@ -611,16 +617,16 @@ func ExpireOffers(ctx context.Context, txn pgx.Tx, now time.Time, actor uuid.UUI
 	var hits []hit
 
 	for rows.Next() {
-		var h hit
+		var expired hit
 
-		err := rows.Scan(&h.job, &h.tenant)
+		err := rows.Scan(&expired.job, &expired.tenant)
 		if err != nil {
 			rows.Close()
 
 			return 0, apperr.Wrap(err, "update maintenance.jobs")
 		}
 
-		hits = append(hits, h)
+		hits = append(hits, expired)
 	}
 
 	rows.Close()
@@ -651,14 +657,14 @@ func ExpireOffers(ctx context.Context, txn pgx.Tx, now time.Time, actor uuid.UUI
 		return 0, apperr.Wrap(execErr, "update maintenance.offers")
 	}
 
-	for _, h := range hits {
+	for _, expired := range hits {
 		_, err := txn.Exec(
 			ctx,
 			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, occurred_at) VALUES ($1,$2,$3,$4,
 				'offer_expired',$5)`,
 			uuid.Must(uuid.NewV7()),
-			h.tenant,
-			h.job,
+			expired.tenant,
+			expired.job,
 			actor,
 			now,
 		)

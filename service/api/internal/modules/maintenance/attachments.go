@@ -69,13 +69,13 @@ func (m Files) store(
 	job, report uuid.UUID,
 	blobInput BlobInput,
 ) (uuid.UUID, error) {
-	id := uuid.New()
+	attachmentID := uuid.New()
 
-	key := "jobs/" + job.String() + "/reports/" + report.String() + "/" + id.String()
+	key := "jobs/" + job.String() + "/reports/" + report.String() + "/" + attachmentID.String()
 
 	putErr := m.Blobs.Put(ctx, key, blobInput.Mime, blobInput.Bytes)
 	if putErr != nil {
-		return id, apperr.Wrap(putErr, "blob.Store.Put")
+		return attachmentID, apperr.Wrap(putErr, "blob.Store.Put")
 	}
 
 	_, err := call.Tx.Exec(
@@ -83,7 +83,7 @@ func (m Files) store(
 		`INSERT INTO maintenance.attachments (id, tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status,
 			uploaded_by, created_at, updated_at)
 		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, 'ready', $8, $9, $9)`,
-		id,
+		attachmentID,
 		job,
 		report,
 		key,
@@ -94,7 +94,7 @@ func (m Files) store(
 		call.Now,
 	)
 
-	return id, apperr.Wrap(err, "insert maintenance.attachments")
+	return attachmentID, apperr.Wrap(err, "insert maintenance.attachments")
 }
 
 // ---- attachments.add ----
@@ -148,46 +148,46 @@ func (in *AddInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/reports/{reportId}/attachments [post]
-func (m Files) add(ctx context.Context, c *ops.Call, input *AddInput) (AttachmentRef, error) {
-	draft, err := m.lockDraft(ctx, c, input.JobID, input.ReportID)
+func (m Files) add(ctx context.Context, call *ops.Call, input *AddInput) (AttachmentRef, error) {
+	draft, err := m.lockDraft(ctx, call, input.JobID, input.ReportID)
 	if err != nil {
 		return AttachmentRef{}, err
 	}
 
-	if draft.Version != *c.ExpectedVersion {
+	if draft.Version != *call.ExpectedVersion {
 		return AttachmentRef{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
-	var n int
+	var count int
 
-	scanErr := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.attachments WHERE report_id = $1`, input.ReportID).
-		Scan(&n)
+	scanErr := call.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.attachments WHERE report_id = $1`, input.ReportID).
+		Scan(&count)
 	if scanErr != nil {
 		return AttachmentRef{}, apperr.Wrap(scanErr, "select maintenance.attachments")
 	}
 
-	if n >= MaxReportAttachments {
+	if count >= MaxReportAttachments {
 		return AttachmentRef{}, apperr.E(apperr.Conflict, "errors.too_many_attachments")
 	}
 
-	id, err := m.store(ctx, c, input.JobID, input.ReportID, input.File)
+	attachmentID, err := m.store(ctx, call, input.JobID, input.ReportID, input.File)
 	if err != nil {
 		return AttachmentRef{}, err
 	}
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.work_reports SET version = version + 1, sign_off = NULL, updated_at = $3 WHERE id = $1 AND version
 			= $2`,
 		input.ReportID,
 		draft.Version,
-		c.Now,
+		call.Now,
 	)
 	if execErr != nil {
 		return AttachmentRef{}, apperr.Wrap(execErr, "update maintenance.work_reports")
 	}
 
-	_, execErr = c.Tx.Exec(
+	_, execErr = call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.jobs SET draft_report_version = $2 WHERE id = $1`,
 		input.JobID,
@@ -199,33 +199,27 @@ func (m Files) add(ctx context.Context, c *ops.Call, input *AddInput) (Attachmen
 
 	next := draft.Version + 1
 
-	c.Emit(
-		ops.Event{
-			AggregateType: "report",
-			AggregateID:   input.ReportID,
-			Type:          "AttachmentAdded",
-			Payload:       map[string]any{"attachmentId": id},
-		},
+	call.Emit(
+		outboxEvent(
+			"report",
+			input.ReportID,
+			"AttachmentAdded",
+			map[string]any{"attachmentId": attachmentID},
+		),
 	)
-	c.Audit(
-		ops.AuditEntry{
-			Action:          "attachments.add",
-			TargetKind:      "report",
-			TargetID:        input.ReportID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &next, Reason: "", Result: "", Before: nil, After: nil,
-		},
+	call.Audit(
+		auditEntry("attachments.add", "report", input.ReportID, call.ExpectedVersion, &next, ""),
 	)
 
 	return AttachmentRef{
-		ID:        id,
-		TenantID:  c.Principal.TenantID,
+		ID:        attachmentID,
+		TenantID:  call.Principal.TenantID,
 		Version:   1,
-		CreatedAt: c.Now,
-		UpdatedAt: c.Now,
+		CreatedAt: call.Now,
+		UpdatedAt: call.Now,
 		JobID:     input.JobID,
 		ReportID:  input.ReportID,
-		BlobID:    id,
+		BlobID:    attachmentID,
 		Name: strings.TrimSpace(
 			input.File.Name,
 		),
@@ -313,31 +307,31 @@ type SignOff struct {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/reports/{reportId}/sign-off [post]
-func (m Files) signOff(ctx context.Context, call *ops.Call, in *SignOffInput) (Report, error) {
-	draft, err := m.lockDraft(ctx, call, in.JobID, in.ReportID)
+func (m Files) signOff(ctx context.Context, call *ops.Call, input *SignOffInput) (Report, error) {
+	draft, err := m.lockDraft(ctx, call, input.JobID, input.ReportID)
 	if err != nil {
 		return Report{}, err
 	}
 
-	if draft.Version != *call.ExpectedVersion || draft.Version != in.ReportVersion {
+	if draft.Version != *call.ExpectedVersion || draft.Version != input.ReportVersion {
 		return Report{}, apperr.E(apperr.Conflict, "errors.report_version_changed")
 	}
 
 	signOff := SignOff{
-		SignerName:    in.SignerName,
+		SignerName:    input.SignerName,
 		SignedAt:      call.Now,
-		AbsentReason:  in.AbsentReason,
+		AbsentReason:  input.AbsentReason,
 		ReportVersion: draft.Version, SignatureAttachmentID: nil, SitePhotoAttachmentID: nil,
 	}
-	if in.Signature != nil {
-		id, err := m.store(ctx, call, in.JobID, in.ReportID, *in.Signature)
+	if input.Signature != nil {
+		id, err := m.store(ctx, call, input.JobID, input.ReportID, *input.Signature)
 		if err != nil {
 			return Report{}, err
 		}
 
 		signOff.SignatureAttachmentID = &id
 	} else {
-		id, err := m.store(ctx, call, in.JobID, in.ReportID, *in.SitePhoto)
+		id, err := m.store(ctx, call, input.JobID, input.ReportID, *input.SitePhoto)
 		if err != nil {
 			return Report{}, err
 		}
@@ -350,7 +344,7 @@ func (m Files) signOff(ctx context.Context, call *ops.Call, in *SignOffInput) (R
 	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.work_reports SET sign_off = $3, updated_at = $4 WHERE id = $1 AND version = $2`,
-		in.ReportID,
+		input.ReportID,
 		draft.Version,
 		raw,
 		call.Now,
@@ -359,27 +353,28 @@ func (m Files) signOff(ctx context.Context, call *ops.Call, in *SignOffInput) (R
 		return Report{}, apperr.Wrap(execErr, "update maintenance.work_reports")
 	}
 
-	report, err := m.Reports.load(ctx, call, in.ReportID, draft.Version)
+	report, err := m.Reports.load(ctx, call, input.ReportID, draft.Version)
 	if err != nil {
 		return report, err
 	}
 
 	call.Emit(
-		ops.Event{
-			AggregateType: "report",
-			AggregateID:   in.ReportID,
-			Type:          "ReportSignedOff",
-			Payload:       map[string]any{"reportVersion": draft.Version},
-		},
+		outboxEvent(
+			"report",
+			input.ReportID,
+			"ReportSignedOff",
+			map[string]any{"reportVersion": draft.Version},
+		),
 	)
 	call.Audit(
-		ops.AuditEntry{
-			Action:          "reports.signOff",
-			TargetKind:      "report",
-			TargetID:        in.ReportID.String(),
-			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &report.Version, Reason: "", Result: "", Before: nil, After: nil,
-		},
+		auditEntry(
+			"reports.signOff",
+			"report",
+			input.ReportID,
+			call.ExpectedVersion,
+			&report.Version,
+			"",
+		),
 	)
 
 	return report, nil
@@ -440,11 +435,15 @@ type BlobOut struct {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/jobs/{jobId}/reports/{reportId}/attachments/{attachmentId}/content [get]
-func (m Files) content(ctx context.Context, call *ops.Call, in *ContentInput) (BlobOut, error) {
+func (m Files) content(ctx context.Context, call *ops.Call, input *ContentInput) (BlobOut, error) {
 	_, getErr := m.Reports.get(
 		ctx,
 		call,
-		&GetReportInput{JobID: in.JobID, ReportID: in.ReportID, ReportVersion: in.ReportVersion},
+		&GetReportInput{
+			JobID:         input.JobID,
+			ReportID:      input.ReportID,
+			ReportVersion: input.ReportVersion,
+		},
 	)
 	if getErr != nil {
 		return BlobOut{}, getErr
@@ -457,7 +456,7 @@ func (m Files) content(ctx context.Context, call *ops.Call, in *ContentInput) (B
 
 	err := call.Tx.QueryRow(ctx, `SELECT object_key, name, mime, size_bytes FROM maintenance.attachments WHERE id = $1 AND
 		report_id = $2 AND job_id = $3 AND status = 'ready'`,
-		in.AttachmentID, in.ReportID, in.JobID).
+		input.AttachmentID, input.ReportID, input.JobID).
 		Scan(&key, &out.Name, &out.Mime, &out.Size)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return out, apperr.E(apperr.NotFound, apperr.KeyNotFound)

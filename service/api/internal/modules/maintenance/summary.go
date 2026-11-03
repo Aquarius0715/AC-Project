@@ -27,23 +27,23 @@ func (m Jobs) CountJobs(
 	call *ops.Call,
 	raw json.RawMessage,
 ) (JobCounts, error) {
-	var f listFilters
+	var filters listFilters
 
 	if len(raw) > 0 && string(raw) != "null" {
 		dec := json.NewDecoder(strings.NewReader(string(raw)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil {
+		if dec.Decode(&filters) != nil {
 			return JobCounts{}, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
 		}
 	}
 
-	err := f.check()
+	err := filters.check()
 	if err != nil {
 		return JobCounts{}, err
 	}
 
-	items, err := m.collect(ctx, call, &f)
+	items, err := m.collect(ctx, call, &filters)
 	if err != nil {
 		return JobCounts{}, err
 	}

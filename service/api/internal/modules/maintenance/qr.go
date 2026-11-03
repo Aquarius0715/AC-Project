@@ -33,17 +33,21 @@ func (QrAccess) QrAssignment(
 	return r.Assigned, r.JobID, apperr.Wrap(err, "delegate maintenance.qrAssignment")
 }
 
-func qrAssignment(ctx context.Context, c *ops.Call, input *UnitInput) (QrAssignmentResult, error) {
+func qrAssignment(
+	ctx context.Context,
+	call *ops.Call,
+	input *UnitInput,
+) (QrAssignmentResult, error) {
 	var qrAssignmentResult QrAssignmentResult
 
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id =
+	err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id =
 		a.job_id
 			WHERE j.unit_id = $1 AND a.technician_membership_id = $2 AND a.status = 'active'),
 		(SELECT j.id FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id
 			WHERE j.unit_id = $1 AND a.technician_membership_id = $2 AND a.status = 'active' AND j.status IN ('assigned',
 			'in_progress','on_hold','rework_requested')
 			  AND upper(a.scheduled) > $3 ORDER BY upper(a.scheduled), j.id LIMIT
-			  1)`, input.UnitID, c.Principal.MembershipID, c.Now).
+			  1)`, input.UnitID, call.Principal.MembershipID, call.Now).
 		Scan(&qrAssignmentResult.Assigned, &qrAssignmentResult.JobID)
 
 	return qrAssignmentResult, apperr.Wrap(err, "select maintenance.assignments")

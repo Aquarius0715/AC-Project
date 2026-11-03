@@ -81,15 +81,15 @@ func scanPlan(row pgx.Row) (Plan, error) {
 }
 
 // occurrences reads the jobs generated for the plans in one query, not one per plan (IR497).
-func (m Plans) occurrences(ctx context.Context, call *ops.Call, ps []Plan) error {
-	if len(ps) == 0 {
+func (m Plans) occurrences(ctx context.Context, call *ops.Call, plans []Plan) error {
+	if len(plans) == 0 {
 		return nil
 	}
 
-	ids, at := make([]uuid.UUID, len(ps)), make(map[uuid.UUID]int, len(ps))
-	for i := range ps {
-		ps[i].GeneratedOccurrences = []Occurrence{}
-		ids[i], at[ps[i].ID] = ps[i].ID, i
+	ids, indexOf := make([]uuid.UUID, len(plans)), make(map[uuid.UUID]int, len(plans))
+	for i := range plans {
+		plans[i].GeneratedOccurrences = []Occurrence{}
+		ids[i], indexOf[plans[i].ID] = plans[i].ID, i
 	}
 
 	rows, err := call.Tx.Query(
@@ -114,8 +114,8 @@ func (m Plans) occurrences(ctx context.Context, call *ops.Call, ps []Plan) error
 			return apperr.Wrap(err, "select maintenance.jobs")
 		}
 
-		if i, ok := at[plan]; ok {
-			ps[i].GeneratedOccurrences = append(ps[i].GeneratedOccurrences, occurrence)
+		if i, ok := indexOf[plan]; ok {
+			plans[i].GeneratedOccurrences = append(plans[i].GeneratedOccurrences, occurrence)
 		}
 	}
 
@@ -124,13 +124,18 @@ func (m Plans) occurrences(ctx context.Context, call *ops.Call, ps []Plan) error
 	return apperr.Wrap(rows.Err(), "select maintenance.jobs")
 }
 
-func (m Plans) load(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Plan, error) {
+func (m Plans) load(
+	ctx context.Context,
+	call *ops.Call,
+	planID uuid.UUID,
+	lock bool,
+) (Plan, error) {
 	q := "SELECT " + planCols + " FROM maintenance.plans p WHERE p.id = $1"
 	if lock {
 		q += " FOR UPDATE"
 	}
 
-	plan, err := scanPlan(c.Tx.QueryRow(ctx, q, id))
+	plan, err := scanPlan(call.Tx.QueryRow(ctx, q, planID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return plan, apperr.E(apperr.NotFound, apperr.KeyNotFound)
 	}
@@ -140,22 +145,22 @@ func (m Plans) load(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (
 	}
 
 	ps := []Plan{plan}
-	err = m.occurrences(ctx, c, ps)
+	err = m.occurrences(ctx, call, ps)
 
 	return ps[0], err
 }
 
 // NextOccurrence adds months to t and moves to the anchor day (clamped to the month's last day) at the same UTC time.
-func NextOccurrence(t time.Time, months, anchor int) time.Time {
-	t = t.UTC()
+func NextOccurrence(from time.Time, months, anchor int) time.Time {
+	from = from.UTC()
 	first := time.Date(
-		t.Year(),
-		t.Month()+time.Month(months),
+		from.Year(),
+		from.Month()+time.Month(months),
 		1,
-		t.Hour(),
-		t.Minute(),
-		t.Second(),
-		t.Nanosecond(),
+		from.Hour(),
+		from.Minute(),
+		from.Second(),
+		from.Nanosecond(),
 		time.UTC,
 	)
 	last := first.AddDate(0, 1, -1).Day()
@@ -238,19 +243,19 @@ func (m Plans) get(ctx context.Context, c *ops.Call, in *IDInput) (Plan, error) 
 func (m Plans) list(
 	ctx context.Context,
 	call *ops.Call,
-	in *paging.Query,
+	query *paging.Query,
 ) (paging.Page[Plan], error) {
-	var f struct {
+	var filters struct {
 		UnitID     *uuid.UUID `json:"unitId,omitempty"`
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
 		PropertyID *uuid.UUID `json:"propertyId,omitempty"`
 	}
 
-	if len(in.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
+	if len(query.Filters) > 0 {
+		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
 		dec.DisallowUnknownFields()
 
-		if dec.Decode(&f) != nil {
+		if dec.Decode(&filters) != nil {
 			return paging.Page[Plan]{}, apperr.Fields(
 				map[string]string{"filters": apperr.KeyInvalid},
 			)
@@ -258,7 +263,7 @@ func (m Plans) list(
 	}
 
 	order, err := paging.OrderBy(
-		in.Sort,
+		query.Sort,
 		map[string]string{"id": "p.id", "createdAt": "p.created_at", "updatedAt": "p.updated_at"},
 		"p.id ASC",
 	)
@@ -266,7 +271,7 @@ func (m Plans) list(
 		return paging.Page[Plan]{}, apperr.Wrap(err, "paging.OrderBy")
 	}
 
-	window, err := paging.Resolve(*in, f, call.Principal.ScopeVersion, 1)
+	window, err := paging.Resolve(*query, filters, call.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Plan]{}, apperr.Wrap(err, "paging.Resolve")
 	}
@@ -280,12 +285,12 @@ func (m Plans) list(
 	}
 
 	conds := []string{"TRUE"}
-	if f.UnitID != nil {
-		conds = append(conds, "p.unit_id = "+add(*f.UnitID))
+	if filters.UnitID != nil {
+		conds = append(conds, "p.unit_id = "+add(*filters.UnitID))
 	}
 
-	if f.CustomerID != nil {
-		org, ok, err := m.Jobs.Units.OrgOfCustomer(ctx, call, *f.CustomerID)
+	if filters.CustomerID != nil {
+		org, ok, err := m.Jobs.Units.OrgOfCustomer(ctx, call, *filters.CustomerID)
 		if err != nil {
 			return paging.Page[Plan]{}, apperr.Wrap(err, "maintenance.JobUnits.OrgOfCustomer")
 		}
@@ -302,8 +307,8 @@ func (m Plans) list(
 		conds = append(conds, "p.unit_id = ANY("+add(units)+")")
 	}
 
-	if f.PropertyID != nil {
-		units, err := m.Jobs.Units.UnitsOfProperty(ctx, call, *f.PropertyID)
+	if filters.PropertyID != nil {
+		units, err := m.Jobs.Units.UnitsOfProperty(ctx, call, *filters.PropertyID)
 		if err != nil {
 			return paging.Page[Plan]{}, apperr.Wrap(err, "maintenance.JobUnits.UnitsOfProperty")
 		}
@@ -422,12 +427,12 @@ func (in *PlanSaveInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/plans [post]
-func (m Plans) save(ctx context.Context, call *ops.Call, in *PlanSaveInput) (Plan, error) {
-	if !in.NextDueAt.After(call.Now) {
+func (m Plans) save(ctx context.Context, call *ops.Call, input *PlanSaveInput) (Plan, error) {
+	if !input.NextDueAt.After(call.Now) {
 		return Plan{}, apperr.Fields(map[string]string{"nextDueAt": apperr.KeyPast})
 	}
 
-	_, archived, found, err := m.Jobs.Units.UnitState(ctx, call, in.UnitID)
+	_, archived, found, err := m.Jobs.Units.UnitState(ctx, call, input.UnitID)
 	if err != nil {
 		return Plan{}, apperr.Wrap(err, "maintenance.JobUnits.UnitState")
 	}
@@ -440,28 +445,28 @@ func (m Plans) save(ctx context.Context, call *ops.Call, in *PlanSaveInput) (Pla
 		return Plan{}, apperr.Fields(map[string]string{"unitId": apperr.KeyUnitArchived})
 	}
 
-	next := in.NextDueAt.UTC()
+	next := input.NextDueAt.UTC()
 
-	var id uuid.UUID
+	var planID uuid.UUID
 
 	event := "PlanCreated"
 
-	if in.ID == nil {
+	if input.ID == nil {
 		err := call.Tx.QueryRow(ctx, `INSERT INTO maintenance.plans (tenant_id, unit_id, interval_months, anchor_day,
 			next_due_at, created_at, updated_at)
 			VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $5) RETURNING
-			id`, in.UnitID, in.Recurrence.IntervalMonths, next.Day(), next, call.Now).
-			Scan(&id)
+			id`, input.UnitID, input.Recurrence.IntervalMonths, next.Day(), next, call.Now).
+			Scan(&planID)
 		if err != nil {
 			return Plan{}, apperr.Wrap(err, "insert maintenance.plans")
 		}
 	} else {
-		plan, err := m.load(ctx, call, *in.ID, true)
+		plan, err := m.load(ctx, call, *input.ID, true)
 		if err != nil {
 			return plan, err
 		}
 
-		if plan.UnitID != in.UnitID {
+		if plan.UnitID != input.UnitID {
 			return plan, apperr.Fields(map[string]string{"unitId": "error.unitFixed"})
 		}
 
@@ -479,7 +484,7 @@ func (m Plans) save(ctx context.Context, call *ops.Call, in *PlanSaveInput) (Pla
 			`UPDATE maintenance.plans SET interval_months = $2, anchor_day = $3, next_due_at = $4, version = version + 1,
 				updated_at = $5 WHERE id = $1`,
 			plan.ID,
-			in.Recurrence.IntervalMonths,
+			input.Recurrence.IntervalMonths,
 			anchor,
 			next,
 			call.Now,
@@ -488,33 +493,18 @@ func (m Plans) save(ctx context.Context, call *ops.Call, in *PlanSaveInput) (Pla
 			return plan, apperr.Wrap(execErr, "update maintenance.plans")
 		}
 
-		id, event = plan.ID, "PlanChanged"
+		planID, event = plan.ID, "PlanChanged"
 	}
 
-	p, err := m.load(ctx, call, id, false)
+	saved, err := m.load(ctx, call, planID, false)
 	if err != nil {
-		return p, err
+		return saved, err
 	}
 
-	call.Emit(
-		ops.Event{
-			AggregateType: "plan",
-			AggregateID:   id,
-			Type:          event,
-			Payload:       map[string]any{"unitId": p.UnitID},
-		},
-	)
-	call.Audit(
-		ops.AuditEntry{
-			Action:          "plans.save",
-			TargetKind:      "plan",
-			TargetID:        id.String(),
-			PreviousVersion: call.ExpectedVersion,
-			NextVersion:     &p.Version, Reason: "", Result: "", Before: nil, After: nil,
-		},
-	)
+	call.Emit(outboxEvent("plan", planID, event, map[string]any{"unitId": saved.UnitID}))
+	call.Audit(auditEntry("plans.save", "plan", planID, call.ExpectedVersion, &saved.Version, ""))
 
-	return p, nil
+	return saved, nil
 }
 
 // ---- plans.generateNext ----
@@ -576,15 +566,15 @@ func (m Plans) generateNext(
 // generateNextJob is generateNext answering the job with its detail extras.
 func (m Plans) generateNextJob(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	input *GenerateInput,
 ) (Job, error) {
-	plan, err := m.load(ctx, c, input.ID, true)
+	plan, err := m.load(ctx, call, input.ID, true)
 	if err != nil {
 		return Job{}, err
 	}
 
-	if plan.Version != *c.ExpectedVersion {
+	if plan.Version != *call.ExpectedVersion {
 		return Job{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 	}
 
@@ -592,7 +582,7 @@ func (m Plans) generateNextJob(
 		return Job{}, apperr.E(apperr.Conflict, "errors.occurrence_mismatch")
 	}
 
-	if !input.OccurrenceDate.After(c.Now) {
+	if !input.OccurrenceDate.After(call.Now) {
 		return Job{}, apperr.E(apperr.Conflict, "errors.next_date_past")
 	}
 
@@ -602,7 +592,7 @@ func (m Plans) generateNextJob(
 		}
 	}
 
-	org, archived, found, err := m.Jobs.Units.UnitState(ctx, c, plan.UnitID)
+	org, archived, found, err := m.Jobs.Units.UnitState(ctx, call, plan.UnitID)
 	if err != nil {
 		return Job{}, apperr.Wrap(err, "maintenance.JobUnits.UnitState")
 	}
@@ -613,58 +603,52 @@ func (m Plans) generateNextJob(
 
 	start := input.OccurrenceDate.UTC()
 
-	var id uuid.UUID
+	var jobID uuid.UUID
 
-	scanErr := c.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, plan_id,
+	scanErr := call.Tx.QueryRow(ctx, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, plan_id,
 		occurrence_at, type, status, origin, symptom, requested_slot,
 		preferred_slots, due_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'periodic', 'requested',
 		'periodic_plan', 'Scheduled periodic maintenance',
 		tstzrange($4, $5), '[]', $5) RETURNING id`, plan.UnitID, org, plan.ID, start, start.Add(time.Hour)).
-		Scan(&id)
+		Scan(&jobID)
 	if scanErr != nil {
 		return Job{}, apperr.Wrap(scanErr, "insert maintenance.jobs")
 	}
 
 	next := NextOccurrence(start, plan.Recurrence.IntervalMonths, plan.AnchorDay)
 
-	_, execErr := c.Tx.Exec(
+	_, execErr := call.Tx.Exec(
 		ctx,
 		`UPDATE maintenance.plans SET next_due_at = $2, version = version + 1, updated_at = $3 WHERE id = $1`,
 		plan.ID,
 		next,
-		c.Now,
+		call.Now,
 	)
 	if execErr != nil {
 		return Job{}, apperr.Wrap(execErr, "update maintenance.plans")
 	}
 
-	eventErr := m.Jobs.event(ctx, c, id, "job.created", nil)
+	eventErr := m.Jobs.event(ctx, call, jobID, "job.created", nil)
 	if eventErr != nil {
 		return Job{}, eventErr
 	}
 
-	job, err := m.Jobs.detail(ctx, c, id)
+	job, err := m.Jobs.detail(ctx, call, jobID)
 	if err != nil {
 		return job, err
 	}
 
-	nv := plan.Version + 1
-	c.Emit(
-		ops.Event{
-			AggregateType: "plan",
-			AggregateID:   plan.ID,
-			Type:          "PlanOccurrenceGenerated",
-			Payload:       map[string]any{"jobId": id, "occurrenceAt": start},
-		},
+	nextVersion := plan.Version + 1
+	call.Emit(
+		outboxEvent(
+			"plan",
+			plan.ID,
+			"PlanOccurrenceGenerated",
+			map[string]any{"jobId": jobID, "occurrenceAt": start},
+		),
 	)
-	c.Audit(
-		ops.AuditEntry{
-			Action:          "plans.generateNext",
-			TargetKind:      "plan",
-			TargetID:        plan.ID.String(),
-			PreviousVersion: c.ExpectedVersion,
-			NextVersion:     &nv, Reason: "", Result: "", Before: nil, After: nil,
-		},
+	call.Audit(
+		auditEntry("plans.generateNext", "plan", plan.ID, call.ExpectedVersion, &nextVersion, ""),
 	)
 
 	return job, nil

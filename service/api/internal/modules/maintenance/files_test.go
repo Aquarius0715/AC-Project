@@ -17,13 +17,13 @@ func TestValidFileName(t *testing.T) {
 		}
 	}
 
-	for _, n := range []string{
+	for _, name := range []string{
 		"", "   ", strings.Repeat("a", 201), "a\r\nSet-Cookie: x.png", "nul\x00.png", "tab\t.png", "del\x7f.png",
 		"c1\u0085.png",
 		"../../etc/passwd", "a/b.png", `a\b.png`, "photo\u202egpj.exe", "x\u2066y.png", "lrm\u200e.png", "alm\u061c.png",
 	} {
-		if ValidFileName(n) {
-			t.Errorf("%q accepted", n)
+		if ValidFileName(name) {
+			t.Errorf("%q accepted", name)
 		}
 	}
 
