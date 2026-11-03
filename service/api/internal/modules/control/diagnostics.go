@@ -127,6 +127,62 @@ func (in *RunInput) Validate() map[string]string {
 	return fieldErrs
 }
 
+// checkRun checks a diagnostic run before it starts and returns the unit's device: the technician's job covers the
+// unit, the unit and the job are at the versions shown, the unit can take both actions and no restriction forbids
+// them, and the unit is ready for a command.
+func (m Diagnostics) checkRun(
+	ctx context.Context,
+	call *ops.Call,
+	input *RunInput,
+) (uuid.UUID, error) {
+	err := m.Commands.Access.TechnicianJob(ctx, call, input.JobID, input.UnitID)
+	if err != nil {
+		return uuid.Nil, apperr.Wrap(err, "control.TechAccess.TechnicianJob")
+	}
+
+	target, found, err := m.Commands.Units.Target(ctx, call, input.UnitID)
+	if err != nil {
+		return uuid.Nil, apperr.Wrap(err, "control.Units.Target")
+	}
+
+	if !found {
+		return uuid.Nil, apperr.E(apperr.NotFound, apperr.KeyNotFound)
+	}
+
+	jv, _, _, err := m.Jobs.JobVersion(ctx, call, input.JobID)
+	if err != nil {
+		return uuid.Nil, apperr.Wrap(err, "control.JobVersions.JobVersion")
+	}
+
+	if target.Version != input.ExpectedUnitVersion || jv != input.ExpectedJobVersion {
+		return uuid.Nil, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	if !input.start.Supports(target.Caps) {
+		return uuid.Nil, apperr.Fields(
+			map[string]string{"startAction": apperr.KeyUnsupportedAction},
+		)
+	}
+
+	if !input.end.Supports(target.Caps) {
+		return uuid.Nil, apperr.Fields(map[string]string{"endAction": apperr.KeyUnsupportedAction})
+	}
+
+	policy, err := m.Commands.Restrictions.UnitPolicy(ctx, call, input.UnitID)
+	if err != nil {
+		return uuid.Nil, apperr.Wrap(err, "control.Restrictions.UnitPolicy")
+	}
+
+	if !Allowed(input.start, policy) || !Allowed(input.end, policy) {
+		e := apperr.E(apperr.Forbidden, "errors.restriction_active")
+		e.FieldErrors = map[string]string{"startAction": "errors.restriction_active"}
+
+		return uuid.Nil, e
+	}
+
+	return m.Commands.ready(ctx, call, input.UnitID)
+}
+
 // create serves diagnosticRuns.create.
 //
 //	@Summary		diagnosticRuns.create (write)
@@ -153,51 +209,8 @@ func (in *RunInput) Validate() map[string]string {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/diagnostic-runs [post]
-func (m Diagnostics) create(ctx context.Context, call *ops.Call, in *RunInput) (Run, error) {
-	err := m.Commands.Access.TechnicianJob(ctx, call, in.JobID, in.UnitID)
-	if err != nil {
-		return Run{}, apperr.Wrap(err, "control.TechAccess.TechnicianJob")
-	}
-
-	target, found, err := m.Commands.Units.Target(ctx, call, in.UnitID)
-	if err != nil {
-		return Run{}, apperr.Wrap(err, "control.Units.Target")
-	}
-
-	if !found {
-		return Run{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-	}
-
-	jv, _, _, err := m.Jobs.JobVersion(ctx, call, in.JobID)
-	if err != nil {
-		return Run{}, apperr.Wrap(err, "control.JobVersions.JobVersion")
-	}
-
-	if target.Version != in.ExpectedUnitVersion || jv != in.ExpectedJobVersion {
-		return Run{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-	}
-
-	if !in.start.Supports(target.Caps) {
-		return Run{}, apperr.Fields(map[string]string{"startAction": apperr.KeyUnsupportedAction})
-	}
-
-	if !in.end.Supports(target.Caps) {
-		return Run{}, apperr.Fields(map[string]string{"endAction": apperr.KeyUnsupportedAction})
-	}
-
-	policy, err := m.Commands.Restrictions.UnitPolicy(ctx, call, in.UnitID)
-	if err != nil {
-		return Run{}, apperr.Wrap(err, "control.Restrictions.UnitPolicy")
-	}
-
-	if !Allowed(in.start, policy) || !Allowed(in.end, policy) {
-		e := apperr.E(apperr.Forbidden, "errors.restriction_active")
-		e.FieldErrors = map[string]string{"startAction": "errors.restriction_active"}
-
-		return Run{}, e
-	}
-
-	dev, err := m.Commands.ready(ctx, call, in.UnitID)
+func (m Diagnostics) create(ctx context.Context, call *ops.Call, input *RunInput) (Run, error) {
+	dev, err := m.checkRun(ctx, call, input)
 	if err != nil {
 		return Run{}, err
 	}
@@ -211,8 +224,9 @@ func (m Diagnostics) create(ctx context.Context, call *ops.Call, in *RunInput) (
 		requested_at, sent_at, expires_at, correlation_id, created_at, updated_at) VALUES
 		(current_setting('app.tenant_id')::uuid, $1, $2, $3, 'diagnostic', $4, $5, $6, $7, 'requested', 'not_sent',
 		$8, NULL, $9, $10, $8, $8) RETURNING
-		id`, in.UnitID, dev, call.Principal.MembershipID, []byte(in.StartAction), runID, in.JobID, in.Reason, call.Now,
-		call.Now.Add(CommandTTL), call.CorrelationID).
+		id`,
+		input.UnitID, dev, call.Principal.MembershipID, []byte(input.StartAction), runID, input.JobID, input.Reason,
+		call.Now, call.Now.Add(CommandTTL), call.CorrelationID).
 		Scan(&cmd)
 	if scanErr != nil {
 		return Run{}, apperr.Wrap(scanErr, "insert control.commands")
@@ -226,13 +240,13 @@ func (m Diagnostics) create(ctx context.Context, call *ops.Call, in *RunInput) (
 		start_command_id, created_at, updated_at) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7,
 		$8, 'awaiting_start', $9, $10, $10) RETURNING `+runCols,
 			runID,
-			in.JobID,
-			in.UnitID,
+			input.JobID,
+			input.UnitID,
 			call.Principal.MembershipID,
-			[]byte(in.StartAction),
-			[]byte(in.EndAction),
-			in.DurationMinutes,
-			in.Reason,
+			[]byte(input.StartAction),
+			[]byte(input.EndAction),
+			input.DurationMinutes,
+			input.Reason,
 			cmd,
 			call.Now,
 		),
@@ -247,7 +261,7 @@ func (m Diagnostics) create(ctx context.Context, call *ops.Call, in *RunInput) (
 			AggregateID:   cmd,
 			Type:          eventCommandRequested,
 			Payload: map[string]any{
-				keyUnitID:         in.UnitID,
+				keyUnitID:         input.UnitID,
 				"deviceId":        dev,
 				"diagnosticRunId": runID,
 			},
@@ -259,7 +273,7 @@ func (m Diagnostics) create(ctx context.Context, call *ops.Call, in *RunInput) (
 			TargetKind:  "diagnostic_run",
 			TargetID:    runID.String(),
 			NextVersion: &run.Version,
-			Reason:      in.Reason, PreviousVersion: nil, Result: "", Before: nil, After: nil,
+			Reason:      input.Reason, PreviousVersion: nil, Result: "", Before: nil, After: nil,
 		},
 	)
 
@@ -506,9 +520,46 @@ func runAcknowledged(ctx context.Context, txn pgx.Tx, command uuid.UUID, when ti
 
 // AdvanceRuns is the worker step of IR139 item 2: failed starts / ends from expired commands, and end commands at
 // endAt.
-func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
-	advanced := 0
+func AdvanceRuns(ctx context.Context, call *ops.Call, commands Commands) (int, error) {
+	advanced, err := expireRunCommands(ctx, call)
+	if err != nil {
+		return advanced, err
+	}
 
+	due, err := dueRuns(ctx, call)
+	if err != nil {
+		return advanced, err
+	}
+
+	for _, run := range due {
+		end, err := endOutcome(ctx, call, commands, run)
+		if err != nil {
+			return advanced, err
+		}
+
+		_, err = call.Tx.Exec(
+			ctx,
+			`UPDATE control.diagnostic_runs SET state = $2, failure_code = NULLIF($3, ''), end_command_id = COALESCE($4,
+				end_command_id), version = version + 1, updated_at = $5
+			WHERE id = $1`,
+			run.ID,
+			end.state,
+			end.code,
+			end.command,
+			call.Now,
+		)
+		if err != nil {
+			return advanced, apperr.Wrap(err, "update control.diagnostic_runs")
+		}
+
+		advanced++
+	}
+
+	return advanced, nil
+}
+
+// expireRunCommands fails the runs whose start or end command expired (TIMEOUT) and returns how many it changed.
+func expireRunCommands(ctx context.Context, call *ops.Call) (int, error) {
 	tag, err := call.Tx.Exec(
 		ctx,
 		`UPDATE control.diagnostic_runs r SET state = 'start_failed', failure_code = 'TIMEOUT', version = r.version + 1,
@@ -520,7 +571,7 @@ func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
 		return 0, apperr.Wrap(err, "update control.diagnostic_runs")
 	}
 
-	advanced += int(tag.RowsAffected())
+	changed := int(tag.RowsAffected())
 
 	tag, err = call.Tx.Exec(
 		ctx,
@@ -530,99 +581,83 @@ func AdvanceRuns(ctx context.Context, call *ops.Call, m Commands) (int, error) {
 		call.Now,
 	)
 	if err != nil {
-		return advanced, apperr.Wrap(err, "update control.diagnostic_runs")
+		return changed, apperr.Wrap(err, "update control.diagnostic_runs")
 	}
 
-	advanced += int(tag.RowsAffected())
+	return changed + int(tag.RowsAffected()), nil
+}
 
+// dueRuns are the running runs whose end time has come, locked for the tick.
+func dueRuns(ctx context.Context, call *ops.Call) ([]Run, error) {
 	rows, err := call.Tx.Query(
 		ctx,
 		"SELECT "+runCols+" FROM control.diagnostic_runs r WHERE r.state = 'running' AND r.end_at <= $1 FOR UPDATE",
 		call.Now,
 	)
 	if err != nil {
-		return advanced, apperr.Wrap(err, "select control.diagnostic_runs")
+		return nil, apperr.Wrap(err, "select control.diagnostic_runs")
 	}
+	defer rows.Close()
 
 	var due []Run
 
 	for rows.Next() {
 		run, err := scanRun(rows)
 		if err != nil {
-			rows.Close()
-
-			return advanced, err
+			return nil, err
 		}
 
 		due = append(due, run)
 	}
 
-	rows.Close()
+	return due, apperr.Wrap(rows.Err(), "select control.diagnostic_runs")
+}
 
-	rowsErr := rows.Err()
-	if rowsErr != nil {
-		return advanced, apperr.Wrap(rowsErr, "select control.diagnostic_runs")
+// runEnd is how a due diagnostic run ends: its state, its failure code and its end command.
+type runEnd struct {
+	state, code string
+	command     *uuid.UUID
+}
+
+// endOutcome is how a due run ends: blocked when a restriction forbids its end action, failed while its device is
+// offline, or requested with its end command.
+func endOutcome(ctx context.Context, call *ops.Call, commands Commands, run Run) (runEnd, error) {
+	end, _ := ParseAction(run.EndAction)
+
+	policy, err := commands.Restrictions.UnitPolicy(ctx, call, run.UnitID)
+	if err != nil {
+		return runEnd{}, apperr.Wrap(err, "control.Restrictions.UnitPolicy")
 	}
 
-	for _, run := range due {
-		end, _ := ParseAction(run.EndAction)
-
-		policy, err := m.Restrictions.UnitPolicy(ctx, call, run.UnitID)
-		if err != nil {
-			return advanced, apperr.Wrap(err, "control.Restrictions.UnitPolicy")
-		}
-
-		state, code := "", ""
-
-		var cmd *uuid.UUID
-
-		if !Allowed(end, policy) {
-			state, code = "end_blocked", "FORBIDDEN"
-		} else {
-			dev, conn, power, bound, err := m.Devices.BoundDevice(ctx, call, run.UnitID)
-			if err != nil {
-				return advanced, apperr.Wrap(err, "control.Devices.BoundDevice")
-			} else if Deliverable(bound, conn, power) != nil {
-				state, code = "end_failed", "OFFLINE"
-			} else {
-				var endCommandID uuid.UUID
-
-				err := call.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id,
-					source,
-					action, diagnostic_run_id, job_id, reason, status, delivery,
-				requested_at, sent_at, expires_at, correlation_id, created_at, updated_at) VALUES ($1, $2, $3, $4, 'diagnostic', $5,
-				$6, $7, $8, 'requested', 'not_sent', $9, NULL, $10, $11, $9, $9) RETURNING id`,
-					run.TenantID, run.UnitID, dev, run.ActorMembershipID, []byte(run.EndAction), run.ID, run.JobID, run.Reason,
-					call.Now,
-					call.Now.Add(CommandTTL), "tick-"+call.Now.Format(time.RFC3339)).
-					Scan(&endCommandID)
-				if err != nil {
-					return advanced, apperr.Wrap(err, "insert control.commands")
-				}
-
-				state, cmd = "end_requested", &endCommandID
-			}
-		}
-
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`UPDATE control.diagnostic_runs SET state = $2, failure_code = NULLIF($3, ''), end_command_id = COALESCE($4,
-				end_command_id), version = version + 1, updated_at = $5
-			WHERE id = $1`,
-			run.ID,
-			state,
-			code,
-			cmd,
-			call.Now,
-		)
-		if execErr != nil {
-			return advanced, apperr.Wrap(execErr, "update control.diagnostic_runs")
-		}
-
-		advanced++
+	if !Allowed(end, policy) {
+		return runEnd{state: "end_blocked", code: "FORBIDDEN", command: nil}, nil
 	}
 
-	return advanced, nil
+	dev, conn, power, bound, err := commands.Devices.BoundDevice(ctx, call, run.UnitID)
+	if err != nil {
+		return runEnd{}, apperr.Wrap(err, "control.Devices.BoundDevice")
+	}
+
+	if deliverable := Deliverable(bound, conn, power) == nil; !deliverable {
+		return runEnd{state: "end_failed", code: "OFFLINE", command: nil}, nil
+	}
+
+	var endCommandID uuid.UUID
+
+	err = call.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id,
+		source,
+		action, diagnostic_run_id, job_id, reason, status, delivery,
+	requested_at, sent_at, expires_at, correlation_id, created_at, updated_at) VALUES ($1, $2, $3, $4, 'diagnostic', $5,
+	$6, $7, $8, 'requested', 'not_sent', $9, NULL, $10, $11, $9, $9) RETURNING id`,
+		run.TenantID, run.UnitID, dev, run.ActorMembershipID, []byte(run.EndAction), run.ID, run.JobID, run.Reason,
+		call.Now,
+		call.Now.Add(CommandTTL), "tick-"+call.Now.Format(time.RFC3339)).
+		Scan(&endCommandID)
+	if err != nil {
+		return runEnd{}, apperr.Wrap(err, "insert control.commands")
+	}
+
+	return runEnd{state: "end_requested", code: "", command: &endCommandID}, nil
 }
 
 // RegisterDiagnostics binds the diagnostic run operations.

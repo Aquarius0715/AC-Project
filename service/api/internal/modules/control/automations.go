@@ -181,6 +181,62 @@ func (m Automations) load(
 	return x, err
 }
 
+// automationFilter is the filters of automations.list.
+type automationFilter struct {
+	Kind    *string    `json:"kind,omitempty"`
+	Enabled *bool      `json:"enabled,omitempty"`
+	UnitID  *uuid.UUID `json:"unitId,omitempty"`
+}
+
+// automationFilterOf decodes and checks the filters of automations.list: known fields only, and a known kind.
+func automationFilterOf(raw json.RawMessage) (automationFilter, error) {
+	var filter automationFilter
+
+	if len(raw) == 0 {
+		return filter, nil
+	}
+
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	dec.DisallowUnknownFields()
+
+	if dec.Decode(&filter) != nil ||
+		(filter.Kind != nil && *filter.Kind != kindSchedule && *filter.Kind != kindEvent) {
+		return automationFilter{}, apperr.Fields(map[string]string{"filters": apperr.KeyInvalid})
+	}
+
+	return filter, nil
+}
+
+// where is the filter's WHERE clause over the caller's organization's automations, with its arguments.
+func (filter automationFilter) where(call *ops.Call) (string, []any) {
+	args := []any{call.Principal.OrgID}
+	add := func(v any) string {
+		args = append(args, v)
+
+		return fmt.Sprintf("$%d", len(args))
+	}
+
+	conds := []string{"a.customer_org_id = $1"}
+	if filter.Kind != nil {
+		conds = append(conds, "a.kind = "+add(*filter.Kind))
+	}
+
+	if filter.Enabled != nil {
+		conds = append(conds, "a.enabled = "+add(*filter.Enabled))
+	}
+
+	if filter.UnitID != nil {
+		conds = append(
+			conds,
+			"EXISTS (SELECT 1 FROM control.automation_units u WHERE u.automation_id = a.id AND u.unit_id = "+add(
+				*filter.UnitID,
+			)+")",
+		)
+	}
+
+	return strings.Join(conds, " AND "), args
+}
+
 // list serves automations.list.
 //
 //	@Summary		automations.list (read)
@@ -216,22 +272,9 @@ func (m Automations) list(
 	call *ops.Call,
 	query *paging.Query,
 ) (paging.Page[Automation], error) {
-	var filters struct {
-		Kind    *string    `json:"kind,omitempty"`
-		Enabled *bool      `json:"enabled,omitempty"`
-		UnitID  *uuid.UUID `json:"unitId,omitempty"`
-	}
-
-	if len(query.Filters) > 0 {
-		dec := json.NewDecoder(strings.NewReader(string(query.Filters)))
-		dec.DisallowUnknownFields()
-
-		if dec.Decode(&filters) != nil ||
-			(filters.Kind != nil && *filters.Kind != kindSchedule && *filters.Kind != kindEvent) {
-			return paging.Page[Automation]{}, apperr.Fields(
-				map[string]string{"filters": apperr.KeyInvalid},
-			)
-		}
+	filters, err := automationFilterOf(query.Filters)
+	if err != nil {
+		return paging.Page[Automation]{}, err
 	}
 
 	order, err := paging.OrderBy(
@@ -254,32 +297,7 @@ func (m Automations) list(
 		return paging.Page[Automation]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	args := []any{call.Principal.OrgID}
-	add := func(v any) string {
-		args = append(args, v)
-
-		return fmt.Sprintf("$%d", len(args))
-	}
-
-	conds := []string{"a.customer_org_id = $1"}
-	if filters.Kind != nil {
-		conds = append(conds, "a.kind = "+add(*filters.Kind))
-	}
-
-	if filters.Enabled != nil {
-		conds = append(conds, "a.enabled = "+add(*filters.Enabled))
-	}
-
-	if filters.UnitID != nil {
-		conds = append(
-			conds,
-			"EXISTS (SELECT 1 FROM control.automation_units u WHERE u.automation_id = a.id AND u.unit_id = "+add(
-				*filters.UnitID,
-			)+")",
-		)
-	}
-
-	where := strings.Join(conds, " AND ")
+	where, args := filters.where(call)
 
 	var total int
 
@@ -362,6 +380,16 @@ type extraCondition struct {
 	Value    *float64 `json:"value,omitempty"`
 }
 
+// The limits of a rule's conditions: maxExtras extra conditions at most (IR215), ISO weekdays from isoMonday to
+// isoSunday, and a weather temperature from minWeatherCelsius to maxWeatherCelsius.
+const (
+	maxExtras         = 3
+	isoMonday         = 1
+	isoSunday         = 7
+	minWeatherCelsius = -50
+	maxWeatherCelsius = 100
+)
+
 // parseExtras checks onlyIf (IR215): at most 3 of weekday / occupancy / weather, each type once, no weekday on a
 // schedule (it has its own weekdays) and not the type of the rule's own condition. Returns the error key or "".
 func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondition, string) {
@@ -373,7 +401,7 @@ func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondit
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
 	dec.DisallowUnknownFields()
 
-	if dec.Decode(&out) != nil || len(out) > 3 {
+	if dec.Decode(&out) != nil || len(out) > maxExtras {
 		return nil, apperr.KeyInvalid
 	}
 
@@ -384,44 +412,9 @@ func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondit
 		}
 
 		seen[extra.Type] = true
-		switch extra.Type {
-		case "weekday":
-			if kind == kindSchedule {
-				return nil, "errors.weekday_on_schedule"
-			}
 
-			days := map[int]bool{}
-			for _, d := range extra.Weekdays {
-				if d < 1 || d > 7 || days[d] {
-					return nil, apperr.KeyInvalid
-				}
-
-				days[d] = true
-			}
-
-			if len(extra.Weekdays) == 0 || extra.Occupied != nil || extra.Metric != nil ||
-				extra.Operator != nil ||
-				extra.Value != nil {
-				return nil, apperr.KeyInvalid
-			}
-		case condOccupancy:
-			if extra.Occupied == nil || extra.Weekdays != nil || extra.Metric != nil ||
-				extra.Operator != nil ||
-				extra.Value != nil {
-				return nil, apperr.KeyInvalid
-			}
-		case condWeather:
-			if extra.Metric == nil || *extra.Metric != metricTemperature || extra.Operator == nil ||
-				!slices.Contains([]string{"gt", opGTE, "lt", "lte"}, *extra.Operator) ||
-				extra.Value == nil ||
-				*extra.Value < -50 ||
-				*extra.Value > 100 ||
-				extra.Weekdays != nil ||
-				extra.Occupied != nil {
-				return nil, apperr.KeyInvalid
-			}
-		default:
-			return nil, apperr.KeyInvalid
+		if key := extraError(extra, kind); key != "" {
+			return nil, key
 		}
 
 		if extra.Type == conditionType {
@@ -430,6 +423,79 @@ func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondit
 	}
 
 	return out, ""
+}
+
+// extraError is what is wrong with one extra condition ("" when it is valid). A weekday condition, never on a schedule,
+// names ISO weekdays once each; an occupancy one says occupied or not; a weather one compares the temperature with a
+// value in range. Each carries its own fields only.
+func extraError(extra extraCondition, kind string) string {
+	switch extra.Type {
+	case "weekday":
+		if kind == kindSchedule {
+			return "errors.weekday_on_schedule"
+		}
+
+		if len(extra.Weekdays) == 0 || !extra.only("weekdays") || !validWeekdays(extra.Weekdays) {
+			return apperr.KeyInvalid
+		}
+	case condOccupancy:
+		if !extra.only(fieldOccupied) {
+			return apperr.KeyInvalid
+		}
+	case condWeather:
+		if !extra.only("metric", "operator", "value") ||
+			!validWeather(*extra.Metric, *extra.Operator, *extra.Value) {
+			return apperr.KeyInvalid
+		}
+	default:
+		return apperr.KeyInvalid
+	}
+
+	return ""
+}
+
+// only is whether the extra condition's optional fields that are set are exactly the named ones.
+func (extra extraCondition) only(names ...string) bool {
+	return onlySet(names, map[string]bool{
+		"weekdays":    extra.Weekdays != nil,
+		fieldOccupied: extra.Occupied != nil,
+		"metric":      extra.Metric != nil,
+		"operator":    extra.Operator != nil,
+		"value":       extra.Value != nil,
+	})
+}
+
+// onlySet is whether the fields that are set are exactly the named ones.
+func onlySet(names []string, set map[string]bool) bool {
+	for name, isSet := range set {
+		if isSet != slices.Contains(names, name) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// validWeekdays is whether weekdays are ISO days (1 Monday … 7 Sunday), each named once.
+func validWeekdays(weekdays []int) bool {
+	seen := map[int]bool{}
+	for _, d := range weekdays {
+		if d < isoMonday || d > isoSunday || seen[d] {
+			return false
+		}
+
+		seen[d] = true
+	}
+
+	return true
+}
+
+// validWeather is whether a weather comparison reads the temperature with a known operator and a value in range.
+func validWeather(metric, operator string, value float64) bool {
+	return metric == metricTemperature &&
+		slices.Contains([]string{"gt", opGTE, "lt", "lte"}, operator) &&
+		value >= minWeatherCelsius &&
+		value <= maxWeatherCelsius
 }
 
 var hhmm = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
@@ -445,6 +511,9 @@ type condition struct {
 	Value     *float64 `json:"value,omitempty"`
 }
 
+// parseCondition decodes a customer rule's condition and reports whether it is valid: an occupancy condition says
+// occupied or not, a location one an arrival or a departure, a pattern one a local time, and a weather one compares the
+// temperature. Each carries its own fields only.
 func parseCondition(raw json.RawMessage) (condition, bool) {
 	var cond condition
 
@@ -457,38 +526,29 @@ func parseCondition(raw json.RawMessage) (condition, bool) {
 
 	switch cond.Type {
 	case condOccupancy:
-		return cond, cond.Occupied != nil && cond.Event == nil && cond.LocalTime == nil &&
-			cond.Metric == nil &&
-			cond.Operator == nil &&
-			cond.Value == nil
+		return cond, cond.only(fieldOccupied)
 	case condLocation:
-		return cond, cond.Event != nil &&
-			(*cond.Event == "arrival" || *cond.Event == "departure") &&
-			cond.Occupied == nil &&
-			cond.LocalTime == nil &&
-			cond.Metric == nil &&
-			cond.Operator == nil &&
-			cond.Value == nil
+		return cond, cond.only("event") && (*cond.Event == "arrival" || *cond.Event == "departure")
 	case "pattern":
-		return cond, cond.LocalTime != nil && hhmm.MatchString(*cond.LocalTime) &&
-			cond.Occupied == nil &&
-			cond.Event == nil &&
-			cond.Metric == nil &&
-			cond.Operator == nil &&
-			cond.Value == nil
+		return cond, cond.only("localTime") && hhmm.MatchString(*cond.LocalTime)
 	case condWeather:
-		return cond, cond.Metric != nil && *cond.Metric == metricTemperature &&
-			cond.Operator != nil &&
-			slices.Contains([]string{"gt", opGTE, "lt", "lte"}, *cond.Operator) &&
-			cond.Value != nil &&
-			*cond.Value >= -50 &&
-			*cond.Value <= 100 &&
-			cond.Occupied == nil &&
-			cond.Event == nil &&
-			cond.LocalTime == nil
+		return cond, cond.only("metric", "operator", "value") &&
+			validWeather(*cond.Metric, *cond.Operator, *cond.Value)
 	}
 
 	return cond, false
+}
+
+// only is whether the condition's optional fields that are set are exactly the named ones.
+func (cond condition) only(names ...string) bool {
+	return onlySet(names, map[string]bool{
+		fieldOccupied: cond.Occupied != nil,
+		"event":       cond.Event != nil,
+		"localTime":   cond.LocalTime != nil,
+		"metric":      cond.Metric != nil,
+		"operator":    cond.Operator != nil,
+		"value":       cond.Value != nil,
+	})
 }
 
 func minutesOf(s string) int {
@@ -631,6 +691,23 @@ func validSchedule(
 	}
 }
 
+// The days of a schedule's occurrences that are expanded: tickDays around a tick (the day before, the day and the day
+// after, so an occurrence at the tick is among them in any timezone), previewDays for the next occurrences shown,
+// and checkDays, a year and a day either side, in which every schedule must have an occurrence.
+const (
+	tickDays    = 3
+	previewDays = 30
+	checkDays   = 367
+)
+
+// minutesPerHour and hoursPerDay convert local times and spans, and previewCount is how many next occurrences a
+// schedule preview shows (ScheduledOccurrence list).
+const (
+	minutesPerHour = 60
+	hoursPerDay    = 24
+	previewCount   = 8
+)
+
 // occurrences lists the schedule's start/end instants from the start day firstDay for days days, with the wall time
 // problems found (nonexistent or ambiguous local times, D09).
 func occurrences(
@@ -644,11 +721,11 @@ func occurrences(
 	bad := false
 
 	instantOf := func(day time.Time, hm string) time.Time {
-		h, mi := minutesOf(hm)/60, minutesOf(hm)%60
-		instant := time.Date(day.Year(), day.Month(), day.Day(), h, mi, 0, 0, loc)
+		hour, minute := minutesOf(hm)/minutesPerHour, minutesOf(hm)%minutesPerHour
+		instant := time.Date(day.Year(), day.Month(), day.Day(), hour, minute, 0, 0, loc)
 
 		lt := instant.In(loc)
-		if lt.Hour() != h || lt.Minute() != mi || lt.Day() != day.Day() { // nonexistent
+		if lt.Hour() != hour || lt.Minute() != minute || lt.Day() != day.Day() { // nonexistent
 			bad = true
 		}
 
@@ -658,8 +735,8 @@ func occurrences(
 		} {
 			u := instant.Add(dd).In(loc)
 			if u.Year() == day.Year() && u.Month() == day.Month() && u.Day() == day.Day() &&
-				u.Hour() == h &&
-				u.Minute() == mi { // ambiguous
+				u.Hour() == hour &&
+				u.Minute() == minute { // ambiguous
 				bad = true
 			}
 		}
@@ -741,87 +818,19 @@ func (m Automations) save(
 	call *ops.Call,
 	input *AutomationInput,
 ) (Automation, error) {
-	for _, unitID := range input.UnitIDs { // own, not archived units whose capabilities support every action
-		target, found, err := m.Units.Target(ctx, call, unitID)
-		if err != nil {
-			return Automation{}, apperr.Wrap(err, "control.Units.Target")
-		}
-
-		if !found || target.OrgID != call.Principal.OrgID {
-			return Automation{}, apperr.E(apperr.NotFound, apperr.KeyNotFound)
-		}
-
-		var archived bool
-
-		scanErr := call.Tx.QueryRow(ctx, `SELECT archived FROM assets.units WHERE id = $1`, unitID).
-			Scan(&archived)
-		if scanErr != nil {
-			return Automation{}, apperr.Wrap(scanErr, "select assets.units")
-		}
-
-		if archived {
-			return Automation{}, apperr.E(apperr.Conflict, "errors.unit_archived")
-		}
-
-		for _, a := range input.actions {
-			if !a.Supports(target.Caps) {
-				return Automation{}, apperr.Fields(
-					map[string]string{"unitIds": apperr.KeyUnsupportedAction},
-				)
-			}
-		}
+	err := m.checkAutomationUnits(ctx, call, input)
+	if err != nil {
+		return Automation{}, err
 	}
 
-	if input.Kind == kindEvent &&
-		input.condition.Type == condLocation { // location conditions need the owner's consent (SR02)
-		granted, err := identity.ConsentGranted(
-			ctx,
-			call,
-			call.Principal.MembershipID,
-			"location_automation",
-		) // identity's record (IR194)
-		if err != nil {
-			return Automation{}, apperr.Wrap(err, "identity.ConsentGranted")
-		}
-
-		if !granted {
-			return Automation{}, apperr.Fields(
-				map[string]string{keyCondition: "errors.consent_required"},
-			)
-		}
+	err = checkLocationConsent(ctx, call, input)
+	if err != nil {
+		return Automation{}, err
 	}
 
-	def := definition{
-		Weekdays:    input.Weekdays,
-		StartLocal:  input.StartLocal,
-		EndLocal:    input.EndLocal,
-		EndsNextDay: input.EndsNextDay,
-		StartAction: input.StartAction,
-		EndAction:   input.EndAction,
-		Condition:   input.Condition,
-		Action:      input.Action, OnlyIf: nil,
-	}
-	if len(input.extras) > 0 {
-		marshaled, marshalErr := json.Marshal(input.extras)
-		if marshalErr != nil {
-			return Automation{}, apperr.Wrap(marshalErr, "json.Marshal")
-		}
-
-		def.OnlyIf = marshaled
-	}
-
-	if input.Kind == kindSchedule {
-		loc, _ := time.LoadLocation(input.Timezone)
-		if _, bad := occurrences(def, loc, call.Now.In(loc), 367); bad {
-			return Automation{}, apperr.Fields(
-				map[string]string{"startLocal": "errors.local_time_invalid"},
-			)
-		}
-	}
-
-	raw, marshalErr := json.Marshal(def)
-	if marshalErr != nil {
-		return Automation{}, apperr.Wrap(marshalErr, "json.Marshal")
+	raw, err := ruleDefinition(call, input)
+	if err != nil {
+		return Automation{}, err
 	}
 
 	var (
@@ -832,55 +841,14 @@ func (m Automations) save(
 	version := 1
 
 	if input.ID == nil {
-		err := call.Tx.QueryRow(ctx, `INSERT INTO control.automations (tenant_id, customer_org_id, kind, name,
-			owner_membership_id, created_by_user_id, timezone, enabled, priority,
-			definition, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8,
-			$9, $10, $10) RETURNING id`,
-			call.Principal.OrgID, input.Kind, input.Name, call.Principal.MembershipID, call.Principal.UserID, input.Timezone,
-			input.Enabled,
-			input.Priority, raw, call.Now).
-			Scan(&automationID)
+		automationID, err = insertAutomation(ctx, call, input, raw)
 		if err != nil {
-			return Automation{}, apperr.Wrap(err, "insert control.automations")
+			return Automation{}, err
 		}
 	} else {
-		cur, err := m.load(ctx, call, *input.ID, true)
+		cur, err := m.updateAutomation(ctx, call, input, raw)
 		if err != nil {
 			return cur, err
-		}
-
-		if cur.Version != *call.ExpectedVersion {
-			return cur, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
-		}
-
-		if cur.Kind != input.Kind {
-			return cur, apperr.Fields(map[string]string{"kind": apperr.KeyImmutable})
-		}
-		// IR27: explicit enabling rechecks (done above) and clears the stop reason; editing while disabled keeps it
-		_, execErr := call.Tx.Exec(
-			ctx,
-			`UPDATE control.automations SET name = $2, timezone = $3, enabled = $4, priority = $5, definition = $6,
-			disabled_reason = CASE WHEN $4 THEN NULL ELSE disabled_reason END, version = version + 1, updated_at = $7 WHERE id =
-			$1`,
-			cur.ID,
-			input.Name,
-			input.Timezone,
-			input.Enabled,
-			input.Priority,
-			raw,
-			call.Now,
-		)
-		if execErr != nil {
-			return cur, apperr.Wrap(execErr, "update control.automations")
-		}
-
-		_, execErr = call.Tx.Exec(
-			ctx,
-			`DELETE FROM control.automation_units WHERE automation_id = $1`,
-			cur.ID,
-		)
-		if execErr != nil {
-			return cur, apperr.Wrap(execErr, "delete control.automation_units")
 		}
 
 		automationID, prev, version = cur.ID, call.ExpectedVersion, cur.Version+1
@@ -910,6 +878,183 @@ func (m Automations) save(
 	)
 
 	return m.load(ctx, call, automationID, false)
+}
+
+// checkAutomationUnits checks a rule's units: the caller's own, not archived, and able to take every action of the
+// rule.
+func (m Automations) checkAutomationUnits(
+	ctx context.Context,
+	call *ops.Call,
+	input *AutomationInput,
+) error {
+	for _, unitID := range input.UnitIDs { // own, not archived units whose capabilities support every action
+		target, found, err := m.Units.Target(ctx, call, unitID)
+		if err != nil {
+			return apperr.Wrap(err, "control.Units.Target")
+		}
+
+		if !found || target.OrgID != call.Principal.OrgID {
+			return apperr.E(apperr.NotFound, apperr.KeyNotFound)
+		}
+
+		var archived bool
+
+		scanErr := call.Tx.QueryRow(ctx, `SELECT archived FROM assets.units WHERE id = $1`, unitID).
+			Scan(&archived)
+		if scanErr != nil {
+			return apperr.Wrap(scanErr, "select assets.units")
+		}
+
+		if archived {
+			return apperr.E(apperr.Conflict, "errors.unit_archived")
+		}
+
+		for _, a := range input.actions {
+			if !a.Supports(target.Caps) {
+				return apperr.Fields(
+					map[string]string{"unitIds": apperr.KeyUnsupportedAction},
+				)
+			}
+		}
+	}
+
+	return nil
+}
+
+// checkLocationConsent checks that the owner consented to location automation when an event rule has a location
+// condition (SR02; identity's record, IR194).
+func checkLocationConsent(ctx context.Context, call *ops.Call, input *AutomationInput) error {
+	if input.Kind == kindEvent &&
+		input.condition.Type == condLocation { // location conditions need the owner's consent (SR02)
+		granted, err := identity.ConsentGranted(
+			ctx,
+			call,
+			call.Principal.MembershipID,
+			"location_automation",
+		) // identity's record (IR194)
+		if err != nil {
+			return apperr.Wrap(err, "identity.ConsentGranted")
+		}
+
+		if !granted {
+			return apperr.Fields(
+				map[string]string{keyCondition: "errors.consent_required"},
+			)
+		}
+	}
+
+	return nil
+}
+
+// ruleDefinition is a rule's stored definition: its schedule or its condition and action, with its extra conditions.
+// A schedule must have a valid local time in its timezone (no nonexistent or ambiguous time).
+func ruleDefinition(call *ops.Call, input *AutomationInput) ([]byte, error) {
+	def := definition{
+		Weekdays:    input.Weekdays,
+		StartLocal:  input.StartLocal,
+		EndLocal:    input.EndLocal,
+		EndsNextDay: input.EndsNextDay,
+		StartAction: input.StartAction,
+		EndAction:   input.EndAction,
+		Condition:   input.Condition,
+		Action:      input.Action, OnlyIf: nil,
+	}
+	if len(input.extras) > 0 {
+		marshaled, marshalErr := json.Marshal(input.extras)
+		if marshalErr != nil {
+			return nil, apperr.Wrap(marshalErr, "json.Marshal")
+		}
+
+		def.OnlyIf = marshaled
+	}
+
+	if input.Kind == kindSchedule {
+		loc, err := time.LoadLocation(input.Timezone)
+		if err != nil {
+			return nil, apperr.Fields(map[string]string{"timezone": apperr.KeyInvalid})
+		}
+
+		if _, bad := occurrences(def, loc, call.Now.In(loc), checkDays); bad {
+			return nil, apperr.Fields(
+				map[string]string{"startLocal": "errors.local_time_invalid"},
+			)
+		}
+	}
+
+	raw, err := json.Marshal(def)
+
+	return raw, apperr.Wrap(err, "json.Marshal")
+}
+
+// insertAutomation stores a new rule owned by the caller.
+func insertAutomation(
+	ctx context.Context,
+	call *ops.Call,
+	input *AutomationInput,
+	raw []byte,
+) (uuid.UUID, error) {
+	var automationID uuid.UUID
+
+	err := call.Tx.QueryRow(ctx, `INSERT INTO control.automations (tenant_id, customer_org_id, kind, name,
+		owner_membership_id, created_by_user_id, timezone, enabled, priority,
+		definition, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8,
+		$9, $10, $10) RETURNING id`,
+		call.Principal.OrgID, input.Kind, input.Name, call.Principal.MembershipID, call.Principal.UserID, input.Timezone,
+		input.Enabled,
+		input.Priority, raw, call.Now).
+		Scan(&automationID)
+
+	return automationID, apperr.Wrap(err, "insert control.automations")
+}
+
+// updateAutomation stores a new version of a rule at the version shown, of the same kind, with its units cleared for
+// the new list. IR27: enabling it again (rechecked above) clears the stop reason; editing it while disabled keeps it.
+func (m Automations) updateAutomation(
+	ctx context.Context,
+	call *ops.Call,
+	input *AutomationInput,
+	raw []byte,
+) (Automation, error) {
+	cur, err := m.load(ctx, call, *input.ID, true)
+	if err != nil {
+		return cur, err
+	}
+
+	if cur.Version != *call.ExpectedVersion {
+		return cur, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
+	}
+
+	if cur.Kind != input.Kind {
+		return cur, apperr.Fields(map[string]string{"kind": apperr.KeyImmutable})
+	}
+
+	_, execErr := call.Tx.Exec(
+		ctx,
+		`UPDATE control.automations SET name = $2, timezone = $3, enabled = $4, priority = $5, definition = $6,
+		disabled_reason = CASE WHEN $4 THEN NULL ELSE disabled_reason END, version = version + 1, updated_at = $7 WHERE id =
+		$1`,
+		cur.ID,
+		input.Name,
+		input.Timezone,
+		input.Enabled,
+		input.Priority,
+		raw,
+		call.Now,
+	)
+	if execErr != nil {
+		return cur, apperr.Wrap(execErr, "update control.automations")
+	}
+
+	_, execErr = call.Tx.Exec(
+		ctx,
+		`DELETE FROM control.automation_units WHERE automation_id = $1`,
+		cur.ID,
+	)
+	if execErr != nil {
+		return cur, apperr.Wrap(execErr, "delete control.automation_units")
+	}
+
+	return cur, nil
 }
 
 // ScheduleDraft is the unsaved schedule of the editor (automations.nextRuns draft, IR214).
@@ -968,7 +1113,7 @@ func (in *NextRunsInput) Validate() map[string]string {
 		}
 	}
 
-	if in.Count != 8 {
+	if in.Count != previewCount {
 		fieldErrs["count"] = apperr.KeyInvalid
 	}
 
@@ -1025,7 +1170,7 @@ func (m Automations) nextRuns(
 		timezone = scheduleDraft.Timezone
 
 		loc, _ := time.LoadLocation(timezone)
-		if _, bad := occurrences(def, loc, call.Now.In(loc), 367); bad {
+		if _, bad := occurrences(def, loc, call.Now.In(loc), checkDays); bad {
 			return nil, apperr.Fields(
 				map[string]string{"draft.startLocal": "errors.local_time_invalid"},
 			)
@@ -1052,7 +1197,7 @@ func (m Automations) nextRuns(
 	}
 
 	loc, _ := time.LoadLocation(timezone)
-	occ, _ := occurrences(def, loc, call.Now.In(loc).AddDate(0, 0, -1), 30)
+	occ, _ := occurrences(def, loc, call.Now.In(loc).AddDate(0, 0, -1), previewDays)
 
 	out := []ScheduledOccurrence{}
 	for _, o := range occ {

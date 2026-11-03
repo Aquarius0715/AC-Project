@@ -11,6 +11,8 @@ import (
 const kualaLumpur = "Asia/Kuala_Lumpur"
 
 func TestCompare(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		op   string
 		a, b float64
@@ -33,6 +35,8 @@ func TestCompare(t *testing.T) {
 }
 
 func TestConditionMetric(t *testing.T) {
+	t.Parallel()
+
 	for cond, want := range map[string]string{
 		`{"type":"occupancy",` +
 			`"occupied":true}`: "occupied", `{"type":"weather","operator":"gt",` +
@@ -84,6 +88,8 @@ func testFacts(unit uuid.UUID, when time.Time) map[string]Fact {
 }
 
 func TestMatchConditions(t *testing.T) {
+	t.Parallel()
+
 	unit := uuid.New()
 	when := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
 	facts := testFacts(unit, when)
@@ -159,6 +165,8 @@ func TestMatchConditions(t *testing.T) {
 }
 
 func TestExtrasMatch(t *testing.T) {
+	t.Parallel()
+
 	unit := uuid.New()
 	sunday := time.Date(
 		2026,

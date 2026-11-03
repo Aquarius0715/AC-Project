@@ -244,56 +244,15 @@ func inScope(p *ops.Principal, unit, property, org uuid.UUID) bool {
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/commands [post]
-func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (Command, error) {
-	target, found, err := m.Units.Target(ctx, c, input.UnitID)
+func (m Commands) create(ctx context.Context, call *ops.Call, input *CreateInput) (Command, error) {
+	target, found, err := m.Units.Target(ctx, call, input.UnitID)
 	if err != nil {
 		return Command{}, apperr.Wrap(err, "control.Units.Target")
 	}
 
-	notFound := apperr.E(apperr.NotFound, apperr.KeyNotFound)
-
-	switch c.Principal.Role {
-	case authz.RoleClient:
-		if !found || target.OrgID != c.Principal.OrgID {
-			return Command{}, notFound
-		}
-
-		if input.Reason != nil {
-			return Command{}, apperr.Fields(map[string]string{keyReason: apperr.KeyNotAllowed})
-		}
-	case authz.RoleTechnician:
-		if input.Source == sourceVoice {
-			return Command{}, apperr.Fields(map[string]string{keySource: apperr.KeyNotAllowed})
-		}
-
-		if !found {
-			return Command{}, notFound
-		}
-
-		if input.JobID == nil {
-			return Command{}, apperr.Fields(map[string]string{"jobId": apperr.KeyRequired})
-		}
-
-		err := m.Access.TechnicianJob(ctx, c, *input.JobID, input.UnitID)
-		if err != nil {
-			return Command{}, apperr.Wrap(err, "control.TechAccess.TechnicianJob")
-		}
-
-		if input.Reason == nil {
-			return Command{}, apperr.Fields(map[string]string{keyReason: apperr.KeyRequired})
-		}
-	default:
-		if !found {
-			return Command{}, notFound
-		}
-
-		if input.Source == sourceVoice { // the assistant is offered only in the Client app (IR115)
-			return Command{}, apperr.Fields(map[string]string{keySource: apperr.KeyNotAllowed})
-		}
-
-		if input.Reason == nil {
-			return Command{}, apperr.Fields(map[string]string{keyReason: apperr.KeyRequired})
-		}
+	err = m.checkRequester(ctx, call, input, target, found)
+	if err != nil {
+		return Command{}, err
 	}
 
 	if target.Version != input.ExpectedUnitVersion {
@@ -304,7 +263,7 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 		return Command{}, apperr.Fields(map[string]string{keyAction: apperr.KeyUnsupportedAction})
 	}
 
-	policy, err := m.Restrictions.UnitPolicy(ctx, c, input.UnitID)
+	policy, err := m.Restrictions.UnitPolicy(ctx, call, input.UnitID)
 	if err != nil {
 		return Command{}, apperr.Wrap(err, "control.Restrictions.UnitPolicy")
 	}
@@ -316,13 +275,13 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 		return Command{}, e
 	}
 
-	dev, err := m.ready(ctx, c, input.UnitID)
+	dev, err := m.ready(ctx, call, input.UnitID)
 	if err != nil {
 		return Command{}, err
 	}
 
 	command, err := scanCommand(
-		c.Tx.QueryRow(
+		call.Tx.QueryRow(
 			ctx,
 			`INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, job_id, reason,
 				status, delivery,
@@ -331,13 +290,13 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 		$9, $7, $7) RETURNING `+commandCols,
 			input.UnitID,
 			dev,
-			c.Principal.MembershipID,
+			call.Principal.MembershipID,
 			[]byte(input.Action),
 			input.JobID,
 			input.Reason,
-			c.Now,
-			c.Now.Add(CommandTTL),
-			c.CorrelationID,
+			call.Now,
+			call.Now.Add(CommandTTL),
+			call.CorrelationID,
 			input.Source,
 		),
 	)
@@ -345,7 +304,7 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 		return command, err
 	}
 	// requested: the IoT gateway sends it to the device and reports it sent (demo trigger command_sent)
-	c.Emit(
+	call.Emit(
 		ops.Event{
 			AggregateType: kindCommand,
 			AggregateID:   command.ID,
@@ -353,12 +312,12 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 			Payload: map[string]any{
 				keyUnitID:  input.UnitID,
 				"deviceId": dev,
-				keyAction:  json.RawMessage(input.Action),
+				keyAction:  input.Action,
 			},
 		},
 	)
 	// the device answers later: the request is pending, and its result follows under this correlation ID (IR90, IR604)
-	c.Audit(
+	call.Audit(
 		ops.AuditEntry{
 			Action:      "commands.create",
 			TargetKind:  kindCommand,
@@ -370,6 +329,65 @@ func (m Commands) create(ctx context.Context, c *ops.Call, input *CreateInput) (
 	)
 
 	return command, nil
+}
+
+// checkRequester checks who asks for a command: a client, for a unit of its own organization and without a reason; a
+// technician, never by voice, on a job of theirs that covers the unit and with a reason; HQ, never by voice (the
+// assistant is offered only in the Client app, IR115) and with a reason. A unit out of reach is NOT_FOUND.
+func (m Commands) checkRequester(
+	ctx context.Context,
+	call *ops.Call,
+	input *CreateInput,
+	target Target,
+	found bool,
+) error {
+	notFound := apperr.E(apperr.NotFound, apperr.KeyNotFound)
+
+	switch call.Principal.Role {
+	case authz.RoleClient:
+		if !found || target.OrgID != call.Principal.OrgID {
+			return notFound
+		}
+
+		if input.Reason != nil {
+			return apperr.Fields(map[string]string{keyReason: apperr.KeyNotAllowed})
+		}
+	case authz.RoleTechnician:
+		if input.Source == sourceVoice {
+			return apperr.Fields(map[string]string{keySource: apperr.KeyNotAllowed})
+		}
+
+		if !found {
+			return notFound
+		}
+
+		if input.JobID == nil {
+			return apperr.Fields(map[string]string{"jobId": apperr.KeyRequired})
+		}
+
+		err := m.Access.TechnicianJob(ctx, call, *input.JobID, input.UnitID)
+		if err != nil {
+			return apperr.Wrap(err, "control.TechAccess.TechnicianJob")
+		}
+
+		if input.Reason == nil {
+			return apperr.Fields(map[string]string{keyReason: apperr.KeyRequired})
+		}
+	default:
+		if !found {
+			return notFound
+		}
+
+		if input.Source == sourceVoice { // the assistant is offered only in the Client app (IR115)
+			return apperr.Fields(map[string]string{keySource: apperr.KeyNotAllowed})
+		}
+
+		if input.Reason == nil {
+			return apperr.Fields(map[string]string{keyReason: apperr.KeyRequired})
+		}
+	}
+
+	return nil
 }
 
 // ready applies the D04 mutual exclusion and IR47 delivery checks and returns the bound device.
@@ -560,43 +578,9 @@ func (m Commands) list(
 		return paging.Page[Command]{}, apperr.Wrap(err, "paging.Resolve")
 	}
 
-	target, found, err := m.Units.Target(ctx, call, input.UnitID)
+	err = m.checkReader(ctx, call, input)
 	if err != nil {
-		return paging.Page[Command]{}, apperr.Wrap(err, "control.Units.Target")
-	}
-
-	notFound := apperr.E(apperr.NotFound, apperr.KeyNotFound)
-
-	switch call.Principal.Role {
-	case authz.RoleClient:
-		if !found || target.OrgID != call.Principal.OrgID {
-			return paging.Page[Command]{}, notFound
-		}
-	case authz.RoleTechnician:
-		if input.JobID == nil {
-			return paging.Page[Command]{}, apperr.Fields(
-				map[string]string{"jobId": apperr.KeyRequired},
-			)
-		}
-
-		var assigned bool
-
-		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND unit_id
-			=
-			$2 AND technician_membership_id = $3)`,
-			*input.JobID, input.UnitID, call.Principal.MembershipID).
-			Scan(&assigned)
-		if err != nil {
-			return paging.Page[Command]{}, apperr.Wrap(err, "select assets.unit_assignment_access")
-		}
-
-		if !assigned {
-			return paging.Page[Command]{}, notFound
-		}
-	default:
-		if !found {
-			return paging.Page[Command]{}, notFound
-		}
+		return paging.Page[Command]{}, err
 	}
 
 	args := []any{input.UnitID}
@@ -653,6 +637,51 @@ func (m Commands) list(
 		Total:           total,
 		SnapshotVersion: window.Snapshot,
 	}, apperr.Wrap(rows.Err(), "select control.commands")
+}
+
+// checkReader checks who reads a unit's commands: a client, for a unit of its own organization; a technician, on a job
+// of theirs assigned to the unit; HQ, for a unit of the tenant. A unit out of reach is NOT_FOUND.
+func (m Commands) checkReader(ctx context.Context, call *ops.Call, input *ListInput) error {
+	target, found, err := m.Units.Target(ctx, call, input.UnitID)
+	if err != nil {
+		return apperr.Wrap(err, "control.Units.Target")
+	}
+
+	notFound := apperr.E(apperr.NotFound, apperr.KeyNotFound)
+
+	switch call.Principal.Role {
+	case authz.RoleClient:
+		if !found || target.OrgID != call.Principal.OrgID {
+			return notFound
+		}
+	case authz.RoleTechnician:
+		if input.JobID == nil {
+			return apperr.Fields(
+				map[string]string{"jobId": apperr.KeyRequired},
+			)
+		}
+
+		var assigned bool
+
+		err := call.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND unit_id
+			=
+			$2 AND technician_membership_id = $3)`,
+			*input.JobID, input.UnitID, call.Principal.MembershipID).
+			Scan(&assigned)
+		if err != nil {
+			return apperr.Wrap(err, "select assets.unit_assignment_access")
+		}
+
+		if !assigned {
+			return notFound
+		}
+	default:
+		if !found {
+			return notFound
+		}
+	}
+
+	return nil
 }
 
 // AuditResult appends the final result of a command that a person asked for (commands.create: source ui or voice) under

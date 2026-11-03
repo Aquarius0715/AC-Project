@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
+	"slices"
 	"sort"
 	"time"
 
@@ -37,6 +39,42 @@ const maxScheduleWindow = 400 * 24 * time.Hour
 func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, error) {
 	now := call.Now.UTC().Truncate(time.Minute)
 
+	since, due, err := scheduleWindow(ctx, call, now)
+	if err != nil || !due {
+		return 0, err
+	}
+
+	order, err := dueTicks(ctx, call, since, now)
+	if err != nil {
+		return 0, err
+	}
+
+	last := lastTicks(order)
+	created := 0
+
+	for _, tick := range order {
+		fired, err := m.fireTick(ctx, call, tick, last)
+		created += fired
+
+		if err != nil {
+			return created, err
+		}
+	}
+
+	_, err = call.Tx.Exec(
+		ctx,
+		`UPDATE control.schedule_watermarks SET evaluated_until = $2 WHERE tenant_id = $1`,
+		call.Principal.TenantID,
+		now,
+	)
+
+	return created, apperr.Wrap(err, "update control.schedule_watermarks")
+}
+
+// scheduleWindow is where this tick starts, the tenant's watermark (locked for the tick), and whether any minute is
+// due. The first tick only sets the watermark, so occurrences before it are never replayed; a long catch-up reaches
+// back maxScheduleWindow at most.
+func scheduleWindow(ctx context.Context, call *ops.Call, now time.Time) (time.Time, bool, error) {
 	var since time.Time
 
 	err := call.Tx.QueryRow(ctx, `SELECT evaluated_until FROM control.schedule_watermarks WHERE tenant_id = $1 FOR
@@ -51,25 +89,34 @@ func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, er
 			now,
 		)
 
-		return 0, apperr.Wrap(err, "insert control.schedule_watermarks")
+		return since, false, apperr.Wrap(err, "insert control.schedule_watermarks")
 	}
 
-	if err != nil || !now.After(since) {
-		return 0, apperr.Wrap(err, "insert control.schedule_watermarks")
+	if err != nil {
+		return since, false, apperr.Wrap(err, "select control.schedule_watermarks")
+	}
+
+	if !now.After(since) {
+		return since, false, nil
 	}
 
 	if now.Sub(since) > maxScheduleWindow {
 		since = now.Add(-maxScheduleWindow)
 	}
 
-	type tick struct {
-		at    time.Time
-		phase string
-		units map[uuid.UUID]bool
-	}
+	return since, true, nil
+}
 
-	ticks := map[string]*tick{}
+// scheduleTick is one minute and phase that schedule occurrences fell on, with the units of their rules.
+type scheduleTick struct {
+	at    time.Time
+	phase string
+	units map[uuid.UUID]bool
+}
 
+// dueTicks are the ticks of the tenant's enabled schedule rules in (since, now], in time order, an end before a start
+// of the same minute. A rule in a timezone this server does not know has none.
+func dueTicks(ctx context.Context, call *ops.Call, since, now time.Time) ([]*scheduleTick, error) {
 	rows, err := call.Tx.Query(
 		ctx,
 		`SELECT a.definition, a.timezone, array_agg(u.unit_id ORDER BY u.unit_id) FROM control.automations a
@@ -77,23 +124,26 @@ func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, er
 		BY a.id`,
 	)
 	if err != nil {
-		return 0, apperr.Wrap(err, "select control.automations")
+		return nil, apperr.Wrap(err, "select control.automations")
 	}
+	defer rows.Close()
 
-	days := int(now.Sub(since).Hours()/24) + 3
+	days := int(
+		now.Sub(since).Hours()/hoursPerDay,
+	) + tickDays // the days since the last tick, and one either side
+	ticks := map[string]*scheduleTick{}
 
 	for rows.Next() {
 		var (
 			raw      []byte
 			timezone string
 			units    []uuid.UUID
+			def      definition
 		)
 
 		err := rows.Scan(&raw, &timezone, &units)
 		if err != nil {
-			rows.Close()
-
-			return 0, apperr.Wrap(err, "select control.automations")
+			return nil, apperr.Wrap(err, "select control.automations")
 		}
 
 		loc, err := time.LoadLocation(timezone)
@@ -101,46 +151,38 @@ func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, er
 			continue
 		}
 
-		var d definition
+		err = json.Unmarshal(raw, &def)
+		if err != nil {
+			return nil, apperr.Wrap(err, "json.Unmarshal")
+		}
 
-		_ = json.Unmarshal(raw, &d)
-
-		occ, _ := occurrences(d, loc, since.In(loc).AddDate(0, 0, -1), days)
-		for _, scheduledOccurrence := range occ {
-			if !scheduledOccurrence.At.After(since) || scheduledOccurrence.At.After(now) {
+		occ, _ := occurrences(def, loc, since.In(loc).AddDate(0, 0, -1), days)
+		for _, occurrence := range occ {
+			if !occurrence.At.After(since) || occurrence.At.After(now) {
 				continue
 			}
 
-			key := scheduleRef(scheduledOccurrence.Phase, scheduledOccurrence.At)
-
-			scheduleTick := ticks[key]
-			if scheduleTick == nil {
-				scheduleTick = &tick{
-					at:    scheduledOccurrence.At.UTC(),
-					phase: scheduledOccurrence.Phase,
+			key := scheduleRef(occurrence.Phase, occurrence.At)
+			if ticks[key] == nil {
+				ticks[key] = &scheduleTick{
+					at:    occurrence.At.UTC(),
+					phase: occurrence.Phase,
 					units: map[uuid.UUID]bool{},
 				}
-				ticks[key] = scheduleTick
 			}
 
 			for _, u := range units {
-				scheduleTick.units[u] = true
+				ticks[key].units[u] = true
 			}
 		}
 	}
 
-	rows.Close()
-
 	rowsErr := rows.Err()
 	if rowsErr != nil {
-		return 0, apperr.Wrap(rowsErr, "select control.automations")
+		return nil, apperr.Wrap(rowsErr, "select control.automations")
 	}
 
-	order := make([]*tick, 0, len(ticks))
-	for _, t := range ticks {
-		order = append(order, t)
-	}
-
+	order := slices.Collect(maps.Values(ticks))
 	sort.Slice(order, func(left, right int) bool {
 		if !order[left].at.Equal(order[right].at) {
 			return order[left].at.Before(order[right].at)
@@ -150,80 +192,90 @@ func (m Automations) FireSchedules(ctx context.Context, call *ops.Call) (int, er
 			order[right].phase != phaseScheduleEnd // end, then the next start
 	})
 
-	last := map[uuid.UUID]time.Time{} // the last minute the tick passed for each unit (IR473)
+	return order, nil
+}
 
-	for _, t := range order {
-		for u := range t.units {
-			if t.at.After(last[u]) {
-				last[u] = t.at
+// lastTicks is the last minute the tick passed for each unit (IR473).
+func lastTicks(order []*scheduleTick) map[uuid.UUID]time.Time {
+	last := map[uuid.UUID]time.Time{}
+
+	for _, tick := range order {
+		for u := range tick.units {
+			if tick.at.After(last[u]) {
+				last[u] = tick.at
 			}
 		}
+	}
+
+	return last
+}
+
+// fireTick evaluates one tick for its units whose last minute it is (an earlier minute is passed over: the later one
+// sets the unit's state), skipping archived or removed units, and audits each Command it created. It returns how many
+// it created.
+func (m Automations) fireTick(
+	ctx context.Context,
+	call *ops.Call,
+	tick *scheduleTick,
+	last map[uuid.UUID]time.Time,
+) (int, error) {
+	input := &EvaluationInput{
+		EventID:    uuid.NewSHA1(call.Principal.TenantID, []byte(scheduleRef(tick.phase, tick.at))),
+		OccurredAt: tick.at,
+		Phase:      tick.phase,
+		UnitIDs:    nil,
+		Facts:      nil,
+	}
+
+	for unitID := range tick.units {
+		if !tick.at.Equal(last[unitID]) {
+			continue
+		}
+
+		_, found, err := m.Units.Target(ctx, call, unitID)
+		if err != nil {
+			return 0, apperr.Wrap(err, "control.Units.Target")
+		}
+
+		if found {
+			input.UnitIDs = append(input.UnitIDs, unitID)
+		}
+	}
+
+	if len(input.UnitIDs) == 0 {
+		return 0, nil
+	}
+
+	result, err := m.evaluate(ctx, call, input, true, false)
+	if err != nil {
+		return 0, err
 	}
 
 	created := 0
 
-	for _, scheduleTick := range order {
-		input := &EvaluationInput{
-			EventID: uuid.NewSHA1(
-				call.Principal.TenantID,
-				[]byte(scheduleRef(scheduleTick.phase, scheduleTick.at)),
-			),
-			OccurredAt: scheduleTick.at,
-			Phase:      scheduleTick.phase,
-			UnitIDs:    nil,
-			Facts:      nil,
-		}
-		for unitID := range scheduleTick.units {
-			if !scheduleTick.at.Equal(last[unitID]) {
-				continue // passed over: a later minute sets the unit's state
-			}
-
-			_, found, err := m.Units.Target(ctx, call, unitID)
-			if err != nil {
-				return created, apperr.Wrap(err, "control.Units.Target")
-			} else if found { // an archived or removed unit is skipped, not an error of the tick
-				input.UnitIDs = append(input.UnitIDs, unitID)
-			}
-		}
-
-		if len(input.UnitIDs) == 0 {
+	for _, decision := range result.Results {
+		if decision.Decision != decisionRequested || decision.RuleID == nil ||
+			decision.CommandID == nil ||
+			!decision.fresh {
 			continue
 		}
 
-		r, err := m.evaluate(ctx, call, input, true, false)
-		if err != nil {
-			return created, err
-		}
+		created++
 
-		for _, decision := range r.Results {
-			if decision.Decision == decisionRequested && decision.RuleID != nil &&
-				decision.CommandID != nil &&
-				decision.fresh {
-				created++
-
-				call.Audit(
-					ops.AuditEntry{
-						Action:          "automations.schedule",
-						TargetKind:      kindAutomation,
-						TargetID:        decision.RuleID.String(),
-						Reason:          scheduleTick.phase,
-						PreviousVersion: nil,
-						NextVersion:     nil,
-						Result:          "",
-						Before:          nil,
-						After:           nil,
-					},
-				)
-			}
-		}
+		call.Audit(
+			ops.AuditEntry{
+				Action:          "automations.schedule",
+				TargetKind:      kindAutomation,
+				TargetID:        decision.RuleID.String(),
+				Reason:          tick.phase,
+				PreviousVersion: nil,
+				NextVersion:     nil,
+				Result:          "",
+				Before:          nil,
+				After:           nil,
+			},
+		)
 	}
 
-	_, err = call.Tx.Exec(
-		ctx,
-		`UPDATE control.schedule_watermarks SET evaluated_until = $2 WHERE tenant_id = $1`,
-		call.Principal.TenantID,
-		now,
-	)
-
-	return created, apperr.Wrap(err, "update control.schedule_watermarks")
+	return created, nil
 }
