@@ -172,7 +172,7 @@ Scope: FR-A03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 | employment | enum/required for technicians | internal/external | Employment type |
 | permissions | enum array/required | Choose from the role's allowed permissions | Capabilities |
 | scopes | ScopeRef array/required | Role-specific types under SR03. Empty means zero business targets | Target scope |
-| validFrom / validUntil | validFrom: datetime/required; validUntil: datetime/null | validUntil required only for external technicians (IR74) | Valid period |
+| validFrom / validUntil | validFrom: datetime/required; validUntil: datetime/null | A new membership starts now on the business clock, in the display time zone (IR622); validUntil required only for external technicians (IR74) | Valid period |
 | reason | string/required | 1–1000 characters | Change reason |
 
 **Steps**
@@ -184,7 +184,7 @@ Scope: FR-A03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 5. Language and time (IR302): texts, roles and matrix resources follow the display language; permission codes stay codes. The valid period is typed and shown in the display time zone, and the form names it. A revoke ends the access at now and turns the sign-in off: the list marks the membership Revoked, the editor says that only HQ gives the access back, and saving a later “Valid until” does — the sign-in comes back unless the company or customer disabled the account (DEC-83, IR508).
 6. Sign out everywhere (IR384, Figma Admin 03-8): “Sign out everywhere…” in the editor's footer opens a centered modal with a required reason (1–1000 characters, kept in the audit log). `members.revokeSessions` ends every session of the membership's user in this tenant at once, in all four apps: the user's next page asks to sign in, and the identity provider asks for the password again (IR385). The access stays, so the user signs in again with their password and two-step code. Use it for a lost device or a suspected takeover; Revoke access ends the membership instead.
 
-**Boundary cases and failures**: Reject other-tenant scopes, external access without an end date, validFrom at or after validUntil, and adding override to oneself. Reject saves from old screens after permissions expire.
+**Boundary cases and failures**: Reject other-tenant scopes, external access without an end date, validFrom at or after validUntil, and adding override to oneself. Reject saves from old screens after permissions expire. A refused save takes the focus to the first field to fix, top to bottom, since Save sits at the end of a long form. After a revoke the focus goes to the membership's row in the list, which then reads Revoked (IR622).
 
 **Permission matrix (IR107, Figma Admin 03-1…03-7)**: Rows per resource with READ / WRITE / ACTIONS columns (see FR-A03 BR-A03); a header shows “Permissions · n of 38”. Turning Write on locks Read on. The role select only pre-checks defaults. The organization filter (URL key `organizationId`, `members.list` filter) and “+ Add scope” use search-selects (first 20, type to search). A `membershipId` the list does not hold says so instead of opening another membership (IR321). Client memberships are excluded from `members.list` results on this screen (role filter Admin/Contractor/Technician) and from the role options. Revoke access opens a centered modal (valid until = now, reason). Granting `identity.write` or `restriction.override` to one’s own membership is rejected (FORBIDDEN) with Save disabled.
 

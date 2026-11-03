@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import {
-  allowedFor, allPermissions, isActive, memberDraft, memberErrors, memberInput, memberRows, orgKind, resourceWord, roleDefaults, roleWord, validity, zonedLocal,
+  allowedFor, allPermissions, isActive, MEMBER_FIELDS, memberDraft, memberErrors, memberFieldId, memberInput, memberRows, orgKind, resourceWord, roleDefaults, roleWord, validity, zonedLocal,
   type ApiMember, type MemberDraft,
 } from "@ac/web/lib/members";
 
@@ -38,13 +38,16 @@ describe("HQ access & roles (FR-A03, BR-A03, IR107)", () => {
     expect(memberInput(draft({ role: "admin", validUntil: "" })).employment).toBeNull();
     expect(zonedLocal("2026-09-15T01:00:00Z", "Asia/Tokyo")).toBe("2026-09-15T10:00"); // a saved instant in the form's zone
     expect(memberDraft().role).toBe("contractor");
+    // a new membership starts now on the business clock, in the form's zone (IR622); an existing one keeps its own
+    expect([memberDraft(undefined, "", "Asia/Kuala_Lumpur", "2026-09-23T09:38:00Z").validFrom, memberDraft(undefined).validFrom, memberDraft(member({}), "", "Asia/Kuala_Lumpur", "2026-09-23T09:38:00Z").validFrom])
+      .toEqual(["2026-09-23T17:38", "", "2026-09-01T08:00"]);
   });
 
   it("checks a membership before members.save (no self-grant of identity.write or restriction.override)", () => {
     expect(memberErrors(draft({}), { selfUserId: "me" })).toEqual({});
     expect(memberErrors(draft({ userId: "", organizationId: "", scopes: [], validFrom: "", validUntil: "", reason: " ", permissions: ["alert.read", "billing.read"] }), { selfUserId: "me" })).toEqual({
       userId: "Choose a user", organizationId: "Choose the organization", permissions: "Not allowed for this role: billing.read", scopes: "Add at least one unit, property or customer organization",
-      validFrom: "Required", validUntil: "External technicians need an end date (IR74)", reason: "A change reason is required (1–1000 characters)",
+      validFrom: "Required", validUntil: "External technicians need an end date", reason: "A change reason is required (1–1000 characters)",
     });
     expect(memberErrors(draft({ role: "admin", permissions: ["asset.write"], validUntil: "2026-08-01T00:00" }), { selfUserId: "me" })).toEqual({ permissions: "asset.write needs asset.read", validUntil: "Must be after valid from" });
     expect(memberErrors(draft({ userId: "me", role: "admin", permissions: ["identity.read", "identity.write", "restriction.override"] }), { selfUserId: "me", current: member({ permissions: ["identity.read"] }) }).permissions)
@@ -71,5 +74,15 @@ describe("HQ access & roles in Malay with the display time zone (IR302)", () => 
     expect(validity(member({ validUntil: null }), MS)).toBe("1 Sep 2026, 9:00 PG GMT+9 → terbuka");
     expect(memberRows([member({ organizationId: "x" })], [], NOW, MS)[0].label).toBe("Juruteknik · luaran · organisasi");
     expect(memberErrors(draft({ userId: "", reason: "" }), { selfUserId: "me" }, t)).toEqual({ userId: "Pilih pengguna", reason: "Sebab perubahan diperlukan (1–1000 aksara)" });
+  });
+});
+
+// IR622: a refused save focuses the first field to fix, so every field memberErrors names has a place in the order
+describe("the form's field order", () => {
+  it("holds every field a check can name, each with its element id", () => {
+    const all = { ...memberErrors(draft({ userId: "", organizationId: "", scopes: [], validFrom: "", validUntil: "", reason: " ", permissions: ["alert.read", "billing.read"] }), { selfUserId: "me" }),
+      ...memberErrors(draft({ userId: "", newUser: true, newEmail: "nope", newName: " " }), { selfUserId: "me" }) };
+    expect(Object.keys(all).filter((k) => !(MEMBER_FIELDS as readonly string[]).includes(k))).toEqual([]);
+    expect([memberFieldId("newUser.email"), memberFieldId("validFrom")]).toEqual(["member-newUser-email", "member-validFrom"]);
   });
 });

@@ -53,20 +53,22 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     expect(keys.filter((k, n) => keys.indexOf(k) !== n)).toEqual([]);
   });
 
+  // it searches the whole code once per key: seconds of work, beyond the default 5 s while the other files run beside it
   it("has no Malay entry the code no longer shows", () => {
     const dynamic = new Set(Object.values(ROLES).flatMap((cfg) => [cfg.sub, cfg.chip.split(" — ")[0], ...cfg.nav.map((i) => i.label)]));
     expect(Object.keys(ms).filter((key) => !dynamic.has(key) && !code.includes(JSON.stringify(key)))).toEqual([]);
-  });
+  }, 30_000);
 
-  it("speaks to customers, contractors, technicians and HQ's customers & units and restrictions without error codes or spec IDs (IR584, IR585, IR587, IR590, IR591, IR595)", () => {
+  it("speaks to customers, contractors, technicians and HQ's customers & units, restrictions and access without error codes or spec IDs (IR584, IR585, IR587, IR590, IR591, IR595, IR622)", () => {
     const lib = (name: RegExp) => readdirSync(join(root, "shared/lib")).filter((f) => name.test(f)).map((f) => join(root, "shared/lib", f));
-    const files = [...sources(join(root, "customer/app")), ...lib(/^client\w*\.ts$/), ...sources(join(root, "partner/app")), ...lib(/^partner\w*\.ts$/), ...sources(join(root, "technician/app")), ...lib(/^tech\w*\.ts$/), ...sources(join(root, "admin/app/admin/units")), ...lib(/^assets\.ts$/), ...sources(join(root, "admin/app/admin/restrictions")), ...lib(/^restrictions\.ts$/)];
+    const files = [...sources(join(root, "customer/app")), ...lib(/^client\w*\.ts$/), ...sources(join(root, "partner/app")), ...lib(/^partner\w*\.ts$/), ...sources(join(root, "technician/app")), ...lib(/^tech\w*\.ts$/), ...sources(join(root, "admin/app/admin/units")), ...lib(/^assets\.ts$/), ...sources(join(root, "admin/app/admin/restrictions")), ...lib(/^restrictions\.ts$/), ...sources(join(root, "admin/app/admin/settings")), ...lib(/^members\.ts$/)];
     const strings = files.flatMap((f) => [...readFileSync(f, "utf8").matchAll(/"((?:[^"\\\n]|\\.)*)"/g)].flatMap((m) => {
       try { return [JSON.parse(`"${m[1]}"`) as string]; } catch { return []; }
     }));
     const texts = [...new Set(strings.filter((text) => text in ms))]; // every literal the dictionary translates, maps of texts included
     expect(texts.length).toBeGreaterThan(100);
-    const coded = /\b(?:IR\d+|(?:FR|DD|BR|NFR|DEC|AT|SCR|DDC|REV)-[A-Z]*\d+|SR\d+|D\d{2,})\b|^(?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\b|\((?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\)/;
+    // screen IDs as well ("Access & roles (A03)")
+    const coded = /\b(?:IR\d+|(?:FR|DD|BR|NFR|DEC|AT|SCR|DDC|REV)-[A-Z]*\d+|SR\d+|D\d{2,})\b|^(?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\b|\((?:CONFLICT|NOT_FOUND|FORBIDDEN|UNAVAILABLE|VALIDATION|TIMEOUT|OFFLINE)\)|\([ACPTX]\d{2}[a-z]?\)/;
     expect(texts.filter((text) => coded.test(text))).toEqual([]);
   });
 

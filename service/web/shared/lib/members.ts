@@ -94,9 +94,10 @@ const zonedFrom = (local: string, zone: string) => zonedInstant(local.slice(0, 1
 /** The user ID members.save receives with newUser: none yet. */
 const NO_USER = "00000000-0000-0000-0000-000000000000";
 
-/** The form of a membership; the valid period is typed in the display time zone (NFR-08). */
-export function memberDraft(m?: ApiMember, tenantId = "", zone = "Asia/Kuala_Lumpur"): MemberDraft {
-  if (!m || m.role === "client") return { userId: "", organizationId: "", role: "contractor", employment: "internal", permissions: roleDefaults.contractor, scopes: [], validFrom: "", validUntil: "", reason: "", newUser: false, newEmail: "", newName: "" };
+/** The form of a membership; the valid period is typed in the display time zone (NFR-08). A new one starts `now` (the
+ * business clock), as most do, so the period needs only its end (IR622). */
+export function memberDraft(m?: ApiMember, tenantId = "", zone = "Asia/Kuala_Lumpur", now?: string): MemberDraft {
+  if (!m || m.role === "client") return { userId: "", organizationId: "", role: "contractor", employment: "internal", permissions: roleDefaults.contractor, scopes: [], validFrom: now ? zonedLocal(now, zone) : "", validUntil: "", reason: "", newUser: false, newEmail: "", newName: "" };
   return {
     newUser: false, newEmail: "", newName: "",
     userId: m.userId, organizationId: m.organizationId, role: m.role, employment: m.employment ?? "internal", permissions: m.permissions, scopes: m.role === "admin" && m.scopes.length === 0 && tenantId ? [{ kind: "tenant", id: tenantId }] : m.scopes,
@@ -106,6 +107,11 @@ export function memberDraft(m?: ApiMember, tenantId = "", zone = "Asia/Kuala_Lum
 
 /** The organization kind each role (and employment) belongs to. */
 export const orgKind = (role: Role, employment: MemberDraft["employment"]): ApiOrganization["kind"] => (role === "contractor" || (role === "technician" && employment === "external") ? "contractor" : "operator");
+
+/** The fields of the form with a check, top to bottom: a refused save focuses the first one with an error (IR622). */
+export const MEMBER_FIELDS = ["newUser.displayName", "newUser.email", "userId", "organizationId", "scopes", "validFrom", "validUntil", "permissions", "reason"] as const;
+/** The element id of a checked field of the form. */
+export const memberFieldId = (k: string) => `member-${k.replace(".", "-")}`;
 
 export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?: ApiMember }, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
@@ -124,7 +130,7 @@ export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?
   if (d.role === "technician" && d.scopes.length === 0) e.scopes = t("Add at least one unit, property or customer organization");
   if (!d.validFrom) e.validFrom = t("Required");
   if (d.validUntil && d.validFrom && d.validUntil <= d.validFrom) e.validUntil = t("Must be after valid from");
-  if (d.role === "technician" && d.employment === "external" && !d.validUntil) e.validUntil = t("External technicians need an end date (IR74)");
+  if (d.role === "technician" && d.employment === "external" && !d.validUntil) e.validUntil = t("External technicians need an end date");
   if ([...d.reason.trim()].length < 1 || d.reason.length > 1000) e.reason = t("A change reason is required (1–1000 characters)");
   return e;
 }

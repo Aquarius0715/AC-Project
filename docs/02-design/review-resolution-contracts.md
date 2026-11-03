@@ -8697,3 +8697,31 @@ Found in the UX loop (UX-39, the technician's QR scan and check-in on a phone). 
      - Opened the job and was refused for 250 m, for an empty manual reason, and for Bedroom AC's label, each under its field with the focus there.
      - Checked in, and the focus was on the title.
    - axe passed on the scan and check-in dialogs. At 1920 the workspace was unchanged. The job was removed afterwards.
+
+## IR622 A pressed button keeps the focus while its action runs, and Access & roles takes it to the field to fix — 2026-11-03
+
+Found in the UX loop (UX-40, HQ's Access & roles). An identity administrator added a new external technician of Contractor A for Living room AC for one month, then revoked the membership.
+
+1. **A pressed button kept no focus.** Every button that runs an action is disabled while the action is pending, to prevent a second submit. A natively disabled button cannot hold the focus, so the browser moved the focus to the page. After Create membership, Save changes or Submit, a keyboard or screen-reader user started again from the top. The shared shadcn/Base UI Button now stays focusable when it turns disabled while it has the focus. It is marked aria-disabled and Base UI ignores its clicks and keys, so nothing is sent twice. Once the focus moves on, it is natively disabled again, and a button disabled without the focus never enters the Tab order. This applies to all four apps.
+2. **Refused saves.** Create membership sits at the end of a long form (identity, scope, period, 38 permissions, reason). A refused save left the focus on it while the errors sat far up the page, so nothing seemed to happen. The save now takes the focus to the first field to fix, top to bottom (`MEMBER_FIELDS`), as IR586 and IR620 ask.
+3. **Valid from.** A new membership's Valid from was empty and "Required". It now starts now on the business clock, in the display time zone, as most memberships do.
+4. **After a revoke.** Revoking takes away "Revoke access…", and the focus fell to the page. It now goes to the membership's row in the list, which reads Revoked. `ListRow` takes an `id`.
+5. **Wording.** Three texts named specification IDs:
+   - "External technicians need an end date (IR74)" no longer names IR74.
+   - The contractors note no longer says "Access & roles (A03)".
+   - "Model {model} is not in the model register (A04)" now says to add the model under Devices & models first.
+
+   The guard over customer, partner, technician and HQ texts now also covers Access & roles and `members.ts`, and it flags screen IDs such as "(A03)". It found the A04 text. 16 more HQ texts outside these screens still name codes or IDs; they are left for the next HQ round.
+6. **A slow guard.** The check that every Malay entry is still used searches the whole code once per key. With the other test files running beside it, it took longer than the default 5 s, so it now has 30 s.
+7. **Design.** DD-A03 and the UIUX accessibility rules say the same. Figma is unchanged: nothing looks different.
+8. **Tests.**
+   - `buttonFocus.test.tsx`: a focused button disabled by its own click keeps the focus, is aria-disabled and ignores presses, and is natively disabled again once the focus moves on. It fails on the old Button.
+   - `members.test.ts`: the default Valid from and the field order.
+   - `i18n.test.ts`: the extended guard.
+   - On the development stack, hq-operator did the following at 1920 and 1280:
+     - An empty Create membership focused Name, in view.
+     - Valid from showed the demo now.
+     - After the create, the focus stayed on the button, now Save changes.
+     - The revoke dialog focused its reason. After the revoke, the focus was on the membership's row, Revoked.
+   - axe passed on the page and the dialog.
+   - access, alert-policies, billing, contracts, customers, restrictions and keyboard e2e passed. One alert-policies case opened the live lab unit's open-window alert, the first in the dev list, and stopped there. Its afterEach removed the policy it had made. CI has no live unit.

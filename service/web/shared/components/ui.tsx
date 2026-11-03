@@ -532,10 +532,10 @@ export function DataTable<T extends RowData>({ cols, rows, rowKey, onRowClick, s
 }
 
 /** Selectable list row used by master/detail panes. */
-export function ListRow({ selected, onClick, href, children, className }: { selected?: boolean; onClick?: () => void; href?: string; children: React.ReactNode; className?: string }) {
+export function ListRow({ id, selected, onClick, href, children, className }: { id?: string; selected?: boolean; onClick?: () => void; href?: string; children: React.ReactNode; className?: string }) {
   const cls = cx("flex w-full min-w-0 items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors", selected ? "border-primary bg-primary-soft/60" : "border-line bg-surface hover:bg-surface2/70", className);
-  if (href) return <Link href={href} className={cls}>{children}</Link>;
-  return <button type="button" onClick={onClick} aria-pressed={selected} className={cls}>{children}</button>;
+  if (href) return <Link id={id} href={href} className={cls}>{children}</Link>;
+  return <button id={id} type="button" onClick={onClick} aria-pressed={selected} className={cls}>{children}</button>;
 }
 
 /* ───────────── Charts: shadcn/ui's chart on Recharts (DEC-75); full width, `height` pixels tall ───────────── */

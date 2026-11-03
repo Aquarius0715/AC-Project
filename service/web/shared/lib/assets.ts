@@ -484,7 +484,7 @@ export function importMessage(r: ApiImportRow, t: T = en): string {
     case null: return t("Ready");
     case "warning.importCreatesProperty": return t("Property “{name}” does not exist — it will be created (office; add its address afterwards).", { name: r.propertyName });
     case "warning.importCreatesSpace": return t("“{place}” does not exist — it will be created.", { place });
-    case "error.unknownModel": return t("Model {model} is not in the model register (A04).", { model: r.modelCode });
+    case "error.unknownModel": return t("Model {model} is not in the model register — add it under Devices & models first.", { model: r.modelCode });
     case "error.serialBound": return t("Serial {serial} is already bound to another unit.", { serial: r.serial ?? "" });
     case "error.unknownSerial": return t("Serial {serial} is not a registered device.", { serial: r.serial ?? "" });
     case "error.duplicateSerial": return t("Serial {serial} appears more than once in this file.", { serial: r.serial ?? "" });

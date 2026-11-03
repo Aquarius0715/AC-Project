@@ -45,7 +45,7 @@ export function ContractorsView({ live }: { live: ContractorsLive }) {
               </ListRow>
             ))}</div>
           )}
-          <p className="mt-2 text-[11px] text-muted-foreground">{t("Contractor companies are partners, not users — HQ adds their staff in Access & roles (A03), and their contractors in the partner app's Users.")}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("Contractor companies are partners, not users — HQ adds their staff in Access & roles, and their contractors in the partner app's Users.")}</p>
         </Card>
         {d ? <ContractorDetail key={`${d.org.id}:${d.profile?.version ?? 0}`} d={d} open={setModal} /> : <Card title={t("Contractor")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That contractor no longer exists." : "Pick a contractor.")}</p></Card>}
       </div>
