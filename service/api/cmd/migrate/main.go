@@ -230,8 +230,8 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 
 		log.Printf(
 			"migrate: live sensor site of %s ready (%s)",
-			seed.LiveSite.CustomerName,
-			seed.LiveSite.UnitName,
+			seed.LiveSite().CustomerName,
+			seed.LiveSite().UnitName,
 		)
 	}
 

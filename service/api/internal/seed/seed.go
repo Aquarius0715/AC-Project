@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,14 +21,23 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
-// errUnknownParents stops the seed when spaces name parents the fixture does not have.
-var errUnknownParents = errors.New("spaces with unknown parents")
+var (
+	// errUnknownParents stops the seed when spaces name parents the fixture does not have.
+	errUnknownParents = errors.New("spaces with unknown parents")
+	// errPerUnitEntry stops the seed at a restriction's per-unit state that is not an object.
+	errPerUnitEntry = errors.New("a perUnit entry is not an object")
+	// errNoTarget stops the seed at a notification whose target has no ID.
+	errNoTarget = errors.New("the target has no id")
+)
 
-// Namespace is the UUIDv5 namespace for fixture IDs.
-var Namespace = uuid.MustParse("6f1c3a52-6d0b-5c1e-9a57-0d1b7a4c2e10")
+// namespace is the UUIDv5 namespace of the fixture IDs.
+const namespace = "6f1c3a52-6d0b-5c1e-9a57-0d1b7a4c2e10"
+
+// Namespace is the UUIDv5 namespace of the fixture IDs.
+func Namespace() uuid.UUID { return uuid.MustParse(namespace) }
 
 // ID returns the database UUID of a fixture ID.
-func ID(fixtureID string) uuid.UUID { return uuid.NewSHA1(Namespace, []byte(fixtureID)) }
+func ID(fixtureID string) uuid.UUID { return uuid.NewSHA1(Namespace(), []byte(fixtureID)) }
 
 // Fixture is the subset of fixture-contract.json the loader uses.
 type Fixture struct {
@@ -59,29 +69,33 @@ type Fixture struct {
 	} `json:"actors"`
 	DemoSeed struct {
 		Factors []struct {
-			ID           string    `json:"id"`
-			TenantID     string    `json:"tenantId"`
-			Version      int       `json:"version"`
-			CreatedAt    time.Time `json:"createdAt"`
-			Region       string    `json:"region"`
-			Year         int       `json:"year"`
-			KgCO2ePerKWh float64   `json:"kgCO2ePerKWh"`
-			Source       string    `json:"source"`
+			ID        string    `json:"id"`
+			TenantID  string    `json:"tenantId"`
+			Version   int       `json:"version"`
+			CreatedAt time.Time `json:"createdAt"`
+			Region    string    `json:"region"`
+			Year      int       `json:"year"`
+			//nolint:tagliatelle // the fixture's key, as the contract's EmissionFactor names it (CO2)
+			KgCO2ePerKWh float64 `json:"kgCO2ePerKWh"`
+			Source       string  `json:"source"`
 		} `json:"factors"`
 		Baselines []struct {
-			ID          string                       `json:"id"`
-			TenantID    string                       `json:"tenantId"`
-			Version     int                          `json:"version"`
-			CreatedAt   time.Time                    `json:"createdAt"`
-			UnitIDs     []string                     `json:"unitIds"`
-			Period      struct{ From, To time.Time } `json:"period"`
-			Method      string                       `json:"method"`
-			BaselineKWh *float64                     `json:"baselineKWh"`
-			Quality     json.RawMessage              `json:"quality"     swaggertype:"object"`
-			BoundaryID  string                       `json:"boundaryId"`
-			Boundary    string                       `json:"boundary"`
-			Assumptions string                       `json:"assumptions"`
-			Source      string                       `json:"source"`
+			ID        string    `json:"id"`
+			TenantID  string    `json:"tenantId"`
+			Version   int       `json:"version"`
+			CreatedAt time.Time `json:"createdAt"`
+			UnitIDs   []string  `json:"unitIds"`
+			Period    struct {
+				From time.Time `json:"from"`
+				To   time.Time `json:"to"`
+			} `json:"period"`
+			Method      string          `json:"method"`
+			BaselineKWh *float64        `json:"baselineKWh"`
+			Quality     json.RawMessage `json:"quality"     swaggertype:"object"`
+			BoundaryID  string          `json:"boundaryId"`
+			Boundary    string          `json:"boundary"`
+			Assumptions string          `json:"assumptions"`
+			Source      string          `json:"source"`
 		} `json:"baselines"`
 		Contracts     []map[string]any `json:"contracts"`
 		Invoices      []map[string]any `json:"invoices"`
@@ -107,7 +121,11 @@ type Fixture struct {
 		} `json:"consents"`
 		Tenants       []string `json:"tenants"`
 		Organizations []struct {
-			ID, TenantID, Kind, Name, Status string
+			ID       string `json:"id"`
+			TenantID string `json:"tenantId"`
+			Kind     string `json:"kind"`
+			Name     string `json:"name"`
+			Status   string `json:"status"`
 		} `json:"organizations"`
 		Capabilities []struct {
 			ID                 string          `json:"id"`
@@ -218,14 +236,14 @@ type Fixture struct {
 
 // Load reads a fixture file.
 func Load(path string) (*Fixture, error) {
-	b, err := os.ReadFile(path)
+	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return nil, apperr.Wrap(err, "os.ReadFile")
 	}
 
 	var fixture Fixture
 
-	unmarshalErr := json.Unmarshal(b, &fixture)
+	unmarshalErr := json.Unmarshal(data, &fixture)
 	if unmarshalErr != nil {
 		return nil, fmt.Errorf("fixture: %w", unmarshalErr)
 	}
@@ -244,8 +262,8 @@ func tenantOfOrg(f *Fixture) map[string]string {
 
 // Apply inserts the fixture inside tx. It must run as the schema owner (seeding bypasses row-level security)
 // and is idempotent: rows that already exist are left unchanged.
-func Apply(ctx context.Context, txn pgx.Tx, f *Fixture) error {
-	ex := func(sql string, args ...any) error {
+func Apply(ctx context.Context, txn pgx.Tx, fixture *Fixture) error {
+	exec := func(sql string, args ...any) error {
 		_, err := txn.Exec(ctx, sql, args...)
 
 		return apperr.Wrap(err, "exec (Apply)")
@@ -253,10 +271,10 @@ func Apply(ctx context.Context, txn pgx.Tx, f *Fixture) error {
 	// IR91 item 2: a row without createdAt / updatedAt gets fixture.seedCreatedAt. The columns default to
 	// platform.app_now(), so the transaction's app.now is that time while the fixture is applied; otherwise the
 	// seed would carry the wall clock, a date after the demo clock (IR318: "customer since Oct 2026").
-	if !f.SeedCreatedAt.IsZero() {
-		err := ex(
+	if !fixture.SeedCreatedAt.IsZero() {
+		err := exec(
 			`SELECT set_config('app.now', $1, true)`,
-			f.SeedCreatedAt.UTC().Format(time.RFC3339Nano),
+			fixture.SeedCreatedAt.UTC().Format(time.RFC3339Nano),
 		)
 		if err != nil {
 			return err
@@ -265,249 +283,349 @@ func Apply(ctx context.Context, txn pgx.Tx, f *Fixture) error {
 		defer func() { _, _ = txn.Exec(ctx, `SELECT set_config('app.now', '', true)`) }()
 	}
 
-	orgTenant := tenantOfOrg(f)
-	for _, t := range f.DemoSeed.Tenants {
-		err := ex(
-			`INSERT INTO platform.tenants (id, name) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
-			ID(t),
-			t,
-		)
+	run := newSeeding(exec, fixture)
+	// the records a row names come before it; the business records (IR161) follow the demo's places and devices, and
+	// the default alert policies come last
+	for _, step := range []func() error{
+		run.tenants, run.organizations, run.actors, run.capabilities, run.customers, run.properties, run.spaces,
+		run.units, run.devices, run.measurements, run.allergens, run.factors, run.baselines, run.consents,
+		run.companyUsers, run.contracts, run.invoices, run.restrictions, run.commands, run.alerts, run.notifications,
+		run.jobs, run.offers, run.assignments, run.rateCards, run.filterCleanings, run.jobEvents, run.policies,
+	} {
+		err := step()
 		if err != nil {
-			return fmt.Errorf("tenant %s: %w", t, err)
+			return err
 		}
 	}
 
-	for _, o := range f.DemoSeed.Organizations {
-		kind := o.Kind
+	return nil
+}
+
+// execSQL runs one statement of the seed.
+type execSQL func(sql string, args ...any) error
+
+// seeding is one run of Apply: the statement runner, the fixture, HQ's operator membership (the author of the
+// factors, baselines and contracts), and by fixture ID the tenant of each organization, property, unit, customer,
+// contract, job and membership, the customer organization of each unit and the customer of each contract. The business
+// records take their tenants from the customers and units they name (IR161).
+type seeding struct {
+	exec    execSQL
+	fixture *Fixture
+	hq      uuid.UUID
+
+	orgTenant, propertyTenant, unitTenant, unitOrg, memberTenant map[string]string
+	customerTenant, contractTenant, contractCustomer, jobTenant  map[string]string
+}
+
+// newSeeding prepares a run of Apply on the fixture.
+func newSeeding(exec execSQL, fixture *Fixture) *seeding {
+	run := &seeding{
+		exec:             exec,
+		fixture:          fixture,
+		hq:               ID("hq-operator"),
+		orgTenant:        tenantOfOrg(fixture),
+		propertyTenant:   map[string]string{},
+		unitTenant:       map[string]string{},
+		unitOrg:          map[string]string{},
+		memberTenant:     map[string]string{},
+		customerTenant:   map[string]string{},
+		contractTenant:   map[string]string{},
+		contractCustomer: map[string]string{},
+		jobTenant:        map[string]string{},
+	}
+
+	for _, property := range fixture.DemoSeed.Properties {
+		run.propertyTenant[property.ID] = run.orgTenant[property.CustomerOrgID]
+	}
+
+	for _, unit := range fixture.DemoSeed.Units {
+		run.unitTenant[unit.ID], run.unitOrg[unit.ID] = run.orgTenant[unit.CustomerOrgID], unit.CustomerOrgID
+	}
+
+	for _, actor := range fixture.Actors {
+		run.memberTenant[actor.MembershipID] = actor.TenantID
+	}
+
+	for _, customer := range fixture.DemoSeed.Customers {
+		run.customerTenant[customer.ID] = customer.TenantID
+	}
+
+	for _, contract := range fixture.DemoSeed.Contracts {
+		id := str(contract, "id")
+		run.contractTenant[id] = run.customerTenant[str(contract, "customerId")]
+		run.contractCustomer[id] = str(contract, "customerId")
+	}
+
+	for _, job := range fixture.DemoSeed.Jobs {
+		run.jobTenant[str(job, "id")] = run.unitTenant[str(job, "unitId")]
+	}
+
+	return run
+}
+
+// tenants inserts the fixture's tenants.
+func (s *seeding) tenants() error {
+	for _, tenant := range s.fixture.DemoSeed.Tenants {
+		err := s.exec(
+			`INSERT INTO platform.tenants (id, name) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
+			ID(tenant),
+			tenant,
+		)
+		if err != nil {
+			return fmt.Errorf("tenant %s: %w", tenant, err)
+		}
+	}
+
+	return nil
+}
+
+// organizations inserts the organizations; the HQ and admin kinds are the operator's.
+func (s *seeding) organizations() error {
+	for _, org := range s.fixture.DemoSeed.Organizations {
+		kind := org.Kind
 		if kind == "hq" || kind == "admin" {
 			kind = "operator"
 		}
 
-		err := ex(
+		err := s.exec(
 			`INSERT INTO identity.organizations (id, tenant_id, name, kind, status) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO
 				NOTHING`,
-			ID(o.ID),
-			ID(o.TenantID),
-			o.Name,
+			ID(org.ID),
+			ID(org.TenantID),
+			org.Name,
 			kind,
-			o.Status,
+			org.Status,
 		)
 		if err != nil {
-			return fmt.Errorf("organization %s: %w", o.ID, err)
+			return fmt.Errorf("organization %s: %w", org.ID, err)
 		}
 	}
 
-	for _, a := range f.Actors {
-		// the realm's account of the actor names this membership in its claims (IR462)
-		err := ex(
+	return nil
+}
+
+// actors inserts each actor's person and membership with its permissions, qualification grants and scopes.
+func (s *seeding) actors() error {
+	for _, actor := range s.fixture.Actors {
+		// the realm'scope account of the actor names this membership in its claims (IR462)
+		err := s.exec(
 			`INSERT INTO identity.users (id, email, display_name, sign_in_membership_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO
 				NOTHING`,
 			ID(
-				a.UserID,
+				actor.UserID,
 			),
-			a.MembershipID+"@ac.local",
-			a.DisplayName,
-			ID(a.MembershipID),
+			actor.MembershipID+"@ac.local",
+			actor.DisplayName,
+			ID(actor.MembershipID),
 		)
 		if err != nil {
-			return fmt.Errorf("user %s: %w", a.UserID, err)
+			return fmt.Errorf("user %s: %w", actor.UserID, err)
 		}
 
-		err = ex(
+		err = s.exec(
 			`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, client_role,
 				scope_version, valid_from, valid_until)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`,
 			ID(
-				a.MembershipID,
+				actor.MembershipID,
 			),
-			ID(a.TenantID),
-			ID(a.UserID),
-			ID(a.OrganizationID),
-			a.Role,
-			a.Employment,
-			a.ClientRole,
-			max(a.ScopeVersion, 1),
-			a.ValidFrom,
-			a.ValidUntil,
+			ID(actor.TenantID),
+			ID(actor.UserID),
+			ID(actor.OrganizationID),
+			actor.Role,
+			actor.Employment,
+			actor.ClientRole,
+			max(actor.ScopeVersion, 1),
+			actor.ValidFrom,
+			actor.ValidUntil,
 		)
 		if err != nil {
-			return fmt.Errorf("membership %s: %w", a.MembershipID, err)
+			return fmt.Errorf("membership %s: %w", actor.MembershipID, err)
 		}
 
-		for _, p := range a.Permissions {
-			err := ex(
+		for _, permission := range actor.Permissions {
+			err := s.exec(
 				`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1,$2,$3) ON CONFLICT DO
 					NOTHING`,
-				ID(a.TenantID),
-				ID(a.MembershipID),
-				p,
+				ID(actor.TenantID),
+				ID(actor.MembershipID),
+				permission,
 			)
 			if err != nil {
-				return fmt.Errorf("permission %s/%s: %w", a.MembershipID, p, err)
+				return fmt.Errorf("permission %s/%s: %w", actor.MembershipID, permission, err)
 			}
 		}
 
-		for _, q := range a.Qualifications { // one grant per membership and code (UUIDv5 of both)
-			err := ex(
+		for _, qualification := range actor.Qualifications { // one grant per membership and code (UUIDv5 of both)
+			err := s.exec(
 				`INSERT INTO identity.qualification_grants (id, tenant_id, membership_id, code, valid_from, valid_until, revoked_at)
 				VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING`,
-				ID("grant-"+a.MembershipID+"-"+q.Code),
-				ID(a.TenantID),
-				ID(a.MembershipID),
-				q.Code,
-				q.ValidFrom,
-				q.ValidUntil,
-				q.RevokedAt,
+				ID("grant-"+actor.MembershipID+"-"+qualification.Code),
+				ID(actor.TenantID),
+				ID(actor.MembershipID),
+				qualification.Code,
+				qualification.ValidFrom,
+				qualification.ValidUntil,
+				qualification.RevokedAt,
 			)
 			if err != nil {
-				return fmt.Errorf("grant %s/%s: %w", a.MembershipID, q.Code, err)
+				return fmt.Errorf("grant %s/%s: %w", actor.MembershipID, qualification.Code, err)
 			}
 		}
 
-		for _, s := range a.Scopes {
-			err := ex(
+		for _, scope := range actor.Scopes {
+			err := s.exec(
 				`INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO
 					NOTHING`,
-				ID(a.TenantID),
-				ID(a.MembershipID),
-				s.Kind,
-				ID(s.ID),
+				ID(actor.TenantID),
+				ID(actor.MembershipID),
+				scope.Kind,
+				ID(scope.ID),
 			)
 			if err != nil {
-				return fmt.Errorf("scope %s: %w", a.MembershipID, err)
+				return fmt.Errorf("scope %s: %w", actor.MembershipID, err)
 			}
 		}
 	}
 
-	for _, m := range f.DemoSeed.Capabilities {
+	return nil
+}
+
+// capabilities inserts the models' capabilities, each the current version.
+func (s *seeding) capabilities() error {
+	for _, capability := range s.fixture.DemoSeed.Capabilities {
 		var temp any
-		if len(m.Temperature) > 0 && string(m.Temperature) != jsonNull {
-			temp = []byte(m.Temperature)
+		if len(capability.Temperature) > 0 && string(capability.Temperature) != jsonNull {
+			temp = []byte(capability.Temperature)
 		}
 
-		sensors := []byte(m.Sensors)
+		sensors := []byte(capability.Sensors)
 		if len(sensors) == 0 {
 			sensors = []byte("[]")
 		}
 
-		nz := func(a []string) []string {
-			if a == nil {
-				return []string{}
-			}
-
-			return a
-		}
-
-		err := ex(
+		err := s.exec(
 			`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control,
 				temperature,
 			modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,true) ON CONFLICT DO NOTHING`,
 			ID(
-				m.ID,
+				capability.ID,
 			),
-			max(m.Version, 1),
-			ID(m.TenantID),
-			m.Manufacturer,
-			m.Model,
-			m.Control,
-			m.ModeControl,
-			m.FanControl,
+			max(capability.Version, 1),
+			ID(capability.TenantID),
+			capability.Manufacturer,
+			capability.Model,
+			capability.Control,
+			capability.ModeControl,
+			capability.FanControl,
 			temp,
-			nz(
-				m.Modes,
+			nonNil(
+				capability.Modes,
 			),
-			nz(m.FanLevels),
-			m.Ventilation,
-			nz(m.VentilationLevels),
+			nonNil(capability.FanLevels),
+			capability.Ventilation,
+			nonNil(capability.VentilationLevels),
 			sensors,
-			nz(m.FirmwareCandidates),
+			nonNil(capability.FirmwareCandidates),
 		)
 		if err != nil {
-			return fmt.Errorf("capability %s: %w", m.ID, err)
+			return fmt.Errorf("capability %s: %w", capability.ID, err)
 		}
 	}
 
-	for _, c := range f.DemoSeed.Customers {
-		err := ex(
+	return nil
+}
+
+// customers inserts the customers.
+func (s *seeding) customers() error {
+	for _, customer := range s.fixture.DemoSeed.Customers {
+		err := s.exec(
 			`INSERT INTO assets.customers (id, tenant_id, organization_id, name, status, service_profile) VALUES ($1,$2,$3,$4,$5,
 				$6) ON CONFLICT DO NOTHING`,
 			ID(
-				c.ID,
+				customer.ID,
 			),
-			ID(c.TenantID),
-			ID(c.OrganizationID),
-			c.Name,
-			c.Status,
-			c.ServiceProfile,
+			ID(customer.TenantID),
+			ID(customer.OrganizationID),
+			customer.Name,
+			customer.Status,
+			customer.ServiceProfile,
 		)
 		if err != nil {
-			return fmt.Errorf("customer %s: %w", c.ID, err)
+			return fmt.Errorf("customer %s: %w", customer.ID, err)
 		}
 	}
 
-	propTenant := map[string]string{}
+	return nil
+}
 
-	for _, p := range f.DemoSeed.Properties {
-		t := orgTenant[p.CustomerOrgID]
+// properties inserts the properties in the tenants of their customer organizations.
+func (s *seeding) properties() error {
+	for _, property := range s.fixture.DemoSeed.Properties {
+		tenant := s.orgTenant[property.CustomerOrgID]
 
-		propTenant[p.ID] = t
-
-		err := ex(
+		err := s.exec(
 			`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, access_instructions, archived)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`,
 			ID(
-				p.ID,
+				property.ID,
 			),
-			ID(t),
-			ID(p.CustomerOrgID),
-			p.Kind,
-			p.Name,
-			p.Address,
-			p.AccessInstructions,
-			p.Archived,
+			ID(tenant),
+			ID(property.CustomerOrgID),
+			property.Kind,
+			property.Name,
+			property.Address,
+			property.AccessInstructions,
+			property.Archived,
 		)
 		if err != nil {
-			return fmt.Errorf("property %s: %w", p.ID, err)
+			return fmt.Errorf("property %s: %w", property.ID, err)
 		}
 	}
+
+	return nil
+}
+
+// spaces inserts the spaces, parents before children.
+func (s *seeding) spaces() error {
 	// parents before children
-	pending := f.DemoSeed.Spaces
+	pending := s.fixture.DemoSeed.Spaces
 	done := map[string]bool{}
 
 	for len(pending) > 0 {
 		next := pending[:0:0]
-		for _, s := range pending {
-			if s.ParentSpaceID != nil && !done[*s.ParentSpaceID] {
-				next = append(next, s)
+		for _, space := range pending {
+			if space.ParentSpaceID != nil && !done[*space.ParentSpaceID] {
+				next = append(next, space)
 
 				continue
 			}
 
 			var parent *uuid.UUID
 
-			if s.ParentSpaceID != nil {
-				u := ID(*s.ParentSpaceID)
-				parent = &u
+			if space.ParentSpaceID != nil {
+				parentID := ID(*space.ParentSpaceID)
+				parent = &parentID
 			}
 
-			err := ex(
+			err := s.exec(
 				`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name) VALUES ($1,$2,$3,$4,$5,$6) ON
 					CONFLICT DO NOTHING`,
 				ID(
-					s.ID,
+					space.ID,
 				),
-				ID(propTenant[s.PropertyID]),
-				ID(s.PropertyID),
+				ID(s.propertyTenant[space.PropertyID]),
+				ID(space.PropertyID),
 				parent,
-				s.Kind,
-				s.Name,
+				space.Kind,
+				space.Name,
 			)
 			if err != nil {
-				return fmt.Errorf("space %s: %w", s.ID, err)
+				return fmt.Errorf("space %s: %w", space.ID, err)
 			}
 
-			done[s.ID] = true
+			done[space.ID] = true
 		}
 
 		if len(next) == len(pending) {
@@ -517,15 +635,20 @@ func Apply(ctx context.Context, txn pgx.Tx, f *Fixture) error {
 		pending = next
 	}
 
-	for _, u := range f.DemoSeed.Units {
+	return nil
+}
+
+// units inserts the units with their observed state, observed restriction and service scope.
+func (s *seeding) units() error {
+	for _, unit := range s.fixture.DemoSeed.Units {
 		var space *uuid.UUID
 
-		if u.SpaceID != nil {
-			s := ID(*u.SpaceID)
-			space = &s
+		if unit.SpaceID != nil {
+			spaceID := ID(*unit.SpaceID)
+			space = &spaceID
 		}
 
-		state := []byte(u.ObservedState)
+		state := []byte(unit.ObservedState)
 		if len(state) == 0 || string(state) == jsonNull {
 			state = []byte(
 				`{"power":null,"celsius":null,"mode":null,"fanLevel":null,"observedAt":null}`,
@@ -533,102 +656,102 @@ func Apply(ctx context.Context, txn pgx.Tx, f *Fixture) error {
 		}
 
 		var restr any
-		if len(u.ObservedRestriction) > 0 && string(u.ObservedRestriction) != jsonNull {
-			restr = []byte(u.ObservedRestriction)
+		if len(unit.ObservedRestriction) > 0 && string(unit.ObservedRestriction) != jsonNull {
+			restr = []byte(unit.ObservedRestriction)
 		}
 
-		scope := u.ServiceScope
+		scope := unit.ServiceScope
 		if len(scope) == 0 {
 			scope = []string{"indoor", "outdoor", "electrical"}
 		}
 
-		err := ex(
+		err := s.exec(
 			`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id,
 				installed_at,
 			service_scope, archived, capability_version, observed_state, observed_restriction, version, warranty_ends_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT DO NOTHING`,
 			ID(
-				u.ID,
+				unit.ID,
 			),
-			ID(orgTenant[u.CustomerOrgID]),
-			ID(u.CustomerOrgID),
-			ID(u.PropertyID),
+			ID(s.orgTenant[unit.CustomerOrgID]),
+			ID(unit.CustomerOrgID),
+			ID(unit.PropertyID),
 			space,
-			u.DisplayName,
-			ID(u.ModelID),
-			u.InstalledAt,
+			unit.DisplayName,
+			ID(unit.ModelID),
+			unit.InstalledAt,
 			scope,
-			u.Archived,
-			u.CapabilityVersion,
+			unit.Archived,
+			unit.CapabilityVersion,
 			state,
 			restr,
-			max(u.Version, 1),
-			u.WarrantyEndsAt,
+			max(unit.Version, 1),
+			unit.WarrantyEndsAt,
 		)
 		if err != nil {
-			return fmt.Errorf("unit %s: %w", u.ID, err)
+			return fmt.Errorf("unit %s: %w", unit.ID, err)
 		}
 	}
 
-	unitTenant := map[string]string{}
-	for _, u := range f.DemoSeed.Units {
-		unitTenant[u.ID] = orgTenant[u.CustomerOrgID]
-	}
+	return nil
+}
 
-	for _, d := range f.DemoSeed.Devices { // device, sensors, active binding; the unit mirrors the device connection
-		tenant := ID(unitTenant[d.TargetUnitID])
+// devices inserts each device with its sensors and active binding; the bound unit mirrors the device's connection.
+func (s *seeding) devices() error {
+	for _, device := range s.fixture.DemoSeed.Devices {
+		tenant := ID(s.unitTenant[device.TargetUnitID])
 
 		var unit, binding *uuid.UUID
 
-		if d.UnitID != nil {
-			u := ID(*d.UnitID)
-			unit = &u
+		if device.UnitID != nil {
+			unitID := ID(*device.UnitID)
+			unit = &unitID
 		}
 
-		if d.BindingID != nil {
-			b := ID(*d.BindingID)
-			binding = &b
+		if device.BindingID != nil {
+			bindingID := ID(*device.BindingID)
+			binding = &bindingID
 		}
 
-		err := ex(
+		err := s.exec(
 			`INSERT INTO devices.devices (id, tenant_id, serial, binding_id, unit_id, target_unit_id, created_by_membership_id,
 				connection, last_seen_at,
 			firmware_version, power_signal, tamper) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT DO NOTHING`,
 			ID(
-				d.ID,
+				device.ID,
 			),
 			tenant,
-			d.Serial,
+			device.Serial,
 			binding,
 			unit,
-			ID(d.TargetUnitID),
-			ID(d.CreatedByMembershipID),
-			d.Connection,
-			d.LastSeenAt,
-			d.FirmwareVersion,
-			d.PowerSignal,
-			d.Tamper,
+			ID(device.TargetUnitID),
+			ID(device.CreatedByMembershipID),
+			device.Connection,
+			device.LastSeenAt,
+			device.FirmwareVersion,
+			device.PowerSignal,
+			device.Tamper,
 		)
 		if err != nil {
-			return fmt.Errorf("device %s: %w", d.ID, err)
+			return fmt.Errorf("device %s: %w", device.ID, err)
 		}
 
-		for _, x := range d.Sensors {
-			err := ex(
+		for _, sensor := range device.Sensors {
+			err := s.exec(
 				`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds,
 					calibrated_at)
 				VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`,
-				ID(x.ID),
+				ID(sensor.ID),
 				tenant,
-				ID(d.ID),
-				x.Metric,
-				x.Unit,
-				x.BoundaryID,
-				x.StaleAfterSeconds,
-				x.CalibratedAt,
+				ID(device.ID),
+				sensor.Metric,
+				sensor.Unit,
+				sensor.BoundaryID,
+				sensor.StaleAfterSeconds,
+				sensor.CalibratedAt,
 			)
 			if err != nil {
-				return fmt.Errorf("sensor %s: %w", x.ID, err)
+				return fmt.Errorf("sensor %s: %w", sensor.ID, err)
 			}
 		}
 
@@ -636,154 +759,184 @@ func Apply(ctx context.Context, txn pgx.Tx, f *Fixture) error {
 			continue
 		}
 
-		err = ex(
+		err = s.exec(
 			`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason,
 				actor_membership_id)
 			SELECT $1,$2,$3,$4,u.customer_org_id,$5,'demo seed',$6 FROM assets.units u WHERE u.id = $4 ON CONFLICT DO NOTHING`,
 			*binding,
 			tenant,
-			ID(d.ID),
+			ID(device.ID),
 			*unit,
-			f.SeedCreatedAt,
-			ID(d.CreatedByMembershipID),
+			s.fixture.SeedCreatedAt,
+			ID(device.CreatedByMembershipID),
 		)
 		if err != nil {
-			return fmt.Errorf("binding %s: %w", d.ID, err)
+			return fmt.Errorf("binding %s: %w", device.ID, err)
 		}
 
-		err = ex(
+		err = s.exec(
 			`UPDATE assets.units SET connection = $2, last_seen_at = $3 WHERE id = $1`,
 			*unit,
-			d.Connection,
-			d.LastSeenAt,
+			device.Connection,
+			device.LastSeenAt,
 		)
 		if err != nil {
-			return fmt.Errorf("unit connection %s: %w", d.ID, err)
+			return fmt.Errorf("unit connection %s: %w", device.ID, err)
 		}
 	}
 
-	for _, m := range f.DemoSeed.Measurements { // IR121: Measurement.id = eventId
-		err := ex(
+	return nil
+}
+
+// measurements inserts the readings; a measurement's ID is its event ID (IR121).
+func (s *seeding) measurements() error {
+	for _, measurement := range s.fixture.DemoSeed.Measurements {
+		err := s.exec(
 			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
 				origin, quality, boundary_id, received_at, event_id)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT DO NOTHING`,
 			ID(
-				unitTenant[m.UnitID],
+				s.unitTenant[measurement.UnitID],
 			),
-			ID(m.UnitID),
-			ID(m.SensorID),
-			m.Metric,
-			m.ObservedAt,
-			m.Sequence,
-			m.Value,
-			m.Unit,
-			m.Origin,
-			m.Quality,
-			m.BoundaryID,
-			m.ReceivedAt,
-			ID(m.ID),
+			ID(measurement.UnitID),
+			ID(measurement.SensorID),
+			measurement.Metric,
+			measurement.ObservedAt,
+			measurement.Sequence,
+			measurement.Value,
+			measurement.Unit,
+			measurement.Origin,
+			measurement.Quality,
+			measurement.BoundaryID,
+			measurement.ReceivedAt,
+			ID(measurement.ID),
 		)
 		if err != nil {
-			return fmt.Errorf("measurement %s: %w", m.ID, err)
+			return fmt.Errorf("measurement %s: %w", measurement.ID, err)
 		}
 	}
 
-	for _, a := range f.DemoSeed.AllergenObservations {
-		err := ex(
+	return nil
+}
+
+// allergens inserts the allergen observations.
+func (s *seeding) allergens() error {
+	for _, observation := range s.fixture.DemoSeed.AllergenObservations {
+		err := s.exec(
 			`INSERT INTO monitoring.allergen_observations (id, tenant_id, unit_id, availability, substance, value, unit,
 				source_label, observed_at, evidence_text, created_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT DO NOTHING`,
 			ID(
-				a.ID,
+				observation.ID,
 			),
-			ID(unitTenant[a.UnitID]),
-			ID(a.UnitID),
-			a.Availability,
-			a.Substance,
-			a.Value,
-			a.Unit,
-			a.SourceLabel,
-			a.ObservedAt,
-			a.EvidenceText,
-			a.CreatedAt,
+			ID(s.unitTenant[observation.UnitID]),
+			ID(observation.UnitID),
+			observation.Availability,
+			observation.Substance,
+			observation.Value,
+			observation.Unit,
+			observation.SourceLabel,
+			observation.ObservedAt,
+			observation.EvidenceText,
+			observation.CreatedAt,
 		)
 		if err != nil {
-			return fmt.Errorf("allergen %s: %w", a.ID, err)
+			return fmt.Errorf("allergen %s: %w", observation.ID, err)
 		}
 	}
 
-	hq := ID("hq-operator")
-	for _, x := range f.DemoSeed.Factors {
-		err := ex(
+	return nil
+}
+
+// factors inserts the emission factors, created by HQ.
+func (s *seeding) factors() error {
+	for _, factor := range s.fixture.DemoSeed.Factors {
+		err := s.exec(
 			`INSERT INTO energy.emission_factors (id, version, tenant_id, region, year, kg_co2e_per_kwh, source, created_by,
 				created_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING`,
-			ID(x.ID),
-			x.Version,
-			ID(x.TenantID),
-			x.Region,
-			x.Year,
-			x.KgCO2ePerKWh,
-			x.Source,
-			hq,
-			x.CreatedAt,
+			ID(factor.ID),
+			factor.Version,
+			ID(factor.TenantID),
+			factor.Region,
+			factor.Year,
+			factor.KgCO2ePerKWh,
+			factor.Source,
+			s.hq,
+			factor.CreatedAt,
 		)
 		if err != nil {
-			return fmt.Errorf("factor %s: %w", x.ID, err)
+			return fmt.Errorf("factor %s: %w", factor.ID, err)
 		}
 	}
 
-	for _, x := range f.DemoSeed.Baselines {
-		units := make([]uuid.UUID, len(x.UnitIDs))
-		for i, u := range x.UnitIDs {
-			units[i] = ID(u)
+	return nil
+}
+
+// baselines inserts the energy baselines, created by HQ.
+func (s *seeding) baselines() error {
+	for _, baseline := range s.fixture.DemoSeed.Baselines {
+		units := make([]uuid.UUID, len(baseline.UnitIDs))
+		for i, unitID := range baseline.UnitIDs {
+			units[i] = ID(unitID)
 		}
 
-		err := ex(
+		err := s.exec(
 			`INSERT INTO energy.baselines (id, version, tenant_id, unit_ids, period, method, baseline_kwh, quality, boundary_id,
 				boundary, assumptions, source, created_by, created_at)
 			VALUES ($1,$2,$3,$4,tstzrange($5,$6),$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT DO NOTHING`,
-			ID(x.ID),
-			x.Version,
-			ID(x.TenantID),
+			ID(baseline.ID),
+			baseline.Version,
+			ID(baseline.TenantID),
 			units,
-			x.Period.From,
-			x.Period.To,
-			x.Method,
-			x.BaselineKWh,
-			[]byte(x.Quality),
-			x.BoundaryID,
-			x.Boundary,
-			x.Assumptions,
-			x.Source,
-			hq,
-			x.CreatedAt,
+			baseline.Period.From,
+			baseline.Period.To,
+			baseline.Method,
+			baseline.BaselineKWh,
+			[]byte(baseline.Quality),
+			baseline.BoundaryID,
+			baseline.Boundary,
+			baseline.Assumptions,
+			baseline.Source,
+			s.hq,
+			baseline.CreatedAt,
 		)
 		if err != nil {
-			return fmt.Errorf("baseline %s: %w", x.ID, err)
+			return fmt.Errorf("baseline %s: %w", baseline.ID, err)
 		}
 	}
 
-	for _, x := range f.DemoSeed.Consents { // IR84 initial location consents
-		err := ex(
+	return nil
+}
+
+// consents inserts the initial location consents (IR84).
+func (s *seeding) consents() error {
+	for _, consent := range s.fixture.DemoSeed.Consents {
+		err := s.exec(
 			`INSERT INTO identity.consents (id, tenant_id, membership_id, purpose, granted, granted_at, revoked_at, created_at,
 				updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8) ON CONFLICT DO NOTHING`,
-			ID(x.ID),
-			ID(x.TenantID),
-			ID(x.MembershipID),
-			x.Purpose,
-			x.Granted,
-			x.GrantedAt,
-			x.RevokedAt,
-			x.CreatedAt,
+			ID(consent.ID),
+			ID(consent.TenantID),
+			ID(consent.MembershipID),
+			consent.Purpose,
+			consent.Granted,
+			consent.GrantedAt,
+			consent.RevokedAt,
+			consent.CreatedAt,
 		)
 		if err != nil {
-			return fmt.Errorf("consent %s: %w", x.ID, err)
+			return fmt.Errorf("consent %s: %w", consent.ID, err)
 		}
 	}
+
+	return nil
+}
+
+// companyUsers inserts the customers' and the contractor companies' user lists of the seed accounts.
+func (s *seeding) companyUsers() error {
 	// client_users rows for the seed client memberships (owners, active; IR144)
-	err := ex(
+	err := s.exec(
 		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role,
 			status, invited_at, invited_by_membership_id, created_at, updated_at)
 		SELECT m.id, m.tenant_id, cu.id, m.id, u.email, u.display_name, COALESCE(m.client_role, 'owner'), 'active', $1, m.id,
@@ -791,32 +944,27 @@ func Apply(ctx context.Context, txn pgx.Tx, f *Fixture) error {
 		FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id JOIN assets.customers cu ON cu.organization_id =
 		m.organization_id
 		WHERE m.role = 'client' AND m.id = ANY($2) ON CONFLICT DO NOTHING`,
-		f.SeedCreatedAt,
-		clientMemberships(f),
+		s.fixture.SeedCreatedAt,
+		clientMemberships(s.fixture),
 	)
 	if err != nil {
 		return fmt.Errorf("client users: %w", err)
 	}
 	// partner_users rows for the seed contractor company accounts (contractors and their technicians, active; FR-P11)
-	err = ex(
+	err = s.exec(
 		`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, display_name, partner_role,
 			status, invited_at, invited_by_membership_id, created_at, updated_at)
 		SELECT m.id, m.tenant_id, m.organization_id, m.id, u.email, u.display_name, m.role, 'active', $1, m.id, $1, $1
 		FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id JOIN identity.organizations o ON o.id =
 		m.organization_id
 		WHERE o.kind = 'contractor' AND m.role IN ('contractor','technician') ON CONFLICT DO NOTHING`,
-		f.SeedCreatedAt,
+		s.fixture.SeedCreatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("partner users: %w", err)
 	}
 
-	err = applyBusiness(ex, f)
-	if err != nil {
-		return err
-	}
-
-	return applyPolicies(ex, f)
+	return nil
 }
 
 func clientMemberships(f *Fixture) []uuid.UUID {
@@ -831,47 +979,47 @@ func clientMemberships(f *Fixture) []uuid.UUID {
 	return out
 }
 
-// applyPolicies seeds the IR120 default policy of each tenant (owned by its first HQ actor) and the customer-a demo
+// policies seeds the IR120 default policy of each tenant (owned by its first HQ actor) and the customer-actor demo
 // setting that switches the AC offline rule off.
-func applyPolicies(ex func(string, ...any) error, f *Fixture) error {
+func (s *seeding) policies() error {
 	rules, err := json.Marshal(monitoring.DefaultRules)
 	if err != nil {
 		return apperr.Wrap(err, "json.Marshal")
 	}
 
 	done := map[string]bool{}
-	for _, a := range f.Actors {
-		if a.Role != "admin" || done[a.TenantID] {
+	for _, actor := range s.fixture.Actors {
+		if actor.Role != "admin" || done[actor.TenantID] {
 			continue
 		}
 
-		done[a.TenantID] = true
+		done[actor.TenantID] = true
 
-		id := DefaultPolicyID(a.TenantID)
+		id := DefaultPolicyID(actor.TenantID)
 
-		err := ex(
+		err := s.exec(
 			`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id,
 				created_by_user_id, timezone, enabled, priority, rules)
 			VALUES ($1,$2,'default_alert',NULL,'Default policy',$3,$4,'Asia/Kuala_Lumpur',true,0,$5) ON CONFLICT DO NOTHING`,
 			id,
-			ID(a.TenantID),
-			ID(a.MembershipID),
-			ID(a.UserID),
+			ID(actor.TenantID),
+			ID(actor.MembershipID),
+			ID(actor.UserID),
 			rules,
 		)
 		if err != nil {
-			return fmt.Errorf("default policy %s: %w", a.TenantID, err)
+			return fmt.Errorf("default policy %s: %w", actor.TenantID, err)
 		}
 
-		if a.TenantID == demoTenant {
-			err := ex(
+		if actor.TenantID == demoTenant {
+			err := s.exec(
 				`INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id, enabled,
 					changed_by_membership_id, reason)
 				VALUES ($1,$2,'ac_offline',$3,false,$4,'Demo: customer switched the offline rule off') ON CONFLICT DO NOTHING`,
-				ID(a.TenantID),
+				ID(actor.TenantID),
 				id,
 				ID("cust-a"),
-				ID(a.MembershipID),
+				ID(actor.MembershipID),
 			)
 			if err != nil {
 				return fmt.Errorf("default rule setting: %w", err)
@@ -923,24 +1071,37 @@ func num(m map[string]any, k string) float64 {
 	return v
 }
 
-func rng(m map[string]any, k, from, to string) (any, any) {
+// rng is the two ends of the range object at m[k], by their keys lower and upper; nil and nil without one.
+func rng(m map[string]any, k, lower, upper string) (any, any) {
 	r, _ := m[k].(map[string]any)
 	if r == nil {
 		return nil, nil
 	}
 
-	return r[from], r[to]
+	return r[lower], r[upper]
 }
 
+// ids is the database IDs of a list of fixture IDs; an entry that is not a string is left out, as str reads it.
 func ids(v any) []uuid.UUID {
-	out := []uuid.UUID{}
-
 	xs, _ := v.([]any)
+
+	out := make([]uuid.UUID, 0, len(xs))
 	for _, x := range xs {
-		out = append(out, ID(x.(string)))
+		if fixtureID, ok := x.(string); ok {
+			out = append(out, ID(fixtureID))
+		}
 	}
 
 	return out
+}
+
+// nonNil is values, or an empty list for none: the array columns are NOT NULL.
+func nonNil(values []string) []string {
+	if values == nil {
+		return []string{}
+	}
+
+	return values
 }
 
 // raw is v as JSON. Fixture values come from the fixture's own JSON, so they always encode again; one that did not
@@ -970,163 +1131,146 @@ func fixtureIDs(v any, keys ...string) []byte {
 	return raw(out)
 }
 
-// applyBusiness loads the demoSeed business collections with deterministic IDs so the API demo shows the fixture
-// scenario (IR161). Tenants come from the referenced customers / units.
-func applyBusiness(ex func(string, ...any) error, fixture *Fixture) error {
-	tenantOf := map[string]string{}
-	for _, c := range fixture.DemoSeed.Customers {
-		tenantOf[c.ID] = c.TenantID
-	}
+// The demoSeed business records (contracts, invoices, restrictions, commands, alerts, notifications, jobs) have
+// deterministic IDs, so the API demo shows the fixture scenario (IR161).
 
-	unitTenant := map[string]string{}
-	unitOrg := map[string]string{}
+// contracts inserts the contracts and the units each covers, in the tenants of their customers.
+func (s *seeding) contracts() error {
+	for _, contract := range s.fixture.DemoSeed.Contracts {
+		tenant := s.customerTenant[str(contract, "customerId")]
 
-	orgTenant := tenantOfOrg(fixture)
-	for _, u := range fixture.DemoSeed.Units {
-		unitTenant[u.ID], unitOrg[u.ID] = orgTenant[u.CustomerOrgID], u.CustomerOrgID
-	}
-
-	hq := ID("hq-operator")
-	contractTenant := map[string]string{}
-
-	for _, k := range fixture.DemoSeed.Contracts {
-		t := tenantOf[str(k, "customerId")]
-
-		contractTenant[str(k, "id")] = t
-
-		err := ex(
+		err := s.exec(
 			`INSERT INTO billing.contracts (id, version, tenant_id, customer_id, customer_org_id, plan_type, term, price_minor,
 				currency, restriction_eligible, rules_version, created_by, created_at)
 			VALUES ($1,$2,$3,$4,$5,$6,tstzrange($7::timestamptz,$8::timestamptz),$9,$10,$11,$12,$13,$7::timestamptz) ON CONFLICT
 			DO NOTHING`,
 			ID(
-				str(k, "id"),
+				str(contract, "id"),
 			),
-			int(num(k, "version")),
-			ID(t),
-			ID(str(k, "customerId")),
-			ID(str(k, "customerOrgId")),
-			str(k, "planType"),
-			str(k, "startAt"),
-			str(k, "endAt"),
+			int(num(contract, "version")),
+			ID(tenant),
+			ID(str(contract, "customerId")),
+			ID(str(contract, "customerOrgId")),
+			str(contract, "planType"),
+			str(contract, "startAt"),
+			str(contract, "endAt"),
 			int64(
-				num(k, "priceMinor"),
+				num(contract, "priceMinor"),
 			),
-			str(k, "currency"),
-			k["restrictionEligible"],
-			opt(k, "rulesVersion"),
-			hq,
+			str(contract, "currency"),
+			contract["restrictionEligible"],
+			opt(contract, "rulesVersion"),
+			s.hq,
 		)
 		if err != nil {
-			return fmt.Errorf("contract %s: %w", str(k, "id"), err)
+			return fmt.Errorf("contract %s: %w", str(contract, "id"), err)
 		}
 
-		for _, u := range ids(k["unitIds"]) {
-			err := ex(
+		for _, unit := range ids(contract["unitIds"]) {
+			err := s.exec(
 				`INSERT INTO billing.contract_units (tenant_id, contract_id, contract_version, unit_id) VALUES ($1,$2,$3,$4) ON
 					CONFLICT DO NOTHING`,
-				ID(t),
-				ID(str(k, "id")),
-				int(num(k, "version")),
-				u,
+				ID(tenant),
+				ID(str(contract, "id")),
+				int(num(contract, "version")),
+				unit,
 			)
 			if err != nil {
-				return fmt.Errorf("contract units %s: %w", str(k, "id"), err)
+				return fmt.Errorf("contract units %s: %w", str(contract, "id"), err)
 			}
 		}
 	}
 
-	for idx, inv := range fixture.DemoSeed.Invoices {
-		t := contractTenant[str(inv, "contractId")]
+	return nil
+}
 
-		var customer string
+// invoices inserts the invoices, numbered in fixture order by their period's start.
+func (s *seeding) invoices() error {
+	for idx, invoice := range s.fixture.DemoSeed.Invoices {
+		tenant := s.contractTenant[str(invoice, "contractId")]
 
-		for _, k := range fixture.DemoSeed.Contracts {
-			if str(k, "id") == str(inv, "contractId") {
-				customer = str(k, "customerId")
-			}
-		}
+		customer := s.contractCustomer[str(invoice, "contractId")]
+		periodFrom, periodTo := rng(invoice, "period", "from", "to")
 
-		from, to := rng(inv, "period", "from", "to")
+		fromText, _ := periodFrom.(string)
 
-		start, err := time.Parse(time.RFC3339, str(inv["period"].(map[string]any), "from"))
+		start, err := time.Parse(time.RFC3339, fromText)
 		if err != nil {
-			return fmt.Errorf("invoice %s period: %w", str(inv, "id"), err)
+			return fmt.Errorf("invoice %s period: %w", str(invoice, "id"), err)
 		}
 
-		exErr := ex(
+		exErr := s.exec(
 			`INSERT INTO billing.invoices (id, tenant_id, number, contract_id, contract_version, customer_id, amount_minor,
 				currency, period, due_at, status, paid_at, version)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,tstzrange($9::timestamptz,$10::timestamptz),$11,$12,$13,$14) ON CONFLICT DO NOTHING`,
 			ID(
-				str(inv, "id"),
+				str(invoice, "id"),
 			),
-			ID(t),
+			ID(tenant),
 			billing.InvoiceNumber(start, idx+1),
-			ID(str(inv, "contractId")),
-			int(num(inv, "contractVersion")),
+			ID(str(invoice, "contractId")),
+			int(num(invoice, "contractVersion")),
 			ID(
 				customer,
 			),
-			int64(num(inv, "amountMinor")),
-			str(inv, "currency"),
-			from,
-			to,
-			str(inv, "dueAt"),
-			str(inv, "status"),
-			opt(inv, "paidAt"),
-			int(num(inv, "version")),
+			int64(num(invoice, "amountMinor")),
+			str(invoice, "currency"),
+			periodFrom,
+			periodTo,
+			str(invoice, "dueAt"),
+			str(invoice, "status"),
+			opt(invoice, "paidAt"),
+			int(num(invoice, "version")),
 		)
 		if exErr != nil {
-			return fmt.Errorf("invoice %s: %w", str(inv, "id"), exErr)
+			return fmt.Errorf("invoice %s: %w", str(invoice, "id"), exErr)
 		}
 	}
 
-	for _, r := range fixture.DemoSeed.Restrictions {
-		t := contractTenant[str(r, "contractId")]
+	return nil
+}
 
-		var customer string
+// restrictions inserts the restrictions with the invoices that caused them and their units.
+func (s *seeding) restrictions() error {
+	for _, restriction := range s.fixture.DemoSeed.Restrictions {
+		tenant := s.contractTenant[str(restriction, "contractId")]
 
-		for _, k := range fixture.DemoSeed.Contracts {
-			if str(k, "id") == str(r, "contractId") {
-				customer = str(k, "customerId")
-			}
-		}
+		customer := s.contractCustomer[str(restriction, "contractId")]
 
-		err := ex(
+		err := s.exec(
 			`INSERT INTO restrictions.restrictions (id, tenant_id, contract_id, contract_version, customer_id, rules_version,
 				notice_at, execute_after, reason, policy, state,
 			notice_notification_ids, version, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$7,$7)
 			ON CONFLICT DO NOTHING`,
 			ID(
-				str(r, "id"),
+				str(restriction, "id"),
 			),
-			ID(t),
-			ID(str(r, "contractId")),
-			int(num(r, "contractVersion")),
+			ID(tenant),
+			ID(str(restriction, "contractId")),
+			int(num(restriction, "contractVersion")),
 			ID(customer),
-			str(r, "rulesVersion"),
-			str(r, "noticeAt"),
-			str(r, "executeAfter"),
+			str(restriction, "rulesVersion"),
+			str(restriction, "noticeAt"),
+			str(restriction, "executeAfter"),
 			str(
-				r,
+				restriction,
 				"reason",
 			),
-			raw(r["policy"]),
-			str(r, "state"),
-			ids(r["noticeNotificationIds"]),
-			int(num(r, "version")),
+			raw(restriction["policy"]),
+			str(restriction, "state"),
+			ids(restriction["noticeNotificationIds"]),
+			int(num(restriction, "version")),
 		)
 		if err != nil {
-			return fmt.Errorf("restriction %s: %w", str(r, "id"), err)
+			return fmt.Errorf("restriction %s: %w", str(restriction, "id"), err)
 		}
 
-		for _, inv := range ids(r["causeInvoiceIds"]) {
-			err := ex(
+		for _, inv := range ids(restriction["causeInvoiceIds"]) {
+			err := s.exec(
 				`INSERT INTO restrictions.restriction_invoices (tenant_id, restriction_id, invoice_id) VALUES ($1,$2,$3) ON CONFLICT
 					DO NOTHING`,
-				ID(t),
-				ID(str(r, "id")),
+				ID(tenant),
+				ID(str(restriction, "id")),
 				inv,
 			)
 			if err != nil {
@@ -1134,233 +1278,267 @@ func applyBusiness(ex func(string, ...any) error, fixture *Fixture) error {
 			}
 		}
 
-		pu, _ := r["perUnit"].([]any)
-		for _, x := range pu {
-			u := x.(map[string]any)
-			obs := map[string]any{
-				"restrictionId": ID(str(r, "id")).String(),
-				"rulesVersion":  str(r, "rulesVersion"),
-				"policy":        r["policy"],
-				keyObservedAt:   u[keyObservedAt],
-			}
+		err = s.restrictionUnits(restriction, tenant)
+		if err != nil {
+			return err
+		}
+	}
 
-			var observed any
-			if str(u, "applyState") == "applied" {
-				observed = raw(obs)
-			}
+	return nil
+}
 
-			err := ex(
-				`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state,
-					apply_command_ids, release_command_ids, observed_restriction,
-				observed_at, pending_reason) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`,
-				ID(t),
-				ID(str(r, "id")),
-				ID(str(u, "unitId")),
-				str(u, "applyState"),
-				str(
-					u,
-					"releaseState",
-				),
-				ids(u["applyCommandIds"]),
-				ids(u["releaseCommandIds"]),
+// restrictionUnits inserts the per-unit states of a restriction; a unit where it is applied observes it.
+func (s *seeding) restrictionUnits(restriction map[string]any, tenant string) error {
+	entries, _ := restriction["perUnit"].([]any)
+	for _, entry := range entries {
+		unit, ok := entry.(map[string]any)
+		if !ok {
+			return fmt.Errorf("restriction %s: %w", str(restriction, "id"), errPerUnitEntry)
+		}
+
+		obs := map[string]any{
+			"restrictionId": ID(str(restriction, "id")).String(),
+			"rulesVersion":  str(restriction, "rulesVersion"),
+			"policy":        restriction["policy"],
+			keyObservedAt:   unit[keyObservedAt],
+		}
+
+		var observed any
+		if str(unit, "applyState") == "applied" {
+			observed = raw(obs)
+		}
+
+		err := s.exec(
+			`INSERT INTO restrictions.restriction_units (tenant_id, restriction_id, unit_id, apply_state, release_state,
+				apply_command_ids, release_command_ids, observed_restriction,
+			observed_at, pending_reason) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`,
+			ID(tenant),
+			ID(str(restriction, "id")),
+			ID(str(unit, "unitId")),
+			str(unit, "applyState"),
+			str(
+				unit,
+				"releaseState",
+			),
+			ids(unit["applyCommandIds"]),
+			ids(unit["releaseCommandIds"]),
+			observed,
+			opt(unit, keyObservedAt),
+			opt(unit, "pendingReason"),
+		)
+		if err != nil {
+			return fmt.Errorf("restriction unit: %w", err)
+		}
+
+		if observed != nil {
+			err := s.exec(
+				`UPDATE assets.units SET observed_restriction = $2 WHERE id = $1`,
+				ID(str(unit, "unitId")),
 				observed,
-				opt(u, keyObservedAt),
-				opt(u, "pendingReason"),
 			)
 			if err != nil {
-				return fmt.Errorf("restriction unit: %w", err)
-			}
-
-			if observed != nil {
-				err := ex(
-					`UPDATE assets.units SET observed_restriction = $2 WHERE id = $1`,
-					ID(str(u, "unitId")),
-					observed,
-				)
-				if err != nil {
-					return err
-				}
+				return err
 			}
 		}
 	}
 
-	for _, c := range fixture.DemoSeed.Commands {
-		a, _ := c["action"].(map[string]any)
+	return nil
+}
 
-		err := ex(
+// commands inserts the unit commands, and billing's own record of each restriction command (IR194).
+func (s *seeding) commands() error {
+	for _, command := range s.fixture.DemoSeed.Commands {
+		action, _ := command["action"].(map[string]any)
+
+		err := s.exec(
 			`INSERT INTO control.commands (id, tenant_id, unit_id, actor_membership_id, source, action, restriction_id, status,
 				delivery, requested_at, sent_at, acknowledged_at,
 			expires_at, correlation_id, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'seed',$10,
 			$10) ON CONFLICT DO NOTHING`,
 			ID(
-				str(c, "id"),
+				str(command, "id"),
 			),
-			ID(unitTenant[str(c, "unitId")]),
-			ID(str(c, "unitId")),
-			ID(str(c, "actorMembershipId")),
-			map[bool]string{true: "restriction", false: "ui"}[a["restrictionId"] != nil],
+			ID(s.unitTenant[str(command, "unitId")]),
+			ID(str(command, "unitId")),
+			ID(str(command, "actorMembershipId")),
+			map[bool]string{true: "restriction", false: "ui"}[action["restrictionId"] != nil],
 			fixtureIDs(
-				a,
+				action,
 				"restrictionId",
 			),
-			optID(a, "restrictionId"),
-			str(c, "status"),
-			str(c, "delivery"),
-			str(c, "requestedAt"),
-			opt(c, "sentAt"),
-			opt(c, "acknowledgedAt"),
-			str(c, "expiresAt"),
+			optID(action, "restrictionId"),
+			str(command, "status"),
+			str(command, "delivery"),
+			str(command, "requestedAt"),
+			opt(command, "sentAt"),
+			opt(command, "acknowledgedAt"),
+			str(command, "expiresAt"),
 		)
 		if err != nil {
-			return fmt.Errorf("command %s: %w", str(c, "id"), err)
+			return fmt.Errorf("command %s: %w", str(command, "id"), err)
 		}
 
-		if a["restrictionId"] != nil { // billing's own record of the restriction command (IR194)
-			status := str(c, "status")
+		if action["restrictionId"] != nil { // billing's own record of the restriction command (IR194)
+			status := str(command, "status")
 			if status == "sent" {
 				status = "requested"
 			}
 
-			kind, _ := a["kind"].(string)
+			kind, _ := action["kind"].(string)
 
-			err := ex(
+			err := s.exec(
 				`INSERT INTO restrictions.restriction_commands (tenant_id, command_id, restriction_id, unit_id, kind, delivered,
 					status, requested_at, updated_at)
 				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8) ON CONFLICT DO NOTHING`,
-				ID(unitTenant[str(c, "unitId")]),
-				ID(str(c, "id")),
-				optID(a, "restrictionId"),
-				ID(str(c, "unitId")),
+				ID(s.unitTenant[str(command, "unitId")]),
+				ID(str(command, "id")),
+				optID(action, "restrictionId"),
+				ID(str(command, "unitId")),
 				kind,
-				str(c, "delivery") == "sent",
+				str(command, "delivery") == "sent",
 				status,
-				str(c, "requestedAt"),
+				str(command, "requestedAt"),
 			)
 			if err != nil {
-				return fmt.Errorf("restriction command %s: %w", str(c, "id"), err)
+				return fmt.Errorf("restriction command %s: %w", str(command, "id"), err)
 			}
 		}
 	}
 
-	for _, a := range fixture.DemoSeed.Alerts {
-		u := str(a, "unitId")
+	return nil
+}
 
-		err := ex(
+// alerts inserts the alerts in the tenants and customer organizations of their units.
+func (s *seeding) alerts() error {
+	for _, alert := range s.fixture.DemoSeed.Alerts {
+		unit := str(alert, "unitId")
+
+		err := s.exec(
 			`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, policy_id, type, severity, status,
 				cause_code, evidence_kind, evidence_text, observed_at, detected_at,
 			previous_alert_id, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$13,$13) ON
 			CONFLICT DO NOTHING`,
 			ID(
-				str(a, "id"),
+				str(alert, "id"),
 			),
-			ID(unitTenant[u]),
-			ID(u),
-			ID(unitOrg[u]),
-			optID(a, "policyId"),
-			str(a, "type"),
-			str(a, "severity"),
-			str(a, "status"),
-			str(a, "causeCode"),
+			ID(s.unitTenant[unit]),
+			ID(unit),
+			ID(s.unitOrg[unit]),
+			optID(alert, "policyId"),
+			str(alert, "type"),
+			str(alert, "severity"),
+			str(alert, "status"),
+			str(alert, "causeCode"),
 			str(
-				a,
+				alert,
 				"evidenceKind",
 			),
-			str(a, "evidenceText"),
-			str(a, keyObservedAt),
-			str(a, "detectedAt"),
-			optID(a, "previousAlertId"),
+			str(alert, "evidenceText"),
+			str(alert, keyObservedAt),
+			str(alert, "detectedAt"),
+			optID(alert, "previousAlertId"),
 		)
 		if err != nil {
-			return fmt.Errorf("alert %s: %w", str(a, "id"), err)
+			return fmt.Errorf("alert %s: %w", str(alert, "id"), err)
 		}
 	}
 
-	memberTenant := map[string]string{}
-	for _, a := range fixture.Actors {
-		memberTenant[a.MembershipID] = a.TenantID
-	}
+	return nil
+}
 
-	for _, n := range fixture.DemoSeed.Notifications {
-		tg, _ := n["target"].(map[string]any)
+// notifications inserts the notifications in their recipients' tenants, with the targets' database IDs.
+func (s *seeding) notifications() error {
+	for _, notification := range s.fixture.DemoSeed.Notifications {
+		ref, _ := notification["target"].(map[string]any)
 
-		target := raw(map[string]any{"kind": tg["kind"], "id": ID(tg["id"].(string)).String()})
+		targetID, ok := ref["id"].(string)
+		if !ok {
+			return fmt.Errorf("notification %s: %w", str(notification, "id"), errNoTarget)
+		}
 
-		err := ex(
+		target := raw(map[string]any{"kind": ref["kind"], "id": ID(targetID).String()})
+
+		err := s.exec(
 			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel,
 				template_key, target, params, source_alert_id, severity,
 			occurred_at, read_at, created_at) VALUES ($1,$2,$3,1,$4,$5,$6,$7,'{}',$8,$9,$10,$11,$10) ON CONFLICT DO NOTHING`,
 			ID(
-				str(n, "id"),
+				str(notification, "id"),
 			),
-			ID(memberTenant[str(n, "recipientMembershipId")]),
-			ID(str(n, "recipientMembershipId")),
-			str(n, "type"),
-			str(n, "channel"),
-			str(n, "templateKey"),
+			ID(s.memberTenant[str(notification, "recipientMembershipId")]),
+			ID(str(notification, "recipientMembershipId")),
+			str(notification, "type"),
+			str(notification, "channel"),
+			str(notification, "templateKey"),
 			target,
 			optID(
-				n,
+				notification,
 				"sourceAlertId",
 			),
-			str(n, "severity"),
-			str(n, "occurredAt"),
-			opt(n, "readAt"),
+			str(notification, "severity"),
+			str(notification, "occurredAt"),
+			opt(notification, "readAt"),
 		)
 		if err != nil {
-			return fmt.Errorf("notification %s: %w", str(n, "id"), err)
+			return fmt.Errorf("notification %s: %w", str(notification, "id"), err)
 		}
 	}
 
-	for _, j := range fixture.DemoSeed.Jobs {
-		u := str(j, "unitId")
-		rs, re := rng(j, "requestedSlot", "startAt", "endAt")
-		ss, se := rng(j, "scheduledSlot", "startAt", "endAt")
+	return nil
+}
+
+// jobs inserts the maintenance jobs with the alerts each answers.
+func (s *seeding) jobs() error {
+	for _, job := range s.fixture.DemoSeed.Jobs {
+		unit := str(job, "unitId")
+		requestedStart, requestedEnd := rng(job, "requestedSlot", "startAt", "endAt")
+		scheduledStart, scheduledEnd := rng(job, "scheduledSlot", "startAt", "endAt")
 
 		var sched any
-		if ss != nil {
-			sched = fmt.Sprintf("[%s,%s)", ss, se)
+		if scheduledStart != nil {
+			sched = fmt.Sprintf("[%s,%s)", scheduledStart, scheduledEnd)
 		}
 
-		err := ex(
+		err := s.exec(
 			`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, symptom,
 				contact_window, requested_slot, preferred_slots, preference_round,
 			scheduled_slot, due_at, contractor_org_id, assignment_id, version, created_at, updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,tstzrange($10::timestamptz,$11::timestamptz),$12,$13,$14::tstzrange,$15,$16,$17,
 			$18,$19,$19) ON CONFLICT DO NOTHING`,
 			ID(
-				str(j, "id"),
+				str(job, "id"),
 			),
-			ID(unitTenant[u]),
-			ID(u),
-			ID(unitOrg[u]),
-			str(j, "type"),
-			str(j, "status"),
-			str(j, "origin"),
-			str(j, "symptom"),
-			opt(j, "contactWindow"),
-			rs,
-			re,
+			ID(s.unitTenant[unit]),
+			ID(unit),
+			ID(s.unitOrg[unit]),
+			str(job, "type"),
+			str(job, "status"),
+			str(job, "origin"),
+			str(job, "symptom"),
+			opt(job, "contactWindow"),
+			requestedStart,
+			requestedEnd,
 			raw(
-				j["preferredSlots"],
+				job["preferredSlots"],
 			),
-			int(num(j, "preferenceRound")),
+			int(num(job, "preferenceRound")),
 			sched,
-			str(j, "dueAt"),
-			optID(j, "contractorOrgId"),
-			optID(j, "assignmentId"),
-			int(num(j, "version")),
-			fixture.SeedCreatedAt,
+			str(job, "dueAt"),
+			optID(job, "contractorOrgId"),
+			optID(job, "assignmentId"),
+			int(num(job, "version")),
+			s.fixture.SeedCreatedAt,
 		)
 		if err != nil {
-			return fmt.Errorf("job %s: %w", str(j, "id"), err)
+			return fmt.Errorf("job %s: %w", str(job, "id"), err)
 		}
 
-		for _, a := range ids(j["alertIds"]) {
-			err := ex(
+		for _, alert := range ids(job["alertIds"]) {
+			err := s.exec(
 				`INSERT INTO maintenance.job_alerts (tenant_id, job_id, alert_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
-				ID(unitTenant[u]),
-				ID(str(j, "id")),
-				a,
+				ID(s.unitTenant[unit]),
+				ID(str(job, "id")),
+				alert,
 			)
 			if err != nil {
 				return err
@@ -1368,174 +1546,185 @@ func applyBusiness(ex func(string, ...any) error, fixture *Fixture) error {
 		}
 	}
 
-	jobTenant := map[string]string{}
-	for _, j := range fixture.DemoSeed.Jobs {
-		jobTenant[str(j, "id")] = unitTenant[str(j, "unitId")]
-	}
+	return nil
+}
 
-	for _, o := range fixture.DemoSeed.Offers {
-		vs, ve := rng(o, "visitSlot", "startAt", "endAt")
+// offers inserts the contractors' offers.
+func (s *seeding) offers() error {
+	for _, offer := range s.fixture.DemoSeed.Offers {
+		visitStart, visitEnd := rng(offer, "visitSlot", "startAt", "endAt")
 
-		err := ex(
+		err := s.exec(
 			`INSERT INTO maintenance.offers (id, tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
 				offer_expires_at, access_valid_from, access_valid_until,
 			decision, decided_by, decided_at, decline_reason, created_at, updated_at)
 			VALUES ($1,$2,$3,$4,$5,tstzrange($6::timestamptz,$7::timestamptz),$8,$9,$10,$11,$12,$13,$14,$15,$8,$8) ON CONFLICT DO
 			NOTHING`,
 			ID(
-				str(o, "id"),
+				str(offer, "id"),
 			),
-			ID(jobTenant[str(o, "jobId")]),
-			ID(str(o, "jobId")),
-			ID(str(o, "contractorOrgId")),
-			str(o, "termsVersion"),
-			vs,
-			ve,
-			str(o, "offeredAt"),
-			str(o, "offerExpiresAt"),
+			ID(s.jobTenant[str(offer, "jobId")]),
+			ID(str(offer, "jobId")),
+			ID(str(offer, "contractorOrgId")),
+			str(offer, "termsVersion"),
+			visitStart,
+			visitEnd,
+			str(offer, "offeredAt"),
+			str(offer, "offerExpiresAt"),
 			str(
-				o,
+				offer,
 				"accessValidFrom",
 			),
-			str(o, "accessValidUntil"),
-			opt(o, "decision"),
-			optID(o, "decidedBy"),
-			opt(o, "decidedAt"),
-			opt(o, "declineReason"),
+			str(offer, "accessValidUntil"),
+			opt(offer, "decision"),
+			optID(offer, "decidedBy"),
+			opt(offer, "decidedAt"),
+			opt(offer, "declineReason"),
 		)
 		if err != nil {
-			return fmt.Errorf("offer %s: %w", str(o, "id"), err)
+			return fmt.Errorf("offer %s: %w", str(offer, "id"), err)
 		}
 	}
 
-	for _, a := range fixture.DemoSeed.Assignments {
-		err := ex(
+	return nil
+}
+
+// assignments inserts the technicians' assignments.
+func (s *seeding) assignments() error {
+	for _, assignment := range s.fixture.DemoSeed.Assignments {
+		err := s.exec(
 			`INSERT INTO maintenance.assignments (id, tenant_id, job_id, technician_membership_id, valid_from, valid_until,
 				scheduled, status, reason, acknowledgement, acknowledged_at,
 			cant_make_reason, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,tstzrange($7::timestamptz,$8::timestamptz),$9,
 			$10,$11,$12,$13,$14,$14) ON CONFLICT DO NOTHING`,
 			ID(
-				str(a, "id"),
+				str(assignment, "id"),
 			),
-			ID(jobTenant[str(a, "jobId")]),
-			ID(str(a, "jobId")),
-			ID(str(a, "technicianMembershipId")),
-			str(a, "validFrom"),
-			str(a, "validUntil"),
+			ID(s.jobTenant[str(assignment, "jobId")]),
+			ID(str(assignment, "jobId")),
+			ID(str(assignment, "technicianMembershipId")),
+			str(assignment, "validFrom"),
+			str(assignment, "validUntil"),
 			str(
-				a,
+				assignment,
 				"scheduledStart",
 			),
-			str(a, "scheduledEnd"),
-			str(a, "status"),
-			opt(a, "reason"),
-			str(a, "acknowledgement"),
-			opt(a, "acknowledgedAt"),
-			opt(a, "cantMakeReason"),
-			str(a, "createdAt"),
+			str(assignment, "scheduledEnd"),
+			str(assignment, "status"),
+			opt(assignment, "reason"),
+			str(assignment, "acknowledgement"),
+			opt(assignment, "acknowledgedAt"),
+			opt(assignment, "cantMakeReason"),
+			str(assignment, "createdAt"),
 		)
 		if err != nil {
-			return fmt.Errorf("assignment %s: %w", str(a, "id"), err)
+			return fmt.Errorf("assignment %s: %w", str(assignment, "id"), err)
 		}
 	}
 
-	for _, r := range fixture.DemoSeed.RateCards {
-		// contractor rate cards (FR-A22 / FR-P10): the payout prices of a contractor
-		lines, marshalErr := json.Marshal(r["lines"])
+	return nil
+}
+
+// rateCards inserts the contractors' rate cards, their payout prices (FR-A22, FR-P10).
+func (s *seeding) rateCards() error {
+	for _, card := range s.fixture.DemoSeed.RateCards {
+		lines, marshalErr := json.Marshal(card["lines"])
 		if marshalErr != nil {
 			return apperr.Wrap(marshalErr, "json.Marshal")
 		}
 
-		err := ex(
+		err := s.exec(
 			`INSERT INTO maintenance.rate_cards (id, tenant_id, contractor_org_id, effective_from, currency, lines, version,
 				created_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`,
 			ID(
-				str(r, "id"),
+				str(card, "id"),
 			),
-			ID(str(r, "tenantId")),
-			ID(str(r, "contractorOrgId")),
-			str(r, "effectiveFrom"),
-			str(r, "currency"),
+			ID(str(card, "tenantId")),
+			ID(str(card, "contractorOrgId")),
+			str(card, "effectiveFrom"),
+			str(card, "currency"),
 			lines,
-			r["version"],
-			str(r, "createdAt"),
+			card["version"],
+			str(card, "createdAt"),
 		)
 		if err != nil {
-			return fmt.Errorf("rate card %s: %w", str(r, "id"), err)
+			return fmt.Errorf("rate card %s: %w", str(card, "id"), err)
 		}
 	}
 
-	for _, c := range fixture.DemoSeed.FilterCleanings {
-		err := ex(
+	return nil
+}
+
+// filterCleanings inserts the customers' own filter cleanings (FR-C18).
+func (s *seeding) filterCleanings() error {
+	for _, cleaning := range s.fixture.DemoSeed.FilterCleanings {
+		err := s.exec(
 			`INSERT INTO maintenance.filter_cleanings (id, tenant_id, unit_id, cleaned_at, marked_by_membership_id) VALUES ($1,
 				$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
 			ID(
-				str(c, "id"),
+				str(cleaning, "id"),
 			),
-			ID(unitTenant[str(c, "unitId")]),
-			ID(str(c, "unitId")),
-			str(c, "cleanedAt"),
-			ID(str(c, "markedByMembershipId")),
+			ID(s.unitTenant[str(cleaning, "unitId")]),
+			ID(str(cleaning, "unitId")),
+			str(cleaning, "cleanedAt"),
+			ID(str(cleaning, "markedByMembershipId")),
 		)
 		if err != nil {
-			return fmt.Errorf("filter cleaning %s: %w", str(c, "id"), err)
+			return fmt.Errorf("filter cleaning %s: %w", str(cleaning, "id"), err)
 		}
 	}
 
-	return seedJobEvents(ex, fixture, jobTenant)
+	return nil
 }
 
-// seedJobEvents derives the job history (jobs.events) that the fixture rows imply: created, offered, the offer
+// jobEvents derives the job history (jobs.events) that the fixture rows imply: created, offered, the offer
 // decision and the assignment. IDs are deterministic so re-seeding is idempotent; actors are only set where the
 // fixture names them (decidedBy).
-func seedJobEvents(
-	ex func(string, ...any) error,
-	fixture *Fixture,
-	jobTenant map[string]string,
-) error {
-	ev := func(job, action string, actor, at any) error {
-		return ex(
+func (s *seeding) jobEvents() error {
+	event := func(job, action string, actor, occurredAt any) error {
+		return s.exec(
 			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, occurred_at) VALUES ($1,$2,$3,$4,
 				$5,$6) ON CONFLICT DO NOTHING`,
 			ID("event:"+job+":"+action),
-			ID(jobTenant[job]),
+			ID(s.jobTenant[job]),
 			ID(job),
 			actor,
 			action,
-			at,
+			occurredAt,
 		)
 	}
-	for _, j := range fixture.DemoSeed.Jobs {
-		err := ev(str(j, "id"), "job.created", nil, fixture.SeedCreatedAt)
+
+	for _, job := range s.fixture.DemoSeed.Jobs {
+		err := event(str(job, "id"), "job.created", nil, s.fixture.SeedCreatedAt)
 		if err != nil {
 			return err
 		}
 	}
 
-	for _, o := range fixture.DemoSeed.Offers {
-		job := str(o, "jobId")
+	for _, offer := range s.fixture.DemoSeed.Offers {
+		job := str(offer, "jobId")
 
-		err := ev(job, "job.offered", nil, str(o, "offeredAt"))
+		err := event(job, "job.offered", nil, str(offer, "offeredAt"))
 		if err != nil {
 			return err
 		}
 
-		if d := opt(o, "decision"); d != nil && opt(o, "decidedAt") != nil {
+		if decision := opt(offer, "decision"); decision != nil && opt(offer, "decidedAt") != nil {
 			action := "offer.accepted"
-			if *d == "decline" {
+			if *decision == "decline" {
 				action = "offer.declined"
 			}
 
-			err := ev(job, action, optID(o, "decidedBy"), *opt(o, "decidedAt"))
+			err := event(job, action, optID(offer, "decidedBy"), *opt(offer, "decidedAt"))
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	for _, a := range fixture.DemoSeed.Assignments {
-		err := ev(str(a, "jobId"), "job.assigned", nil, str(a, "createdAt"))
+	for _, assignment := range s.fixture.DemoSeed.Assignments {
+		err := event(str(assignment, "jobId"), "job.assigned", nil, str(assignment, "createdAt"))
 		if err != nil {
 			return err
 		}

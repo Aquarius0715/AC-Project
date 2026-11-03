@@ -13,6 +13,8 @@ import (
 // TestScenarioNowReadsThePreviewSnapshot: the scenario time is the preview's snapshot time; an answer without one, a
 // bad answer and a dead API are errors.
 func TestScenarioNowReadsThePreviewSnapshot(t *testing.T) {
+	t.Parallel()
+
 	scenario := time.Date(2026, 9, 15, 0, 53, 0, 0, time.UTC)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {

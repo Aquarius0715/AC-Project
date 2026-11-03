@@ -96,7 +96,7 @@ func run(broker, api, equipment, tenant string) error {
 	}
 
 	resolver := iotbridge.NewResolver(
-		append(append([]iotbridge.Link{}, iotbridge.Links...), iotbridge.FleetLinks(fleet)...),
+		append(append([]iotbridge.Link{}, iotbridge.Links()...), iotbridge.FleetLinks(fleet)...),
 	)
 	httpc := &http.Client{Timeout: httpTimeout, Transport: nil, CheckRedirect: nil, Jar: nil}
 	endpoint := api + "/v1/demo/trigger"
@@ -308,8 +308,8 @@ func startLive(
 		"iot-bridge: live sensors from %s (%s) → %s of %s",
 		strconv.Quote(host),
 		strconv.Quote(topic),
-		seed.LiveSite.UnitName,
-		seed.LiveSite.CustomerName,
+		seed.LiveSite().UnitName,
+		seed.LiveSite().CustomerName,
 	)
 
 	control := newLiveControl(
@@ -666,7 +666,7 @@ func reportGap(
 			when := now.Add(clock.offset() - clockMargin).UTC()
 			gap := heard.Gap(now)
 
-			f, err := fetchConnectionFault(ctx, httpc, api, seed.ID(seed.LiveSite.Device))
+			f, err := fetchConnectionFault(ctx, httpc, api, seed.ID(seed.LiveSite().Device))
 			if err != nil {
 				rep.Failed(fmt.Sprintf("live connection: %v", err))
 			} else if trigger, ok := iotbridge.LiveConnectionTrigger(f, gap, when); ok {
@@ -676,7 +676,7 @@ func reportGap(
 				} else {
 					log.Printf(
 						"live module %s: %s (nodes unheard for %s)",
-						seed.LiveSite.UnitName,
+						seed.LiveSite().UnitName,
 						trigger.Kind,
 						gap.Round(time.Second),
 					)
@@ -756,7 +756,7 @@ type liveControl struct {
 }
 
 func newLiveControl(client mqtt.Client, node string, enabled bool) *liveControl {
-	if _, ok := iotbridge.LiveNodes[node]; !ok {
+	if _, ok := iotbridge.LiveNodes()[node]; !ok {
 		log.Printf("live commands: %q is not a live node; sending is off", node)
 
 		enabled = false
@@ -765,13 +765,13 @@ func newLiveControl(client mqtt.Client, node string, enabled bool) *liveControl 
 	if enabled {
 		log.Printf(
 			"live commands: power on/off of %s goes to %s",
-			seed.LiveSite.UnitName,
+			seed.LiveSite().UnitName,
 			iotbridge.LiveCommandTopic(node),
 		)
 	} else {
 		log.Printf(
 			"live commands: off (REAL_MQTT_COMMANDS); commands of %s fail",
-			seed.LiveSite.UnitName,
+			seed.LiveSite().UnitName,
 		)
 	}
 
@@ -779,7 +779,7 @@ func newLiveControl(client mqtt.Client, node string, enabled bool) *liveControl 
 		client:  client,
 		node:    node,
 		enabled: enabled,
-		device:  seed.ID(seed.LiveSite.Device),
+		device:  seed.ID(seed.LiveSite().Device),
 	}
 }
 
@@ -793,7 +793,7 @@ func (l *liveControl) send(
 	waiting iotbridge.Waiting,
 	off time.Duration,
 ) error {
-	payload, state, supported, err := iotbridge.LiveCommand(waiting.Action)
+	command, supported, err := iotbridge.LiveCommand(waiting.Action)
 	if err != nil {
 		return apperr.Wrap(err, "iotbridge.LiveCommand")
 	}
@@ -807,7 +807,7 @@ func (l *liveControl) send(
 		return errLiveBrokerDown
 	}
 
-	tok := l.client.Publish(iotbridge.LiveCommandTopic(l.node), 1, false, payload)
+	tok := l.client.Publish(iotbridge.LiveCommandTopic(l.node), 1, false, command.Payload)
 	if !tok.WaitTimeout(liveCommandWait) {
 		return errLiveCommandTimeout
 	}
@@ -820,11 +820,11 @@ func (l *liveControl) send(
 	log.Printf(
 		"live command %s: %s → %s",
 		waiting.ID,
-		strconv.Quote(payload),
+		strconv.Quote(command.Payload),
 		strconv.Quote(iotbridge.LiveCommandTopic(l.node)),
 	)
 
-	for _, tr := range iotbridge.LiveSentTriggers(waiting, when, when.Add(-clockMargin), state) {
+	for _, tr := range iotbridge.LiveSentTriggers(waiting, when, when.Add(-clockMargin), command.State) {
 		err := send(ctx, httpc, endpoint, tr)
 		if err != nil {
 			return err

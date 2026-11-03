@@ -16,6 +16,7 @@ func ownerConn(t *testing.T) *pgx.Conn {
 
 	url := os.Getenv("AC_TEST_OWNER_DATABASE_URL")
 	if url == "" {
+		//nolint:gosec // local test database password, not a secret
 		url = "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable"
 	}
 
@@ -27,12 +28,15 @@ func ownerConn(t *testing.T) *pgx.Conn {
 		t.Skip("database not available:", err)
 	}
 
-	t.Cleanup(func() { conn.Close(context.Background()) })
+	t.Cleanup(func() { _ = conn.Close(context.Background()) })
 
 	return conn
 }
 
+// TestIDDeterministic: a fixture ID maps to one UUIDv5, and two IDs to two.
 func TestIDDeterministic(t *testing.T) {
+	t.Parallel()
+
 	if a, b := ID(
 		"unit-online-rto",
 	), ID(
@@ -43,17 +47,23 @@ func TestIDDeterministic(t *testing.T) {
 	}
 }
 
+// TestLoadErrors: a missing file and a file that is no JSON are errors.
 func TestLoadErrors(t *testing.T) {
+	t.Parallel()
+
 	_, err := Load("nope.json")
 	if err == nil {
 		t.Fatal("missing file")
 	}
 
-	p := t.TempDir() + "/bad.json"
+	bad := t.TempDir() + "/bad.json"
 
-	_ = os.WriteFile(p, []byte("{"), 0o600)
+	err = os.WriteFile(bad, []byte("{"), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	_, err = Load(p)
+	_, err = Load(bad)
 	if err == nil {
 		t.Fatal("bad json")
 	}
@@ -62,6 +72,8 @@ func TestLoadErrors(t *testing.T) {
 // Every demo actor has its own display name: screens list memberships by name (members.list displayName, IR172), so a
 // copied name shows two people as one (R293: the override-only actor was named "hq-operator").
 func TestActorNamesUnique(t *testing.T) {
+	t.Parallel()
+
 	fixture, err := Load(fixturePath)
 	if err != nil {
 		t.Fatal(err)
@@ -69,34 +81,41 @@ func TestActorNamesUnique(t *testing.T) {
 
 	seen := map[string]string{}
 
-	for _, a := range fixture.Actors {
-		if a.DisplayName == "" {
-			t.Errorf("%s has no display name", a.MembershipID)
+	for _, actor := range fixture.Actors {
+		if actor.DisplayName == "" {
+			t.Errorf("%s has no display name", actor.MembershipID)
 		}
 
-		if other, ok := seen[a.DisplayName]; ok {
-			t.Errorf("%s and %s share the display name %q", other, a.MembershipID, a.DisplayName)
+		if other, ok := seen[actor.DisplayName]; ok {
+			t.Errorf(
+				"%s and %s share the display name %q",
+				other,
+				actor.MembershipID,
+				actor.DisplayName,
+			)
 		}
 
-		seen[a.DisplayName] = a.MembershipID
+		seen[actor.DisplayName] = actor.MembershipID
 	}
 }
 
 // Applies the fixture twice in a rolled-back transaction and checks the row counts.
 func TestApplyFixture(t *testing.T) {
+	t.Parallel()
+
 	fixture, err := Load(fixturePath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	c := ownerConn(t)
+	conn := ownerConn(t)
 	ctx := context.Background()
 
-	txn, err := c.Begin(ctx)
+	txn, err := conn.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer txn.Rollback(ctx)
+	defer func() { _ = txn.Rollback(ctx) }()
 
 	for i := range 2 {
 		err := Apply(ctx, txn, fixture)
@@ -160,10 +179,10 @@ func TestApplyFixture(t *testing.T) {
 
 	var perms int
 
-	_ = txn.QueryRow(ctx, `SELECT count(*) FROM identity.membership_permissions WHERE
+	err = txn.QueryRow(ctx, `SELECT count(*) FROM identity.membership_permissions WHERE
 		membership_id=$1`, ID("hq-operator")).
 		Scan(&perms)
-	if perms == 0 {
+	if err != nil || perms == 0 {
 		t.Error("hq-operator has no permissions")
 	}
 

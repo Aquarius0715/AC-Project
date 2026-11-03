@@ -29,24 +29,24 @@ type Waiting struct {
 // keeps the expiry on its scenario clock and the module runs on real time, so the expiry is moved by the clock offset
 // (scenario minus real): the module then decides "in time" and "late" on its own clock.
 func CommandMessage(waiting Waiting, offset time.Duration) (devicesim.Command, error) {
-	var a struct {
+	var action struct {
 		Kind    string   `json:"kind"`
 		Celsius *float64 `json:"celsius"`
 	}
 
-	err := json.Unmarshal(waiting.Action, &a)
+	err := json.Unmarshal(waiting.Action, &action)
 	if err != nil {
 		return devicesim.Command{}, fmt.Errorf("command %s action: %w", waiting.ID, err)
 	}
 
-	if a.Kind == "" {
+	if action.Kind == "" {
 		return devicesim.Command{}, fmt.Errorf("command %s %w", waiting.ID, errNoActionKind)
 	}
 
 	return devicesim.Command{
 		CommandID: waiting.ID.String(),
-		Kind:      a.Kind,
-		Setpoint:  a.Celsius,
+		Kind:      action.Kind,
+		Setpoint:  action.Celsius,
 		ExpiresAt: waiting.ExpiresAt.Add(-offset).UTC(),
 	}, nil
 }
@@ -57,7 +57,7 @@ func SentTrigger(w Waiting, when time.Time) Trigger {
 
 	return Trigger{
 		ScenarioID:  Scenario,
-		EventID:     uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/sent", cmd))),
+		EventID:     uuid.NewSHA1(seed.Namespace(), []byte(fmt.Sprintf("%s/sent", cmd))),
 		OccurredAt:  when.UTC(),
 		EventType:   "command_sent",
 		CommandID:   &cmd,
@@ -81,13 +81,13 @@ func CommandTopic(tenant, device uuid.UUID) string {
 // heartbeat without a state, as a module that reads no air-conditioner settings sends it, is a report with no settings,
 // which the API takes as heard only (IR528): the device's last seen time follows its heartbeats, as the live module's
 // does (IR613).
-func StateTrigger(hb devicesim.Heartbeat, when time.Time) (Trigger, error) {
-	dev, err := uuid.Parse(hb.DeviceID)
+func StateTrigger(heartbeat devicesim.Heartbeat, when time.Time) (Trigger, error) {
+	dev, err := uuid.Parse(heartbeat.DeviceID)
 	if err != nil {
-		return Trigger{}, fmt.Errorf("device %q: %w", hb.DeviceID, err)
+		return Trigger{}, fmt.Errorf("device %q: %w", heartbeat.DeviceID, err)
 	}
 
-	state := hb.State
+	state := heartbeat.State
 	if state == nil {
 		state = &devicesim.ReportedState{Power: nil, Celsius: nil, Mode: nil, FanLevel: nil}
 	}
@@ -97,7 +97,7 @@ func StateTrigger(hb devicesim.Heartbeat, when time.Time) (Trigger, error) {
 	return Trigger{
 		ScenarioID: Scenario,
 		EventID: uuid.NewSHA1(
-			seed.Namespace,
+			seed.Namespace(),
 			[]byte(fmt.Sprintf("%s/state/%s", dev, when.Format(time.RFC3339Nano))),
 		),
 		OccurredAt:  when,

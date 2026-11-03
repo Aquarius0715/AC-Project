@@ -39,7 +39,7 @@ func TestLiveSiteSeeds(t *testing.T) {
 		t.Fatalf("apply: %v", applyLiveErr)
 	}
 
-	site := seed.LiveSite
+	site := seed.LiveSite()
 	count := func(sql string, args ...any) int {
 		var total int
 
@@ -327,7 +327,7 @@ func TestLiveSiteRefusesATakenAddress(t *testing.T) {
 	_, execErr := txn.Exec(
 		ctx,
 		`INSERT INTO identity.users (email, display_name) VALUES ($1, 'Someone else')`,
-		seed.LiveSite.Owner.Email,
+		seed.LiveSite().Owner.Email,
 	)
 	if execErr != nil {
 		t.Fatal(execErr)

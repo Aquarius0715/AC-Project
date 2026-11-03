@@ -291,7 +291,7 @@ func fixtureModule(tenant, name, firmware string) (*devicesim.Module, bool) {
 	id := seed.ID(name).String()
 
 	module := devicesim.NewModule(tenant, id, firmware, seedOf(id)).Only(sensorsOf(name)...)
-	for _, l := range iotbridge.Links {
+	for _, l := range iotbridge.Links() {
 		if l.Device == name && l.Connection != "online" {
 			return module.Behave("silent", "ignore", false), false
 		}
@@ -302,7 +302,7 @@ func fixtureModule(tenant, name, firmware string) (*devicesim.Module, bool) {
 
 // sensorsOf names the sensors a fixture device has (its bridge link), so it reports only those.
 func sensorsOf(device string) []string {
-	for _, l := range iotbridge.Links {
+	for _, l := range iotbridge.Links() {
 		if l.Device == device {
 			out := make([]string, 0, len(l.Sensors))
 			for name := range l.Sensors {
@@ -318,8 +318,8 @@ func sensorsOf(device string) []string {
 
 // demoDevices are the fixture devices (the links of internal/iotbridge), with or without sensors.
 func demoDevices() []string {
-	out := make([]string, 0, len(iotbridge.Links))
-	for _, l := range iotbridge.Links {
+	out := make([]string, 0, len(iotbridge.Links()))
+	for _, l := range iotbridge.Links() {
 		out = append(out, l.Device)
 	}
 

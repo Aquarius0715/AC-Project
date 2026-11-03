@@ -14,6 +14,8 @@ import (
 // TestCommandMessageFromTheStoredAction: a stored set-temperature action becomes the module's command with its setpoint
 // and expiry; an action without a kind is refused; the sent report names the command.
 func TestCommandMessageFromTheStoredAction(t *testing.T) {
+	t.Parallel()
+
 	waiting := iotbridge.Waiting{
 		ID:        uuid.MustParse("9f67089f-44c9-5231-ba20-03d3b9a1be53"),
 		DeviceID:  iotbridge.DeviceID("device-online-rto"),
@@ -54,6 +56,8 @@ func TestCommandMessageFromTheStoredAction(t *testing.T) {
 
 // TestCommandTopicOfTheDevice: the command goes down the device's own topic in its tenant.
 func TestCommandTopicOfTheDevice(t *testing.T) {
+	t.Parallel()
+
 	tenant := uuid.MustParse("820cc6b6-9ea8-5d18-8b10-5c8c1d126814")
 	if got, want := iotbridge.CommandTopic(
 		tenant,
@@ -65,6 +69,8 @@ func TestCommandTopicOfTheDevice(t *testing.T) {
 
 // TestCommandMessageRefusesBadActions: an action that is not JSON is refused with the command named.
 func TestCommandMessageRefusesBadActions(t *testing.T) {
+	t.Parallel()
+
 	waiting := iotbridge.Waiting{
 		ID:        uuid.New(),
 		Action:    json.RawMessage(`{"kind":`),
@@ -82,6 +88,8 @@ func TestCommandMessageRefusesBadActions(t *testing.T) {
 // TestCommandExpiryOnTheDeviceClock: the expiry the module sees is the API's expiry moved onto real time, so a scenario
 // clock 29 days behind real time gives an expiry 29 days later on the module's clock.
 func TestCommandExpiryOnTheDeviceClock(t *testing.T) {
+	t.Parallel()
+
 	scenario := time.Date(2026, 9, 14, 22, 0, 30, 0, time.UTC)
 	offset := -29 * 24 * time.Hour // scenario minus real
 	waiting := iotbridge.Waiting{
@@ -104,7 +112,9 @@ func TestCommandExpiryOnTheDeviceClock(t *testing.T) {
 // without a state becomes a report with no settings, which the API takes as heard only (IR528, IR613); a bad device ID
 // is an error.
 func TestStateTriggerFromAHeartbeat(t *testing.T) {
-	on, c := true, 24.0
+	t.Parallel()
+
+	power, celsius := true, 24.0
 	dev := iotbridge.DeviceID("device-mock-cool-on")
 	when := time.Date(2026, 9, 15, 1, 30, 0, 0, time.UTC)
 
@@ -112,8 +122,8 @@ func TestStateTriggerFromAHeartbeat(t *testing.T) {
 		devicesim.Heartbeat{
 			DeviceID: dev.String(),
 			State: &devicesim.ReportedState{
-				Power:    &on,
-				Celsius:  &c,
+				Power:    &power,
+				Celsius:  &celsius,
 				Mode:     nil,
 				FanLevel: nil,
 			},

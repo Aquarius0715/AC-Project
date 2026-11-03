@@ -32,56 +32,73 @@ type LiveOwner struct {
 	Email, Name                  string
 }
 
-// LiveSite is where the readings of real sensor nodes land (DEC-86, IR524): a customer of its own (DEC-87, IR525)
-// with one Daikin air conditioner (DEC-89, IR528). The two nodes in front of it make one module: node_1 measures the
-// room, node_2 the air conditioner's supply, and node_1's infrared LED switches it on and off. The model offers the
-// power only, the one setting the nodes' firmware takes (ON, OFF and a cooling preset). The IoT bridge subscribes to
-// the nodes' broker (REAL_MQTT_URL), sends their readings to these sensors and the power commands to node_1.
-// Development only.
-var LiveSite = struct {
+// Site is a site the seed adds outside the fixture, by the fixture-style names of its records.
+type Site struct {
 	Tenant, CustomerOrgID, Customer, CustomerName     string
 	Owner                                             LiveOwner
 	Property, Floor, Room                             string
 	Capability, Manufacturer, Model, UnitName, Serial string
 	Unit, Device, Binding                             string
 	Sensors                                           []LiveSensor
-}{
-	Tenant:        demoTenant,
-	CustomerOrgID: "org-customer-live",
-	Customer:      "cust-live",
-	CustomerName:  "Live Sensor Customer",
-	Owner: LiveOwner{
-		User:       "user-live-owner",
-		Membership: "live-owner",
-		ClientUser: "client-user-live-owner",
-		Email:      "live-sensors@example.com",
-		Name:       "Live Sensor Owner",
-	},
-	Property:     "property-live-sensors",
-	Floor:        "space-live-1f",
-	Room:         "space-live-room",
-	Capability:   "cap-live-daikin",
-	Manufacturer: "Daikin",
-	Model:        "IR via node_1",
-	UnitName:     "Live · Daikin AC",
-	Serial:       "node_1+node_2",
-	Unit:         "unit-live-ac",
-	Device:       "device-live-ac",
-	Binding:      "binding-live-ac",
-	Sensors: []LiveSensor{
-		{Name: "sensor-live-temperature", Metric: "temperature", Unit: "°C", Boundary: ""},
-		{Name: "sensor-live-humidity", Metric: "humidity", Unit: "%", Boundary: ""},
-		{Name: "sensor-live-power", Metric: keyPower, Unit: "kW", Boundary: "ac_input_electricity"},
-	},
+}
+
+// liveStaleAfterSeconds is when a live reading goes stale: two missed minutes (the bridge sends one reading a minute).
+const liveStaleAfterSeconds = 120
+
+// liveExec runs one statement of the live seed; what names the record in its error.
+type liveExec func(what, sql string, args ...any) error
+
+// LiveSite is where the readings of real sensor nodes land (DEC-86, IR524): a customer of its own (DEC-87, IR525)
+// with one Daikin air conditioner (DEC-89, IR528). The two nodes in front of it make one module: node_1 measures the
+// room, node_2 the air conditioner's supply, and node_1's infrared LED switches it on and off. The model offers the
+// power only, the one setting the nodes' firmware takes (ON, OFF and a cooling preset). The IoT bridge subscribes to
+// the nodes' broker (REAL_MQTT_URL), sends their readings to these sensors and the power commands to node_1.
+// Development only.
+func LiveSite() Site {
+	return Site{
+		Tenant:        demoTenant,
+		CustomerOrgID: "org-customer-live",
+		Customer:      "cust-live",
+		CustomerName:  "Live Sensor Customer",
+		Owner: LiveOwner{
+			User:       "user-live-owner",
+			Membership: "live-owner",
+			ClientUser: "client-user-live-owner",
+			Email:      "live-sensors@example.com",
+			Name:       "Live Sensor Owner",
+		},
+		Property:     "property-live-sensors",
+		Floor:        "space-live-1f",
+		Room:         "space-live-room",
+		Capability:   "cap-live-daikin",
+		Manufacturer: "Daikin",
+		Model:        "IR via node_1",
+		UnitName:     "Live · Daikin AC",
+		Serial:       "node_1+node_2",
+		Unit:         "unit-live-ac",
+		Device:       "device-live-ac",
+		Binding:      "binding-live-ac",
+		Sensors: []LiveSensor{
+			{Name: "sensor-live-temperature", Metric: "temperature", Unit: "°C", Boundary: ""},
+			{Name: "sensor-live-humidity", Metric: "humidity", Unit: "%", Boundary: ""},
+			{
+				Name:     "sensor-live-power",
+				Metric:   keyPower,
+				Unit:     "kW",
+				Boundary: "ac_input_electricity",
+			},
+		},
+	}
 }
 
 // ApplyLive adds the live site to a seeded database: the live customer and its owner (liveOwner), the model (remote
-// power only), a property with one room, the air conditioner and its module, online since at. Records that exist are
-// kept (ON CONFLICT DO NOTHING), so it can run on every start. Development only: tests and production never load it.
-func ApplyLive(ctx context.Context, txn pgx.Tx, at time.Time) error {
-	s := LiveSite
-	tenant := ID(s.Tenant)
-	ex := func(what, sql string, args ...any) error {
+// power only), a property with one room, the air conditioner and its module, online as of now. Records that exist
+// are kept (ON CONFLICT DO NOTHING), so it can run on every start. Development only: tests and production
+// never load it.
+func ApplyLive(ctx context.Context, txn pgx.Tx, now time.Time) error {
+	site := LiveSite()
+	tenant := ID(site.Tenant)
+	exec := func(what, sql string, args ...any) error {
 		_, err := txn.Exec(ctx, sql, args...)
 		if err != nil {
 			return fmt.Errorf("live site %s: %w", what, err)
@@ -90,38 +107,59 @@ func ApplyLive(ctx context.Context, txn pgx.Tx, at time.Time) error {
 		return nil
 	}
 	// the customer as HQ adds one: its organization, then the customer (organizations.save, customers.save)
-	err := ex(
+	err := exec(
 		"customer organization",
 		`INSERT INTO identity.organizations (id, tenant_id, name, kind, status, created_at, updated_at)
 		VALUES ($1,$2,$3,'customer','active',$4,$4) ON CONFLICT DO NOTHING`,
-		ID(s.CustomerOrgID),
+		ID(site.CustomerOrgID),
 		tenant,
-		s.CustomerName,
-		at,
+		site.CustomerName,
+		now,
 	)
 	if err != nil {
 		return err
 	}
 
-	err = ex(
+	err = exec(
 		"customer",
 		`INSERT INTO assets.customers (id, tenant_id, organization_id, name, status, service_profile, created_at, updated_at)
 		VALUES ($1,$2,$3,$4,'active','environment',$5,$5) ON CONFLICT DO NOTHING`,
-		ID(s.Customer),
+		ID(site.Customer),
 		tenant,
-		ID(s.CustomerOrgID),
-		s.CustomerName,
-		at,
+		ID(site.CustomerOrgID),
+		site.CustomerName,
+		now,
 	)
 	if err != nil {
 		return err
 	}
 
-	err = liveOwner(ctx, txn, tenant, at)
+	err = liveOwner(ctx, txn, tenant, now)
 	if err != nil {
 		return err
 	}
 
+	err = liveModel(exec, site, tenant)
+	if err != nil {
+		return err
+	}
+
+	err = livePlace(exec, site, tenant)
+	if err != nil {
+		return err
+	}
+
+	err = liveUnit(exec, site, tenant, now)
+	if err != nil {
+		return err
+	}
+
+	return liveModule(ctx, txn, exec, site, tenant, now)
+}
+
+// liveModel adds the live air conditioner's model: remote power only, no mode, fan or temperature setting (the
+// deterministic contracts take empty lists and a null temperature), with the module's sensors.
+func liveModel(exec liveExec, site Site, tenant uuid.UUID) error {
 	type capSensor struct {
 		Metric            string  `json:"metric"`
 		Unit              string  `json:"unit"`
@@ -129,110 +167,122 @@ func ApplyLive(ctx context.Context, txn pgx.Tx, at time.Time) error {
 		BoundaryID        *string `json:"boundaryId"`
 	}
 
-	var sensors []capSensor
-
-	for _, x := range s.Sensors {
-		cs := capSensor{Metric: x.Metric, Unit: x.Unit, StaleAfterSeconds: 120, BoundaryID: nil}
-		if x.Boundary != "" {
-			cs.BoundaryID = &x.Boundary
+	sensors := make([]capSensor, 0, len(site.Sensors))
+	for _, sensor := range site.Sensors {
+		capSens := capSensor{
+			Metric:            sensor.Metric,
+			Unit:              sensor.Unit,
+			StaleAfterSeconds: liveStaleAfterSeconds,
+			BoundaryID:        nil,
+		}
+		if sensor.Boundary != "" {
+			capSens.BoundaryID = &sensor.Boundary
 		}
 
-		sensors = append(sensors, cs)
+		sensors = append(sensors, capSens)
 	}
 
 	capSensors, err := json.Marshal(sensors)
 	if err != nil {
 		return apperr.Wrap(err, "json.Marshal")
 	}
-	// remote power only: no mode, fan or temperature setting (deterministic contracts: empty lists, null temperature)
-	exErr := ex(
+
+	return exec(
 		"model",
 		`INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control,
 			temperature,
 		modes, fan_levels, ventilation, ventilation_levels, sensors, firmware_candidates, is_current)
 		VALUES ($1,1,$2,$3,$4,true,false,false,NULL,'{}','{}',false,'{}',$5,'{}',true) ON CONFLICT DO NOTHING`,
-		ID(s.Capability),
+		ID(site.Capability),
 		tenant,
-		s.Manufacturer,
-		s.Model,
+		site.Manufacturer,
+		site.Model,
 		capSensors,
 	)
-	if exErr != nil {
-		return exErr
-	}
+}
 
-	exErr = ex(
+// livePlace adds the live site's property with one floor and its room.
+func livePlace(exec liveExec, site Site, tenant uuid.UUID) error {
+	err := exec(
 		"property",
 		`INSERT INTO assets.properties (id, tenant_id, customer_org_id, kind, name, address, access_instructions, archived)
 		VALUES ($1,$2,$3,'office','Live sensors',NULL,NULL,false) ON CONFLICT DO NOTHING`,
-		ID(s.Property),
+		ID(site.Property),
 		tenant,
-		ID(s.CustomerOrgID),
+		ID(site.CustomerOrgID),
 	)
-	if exErr != nil {
-		return exErr
+	if err != nil {
+		return err
 	}
 
-	exErr = ex(
+	err = exec(
 		"floor",
 		`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name) VALUES ($1,$2,$3,NULL,'floor',
 			'1F') ON CONFLICT DO NOTHING`,
-		ID(s.Floor),
+		ID(site.Floor),
 		tenant,
-		ID(s.Property),
+		ID(site.Property),
 	)
-	if exErr != nil {
-		return exErr
+	if err != nil {
+		return err
 	}
 
-	exErr = ex(
+	return exec(
 		"room",
 		`INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name) VALUES ($1,$2,$3,$4,'room',
 			'Sensor room') ON CONFLICT DO NOTHING`,
-		ID(s.Room),
+		ID(site.Room),
 		tenant,
-		ID(s.Property),
-		ID(s.Floor),
+		ID(site.Property),
+		ID(site.Floor),
 	)
-	if exErr != nil {
-		return exErr
-	}
-	// the air conditioner's settings are unknown until a command sets them (the nodes report none)
+}
+
+// liveUnit adds the live air conditioner in the room as of now; its settings are unknown until a command sets them
+// (the nodes report none).
+func liveUnit(exec liveExec, site Site, tenant uuid.UUID, now time.Time) error {
+	// the air conditioner'site settings are unknown until a command sets them (the nodes report none)
 	state, marshalErr := json.Marshal(
 		map[string]any{
 			keyPower:      nil,
 			"celsius":     nil,
 			"mode":        nil,
 			"fanLevel":    nil,
-			keyObservedAt: at.UTC(),
+			keyObservedAt: now.UTC(),
 		},
 	)
 	if marshalErr != nil {
 		return apperr.Wrap(marshalErr, "json.Marshal")
 	}
 
-	unit := ID(s.Unit)
-
-	exErr = ex(
+	return exec(
 		"unit",
 		`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id,
 			installed_at,
 		service_scope, archived, capability_version, observed_state, observed_restriction, version, warranty_ends_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,'{indoor,outdoor,electrical}',false,1,$8,NULL,1,NULL) ON CONFLICT DO NOTHING`,
-		unit,
+		ID(site.Unit),
 		tenant,
-		ID(s.CustomerOrgID),
-		ID(s.Property),
-		ID(s.Room),
-		s.UnitName,
-		ID(s.Capability),
+		ID(site.CustomerOrgID),
+		ID(site.Property),
+		ID(site.Room),
+		site.UnitName,
+		ID(site.Capability),
 		state,
 	)
-	if exErr != nil {
-		return exErr
-	}
+}
 
-	device, binding := ID(s.Device), ID(s.Binding)
+// liveModule adds the live site's module, online as of now, with its sensors and its binding to the unit; the unit
+// mirrors a new module's connection and last seen (IR47), while a module from an earlier start keeps its own.
+func liveModule(
+	ctx context.Context,
+	txn pgx.Tx,
+	exec liveExec,
+	site Site,
+	tenant uuid.UUID,
+	now time.Time,
+) error {
+	unit, device, binding := ID(site.Unit), ID(site.Device), ID(site.Binding)
 
 	added, err := txn.Exec(
 		ctx,
@@ -242,40 +292,41 @@ func ApplyLive(ctx context.Context, txn pgx.Tx, at time.Time) error {
 		CONFLICT DO NOTHING`,
 		device,
 		tenant,
-		s.Serial,
+		site.Serial,
 		binding,
 		unit,
 		ID("system-demo"),
-		at,
+		now,
 	)
 	if err != nil {
 		return fmt.Errorf("live site module: %w", err)
 	}
 
-	for _, liveSensor := range s.Sensors {
+	for _, liveSensor := range site.Sensors {
 		var boundary *string
 		if liveSensor.Boundary != "" {
 			boundary = &liveSensor.Boundary
 		}
 
-		err := ex(
+		err := exec(
 			"sensor "+liveSensor.Metric,
 			`INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds,
 				calibrated_at)
-			VALUES ($1,$2,$3,$4,$5,$6,120,NULL) ON CONFLICT DO NOTHING`,
+			VALUES ($1,$2,$3,$4,$5,$6,$7,NULL) ON CONFLICT DO NOTHING`,
 			ID(liveSensor.Name),
 			tenant,
 			device,
 			liveSensor.Metric,
 			liveSensor.Unit,
 			boundary,
+			liveStaleAfterSeconds,
 		)
 		if err != nil {
 			return err
 		}
 	}
 
-	exErr = ex(
+	err = exec(
 		"binding",
 		`INSERT INTO devices.device_bindings (id, tenant_id, device_id, unit_id, customer_org_id, bound_at, reason,
 			actor_membership_id)
@@ -284,23 +335,23 @@ func ApplyLive(ctx context.Context, txn pgx.Tx, at time.Time) error {
 		tenant,
 		device,
 		unit,
-		ID(s.CustomerOrgID),
-		at,
+		ID(site.CustomerOrgID),
+		now,
 		ID("system-demo"),
 	)
-	if exErr != nil {
-		return exErr
+	if err != nil {
+		return err
 	}
 
 	if added.RowsAffected() == 0 { // a module from an earlier start keeps its connection and last seen
 		return nil
 	}
-	// the unit mirrors its new module's connection and last seen (IR47)
-	return ex(
+	// the unit mirrors its new module'site connection and last seen (IR47)
+	return exec(
 		"unit connection",
 		`UPDATE assets.units SET connection = 'online', last_seen_at = $2 WHERE id = $1`,
 		unit,
-		at,
+		now,
 	)
 }
 
@@ -309,34 +360,15 @@ func ApplyLive(ctx context.Context, txn pgx.Tx, at time.Time) error {
 // entry in the customer's user list. A new membership asks for the sign-in account as bootstrap-admin does (IR509): on
 // AccountRequested the identity-accounts consumer opens it, with the address as its username, and e-mails the set-up
 // link (in development to Mailpit), where the owner chooses a password. A membership that exists asks for nothing.
-func liveOwner(ctx context.Context, txn pgx.Tx, tenant uuid.UUID, at time.Time) error {
-	o, org, customer := LiveSite.Owner, ID(LiveSite.CustomerOrgID), ID(LiveSite.Customer)
+func liveOwner(ctx context.Context, txn pgx.Tx, tenant uuid.UUID, now time.Time) error {
+	site := LiveSite()
+	owner, org, customer := site.Owner, ID(site.CustomerOrgID), ID(site.Customer)
 
-	user, membership := ID(o.User), ID(o.Membership)
+	user, membership := ID(owner.User), ID(owner.Membership)
 
-	_, err := txn.Exec(
-		ctx,
-		`INSERT INTO identity.users (id, email, display_name, status, created_at, updated_at) VALUES ($1,$2,$3,'active',$4,$4)
-		ON CONFLICT DO NOTHING`,
-		user,
-		o.Email,
-		o.Name,
-		at,
-	)
+	err := livePerson(ctx, txn, owner, user, now)
 	if err != nil {
-		return fmt.Errorf("live owner: %w", err)
-	}
-
-	var holder uuid.UUID
-
-	err = txn.QueryRow(ctx, `SELECT id FROM identity.users WHERE email = $1`, o.Email).
-		Scan(&holder)
-	if err != nil {
-		return fmt.Errorf("live owner: %w", err)
-	}
-
-	if holder != user {
-		return fmt.Errorf("live owner: %s %w", o.Email, errAddressTaken)
+		return err
 	}
 
 	added, err := txn.Exec(
@@ -348,23 +380,114 @@ func liveOwner(ctx context.Context, txn pgx.Tx, tenant uuid.UUID, at time.Time) 
 		tenant,
 		user,
 		org,
-		at,
+		now,
 	)
 	if err != nil {
 		return fmt.Errorf("live owner membership: %w", err)
 	}
 
-	for _, p := range identity.DefaultPermissions("client") {
+	err = liveOwnerAccess(ctx, txn, tenant, membership, org, now)
+	if err != nil {
+		return err
+	}
+
+	_, execErr := txn.Exec(
+		ctx,
+		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role,
+			status, invited_at,
+		invited_by_membership_id, last_invite_sent_at, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,'owner','invited',$7,
+		$4,$7,$7,$7) ON CONFLICT DO NOTHING`,
+		ID(owner.ClientUser),
+		tenant,
+		customer,
+		membership,
+		owner.Email,
+		owner.Name,
+		now,
+	)
+	if execErr != nil {
+		return fmt.Errorf("live owner user list: %w", execErr)
+	}
+
+	if added.RowsAffected() == 0 {
+		return nil
+	}
+
+	_, err = txn.Exec(
+		ctx,
+		`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
+			occurred_at)
+		VALUES ($1, 'membership', $2, $3, jsonb_build_object('userId', $4::uuid::text, 'membershipId', $2::uuid::text, 'role',
+		'client'), 'seed-live-site', $5)`,
+		tenant,
+		membership,
+		identity.EventAccountRequested,
+		user,
+		now,
+	)
+	if err != nil {
+		return fmt.Errorf("live owner account: %w", err)
+	}
+
+	return nil
+}
+
+// livePerson adds the live owner's person, unless the address is already theirs; an address another person holds
+// stops the seed.
+func livePerson(
+	ctx context.Context,
+	txn pgx.Tx,
+	owner LiveOwner,
+	user uuid.UUID,
+	now time.Time,
+) error {
+	_, err := txn.Exec(
+		ctx,
+		`INSERT INTO identity.users (id, email, display_name, status, created_at, updated_at) VALUES ($1,$2,$3,'active',$4,$4)
+		ON CONFLICT DO NOTHING`,
+		user,
+		owner.Email,
+		owner.Name,
+		now,
+	)
+	if err != nil {
+		return fmt.Errorf("live owner: %w", err)
+	}
+
+	var holder uuid.UUID
+
+	err = txn.QueryRow(ctx, `SELECT id FROM identity.users WHERE email = $1`, owner.Email).
+		Scan(&holder)
+	if err != nil {
+		return fmt.Errorf("live owner: %w", err)
+	}
+
+	if holder != user {
+		return fmt.Errorf("live owner: %s %w", owner.Email, errAddressTaken)
+	}
+
+	return nil
+}
+
+// liveOwnerAccess gives the owner's membership a client's permissions over the organization and the initial location
+// consent (IR84).
+func liveOwnerAccess(
+	ctx context.Context,
+	txn pgx.Tx,
+	tenant, membership, org uuid.UUID,
+	now time.Time,
+) error {
+	for _, permission := range identity.DefaultPermissions("client") {
 		_, err := txn.Exec(
 			ctx,
 			`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1,$2,$3) ON CONFLICT DO
 				NOTHING`,
 			tenant,
 			membership,
-			p,
+			permission,
 		)
 		if err != nil {
-			return fmt.Errorf("live owner permission %s: %w", p, err)
+			return fmt.Errorf("live owner permission %s: %w", permission, err)
 		}
 	}
 
@@ -387,48 +510,10 @@ func liveOwner(ctx context.Context, txn pgx.Tx, tenant uuid.UUID, at time.Time) 
 		ON CONFLICT DO NOTHING`,
 		tenant,
 		membership,
-		at,
+		now,
 	)
 	if execErr != nil {
 		return fmt.Errorf("live owner consent: %w", execErr)
-	}
-
-	_, execErr = txn.Exec(
-		ctx,
-		`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, display_name, client_role,
-			status, invited_at,
-		invited_by_membership_id, last_invite_sent_at, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,'owner','invited',$7,
-		$4,$7,$7,$7) ON CONFLICT DO NOTHING`,
-		ID(o.ClientUser),
-		tenant,
-		customer,
-		membership,
-		o.Email,
-		o.Name,
-		at,
-	)
-	if execErr != nil {
-		return fmt.Errorf("live owner user list: %w", execErr)
-	}
-
-	if added.RowsAffected() == 0 {
-		return nil
-	}
-
-	_, err = txn.Exec(
-		ctx,
-		`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id,
-			occurred_at)
-		VALUES ($1, 'membership', $2, $3, jsonb_build_object('userId', $4::uuid::text, 'membershipId', $2::uuid::text, 'role',
-		'client'), 'seed-live-site', $5)`,
-		tenant,
-		membership,
-		identity.EventAccountRequested,
-		user,
-		at,
-	)
-	if err != nil {
-		return fmt.Errorf("live owner account: %w", err)
 	}
 
 	return nil

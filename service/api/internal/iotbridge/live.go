@@ -33,18 +33,23 @@ type LiveField struct {
 	Gate string
 }
 
+// kWPerWatt scales the meter's power in W to the sensor's kW.
+const kWPerWatt = 0.001
+
 // LiveNodes are the real sensor nodes and the fields the bridge records from each: node_1 measures the room
 // (temperature, humidity; also pressure, gas resistance and altitude, which the platform has no metric for) and
 // node_2 the air conditioner's supply (power in W; also voltage, current and cumulative energy, which the platform
 // derives from power instead). Both report one JSON message every 5 seconds on smarthome/ac/<node>/sensors.
-var LiveNodes = map[string][]LiveField{
-	"node_1": {
-		{Field: "temp", Sensor: "sensor-live-temperature", Scale: 1, Gate: "temp"},
-		{Field: sensorHumidity, Sensor: "sensor-live-humidity", Scale: 1, Gate: sensorHumidity},
-	},
-	"node_2": {
-		{Field: sensorPower, Sensor: "sensor-live-power", Scale: 0.001, Gate: "voltage"},
-	},
+func LiveNodes() map[string][]LiveField {
+	return map[string][]LiveField{
+		"node_1": {
+			{Field: "temp", Sensor: "sensor-live-temperature", Scale: 1, Gate: "temp"},
+			{Field: sensorHumidity, Sensor: "sensor-live-humidity", Scale: 1, Gate: sensorHumidity},
+		},
+		"node_2": {
+			{Field: sensorPower, Sensor: "sensor-live-power", Scale: kWPerWatt, Gate: "voltage"},
+		},
+	}
 }
 
 // LiveNode is the node a topic carries: the level before the last, sensors (smarthome/ac/<node>/sensors); "" for any
@@ -66,7 +71,7 @@ func LiveNode(topic string) string {
 // API takes as heard only (IR528) and which keeps the unit's last seen time current. A node the bridge does not know is
 // an error; a message with nothing measured gives no triggers.
 func LiveTriggers(node string, payload []byte, when time.Time) ([]Trigger, error) {
-	fields, ok := LiveNodes[node]
+	fields, ok := LiveNodes()[node]
 	if !ok {
 		return nil, fmt.Errorf("node %q %w", node, errNotLiveNode)
 	}
@@ -78,68 +83,12 @@ func LiveTriggers(node string, payload []byte, when time.Time) ([]Trigger, error
 		return nil, fmt.Errorf("node %s: %w", node, err)
 	}
 
-	num := func(k string) (float64, bool) {
-		v, ok := msg[k].(float64)
-
-		return v, ok
-	}
 	when = when.UTC()
 	slot := when.Truncate(time.Minute)
 
-	units := map[string]seed.LiveSensor{}
-	for _, s := range seed.LiveSite.Sensors {
-		units[s.Name] = s
-	}
-
-	var out []Trigger
-
-	for _, liveField := range fields {
-		g, ok := num(liveField.Gate)
-
-		v, has := num(liveField.Field)
-		if !ok || g == 0 || !has {
-			continue
-		}
-
-		liveSensor, ok := units[liveField.Sensor]
-		if !ok {
-			return nil, fmt.Errorf(
-				"node %s: %w %s",
-				node,
-				errNoLiveSensor,
-				liveField.Sensor,
-			)
-		}
-
-		value := v * liveField.Scale
-		event := uuid.NewSHA1(
-			seed.Namespace,
-			[]byte(fmt.Sprintf("live/%s/%s/%s", node, liveField.Field, slot.Format(time.RFC3339))),
-		)
-		out = append(out, Trigger{
-			ScenarioID: Scenario,
-			EventID:    event,
-			OccurredAt: slot,
-			EventType:  "telemetry",
-			Measurement: &Measurement{
-				UnitID: seed.ID(
-					seed.LiveSite.Unit,
-				),
-				SensorID:   seed.ID(liveSensor.Name),
-				Metric:     liveSensor.Metric,
-				Value:      &value,
-				Unit:       liveSensor.Unit,
-				ObservedAt: slot,
-				ReceivedAt: when,
-				Origin:     "measured",
-				Quality:    qualityValid,
-				EventID:    event, Sequence: nil,
-			}, CommandID: nil, DeviceID: nil, State: nil, Event: nil, BindingID: nil, Sequence: nil, Kind: "", Recovery: nil,
-		})
-	}
-
-	if len(out) == 0 {
-		return nil, nil
+	out, err := liveReadings(node, fields, msg, slot, when)
+	if err != nil || len(out) == 0 {
+		return nil, err
 	}
 	// the same readings as facts of the unit's alert policies (IR529): a rule over a threshold alerts and notifies
 	facts := make([]Fact, 0, len(out))
@@ -165,13 +114,91 @@ func LiveTriggers(node string, payload []byte, when time.Time) ([]Trigger, error
 			slot,
 			facts,
 		),
+		liveHeartbeat(slot),
 	)
-	dev := seed.ID(seed.LiveSite.Device)
-	out = append(out, Trigger{
+
+	return out, nil
+}
+
+// liveReadings are the readings of one node message: each field the node measured (its gate is not zero) on the live
+// module's sensor it is recorded as, at the minute slot, with the node, field and minute as its event ID.
+func liveReadings(
+	node string,
+	fields []LiveField,
+	msg map[string]any,
+	slot, when time.Time,
+) ([]Trigger, error) {
+	num := func(k string) (float64, bool) {
+		v, ok := msg[k].(float64)
+
+		return v, ok
+	}
+
+	sensors := map[string]seed.LiveSensor{}
+	for _, s := range seed.LiveSite().Sensors {
+		sensors[s.Name] = s
+	}
+
+	var out []Trigger
+
+	for _, liveField := range fields {
+		g, ok := num(liveField.Gate)
+
+		v, has := num(liveField.Field)
+		if !ok || g == 0 || !has {
+			continue
+		}
+
+		liveSensor, ok := sensors[liveField.Sensor]
+		if !ok {
+			return nil, fmt.Errorf(
+				"node %s: %w %s",
+				node,
+				errNoLiveSensor,
+				liveField.Sensor,
+			)
+		}
+
+		value := v * liveField.Scale
+		event := uuid.NewSHA1(
+			seed.Namespace(),
+			[]byte(fmt.Sprintf("live/%s/%s/%s", node, liveField.Field, slot.Format(time.RFC3339))),
+		)
+		out = append(out, Trigger{
+			ScenarioID: Scenario,
+			EventID:    event,
+			OccurredAt: slot,
+			EventType:  "telemetry",
+			Measurement: &Measurement{
+				UnitID: seed.ID(
+					seed.LiveSite().Unit,
+				),
+				SensorID:   seed.ID(liveSensor.Name),
+				Metric:     liveSensor.Metric,
+				Value:      &value,
+				Unit:       liveSensor.Unit,
+				ObservedAt: slot,
+				ReceivedAt: when,
+				Origin:     "measured",
+				Quality:    qualityValid,
+				EventID:    event, Sequence: nil,
+			}, CommandID: nil, DeviceID: nil, State: nil, Event: nil, BindingID: nil, Sequence: nil, Kind: "", Recovery: nil,
+		})
+	}
+
+	return out, nil
+}
+
+// liveHeartbeat is the live module's heartbeat of the minute slot: a state report with no settings (the nodes report
+// none), which the API takes as heard only (IR528). It is one a minute for the module, whichever node is heard first:
+// both nodes send the same body.
+func liveHeartbeat(slot time.Time) Trigger {
+	dev := seed.ID(seed.LiveSite().Device)
+
+	return Trigger{
 		ScenarioID: Scenario,
-		// one a minute for the module, whichever node is heard first: both nodes send the same body
 		EventID: uuid.NewSHA1(
-			seed.Namespace,
+			seed.Namespace(),
 			[]byte(fmt.Sprintf("%s/state/%s", dev, slot.Format(time.RFC3339))),
 		),
 		OccurredAt: slot,
@@ -190,14 +217,12 @@ func LiveTriggers(node string, payload []byte, when time.Time) ([]Trigger, error
 		Sequence:    nil,
 		Kind:        "",
 		Recovery:    nil,
-	})
-
-	return out, nil
+	}
 }
 
 // liveEvaluation is a demo automation trigger of the live unit's facts, with an event ID from key.
 func liveEvaluation(key string, when time.Time, facts []Fact) Trigger {
-	event := uuid.NewSHA1(seed.Namespace, []byte(key))
+	event := uuid.NewSHA1(seed.Namespace(), []byte(key))
 
 	return Trigger{
 		ScenarioID: Scenario,
@@ -207,7 +232,7 @@ func liveEvaluation(key string, when time.Time, facts []Fact) Trigger {
 		Event: &Evaluation{
 			EventID:    event,
 			OccurredAt: when,
-			UnitIDs:    []uuid.UUID{seed.ID(seed.LiveSite.Unit)},
+			UnitIDs:    []uuid.UUID{seed.ID(seed.LiveSite().Unit)},
 			Facts:      facts,
 			Phase:      "condition",
 		}, CommandID: nil, Measurement: nil, DeviceID: nil, State: nil, BindingID: nil, Sequence: nil, Kind: "",
@@ -215,19 +240,22 @@ func liveEvaluation(key string, when time.Time, facts []Fact) Trigger {
 	}
 }
 
+// gapTenths is the step of the heartbeat gap the bridge sends: it is floored to a tenth of a minute.
+const gapTenths = 10
+
 // LiveGapTrigger reports, at the scenario minute slot, how long the live module has gone unheard: the longest time in
 // minutes since a node's last message (heartbeat_gap). The default rule ac_offline alerts at 15 minutes and resolves
 // under 1 (IR120), so a node that stops, or a broker out of reach, is noticed without the nodes' help (IR529).
 func LiveGapTrigger(gap time.Duration, slot time.Time) Trigger {
 	slot = slot.UTC()
-	minutes := math.Floor(gap.Minutes()*10) / 10
+	minutes := math.Floor(gap.Minutes()*gapTenths) / gapTenths
 
 	return liveEvaluation(
 		"live/gap/"+slot.Format(time.RFC3339),
 		slot,
 		[]Fact{
 			{
-				UnitID:     seed.ID(seed.LiveSite.Unit),
+				UnitID:     seed.ID(seed.LiveSite().Unit),
 				Metric:     "heartbeat_gap",
 				Value:      minutes,
 				Unit:       "min",
@@ -259,8 +287,12 @@ type ConnectionFault struct {
 // naming the open fault, once every node is heard again. ok is false when the connection already matches, or while the
 // module is unbound. The sequence follows the API's newest on the axis, and the event IDs come from the binding and
 // sequence or the fault, so a repeat is one event.
-func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, when time.Time) (Trigger, bool) {
-	if f.BindingID == nil {
+func LiveConnectionTrigger(
+	fault ConnectionFault,
+	gap time.Duration,
+	when time.Time,
+) (Trigger, bool) {
+	if fault.BindingID == nil {
 		return Trigger{
 			ScenarioID:  "",
 			EventID:     uuid.UUID{},
@@ -278,14 +310,14 @@ func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, when time.Time)
 		}, false
 	}
 
-	dev, seq := seed.ID(seed.LiveSite.Device), f.Sequence+1
+	dev, seq := seed.ID(seed.LiveSite().Device), fault.Sequence+1
 
 	trigger := Trigger{
 		ScenarioID:  Scenario,
 		OccurredAt:  when.UTC(),
 		EventType:   "device",
 		DeviceID:    &dev,
-		BindingID:   f.BindingID,
+		BindingID:   fault.BindingID,
 		Sequence:    &seq,
 		EventID:     uuid.UUID{},
 		CommandID:   nil,
@@ -296,20 +328,23 @@ func LiveConnectionTrigger(f ConnectionFault, gap time.Duration, when time.Time)
 		Recovery:    nil,
 	}
 	switch {
-	case f.FaultID == nil && gap >= LiveOfflineAfter:
+	case fault.FaultID == nil && gap >= LiveOfflineAfter:
 		trigger.Kind = "communication_lost"
 		trigger.EventID = uuid.NewSHA1(
-			seed.Namespace,
-			[]byte(fmt.Sprintf("live/lost/%s/%d", f.BindingID, seq)),
+			seed.Namespace(),
+			[]byte(fmt.Sprintf("live/lost/%s/%d", fault.BindingID, seq)),
 		)
-	case f.FaultID != nil && gap < LiveOnlineWithin:
+	case fault.FaultID != nil && gap < LiveOnlineWithin:
 		trigger.Kind = "restored"
 		trigger.Recovery = &Recovery{
 			Axis:          "connection",
-			SourceEventID: *f.FaultID,
+			SourceEventID: *fault.FaultID,
 			Value:         connectionOnline,
 		}
-		trigger.EventID = uuid.NewSHA1(seed.Namespace, []byte("live/restored/"+f.FaultID.String()))
+		trigger.EventID = uuid.NewSHA1(
+			seed.Namespace(),
+			[]byte("live/restored/"+fault.FaultID.String()),
+		)
 	default:
 		return Trigger{
 			ScenarioID:  "",
@@ -364,7 +399,7 @@ func (h *LiveHeard) Gap(now time.Time) time.Duration {
 
 	var gap time.Duration
 
-	for node := range LiveNodes {
+	for node := range LiveNodes() {
 		last, ok := h.last[node]
 		if !ok {
 			last = h.start
@@ -420,38 +455,50 @@ const LiveCommandNode = "node_1"
 // LiveCommandTopic is a node's command topic, as its firmware subscribes to it.
 func LiveCommandTopic(node string) string { return "smarthome/ac/" + node + "/command" }
 
-// LiveCommand is the nodes' firmware command for a requested unit action, and the air conditioner's settings after it.
-// The firmware takes ON, OFF and COOL24 (on, cooling, 24 °C, fan auto). Power on sends COOL24: ON resumes whatever the
-// board sent last, after a restart the infrared library's default, which need not be cooling. Power off sends OFF and
-// leaves the other settings as they were (state nil). Any other action is one the firmware does not take (ok false).
-func LiveCommand(
-	action json.RawMessage,
-) (payload string, state *devicesim.ReportedState, ok bool, err error) {
-	var a struct {
-		Kind  string `json:"kind"`
-		Power *bool  `json:"power"`
+// LiveAction is the nodes' firmware command for a unit action, and the air conditioner's settings after it (nil: the
+// command leaves the other settings as they were).
+type LiveAction struct {
+	Payload string
+	State   *devicesim.ReportedState
+}
+
+// LiveCommand is the nodes' firmware command for a requested unit action. The firmware takes ON, OFF and COOL24 (on,
+// cooling, 24 °C, fan auto). Power on sends COOL24: ON resumes whatever the board sent last, after a restart the
+// infrared library's default, which need not be cooling. Power off sends OFF and leaves the other settings as they
+// were (State nil). Any other action is one the firmware does not take (ok false).
+func LiveCommand(raw json.RawMessage) (LiveAction, bool, error) {
+	var (
+		action struct {
+			Kind  string `json:"kind"`
+			Power *bool  `json:"power"`
+		}
+		none LiveAction
+	)
+
+	err := json.Unmarshal(raw, &action)
+	if err != nil {
+		return none, false, fmt.Errorf("live command action: %w", err)
 	}
 
-	unmarshalErr := json.Unmarshal(action, &a)
-	if unmarshalErr != nil {
-		return "", nil, false, fmt.Errorf("live command action: %w", unmarshalErr)
+	if action.Kind != "set_power" || action.Power == nil {
+		return none, false, nil
 	}
 
-	if a.Kind != "set_power" || a.Power == nil {
-		return "", nil, false, nil
-	}
-
-	if !*a.Power {
-		return "OFF", nil, true, nil
+	if !*action.Power {
+		return LiveAction{Payload: "OFF", State: nil}, true, nil
 	}
 
 	on, celsius, cool := true, 24.0, "cool"
 
-	return "COOL24", &devicesim.ReportedState{
-		Power:   &on,
-		Celsius: &celsius,
-		Mode:    &cool, FanLevel: nil,
-	}, true, nil // fan auto has no level
+	return LiveAction{
+		Payload: "COOL24",
+		State: &devicesim.ReportedState{
+			Power:    &on,
+			Celsius:  &celsius,
+			Mode:     &cool,
+			FanLevel: nil,
+		}, // fan auto: no level
+	}, true, nil
 }
 
 // LiveSentTriggers report a command the bridge published to the command node at `at`: sent, then acknowledged at once
@@ -459,19 +506,19 @@ func LiveCommand(
 // when the command sets more than its own action (COOL24), the module's state report with those settings at stateAt
 // (no later than the API's clock, which refuses a report from its future).
 func LiveSentTriggers(
-	w Waiting,
+	waiting Waiting,
 	when, stateAt time.Time,
 	state *devicesim.ReportedState,
 ) []Trigger {
 	when = when.UTC()
-	cmd, dev := w.ID, seed.ID(seed.LiveSite.Device)
+	cmd, dev := waiting.ID, seed.ID(seed.LiveSite().Device)
 
 	out := []Trigger{
-		SentTrigger(w, when),
+		SentTrigger(waiting, when),
 		{
 			ScenarioID: Scenario,
 			EventID: uuid.NewSHA1(
-				seed.Namespace,
+				seed.Namespace(),
 				[]byte(fmt.Sprintf("%s/%s/command_ack", dev, cmd)),
 			),
 			OccurredAt:  when,
@@ -489,8 +536,11 @@ func LiveSentTriggers(
 	}
 	if state != nil {
 		out = append(out, Trigger{
-			ScenarioID:  Scenario,
-			EventID:     uuid.NewSHA1(seed.Namespace, []byte(fmt.Sprintf("%s/state/%s", dev, cmd))),
+			ScenarioID: Scenario,
+			EventID: uuid.NewSHA1(
+				seed.Namespace(),
+				[]byte(fmt.Sprintf("%s/state/%s", dev, cmd)),
+			),
 			OccurredAt:  stateAt.UTC(),
 			EventType:   eventState,
 			DeviceID:    &dev,
@@ -516,8 +566,8 @@ func LiveRefusedTrigger(w Waiting, when time.Time) Trigger {
 	return Trigger{
 		ScenarioID: Scenario,
 		EventID: uuid.NewSHA1(
-			seed.Namespace,
-			[]byte(fmt.Sprintf("%s/%s/command_fail", seed.ID(seed.LiveSite.Device), cmd)),
+			seed.Namespace(),
+			[]byte(fmt.Sprintf("%s/%s/command_fail", seed.ID(seed.LiveSite().Device), cmd)),
 		),
 		OccurredAt:  when.UTC(),
 		EventType:   "command_fail",

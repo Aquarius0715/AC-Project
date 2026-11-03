@@ -35,42 +35,44 @@ type Link struct {
 
 // Links are the demo fixture's five devices with the sensors each has there (device-no-sensor has none: its module only
 // beats) and their connection.
-var Links = []Link{
-	{Device: "device-online-rto", Unit: "unit-online-rto", Sensors: map[string]string{
-		sensorTemperature: "sensor-online-temperature",
-		sensorPower:       "sensor-online-power",
-		sensorHumidity:    "sensor-online-humidity",
-		"co2":             "sensor-online-co2",
-		"pm25":            "sensor-online-pm25",
-	}, Connection: connectionOnline},
-	{Device: "device-tamper", Unit: "unit-non-rto", Sensors: map[string]string{
-		sensorTemperature: "sensor-tamper-temperature", sensorPower: "sensor-tamper-power",
-		sensorHumidity: "sensor-tamper-humidity",
-	}, Connection: connectionOnline},
-	{
-		Device: "device-offline-rto",
-		Unit:   "unit-offline-rto",
-		Sensors: map[string]string{
-			sensorTemperature: "sensor-offline-temperature",
-			sensorPower:       "sensor-offline-power",
+func Links() []Link {
+	return []Link{
+		{Device: "device-online-rto", Unit: "unit-online-rto", Sensors: map[string]string{
+			sensorTemperature: "sensor-online-temperature",
+			sensorPower:       "sensor-online-power",
+			sensorHumidity:    "sensor-online-humidity",
+			"co2":             "sensor-online-co2",
+			"pm25":            "sensor-online-pm25",
+		}, Connection: connectionOnline},
+		{Device: "device-tamper", Unit: "unit-non-rto", Sensors: map[string]string{
+			sensorTemperature: "sensor-tamper-temperature", sensorPower: "sensor-tamper-power",
+			sensorHumidity: "sensor-tamper-humidity",
+		}, Connection: connectionOnline},
+		{
+			Device: "device-offline-rto",
+			Unit:   "unit-offline-rto",
+			Sensors: map[string]string{
+				sensorTemperature: "sensor-offline-temperature",
+				sensorPower:       "sensor-offline-power",
+			},
+			Connection: "offline",
 		},
-		Connection: "offline",
-	},
-	{
-		Device: "device-limited",
-		Unit:   "unit-limited",
-		Sensors: map[string]string{
-			sensorTemperature: "sensor-limited-temperature",
-			sensorPower:       "sensor-limited-power",
+		{
+			Device: "device-limited",
+			Unit:   "unit-limited",
+			Sensors: map[string]string{
+				sensorTemperature: "sensor-limited-temperature",
+				sensorPower:       "sensor-limited-power",
+			},
+			Connection: connectionOnline,
 		},
-		Connection: connectionOnline,
-	},
-	{
-		Device:     "device-no-sensor",
-		Unit:       "unit-other-customer",
-		Sensors:    map[string]string{},
-		Connection: connectionOnline,
-	},
+		{
+			Device:     "device-no-sensor",
+			Unit:       "unit-other-customer",
+			Sensors:    map[string]string{},
+			Connection: connectionOnline,
+		},
+	}
 }
 
 // target is one link resolved to the IDs the API uses.
@@ -176,7 +178,7 @@ func (r *Resolver) Triggers(batch devicesim.Batch, received time.Time) ([]Trigge
 		return nil, fmt.Errorf("device %q: %w", batch.DeviceID, err)
 	}
 
-	t, ok := r.byDevice[dev]
+	resolved, ok := r.byDevice[dev]
 	if !ok {
 		return nil, fmt.Errorf("device %s %w", batch.DeviceID, errNotDemoLink)
 	}
@@ -186,7 +188,7 @@ func (r *Resolver) Triggers(batch devicesim.Batch, received time.Time) ([]Trigge
 	var first error // the first reading that could not convert; the rest of the batch still converts
 
 	for _, measurement := range batch.Measurements {
-		sensor, ok := t.sensors[measurement.SensorID]
+		sensor, ok := resolved.sensors[measurement.SensorID]
 		if !ok {
 			if first == nil {
 				first = fmt.Errorf(
@@ -202,7 +204,7 @@ func (r *Resolver) Triggers(batch devicesim.Batch, received time.Time) ([]Trigge
 		// the event ID is the reading itself (device, sensor, observed time): a simulator restart restarts its sequence, so
 		// the sequence cannot tell readings apart; a redelivered reading has the same time and so the same event
 		event := uuid.NewSHA1(
-			seed.Namespace,
+			seed.Namespace(),
 			[]byte(
 				fmt.Sprintf(
 					"%s/%s/%s",
@@ -218,7 +220,7 @@ func (r *Resolver) Triggers(batch devicesim.Batch, received time.Time) ([]Trigge
 			OccurredAt: measurement.ObservedAt,
 			EventType:  "telemetry",
 			Measurement: &Measurement{
-				UnitID:     t.unit,
+				UnitID:     resolved.unit,
 				SensorID:   sensor,
 				Metric:     measurement.Metric,
 				Value:      measurement.Value,
@@ -274,7 +276,7 @@ func CommandTrigger(ack devicesim.Ack, received time.Time) (Trigger, bool, error
 	return Trigger{
 		ScenarioID: Scenario,
 		EventID: uuid.NewSHA1(
-			seed.Namespace,
+			seed.Namespace(),
 			[]byte(fmt.Sprintf("%s/%s/%s", ack.DeviceID, ack.CommandID, kind)),
 		),
 		OccurredAt:  received.UTC(),
