@@ -77,7 +77,7 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		"units.get",
 		`{"id":"`+unit+`"}`,
 	); code != 403 ||
-		res["messageKey"] != "errors.assignment_not_started" {
+		res["messageKey"] != keyAssignmentNotStarted {
 		t.Fatalf("before the work window: %d %v", code, res)
 	}
 	// the unit list carries no telemetry before the work window (latestMeasurements is an equipment read, IR213)
@@ -137,7 +137,7 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		"alerts.get",
 		`{"id":"`+alert+`"}`,
 	); code != 403 ||
-		res["messageKey"] != "errors.assignment_not_started" {
+		res["messageKey"] != keyAssignmentNotStarted {
 		t.Fatalf("alerts.get before the work window: %d %v", code, res)
 	}
 
@@ -152,7 +152,7 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		"telemetry.series",
 		series,
 	); code != 403 ||
-		res["messageKey"] != "errors.assignment_not_started" {
+		res["messageKey"] != keyAssignmentNotStarted {
 		t.Fatalf("telemetry before the work window: %d %v", code, res)
 	}
 

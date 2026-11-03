@@ -35,7 +35,7 @@ func TestTelemetry(t *testing.T) {
 		t.Fatalf("series: %d %v", code, res)
 	}
 
-	if a := asObj(t, data(res)["allergenObservation"]); a["availability"] != "available" ||
+	if a := asObj(t, data(res)["allergenObservation"]); a["availability"] != stateAvailable ||
 		a["substance"] == nil {
 		t.Fatalf("allergen: %v", a)
 	}
@@ -112,17 +112,17 @@ func TestTelemetry(t *testing.T) {
 	}
 	// scope and validation
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		"bad metric":          "metric=error.invalid",
+		"bad metric":          refusedMetricInvalid,
 		"bad sort":            "query.sort.field=error.invalid",
-		"both targets":        "unitIds=error.exactlyOneTarget",
-		"duplicate units":     "unitIds=error.invalid",
-		"empty unitIds":       "unitIds=error.invalid",
-		"filters not allowed": "x=error.notAllowed",
+		caseBothTargets:       "unitIds=error.exactlyOneTarget",
+		caseDuplicateUnits:    refusedUnitIDsInvalid,
+		"empty unitIds":       refusedUnitIDsInvalid,
+		"filters not allowed": refusedUnknownFieldX,
 		"missing from":        "from=error.required",
 		"missing to":          "to=error.required",
-		"no target":           "unitIds=error.exactlyOneTarget",
+		caseNoTarget:          "unitIds=error.exactlyOneTarget",
 		"range > 35 days":     "to=error.rangeTooLong",
-		"reversed range":      "to=error.range",
+		"reversed range":      refusedToRange,
 	}
 
 	for name, tc := range map[string]struct {
@@ -136,11 +136,11 @@ func TestTelemetry(t *testing.T) {
 		"technician in scope":     {techInt(), `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2","query":{}}`, 200},
 		"technician out of scope": {techInt(), `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
 		"external, no assignment": {techB(), `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
-		"both targets": {hq(), `{` + rng + `,"unitIds":["` + online + `"],"spaceId":"` +
+		caseBothTargets: {hq(), `{` + rng + `,"unitIds":["` + online + `"],"spaceId":"` +
 			seed.ID("room-1").String() + `","metric":"co2","query":{}}`, 422},
-		"no target":     {hq(), `{` + rng + `,"metric":"co2","query":{}}`, 422},
+		caseNoTarget:    {hq(), `{` + rng + `,"metric":"co2","query":{}}`, 422},
 		"empty unitIds": {hq(), `{` + rng + `,"unitIds":[],"metric":"co2","query":{}}`, 422},
-		"duplicate units": {hq(), `{` + rng + `,"unitIds":["` + online + `","` + online + `"],"metric":"co2",` +
+		caseDuplicateUnits: {hq(), `{` + rng + `,"unitIds":["` + online + `","` + online + `"],"metric":"co2",` +
 			`"query":{}}`, 422},
 		"bad metric": {hq(), `{` + rng + `,"unitIds":["` + online + `"],"metric":"noise","query":{}}`, 422},
 		"reversed range": {hq(), `{"from":"` + to + `","to":"` + from + `","unitIds":["` + online + `"],"metric":"co2",` +
@@ -186,9 +186,9 @@ func TestTelemetry(t *testing.T) {
 	}
 
 	for b, want := range map[string]string{
-		`{` + rng + `,"unitIds":[]}`:                                             "unitIds=error.invalid",
-		`{` + rng + `,"unitIds":["` + online + `"],"metric":"x"}`:                "metric=error.invalid",
-		`{"from":"` + to + `","to":"` + from + `","unitIds":["` + online + `"]}`: "to=error.range",
+		`{` + rng + `,"unitIds":[]}`:                                             refusedUnitIDsInvalid,
+		`{` + rng + `,"unitIds":["` + online + `"],"metric":"x"}`:                refusedMetricInvalid,
+		`{"from":"` + to + `","to":"` + from + `","unitIds":["` + online + `"]}`: refusedToRange,
 	} {
 		code, m := post(srv, customerA(), "telemetry.summary", b)
 		refusal(t, b, code, m, want)
@@ -238,9 +238,9 @@ func TestVentilation(t *testing.T) {
 	}
 
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		"bad method":        "method=error.invalid",
-		"duration 0":        "durationMinutes=error.range",
-		"duration 241":      "durationMinutes=error.range",
+		caseBadMethod:       refusedMethodInvalid,
+		caseZeroDuration:    refusedDurationMinutesRange,
+		"duration 241":      refusedDurationMinutesRange,
 		"missing space":     "spaceId=error.required",
 		"unit not in space": "unitId=error.unitNotInSpace",
 	}
@@ -250,10 +250,10 @@ func TestVentilation(t *testing.T) {
 		body string
 		code int
 	}{
-		"duration 0":    {customerA(), `{"spaceId":"` + room1 + `","method":"other","durationMinutes":0}`, 422},
-		"duration 241":  {customerA(), `{"spaceId":"` + room1 + `","method":"other","durationMinutes":241}`, 422},
-		"bad method":    {customerA(), `{"spaceId":"` + room1 + `","method":"aircon","durationMinutes":5}`, 422},
-		"missing space": {customerA(), `{"method":"other","durationMinutes":5}`, 422},
+		caseZeroDuration: {customerA(), `{"spaceId":"` + room1 + `","method":"other","durationMinutes":0}`, 422},
+		"duration 241":   {customerA(), `{"spaceId":"` + room1 + `","method":"other","durationMinutes":241}`, 422},
+		caseBadMethod:    {customerA(), `{"spaceId":"` + room1 + `","method":"aircon","durationMinutes":5}`, 422},
+		"missing space":  {customerA(), `{"method":"other","durationMinutes":5}`, 422},
 		"unit not in space": {customerA(), `{"spaceId":"` + room1 + `","unitId":"` + seed.ID("unit-non-rto").String() +
 			`","method":"other","durationMinutes":5}`, 422},
 		"other customer's room": {customerA(), `{"spaceId":"` + roomB + `","method":"other","durationMinutes":5}`, 404},
@@ -332,12 +332,12 @@ func TestVentilation(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"filters\":{\"from\":\"2026-09-14T01:00:00Z\",\"to\":\"2026-09-14T00:00:00Z\"}}": "filters.to=error.range",
-		"{\"filters\":{\"x\":1}}":                                 "x=error.notAllowed",
-		"{\"sort\":{\"field\":\"method\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+		bodyReversedPeriod: refusedFilterToRange,
+		bodyUnknownFilter:  refusedUnknownFieldX,
+		"{\"sort\":{\"field\":\"method\",\"direction\":\"asc\"}}": refusedSortFieldInvalid,
 	}
 
-	for _, b := range []string{`{"filters":{"x":1}}`, `{"filters":{"from":"` + clock().Format(time.RFC3339) + `","to":"` +
+	for _, b := range []string{bodyUnknownFilter, `{"filters":{"from":"` + clock().Format(time.RFC3339) + `","to":"` +
 		clock().Add(-time.Hour).Format(time.RFC3339) + `"}}`, `{"sort":{"field":"method","direction":"asc"}}`} {
 		code, m := post(srv, hq(), "ventilation.list", b)
 		refusal(t, b, code, m, want[b])
@@ -375,13 +375,18 @@ func TestLatestMeasurements(t *testing.T) {
 	)
 
 	sensor := map[string]string{
-		"co2":         uuid.NewString(),
-		"humidity":    uuid.NewString(),
-		"temperature": uuid.NewString(),
-		"pm25":        uuid.NewString(),
+		metricCO2:         uuid.NewString(),
+		metricHumidity:    uuid.NewString(),
+		metricTemperature: uuid.NewString(),
+		metricPM25:        uuid.NewString(),
 	}
 
-	units := map[string]string{"co2": "ppm", "humidity": "%", "temperature": "°C", "pm25": "µg/m³"}
+	units := map[string]string{
+		metricCO2:         "ppm",
+		metricHumidity:    "%",
+		metricTemperature: "°C",
+		metricPM25:        "µg/m³",
+	}
 	for metric, id := range sensor {
 		owner(
 			t,
@@ -465,7 +470,7 @@ func TestLatestMeasurements(t *testing.T) {
 		}
 
 		doc := data(resp)
-		if operation == "units.list" {
+		if operation == opUnitsList {
 			doc = items(t, resp)[0]
 		}
 
@@ -511,7 +516,7 @@ func TestLatestMeasurements(t *testing.T) {
 			time.RFC3339,
 		)+`","unitIds":["`+unit+`"],"metric":"temperature","query":{}}`,
 	)
-	if len(items(t, res)) != 1 || items(t, res)[0]["quality"] != "valid" {
+	if len(items(t, res)) != 1 || items(t, res)[0]["quality"] != qualityValid {
 		t.Fatalf("series quality: %v", res)
 	}
 	// co2AtLog (IR110/IR213) is the unit's latest CO₂ reading when it is valid; a newer null reading gives null, never an

@@ -59,7 +59,7 @@ func buildCluster(
 		cfg := base
 		cfg.Domains, cfg.InternalToken, cfg.DatabaseURL = []string{
 			d,
-		}, "test-internal", serviceURL(
+		}, internalToken, serviceURL(
 			d,
 		)
 
@@ -92,7 +92,7 @@ func buildCluster(
 	for d, s := range cluster.srv {
 		s.Registry.Remote = &ops.HTTPQueries{
 			Targets: cluster.targets(d),
-			Token:   "test-internal",
+			Token:   internalToken,
 			Client:  nil,
 		}
 	}

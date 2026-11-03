@@ -70,7 +70,7 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 		clock().Add(2*time.Hour),
 		"active",
 	)
-	if code, key := events(techInt()); code != 403 || key != "errors.assignment_not_started" {
+	if code, key := events(techInt()); code != 403 || key != keyAssignmentNotStarted {
 		t.Errorf("assignment starting later: %d %s", code, key)
 	}
 
@@ -95,7 +95,7 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 		clock().Add(-time.Hour),
 	)
 
-	if code, key := events(techInt()); code != 403 || key != "errors.assignment_ended" {
+	if code, key := events(techInt()); code != 403 || key != keyAssignmentEnded {
 		t.Errorf("assignment window ended: %d %s", code, key)
 	}
 

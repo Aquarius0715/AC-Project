@@ -37,7 +37,7 @@ func TestHoldRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 	}
 
 	_, res = post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
-	if data(res)["status"] != "in_progress" || data(res)["holdReason"] != nil ||
+	if data(res)["status"] != statusInProgress || data(res)["holdReason"] != nil ||
 		ver(t, res) != version {
 		t.Errorf("a failed hold changed the job: %v", res)
 	}

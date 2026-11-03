@@ -290,16 +290,16 @@ func adminSave(
 		}
 
 		body := map[string]any{
-			"id":             id,
-			"userId":         it["userId"],
-			"organizationId": it["organizationId"],
-			"role":           "admin",
-			"employment":     nil,
-			"permissions":    it["permissions"],
-			"scopes":         it["scopes"],
-			"validFrom":      it["validFrom"],
-			"validUntil":     it["validUntil"],
-			"reason":         "IR472 test",
+			"id":                id,
+			fieldUserID:         it["userId"],
+			fieldOrganizationID: it["organizationId"],
+			fieldRole:           roleAdmin,
+			fieldEmployment:     nil,
+			fieldPermissions:    it["permissions"],
+			fieldScopes:         it["scopes"],
+			fieldValidFrom:      it["validFrom"],
+			fieldValidUntil:     it["validUntil"],
+			fieldReason:         "IR472 test",
 		}
 		edit(body)
 

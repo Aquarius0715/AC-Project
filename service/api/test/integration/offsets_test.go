@@ -11,6 +11,11 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const (
+	statusDemoPurchased = "demo_purchased"
+	statusDemoRequested = "demo_requested"
+)
+
 func TestOffsets(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Offset AC")
@@ -90,7 +95,7 @@ func TestOffsets(t *testing.T) {
 		`{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":true}`,
 		0,
 	)
-	if code != 200 || data(resp)["state"] != "demo_requested" ||
+	if code != 200 || data(resp)["state"] != statusDemoRequested ||
 		len(asArr(t, data(resp)["attempts"])) != 1 {
 		t.Fatalf("request: %d %v", code, resp)
 	}
@@ -117,8 +122,8 @@ func TestOffsets(t *testing.T) {
 	failID := uuid.NewString()
 
 	code, resp = sim(hq(), ev("fail", att, failID), 1)
-	if code != 200 || data(resp)["state"] != "failed" ||
-		data(resp)["previousState"] != "demo_requested" ||
+	if code != 200 || data(resp)["state"] != statusFailed ||
+		data(resp)["previousState"] != statusDemoRequested ||
 		data(resp)["currentAttemptId"] != att {
 		t.Fatalf("fail: %d %v", code, resp)
 	}
@@ -147,7 +152,7 @@ func TestOffsets(t *testing.T) {
 	}
 
 	code, resp = retry(att, 2)
-	if code != 200 || data(resp)["state"] != "demo_requested" ||
+	if code != 200 || data(resp)["state"] != statusDemoRequested ||
 		data(resp)["currentAttemptId"] == att ||
 		len(asArr(t, data(resp)["attempts"])) != 2 {
 		t.Fatalf("retry: %d %v", code, resp)
@@ -160,7 +165,8 @@ func TestOffsets(t *testing.T) {
 	}
 
 	code, resp = sim(hq(), ev("purchase_confirm", att2, uuid.NewString()), 3)
-	if code != 200 || data(resp)["state"] != "demo_purchased" || data(resp)["purchaseRef"] == nil {
+	if code != 200 || data(resp)["state"] != statusDemoPurchased ||
+		data(resp)["purchaseRef"] == nil {
 		t.Fatalf("purchase: %d %v", code, resp)
 	}
 
@@ -205,8 +211,8 @@ func TestOffsets(t *testing.T) {
 		hq(),
 		ev2("fail", retirement),
 		2,
-	); code != 200 || data(res)["state"] != "failed" ||
-		data(res)["previousState"] != "demo_purchased" {
+	); code != 200 || data(res)["state"] != statusFailed ||
+		data(res)["previousState"] != statusDemoPurchased {
 		t.Fatalf("the retirement fails: %d %v", code, res)
 	}
 
@@ -215,7 +221,7 @@ func TestOffsets(t *testing.T) {
 		`{"event":"retry","recordId":"`+rid2+`","attemptId":"`+retirement+`","demoConfirmed":true}`,
 		3,
 	)
-	if code != 200 || data(resp)["state"] != "demo_purchased" ||
+	if code != 200 || data(resp)["state"] != statusDemoPurchased ||
 		data(resp)["currentAttemptId"] == retirement ||
 		len(asArr(t, data(resp)["attempts"])) != 3 {
 		t.Fatalf("retry the retirement: %d %v", code, resp)
@@ -323,7 +329,7 @@ func TestOffsets(t *testing.T) {
 		"offsets.list",
 		`{"filters":{"status":"sold"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad state filter: %d %s", code, fields(res))
 	}
 	// expired quotes cannot be requested; HQ quotes need the customer's units

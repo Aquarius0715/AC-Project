@@ -33,9 +33,9 @@ func TestReadModelsAcrossServices(t *testing.T) {
 				Format(time.RFC3339) +
 				`"}`,
 		},
-		{contrA(), "summaries.get", `{"kind":"partner","filters":{}}`},
-		{techA(), "summaries.get", `{"kind":"technician","filters":{}}`},
-		{customerA(), "summaries.get", `{"kind":"customer","filters":{}}`},
+		{contrA(), opSummariesGet, `{"kind":"partner","filters":{}}`},
+		{techA(), opSummariesGet, `{"kind":"technician","filters":{}}`},
+		{customerA(), opSummariesGet, `{"kind":"customer","filters":{}}`},
 	}
 	for _, tc := range cases {
 		code1, want := post(all, tc.who, tc.op, tc.body)

@@ -84,16 +84,16 @@ func TestAlerts(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"filters\":{\"from\":\"2026-09-14T01:00:00Z\",\"to\":\"2026-09-14T00:00:00Z\"}}": "filters.to=error.range",
-		"{\"filters\":{\"severity\":\"info\"}}":                                             "filters.severity=error.invalid",
-		"{\"filters\":{\"status\":\"x\"}}":                                                  "filters.status=error.invalid",
-		"{\"filters\":{\"z\":1}}":                                                           "z=error.notAllowed",
-		"{\"sort\":{\"field\":\"title\",\"direction\":\"asc\"}}":                            "sort.field=error.invalid",
+		bodyReversedPeriod:        refusedFilterToRange,
+		bodyInfoSeverity:          "filters.severity=error.invalid",
+		bodyUnknownStatus:         refusedFilterStatusInvalid,
+		"{\"filters\":{\"z\":1}}": "z=error.notAllowed",
+		"{\"sort\":{\"field\":\"title\",\"direction\":\"asc\"}}": refusedSortFieldInvalid,
 	}
 
 	for _, b := range []string{
-		`{"filters":{"severity":"info"}}`, `{"filters":{"status":"x"}}`,
-		`{"filters":{"from":"2026-09-14T01:00:00Z","to":"2026-09-14T00:00:00Z"}}`, `{"filters":{"z":1}}`,
+		bodyInfoSeverity, bodyUnknownStatus,
+		bodyReversedPeriod, `{"filters":{"z":1}}`,
 		`{"sort":{"field":"title","direction":"asc"}}`,
 	} {
 		code, m := post(srv, hq(), "alerts.list", b)
@@ -119,7 +119,7 @@ func TestAlerts(t *testing.T) {
 		"alerts.acknowledge",
 		`{"alertId":"`+crit+`"}`,
 		1,
-	); code != 200 || data(res)["status"] != "acknowledged" ||
+	); code != 200 || data(res)["status"] != statusAcknowledged ||
 		data(res)["acknowledgedAt"] == nil {
 		t.Fatalf("ack: %d %v", code, res)
 	}
@@ -193,7 +193,7 @@ func TestAlerts(t *testing.T) {
 		`{"alertId":"`+warn+`","resolutionReason":"direct","resolutionEvidenceIds":["`+back+`"]}`,
 		1,
 	); code != 200 ||
-		data(res)["status"] != "resolved" {
+		data(res)["status"] != statusResolved {
 		t.Fatalf("resolve from open: %d %v", code, res)
 	}
 
@@ -298,12 +298,12 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 	}
 
 	want := map[string]any{
-		"name":              "Bedroom too hot",
-		"metric":            "temperature",
-		"operator":          "gte",
-		"threshold":         30.0,
-		"recoveryThreshold": 28.0,
-		"durationSeconds":   60.0,
+		fieldName:              "Bedroom too hot",
+		fieldMetric:            metricTemperature,
+		fieldOperator:          operatorAtLeast,
+		fieldThreshold:         30.0,
+		fieldRecoveryThreshold: 28.0,
+		fieldDurationSeconds:   60.0,
 	}
 	for _, a := range []*actor{hq(), customerB()} {
 		if got, _ := rule(a, own).(map[string]any); fmt.Sprint(got) != fmt.Sprint(want) {
@@ -312,7 +312,7 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 	}
 
 	if got, _ := rule(hq(), viaDefault).(map[string]any); got["name"] != "Ventilation" ||
-		got["metric"] != "co2" ||
+		got["metric"] != metricCO2 ||
 		got["threshold"] != 1000.0 ||
 		got["recoveryThreshold"] != 900.0 ||
 		got["durationSeconds"] != 600.0 {
@@ -370,7 +370,7 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 		"alerts.acknowledge",
 		`{"alertId":"`+own+`"}`,
 		1,
-	); code != 200 || data(res)["status"] != "acknowledged" ||
+	); code != 200 || data(res)["status"] != statusAcknowledged ||
 		data(res)["rule"] == nil {
 		t.Fatalf("technician acknowledges with alert.read: %d %v", code, res)
 	}
@@ -400,7 +400,7 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 		`{"alertId":"`+own+`","resolutionReason":"filter replaced","resolutionEvidenceIds":[]}`,
 		2,
 	); code != 200 ||
-		data(res)["status"] != "resolved" {
+		data(res)["status"] != statusResolved {
 		t.Fatalf("resolve with alert.resolve: %d %v", code, res)
 	}
 }

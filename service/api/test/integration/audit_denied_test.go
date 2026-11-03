@@ -75,7 +75,7 @@ func TestDeniedWritesAudited(t *testing.T) {
 	}
 
 	e := got[0]
-	if e["actorRoleAtTime"] != "contractor" || e["result"] != "denied" ||
+	if e["actorRoleAtTime"] != roleContractor || e["result"] != "denied" ||
 		e["reason"] != apperr.KeyForbidden ||
 		asObj(t, e["targetRef"])["kind"] != "unit" ||
 		asObj(t, e["targetRef"])["id"] != unit ||

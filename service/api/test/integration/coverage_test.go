@@ -75,7 +75,7 @@ func TestUnitsCoverage(t *testing.T) {
 	}
 
 	all := byUnit(`{"filters":{"customerId":"` + seed.ID("cust-a").String() + `"},"limit":100}`)
-	if all[seed.ID("unit-online-rto").String()]["status"] != "expiring" ||
+	if all[seed.ID("unit-online-rto").String()]["status"] != statusExpiring ||
 		all[seed.ID("unit-non-rto").String()]["status"] != "under_warranty" {
 		t.Fatalf("warranty statuses: %v", all)
 	}
@@ -149,7 +149,7 @@ func TestUnitsCoverage(t *testing.T) {
 
 	exp := byUnit(`{"filters":{"coverage":"expiring"},"limit":100}`)
 	for _, it := range exp {
-		if it["status"] != "expiring" {
+		if it["status"] != statusExpiring {
 			t.Fatal("coverage filter")
 		}
 	}
@@ -176,7 +176,7 @@ func TestUnitsCoverage(t *testing.T) {
 	want := map[string]string{ // the field each case is refused for
 		"{\"filters\":{\"coverage\":\"x\"}}":                      "filters.coverage=error.invalid",
 		"{\"filters\":{\"expiringWithinDays\":0}}":                "filters.expiringWithinDays=error.range",
-		"{\"sort\":{\"field\":\"status\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+		"{\"sort\":{\"field\":\"status\",\"direction\":\"asc\"}}": refusedSortFieldInvalid,
 	}
 
 	for _, b := range []string{

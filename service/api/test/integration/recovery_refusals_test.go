@@ -65,7 +65,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 
 		return m
 	}
-	if data(get())["state"] != "applied" {
+	if data(get())["state"] != statusApplied {
 		t.Fatal("applied")
 	}
 
@@ -82,7 +82,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 	)
 	ackCommand(t, cmdOf(t, res, unit, "releaseCommandIds"), clock().Add(2*time.Second))
 
-	if data(get())["state"] != "released" {
+	if data(get())["state"] != statusReleased {
 		t.Fatal("released")
 	}
 
@@ -106,7 +106,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 
 	observe(id)
 
-	if caseState() != "pending" {
+	if caseState() != statusPending {
 		t.Fatalf("recovery case: %v", get())
 	}
 
@@ -126,7 +126,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 
 	owner(t, `UPDATE devices.devices SET connection = 'offline' WHERE unit_id = $1`, unit)
 
-	if code, m := reconcile(); code != 409 || m["code"] != "OFFLINE" ||
+	if code, m := reconcile(); code != 409 || m["code"] != codeOffline ||
 		m["messageKey"] != "errors.device_offline" {
 		t.Errorf("device offline: %d %v", code, m)
 	}
@@ -168,7 +168,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		now.Add(time.Minute),
 	)
 
-	if code, m := reconcile(); code != 409 || m["messageKey"] != "errors.unit_busy" {
+	if code, m := reconcile(); code != 409 || m["messageKey"] != keyUnitBusy {
 		t.Errorf("remove command not deliverable during a device operation: %d %v", code, m)
 	}
 
@@ -177,7 +177,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 	code, res := reconcile()
 
 	cases := asArr(t, data(res)["recoveryCases"])
-	if code != 200 || asObj(t, cases[len(cases)-1])["state"] != "removing" {
+	if code != 200 || asObj(t, cases[len(cases)-1])["state"] != statusRemoving {
 		t.Fatalf("reconcile: %d %v", code, res)
 	}
 
@@ -196,14 +196,14 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		t.Fatalf("command_fail: %d %v", code, resp)
 	}
 
-	if caseState() != "pending" {
+	if caseState() != statusPending {
 		t.Fatalf("a failed remove returns the case to pending: %v", get())
 	}
 
 	code, res = reconcile()
 
 	cases = asArr(t, data(res)["recoveryCases"])
-	if code != 200 || asObj(t, cases[len(cases)-1])["state"] != "removing" ||
+	if code != 200 || asObj(t, cases[len(cases)-1])["state"] != statusRemoving ||
 		len(asArr(t, asObj(t, cases[len(cases)-1])["commandIds"])) != 2 {
 		t.Fatalf("reconcile again: %d %v", code, res)
 	}
@@ -211,11 +211,11 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 	cmds = asArr(t, asObj(t, cases[len(cases)-1])["commandIds"])
 	ackCommand(t, asStr(t, cmds[len(cmds)-1]), clock().Add(5*time.Second))
 
-	if caseState() != "resolved" {
+	if caseState() != statusResolved {
 		t.Fatalf("resolved after the acknowledgement: %v", get())
 	}
 
-	if r := reason(); r != "" && r != "no_match" {
+	if r := reason(); r != "" && r != reasonNoMatch {
 		t.Errorf("control after the case is resolved: %q", r)
 	}
 }

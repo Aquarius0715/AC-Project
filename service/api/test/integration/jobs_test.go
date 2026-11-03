@@ -7,7 +7,14 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
+)
+
+const (
+	fieldContactWindow = "contactWindow"
+	fieldSymptom       = "symptom"
+	refusedSlotRules   = "alternativeSlots=" + apperr.KeySlotRules
 )
 
 // slotJSON returns a Slot starting h hours after the fixture clock lasting d hours.
@@ -24,14 +31,14 @@ func slotJSON(h, d int) string {
 func jobBody(unit string, extra map[string]string) string {
 	// clock = 2026-09-14 09:00 Kuala Lumpur; +25 h is the next local day
 	f := map[string]string{
-		"unitId":  `"` + unit + `"`,
-		"type":    `"reactive"`,
-		"symptom": `"Water dripping from the indoor unit"`,
-		"requestedStart": `"` + clock().Add(25*time.Hour).
+		fieldUnitID:  `"` + unit + `"`,
+		fieldType:    `"reactive"`,
+		fieldSymptom: `"Water dripping from the indoor unit"`,
+		fieldRequestedStart: `"` + clock().Add(25*time.Hour).
 			Format(time.RFC3339) +
 			`"`,
-		"requestedEnd":     `"` + clock().Add(27*time.Hour).Format(time.RFC3339) + `"`,
-		"alternativeSlots": "[" + slotJSON(49, 2) + "," + slotJSON(73, 1) + "]",
+		fieldRequestedEnd:     `"` + clock().Add(27*time.Hour).Format(time.RFC3339) + `"`,
+		fieldAlternativeSlots: "[" + slotJSON(49, 2) + "," + slotJSON(73, 1) + "]",
 	}
 
 	for key, v := range extra {
@@ -59,12 +66,12 @@ func TestJobsCreate(t *testing.T) {
 		srv,
 		customerA(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"contactWindow": `" Weekdays 09:00-18:00 "`}),
+		jobBody(unit, map[string]string{fieldContactWindow: `" Weekdays 09:00-18:00 "`}),
 		0,
 	)
 
 	j := data(resp)
-	if code != 200 || j["status"] != "requested" || j["origin"] != "client_request" ||
+	if code != 200 || j["status"] != statusRequested || j["origin"] != "client_request" ||
 		len(asArr(t, j["preferredSlots"])) != 3 ||
 		j["dueAt"] != clock().Add(27*time.Hour).Format(time.RFC3339) ||
 		j["contactWindow"] != "Weekdays 09:00-18:00" ||
@@ -108,8 +115,8 @@ func TestJobsCreate(t *testing.T) {
 		jobBody(
 			unit,
 			map[string]string{
-				"alternativeSlots": "[]",
-				"dueAt":            `"` + clock().Add(48*time.Hour).Format(time.RFC3339) + `"`,
+				fieldAlternativeSlots: "[]",
+				fieldDueAt:            `"` + clock().Add(48*time.Hour).Format(time.RFC3339) + `"`,
 			},
 		),
 		0,
@@ -124,22 +131,22 @@ func TestJobsCreate(t *testing.T) {
 		extra map[string]string
 		code  int
 	}{
-		"symptom 9": {customerA(), map[string]string{"symptom": `"too short"`}, 422},
+		"symptom 9": {customerA(), map[string]string{fieldSymptom: `"too short"`}, 422},
 		"symptom 2001": {
 			customerA(),
-			map[string]string{"symptom": `"` + strings.Repeat("s", 2001) + `"`},
+			map[string]string{fieldSymptom: `"` + strings.Repeat("s", 2001) + `"`},
 			422,
 		},
-		"bad type": {customerA(), map[string]string{"type": `"emergency"`}, 422},
+		caseBadType: {customerA(), map[string]string{fieldType: `"emergency"`}, 422},
 		"client one alternative": {
 			customerA(),
-			map[string]string{"alternativeSlots": "[" + slotJSON(49, 2) + "]"},
+			map[string]string{fieldAlternativeSlots: "[" + slotJSON(49, 2) + "]"},
 			422,
 		},
 		"hq three alternatives": {
 			hq(),
 			map[string]string{
-				"alternativeSlots": "[" + slotJSON(
+				fieldAlternativeSlots: "[" + slotJSON(
 					49,
 					2,
 				) + "," + slotJSON(
@@ -155,74 +162,78 @@ func TestJobsCreate(t *testing.T) {
 		"today (KL)": {
 			customerA(),
 			map[string]string{
-				"requestedStart": `"` + clock().Add(5*time.Hour).Format(time.RFC3339) + `"`,
-				"requestedEnd":   `"` + clock().Add(7*time.Hour).Format(time.RFC3339) + `"`,
+				fieldRequestedStart: `"` + clock().Add(5*time.Hour).Format(time.RFC3339) + `"`,
+				fieldRequestedEnd:   `"` + clock().Add(7*time.Hour).Format(time.RFC3339) + `"`,
 			},
 			422,
 		},
 		"slot 5 hours": {
 			customerA(),
 			map[string]string{
-				"alternativeSlots": "[" + slotJSON(49, 5) + "," + slotJSON(73, 1) + "]",
+				fieldAlternativeSlots: "[" + slotJSON(49, 5) + "," + slotJSON(73, 1) + "]",
 			},
 			422,
 		},
 		"duplicate slots": {
 			customerA(),
 			map[string]string{
-				"alternativeSlots": "[" + slotJSON(25, 2) + "," + slotJSON(73, 1) + "]",
+				fieldAlternativeSlots: "[" + slotJSON(25, 2) + "," + slotJSON(73, 1) + "]",
 			},
 			422,
 		},
 		"client dueAt": {
 			customerA(),
-			map[string]string{"dueAt": `"` + clock().Add(48*time.Hour).Format(time.RFC3339) + `"`},
+			map[string]string{
+				fieldDueAt: `"` + clock().Add(48*time.Hour).Format(time.RFC3339) + `"`,
+			},
 			422,
 		},
 		"hq dueAt before end": {
 			hq(),
-			map[string]string{"dueAt": `"` + clock().Add(26*time.Hour).Format(time.RFC3339) + `"`},
+			map[string]string{
+				fieldDueAt: `"` + clock().Add(26*time.Hour).Format(time.RFC3339) + `"`,
+			},
 			422,
 		},
 		"contact email": {
 			customerA(),
-			map[string]string{"contactWindow": `"call me at a@b.c"`},
+			map[string]string{fieldContactWindow: `"call me at a@b.c"`},
 			422,
 		},
 		"contact phone": {
 			customerA(),
-			map[string]string{"contactWindow": `"+60 (12) 345-6789"`},
+			map[string]string{fieldContactWindow: `"+60 (12) 345-6789"`},
 			422,
 		},
 		"contact 201": {
 			customerA(),
-			map[string]string{"contactWindow": `"` + strings.Repeat("w", 201) + `"`},
+			map[string]string{fieldContactWindow: `"` + strings.Repeat("w", 201) + `"`},
 			422,
 		},
 		"other customer's unit": {customerB(), nil, 404},
-		"unknown unit": {
+		caseUnknownUnit: {
 			hq(),
-			map[string]string{"unitId": `"` + uuid.NewString() + `"`},
+			map[string]string{fieldUnitID: `"` + uuid.NewString() + `"`},
 			404,
 		},
-		"missing alternatives": {customerA(), map[string]string{"alternativeSlots": ""}, 422},
-		"technician":           {techB(), nil, 403},
+		"missing alternatives": {customerA(), map[string]string{fieldAlternativeSlots: ""}, 422},
+		roleTechnician:         {techB(), nil, 403},
 	}
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		"bad type":               "type=error.invalid",
+		caseBadType:              "type=error.invalid",
 		"client dueAt":           "dueAt=error.notAllowed",
 		"client one alternative": "alternativeSlots=error.count",
 		"contact 201":            "contactWindow=error.length",
 		"contact email":          "contactWindow=errors.contact_details_forbidden",
 		"contact phone":          "contactWindow=errors.contact_details_forbidden",
-		"duplicate slots":        "alternativeSlots=error.slotRules",
+		"duplicate slots":        refusedSlotRules,
 		"hq dueAt before end":    "dueAt=error.beforeRequestedEnd",
 		"hq three alternatives":  "alternativeSlots=error.count",
 		"missing alternatives":   "alternativeSlots=error.required",
-		"slot 5 hours":           "alternativeSlots=error.slotRules",
+		"slot 5 hours":           refusedSlotRules,
 		"symptom 2001":           "symptom=error.length",
 		"symptom 9":              "symptom=error.length",
-		"today (KL)":             "alternativeSlots=error.slotRules",
+		"today (KL)":             refusedSlotRules,
 	}
 
 	for name, tc := range bad {
@@ -244,7 +255,7 @@ func TestJobsCreate(t *testing.T) {
 		jobBody(archived, nil),
 		0,
 	); code != 422 ||
-		fields(res) != "unitId=error.unitArchived" {
+		fields(res) != refusedUnitArchived {
 		t.Errorf("archived unit: %d %s", code, fields(res))
 	}
 }
@@ -256,7 +267,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		srv,
 		customerB(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"contactWindow": `"Mornings"`}),
+		jobBody(unit, map[string]string{fieldContactWindow: `"Mornings"`}),
 		0,
 	)
 	job := asStr(t, data(resp)["id"])
@@ -265,9 +276,9 @@ func TestJobsReadAndTransitions(t *testing.T) {
 
 	// list: summary projection with severity, display status, filters
 	_, resp = post(srv, customerB(), "jobs.list", `{"filters":{"unitId":"`+unit+`"}}`)
-	if len(items(t, resp)) != 1 || items(t, resp)[0]["projection"] != "summary" ||
-		items(t, resp)[0]["severity"] != "warning" ||
-		items(t, resp)[0]["displayStatus"] != "requested" {
+	if len(items(t, resp)) != 1 || items(t, resp)[0]["projection"] != projectionSummary ||
+		items(t, resp)[0]["severity"] != severityWarning ||
+		items(t, resp)[0]["displayStatus"] != statusRequested {
 		t.Fatalf("list: %v", resp)
 	}
 
@@ -312,23 +323,23 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	}
 	// the field each case is refused for
 	want := map[string]string{
-		"{\"filters\":{\"from\":\"2026-09-15T00:00:00Z\",\"to\":\"2026-09-14T00:00:00Z\"}}": "filters.to=error.range",
+		"{\"filters\":{\"from\":\"2026-09-15T00:00:00Z\",\"to\":\"2026-09-14T00:00:00Z\"}}": refusedFilterToRange,
 		"{\"filters\":{\"origin\":\"phone\"}}":                                              "filters.origin=error.invalid",
-		"{\"filters\":{\"severity\":\"info\"}}":                                             "filters.severity=error.invalid",
-		"{\"filters\":{\"status\":\"done\"}}":                                               "filters.status=error.invalid",
-		"{\"filters\":{\"status\":\"requested\",\"statuses\":[\"requested\"]}}":             "filters.statuses=error.invalid",
-		"{\"filters\":{\"statuses\":[\"done\"]}}":                                           "filters.statuses=error.invalid",
-		"{\"filters\":{\"statuses\":[]}}":                                                   "filters.statuses=error.invalid",
+		bodyInfoSeverity:                                                                    "filters.severity=error.invalid",
+		"{\"filters\":{\"status\":\"done\"}}":                                               refusedFilterStatusInvalid,
+		"{\"filters\":{\"status\":\"requested\",\"statuses\":[\"requested\"]}}":             refusedFilterStatusesInvalid,
+		"{\"filters\":{\"statuses\":[\"done\"]}}":                                           refusedFilterStatusesInvalid,
+		"{\"filters\":{\"statuses\":[]}}":                                                   refusedFilterStatusesInvalid,
 		"{\"filters\":{\"type\":\"repair\"}}":                                               "filters.type=error.invalid",
-		"{\"filters\":{\"x\":1}}":                                                           "x=error.notAllowed",
-		"{\"sort\":{\"field\":\"unitId\",\"direction\":\"asc\"}}":                           "sort.field=error.invalid",
+		bodyUnknownFilter:                                                                   refusedUnknownFieldX,
+		"{\"sort\":{\"field\":\"unitId\",\"direction\":\"asc\"}}":                           refusedSortFieldInvalid,
 	}
 
 	for _, b := range []string{
 		`{"filters":{"status":"requested",` +
 			`"statuses":["requested"]}}`, `{"filters":{"statuses":[]}}`, `{"filters":{"status":"done"}}`,
-		`{"filters":{"statuses":["done"]}}`, `{"filters":{"severity":"info"}}`, `{"filters":{"origin":"phone"}}`,
-		`{"filters":{"type":"repair"}}`, `{"filters":{"x":1}}`,
+		`{"filters":{"statuses":["done"]}}`, bodyInfoSeverity, `{"filters":{"origin":"phone"}}`,
+		`{"filters":{"type":"repair"}}`, bodyUnknownFilter,
 		`{"filters":{"from":"2026-09-15T00:00:00Z",` +
 			`"to":"2026-09-14T00:00:00Z"}}`, `{"sort":{"field":"unitId",` +
 			`"direction":"asc"}}`,
@@ -337,7 +348,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		refusal(t, b, code, m, want[b])
 	}
 
-	for _, f := range []string{"id", "severity", "dueAt", "status"} {
+	for _, f := range []string{"id", fieldSeverity, fieldDueAt, fieldStatus} {
 		for _, d := range []string{"asc", "desc"} {
 			if code, _ := post(
 				srv,
@@ -354,16 +365,16 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	last := -1
 
 	rank := map[string]int{
-		"requested":        0,
-		"offered":          1,
-		"accepted":         2,
-		"assigned":         3,
-		"in_progress":      4,
-		"on_hold":          5,
+		statusRequested:    0,
+		statusOffered:      1,
+		statusAccepted:     2,
+		statusAssigned:     3,
+		statusInProgress:   4,
+		statusOnHold:       5,
 		"submitted":        6,
 		"rework_requested": 7,
-		"completed":        8,
-		"cancelled":        9,
+		statusCompleted:    8,
+		statusCancelled:    9,
 	}
 	for _, it := range items(t, resp) {
 		if r := rank[asStr(t, it["status"])]; r < last {
@@ -431,7 +442,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		`{"jobId":"`+job+`","message":"   ","visibility":"internal"}`,
 		3,
 	); code != 422 ||
-		fields(res) != "message=error.length" {
+		fields(res) != refusedMessageLength {
 		t.Errorf("blank note: %d %s", code, fields(res))
 	}
 
@@ -489,10 +500,10 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	}
 
 	for b, want := range map[string]string{
-		`{"jobId":"` + job + `","query":{"filters":{"x":1}}}`: "x=error.notAllowed",
+		`{"jobId":"` + job + `","query":{"filters":{"x":1}}}`: refusedUnknownFieldX,
 		`{"jobId":"` + job + `","query":{"filters":{"from":"2026-09-15T00:00:00Z",` +
 			`"to":"2026-09-14T00:00:00Z"}}}`: "query.filters.to=error.range",
-		`{"query":{}}`: "jobId=error.invalid",
+		bodyEmptyQuery: "jobId=error.invalid",
 	} {
 		code, m := post(srv, hq(), "jobs.events", b)
 		refusal(t, b, code, m, want)
@@ -547,7 +558,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		`{"jobId":"`+job+`","reason":" waiting for parts "}`,
 		3,
 	); code != 200 ||
-		data(res)["status"] != "on_hold" {
+		data(res)["status"] != statusOnHold {
 		t.Fatalf("hold: %d", code)
 	}
 
@@ -568,7 +579,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		`{"jobId":"`+job+`","reason":"parts arrived"}`,
 		4,
 	); code != 200 ||
-		data(res)["status"] != "in_progress" {
+		data(res)["status"] != statusInProgress {
 		t.Fatalf("resume: %d", code)
 	}
 
@@ -599,7 +610,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		`{"jobId":"`+job+`","reason":""}`,
 		5,
 	); code != 422 ||
-		fields(res) != "reason=error.length" {
+		fields(res) != refusedReasonLength {
 		t.Errorf("blank hold reason: %d %s", code, fields(res))
 	}
 
@@ -612,7 +623,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		`{"jobId":"`+job+`","cancelReason":"customer withdrew"}`,
 		6,
 	); code != 200 ||
-		data(res)["status"] != "cancelled" {
+		data(res)["status"] != statusCancelled {
 		t.Fatalf("cancel on_hold: %d", code)
 	}
 
@@ -665,7 +676,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 	j3 := asStr(t, data(resp)["id"])

@@ -174,7 +174,7 @@ func TestFilterReminders(t *testing.T) {
 	evaluate(clock().Add(time.Minute))
 
 	as := alertsOf(unit)
-	if len(as) != 1 || as[0].status != "open" || as[0].severity != "normal" ||
+	if len(as) != 1 || as[0].status != statusOpen || as[0].severity != severityNormal ||
 		as[0].ruleKey != "filter_cleaning" ||
 		as[0].evidence != "Cleaning due (200 h of run time, no cleaning recorded). Not a fault." ||
 		as[0].failures != 0 {
@@ -248,7 +248,7 @@ func TestFilterReminders(t *testing.T) {
 
 	drainEvents(t)
 
-	if as := alertsOf(unit); as[0].status != "resolved" || as[0].reason != "filter cleaned" {
+	if as := alertsOf(unit); as[0].status != statusResolved || as[0].reason != "filter cleaned" {
 		t.Fatalf("resolved: %+v", as)
 	}
 
@@ -284,7 +284,7 @@ func TestFilterReminders(t *testing.T) {
 	evaluate(when)
 
 	as = alertsOf(unit)
-	if len(as) != 2 || as[1].status != "open" ||
+	if len(as) != 2 || as[1].status != statusOpen ||
 		as[1].evidence != "Cleaning due (140 h of run time since the last cleaning). Not a fault." {
 		t.Fatalf("second cycle: %+v", as)
 	}
@@ -338,7 +338,7 @@ func TestFilterReminders(t *testing.T) {
 
 	if as := alertsOf(
 		unit,
-	); len(as) != 2 || as[1].status != "resolved" ||
+	); len(as) != 2 || as[1].status != statusResolved ||
 		as[1].reason != "filter cleaned" {
 		t.Fatalf("technician cleaning: %+v", as)
 	}

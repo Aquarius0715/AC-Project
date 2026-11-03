@@ -60,11 +60,11 @@ func TestLastSignIn(t *testing.T) {
 		exec(`UPDATE identity.users SET last_sign_in_at = $2 WHERE id =
 		$1`, user, earlier)
 	} // to see whether a request writes
-	signedIn := func(at time.Time) *actor { return &actor{fmt.Sprintf("tok-a@%d", at.Unix()), "customer-a"} }
+	signedIn := func(at time.Time) *actor { return &actor{fmt.Sprintf("tok-a@%d", at.Unix()), membershipCustomerA} }
 	request := func(a *actor, op string) {
 		t.Helper()
 
-		body := map[string]string{"session.get": `{}`, "units.list": `{"limit":1}`}[op]
+		body := map[string]string{opSessionGet: `{}`, opUnitsList: `{"limit":1}`}[op]
 		if code, m := post(srv, a, op, body); code != 200 {
 			t.Fatalf("%s: %d %v", op, code, m)
 		}

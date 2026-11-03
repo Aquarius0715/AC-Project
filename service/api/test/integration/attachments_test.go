@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const refusedSignatureOrAbsence = "signature=errors.signature_or_absence"
+
 func blobJSON(name, mime string, data []byte, size int) string {
 	return `{"name":"` + name + `","mime":"` + mime + `","size":` + itoa(
 		size,
@@ -34,28 +36,28 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		)
 	}
 	want := map[string]string{ // the field each case is refused for
-		"empty":         "file=error.invalidFile",
-		"gif":           "file=error.invalidFile",
-		"no name":       "file=error.invalidFile",
-		"not a png":     "file=error.invalidFile",
-		"png as jpeg":   "file=error.invalidFile",
-		"size mismatch": "file=error.invalidFile",
-		"pixel flood":   "file=error.invalidFile",
+		"empty":          refusedFileInvalid,
+		"gif":            refusedFileInvalid,
+		caseNoName:       refusedFileInvalid,
+		"not a png":      refusedFileInvalid,
+		casePNGAsJPEG:    refusedFileInvalid,
+		caseSizeMismatch: refusedFileInvalid,
+		casePixelFlood:   refusedFileInvalid,
 		// IR368: the name is a label without control characters, paths or bidirectional overrides
-		"line break in the name": "file=error.invalidFile",
-		"path in the name":       "file=error.invalidFile",
-		"override in the name":   "file=error.invalidFile",
+		"line break in the name": refusedFileInvalid,
+		"path in the name":       refusedFileInvalid,
+		"override in the name":   refusedFileInvalid,
 	}
 
 	for name, f := range map[string]string{
-		"gif":           blobJSON("a.gif", "image/gif", img, len(img)),
-		"size mismatch": blobJSON("a.png", "image/png", img, 3),
-		"pixel flood":   blobJSON("flood.png", "image/png", flood, len(flood)),
-		"empty":         blobJSON("a.png", "image/png", nil, 0),
-		"no name":       blobJSON(" ", "image/png", img, len(img)),
+		"gif":            blobJSON("a.gif", "image/gif", img, len(img)),
+		caseSizeMismatch: blobJSON("a.png", "image/png", img, 3),
+		casePixelFlood:   blobJSON("flood.png", "image/png", flood, len(flood)),
+		"empty":          blobJSON("a.png", "image/png", nil, 0),
+		caseNoName:       blobJSON(" ", "image/png", img, len(img)),
 		// stored and served only as what it is (IR308)
 		"not a png":              blobJSON("a.png", "image/png", []byte("<svg onload=alert(1)>"), 21),
-		"png as jpeg":            blobJSON("a.jpg", "image/jpeg", img, len(img)),
+		casePNGAsJPEG:            blobJSON("a.jpg", "image/jpeg", img, len(img)),
 		"line break in the name": blobJSON(`a\r\nSet-Cookie: x.png`, "image/png", img, len(img)),
 		"path in the name":       blobJSON("../../a.png", "image/png", img, len(img)),
 		"override in the name":   blobJSON("photo\u202egnp.exe", "image/png", img, len(img)),
@@ -94,7 +96,10 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		draftBody(
 			job,
 			"normal",
-			map[string]string{"reportId": `"` + rep + `"`, "attachmentIds": `["` + att + `"]`},
+			map[string]string{
+				fieldReportID:      `"` + rep + `"`,
+				fieldAttachmentIDs: `["` + att + `"]`,
+			},
 		),
 		`"componentKey":"filter","result":"normal","reason":null,"evidenceIds":[]`,
 		`"componentKey":"filter","result":"normal","reason":null,"evidenceIds":["`+att+`"]`,
@@ -127,11 +132,11 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	}
 	sig := blobJSON("sig.png", "image/png", img, len(img))
 	want = map[string]string{ // the field each case is refused for
-		"absent without photo": "signature=errors.signature_or_absence",
+		"absent without photo": refusedSignatureOrAbsence,
 		"blank absent reason":  "absentReason=error.length",
-		"both":                 "signature=errors.signature_or_absence",
+		"both":                 refusedSignatureOrAbsence,
 		"jpeg signature":       "signature=error.invalidFile",
-		"neither":              "signature=errors.signature_or_absence",
+		"neither":              refusedSignatureOrAbsence,
 	}
 
 	for name, extra := range map[string]string{
@@ -185,7 +190,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 
 	code, res = get(techInt(), 3)
 	if code != 200 || data(res)["bytes"] != base64.StdEncoding.EncodeToString(img) ||
-		data(res)["mime"] != "image/png" {
+		data(res)["mime"] != mimePNG {
 		t.Fatalf("getContent: %d %v", code, res)
 	}
 

@@ -20,13 +20,13 @@ func TestAutomationNotifications(t *testing.T) {
 		id := uuid.NewString()
 		cond := jsonBytes(t,
 			map[string]any{
-				"metric":            "co2",
-				"operator":          "gte",
-				"threshold":         1000,
-				"recoveryThreshold": 900,
-				"durationSeconds":   60,
-				"activeWindow":      nil,
-				"severity":          "warning",
+				fieldMetric:            metricCO2,
+				fieldOperator:          operatorAtLeast,
+				fieldThreshold:         1000,
+				fieldRecoveryThreshold: 900,
+				fieldDurationSeconds:   60,
+				fieldActiveWindow:      nil,
+				fieldSeverity:          severityWarning,
 			},
 		)
 		owner(
@@ -81,8 +81,8 @@ func TestAutomationNotifications(t *testing.T) {
 	high := fact(unitID, "1200", clock(), "valid") + "," + fact(lonely, "1200", clock(), "valid")
 
 	code, resp := post(srv, customerB(), "automations.simulate", input(high))
-	if code != 200 || outcome(resp, unitID, withRecipient)["decision"] != "selected" ||
-		outcome(resp, unitID, def)["decision"] != "selected" ||
+	if code != 200 || outcome(resp, unitID, withRecipient)["decision"] != decisionSelected ||
+		outcome(resp, unitID, def)["decision"] != decisionSelected ||
 		outcome(resp, lonely, noRecipient)["reason"] != "no_recipient" {
 		t.Fatalf("simulate: %d %v", code, resp)
 	}
@@ -133,7 +133,7 @@ func TestAutomationNotifications(t *testing.T) {
 	}
 
 	failed := outcome(resp, lonely, noRecipient)
-	if failed["decision"] != "failed" || len(asArr(t, failed["failureIds"])) != 1 ||
+	if failed["decision"] != statusFailed || len(asArr(t, failed["failureIds"])) != 1 ||
 		len(asArr(t, failed["notificationIds"])) != 0 {
 		t.Errorf("no recipient: %v", failed)
 	}
@@ -186,7 +186,7 @@ func TestAutomationNotifications(t *testing.T) {
 		resp,
 		lonely,
 		noRecipient,
-	); again["decision"] != "failed" ||
+	); again["decision"] != statusFailed ||
 		len(asArr(t, again["failureIds"])) != 1 {
 		t.Fatalf("second event: %v", again)
 	}
@@ -242,7 +242,7 @@ func TestAutomationNotifications(t *testing.T) {
 		customerB(),
 		"automations.simulate",
 		input(high),
-	); outcome(res, unitID, withRecipient)["reason"] != "disabled" {
+	); outcome(res, unitID, withRecipient)["reason"] != reasonDisabled {
 		t.Errorf("disabled: %v", res)
 	}
 	// D02: a policy whose owner membership is gone notifies nobody, before any cooldown applies
@@ -278,7 +278,7 @@ func TestAutomationNotifications(t *testing.T) {
 		"automations.simulate",
 		input(high),
 	); code != 200 ||
-		outcome(res, unitID, def)["decision"] == "selected" {
+		outcome(res, unitID, def)["decision"] == decisionSelected {
 		t.Errorf("default rule switched off: %v", outcome(res, unitID, def))
 	}
 
@@ -303,13 +303,13 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 	pol := uuid.NewString()
 	cond := jsonBytes(t,
 		map[string]any{
-			"metric":            "co2",
-			"operator":          "gte",
-			"threshold":         1000,
-			"recoveryThreshold": 900,
-			"durationSeconds":   60,
-			"activeWindow":      nil,
-			"severity":          "warning",
+			fieldMetric:            metricCO2,
+			fieldOperator:          operatorAtLeast,
+			fieldThreshold:         1000,
+			fieldRecoveryThreshold: 900,
+			fieldDurationSeconds:   60,
+			fieldActiveWindow:      nil,
+			fieldSeverity:          severityWarning,
 		},
 	)
 	owner(
@@ -446,7 +446,7 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 	fire("1200", "valid", false)
 
 	first := of(pol)
-	if len(first) != 1 || first[0].status != "open" || len(of(def)) != 1 {
+	if len(first) != 1 || first[0].status != statusOpen || len(of(def)) != 1 {
 		t.Fatalf(
 			"the breach opens the policy's and the default rule's alerts: %v / %v",
 			first,
@@ -475,33 +475,33 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 	fire("850", "suspect", false) // not a valid reading
 	fire("850", "valid", true)    // a simulation saves nothing
 
-	if r := of(pol); r[0].status != "open" {
+	if r := of(pol); r[0].status != statusOpen {
 		t.Fatalf("nothing recovers yet: %v", r)
 	}
 
 	ev := fire("850", "valid", false)
 
 	r := of(pol)[0]
-	if r.status != "resolved" || r.reason == nil ||
+	if r.status != statusResolved || r.reason == nil ||
 		*r.reason != "Recovered: co2 850 < 900 for 60 s (D08)" ||
 		len(r.evidence) != 1 ||
 		r.evidence[0].String() != ev {
 		t.Fatalf("sustained recovery resolves with the recovery as evidence: %+v", r)
 	}
 
-	if d := of(def); d[0].status != "resolved" {
+	if d := of(def); d[0].status != statusResolved {
 		t.Errorf("the default rule's alert recovers too: %+v", d)
 	}
 
 	_, res := post(srv, customerB(), "alerts.get", `{"id":"`+manual+`"}`)
-	if data(res)["status"] != "open" {
+	if data(res)["status"] != statusOpen {
 		t.Errorf("an alert without a policy stays open: %v", data(res)["status"])
 	}
 
 	fire("1300", "valid", false)
 
 	again := of(pol)
-	if len(again) != 2 || again[1].status != "open" || again[1].previous == nil ||
+	if len(again) != 2 || again[1].status != statusOpen || again[1].previous == nil ||
 		again[1].previous.String() != first[0].id {
 		t.Fatalf("a recurrence opens a new alert linked to the resolved one: %+v", again)
 	}
@@ -534,13 +534,13 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 	pol := uuid.NewString()
 	cond := jsonBytes(t,
 		map[string]any{
-			"metric":            "temperature",
-			"operator":          "gte",
-			"threshold":         30,
-			"recoveryThreshold": 28,
-			"durationSeconds":   60,
-			"activeWindow":      nil,
-			"severity":          "warning",
+			fieldMetric:            metricTemperature,
+			fieldOperator:          operatorAtLeast,
+			fieldThreshold:         30,
+			fieldRecoveryThreshold: 28,
+			fieldDurationSeconds:   60,
+			fieldActiveWindow:      nil,
+			fieldSeverity:          severityWarning,
 		},
 	)
 	owner(
@@ -569,7 +569,7 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 		srv,
 		hq(),
 		"policies.save",
-		autoPolicyBody(map[string]string{"unitIds": `["` + unitID + `"]`}),
+		autoPolicyBody(map[string]string{fieldUnitIDs: `["` + unitID + `"]`}),
 		0,
 	); code != 200 {
 		t.Fatalf("automation policy: %d %v", code, resp)

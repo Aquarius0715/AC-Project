@@ -8,20 +8,22 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const fieldEndsNextDay = "endsNextDay"
+
 func scheduleRule(u string, extra map[string]string) string {
 	f := map[string]string{
-		"name":        `"Weekday cooling"`,
-		"unitIds":     `["` + u + `"]`,
-		"timezone":    `"Asia/Kuala_Lumpur"`,
-		"enabled":     "false",
-		"priority":    "50",
-		"kind":        `"schedule"`,
-		"weekdays":    "[1,2,3,4,5]",
-		"startLocal":  `"08:00"`,
-		"endLocal":    `"18:00"`,
-		"endsNextDay": "false",
-		"startAction": `{"kind":"set_power","power":true}`,
-		"endAction":   `{"kind":"set_power","power":false}`,
+		fieldName:        `"Weekday cooling"`,
+		fieldUnitIDs:     `["` + u + `"]`,
+		fieldTimezone:    jsonKualaLumpur,
+		fieldEnabled:     jsonFalse,
+		fieldPriority:    "50",
+		fieldKind:        `"schedule"`,
+		fieldWeekdays:    "[1,2,3,4,5]",
+		fieldStartLocal:  `"08:00"`,
+		fieldEndLocal:    `"18:00"`,
+		fieldEndsNextDay: jsonFalse,
+		fieldStartAction: actionPowerOn,
+		"endAction":      actionPowerOff,
 	}
 
 	for key, v := range extra {
@@ -48,34 +50,34 @@ func TestAutomationSchedules(t *testing.T) {
 	// the field each case is refused for
 	want := map[string]string{
 		"bad time":             "startLocal=error.invalid",
-		"bad zone":             "timezone=error.invalid",
-		"blank name":           "name=error.length",
+		caseBadZone:            refusedTimezoneInvalid,
+		caseBlankName:          refusedNameLength,
 		"duplicate weekday":    "weekdays=error.invalid",
-		"event fields":         "kind=error.invalid",
+		"event fields":         refusedKindInvalid,
 		"no end action":        "endAction=error.invalid",
-		"no weekdays":          "weekdays=error.required",
+		caseNoWeekdays:         "weekdays=error.required",
 		"over 24 hours":        "endsNextDay=errors.over_24_hours",
 		"overnight not marked": "endsNextDay=errors.overnight_required",
-		"priority 101":         "priority=error.range",
+		casePriorityOver100:    refusedPriorityRange,
 		"same start and end":   "endLocal=errors.same_as_start",
 		"unsupported action":   "unitIds=error.unsupportedAction",
-		"weekday 8":            "weekdays=error.invalid",
+		caseWeekdayEight:       "weekdays=error.invalid",
 	}
 
 	for name, e := range map[string]map[string]string{
-		"no weekdays":          {"weekdays": "[]"},
-		"weekday 8":            {"weekdays": "[8]"},
-		"duplicate weekday":    {"weekdays": "[1,1]"},
-		"same start and end":   {"endLocal": `"08:00"`},
-		"overnight not marked": {"startLocal": `"22:00"`, "endLocal": `"06:00"`},
-		"over 24 hours":        {"endsNextDay": "true"},
+		caseNoWeekdays:         {fieldWeekdays: "[]"},
+		caseWeekdayEight:       {fieldWeekdays: "[8]"},
+		"duplicate weekday":    {fieldWeekdays: "[1,1]"},
+		"same start and end":   {fieldEndLocal: `"08:00"`},
+		"overnight not marked": {fieldStartLocal: `"22:00"`, fieldEndLocal: `"06:00"`},
+		"over 24 hours":        {fieldEndsNextDay: jsonTrue},
 		"no end action":        {"endAction": ""},
-		"bad time":             {"startLocal": `"8:00"`},
-		"bad zone":             {"timezone": `"Moon/Base"`},
-		"priority 101":         {"priority": "101"},
-		"blank name":           {"name": `" "`},
-		"event fields":         {"condition": `{"type":"occupancy","occupied":true}`},
-		"unsupported action":   {"startAction": `{"kind":"set_temperature","celsius":40}`},
+		"bad time":             {fieldStartLocal: `"8:00"`},
+		caseBadZone:            {fieldTimezone: `"Moon/Base"`},
+		casePriorityOver100:    {fieldPriority: "101"},
+		caseBlankName:          {fieldName: jsonBlank},
+		"event fields":         {fieldCondition: `{"type":"occupancy","occupied":true}`},
+		"unsupported action":   {fieldStartAction: `{"kind":"set_temperature","celsius":40}`},
 	} {
 		code, m := write(srv, customerB(), "automations.save", scheduleRule(unit, e), 0)
 		refusal(t, name, code, m, want[name])
@@ -104,10 +106,10 @@ func TestAutomationSchedules(t *testing.T) {
 			scheduleRule(
 				unit,
 				map[string]string{
-					"timezone":   `"America/New_York"`,
-					"weekdays":   "[7]",
-					"startLocal": hm,
-					"endLocal":   `"05:00"`,
+					fieldTimezone:   `"America/New_York"`,
+					fieldWeekdays:   "[7]",
+					fieldStartLocal: hm,
+					fieldEndLocal:   `"05:00"`,
 				},
 			),
 			0,
@@ -122,9 +124,9 @@ func TestAutomationSchedules(t *testing.T) {
 		scheduleRule(
 			unit,
 			map[string]string{
-				"startLocal":  `"22:00"`,
-				"endLocal":    `"06:00"`,
-				"endsNextDay": "true",
+				fieldStartLocal:  `"22:00"`,
+				fieldEndLocal:    `"06:00"`,
+				fieldEndsNextDay: jsonTrue,
 			},
 		),
 		0,
@@ -206,7 +208,7 @@ func TestAutomationSchedules(t *testing.T) {
 		srv,
 		customerB(),
 		"automations.save",
-		scheduleRule(unit, map[string]string{"id": `"` + id + `"`, "name": `"Edited"`}),
+		scheduleRule(unit, map[string]string{"id": `"` + id + `"`, fieldName: `"Edited"`}),
 		1,
 	)
 	if code != 200 || ver(t, resp) != 2 || data(resp)["disabledReason"] != "capability_changed" {
@@ -217,7 +219,7 @@ func TestAutomationSchedules(t *testing.T) {
 		srv,
 		customerB(),
 		"automations.save",
-		scheduleRule(unit, map[string]string{"id": `"` + id + `"`, "enabled": "true"}),
+		scheduleRule(unit, map[string]string{"id": `"` + id + `"`, fieldEnabled: jsonTrue}),
 		2,
 	)
 	if code != 200 || data(resp)["enabled"] != true || data(resp)["disabledReason"] != nil {
@@ -251,7 +253,7 @@ func TestAutomationSchedules(t *testing.T) {
 		"automations.list",
 		`{"filters":{"kind":"cron"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad kind filter: %d %s", code, fields(res))
 	}
 
@@ -269,11 +271,11 @@ func TestAutomationEvents(t *testing.T) {
 			`"kind":"event","condition":` + cond + `,"action":{"kind":"set_temperature","celsius":24}}`
 	}
 	want := map[string]string{ // the field each case is refused for
-		"{\"type\":\"location\",\"event\":\"leave\"}":                                        "condition=error.invalid",
-		"{\"type\":\"occupancy\"}":                                                           "condition=error.invalid",
-		"{\"type\":\"pattern\",\"localTime\":\"25:00\"}":                                     "condition=error.invalid",
-		"{\"type\":\"tariff\",\"operator\":\"gt\",\"value\":1,\"unit\":\"MYR_per_kWh\"}":     "condition=error.invalid",
-		"{\"type\":\"weather\",\"metric\":\"temperature\",\"operator\":\"eq\",\"value\":30}": "condition=error.invalid",
+		"{\"type\":\"location\",\"event\":\"leave\"}":                                        refusedConditionInvalid,
+		"{\"type\":\"occupancy\"}":                                                           refusedConditionInvalid,
+		"{\"type\":\"pattern\",\"localTime\":\"25:00\"}":                                     refusedConditionInvalid,
+		"{\"type\":\"tariff\",\"operator\":\"gt\",\"value\":1,\"unit\":\"MYR_per_kWh\"}":     refusedConditionInvalid,
+		"{\"type\":\"weather\",\"metric\":\"temperature\",\"operator\":\"eq\",\"value\":30}": refusedConditionInvalid,
 	}
 
 	for _, c := range []string{

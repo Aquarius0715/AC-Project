@@ -59,7 +59,7 @@ func TestBootstrapAdmin(t *testing.T) {
 	for name, bad := range map[string]bootstrap.Input{
 		"no tenant":  {Organization: "HQ", Email: input.Email, Name: input.Name, Tenant: "", At: time.Time{}},
 		"no address": {Tenant: input.Tenant, Organization: "HQ", Email: "nobody", Name: input.Name, At: time.Time{}},
-		"no name":    {Tenant: input.Tenant, Organization: "HQ", Email: input.Email, Name: "", At: time.Time{}},
+		caseNoName:   {Tenant: input.Tenant, Organization: "HQ", Email: input.Email, Name: "", At: time.Time{}},
 	} {
 		_, err := run(bad)
 		if err == nil {
@@ -196,7 +196,7 @@ func TestBootstrapAdmin(t *testing.T) {
 
 	fake.mu.Lock()
 	opened := slices.ContainsFunc(fake.created, func(a idp.Account) bool {
-		return a.Email == input.Email && a.Role == "admin" &&
+		return a.Email == input.Email && a.Role == roleAdmin &&
 			a.TenantID == result.TenantID.String() &&
 			a.Membership == result.MembershipID.String()
 	})

@@ -151,7 +151,7 @@ func TestCertificateReminders(t *testing.T) {
 	if r := sent(
 		main,
 	); len(r) != 1 || r[0].days != 60 || r[0].notifications != 1 || r[0].to != admin ||
-		r[0].severity != "normal" {
+		r[0].severity != severityNormal {
 		t.Fatalf("60 days: %+v", r)
 	}
 
@@ -196,7 +196,8 @@ func TestCertificateReminders(t *testing.T) {
 
 	if r := sent(
 		main,
-	); len(r) != 3 || r[1].days != 30 || r[1].severity != "normal" || r[2].days != 7 || r[2].severity != "warning" ||
+	); len(r) != 3 || r[1].days != 30 || r[1].severity != severityNormal || r[2].days != 7 ||
+		r[2].severity != severityWarning ||
 		r[2].to != admin {
 		t.Fatalf("30 and 7 days: %+v", r)
 	}
@@ -235,7 +236,7 @@ func TestCertificateReminders(t *testing.T) {
 	}
 
 	for name, id := range map[string]string{
-		"pending": pending, "rejected": rejected, "expired": expired, "left": left,
+		statusPending: pending, statusRejected: rejected, statusExpired: expired, "left": left,
 		"renewed": renewed, "older": older,
 	} {
 		if r := sent(id); len(r) != 0 {
@@ -280,8 +281,8 @@ func TestCertificateReminders(t *testing.T) {
 		time.RFC3339,
 		asStr(t, params["at"]),
 	); params["targetName"] != "Test user · Indoor AC" || !at.Equal(clock().Add(20*day)) ||
-		params["status"] != "expiring" ||
-		mine["severity"] != "normal" ||
+		params["status"] != statusExpiring ||
+		mine["severity"] != severityNormal ||
 		mine["templateKey"] != "certificate_expiry" {
 		t.Errorf("notification: %v", mine)
 	}

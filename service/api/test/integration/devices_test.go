@@ -12,7 +12,7 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
-func techInt() *actor { return &actor{"tok-ti", "tech-internal-a"} }
+func techInt() *actor { return &actor{"tok-ti", membershipTechInternalA} }
 
 // newUnit creates a unit for customer-b's home (fresh per test run).
 func newUnit(t *testing.T, s *apiserver.Server, name string) string {
@@ -44,7 +44,7 @@ func assign(t *testing.T, unit, membership string, from, until time.Time, status
 
 	job := uuid.NewString()
 
-	if status == "active" { // isolate from active assignments other tests left in the same window
+	if status == statusActive { // isolate from active assignments other tests left in the same window
 		owner(
 			t,
 			`UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND
@@ -203,11 +203,11 @@ func TestDevicesRegisterListGet(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"filters\":{\"status\":\"x\"}}": "filters.status=error.invalid",
-		"{\"filters\":{\"y\":1}}":          "y=error.notAllowed",
+		bodyUnknownStatus:  refusedFilterStatusInvalid,
+		bodyUnknownFilterY: "y=error.notAllowed",
 	}
 
-	for _, b := range []string{`{"filters":{"status":"x"}}`, `{"filters":{"y":1}}`} {
+	for _, b := range []string{bodyUnknownStatus, bodyUnknownFilterY} {
 		code, m := post(srv, hq(), "devices.list", b)
 		refusal(t, b, code, m, want[b])
 	}
@@ -268,7 +268,7 @@ func TestTechnicianWriteTable(t *testing.T) {
 		u1,
 		future,
 	); code != 403 ||
-		m["messageKey"] != "errors.assignment_not_started" {
+		m["messageKey"] != keyAssignmentNotStarted {
 		t.Fatalf("before window: %d %v", code, m)
 	}
 
@@ -282,7 +282,7 @@ func TestTechnicianWriteTable(t *testing.T) {
 		clock().Add(-time.Hour),
 		"active",
 	)
-	if code, m := reg(u2, ended); code != 403 || m["messageKey"] != "errors.assignment_ended" {
+	if code, m := reg(u2, ended); code != 403 || m["messageKey"] != keyAssignmentEnded {
 		t.Fatalf("after window: %d %v", code, m)
 	}
 
@@ -296,7 +296,7 @@ func TestTechnicianWriteTable(t *testing.T) {
 		clock().Add(time.Hour),
 		"revoked",
 	)
-	if code, m := reg(u3, revoked); code != 403 || m["messageKey"] != "errors.assignment_ended" {
+	if code, m := reg(u3, revoked); code != 403 || m["messageKey"] != keyAssignmentEnded {
 		t.Fatalf("revoked after start: %d %v", code, m)
 	}
 
@@ -369,7 +369,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		`{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":""}`,
 		1,
 	); code != 422 ||
-		fields(res) != "reason=error.length" {
+		fields(res) != refusedReasonLength {
 		t.Errorf("bind reason required: %d %s", code, fields(res))
 	}
 
@@ -406,16 +406,16 @@ func TestDeviceBindAndOperations(t *testing.T) {
 
 	v++
 	want := map[string]string{ // the field each case is refused for
-		"future":         "calibratedAt=error.future",
+		caseFuture:       "calibratedAt=error.future",
 		"metric differs": "metric=error.sensorMismatch",
 		"other sensor":   "sensorId=error.notOnDevice",
-		"unit mismatch":  "unit=error.unitMismatch",
+		caseUnitMismatch: "unit=error.unitMismatch",
 	}
 
 	for name, b := range map[string]string{
-		"future": `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"temperature","unit":"°C",` +
+		caseFuture: `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"temperature","unit":"°C",` +
 			`"referenceValue":1,"measuredValue":1,"calibratedAt":"2030-01-01T00:00:00Z"}`,
-		"unit mismatch": `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"temperature","unit":"%",` +
+		caseUnitMismatch: `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"temperature","unit":"%",` +
 			`"referenceValue":1,"measuredValue":1,"calibratedAt":"2026-09-14T00:30:00Z"}`,
 		"other sensor": `{"deviceId":"` + dev + `","sensorId":"` + uuid.NewString() + `","metric":"temperature",` +
 			`"unit":"°C","referenceValue":1,"measuredValue":1,"calibratedAt":"2026-09-14T00:30:00Z"}`,
@@ -427,7 +427,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 	}
 
 	code, resp = write(srv, hq(), "devices.check", `{"id":"`+dev+`"}`, v)
-	if code != 200 || data(resp)["status"] != "queued" || data(resp)["kind"] != "check" {
+	if code != 200 || data(resp)["status"] != statusQueued || data(resp)["kind"] != "check" {
 		t.Fatalf("check: %d %v", code, resp)
 	}
 
@@ -464,7 +464,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		`{"deviceId":"`+dev+`","firmwareVersion":"v2"}`,
 		v,
 	); code != 409 ||
-		res["code"] != "OFFLINE" {
+		res["code"] != codeOffline {
 		t.Fatalf("offline firmware: %d %v", code, res)
 	}
 

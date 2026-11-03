@@ -44,7 +44,12 @@ func TestWorkerTickExpiresOffers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, m := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`); data(m)["status"] != "offered" {
+	if _, m := post(
+		srv,
+		hq(),
+		"jobs.get",
+		`{"jobId":"`+job+`"}`,
+	); data(m)["status"] != statusOffered {
 		t.Fatal("offer still open before its deadline")
 	}
 
@@ -54,7 +59,7 @@ func TestWorkerTickExpiresOffers(t *testing.T) {
 	}
 
 	_, res = post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
-	if data(res)["status"] != "requested" || data(res)["contractorOrgId"] != nil ||
+	if data(res)["status"] != statusRequested || data(res)["contractorOrgId"] != nil ||
 		asNum(t, data(res)["version"]) != 3 {
 		t.Fatalf("expired: %v", res)
 	}
@@ -218,7 +223,7 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 	}
 
 	r, err := scheduler.TryTickDomains(ctx, ms.DB, clock().Add(time.Hour), maint, ms.Registry)
-	if err != nil || r.Skipped < 1 || r.ExpiredOffers != 0 || status(job) != "offered" {
+	if err != nil || r.Skipped < 1 || r.ExpiredOffers != 0 || status(job) != statusOffered {
 		t.Fatalf("the background tick skips the held tenant: %+v %v %v", r, err, status(job))
 	}
 
@@ -244,7 +249,7 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 		t.Fatal(commitErr)
 	}
 
-	if r := <-done; r.ExpiredOffers < 1 || status(job) != "requested" || expiries(job) != 1 {
+	if r := <-done; r.ExpiredOffers < 1 || status(job) != statusRequested || expiries(job) != 1 {
 		t.Fatalf("the waiting tick after the lock: %+v %v %d", r, status(job), expiries(job))
 	}
 	// two background ticks at once: the offer expires once
@@ -278,7 +283,7 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 
 	group.Wait()
 
-	if total.ExpiredOffers != 1 || status(job2) != "requested" || expiries(job2) != 1 {
+	if total.ExpiredOffers != 1 || status(job2) != statusRequested || expiries(job2) != 1 {
 		t.Fatalf("two instances: %+v %v %d", total, status(job2), expiries(job2))
 	}
 

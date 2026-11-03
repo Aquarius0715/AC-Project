@@ -122,11 +122,11 @@ func TestWarrantyReminders(t *testing.T) {
 	if r := sent(
 		soon,
 	); admins == 0 || len(r) != 1 || r[0].days != 90 || r[0].notifications != admins ||
-		r[0].severity != "normal" {
+		r[0].severity != severityNormal {
 		t.Fatalf("90 days: %d admins, %+v", admins, r)
 	}
 
-	if r := sent(near); len(r) != 1 || r[0].days != 30 || r[0].severity != "warning" {
+	if r := sent(near); len(r) != 1 || r[0].days != 30 || r[0].severity != severityWarning {
 		t.Fatalf("20 days left: only the 30-day reminder: %+v", r)
 	}
 
@@ -217,7 +217,7 @@ func TestWarrantyReminders(t *testing.T) {
 	if at, _ := time.Parse(
 		time.RFC3339,
 		asStr(t, params["at"]),
-	); !at.Equal(clock().Add(20*day)) || params["status"] != "expiring" ||
+	); !at.Equal(clock().Add(20*day)) || params["status"] != statusExpiring ||
 		mine["templateKey"] != "warranty_expiring" {
 		t.Errorf("notification: %v", mine)
 	}

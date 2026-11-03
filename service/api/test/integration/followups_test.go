@@ -14,6 +14,8 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
+const refusedPhotosInvalid = "photos=" + apperr.KeyInvalidFile
+
 // completedJob creates a customer-a job completed one hour before the fixture clock.
 func completedJob(t *testing.T, s *apiserver.Server) string {
 	t.Helper()
@@ -124,26 +126,26 @@ func TestRateAndReportProblem(t *testing.T) {
 		return write(srv, customerA(), "jobs.reportProblem", `{"jobId":"`+job+`",`+body+`}`, v)
 	}
 	want = map[string]string{ // the field each case is refused for
-		"bad code":      "reasonCode=error.invalid",
-		"bad mime":      "photos=error.invalidFile",
-		"png as jpeg":   "photos=error.invalidFile",
-		"short details": "details=error.length",
-		"six photos":    "photos=error.count",
-		"size mismatch": "photos=error.invalidFile",
-		"pixel flood":   "photos=error.invalidFile",
-		"today slot":    "preferredSlot=error.slotRules",
+		caseBadCode:      "reasonCode=error.invalid",
+		"bad mime":       refusedPhotosInvalid,
+		casePNGAsJPEG:    refusedPhotosInvalid,
+		"short details":  "details=error.length",
+		"six photos":     "photos=error.count",
+		caseSizeMismatch: refusedPhotosInvalid,
+		casePixelFlood:   refusedPhotosInvalid,
+		"today slot":     "preferredSlot=error.slotRules",
 	}
 
 	for name, b := range map[string]string{
 		"short details": `"reasonCode":"same_problem","details":"short","photos":[],"preferredSlot":null`,
-		"bad code":      `"reasonCode":"angry","details":"still dripping water","photos":[],"preferredSlot":null`,
+		caseBadCode:     `"reasonCode":"angry","details":"still dripping water","photos":[],"preferredSlot":null`,
 		"bad mime": `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.gif",` +
 			`"mime":"image/gif","size":` + size + `,"bytes":"` + png + `"}],"preferredSlot":null`,
-		"png as jpeg": `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.jpg",` +
+		casePNGAsJPEG: `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.jpg",` +
 			`"mime":"image/jpeg","size":` + size + `,"bytes":"` + png + `"}],"preferredSlot":null`,
-		"size mismatch": `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.png",` +
+		caseSizeMismatch: `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.png",` +
 			`"mime":"image/png","size":3,"bytes":"` + png + `"}],"preferredSlot":null`,
-		"pixel flood": `"reasonCode":"same_problem","details":"still dripping water",` +
+		casePixelFlood: `"reasonCode":"same_problem","details":"still dripping water",` +
 			`"photos":[` + blobJSON("flood.png", "image/png", flood, len(flood)) + `],"preferredSlot":null`,
 		"six photos": `"reasonCode":"same_problem","details":"still dripping water",` +
 			`"photos":[` + strings.Repeat(photo+",", 5) + photo + `],"preferredSlot":null`,
@@ -163,8 +165,8 @@ func TestRateAndReportProblem(t *testing.T) {
 		3,
 	)
 	if code != 200 || data(resp)["followUpOfJobId"] != job ||
-		data(resp)["followUpClass"] != "pending" ||
-		data(resp)["status"] != "requested" ||
+		data(resp)["followUpClass"] != statusPending ||
+		data(resp)["status"] != statusRequested ||
 		len(asArr(t, data(resp)["preferredSlots"])) != 1 {
 		t.Fatalf("reportProblem: %d %v", code, resp)
 	}
@@ -201,7 +203,7 @@ func TestRateAndReportProblem(t *testing.T) {
 			a,
 			"jobs.getAttachment",
 			`{"jobId":"`+follow+`","attachmentId":"`+pid+`"}`,
-		); code != 200 || data(res)["mime"] != "image/png" ||
+		); code != 200 || data(res)["mime"] != mimePNG ||
 			data(res)["bytes"] != png {
 			t.Errorf("jobs.getAttachment: %d %v", code, res)
 		}
@@ -274,12 +276,12 @@ func TestRateAndReportProblem(t *testing.T) {
 	var created time.Time
 	ownerScan(t, `SELECT created_at FROM maintenance.jobs WHERE id = $1`, []any{follow}, &created)
 
-	for name, a := range map[string]*actor{"hq": hq(), "client": customerA()} {
+	for name, a := range map[string]*actor{"hq": hq(), roleClient: customerA()} {
 		row := summary(a)
 
 		at, _ := time.Parse(time.RFC3339, asStr(t, row["createdAt"]))
-		if row["projection"] != "summary" || row["followUpOfJobId"] != job ||
-			row["followUpClass"] != "pending" ||
+		if row["projection"] != projectionSummary || row["followUpOfJobId"] != job ||
+			row["followUpClass"] != statusPending ||
 			!at.Equal(created) {
 			t.Errorf("%s row: %v", name, row)
 		}
@@ -587,7 +589,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		`{"jobId":"`+j2+`","accessValidUntil":"`+stamp(200)+`","reason":" "}`,
 		3,
 	); code != 422 ||
-		fields(res) != "reason=error.length" {
+		fields(res) != refusedReasonLength {
 		t.Errorf("extension reason: %d %s", code, fields(res))
 	}
 

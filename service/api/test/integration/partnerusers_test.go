@@ -35,17 +35,17 @@ func TestPartnerUsers(t *testing.T) {
 		`"`
 	invite := `{"email":"` + email + `","partnerRole":"technician"` + access + `}`
 	want := map[string]string{ // the field each case is refused for
-		"bad email":    "email=error.invalid",
-		"bad role":     "partnerRole=error.invalid",
-		"bad status":   "status=error.invalid",
-		"blank reason": "reason=error.length",
+		caseBadEmail:    "email=error.invalid",
+		caseBadRole:     "partnerRole=error.invalid",
+		caseBadStatus:   "status=error.invalid",
+		caseBlankReason: refusedReasonLength,
 	}
 
 	for name, b := range map[string]string{
-		"bad email":    `{"email":"not-an-email","partnerRole":"technician"}`,
-		"bad role":     `{"email":"` + email + `","partnerRole":"admin"}`,
-		"bad status":   `{"email":"` + email + `","partnerRole":"technician","status":"invited"}`,
-		"blank reason": `{"email":"` + email + `","partnerRole":"technician","reason":" "}`,
+		caseBadEmail:    `{"email":"not-an-email","partnerRole":"technician"}`,
+		caseBadRole:     `{"email":"` + email + `","partnerRole":"admin"}`,
+		caseBadStatus:   `{"email":"` + email + `","partnerRole":"technician","status":"invited"}`,
+		caseBlankReason: `{"email":"` + email + `","partnerRole":"technician","reason":" "}`,
 	} {
 		code, m := save(contrA(), b, 0)
 		refusal(t, name, code, m, want[name])
@@ -56,7 +56,7 @@ func TestPartnerUsers(t *testing.T) {
 		`{"email":"`+email+`","partnerRole":"technician","status":"active"`+access+`}`,
 		0,
 	); code != 422 ||
-		fields(res) != "status=error.notAllowed" {
+		fields(res) != refusedStatusNotAllowed {
 		t.Errorf("status on invite: %d %s", code, fields(res))
 	}
 
@@ -71,8 +71,8 @@ func TestPartnerUsers(t *testing.T) {
 	}
 
 	code, resp := save(contrA(), invite, 0)
-	if code != 200 || data(resp)["status"] != "invited" ||
-		data(resp)["partnerRole"] != "technician" ||
+	if code != 200 || data(resp)["status"] != statusInvited ||
+		data(resp)["partnerRole"] != roleTechnician ||
 		data(resp)["membershipId"] == nil ||
 		data(resp)["organizationId"] != seed.ID("org-contractor-a").String() ||
 		data(resp)["invitedByMembershipId"] != seed.ID("contractor-a").String() {
@@ -86,7 +86,7 @@ func TestPartnerUsers(t *testing.T) {
 		strings.Replace(invite, email, strings.ToUpper(email[:1])+email[1:], 1),
 		0,
 	); code != 422 ||
-		fields(res) != "email=errors.email_taken" {
+		fields(res) != refusedEmailTaken {
 		t.Errorf("duplicate email (case-insensitive): %d %s", code, fields(res))
 	}
 
@@ -95,7 +95,7 @@ func TestPartnerUsers(t *testing.T) {
 		invite,
 		0,
 	); code != 422 ||
-		fields(res) != "email=errors.email_taken" { // one person, one account (IR461)
+		fields(res) != refusedEmailTaken { // one person, one account (IR461)
 		t.Errorf("same email at company B: %d %s", code, fields(res))
 	}
 
@@ -113,9 +113,9 @@ func TestPartnerUsers(t *testing.T) {
 	}
 
 	self, tech := byMembership[seed.ID("contractor-a").String()], byMembership[seed.ID("tech-external-a").String()]
-	if self == nil || self["partnerRole"] != "contractor" || self["status"] != "active" ||
+	if self == nil || self["partnerRole"] != roleContractor || self["status"] != statusActive ||
 		tech == nil ||
-		tech["partnerRole"] != "technician" ||
+		tech["partnerRole"] != roleTechnician ||
 		tech["accessUntil"] == nil {
 		t.Fatalf("seed accounts listed: %v", resp)
 	}
@@ -141,7 +141,7 @@ func TestPartnerUsers(t *testing.T) {
 		"partnerUsers.list",
 		`{"filters":{"partnerRole":"owner"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad role filter: %d %s", code, fields(res))
 	}
 	// resend: not sooner than 5 minutes after the last invitation e-mail (IR423), then queued again (IR418), pending
@@ -169,7 +169,7 @@ func TestPartnerUsers(t *testing.T) {
 		"partnerUsers.resendInvite",
 		`{"id":"`+id+`"}`,
 		0,
-	); code != 200 || data(res)["deliveryState"] != "queued" ||
+	); code != 200 || data(res)["deliveryState"] != statusQueued ||
 		asObj(t, data(res)["target"])["kind"] != "partner_user" {
 		t.Fatalf("resend: %d %v", code, res)
 	}
@@ -211,7 +211,7 @@ func TestPartnerUsers(t *testing.T) {
 		`{"id":"`+id+`","email":"`+email+`","partnerRole":"contractor"}`,
 		1,
 	); code != 422 ||
-		fields(res) != "reason=error.required" {
+		fields(res) != refusedReasonRequired {
 		t.Errorf("update without reason: %d %s", code, fields(res))
 	}
 
@@ -237,7 +237,7 @@ func TestPartnerUsers(t *testing.T) {
 		"",
 		1,
 	); code != 422 ||
-		fields(res) != "email=error.immutable" {
+		fields(res) != refusedEmailImmutable {
 		t.Errorf("change the e-mail: %d %s", code, fields(res))
 	}
 
@@ -258,7 +258,7 @@ func TestPartnerUsers(t *testing.T) {
 		"technician",
 		"",
 		1,
-	); code != 200 || data(res)["status"] != "invited" ||
+	); code != 200 || data(res)["status"] != statusInvited ||
 		ver(t, res) != 2 {
 		t.Fatalf("save unchanged: %d %v", code, res)
 	}
@@ -279,7 +279,7 @@ func TestPartnerUsers(t *testing.T) {
 		"disabled",
 		sv,
 	); code != 409 ||
-		res["messageKey"] != "errors.own_account" {
+		res["messageKey"] != keyOwnAccount {
 		t.Errorf("disable the own account: %d %v", code, res)
 	}
 
@@ -290,7 +290,7 @@ func TestPartnerUsers(t *testing.T) {
 		`{"id":"`+asStr(t, self["id"])+`","reason":"leaving"}`,
 		sv,
 	); code != 409 ||
-		res["messageKey"] != "errors.own_account" {
+		res["messageKey"] != keyOwnAccount {
 		t.Errorf("remove the own account: %d %v", code, res)
 	}
 
@@ -443,7 +443,7 @@ func TestPartnerUserAccess(t *testing.T) {
 		"active",
 		v,
 	); code != 422 ||
-		fields(res) != "email=error.immutable" {
+		fields(res) != refusedEmailImmutable {
 		t.Errorf("change an accepted email: %d %s", code, fields(res))
 	}
 
@@ -458,7 +458,7 @@ func TestPartnerUserAccess(t *testing.T) {
 	}
 	// the same address in capitals is no change: the stored spelling stays
 	code, resp = save(strings.ToUpper(email), "technician", "disabled", v)
-	if code != 200 || data(resp)["status"] != "disabled" || data(resp)["email"] != email ||
+	if code != 200 || data(resp)["status"] != statusDisabled || data(resp)["email"] != email ||
 		data(resp)["accessUntil"] != until.UTC().Format(time.RFC3339) {
 		t.Fatalf("disable: %d %v", code, resp)
 	}
@@ -476,7 +476,7 @@ func TestPartnerUserAccess(t *testing.T) {
 	}
 
 	code, resp = save(email, "technician", "active", v+1)
-	if code != 200 || data(resp)["status"] != "active" {
+	if code != 200 || data(resp)["status"] != statusActive {
 		t.Fatalf("enable: %d %v", code, resp)
 	}
 
@@ -623,7 +623,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 	until := clock().Add(30 * 24 * time.Hour)
 
 	code, resp := write(srv, contrA(), "partnerUsers.save", body(until), 0)
-	if code != 200 || data(resp)["status"] != "invited" || data(resp)["membershipId"] == nil ||
+	if code != 200 || data(resp)["status"] != statusInvited || data(resp)["membershipId"] == nil ||
 		data(resp)["displayName"] != "Added Tech" {
 		t.Fatalf("add: %d %v", code, resp)
 	}
@@ -649,7 +649,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		&scopes,
 	)
 
-	if role != "technician" || employment != "external" || !end.Equal(until) || perms != 4 ||
+	if role != roleTechnician || employment != "external" || !end.Equal(until) || perms != 4 ||
 		scopes != 0 {
 		t.Errorf("membership: %s %s %v perms %d scopes %d", role, employment, end, perms, scopes)
 	}
@@ -666,7 +666,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		}
 	}
 
-	if len(created) != 1 || created[0].Role != "technician" ||
+	if len(created) != 1 || created[0].Role != roleTechnician ||
 		created[0].Membership != membership ||
 		!strings.HasSuffix(created[0].RedirectURI, "/login") ||
 		!slices.Contains(fake.setups, "sub-"+email) {
@@ -718,7 +718,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		&v,
 	)
 
-	if status != "active" {
+	if status != statusActive {
 		t.Fatalf("after the first sign-in: %s", status)
 	}
 	// the access end moves (at most a year ahead)
@@ -872,19 +872,19 @@ func TestPartnerUserInputs(t *testing.T) {
 	for name, c := range map[string]struct {
 		op, body, want string
 	}{
-		"remove without id": {"partnerUsers.remove", `{"id":"00000000-0000-0000-0000-000000000000",` +
+		"remove without id": {opPartnerUsersRemove, `{"id":"00000000-0000-0000-0000-000000000000",` +
 			`"reason":"x"}`, "id=error.required"},
-		"remove long reason": {"partnerUsers.remove", `{"id":"` + uuid.NewString() + `","reason":"` +
-			strings.Repeat("x", 1001) + `"}`, "reason=error.length"},
+		"remove long reason": {opPartnerUsersRemove, `{"id":"` + uuid.NewString() + `","reason":"` +
+			strings.Repeat("x", 1001) + `"}`, refusedReasonLength},
 		"resend without id": {
-			"partnerUsers.resendInvite", `{"id":"00000000-0000-0000-0000-000000000000"}`,
+			opPartnerUsersResendInvite, `{"id":"00000000-0000-0000-0000-000000000000"}`,
 			"id=error.required",
 		},
-		"reason on an invite": {"partnerUsers.save", `{"email":"x-` + uuid.NewString()[:8] + `@example.com",` +
+		"reason on an invite": {opPartnerUsersSave, `{"email":"x-` + uuid.NewString()[:8] + `@example.com",` +
 			`"partnerRole":"contractor","displayName":"X","reason":"why"}`, "reason=error.notAllowed"},
 	} {
 		code, m := write(srv, contrA(), c.op, c.body, 1)
-		if c.op == "partnerUsers.resendInvite" || c.op == "partnerUsers.save" {
+		if c.op == opPartnerUsersResendInvite || c.op == opPartnerUsersSave {
 			code, m = write(srv, contrA(), c.op, c.body, 0)
 		}
 
@@ -1022,7 +1022,7 @@ func TestNotificationMailRetry(t *testing.T) {
 	}
 	deliver(&fakeMail{err: errSMTPDown, sent: nil}, clock())
 
-	if st, reason := state(); st != "failed" || reason != "smtp down" {
+	if st, reason := state(); st != statusFailed || reason != "smtp down" {
 		t.Fatalf("after a failing send: %s %s", st, reason)
 	}
 
@@ -1035,7 +1035,7 @@ func TestNotificationMailRetry(t *testing.T) {
 		t.Fatalf("retried after the pause: %d", n)
 	}
 
-	if st, _ := state(); st != "sent" {
+	if st, _ := state(); st != statusSent {
 		t.Errorf("after the retry: %s", st)
 	}
 }
@@ -1128,7 +1128,7 @@ func TestNotificationMail(t *testing.T) {
 
 		return st, reason
 	}
-	if st, _ := state(active); st != "sent" {
+	if st, _ := state(active); st != statusSent {
 		t.Errorf("active recipient: %s", st)
 	}
 

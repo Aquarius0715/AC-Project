@@ -10,6 +10,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const refusedLinesInvalid = "lines=" + apperr.KeyInvalid
+
 func TestContractorRegister(t *testing.T) {
 	srv := server(t)
 	org := seed.ID("org-contractor-b").String()
@@ -21,7 +23,7 @@ func TestContractorRegister(t *testing.T) {
 			`"contactEmail":"ops@partner.example","insuranceValidUntil":null` + extra + `}`
 	}
 	want := map[string]string{ // the field each case is refused for
-		"bad email":      "contactEmail=error.invalid",
+		caseBadEmail:     "contactEmail=error.invalid",
 		"blank reg":      "registrationNo=error.length",
 		"customer org":   "organizationId=error.notContractor",
 		"duplicate area": "serviceAreas=error.invalid",
@@ -33,7 +35,7 @@ func TestContractorRegister(t *testing.T) {
 			`"contactEmail":"a@b.example","insuranceValidUntil":null}`,
 		"duplicate area": `{"organizationId":"` + org + `","registrationNo":"R","serviceAreas":["KL","kl"],` +
 			`"contactEmail":"a@b.example","insuranceValidUntil":null}`,
-		"bad email": `{"organizationId":"` + org + `","registrationNo":"R","serviceAreas":["KL"],` +
+		caseBadEmail: `{"organizationId":"` + org + `","registrationNo":"R","serviceAreas":["KL"],` +
 			`"contactEmail":"not-an-email","insuranceValidUntil":null}`,
 		"blank reg": `{"organizationId":"` + org + `","registrationNo":" ","serviceAreas":["KL"],` +
 			`"contactEmail":"a@b.example","insuranceValidUntil":null}`,
@@ -58,7 +60,7 @@ func TestContractorRegister(t *testing.T) {
 	code, resp := write(srv, hq(), "contractors.save", body(""), 0)
 
 	p := data(resp)
-	if code != 200 || p["status"] != "active" || p["registrationNo"] != "REG-1" ||
+	if code != 200 || p["status"] != statusActive || p["registrationNo"] != "REG-1" ||
 		p["name"] == "" ||
 		p["kpis"] == nil ||
 		p["rateCardId"] != nil {
@@ -148,7 +150,7 @@ func TestContractorRegister(t *testing.T) {
 		`{"contractorOrgId":"`+org+`","status":"suspended","reason":" "}`,
 		2,
 	); code != 422 ||
-		fields(res) != "reason=error.length" {
+		fields(res) != refusedReasonLength {
 		t.Errorf("suspend without reason: %d %s", code, fields(res))
 	}
 
@@ -201,7 +203,7 @@ func TestContractorRegister(t *testing.T) {
 		"contractors.list",
 		`{"filters":{"status":"x"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad status filter: %d %s", code, fields(res))
 	}
 
@@ -220,15 +222,15 @@ func TestContractorRegister(t *testing.T) {
 	}
 	line := `[{"workType":"repair_base","amountMinor":45000,"note":" base "}]`
 	want = map[string]string{ // the field each case is refused for
-		"bad worktype": "lines=error.invalid",
-		"dup worktype": "lines=error.invalid",
-		"negative":     "lines=error.invalid",
+		"bad worktype": refusedLinesInvalid,
+		"dup worktype": refusedLinesInvalid,
+		"negative":     refusedLinesInvalid,
 		"no lines":     "lines=error.count",
-		"past":         "effectiveFrom=error.past",
+		casePast:       "effectiveFrom=error.past",
 	}
 
 	for name, tc := range map[string][2]string{
-		"past":     {clock().Add(-time.Hour).Format(time.RFC3339), line},
+		casePast:   {clock().Add(-time.Hour).Format(time.RFC3339), line},
 		"no lines": {until, `[]`},
 		"dup worktype": {until, `[{"workType":"emergency","amountMinor":1,"note":null},{"workType":"emergency",` +
 			`"amountMinor":2,"note":null}]`},
@@ -290,7 +292,7 @@ func TestContractorRegister(t *testing.T) {
 		"rateCards.list",
 		`{"filters":{"x":1}}`,
 	); code != 422 ||
-		fields(res) != "x=error.notAllowed" {
+		fields(res) != refusedUnknownFieldX {
 		t.Errorf("bad rate card filter: %d %s", code, fields(res))
 	}
 }
@@ -310,7 +312,7 @@ func TestSLAScorecard(t *testing.T) {
 	want := map[string]string{ // the field each case is refused for
 		"arrival 120":  "arrivalInWindowPercent=error.range",
 		"bad plan":     "planType=error.invalid",
-		"past":         "effectiveFrom=error.past",
+		casePast:       "effectiveFrom=error.past",
 		"response 0":   "responseHours=error.range",
 		"response 169": "responseHours=error.range",
 	}
@@ -324,7 +326,7 @@ func TestSLAScorecard(t *testing.T) {
 			`"effectiveFrom":"` + clock().Format(time.RFC3339) + `"}`,
 		"bad plan": `{"planType":"vip","responseHours":4,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,` +
 			`"effectiveFrom":"` + clock().Format(time.RFC3339) + `"}`,
-		"past": `{"planType":"general","responseHours":4,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,` +
+		casePast: `{"planType":"general","responseHours":4,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,` +
 			`"effectiveFrom":"` + clock().Add(-time.Hour).Format(time.RFC3339) + `"}`,
 	} {
 		code, m := write(srv, hq(), "sla.saveTargets", b, 0)
@@ -365,7 +367,7 @@ func TestSLAScorecard(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 	job := asStr(t, data(res)["id"])
@@ -396,7 +398,7 @@ func TestSLAScorecard(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 	onTime := asStr(t, data(res)["id"])
@@ -424,7 +426,7 @@ func TestSLAScorecard(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 	overdue := asStr(t, data(res)["id"])
@@ -445,7 +447,7 @@ func TestSLAScorecard(t *testing.T) {
 			srv,
 			hq(),
 			"jobs.create",
-			jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+			jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 			0,
 		)
 		id := asStr(t, data(res)["id"])
@@ -529,9 +531,9 @@ func TestSLAScorecard(t *testing.T) {
 	for _, x := range asArr(t, sc["targets"]) {
 		tv := asObj(t, x)
 		switch {
-		case tv["planType"] == "general" && tv["state"] != "scheduled":
+		case tv["planType"] == "general" && tv["state"] != statusScheduled:
 			general = tv
-		case tv["planType"] == "general" && tv["state"] == "scheduled":
+		case tv["planType"] == "general" && tv["state"] == statusScheduled:
 			scheduled = tv
 		}
 	}
@@ -790,7 +792,7 @@ func TestFirstTimeFixIgnoresPlanVisits(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 	job := asStr(t, data(res)["id"])
@@ -1082,8 +1084,8 @@ func TestCancelEndsContractorAccess(t *testing.T) {
 		contrA(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); code != 200 || data(res)["projection"] != "history" ||
-		data(res)["status"] != "cancelled" {
+	); code != 200 || data(res)["projection"] != projectionHistory ||
+		data(res)["status"] != statusCancelled {
 		t.Errorf("the cancelled job for the contractor: %d %v", code, res)
 	}
 }

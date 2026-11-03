@@ -18,7 +18,7 @@ func TestAssetLists(t *testing.T) {
 	}
 
 	for _, c := range items(t, resp) {
-		if c["status"] != "active" {
+		if c["status"] != statusActive {
 			t.Fatal("default list shows active customers only (IR40)")
 		}
 	}
@@ -37,15 +37,15 @@ func TestAssetLists(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"filters\":{\"kind\":\"x\"}}":                        "filters.kind=error.invalid",
-		"{\"filters\":{\"status\":\"x\"}}":                      "filters.status=error.invalid",
-		"{\"filters\":{\"x\":1}}":                               "x=error.notAllowed",
-		"{\"sort\":{\"field\":\"name\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+		bodyUnknownKind:   refusedFilterKindInvalid,
+		bodyUnknownStatus: refusedFilterStatusInvalid,
+		bodyUnknownFilter: refusedUnknownFieldX,
+		bodySortByName:    refusedSortFieldInvalid,
 	}
 
 	for _, f := range []string{
-		`{"filters":{"kind":"x"}}`, `{"filters":{"status":"x"}}`, `{"filters":{"x":1}}`,
-		`{"sort":{"field":"name","direction":"asc"}}`,
+		bodyUnknownKind, bodyUnknownStatus, bodyUnknownFilter,
+		bodySortByName,
 	} {
 		code, m := post(srv, hq(), "customers.list", f)
 		refusal(t, f, code, m, want[f])
@@ -78,7 +78,7 @@ func TestAssetLists(t *testing.T) {
 		"properties.list",
 		`{"filters":{"kind":"castle"}}`,
 	); code != 422 ||
-		fields(res) != "filters.kind=error.invalid" {
+		fields(res) != refusedFilterKindInvalid {
 		t.Fatalf("bad kind: %d %s", code, fields(res))
 	}
 	// spaces
@@ -108,7 +108,7 @@ func TestAssetLists(t *testing.T) {
 		"spaces.list",
 		`{"filters":{"kind":"x"}}`,
 	); code != 422 ||
-		fields(res) != "filters.kind=error.invalid" {
+		fields(res) != refusedFilterKindInvalid {
 		t.Fatalf("bad space kind: %d %s", code, fields(res))
 	}
 

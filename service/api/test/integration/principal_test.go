@@ -17,7 +17,7 @@ import (
 func TestPrincipalFromIdentityService(t *testing.T) {
 	identity := serverCfg(t, func(c *apiserver.Config) {
 		c.Domains = []string{ops.DomainIdentity}
-		c.InternalToken = "test-internal"
+		c.InternalToken = internalToken
 	})
 
 	idSrv := httptest.NewServer(identity.Echo)
@@ -52,8 +52,8 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 		"test-internal",
 		user,
 		seed.ID("customer-a").String(),
-	); code != 200 || res["role"] != "client" ||
-		res["clientRole"] != "owner" {
+	); code != 200 || res["role"] != roleClient ||
+		res["clientRole"] != clientRoleOwner {
 		t.Fatalf("principal: %d %v", code, res)
 	}
 
@@ -70,7 +70,7 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 	billing := serverCfg(t, func(c *apiserver.Config) {
 		c.Domains = []string{ops.DomainBilling}
 		c.IdentityURL = idSrv.URL
-		c.InternalToken = "test-internal"
+		c.InternalToken = internalToken
 		c.ServiceURLs = cluster.others(ops.DomainBilling)
 	})
 	if code, m := post(billing, customerA(), "invoices.list", `{"limit":1}`); code != 200 {
@@ -86,7 +86,7 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 	down := serverCfg(t, func(c *apiserver.Config) {
 		c.Domains = []string{ops.DomainBilling}
 		c.IdentityURL = idSrv.URL
-		c.InternalToken = "test-internal"
+		c.InternalToken = internalToken
 		c.ServiceURLs = cluster.others(ops.DomainBilling)
 	})
 	if code, res := post(
@@ -95,7 +95,7 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 		"invoices.list",
 		`{"limit":1}`,
 	); code != 503 ||
-		res["code"] != "UNAVAILABLE" {
+		res["code"] != codeUnavailable {
 		t.Fatalf("identity down: %d %v", code, res)
 	}
 }

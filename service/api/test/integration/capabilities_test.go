@@ -11,6 +11,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const refusedFirmwareCandidatesInvalid = "firmwareCandidates=" + apperr.KeyInvalid
+
 func capBody(id, model, extra string) string {
 	idf := ""
 	if id != "" {
@@ -45,7 +47,7 @@ func TestCapabilities(t *testing.T) {
 		"capabilities.list",
 		`{"filters":{"x":1}}`,
 	); code != 422 ||
-		fields(res) != "x=error.notAllowed" {
+		fields(res) != refusedUnknownFieldX {
 		t.Errorf("no filters: %d %s", code, fields(res))
 	}
 
@@ -75,7 +77,7 @@ func TestCapabilities(t *testing.T) {
 			`"min":30,"max":16`,
 			1,
 		),
-		"bad mode": strings.Replace(
+		caseBadMode: strings.Replace(
 			capBody("", "x2", ""),
 			`["cool","dry"]`,
 			`["heat"]`,
@@ -87,14 +89,14 @@ func TestCapabilities(t *testing.T) {
 			`["low","low"]`,
 			1,
 		),
-		"unit mismatch": strings.Replace(capBody("", "x4", ""), `"unit":"°C"`, `"unit":"%"`, 1),
+		caseUnitMismatch: strings.Replace(capBody("", "x4", ""), `"unit":"°C"`, `"unit":"%"`, 1),
 		"stale too low": strings.Replace(
 			capBody("", "x5", ""),
 			`"staleAfterSeconds":120,"boundaryId":null`,
 			`"staleAfterSeconds":1,"boundaryId":null`,
 			1,
 		),
-		"boundary": strings.Replace(
+		fieldBoundary: strings.Replace(
 			capBody("", "x6", ""),
 			`"staleAfterSeconds":120,"boundaryId":null`,
 			`"staleAfterSeconds":120,"boundaryId":"ac_input_electricity"`,
@@ -131,19 +133,19 @@ func TestCapabilities(t *testing.T) {
 	}
 	// the field each case is refused for
 	want := map[string]string{
-		"bad mode":          "modes=error.invalid",
-		"boundary":          "sensors[0].boundaryId=error.invalid",
+		caseBadMode:         "modes=error.invalid",
+		fieldBoundary:       "sensors[0].boundaryId=error.invalid",
 		"dup fan":           "fanLevels=error.invalid",
-		"dup firmware":      "firmwareCandidates=error.invalid",
-		"firmware too long": "firmwareCandidates=error.invalid",
-		"firmware blank":    "firmwareCandidates=error.invalid",
-		"firmware dup trim": "firmwareCandidates=error.invalid",
+		"dup firmware":      refusedFirmwareCandidatesInvalid,
+		"firmware too long": refusedFirmwareCandidatesInvalid,
+		"firmware blank":    refusedFirmwareCandidatesInvalid,
+		"firmware dup trim": refusedFirmwareCandidatesInvalid,
 		"empty name":        "model=error.length",
 		"modes required":    "modes=error.invalid",
 		"no control":        "control=error.controlRequired",
 		"stale too low":     "sensors[0].staleAfterSeconds=error.range",
 		"temp range":        "temperature=error.range",
-		"unit mismatch":     "sensors[0].unit=error.unitMismatch",
+		caseUnitMismatch:    "sensors[0].unit=error.unitMismatch",
 		"vent levels":       "ventilationLevels=error.invalid",
 	}
 

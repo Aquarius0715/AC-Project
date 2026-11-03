@@ -49,7 +49,7 @@ func TestPersonAddedAgain(t *testing.T) {
 	email := "again-" + uuid.NewString()[:8] + "@example.com"
 	add := func(a *actor, role, name string) (int, map[string]any) {
 		access := ""
-		if role == "technician" {
+		if role == roleTechnician {
 			access = `,"accessUntil":"` + clock().Add(30*24*time.Hour).Format(time.RFC3339) + `"`
 		}
 
@@ -123,7 +123,7 @@ func TestPersonAddedAgain(t *testing.T) {
 			"contractor",
 			"X",
 		); code != 422 ||
-			fields(res) != "email=errors.email_taken" {
+			fields(res) != refusedEmailTaken {
 			t.Errorf("%s while the person is a user: %d %s", name, code, fields(res))
 		}
 	}
@@ -131,7 +131,7 @@ func TestPersonAddedAgain(t *testing.T) {
 	remove(first, firstMembership)
 
 	code, resp = add(contrA(), "contractor", "Second Name")
-	if code != 200 || data(resp)["status"] != "invited" ||
+	if code != 200 || data(resp)["status"] != statusInvited ||
 		data(resp)["membershipId"] == firstMembership {
 		t.Fatalf("added again: %d %v", code, resp)
 	}
@@ -205,7 +205,7 @@ func TestPersonAddedAgain(t *testing.T) {
 		&listed,
 	)
 
-	if !updatedTo(hqMembership) || listed != "invited" {
+	if !updatedTo(hqMembership) || listed != statusInvited {
 		t.Errorf("HQ's membership: listed %q, updated %+v", listed, fake.updated)
 	}
 }
@@ -258,7 +258,7 @@ func TestPersonOfAnotherTenant(t *testing.T) {
 			`"}`,
 		0,
 	)
-	if code != 422 || fields(res) != "email=errors.email_taken" {
+	if code != 422 || fields(res) != refusedEmailTaken {
 		t.Errorf("another tenant's person: %d %s", code, fields(res))
 	}
 }
@@ -426,7 +426,7 @@ func TestClientAddedAgain(t *testing.T) {
 	)
 
 	code, res = add("owner")
-	if code != 200 || data(res)["clientRole"] != "owner" {
+	if code != 200 || data(res)["clientRole"] != clientRoleOwner {
 		t.Fatalf("added again: %d %v", code, res)
 	}
 
@@ -607,9 +607,9 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 			id := uuid.New()
 			ids = append(ids, id)
 
-			role, employment, clientRole := "technician", any("external"), any(nil)
+			role, employment, clientRole := roleTechnician, any("external"), any(nil)
 			if org == "org-customer-b" {
-				role, employment, clientRole = "client", nil, "member"
+				role, employment, clientRole = roleClient, nil, clientRoleMember
 			}
 
 			owner(

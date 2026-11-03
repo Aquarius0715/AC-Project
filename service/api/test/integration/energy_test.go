@@ -116,7 +116,7 @@ func TestFactors(t *testing.T) {
 		"factors.list",
 		`{"filters":{"x":1}}`,
 	); code != 422 ||
-		fields(resp) != "x=error.notAllowed" {
+		fields(resp) != refusedUnknownFieldX {
 		t.Errorf("bad factor filter: %d %s", code, fields(resp))
 	}
 }
@@ -148,14 +148,14 @@ func TestBaselines(t *testing.T) {
 	}
 	// the field each case is refused for
 	want := map[string]string{
-		"bad method":             "method=error.invalid",
+		caseBadMethod:            refusedMethodInvalid,
 		"comparison on building": "boundaryId=errors.boundary_not_measurable",
 		"comparison with value":  "baselineKWh=error.notAllowed",
 		"fixed without value":    "baselineKWh=error.range",
 		"negative fixed":         "baselineKWh=error.range",
-		"no units":               "unitIds=error.invalid",
+		caseNoUnits:              refusedUnitIDsInvalid,
 		"unaligned period":       "period=errors.energy_range",
-		"unknown unit":           "unitIds=errors.unit_unknown",
+		caseUnknownUnit:          "unitIds=errors.unit_unknown",
 	}
 
 	for name, b := range map[string]string{
@@ -166,9 +166,9 @@ func TestBaselines(t *testing.T) {
 			"whole_building_electricity", 1),
 		"unaligned period": strings.Replace(body("demo_fixed", `,"baselineKWh":1`), start.Format(time.RFC3339),
 			start.Add(30*time.Second).Format(time.RFC3339), 1),
-		"no units":     strings.Replace(body("demo_fixed", `,"baselineKWh":1`), `["`+unit+`"]`, `[]`, 1),
-		"unknown unit": strings.Replace(body("demo_fixed", `,"baselineKWh":1`), unit, uuid.NewString(), 1),
-		"bad method":   body("guess", ""),
+		caseNoUnits:     strings.Replace(body("demo_fixed", `,"baselineKWh":1`), `["`+unit+`"]`, `[]`, 1),
+		caseUnknownUnit: strings.Replace(body("demo_fixed", `,"baselineKWh":1`), unit, uuid.NewString(), 1),
+		caseBadMethod:   body("guess", ""),
 	} {
 		code, m := write(srv, hq(), "baselines.save", b, 0)
 		refusal(t, name, code, m, want[name])
@@ -270,7 +270,7 @@ func TestBaselines(t *testing.T) {
 		"baselines.list",
 		`{"filters":{"method":"magic"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad baseline filter: %d %s", code, fields(res))
 	}
 
@@ -449,9 +449,9 @@ func TestEnergySummary(t *testing.T) {
 
 	for b, want := range map[string]string{
 		body(end, `,"tariffVersion":"tariff-x"`):                      "tariffVersion=error.invalid",
-		body(start.Add(90*time.Second), ""):                           "from=errors.energy_range", // not whole minutes
-		body(start, ""):                                               "from=errors.energy_range", // empty
-		`{"from":"2026-09-01T00:00:00Z","to":"2026-09-01T00:10:00Z"}`: "unitIds=error.invalid",
+		body(start.Add(90*time.Second), ""):                           refusedEnergyRange, // not whole minutes
+		body(start, ""):                                               refusedEnergyRange, // empty
+		`{"from":"2026-09-01T00:00:00Z","to":"2026-09-01T00:10:00Z"}`: refusedUnitIDsInvalid,
 	} {
 		code, m := post(srv, hq(), "energy.summary", b)
 		refusal(t, b, code, m, want)
@@ -567,7 +567,7 @@ func TestAdminSummary(t *testing.T) {
 		"admin.summary",
 		`{"from":"2026-09-13T12:00:30Z","to":"2026-09-13T12:05:00Z"}`,
 	); code != 422 ||
-		fields(resp) != "from=errors.energy_range" {
+		fields(resp) != refusedEnergyRange {
 		t.Errorf("unaligned period: %d %s", code, fields(resp))
 	}
 

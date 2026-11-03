@@ -320,15 +320,15 @@ func TestOrganizations(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"filters\":{\"kind\":\"x\"}}":                        "filters.kind=error.invalid",
-		"{\"filters\":{\"status\":\"x\"}}":                      "filters.status=error.invalid",
-		"{\"filters\":{\"y\":1}}":                               "y=error.notAllowed",
-		"{\"sort\":{\"field\":\"name\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+		bodyUnknownKind:    refusedFilterKindInvalid,
+		bodyUnknownStatus:  refusedFilterStatusInvalid,
+		bodyUnknownFilterY: "y=error.notAllowed",
+		bodySortByName:     refusedSortFieldInvalid,
 	}
 
 	for _, f := range []string{
-		`{"filters":{"kind":"x"}}`, `{"filters":{"status":"x"}}`, `{"filters":{"y":1}}`,
-		`{"sort":{"field":"name","direction":"asc"}}`,
+		bodyUnknownKind, bodyUnknownStatus, bodyUnknownFilterY,
+		bodySortByName,
 	} {
 		code, m := post(srv, hq(), "organizations.list", f)
 		refusal(t, f, code, m, want[f])

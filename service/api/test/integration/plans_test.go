@@ -10,6 +10,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const refusedRecurrenceInvalid = "recurrence=" + apperr.KeyInvalid
+
 func TestPlans(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Plan AC")
@@ -20,10 +22,10 @@ func TestPlans(t *testing.T) {
 		) + `"` + extra + `}`
 	}
 	want := map[string]string{ // the field each case is refused for
-		"interval 0":  "recurrence=error.invalid",
-		"interval 13": "recurrence=error.invalid",
-		"past":        "nextDueAt=error.past",
-		"weekly":      "recurrence=error.invalid",
+		"interval 0":  refusedRecurrenceInvalid,
+		"interval 13": refusedRecurrenceInvalid,
+		casePast:      "nextDueAt=error.past",
+		"weekly":      refusedRecurrenceInvalid,
 	}
 
 	for name, b := range map[string]string{
@@ -33,7 +35,7 @@ func TestPlans(t *testing.T) {
 			`"nextDueAt":"` + next.Format(time.RFC3339) + `"}`,
 		"weekly": `{"unitId":"` + unit + `","recurrence":{"kind":"weekly","intervalMonths":1},` +
 			`"nextDueAt":"` + next.Format(time.RFC3339) + `"}`,
-		"past": `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":3},` +
+		casePast: `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":3},` +
 			`"nextDueAt":"` + clock().Add(-time.Hour).Format(time.RFC3339) + `"}`,
 	} {
 		code, m := write(srv, hq(), "plans.save", b, 0)
@@ -231,7 +233,7 @@ func TestPlans(t *testing.T) {
 		"plans.list",
 		`{"filters":{"x":1}}`,
 	); code != 422 ||
-		fields(res) != "x=error.notAllowed" {
+		fields(res) != refusedUnknownFieldX {
 		t.Errorf("bad filter: %d %s", code, fields(res))
 	}
 
@@ -257,7 +259,7 @@ func TestPlans(t *testing.T) {
 		body(""),
 		0,
 	); code != 422 ||
-		fields(res) != "unitId=error.unitArchived" {
+		fields(res) != refusedUnitArchived {
 		t.Errorf("archived unit: %d %s", code, fields(res))
 	}
 }

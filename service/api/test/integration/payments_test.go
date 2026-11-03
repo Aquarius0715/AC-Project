@@ -15,6 +15,8 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
+const statusConfirmed = "confirmed"
+
 // newInvoice creates a customer-b contract (rto, restriction eligible) and an unpaid invoice; returns contract and
 // invoice IDs.
 func newInvoice(t *testing.T, srv *apiserver.Server) (string, string) {
@@ -70,12 +72,12 @@ func TestPaymentSimulation(t *testing.T) {
 	}
 	want := map[string]string{ // the field each case is refused for
 		"bad event":     "event=error.invalid",
-		"bad method":    "method=error.invalid",
-		"not confirmed": "invoiceId=error.required",
+		caseBadMethod:   refusedMethodInvalid,
+		"not confirmed": refusedInvoiceIDRequired,
 	}
 
 	for name, b := range map[string]string{
-		"bad method":    `{"event":"initiate","invoiceId":"` + inv + `","method":"cash","demoConfirmed":true}`,
+		caseBadMethod:   `{"event":"initiate","invoiceId":"` + inv + `","method":"cash","demoConfirmed":true}`,
 		"not confirmed": `{"event":"initiate","invoiceId":"` + inv + `","method":"demo_credit_card","demoConfirmed":false}`,
 		"bad event":     `{"event":"refund","invoiceId":"` + inv + `","demoConfirmed":true}`,
 	} {
@@ -87,7 +89,7 @@ func TestPaymentSimulation(t *testing.T) {
 		`{"event":"instructions","invoiceId":"`+inv+`","demoConfirmed":true}`,
 		1,
 	); code != 200 ||
-		data(m)["deliveryState"] != "preview" {
+		data(m)["deliveryState"] != deliveryPreview {
 		t.Fatalf("instructions: %d %v", code, m)
 	}
 
@@ -178,7 +180,7 @@ func TestPaymentSimulation(t *testing.T) {
 		`{"event":"fail","paymentId":"`+pay+`"`+ev("fail")+`}`,
 		2,
 	); code != 200 ||
-		data(m)["status"] != "failed" {
+		data(m)["status"] != statusFailed {
 		t.Fatalf("fail: %d %v", code, m)
 	}
 
@@ -194,8 +196,8 @@ func TestPaymentSimulation(t *testing.T) {
 		hq(),
 		"invoices.get",
 		`{"id":"`+inv+`"}`,
-	); data(res)["status"] != "unpaid" ||
-		data(res)["paymentStatus"] != "failed" {
+	); data(res)["status"] != statusUnpaid ||
+		data(res)["paymentStatus"] != statusFailed {
 		t.Fatalf("invoice after failure: %v", res)
 	}
 	// second attempt confirms; the invoice becomes paid
@@ -215,7 +217,7 @@ func TestPaymentSimulation(t *testing.T) {
 	if code, m := sim(
 		`{"event":"confirm","paymentId":"`+pay+`"`+ev("confirm")+`}`,
 		2,
-	); code != 200 || data(m)["status"] != "confirmed" ||
+	); code != 200 || data(m)["status"] != statusConfirmed ||
 		data(m)["paymentReference"] == nil {
 		t.Fatalf("confirm: %d %v", code, m)
 	}
@@ -351,13 +353,13 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	// each operation takes its own ID only (IR390): the other one is an unknown field, and recordManual names invoiceId
 	entry := `"paymentReference":"X","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"`
 	for _, c := range []struct{ op, body, want string }{
-		{"payments.recordManual", `{` + entry + `}`, "invoiceId=error.required"},
-		{"payments.recordManual", `{"paymentId":"` + inv + `",` + entry + `}`, "_=error.malformedInput"},
+		{opPaymentsRecordManual, `{` + entry + `}`, refusedInvoiceIDRequired},
+		{opPaymentsRecordManual, `{"paymentId":"` + inv + `",` + entry + `}`, refusedMalformedInput},
 		{
-			"payments.recordManual", `{"invoiceId":"` + inv + `","paymentId":"` + inv + `",` + entry + `}`,
-			"_=error.malformedInput",
+			opPaymentsRecordManual, `{"invoiceId":"` + inv + `","paymentId":"` + inv + `",` + entry + `}`,
+			refusedMalformedInput,
 		},
-		{"payments.confirm", `{"invoiceId":"` + inv + `",` + entry + `}`, "_=error.malformedInput"},
+		{"payments.confirm", `{"invoiceId":"` + inv + `",` + entry + `}`, refusedMalformedInput},
 	} {
 		code, m := write(srv, hq(), c.op, c.body, 1)
 		refusal(t, c.op+" "+c.body, code, m, c.want)
@@ -368,7 +370,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	}
 
 	code, res := manual("5000", 1)
-	if code != 200 || data(res)["status"] != "confirmed" || data(res)["method"] != nil {
+	if code != 200 || data(res)["status"] != statusConfirmed || data(res)["method"] != nil {
 		t.Fatalf("manual: %d %v", code, res)
 	}
 
@@ -402,7 +404,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		&pending,
 	)
 
-	if state != "release_requested" || pending == nil || *pending != "offline" {
+	if state != statusReleaseRequested || pending == nil || *pending != reasonOffline {
 		t.Errorf("restriction after payment: %s %v", state, pending)
 	}
 
@@ -483,7 +485,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 
 	if code, m := confirm(
 		2,
-	); code != 200 || data(m)["status"] != "confirmed" ||
+	); code != 200 || data(m)["status"] != statusConfirmed ||
 		data(m)["method"] != "demo_credit_card" {
 		t.Fatalf("hq confirm: %d %v", code, m)
 	}
@@ -530,12 +532,12 @@ func TestManualAfterFailedPayment(t *testing.T) {
 		`{"event":"fail","paymentId":"`+pay+`","eventId":"`+uuid.NewString()+`","paymentReference":"REF-`+pay[:8]+`"}`,
 		1,
 	); code != 200 ||
-		data(m)["status"] != "failed" {
+		data(m)["status"] != statusFailed {
 		t.Fatalf("fail: %d %v", code, m)
 	}
 
 	_, res = post(srv, hq(), "invoices.get", `{"id":"`+inv+`"}`)
-	if code, m := manual(ver(t, res)); code != 200 || data(m)["status"] != "confirmed" {
+	if code, m := manual(ver(t, res)); code != 200 || data(m)["status"] != statusConfirmed {
 		t.Fatalf("manual after the failed card payment: %d %v", code, m)
 	}
 
@@ -600,7 +602,7 @@ func TestInvoiceOnePaymentAtATime(t *testing.T) {
 		`{"event":"fail","paymentId":"`+pay+`","eventId":"`+uuid.NewString()+`","paymentReference":"REF-`+pay[:8]+`"}`,
 		1,
 	); code != 200 ||
-		data(m)["status"] != "failed" {
+		data(m)["status"] != statusFailed {
 		t.Fatalf("fail: %d %v", code, m)
 	}
 

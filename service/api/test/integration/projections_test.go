@@ -55,7 +55,7 @@ func byJob(t *testing.T, m map[string]any, job string) map[string]any {
 func listJob(t *testing.T, s *apiserver.Server, a *actor, job string) map[string]any {
 	t.Helper()
 
-	body := `{"limit":100}`
+	body := bodyFirstHundred
 	for range 50 {
 		_, m := post(s, a, "jobs.list", body)
 		if row := byJob(t, m, job); row != nil {
@@ -136,7 +136,8 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 
 	// offer projection before acceptance
 	o := listJob(t, srv, contrA(), job)
-	if o == nil || o["projection"] != "offer" || o["status"] != "offered" || o["severity"] != nil ||
+	if o == nil || o["projection"] != projectionOffer || o["status"] != statusOffered ||
+		o["severity"] != nil ||
 		len(asArr(t, o["requiredQualifications"])) == 0 ||
 		o["unitId"] != nil {
 		t.Fatalf("offer projection: %v", o)
@@ -147,7 +148,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		contrA(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); code != 200 || data(resp)["projection"] != "offer" ||
+	); code != 200 || data(resp)["projection"] != projectionOffer ||
 		data(resp)["offerId"] != offer {
 		t.Fatalf("get offer: %d %v", code, resp)
 	}
@@ -200,8 +201,8 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		contrA(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); data(resp)["projection"] != "offer" ||
-		data(resp)["status"] != "accepted" {
+	); data(resp)["projection"] != projectionOffer ||
+		data(resp)["status"] != statusAccepted {
 		t.Fatalf("accepted offer: %v", resp)
 	}
 
@@ -231,7 +232,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		t.Fatalf("detail in window: %v", resp)
 	}
 
-	if row := listJob(t, srv, contrA(), job); row["projection"] != "summary" {
+	if row := listJob(t, srv, contrA(), job); row["projection"] != projectionSummary {
 		t.Fatal("summary in window")
 	} else if row["accessValidFrom"] != clock().Add(-time.Hour).Format(time.RFC3339) ||
 		row["accessValidUntil"] != stamp(100) {
@@ -304,7 +305,8 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	code, res := post(srv, contrA(), "jobs.get", `{"jobId":"`+job+`"}`)
 
 	h := data(res)
-	if code != 200 || h["projection"] != "history" || h["dueAt"] != nil || h["severity"] != nil ||
+	if code != 200 || h["projection"] != projectionHistory || h["dueAt"] != nil ||
+		h["severity"] != nil ||
 		len(asArr(t, h["ownDecisionEvents"])) != 1 ||
 		asObj(t, h["redactedReportSummary"])["hasReport"] != false {
 		t.Fatalf("history: %d %v", code, res)
@@ -405,7 +407,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 	key := asStr(t, data(res)["id"])
@@ -447,7 +449,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		resp,
 		key,
 	); row["technicianMembershipId"] != seed.ID("tech-internal-a").String() ||
-		row["assignmentAcknowledgement"] != "pending" {
+		row["assignmentAcknowledgement"] != statusPending {
 		t.Fatalf("the summary names the active assignment's technician (IR225): %v", row)
 	}
 
@@ -500,7 +502,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		techInt(),
 		"jobs.get",
 		`{"jobId":"`+key+`"}`,
-	); code != 200 || data(resp)["projection"] != "history" ||
+	); code != 200 || data(resp)["projection"] != projectionHistory ||
 		len(asArr(t, data(resp)["ownDecisionEvents"])) != 0 {
 		t.Fatalf("technician history: %d %v", code, resp)
 	}

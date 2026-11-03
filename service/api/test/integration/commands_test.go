@@ -14,6 +14,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const actionLimitTo26 = `{"kind":"temperature_limit","minimumCoolingSetpoint":26}`
+
 func TestCommands(t *testing.T) {
 	srv := server(t)
 	unit := seed.ID("unit-online-rto").String()
@@ -40,11 +42,11 @@ func TestCommands(t *testing.T) {
 		)
 	}
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		"bad action":        "action=error.invalid",
+		caseBadAction:       refusedActionInvalid,
 		"client reason":     "reason=error.notAllowed",
 		"hq voice":          "source=error.notAllowed",
-		"hq without reason": "reason=error.required",
-		"out of range":      "action=error.unsupportedAction",
+		"hq without reason": refusedReasonRequired,
+		"out of range":      refusedActionUnsupported,
 		"technician no job": "jobId=error.required",
 		"technician voice":  "source=error.notAllowed",
 		"unknown source":    "source=error.invalid",
@@ -56,15 +58,15 @@ func TestCommands(t *testing.T) {
 		extra  string
 		code   int
 	}{
-		"bad action":         {customerA(), `{"kind":"set_temperature"}`, "", 422},
+		caseBadAction:        {customerA(), `{"kind":"set_temperature"}`, "", 422},
 		"out of range":       {customerA(), `{"kind":"set_temperature","celsius":35}`, "", 422},
-		"client reason":      {customerA(), `{"kind":"set_power","power":true}`, `,"reason":"x"`, 422},
-		"hq without reason":  {hq(), `{"kind":"set_power","power":true}`, "", 422},
-		"other customer":     {customerB(), `{"kind":"set_power","power":true}`, "", 404},
-		"technician no job":  {techInt(), `{"kind":"set_power","power":true}`, `,"reason":"test"`, 422},
-		"stale unit version": {customerA(), `{"kind":"set_power","power":true}`, "", 409},
-		"unknown source":     {customerA(), `{"kind":"set_power","power":true}`, `,"source":"automation"`, 422},
-		"hq voice":           {hq(), `{"kind":"set_power","power":true}`, `,"reason":"check","source":"voice"`, 422},
+		"client reason":      {customerA(), actionPowerOn, `,"reason":"x"`, 422},
+		"hq without reason":  {hq(), actionPowerOn, "", 422},
+		caseOtherCustomer:    {customerB(), actionPowerOn, "", 404},
+		"technician no job":  {techInt(), actionPowerOn, `,"reason":"test"`, 422},
+		"stale unit version": {customerA(), actionPowerOn, "", 409},
+		"unknown source":     {customerA(), actionPowerOn, `,"source":"automation"`, 422},
+		"hq voice":           {hq(), actionPowerOn, `,"reason":"check","source":"voice"`, 422},
 		"technician voice": {techInt(), `{"kind":"set_power",` +
 			`"power":true}`, `,"reason":"test",` +
 			`"jobId":"` + uuid.NewString() + `","source":"voice"`, 422},
@@ -88,7 +90,8 @@ func TestCommands(t *testing.T) {
 		`,"source":"voice"`,
 		v,
 	)
-	if code != 200 || data(resp)["status"] != "requested" || data(resp)["delivery"] != "not_sent" ||
+	if code != 200 || data(resp)["status"] != statusRequested ||
+		data(resp)["delivery"] != statusNotSent ||
 		data(resp)["sentAt"] != nil ||
 		data(resp)["source"] != "voice" ||
 		data(resp)["expiresAt"] != clock().Add(30*time.Second).Format(time.RFC3339) {
@@ -103,7 +106,7 @@ func TestCommands(t *testing.T) {
 		`,"reason":"check"`,
 		v,
 	); code != 409 ||
-		res["messageKey"] != "errors.unit_busy" {
+		res["messageKey"] != keyUnitBusy {
 		t.Errorf("busy: %d %v", code, res)
 	}
 
@@ -156,7 +159,7 @@ func TestCommands(t *testing.T) {
 		hq(),
 		"commands.get",
 		`{"id":"`+id+`"}`,
-	); data(m)["status"] != "acknowledged" {
+	); data(m)["status"] != statusAcknowledged {
 		t.Fatal("acknowledged")
 	}
 	// expiry by the worker
@@ -173,7 +176,12 @@ func TestCommands(t *testing.T) {
 		t.Fatal(schedTickErr)
 	}
 
-	if _, m := post(srv, hq(), "commands.get", `{"id":"`+id2+`"}`); data(m)["status"] == "expired" {
+	if _, m := post(
+		srv,
+		hq(),
+		"commands.get",
+		`{"id":"`+id2+`"}`,
+	); data(m)["status"] == statusExpired {
 		t.Fatalf("expired within the grace: %v", m)
 	}
 
@@ -191,8 +199,8 @@ func TestCommands(t *testing.T) {
 		hq(),
 		"commands.get",
 		`{"id":"`+id2+`"}`,
-	); data(res)["status"] != "expired" ||
-		data(res)["failureCode"] != "TIMEOUT" {
+	); data(res)["status"] != statusExpired ||
+		data(res)["failureCode"] != codeTimeout {
 		t.Fatalf("expired: %v", res)
 	}
 
@@ -260,7 +268,7 @@ func TestCommands(t *testing.T) {
 		`{"kind":"set_temperature","celsius":27}`,
 		"",
 		v,
-	); code != 409 || res["code"] != "OFFLINE" ||
+	); code != 409 || res["code"] != codeOffline ||
 		res["messageKey"] != "errors.device_power_lost" {
 		t.Errorf("power lost: %d %v", code, res)
 	}
@@ -270,14 +278,14 @@ func TestCommands(t *testing.T) {
 		policy string
 		ok     bool
 	}{
-		{`{"kind":"set_power","power":true}`, `{"kind":"power_off"}`, false},
-		{`{"kind":"set_power","power":false}`, `{"kind":"power_off"}`, true},
-		{`{"kind":"set_mode","mode":"cool"}`, `{"kind":"power_off"}`, false},
-		{`{"kind":"set_temperature","celsius":26}`, `{"kind":"temperature_limit","minimumCoolingSetpoint":26}`, true},
-		{`{"kind":"set_temperature","celsius":25}`, `{"kind":"temperature_limit","minimumCoolingSetpoint":26}`, false},
-		{`{"kind":"set_fan","fanLevel":"high"}`, `{"kind":"temperature_limit","minimumCoolingSetpoint":26}`, true},
-		{`{"kind":"ventilate","level":"low"}`, ``, true},
-		{`{"kind":"set_power","power":false}`, `{"kind":`, false}, // a policy that cannot be read allows nothing
+		{actionPowerOn, policyPowerOff, false},
+		{actionPowerOff, policyPowerOff, true},
+		{`{"kind":"set_mode","mode":"cool"}`, policyPowerOff, false},
+		{`{"kind":"set_temperature","celsius":26}`, actionLimitTo26, true},
+		{actionCoolTo25, actionLimitTo26, false},
+		{`{"kind":"set_fan","fanLevel":"high"}`, actionLimitTo26, true},
+		{actionVentilateLow, ``, true},
+		{actionPowerOff, `{"kind":`, false}, // a policy that cannot be read allows nothing
 	} {
 		a, _ := control.ParseAction([]byte(tc.action))
 		if got := control.Allowed(a, []byte(tc.policy)); got != tc.ok {
@@ -419,7 +427,7 @@ func TestCommandHistory(t *testing.T) {
 
 	code, got, rows := list(customerA(), `{"unitId":"`+unit+`","query":{"limit":100}}`)
 	if code != 200 || got[tech] == nil || got[own] == nil || got[tech]["reason"] != nil ||
-		got[tech]["status"] != "expired" {
+		got[tech]["status"] != statusExpired {
 		t.Fatalf("client history: %d %v", code, got[tech])
 	}
 
@@ -473,7 +481,7 @@ func TestCommandHistory(t *testing.T) {
 	}
 
 	for q, want := range map[string]string{`{"sort":{"field":"status",` +
-		`"direction":"asc"}}`: "sort.field=error.invalid", `{"filters":{"status":"sent"}}`: "status=error.notAllowed"} {
+		`"direction":"asc"}}`: refusedSortFieldInvalid, `{"filters":{"status":"sent"}}`: refusedStatusNotAllowed} {
 		code, m := post(srv, hq(), "commands.list", `{"unitId":"`+unit+`","query":`+q+`}`)
 		refusal(t, q, code, m, want)
 	}

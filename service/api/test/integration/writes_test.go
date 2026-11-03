@@ -50,8 +50,8 @@ func TestWritesGetResult(t *testing.T) {
 		op  string
 		key string
 	}{
-		"other member": {techA(), "preferences.update", key}, "other operation": {techB(), "consents.update", key},
-		"unknown key": {techB(), "preferences.update", "nokey-" + uuid.NewString()},
+		"other member": {techA(), opPreferencesUpdate, key}, "other operation": {techB(), "consents.update", key},
+		"unknown key": {techB(), opPreferencesUpdate, "nokey-" + uuid.NewString()},
 	} {
 		if _, m := get(tc.a, tc.op, tc.key); data(m)["state"] != "not_received" {
 			t.Errorf("%s: %v", name, m)
@@ -78,7 +78,7 @@ func TestWritesGetResult(t *testing.T) {
 
 	owner(t, `UPDATE platform.idempotency_keys SET status = 'in_progress' WHERE key = $1`, key)
 
-	if _, m := get(techB(), "preferences.update", key); data(m)["state"] != "pending" {
+	if _, m := get(techB(), "preferences.update", key); data(m)["state"] != statusPending {
 		t.Errorf("pending: %v", m)
 	}
 	// password reset preview is public and generic
@@ -150,7 +150,7 @@ func TestResolveQr(t *testing.T) {
 		t.Error("unknown label")
 	}
 
-	if code, m := qr(" "); code != 422 || fields(m) != "code=error.invalid" {
+	if code, m := qr(" "); code != 422 || fields(m) != refusedCodeInvalid {
 		t.Errorf("blank code: %d %s", code, fields(m))
 	}
 

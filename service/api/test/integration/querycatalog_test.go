@@ -14,6 +14,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const jsonStatusActive = `"active"`
+
 // TestQueryCatalogFilters checks every row of docs/02-design/query-catalog.csv against the API: each catalogued filter
 // key is accepted on its own (no VALIDATION on filters) and an unknown key is VALIDATION (SR06); each allowed sort
 // field sorts both ways and an unknown one is VALIDATION. It keeps the allowlists of the design and the handlers the
@@ -53,19 +55,19 @@ func TestQueryCatalogFilters(t *testing.T) {
 				String() +
 				`"],"from":"2026-09-01T00:00:00Z","to":"2026-09-30T00:00:00Z","query":` + q + `}`
 		},
-		"devices.events":       func(q string) string { return `{"id":"` + device + `","query":` + q + `}` },
-		"devices.calibrations": func(q string) string { return `{"deviceId":"` + device + `","query":` + q + `}` },
-		"devices.operations":   func(q string) string { return `{"deviceId":"` + device + `","query":` + q + `}` },
-		"jobs.events":          func(q string) string { return `{"jobId":"` + job + `","query":` + q + `}` },
-		"members.capacity":     func(q string) string { return `{"date":"2026-09-15","query":` + q + `}` },
-		"members.eligible": func(q string) string {
+		opDevicesEvents:       func(q string) string { return `{"id":"` + device + `","query":` + q + `}` },
+		opDevicesCalibrations: func(q string) string { return `{"deviceId":"` + device + `","query":` + q + `}` },
+		opDevicesOperations:   func(q string) string { return `{"deviceId":"` + device + `","query":` + q + `}` },
+		opJobsEvents:          func(q string) string { return `{"jobId":"` + job + `","query":` + q + `}` },
+		"members.capacity":    func(q string) string { return `{"date":"2026-09-15","query":` + q + `}` },
+		opMembersEligible: func(q string) string {
 			return `{"jobId":"` + job + `","startAt":"2026-09-20T01:00:00Z","endAt":"2026-09-20T03:00:00Z","query":` + q + `}`
 		},
-		"restrictions.forInvoice": func(q string) string { return `{"invoiceId":"` + invoice + `","query":` + q + `}` },
+		opRestrictionsForInvoice: func(q string) string { return `{"invoiceId":"` + invoice + `","query":` + q + `}` },
 		"diagnosticRuns.list": func(q string) string {
 			return `{"unitId":"` + seed.ID("unit-online-rto").String() + `","query":` + q + `}`
 		},
-		"commands.list": func(q string) string { // IR216: the unit's history (HQ or the owning customer)
+		opCommandsList: func(q string) string { // IR216: the unit's history (HQ or the owning customer)
 			return `{"unitId":"` + seed.ID("unit-online-rto").String() + `","query":` + q + `}`
 		},
 		"mrv.versions": func(q string) string { return `{"id":"` + uuid.NewString() + `","query":` + q + `}` },
@@ -74,12 +76,12 @@ func TestQueryCatalogFilters(t *testing.T) {
 				`"id":"` + invoice + `"},"templateKey":"payment_reminder","channel":"email",` +
 				`"query":` + q + `}`
 		},
-		"telemetry.series": func(q string) string {
+		opTelemetrySeries: func(q string) string {
 			return `{"from":"2026-09-13T00:00:00Z","to":"2026-09-14T00:00:00Z","unitIds":["` + seed.ID("unit-online-rto").
 				String() +
 				`"],"metric":"temperature","query":` + q + `}`
 		},
-		"summaries.get": func(q string) string { // summaries take the filters directly
+		opSummariesGet: func(q string) string { // summaries take the filters directly
 			var x struct {
 				Filters json.RawMessage `json:"filters"`
 			}
@@ -94,72 +96,75 @@ func TestQueryCatalogFilters(t *testing.T) {
 	}
 	// sample filter values: by key, then per operation where the enum differs
 	sample := map[string]string{
-		"from":               `"2026-01-01T00:00:00Z"`,
+		fieldFrom:            `"2026-01-01T00:00:00Z"`,
 		"to":                 `"2026-12-31T00:00:00Z"`,
-		"unitIds":            `["` + uuid.NewString() + `"]`,
+		fieldUnitIDs:         `["` + uuid.NewString() + `"]`,
 		"statuses":           `["requested"]`,
 		"connections":        `["online"]`,
-		"severity":           `"warning"`,
+		fieldSeverity:        `"warning"`,
 		"powerState":         `"on"`,
 		"search":             `"a"`,
 		"qualification":      `"demo_indoor"`,
 		"expiringWithinDays": `30`,
-		"period":             `"2026-08"`,
+		fieldPeriod:          `"2026-08"`,
 		"origin":             `"client_request"`,
 		"coverage":           `"contract"`,
 		"method":             `"demo_fixed"`,
-		"boundaryId":         `"ac_input_electricity"`,
+		fieldBoundaryID:      `"ac_input_electricity"`,
 		"region":             `"MY"`,
 		"year":               `2026`,
 		"clientRole":         `"owner"`,
-		"code":               `"demo_indoor"`,
+		fieldCode:            `"demo_indoor"`,
 		"subjectType":        `"payment"`,
 		"targetKind":         `"invoice"`,
-		"action":             `"payments.confirm"`,
-		"role":               `"technician"`,
+		fieldAction:          `"payments.confirm"`,
+		fieldRole:            jsonRoleTechnician,
 		"result":             `"success"`,
 		"correlationId":      `"corr-1"`,
 		"actorId":            `"` + uuid.NewString() + `"`,
 		"targetId":           `"` + uuid.NewString() + `"`,
-		"metric":             `"temperature"`,
-		"includeDescendants": `true`,
-		"overdueOnly":        `true`,
-		"unreadOnly":         `true`,
-		"activeOnly":         `true`,
-		"unassignedOnly":     `true`,
-		"proposalPending":    `true`,
-		"enabled":            `true`,
+		fieldMetric:          `"temperature"`,
+		"includeDescendants": jsonTrue,
+		"overdueOnly":        jsonTrue,
+		"unreadOnly":         jsonTrue,
+		"activeOnly":         jsonTrue,
+		"unassignedOnly":     jsonTrue,
+		"proposalPending":    jsonTrue,
+		fieldEnabled:         jsonTrue,
 	}
 	perOp := map[string]map[string]string{
-		"alerts.list":             {"status": `"open"`},
-		"automations.list":        {"kind": `"schedule"`},
-		"customers.list":          {"kind": `"rto"`, "status": `"active"`},
-		"organizations.list":      {"kind": `"customer"`, "status": `"active"`},
-		"spaces.list":             {"kind": `"floor"`},
-		"notifications.list":      {"type": `"payment"`},
-		"contracts.list":          {"kind": `"rto"`},
-		"devices.list":            {"status": `"online"`},
-		"inquiries.list":          {"status": `"received"`},
-		"invoices.list":           {"status": `"unpaid"`},
-		"jobs.list":               {"status": `"requested"`, "type": `"reactive"`},
-		"mrv.list":                {"status": `"draft"`},
-		"offsets.list":            {"status": `"demo_requested"`},
-		"policies.list":           {"kind": `"alert"`},
-		"properties.list":         {"kind": `"home"`},
-		"restrictions.list":       {"status": `"applied"`},
-		"restrictions.forInvoice": {"status": `"applied"`},
-		"units.list": {
-			"status":             `"online"`,
+		opAlertsList:             {fieldStatus: `"open"`},
+		"automations.list":       {fieldKind: `"schedule"`},
+		"customers.list":         {fieldKind: jsonKindRTO, fieldStatus: jsonStatusActive},
+		"organizations.list":     {fieldKind: `"customer"`, fieldStatus: jsonStatusActive},
+		"spaces.list":            {fieldKind: `"floor"`},
+		"notifications.list":     {fieldType: `"payment"`},
+		"contracts.list":         {fieldKind: jsonKindRTO},
+		opDevicesList:            {fieldStatus: `"online"`},
+		opInquiriesList:          {fieldStatus: `"received"`},
+		"invoices.list":          {fieldStatus: `"unpaid"`},
+		opJobsList:               {fieldStatus: `"requested"`, fieldType: `"reactive"`},
+		"mrv.list":               {fieldStatus: `"draft"`},
+		"offsets.list":           {fieldStatus: `"demo_requested"`},
+		opPoliciesList:           {fieldKind: `"alert"`},
+		"properties.list":        {fieldKind: `"home"`},
+		"restrictions.list":      {fieldStatus: `"applied"`},
+		opRestrictionsForInvoice: {fieldStatus: `"applied"`},
+		opUnitsList: {
+			fieldStatus:          `"online"`,
 			"includeDescendants": `true,"spaceId":"` + seed.ID("floor-1").String() + `"`,
 		},
-		"clientUsers.list":       {"status": `"active"`},
-		"partnerUsers.list":      {"status": `"active"`, "partnerRole": `"technician"`},
-		"contractors.list":       {"status": `"active"`},
-		"certificates.list":      {"status": `"valid"`},
-		"payouts.list":           {"status": `"draft"`},
-		"filterCare.list":        {"status": `"overdue"`},
-		"firmwareCampaigns.list": {"status": `"running"`},
-		"summaries.get":          {"status": `"requested"`},
+		opClientUsersList: {fieldStatus: jsonStatusActive},
+		"partnerUsers.list": {
+			fieldStatus:   jsonStatusActive,
+			"partnerRole": jsonRoleTechnician,
+		},
+		opContractorsList:        {fieldStatus: jsonStatusActive},
+		"certificates.list":      {fieldStatus: `"valid"`},
+		"payouts.list":           {fieldStatus: `"draft"`},
+		opFilterCareList:         {fieldStatus: `"overdue"`},
+		"firmwareCampaigns.list": {fieldStatus: `"running"`},
+		opSummariesGet:           {fieldStatus: `"requested"`},
 	}
 	// base filters every call of the operation carries (audit.list needs its period)
 	base := map[string]string{
@@ -251,7 +256,7 @@ func TestQueryCatalogFilters(t *testing.T) {
 				}
 			}
 
-			if operation == "summaries.get" { // takes filters only, no Query
+			if operation == opSummariesGet { // takes filters only, no Query
 				return
 			}
 			// allowed_sort: each field sorts both ways; an unknown field is VALIDATION
@@ -320,7 +325,7 @@ func filterError(m map[string]any) bool {
 
 	for k := range fe {
 		// filters of a bare Query; query.filters (or the whole query) of a nested one
-		if k == "filters" || strings.HasPrefix(k, "filters.") || k == "query" ||
+		if k == fieldFilters || strings.HasPrefix(k, "filters.") || k == "query" ||
 			strings.HasPrefix(k, "query.filters") {
 			return true
 		}

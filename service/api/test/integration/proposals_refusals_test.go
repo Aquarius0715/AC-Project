@@ -106,7 +106,7 @@ func TestProposalRefusalsByState(t *testing.T) {
 		&status,
 	)
 
-	if status != "withdrawn" {
+	if status != statusWithdrawn {
 		t.Errorf("a refused answer changed the proposal: %s", status)
 	}
 }

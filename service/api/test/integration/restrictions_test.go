@@ -19,6 +19,15 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
+const (
+	fieldCauseInvoiceIDs   = "causeInvoiceIds"
+	fieldPolicy            = "policy"
+	projectionRelease      = "release"
+	statusNotApplied       = "not_applied"
+	statusSentUnknown      = "sent_unknown"
+	statusWaitingReconcile = "waiting_reconcile"
+)
+
 // boundUnit creates a customer-b unit with a bound device in the given connection state.
 func boundUnit(t *testing.T, s *apiserver.Server, connection string) string {
 	t.Helper()
@@ -110,14 +119,14 @@ func overdueContract(t *testing.T, srv *apiserver.Server, units ...string) (stri
 
 func scheduleBody(k, inv string, units []string, extra map[string]string) string {
 	f := map[string]string{
-		"contractId":              `"` + k + `"`,
-		"expectedContractVersion": "1",
-		"causeInvoiceIds":         `["` + inv + `"]`,
-		"unitIds":                 `["` + strings.Join(units, `","`) + `"]`,
-		"policy":                  `{"kind":"temperature_limit","minimumCoolingSetpoint":24}`,
-		"executeAfter":            `"` + clock().Add(25*time.Hour).Format(time.RFC3339) + `"`,
-		"reason":                  `"Invoice overdue"`,
-		"rulesVersion":            `"rules-1"`,
+		fieldContractID:              `"` + k + `"`,
+		fieldExpectedContractVersion: "1",
+		fieldCauseInvoiceIDs:         `["` + inv + `"]`,
+		fieldUnitIDs:                 `["` + strings.Join(units, `","`) + `"]`,
+		fieldPolicy:                  `{"kind":"temperature_limit","minimumCoolingSetpoint":24}`,
+		fieldExecuteAfter:            `"` + clock().Add(25*time.Hour).Format(time.RFC3339) + `"`,
+		fieldReason:                  `"Invoice overdue"`,
+		fieldRulesVersion:            `"rules-1"`,
 	}
 	maps.Copy(f, extra)
 
@@ -194,8 +203,8 @@ func TestRestrictionLifecycle(t *testing.T) {
 	units := []string{online, offline}
 	key, inv := overdueContract(t, srv, online, offline)
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		"blank reason":       "reason=error.length",
-		"duplicate unit":     "unitIds=error.invalid",
+		caseBlankReason:      refusedReasonLength,
+		caseDuplicateUnit:    refusedUnitIDsInvalid,
 		"missing cause":      "causeInvoiceIds=errors.cause_invoices_mismatch",
 		"notice under 24h":   "executeAfter=errors.notice_24h",
 		"power off setpoint": "policy=error.invalid",
@@ -210,20 +219,20 @@ func TestRestrictionLifecycle(t *testing.T) {
 		code int
 	}{
 		"notice under 24h": {
-			map[string]string{"executeAfter": `"` + clock().Add(23*time.Hour).Format(time.RFC3339) + `"`},
+			map[string]string{fieldExecuteAfter: `"` + clock().Add(23*time.Hour).Format(time.RFC3339) + `"`},
 			422,
 		},
-		"missing cause":    {map[string]string{"causeInvoiceIds": `["` + uuid.NewString() + `"]`}, 422},
-		"rules mismatch":   {map[string]string{"rulesVersion": `"rules-2"`}, 422},
-		"setpoint too low": {map[string]string{"policy": `{"kind":"temperature_limit","minimumCoolingSetpoint":15}`}, 422},
-		"setpoint off step": {map[string]string{"policy": `{"kind":"temperature_limit",` +
+		"missing cause":    {map[string]string{fieldCauseInvoiceIDs: `["` + uuid.NewString() + `"]`}, 422},
+		"rules mismatch":   {map[string]string{fieldRulesVersion: `"rules-2"`}, 422},
+		"setpoint too low": {map[string]string{fieldPolicy: `{"kind":"temperature_limit","minimumCoolingSetpoint":15}`}, 422},
+		"setpoint off step": {map[string]string{fieldPolicy: `{"kind":"temperature_limit",` +
 			`"minimumCoolingSetpoint":24.5}`}, 422},
-		"power off setpoint": {map[string]string{"policy": `{"kind":"power_off","minimumCoolingSetpoint":24}`}, 422},
-		"unit not in deal":   {map[string]string{"unitIds": `["` + seed.ID("unit-online-rto").String() + `"]`}, 422},
-		"duplicate unit":     {map[string]string{"unitIds": `["` + online + `","` + online + `"]`}, 422},
-		"blank reason":       {map[string]string{"reason": `"  "`}, 422},
-		"stale contract":     {map[string]string{"expectedContractVersion": "2"}, 409},
-		"unknown contract":   {map[string]string{"contractId": `"` + uuid.NewString() + `"`}, 404},
+		"power off setpoint": {map[string]string{fieldPolicy: `{"kind":"power_off","minimumCoolingSetpoint":24}`}, 422},
+		"unit not in deal":   {map[string]string{fieldUnitIDs: `["` + seed.ID("unit-online-rto").String() + `"]`}, 422},
+		caseDuplicateUnit:    {map[string]string{fieldUnitIDs: `["` + online + `","` + online + `"]`}, 422},
+		caseBlankReason:      {map[string]string{fieldReason: `"  "`}, 422},
+		"stale contract":     {map[string]string{fieldExpectedContractVersion: "2"}, 409},
+		"unknown contract":   {map[string]string{fieldContractID: `"` + uuid.NewString() + `"`}, 404},
 	} {
 		code, res := write(
 			srv,
@@ -256,7 +265,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		scheduleBody(key, inv, units, nil),
 		0,
 	)
-	if code != 200 || data(resp)["state"] != "scheduled" ||
+	if code != 200 || data(resp)["state"] != statusScheduled ||
 		len(asArr(t, data(resp)["noticeNotificationIds"])) == 0 ||
 		data(resp)["noticeAt"] != clock().Format(time.RFC3339) {
 		t.Fatalf("schedule: %d %v", code, resp)
@@ -326,13 +335,14 @@ func TestRestrictionLifecycle(t *testing.T) {
 	}
 
 	code, resp = exec("rules-1", 1)
-	if code != 200 || data(resp)["state"] != "requested" || asNum(t, data(resp)["version"]) != 2 {
+	if code != 200 || data(resp)["state"] != statusRequested ||
+		asNum(t, data(resp)["version"]) != 2 {
 		t.Fatalf("execute: %d %v", code, resp)
 	}
 
 	on, off := unitState(t, resp, online), unitState(t, resp, offline)
-	if on["applyState"] != "sent_unknown" || off["applyState"] != "not_sent" ||
-		off["pendingReason"] != "offline" ||
+	if on["applyState"] != statusSentUnknown || off["applyState"] != statusNotSent ||
+		off["pendingReason"] != reasonOffline ||
 		len(asArr(t, off["applyCommandIds"])) != 1 {
 		t.Fatalf("per unit: %v %v", on, off)
 	}
@@ -346,7 +356,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		&delivery,
 	)
 
-	if status != "requested" || delivery != "not_sent" {
+	if status != statusRequested || delivery != statusNotSent {
 		t.Errorf("offline intent %s/%s", status, delivery)
 	}
 
@@ -359,8 +369,8 @@ func TestRestrictionLifecycle(t *testing.T) {
 	}
 
 	_, resp = post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
-	if data(resp)["state"] != "requested" ||
-		unitState(t, resp, online)["applyState"] != "applied" ||
+	if data(resp)["state"] != statusRequested ||
+		unitState(t, resp, online)["applyState"] != statusApplied ||
 		unitState(t, resp, online)["observedRestriction"] == nil {
 		t.Fatalf("after ack: %v", resp)
 	}
@@ -383,7 +393,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		overrider(),
 		"restrictions.get",
 		`{"id":"`+id+`"}`,
-	); code != 200 || data(res)["projection"] != "release" ||
+	); code != 200 || data(res)["projection"] != projectionRelease ||
 		data(res)["contractId"] != nil {
 		t.Fatalf("release projection: %d %v", code, res)
 	}
@@ -403,7 +413,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		"restrictions.list",
 		`{"filters":{"status":"requested"},"limit":100}`,
 	); len(items(t, res)) == 0 ||
-		items(t, res)[0]["projection"] != "release" {
+		items(t, res)[0]["projection"] != projectionRelease {
 		t.Error("override-only list")
 	}
 
@@ -423,7 +433,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		"restrictions.list",
 		`{"filters":{"status":"paused"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad state filter: %d %s", code, fields(res))
 	}
 
@@ -478,14 +488,14 @@ func TestRestrictionLifecycle(t *testing.T) {
 	}
 
 	code, resp = cancel(3)
-	if code != 200 || data(resp)["state"] != "release_requested" ||
+	if code != 200 || data(resp)["state"] != statusReleaseRequested ||
 		asObj(t, data(resp)["releaseIntent"])["source"] != "cancel" {
 		t.Fatalf("cancel: %d %v", code, resp)
 	}
 
 	on, off = unitState(t, resp, online), unitState(t, resp, offline)
-	if on["releaseState"] != "requested" || len(asArr(t, on["releaseCommandIds"])) != 1 ||
-		off["applyState"] != "not_applied" ||
+	if on["releaseState"] != statusRequested || len(asArr(t, on["releaseCommandIds"])) != 1 ||
+		off["applyState"] != statusNotApplied ||
 		off["releaseState"] != "not_required" {
 		t.Fatalf("release eval: %v %v", on, off)
 	}
@@ -497,7 +507,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		&status,
 	)
 
-	if status != "cancelled" {
+	if status != statusCancelled {
 		t.Errorf("undelivered apply %s", status)
 	}
 
@@ -511,8 +521,8 @@ func TestRestrictionLifecycle(t *testing.T) {
 	}
 
 	_, resp = post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
-	if data(resp)["state"] != "released" ||
-		unitState(t, resp, online)["releaseState"] != "released" {
+	if data(resp)["state"] != statusReleased ||
+		unitState(t, resp, online)["releaseState"] != statusReleased {
 		t.Fatalf("released: %v", resp)
 	}
 
@@ -530,7 +540,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		srv,
 		restrMgr(),
 		"restrictions.schedule",
-		scheduleBody(key, inv, []string{unit}, map[string]string{"policy": `{"kind":"power_off"}`}),
+		scheduleBody(key, inv, []string{unit}, map[string]string{fieldPolicy: policyPowerOff}),
 		0,
 	)
 
@@ -542,7 +552,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		`{"restrictionId":"`+id+`","reason":"mistake"}`,
 		1,
 	); code != 200 ||
-		data(res)["state"] != "cancelled" {
+		data(res)["state"] != statusCancelled {
 		t.Fatalf("cancel scheduled: %d %v", code, res)
 	}
 	// all causes paid right before execution: cancelled with no apply request
@@ -569,7 +579,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 		`{"restrictionId":"`+id+`","confirmedRulesVersion":"rules-1"}`,
 		1,
 	); code != 200 ||
-		data(res)["state"] != "cancelled" ||
+		data(res)["state"] != statusCancelled ||
 		len(asArr(t, unitState(t, res, unit)["applyCommandIds"])) != 0 {
 		t.Fatalf("execute after payment: %d %v", code, res)
 	}
@@ -632,7 +642,7 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	ackCommand(t, cmd, clock().Add(time.Second))
 
 	_, resp = post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
-	if data(resp)["state"] != "applied" {
+	if data(resp)["state"] != statusApplied {
 		t.Fatalf("applied: %v", resp)
 	}
 	// payment of all causes → release_requested with a remove command (IR35 ①); expiry → release failed
@@ -649,8 +659,8 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	}
 
 	_, resp = post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
-	if data(resp)["state"] != "release_requested" ||
-		unitState(t, resp, unit)["releaseState"] != "requested" ||
+	if data(resp)["state"] != statusReleaseRequested ||
+		unitState(t, resp, unit)["releaseState"] != statusRequested ||
 		asObj(t, data(resp)["releaseIntent"])["source"] != "payment" {
 		t.Fatalf("payment release: %v", resp)
 	}
@@ -658,8 +668,8 @@ func TestRestrictionCancelAndPayment(t *testing.T) {
 	expireAt(t, clock().Add(time.Minute))
 
 	_, resp = post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
-	if data(resp)["state"] != "release_requested" ||
-		unitState(t, resp, unit)["releaseState"] != "failed" {
+	if data(resp)["state"] != statusReleaseRequested ||
+		unitState(t, resp, unit)["releaseState"] != statusFailed {
 		t.Fatalf("remove expired: %v", resp)
 	}
 
@@ -774,7 +784,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 
 	expireAt(t, clock().Add(time.Minute))
 
-	if st := unitState(t, get(), offline); st["applyState"] != "not_sent" {
+	if st := unitState(t, get(), offline); st["applyState"] != statusNotSent {
 		t.Fatalf("expired intent: %v", st)
 	}
 
@@ -827,14 +837,14 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE unit_id = $1`, offline)
 
 	code, resp := retry(restrMgr(), "apply", "rules-1", offline)
-	if code != 200 || unitState(t, resp, offline)["applyState"] != "sent_unknown" ||
+	if code != 200 || unitState(t, resp, offline)["applyState"] != statusSentUnknown ||
 		len(asArr(t, unitState(t, resp, offline)["applyCommandIds"])) != 2 {
 		t.Fatalf("retry apply: %d %v", code, resp)
 	}
 
 	ackCommand(t, cmdOf(t, resp, offline, "applyCommandIds"), clock().Add(2*time.Second))
 
-	if data(get())["state"] != "applied" {
+	if data(get())["state"] != statusApplied {
 		t.Fatal("applied after retry")
 	}
 
@@ -892,11 +902,11 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 		deferBody(clock().Add(48*time.Hour)),
 		ver(t, get()),
 	)
-	if code != 200 || data(resp)["state"] != "release_requested" ||
+	if code != 200 || data(resp)["state"] != statusReleaseRequested ||
 		data(resp)["graceUntil"] == nil ||
 		asObj(t, data(resp)["releaseIntent"])["source"] != "exception" ||
-		unitState(t, resp, online)["releaseState"] != "requested" ||
-		unitState(t, resp, offline)["releaseState"] != "requested" {
+		unitState(t, resp, online)["releaseState"] != statusRequested ||
+		unitState(t, resp, offline)["releaseState"] != statusRequested {
 		t.Fatalf("defer: %d %v", code, resp)
 	}
 
@@ -915,9 +925,9 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	expireAt(t, clock().Add(time.Minute))
 
 	resp = get()
-	if data(resp)["state"] != "release_requested" ||
-		unitState(t, resp, offline)["releaseState"] != "failed" ||
-		unitState(t, resp, online)["releaseState"] != "released" {
+	if data(resp)["state"] != statusReleaseRequested ||
+		unitState(t, resp, offline)["releaseState"] != statusFailed ||
+		unitState(t, resp, online)["releaseState"] != statusReleased {
 		t.Fatalf("partial release: %v", resp)
 	}
 
@@ -925,7 +935,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 		t.Error("override-only retry of a non-override release")
 	}
 	// SR26: a unit waiting for reconciliation, or never confirmed applied, is reconciled, not retried
-	for _, st := range [][2]string{{"waiting_reconcile", "applied"}, {"failed", "sent_unknown"}} {
+	for _, st := range [][2]string{{statusWaitingReconcile, statusApplied}, {statusFailed, statusSentUnknown}} {
 		owner(
 			t,
 			`UPDATE restrictions.restriction_units SET release_state = $3, apply_state = $4 WHERE restriction_id = $1 AND unit_id
@@ -962,14 +972,14 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 		"rules-1",
 		offline,
 	); code == 200 ||
-		res["code"] != "OFFLINE" {
+		res["code"] != codeOffline {
 		t.Errorf("offline retry release: %d %v", code, res)
 	}
 
 	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE unit_id = $1`, offline)
 
 	code, resp = retry(restrMgr(), "release", "rules-1", offline, online)
-	if code != 200 || unitState(t, resp, offline)["releaseState"] != "requested" {
+	if code != 200 || unitState(t, resp, offline)["releaseState"] != statusRequested {
 		t.Fatalf("retry release: %d %v", code, resp)
 	}
 
@@ -979,7 +989,7 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 
 	ackCommand(t, cmdOf(t, resp, offline, "releaseCommandIds"), clock().Add(4*time.Second))
 
-	if data(get())["state"] != "released" {
+	if data(get())["state"] != statusReleased {
 		t.Fatal("released after retry")
 	}
 
@@ -1063,7 +1073,7 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 		clock().Add(-time.Minute),
 	)
 
-	if code, m := reconcile(restrMgr()); code == 200 || m["code"] != "TIMEOUT" {
+	if code, m := reconcile(restrMgr()); code == 200 || m["code"] != codeTimeout {
 		t.Errorf("stale observation: %d %v", code, m)
 	}
 
@@ -1087,15 +1097,15 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 	)
 	owner(t, `UPDATE devices.devices SET connection = 'offline' WHERE unit_id = $1`, unit)
 
-	if code, m := reconcile(restrMgr()); code == 200 || m["code"] != "OFFLINE" {
+	if code, m := reconcile(restrMgr()); code == 200 || m["code"] != codeOffline {
 		t.Errorf("offline reconcile: %d %v", code, m)
 	}
 
 	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE unit_id = $1`, unit)
 
 	code, res := reconcile(restrMgr())
-	if code != 200 || data(res)["state"] != "applied" ||
-		unitState(t, res, unit)["applyState"] != "applied" {
+	if code != 200 || data(res)["state"] != statusApplied ||
+		unitState(t, res, unit)["applyState"] != statusApplied {
 		t.Fatalf("reconcile applied: %d %v", code, res)
 	}
 
@@ -1116,8 +1126,8 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 		`{"restrictionId":"`+id+`","reason":"medical hardship"}`,
 		ver(t, get()),
 	)
-	if code != 200 || data(res)["projection"] != "release" ||
-		data(res)["state"] != "release_requested" ||
+	if code != 200 || data(res)["projection"] != projectionRelease ||
+		data(res)["state"] != statusReleaseRequested ||
 		asObj(t, data(res)["releaseIntent"])["source"] != "override" {
 		t.Fatalf("override: %d %v", code, res)
 	}
@@ -1144,21 +1154,21 @@ func TestRestrictionOverrideReconcile(t *testing.T) {
 			`remove"}`,
 		ver(t, get()),
 	)
-	if code != 200 || data(res)["projection"] != "release" ||
-		unitState(t, res, unit)["releaseState"] != "requested" {
+	if code != 200 || data(res)["projection"] != projectionRelease ||
+		unitState(t, res, unit)["releaseState"] != statusRequested {
 		t.Fatalf("override-only retry release: %d %v", code, res)
 	}
 
 	ackCommand(t, cmdOf(t, res, unit, "releaseCommandIds"), clock().Add(time.Second))
 
-	if data(get())["state"] != "released" {
+	if data(get())["state"] != statusReleased {
 		t.Fatal("released after override")
 	}
 
 	var status string
 	ownerScan(t, `SELECT status FROM billing.invoices WHERE id = $1`, []any{inv}, &status)
 
-	if status != "unpaid" {
+	if status != statusUnpaid {
 		t.Error("override keeps the invoice unpaid")
 	}
 }
@@ -1186,7 +1196,7 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 		ver(t, get()),
 	)
 	if code != 200 || asObj(t, data(resp)["exception"])["reason"] != "hospital" ||
-		unitState(t, resp, unit)["releaseState"] != "waiting_reconcile" {
+		unitState(t, resp, unit)["releaseState"] != statusWaitingReconcile {
 		t.Fatalf("exempt: %d %v", code, resp)
 	}
 
@@ -1243,9 +1253,9 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 		`{"restrictionId":"`+id+`","unitIds":["`+unit+`"]}`,
 		ver(t, get()),
 	)
-	if code != 200 || data(resp)["state"] != "released" ||
+	if code != 200 || data(resp)["state"] != statusReleased ||
 		unitState(t, resp, unit)["releaseState"] != "not_required" ||
-		unitState(t, resp, unit)["applyState"] != "not_applied" {
+		unitState(t, resp, unit)["applyState"] != statusNotApplied {
 		t.Fatalf("reconcile not applied: %d %v", code, resp)
 	}
 	// the client reads the state changes only: the reconcile stays HQ's record (IR42)
@@ -1362,7 +1372,7 @@ func TestRestrictionScheduleRefusals(t *testing.T) {
 		t.Errorf("temperature limit on a fan-only model: %d %v", code, res)
 	}
 
-	if code, m := schedule(); code != 200 || data(m)["state"] != "scheduled" {
+	if code, m := schedule(); code != 200 || data(m)["state"] != statusScheduled {
 		t.Fatalf("schedule once the causes are gone: %d %v", code, m)
 	}
 }
@@ -1426,7 +1436,7 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 		id2,
 		u2,
 		ver(t, get2()),
-	); code != 200 || unitState(t, res, u2)["applyState"] != "not_applied" ||
+	); code != 200 || unitState(t, res, u2)["applyState"] != statusNotApplied ||
 		unitState(t, res, u2)["observedRestriction"] != nil {
 		t.Fatalf("reconcile, nothing observed: %d %v", code, res)
 	}
@@ -1456,7 +1466,7 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 			`","reason":"hospital"}`,
 		ver(t, get3()),
 	); code != 200 ||
-		unitState(t, res, u3)["releaseState"] != "waiting_reconcile" {
+		unitState(t, res, u3)["releaseState"] != statusWaitingReconcile {
 		t.Fatalf("exempt: %d %v", code, res)
 	}
 
@@ -1469,15 +1479,15 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 	)
 
 	code, resp := reconcile(id3, u3, ver(t, get3()))
-	if code != 200 || unitState(t, resp, u3)["applyState"] != "applied" ||
-		unitState(t, resp, u3)["releaseState"] != "requested" ||
+	if code != 200 || unitState(t, resp, u3)["applyState"] != statusApplied ||
+		unitState(t, resp, u3)["releaseState"] != statusRequested ||
 		len(asArr(t, unitState(t, resp, u3)["releaseCommandIds"])) != 1 {
 		t.Fatalf("reconcile while releasing: %d %v", code, resp)
 	}
 
 	ackCommand(t, cmdOf(t, resp, u3, "releaseCommandIds"), clock().Add(2*time.Second))
 
-	if data(get3())["state"] != "released" {
+	if data(get3())["state"] != statusReleased {
 		t.Errorf("released after the remove: %v", data(get3())["state"])
 	}
 }
@@ -1511,7 +1521,7 @@ func TestRestrictionExplicitRelease(t *testing.T) {
 
 	if code, m := release(
 		v,
-	); code != 200 || data(m)["state"] != "release_requested" ||
+	); code != 200 || data(m)["state"] != statusReleaseRequested ||
 		ver(t, m) != v+1 {
 		t.Fatalf("release with the causes paid: %d %v", code, m)
 	}
@@ -1623,7 +1633,7 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 				key,
 				inv1,
 				[]string{unit},
-				map[string]string{"causeInvoiceIds": `["` + inv1 + `","` + inv2 + `"]`},
+				map[string]string{fieldCauseInvoiceIDs: `["` + inv1 + `","` + inv2 + `"]`},
 			),
 			0,
 		)
@@ -1657,7 +1667,7 @@ func TestRestrictionEndsWhenItsInvoicesArePaidAtOnce(t *testing.T) {
 		var state string
 		ownerScan(t, `SELECT state FROM restrictions.restrictions WHERE id = $1`, []any{r}, &state)
 
-		if state != "cancelled" {
+		if state != statusCancelled {
 			t.Fatalf(
 				"round %d: both cause invoices paid, the scheduled restriction is %s",
 				round,
@@ -1694,7 +1704,7 @@ func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 		`{"restrictionId":"`+id+`","confirmedRulesVersion":"rules-1"}`,
 		1,
 	)
-	if code != 200 || data(res)["state"] != "requested" {
+	if code != 200 || data(res)["state"] != statusRequested {
 		t.Fatalf("execute: %d %v", code, res)
 	}
 
@@ -1758,7 +1768,7 @@ func TestRestrictionAppliedWhenTwoUnitsAnswerAtOnce(t *testing.T) {
 	var state string
 	ownerScan(t, `SELECT state FROM restrictions.restrictions WHERE id = $1`, []any{id}, &state)
 
-	if state != "applied" {
+	if state != statusApplied {
 		t.Fatalf("both units applied, the restriction is %s", state)
 	}
 }

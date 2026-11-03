@@ -114,7 +114,7 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 	evaluate()
 
 	got := august()
-	if len(got) != 1 || got[0].status != "draft" || got[0].lines != 1 {
+	if len(got) != 1 || got[0].status != statusDraft || got[0].lines != 1 {
 		t.Fatalf("the August draft: %+v", got)
 	}
 

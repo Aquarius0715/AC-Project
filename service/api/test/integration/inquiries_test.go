@@ -10,6 +10,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const fieldFiltersTo = "filters.to"
+
 func TestInquiries(t *testing.T) {
 	srv := server(t)
 	u := boundUnit(t, srv, "online")
@@ -24,9 +26,9 @@ func TestInquiries(t *testing.T) {
 	rid := asStr(t, data(resp)["id"])
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"bad subject":              "subjectType=error.invalid",
-		"blank message":            "message=error.length",
+		"blank message":            refusedMessageLength,
 		"payment with restriction": "restrictionId=error.notAllowed",
-		"payment without invoice":  "invoiceId=error.required",
+		"payment without invoice":  refusedInvoiceIDRequired,
 		"restriction without id":   "restrictionId=error.required",
 	}
 
@@ -138,7 +140,7 @@ func TestInquiries(t *testing.T) {
 		"inquiries.list",
 		`{"filters":{"status":"open"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad state filter: %d %s", code, fields(res))
 	}
 
@@ -217,7 +219,7 @@ func TestAuditList(t *testing.T) {
 		t.Fatalf("invoice audit: %v", resp)
 	}
 
-	if items(t, resp)[0]["actorName"] != "hq-operator" { // the actor user's display name (IR305)
+	if items(t, resp)[0]["actorName"] != membershipHQOperator { // the actor user's display name (IR305)
 		t.Errorf("actor name: %v", items(t, resp)[0]["actorName"])
 	}
 
@@ -275,12 +277,12 @@ func TestAuditList(t *testing.T) {
 	}
 	// the period is required (both ends named when missing), from < to and at most 366 days
 	for b, want := range map[string]map[string]string{
-		`{}`: {"filters.from": apperr.KeyRequired, "filters.to": apperr.KeyRequired},
-		`{"filters":{"from":"` + clock().Format(time.RFC3339) + `"}}`:           {"filters.to": apperr.KeyRequired},
+		`{}`: {"filters.from": apperr.KeyRequired, fieldFiltersTo: apperr.KeyRequired},
+		`{"filters":{"from":"` + clock().Format(time.RFC3339) + `"}}`:           {fieldFiltersTo: apperr.KeyRequired},
 		`{"filters":{"to":"` + clock().Format(time.RFC3339) + `"}}`:             {"filters.from": apperr.KeyRequired},
-		`{"filters":{` + period(clock(), clock().Add(-time.Hour)) + `}}`:        {"filters.to": "errors.period_range"},
-		`{"filters":{` + period(clock().Add(-400*24*time.Hour), clock()) + `}}`: {"filters.to": "errors.period_range"},
-		`{"filters":{` + day + `,"result":"ok"}}`:                               {"filters": apperr.KeyInvalid},
+		`{"filters":{` + period(clock(), clock().Add(-time.Hour)) + `}}`:        {fieldFiltersTo: "errors.period_range"},
+		`{"filters":{` + period(clock().Add(-400*24*time.Hour), clock()) + `}}`: {fieldFiltersTo: "errors.period_range"},
+		`{"filters":{` + day + `,"result":"ok"}}`:                               {fieldFilters: apperr.KeyInvalid},
 		`{"filters":{` + day + `,"x":1}}`:                                       {"x": apperr.KeyNotAllowed},
 	} {
 		code, m := post(srv, hq(), "audit.list", b)

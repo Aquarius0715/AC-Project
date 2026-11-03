@@ -10,6 +10,11 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const (
+	jsonAlertPermissions = `["alert.read","alert.resolve"]`
+	jsonRoleAdmin        = `"admin"`
+)
+
 func newUser(t *testing.T) string {
 	t.Helper()
 
@@ -38,15 +43,15 @@ func TestMembersSave(t *testing.T) {
 	until := clock().Add(30 * 24 * time.Hour).Format(time.RFC3339)
 	body := func(f map[string]string) string {
 		base := map[string]string{
-			"userId":         `"` + user + `"`,
-			"organizationId": `"` + operation + `"`,
-			"role":           `"technician"`,
-			"employment":     `"internal"`,
-			"permissions":    `["alert.read"]`,
-			"scopes":         `[{"kind":"unit","id":"` + unit + `"}]`,
-			"validFrom":      `"` + from + `"`,
-			"validUntil":     "null",
-			"reason":         `"onboarding"`,
+			fieldUserID:         `"` + user + `"`,
+			fieldOrganizationID: `"` + operation + `"`,
+			fieldRole:           jsonRoleTechnician,
+			fieldEmployment:     `"internal"`,
+			fieldPermissions:    `["alert.read"]`,
+			fieldScopes:         `[{"kind":"unit","id":"` + unit + `"}]`,
+			fieldValidFrom:      `"` + from + `"`,
+			fieldValidUntil:     jsonNull,
+			fieldReason:         `"onboarding"`,
 		}
 
 		for key, v := range f {
@@ -69,7 +74,7 @@ func TestMembersSave(t *testing.T) {
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"admin unit scope":       "scopes=error.invalid",
 		"admin two tenants":      "scopes=error.invalid",
-		"blank reason":           "reason=error.length",
+		caseBlankReason:          refusedReasonLength,
 		"employment for admin":   "employment=error.notAllowed",
 		"external without end":   "validUntil=errors.external_needs_end",
 		"internal at contractor": "organizationId=errors.organization_kind",
@@ -86,37 +91,47 @@ func TestMembersSave(t *testing.T) {
 		f    map[string]string
 		code int
 	}{
-		"no employment":         {map[string]string{"employment": "null"}, 422},
-		"employment for admin":  {map[string]string{"role": `"admin"`}, 422},
-		"technician permission": {map[string]string{"permissions": `["job.write"]`}, 422},
+		"no employment":         {map[string]string{fieldEmployment: jsonNull}, 422},
+		"employment for admin":  {map[string]string{fieldRole: jsonRoleAdmin}, 422},
+		"technician permission": {map[string]string{fieldPermissions: `["job.write"]`}, 422},
 		"write without read": {
-			map[string]string{"role": `"admin"`, "employment": "null", "permissions": `["job.write"]`, "scopes": `[]`}, 422,
+			map[string]string{
+				fieldRole: jsonRoleAdmin, fieldEmployment: jsonNull, fieldPermissions: `["job.write"]`,
+				fieldScopes: `[]`,
+			}, 422,
 		},
 		"unknown permission": {
-			map[string]string{"role": `"admin"`, "employment": "null", "permissions": `["god.mode"]`, "scopes": `[]`}, 422,
+			map[string]string{
+				fieldRole: jsonRoleAdmin, fieldEmployment: jsonNull, fieldPermissions: `["god.mode"]`,
+				fieldScopes: `[]`,
+			}, 422,
 		},
-		"admin unit scope": {map[string]string{"role": `"admin"`, "employment": "null", "permissions": `[]`}, 422},
+		"admin unit scope": {
+			map[string]string{fieldRole: jsonRoleAdmin, fieldEmployment: jsonNull, fieldPermissions: `[]`},
+			422,
+		},
 		"admin two tenants": {
 			map[string]string{
-				"role": `"admin"`, "employment": "null", "permissions": `[]`,
-				"scopes": `[{"kind":"tenant","id":"` + seed.ID("tenant-a").String() + `"},{"kind":"tenant","id":"` +
+				fieldRole: jsonRoleAdmin, fieldEmployment: jsonNull, fieldPermissions: `[]`,
+				fieldScopes: `[{"kind":"tenant","id":"` + seed.ID("tenant-a").String() + `"},{"kind":"tenant","id":"` +
 					uuid.NewString() + `"}]`,
 			}, 422,
 		},
 		"external without end": {
-			map[string]string{"employment": `"external"`, "organizationId": `"` + contractor + `"`},
+			map[string]string{fieldEmployment: `"external"`, fieldOrganizationID: `"` + contractor + `"`},
 			422,
 		},
 		"until before from": {
-			map[string]string{"validUntil": `"` + clock().Add(-2*time.Hour).Format(time.RFC3339) + `"`},
+			map[string]string{fieldValidUntil: `"` + clock().Add(-2*time.Hour).Format(time.RFC3339) + `"`},
 			422,
 		},
-		"blank reason":           {map[string]string{"reason": `" "`}, 422},
-		"internal at contractor": {map[string]string{"organizationId": `"` + contractor + `"`}, 422},
-		"unknown scope":          {map[string]string{"scopes": `[{"kind":"unit","id":"` + uuid.NewString() + `"}]`}, 422},
-		"unknown property":       {map[string]string{"scopes": `[{"kind":"property","id":"` + uuid.NewString() + `"}]`}, 422},
-		"unknown user":           {map[string]string{"userId": `"` + uuid.NewString() + `"`}, 404},
-		"unknown organization":   {map[string]string{"organizationId": `"` + uuid.NewString() + `"`}, 404},
+		caseBlankReason:          {map[string]string{fieldReason: jsonBlank}, 422},
+		"internal at contractor": {map[string]string{fieldOrganizationID: `"` + contractor + `"`}, 422},
+		"unknown scope":          {map[string]string{fieldScopes: `[{"kind":"unit","id":"` + uuid.NewString() + `"}]`}, 422},
+		"unknown property": {map[string]string{fieldScopes: `[{"kind":"property",` +
+			`"id":"` + uuid.NewString() + `"}]`}, 422},
+		"unknown user":         {map[string]string{fieldUserID: `"` + uuid.NewString() + `"`}, 404},
+		"unknown organization": {map[string]string{fieldOrganizationID: `"` + uuid.NewString() + `"`}, 404},
 	} {
 		code, m := write(srv, hq(), "members.save", body(tc.f), 0)
 		if w, ok := refused[name]; ok {
@@ -127,7 +142,7 @@ func TestMembersSave(t *testing.T) {
 	}
 
 	code, resp := write(srv, hq(), "members.save", body(nil), 0)
-	if code != 200 || data(resp)["role"] != "technician" ||
+	if code != 200 || data(resp)["role"] != roleTechnician ||
 		len(asArr(t, data(resp)["scopes"])) != 1 ||
 		asNum(t, data(resp)["scopeVersion"]) != 1 {
 		t.Fatalf("create: %d %v", code, resp)
@@ -141,9 +156,9 @@ func TestMembersSave(t *testing.T) {
 		"members.save",
 		body(
 			map[string]string{
-				"id":          `"` + id + `"`,
-				"permissions": `["alert.read","alert.resolve"]`,
-				"validUntil":  `"` + until + `"`,
+				"id":             `"` + id + `"`,
+				fieldPermissions: jsonAlertPermissions,
+				fieldValidUntil:  `"` + until + `"`,
 			},
 		),
 		1,
@@ -159,9 +174,9 @@ func TestMembersSave(t *testing.T) {
 		"members.save",
 		body(
 			map[string]string{
-				"id":          `"` + id + `"`,
-				"permissions": `["alert.read","alert.resolve"]`,
-				"reason":      `"period"`,
+				"id":             `"` + id + `"`,
+				fieldPermissions: jsonAlertPermissions,
+				fieldReason:      `"period"`,
 			},
 		),
 		2,
@@ -176,11 +191,11 @@ func TestMembersSave(t *testing.T) {
 		"members.save",
 		body(
 			map[string]string{
-				"id":          `"` + id + `"`,
-				"role":        `"admin"`,
-				"employment":  "null",
-				"permissions": `[]`,
-				"scopes":      `[]`,
+				"id":             `"` + id + `"`,
+				fieldRole:        jsonRoleAdmin,
+				fieldEmployment:  jsonNull,
+				fieldPermissions: `[]`,
+				fieldScopes:      `[]`,
 			},
 		),
 		3,
@@ -195,17 +210,17 @@ func TestMembersSave(t *testing.T) {
 		"members.save",
 		body(
 			map[string]string{
-				"id":          `"` + id + `"`,
-				"permissions": `["alert.read","alert.resolve"]`,
-				"scopes": `[{"kind":"property","id":"` + seed.ID("property-home-a").
+				"id":             `"` + id + `"`,
+				fieldPermissions: jsonAlertPermissions,
+				fieldScopes: `[{"kind":"property","id":"` + seed.ID("property-home-a").
 					String() +
 					`"}]`,
-				"reason": `"whole home"`,
+				fieldReason: `"whole home"`,
 			},
 		),
 		3,
 	); code != 200 ||
-		asObj(t, asArr(t, data(res)["scopes"])[0])["kind"] != "property" ||
+		asObj(t, asArr(t, data(res)["scopes"])[0])["kind"] != kindProperty ||
 		asNum(t, data(res)["scopeVersion"]) != 3 {
 		t.Fatalf("property scope: %d %v", code, res)
 	}
@@ -221,13 +236,13 @@ func TestMembersSave(t *testing.T) {
 	}
 	// client memberships get clientRole=member and the initial consent
 	code, resp = write(srv, hq(), "members.save", body(map[string]string{
-		"organizationId": `"` + customer + `"`,
-		"role":           `"client"`,
-		"employment":     "null",
-		"permissions":    `[]`,
-		"scopes":         `[{"kind":"organization","id":"` + customer + `"}]`,
+		fieldOrganizationID: `"` + customer + `"`,
+		fieldRole:           `"client"`,
+		fieldEmployment:     jsonNull,
+		fieldPermissions:    `[]`,
+		fieldScopes:         `[{"kind":"organization","id":"` + customer + `"}]`,
 	}), 0)
-	if code != 200 || data(resp)["clientRole"] != "member" {
+	if code != 200 || data(resp)["clientRole"] != clientRoleMember {
 		t.Fatalf("client: %d %v", code, resp)
 	}
 
@@ -331,7 +346,7 @@ func TestMembersList(t *testing.T) {
 
 	_, resp := post(srv, hq(), "members.list", `{"limit":100}`)
 	for _, it := range items(t, resp) {
-		if it["role"] == "client" {
+		if it["role"] == roleClient {
 			t.Fatal("clients excluded by default")
 		}
 	}
@@ -374,7 +389,7 @@ func TestMembersList(t *testing.T) {
 	}
 
 	for _, it := range items(t, resp) {
-		if it["role"] != "technician" ||
+		if it["role"] != roleTechnician ||
 			it["organizationId"] != seed.ID("org-contractor-a").String() ||
 			len(asArr(t, it["permissions"])) != 0 ||
 			len(asArr(t, it["scopes"])) != 0 {
@@ -383,12 +398,12 @@ func TestMembersList(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"filters\":{\"role\":\"guest\"}}":                    "filters=error.invalid",
-		"{\"filters\":{\"x\":1}}":                               "x=error.notAllowed",
-		"{\"sort\":{\"field\":\"name\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+		"{\"filters\":{\"role\":\"guest\"}}": refusedFiltersInvalid,
+		bodyUnknownFilter:                    refusedUnknownFieldX,
+		bodySortByName:                       refusedSortFieldInvalid,
 	}
 
-	for _, b := range []string{`{"filters":{"role":"guest"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"name",` +
+	for _, b := range []string{`{"filters":{"role":"guest"}}`, bodyUnknownFilter, `{"sort":{"field":"name",` +
 		`"direction":"asc"}}`} {
 		code, m := post(srv, hq(), "members.list", b)
 		refusal(t, b, code, m, want[b])

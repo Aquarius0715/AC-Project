@@ -85,7 +85,11 @@ func TestWorkReportEdges(t *testing.T) {
 		srv,
 		techInt(),
 		"jobs.saveDraft",
-		draftBody(job, "", map[string]string{"reportId": `"` + rep + `"`, "items": elsewhere}),
+		draftBody(
+			job,
+			"",
+			map[string]string{fieldReportID: `"` + rep + `"`, fieldItems: elsewhere},
+		),
 		1,
 	); code != 422 ||
 		asObj(t, resp["fieldErrors"])["items"] != apperr.KeyOtherReportAttachment {
@@ -94,8 +98,8 @@ func TestWorkReportEdges(t *testing.T) {
 	// an empty reason is no reason; a measurement saved again by its ID keeps it and counts a version
 	body := strings.Replace(
 		draftBody(job, "normal", map[string]string{
-			"reportId": `"` + rep + `"`,
-			"measurements": `[{"componentKey":"filter","metric":"temperature","value":20,"unit":"°C",` +
+			fieldReportID: `"` + rep + `"`,
+			fieldMeasurements: `[{"componentKey":"filter","metric":"temperature","value":20,"unit":"°C",` +
 				`"observedAt":"` + now + `"}]`,
 		}),
 		`"componentKey":"filter","result":"normal","reason":null`,
@@ -117,8 +121,8 @@ func TestWorkReportEdges(t *testing.T) {
 	first := asObj(t, asArr(t, data(res)["measurements"])[0])
 
 	code, res = write(srv, techInt(), "jobs.saveDraft", draftBody(job, "normal", map[string]string{
-		"reportId": `"` + rep + `"`,
-		"measurements": `[{"id":"` + asStr(
+		fieldReportID: `"` + rep + `"`,
+		fieldMeasurements: `[{"id":"` + asStr(
 			t,
 			first["id"],
 		) + `","componentKey":"filter","metric":"temperature","value":21,` +

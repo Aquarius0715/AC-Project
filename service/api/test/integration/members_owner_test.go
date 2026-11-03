@@ -59,12 +59,12 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 		version  int
 		write    bool
 	}{
-		{"clientUsers.list", `{"limit":10}`, 0, false},
+		{opClientUsersList, `{"limit":10}`, 0, false},
 		{"clientUsers.resendInvite", `{"id":"` + clientUser + `"}`, 0, true},
-		{"clientUsers.save", `{"customerId":"` + custA + `","email":"member.invite@example.com","clientRole":"member",` +
+		{opClientUsersSave, `{"customerId":"` + custA + `","email":"member.invite@example.com","clientRole":"member",` +
 			`"displayName":"Invited Member"}`, 0, true},
-		{"clientUsers.remove", `{"id":"` + clientUser + `","reason":"left"}`, 1, true},
-		{"policies.setDefaultRule", `{"policyId":"` + defaultPolicyID(t) + `","ruleKey":"ventilation_co2",` +
+		{opClientUsersRemove, `{"id":"` + clientUser + `","reason":"left"}`, 1, true},
+		{opPoliciesSetDefaultRule, `{"policyId":"` + defaultPolicyID(t) + `","ruleKey":"ventilation_co2",` +
 			`"customerId":"` + custA + `","enabled":false,"reason":"quiet"}`, 97, true},
 		{"filterCare.saveSettings", `{"thresholdHours":100,"fallbackDays":14,"recipients":"all_users","channels":["inApp",` +
 			`"email"]}`, 0, true},
@@ -118,7 +118,7 @@ func TestMembersSaveNewUser(t *testing.T) {
 	}
 
 	code, resp := write(srv, hq(), "members.save", body(newUser), 0)
-	if code != 200 || data(resp)["role"] != "admin" {
+	if code != 200 || data(resp)["role"] != roleAdmin {
 		t.Fatalf("create with a new person: %d %v", code, resp)
 	}
 
@@ -177,7 +177,7 @@ func TestMembersSaveNewUser(t *testing.T) {
 		&user,
 	)
 
-	if status != "invited" {
+	if status != statusInvited {
 		t.Errorf("listed before the first sign-in: %s", status)
 	}
 
@@ -206,7 +206,7 @@ func TestMembersSaveNewUser(t *testing.T) {
 		&status,
 	)
 
-	if status != "active" {
+	if status != statusActive {
 		t.Errorf("listed after the first sign-in: %s", status)
 	}
 }

@@ -15,6 +15,8 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
+const keyRevokedByHQ = "errors.revoked_by_hq"
+
 // TestHQRevokeTurnsSignInOff (IR508, DEC-83): HQ's revoke in Access & roles ends the access and turns the sign-in off,
 // and only HQ gives it back. The contractor cannot extend the access end, enable the account again or add the person
 // as a new account; disabling and removing stay its own. HQ's later end clears the revoke: the sign-in comes back
@@ -152,7 +154,7 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 	if code, m := partner(
 		`"accessUntil":"` + access + `"`,
 	); code != 409 ||
-		m["messageKey"] != "errors.revoked_by_hq" {
+		m["messageKey"] != keyRevokedByHQ {
 		t.Errorf("extend: %d %v", code, m)
 	}
 
@@ -163,7 +165,7 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 	if code, m := partner(
 		`"status":"active"`,
 	); code != 409 ||
-		m["messageKey"] != "errors.revoked_by_hq" {
+		m["messageKey"] != keyRevokedByHQ {
 		t.Errorf("enable: %d %v", code, m)
 	}
 	// saving again keeps the first revoke (the test clock stands still: the first is moved a minute back)
@@ -308,7 +310,7 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 			v,
 		)
 	}
-	if code, m := save("owner", ""); code != 409 || m["messageKey"] != "errors.revoked_by_hq" {
+	if code, m := save("owner", ""); code != 409 || m["messageKey"] != keyRevokedByHQ {
 		t.Errorf("role change: %d %v", code, m)
 	}
 
@@ -320,7 +322,7 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 		"member",
 		"active",
 	); code != 409 ||
-		m["messageKey"] != "errors.revoked_by_hq" {
+		m["messageKey"] != keyRevokedByHQ {
 		t.Errorf("enable: %d %v", code, m)
 	}
 

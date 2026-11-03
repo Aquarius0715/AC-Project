@@ -28,7 +28,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	)
 	ackCommand(t, cmdOf(t, res, unit, "releaseCommandIds"), clock().Add(2*time.Second))
 
-	if data(get())["state"] != "released" {
+	if data(get())["state"] != statusReleased {
 		t.Fatal("released")
 	}
 
@@ -58,8 +58,8 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	res = get()
 
 	cases := asArr(t, data(res)["recoveryCases"])
-	if data(res)["state"] != "released" || len(cases) != 1 ||
-		asObj(t, cases[0])["state"] != "pending" {
+	if data(res)["state"] != statusReleased || len(cases) != 1 ||
+		asObj(t, cases[0])["state"] != statusPending {
 		t.Fatalf("recovery case: %v", res)
 	}
 
@@ -131,7 +131,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	code, res := reconcile(overrider()) // override-only may handle terminal recovery (IR03)
 
 	c0, _ := data(res)["recoveryCases"].([]any)
-	if code != 200 || len(c0) != 1 || asObj(t, c0[0])["state"] != "removing" ||
+	if code != 200 || len(c0) != 1 || asObj(t, c0[0])["state"] != statusRemoving ||
 		len(asArr(t, asObj(t, c0[0])["commandIds"])) != 1 {
 		t.Fatalf("reconcile terminal: %d %v", code, res)
 	}
@@ -146,7 +146,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 		clock().Add(3*time.Second),
 	)
 
-	if st := asObj(t, asArr(t, data(get())["recoveryCases"])[0])["state"]; st != "resolved" {
+	if st := asObj(t, asArr(t, data(get())["recoveryCases"])[0])["state"]; st != statusResolved {
 		t.Errorf("resolved after acknowledgement: %v", st)
 	}
 
@@ -167,7 +167,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	code, res = reconcile(restrMgr())
 
 	cs := asArr(t, data(res)["recoveryCases"])
-	if code != 200 || len(cs) != 2 || asObj(t, cs[1])["state"] != "resolved" ||
+	if code != 200 || len(cs) != 2 || asObj(t, cs[1])["state"] != statusResolved ||
 		len(asArr(t, asObj(t, cs[1])["commandIds"])) != 0 {
 		t.Fatalf("null observation: %d %v", code, res)
 	}
@@ -184,7 +184,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 		hq(),
 		"units.get",
 		`{"id":"`+unit+`"}`,
-	); asObj(t, data(m)["controlAvailability"])["state"] != "available" {
+	); asObj(t, data(m)["controlAvailability"])["state"] != stateAvailable {
 		t.Error("control available after every case is resolved")
 	}
 

@@ -54,7 +54,7 @@ func TestDeviceHistory(t *testing.T) {
 		clock(),
 	) // after the binding (bound at the test clock)
 
-	for _, operation := range []string{"devices.operations", "devices.calibrations"} {
+	for _, operation := range []string{opDevicesOperations, opDevicesCalibrations} {
 		code, m := post(srv, hq(), operation, `{"deviceId":"`+dev+`","query":{}}`)
 		if code != 200 || len(items(t, m)) != 1 {
 			t.Fatalf("%s: %d %v", operation, code, m)
@@ -99,9 +99,9 @@ func TestDeviceHistory(t *testing.T) {
 	}
 
 	for b, want := range map[string]string{
-		`{"deviceId":"` + dev + `","query":{"filters":{"x":1}}}`: "x=error.notAllowed",
-		`{"query":{}}`: "deviceId=error.invalid",
-		`{"deviceId":"` + dev + `","query":{"sort":{"field":"kind","direction":"asc"}}}`: "sort.field=error.invalid",
+		`{"deviceId":"` + dev + `","query":{"filters":{"x":1}}}`: refusedUnknownFieldX,
+		bodyEmptyQuery: "deviceId=error.invalid",
+		`{"deviceId":"` + dev + `","query":{"sort":{"field":"kind","direction":"asc"}}}`: refusedSortFieldInvalid,
 	} {
 		code, m := post(srv, hq(), "devices.operations", b)
 		refusal(t, b, code, m, want)

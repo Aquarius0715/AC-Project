@@ -9,6 +9,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const kindCustomer = "customer"
+
 func seedID(s string) uuid.UUID { return seed.ID(s) }
 
 func count(t *testing.T, m map[string]any, k string) int {
@@ -21,7 +23,7 @@ func TestSummariesCustomer(t *testing.T) {
 	srv := server(t)
 
 	code, resp := post(srv, customerA(), "summaries.get", `{"kind":"customer","filters":{}}`)
-	if code != 200 || data(resp)["kind"] != "customer" {
+	if code != 200 || data(resp)["kind"] != kindCustomer {
 		t.Fatalf("customer: %d %v", code, resp)
 	}
 
@@ -111,9 +113,9 @@ func TestSummariesCustomer(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"kind\":\"customer\",\"filters\":{\"overdueOnly\":true}}":    "filters=error.invalid",
-		"{\"kind\":\"customer\",\"filters\":{\"status\":\"assigned\"}}": "filters=error.invalid",
-		"{\"kind\":\"shop\",\"filters\":{}}":                            "kind=error.invalid",
+		"{\"kind\":\"customer\",\"filters\":{\"overdueOnly\":true}}":    refusedFiltersInvalid,
+		"{\"kind\":\"customer\",\"filters\":{\"status\":\"assigned\"}}": refusedFiltersInvalid,
+		"{\"kind\":\"shop\",\"filters\":{}}":                            refusedKindInvalid,
 	}
 
 	for _, b := range []string{`{"kind":"customer",` +
@@ -218,7 +220,7 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 		"summaries.get",
 		`{"kind":"technician","filters":{"status":"assigned","statuses":["assigned"]}}`,
 	); code != 422 ||
-		fields(res) != "filters.statuses=error.invalid" {
+		fields(res) != refusedFilterStatusesInvalid {
 		t.Errorf("status with statuses: %d %s", code, fields(res))
 	}
 
@@ -228,7 +230,7 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 		"summaries.get",
 		`{"kind":"technician","filters":{"statuses":[]}}`,
 	); code != 422 ||
-		fields(res) != "filters.statuses=error.invalid" {
+		fields(res) != refusedFilterStatusesInvalid {
 		t.Errorf("empty statuses: %d %s", code, fields(res))
 	}
 
@@ -326,7 +328,7 @@ func TestSummaryJobCounts(t *testing.T) {
 
 	for k, want := range map[string]int{
 		"scheduledCount": 1, "inProgressCount": 1, "reviewCount": 1, "activeCount": 2,
-		"overdueCount": 1, "assignedCount": 3, "total": 1, "online": 1,
+		"overdueCount": 1, "assignedCount": 3, "total": 1, connectionOnline: 1,
 	} {
 		if got := count(t, res, k); got != want {
 			t.Errorf("%s: %d, want %d", k, got, want)

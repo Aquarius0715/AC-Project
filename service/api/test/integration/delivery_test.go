@@ -12,6 +12,11 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const (
+	fieldOfferExpiresAt  = "offerExpiresAt"
+	refusedSlotNotAgreed = "startAt=errors.slot_not_agreed"
+)
+
 func TestOfferAcceptAssign(t *testing.T) {
 	srv := server(t)
 	// earlier runs leave active assignments for these technicians in the same slots
@@ -34,15 +39,15 @@ func TestOfferAcceptAssign(t *testing.T) {
 	s2 := slotJSON(49, 2)
 	offerBody := func(extra map[string]string) string {
 		f := map[string]string{
-			"jobId":           `"` + job + `"`,
-			"contractorOrgId": `"` + seed.ID("org-contractor-a").String() + `"`,
-			"visitSlot":       s2,
-			"offerExpiresAt": `"` + stamp(
+			fieldJobID:           `"` + job + `"`,
+			fieldContractorOrgID: `"` + seed.ID("org-contractor-a").String() + `"`,
+			fieldVisitSlot:       s2,
+			fieldOfferExpiresAt: `"` + stamp(
 				12,
 			) + `"`,
-			"accessValidFrom":  `"` + stamp(0) + `"`,
-			"accessValidUntil": `"` + stamp(100) + `"`,
-			"termsVersion":     `"terms-v1"`,
+			"accessValidFrom":     `"` + stamp(0) + `"`,
+			fieldAccessValidUntil: `"` + stamp(100) + `"`,
+			fieldTermsVersion:     `"terms-v1"`,
 		}
 		maps.Copy(f, extra)
 
@@ -69,13 +74,16 @@ func TestOfferAcceptAssign(t *testing.T) {
 		extra map[string]string
 		code  int
 	}{
-		"expiry in the past":    {map[string]string{"offerExpiresAt": `"` + stamp(-1) + `"`}, 422},
-		"expiry after access":   {map[string]string{"offerExpiresAt": `"` + stamp(101) + `"`}, 422},
-		"access does not cover": {map[string]string{"accessValidUntil": `"` + stamp(50) + `"`}, 422},
-		"slot not agreed":       {map[string]string{"visitSlot": slotJSON(30, 2)}, 422},
-		"blank terms":           {map[string]string{"termsVersion": `""`}, 422},
-		"customer organization": {map[string]string{"contractorOrgId": `"` + seed.ID("org-customer-a").String() + `"`}, 404},
-		"unknown organization":  {map[string]string{"contractorOrgId": `"` + uuid.NewString() + `"`}, 404},
+		"expiry in the past":    {map[string]string{fieldOfferExpiresAt: `"` + stamp(-1) + `"`}, 422},
+		"expiry after access":   {map[string]string{fieldOfferExpiresAt: `"` + stamp(101) + `"`}, 422},
+		"access does not cover": {map[string]string{fieldAccessValidUntil: `"` + stamp(50) + `"`}, 422},
+		"slot not agreed":       {map[string]string{fieldVisitSlot: slotJSON(30, 2)}, 422},
+		"blank terms":           {map[string]string{fieldTermsVersion: `""`}, 422},
+		"customer organization": {
+			map[string]string{fieldContractorOrgID: `"` + seed.ID("org-customer-a").String() + `"`},
+			404,
+		},
+		"unknown organization": {map[string]string{fieldContractorOrgID: `"` + uuid.NewString() + `"`}, 404},
 	} {
 		code, m := write(srv, hq(), "jobs.offer", offerBody(tc.extra), 1)
 		if w, ok := refused[name]; ok {
@@ -101,7 +109,9 @@ func TestOfferAcceptAssign(t *testing.T) {
 		hq(),
 		"jobs.offer",
 		offerBody(
-			map[string]string{"contractorOrgId": `"` + seed.ID("org-contractor-b").String() + `"`},
+			map[string]string{
+				fieldContractorOrgID: `"` + seed.ID("org-contractor-b").String() + `"`,
+			},
 		),
 		1,
 	); code != 409 {
@@ -113,7 +123,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 	}
 
 	code, resp := write(srv, hq(), "jobs.offer", offerBody(nil), 1)
-	if code != 200 || data(resp)["status"] != "offered" ||
+	if code != 200 || data(resp)["status"] != statusOffered ||
 		data(resp)["contractorOrgId"] != seed.ID("org-contractor-a").String() {
 		t.Fatalf("offer: %d %v", code, resp)
 	}
@@ -220,7 +230,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		3,
 		"",
 	); code != 422 ||
-		fields(res) != "startAt=errors.slot_not_agreed" {
+		fields(res) != refusedSlotNotAgreed {
 		t.Errorf("contractor slot must be the visit slot: %d %s", code, fields(res))
 	}
 
@@ -229,7 +239,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 	}
 
 	code, resp = asg(contrA(), job, "tech-external-a", s2, 3, "")
-	if code != 200 || data(resp)["status"] != "assigned" || data(resp)["assignmentId"] == nil ||
+	if code != 200 || data(resp)["status"] != statusAssigned || data(resp)["assignmentId"] == nil ||
 		data(resp)["scheduledSlot"] == nil {
 		t.Fatalf("contractor assign: %d %v", code, resp)
 	}
@@ -243,7 +253,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		contrA(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); asObj(t, data(g)["assignment"])["acknowledgement"] != "pending" {
+	); asObj(t, data(g)["assignment"])["acknowledgement"] != statusPending {
 		t.Errorf("the assignment waits for the technician: %v", data(g)["assignment"])
 	}
 
@@ -256,7 +266,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 	key := asStr(t, data(resp)["id"])
@@ -274,7 +284,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		1,
 		"",
 	); code != 422 ||
-		fields(res) != "startAt=errors.slot_not_agreed" {
+		fields(res) != refusedSlotNotAgreed {
 		t.Errorf("slot not agreed: %d %s", code, fields(res))
 	}
 
@@ -294,7 +304,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		2,
 		"",
 	); code != 422 ||
-		fields(res) != "startAt=errors.slot_not_agreed" {
+		fields(res) != refusedSlotNotAgreed {
 		t.Errorf("reassignment keeps the agreed slot: %d %s", code, fields(res))
 	}
 
@@ -306,7 +316,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		2,
 		"swap",
 	); code != 200 ||
-		data(res)["status"] != "assigned" {
+		data(res)["status"] != statusAssigned {
 		t.Fatalf("reassign: %d", code)
 	}
 
@@ -321,7 +331,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		3,
 		"",
 	); code != 422 ||
-		fields(res) != "reason=error.required" {
+		fields(res) != refusedReasonRequired {
 		t.Errorf("extension needs a reason: %d %s", code, fields(res))
 	}
 
@@ -345,7 +355,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		3,
 		"more work",
 	); code != 200 ||
-		data(res)["status"] != "in_progress" {
+		data(res)["status"] != statusInProgress {
 		t.Fatalf("extend: %d %v", code, res)
 	}
 
@@ -359,7 +369,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 	l := asStr(t, data(resp)["id"])
@@ -382,7 +392,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.create",
-		jobBody(other, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(other, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 	if code, _ := asg(hq(), asStr(t, data(resp)["id"]), "tech-internal-a", s1, 1, ""); code != 403 {
@@ -397,8 +407,8 @@ func TestOfferAcceptAssign(t *testing.T) {
 		`"}`
 
 	_, resp = write(srv, hq(), "jobs.create", jobBody(unit, map[string]string{
-		"alternativeSlots": "[]", "requestedStart": `"` + late.Format(time.RFC3339) + `"`,
-		"requestedEnd": `"` + late.Add(2*time.Hour).Format(time.RFC3339) + `"`,
+		fieldAlternativeSlots: "[]", fieldRequestedStart: `"` + late.Format(time.RFC3339) + `"`,
+		fieldRequestedEnd: `"` + late.Add(2*time.Hour).Format(time.RFC3339) + `"`,
 	}), 0)
 	if code, _ := asg(
 		hq(),
@@ -430,7 +440,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		`{"jobId":"`+job+`","offerId":"`+offer+`","reason":"  "}`,
 		2,
 	); code != 422 ||
-		fields(res) != "reason=error.length" {
+		fields(res) != refusedReasonLength {
 		t.Errorf("blank decline reason: %d %s", code, fields(res))
 	}
 
@@ -450,7 +460,7 @@ func TestOfferAcceptAssign(t *testing.T) {
 		hq(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); data(res)["status"] != "requested" ||
+	); data(res)["status"] != statusRequested ||
 		data(res)["contractorOrgId"] != nil {
 		t.Fatal("decline returns the job to requested")
 	}
@@ -498,7 +508,7 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 	job := asStr(t, data(res)["id"])
@@ -575,14 +585,14 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		"jobs.offer": {`{"jobId":"` + job + `","contractorOrgId":"` + seed.ID("org-contractor-a").String() +
 			`","visitSlot":{"startAt":"` + stamp(3) + `","endAt":"` + stamp(2) +
 			`"},"offerExpiresAt":"` + stamp(5) + `","accessValidFrom":"` + stamp(6) + `","accessValidUntil":"` + stamp(4) +
-			`","termsVersion":"t"}`, []string{"visitSlot", "accessValidUntil"}},
-		"jobs.accept":  {`{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","reason":"x"}`, []string{"_"}},
-		"jobs.decline": {`{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t"}`, []string{"_"}},
-		"jobs.assign": {`{"jobId":"` + job + `","technicianMembershipId":"` + seed.ID("tech-internal-a").String() +
-			`","startAt":"` + stamp(3) + `","endAt":"` + stamp(2) + `"}`, []string{"endAt"}},
+			`","termsVersion":"t"}`, []string{fieldVisitSlot, fieldAccessValidUntil}},
+		opJobsAccept:  {`{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","reason":"x"}`, []string{"_"}},
+		opJobsDecline: {`{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t"}`, []string{"_"}},
+		opJobsAssign: {`{"jobId":"` + job + `","technicianMembershipId":"` + seed.ID("tech-internal-a").String() +
+			`","startAt":"` + stamp(3) + `","endAt":"` + stamp(2) + `"}`, []string{fieldEndAt}},
 	} {
 		a := hq()
-		if op == "jobs.accept" || op == "jobs.decline" {
+		if op == opJobsAccept || op == opJobsDecline {
 			a = contrA()
 		}
 
@@ -603,13 +613,13 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		`{"jobId":"`+job+`","offerId":"`+uuid.NewString()+`","termsVersion":"t","reason":"x"}`,
 		1,
 	); code != 422 ||
-		fields(resp) != "_=error.malformedInput" {
+		fields(resp) != refusedMalformedInput {
 		t.Errorf("both terms and reason: %d %s", code, fields(resp))
 	}
 	// each decision takes only its own fields (service-contracts: accept termsVersion, decline reason)
 	for op, b := range map[string]string{
-		"jobs.accept": `{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t","reason":"x"}`,
-		"jobs.decline": `{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t","reason":"no ` +
+		opJobsAccept: `{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t","reason":"x"}`,
+		opJobsDecline: `{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t","reason":"no ` +
 			`capacity"}`,
 	} {
 		if code, resp := write(
@@ -666,7 +676,7 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 		)+`"}`,
 		2,
 	); code != 422 ||
-		fields(resp) != "reason=error.length" {
+		fields(resp) != refusedReasonLength {
 		t.Errorf("reason too long: %d %s", code, fields(resp))
 	}
 	// contractor outside the access window
@@ -880,7 +890,7 @@ func TestReleaseEndedAccess(t *testing.T) {
 		&reason,
 	)
 
-	if status != "requested" || assignment != nil || reason != "access_ended" {
+	if status != statusRequested || assignment != nil || reason != "access_ended" {
 		t.Errorf(
 			"after the release: status %s, assignment %v, reason %s",
 			status,
@@ -1048,7 +1058,7 @@ func TestReleaseEndedAccessContractor(t *testing.T) {
 		&reason,
 	)
 
-	if status != "accepted" || assignment != nil || reason != "access_ended" {
+	if status != statusAccepted || assignment != nil || reason != "access_ended" {
 		t.Errorf(
 			"after the release: status %s, assignment %v, reason %s",
 			status,
@@ -1226,13 +1236,13 @@ func TestReleaseQualificationEnded(t *testing.T) {
 
 	approve(100) // still covers the visit
 
-	if status, assignment, _ := state(); status != "assigned" || assignment == nil {
+	if status, assignment, _ := state(); status != statusAssigned || assignment == nil {
 		t.Fatalf("a covering certificate released the job: %s %v", status, assignment)
 	}
 
 	approve(50) // ends during the visit
 
-	if status, assignment, reason := state(); status != "accepted" || assignment != nil ||
+	if status, assignment, reason := state(); status != statusAccepted || assignment != nil ||
 		reason == nil ||
 		*reason != "qualification_ended" {
 		t.Errorf(

@@ -202,7 +202,7 @@ func TestPayouts(t *testing.T) {
 		`{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"Travel was not included"}`,
 		2,
 	); code != 200 ||
-		asObj(t, asArr(t, data(res)["queries"])[0])["state"] != "open" {
+		asObj(t, asArr(t, data(res)["queries"])[0])["state"] != statusOpen {
 		t.Fatalf("query: %d %v", code, res)
 	}
 
@@ -290,7 +290,7 @@ func TestPayouts(t *testing.T) {
 	var q2 string
 
 	for _, x := range asArr(t, data(resp)["queries"]) { // both were asked at the test clock: pick the open one
-		if x := asObj(t, x); x["state"] == "open" {
+		if x := asObj(t, x); x["state"] == statusOpen {
 			q2 = asStr(t, x["id"])
 		}
 	}
@@ -366,7 +366,7 @@ func TestPayouts(t *testing.T) {
 	// contractor sees approved/paid only
 	_, resp = post(srv, contrB(), "payouts.list", `{"limit":100}`)
 	for _, it := range items(t, resp) {
-		if it["status"] == "draft" || it["contractorOrgId"] != org.String() {
+		if it["status"] == statusDraft || it["contractorOrgId"] != org.String() {
 			t.Fatalf("contractor list: %v", it)
 		}
 	}
@@ -392,7 +392,7 @@ func TestPayouts(t *testing.T) {
 		"payouts.list",
 		`{"filters":{"status":"void"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad status filter: %d %s", code, fields(res))
 	}
 

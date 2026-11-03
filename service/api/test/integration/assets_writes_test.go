@@ -98,12 +98,12 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	for bad, field := range map[string]string{
 		`{"customerOrgId":"` + org + `","kind":"castle","name":"x","address":null,` +
-			`"accessInstructions":null}`: "kind",
+			`"accessInstructions":null}`: fieldKind,
 		`{"customerOrgId":"` + org + `","kind":"home","name":"","address":null,` +
-			`"accessInstructions":null}`: "name",
+			`"accessInstructions":null}`: fieldName,
 		`{"customerOrgId":"` + org + `","kind":"home",` +
 			`"name":"` + strings.Repeat("x", 121) + `","address":null,` +
-			`"accessInstructions":null}`: "name",
+			`"accessInstructions":null}`: fieldName,
 		`{"customerOrgId":"` + org + `","kind":"home","name":"x",` +
 			`"address":"` + strings.Repeat("a", 501) + `","accessInstructions":null}`: "address",
 		`{"kind":"home","name":"x","address":null,` +
@@ -160,7 +160,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		upd,
 		1,
 	); code != 409 ||
-		m["code"] != "CONFLICT" {
+		m["code"] != codeConflict {
 		t.Fatalf("stale version: %d", code)
 	}
 
@@ -291,7 +291,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 
 	// units: create, wrong customer, unknown model, future install, relocation reason
 	unitBody := func(id, space string, extra string) string {
-		sp := "null"
+		sp := jsonNull
 		if space != "" {
 			sp = `"` + space + `"`
 		}
@@ -326,13 +326,13 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	}
 
 	badUnits := map[string]string{
-		"other customer": strings.Replace(
+		caseOtherCustomer: strings.Replace(
 			unitBody("", "", ""),
 			org,
 			seed.ID("org-customer-a").String(),
 			1,
 		),
-		"unknown model": strings.Replace(unitBody("", "", ""), model, uuid.NewString(), 1),
+		caseUnknownModel: strings.Replace(unitBody("", "", ""), model, uuid.NewString(), 1),
 		"future install": strings.Replace(
 			unitBody("", "", ""),
 			`"installedAt":null`,
@@ -359,9 +359,9 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		"dup scope":       "serviceScope=error.invalid",
 		"empty scope":     "serviceScope=error.required",
 		"future install":  "installedAt=error.future",
-		"other customer":  "propertyId=error.otherCustomer",
+		caseOtherCustomer: "propertyId=error.otherCustomer",
 		"space elsewhere": "spaceId=error.otherProperty",
-		"unknown model":   "modelId=error.unknownModel",
+		caseUnknownModel:  "modelId=error.unknownModel",
 	}
 
 	for name, b := range badUnits {
@@ -551,7 +551,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		`{"id":"`+unit+`","reason":""}`,
 		5,
 	); code != 422 ||
-		fields(res) != "reason=error.length" {
+		fields(res) != refusedReasonLength {
 		t.Errorf("archive reason required: %d %s", code, fields(res))
 	}
 

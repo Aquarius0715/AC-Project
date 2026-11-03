@@ -63,7 +63,7 @@ func TestAutomationDecideReasons(t *testing.T) {
 		}
 
 		d := asObj(t, asArr(t, data(res)["results"])[0])
-		if d["decision"] != "suppressed" {
+		if d["decision"] != decisionSuppressed {
 			t.Fatalf("decision %v", d)
 		}
 
@@ -135,7 +135,7 @@ func TestAutomationDecideReasons(t *testing.T) {
 		seed.ID("customer-b"),
 	)
 
-	if r := reason(fact("location", `"arrival"`, "event")); r != "consent_revoked" {
+	if r := reason(fact("location", `"arrival"`, "event")); r != reasonConsentRevoked {
 		t.Errorf("consent gone: %q", r)
 	}
 
@@ -145,7 +145,7 @@ func TestAutomationDecideReasons(t *testing.T) {
 		seed.ID("customer-b"),
 	)
 
-	if r := reason(fact("location", `"departure"`, "event")); r != "no_match" {
+	if r := reason(fact("location", `"departure"`, "event")); r != reasonNoMatch {
 		t.Errorf("other location event: %q", r)
 	}
 

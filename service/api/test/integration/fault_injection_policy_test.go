@@ -14,7 +14,7 @@ func TestAutomationPolicyEditRollsBackWhenItCannotBeWritten(t *testing.T) {
 		srv,
 		hq(),
 		"policies.save",
-		autoPolicyBody(map[string]string{"name": `"Before the edit"`}),
+		autoPolicyBody(map[string]string{fieldName: `"Before the edit"`}),
 		0,
 	)
 	if code != 200 {
@@ -36,7 +36,7 @@ func TestAutomationPolicyEditRollsBackWhenItCannotBeWritten(t *testing.T) {
 		broken,
 		hq(),
 		"policies.save",
-		autoPolicyBody(map[string]string{"id": `"` + id + `"`, "name": `"Renamed"`}),
+		autoPolicyBody(map[string]string{"id": `"` + id + `"`, fieldName: `"Renamed"`}),
 		ver(t, before),
 	)
 	if code < 500 {

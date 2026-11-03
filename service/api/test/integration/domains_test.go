@@ -32,7 +32,7 @@ func TestDomainServiceServesOnlyItsOperations(t *testing.T) {
 		c.Domains, c.InternalToken = []string{
 			ops.DomainEquipment,
 			ops.DomainBilling,
-		}, "test-internal"
+		}, internalToken
 		c.ServiceURLs = map[string]string{
 			ops.DomainIdentity:    cluster.urls[ops.DomainIdentity],
 			ops.DomainMaintenance: cluster.urls[ops.DomainMaintenance],

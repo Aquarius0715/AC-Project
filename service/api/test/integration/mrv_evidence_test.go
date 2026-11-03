@@ -43,7 +43,7 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 		id := uuid.NewString()
 
 		var accepted any
-		if state == "accepted" {
+		if state == statusAccepted {
 			accepted = input.Add(time.Hour)
 		}
 
@@ -148,7 +148,7 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 	if first["unitId"] != unit || first["reportId"] == nil || first["acceptedAt"] == nil ||
 		first["status"] != "ready" ||
 		first["name"] != "Meter.png" ||
-		first["mime"] != "image/png" {
+		first["mime"] != mimePNG {
 		t.Errorf("candidate fields: %v", first)
 	}
 	// both units; by name (case-insensitive) and a page of one
@@ -176,18 +176,18 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 	for b, want := range map[string]string{
 		`{"unitIds":[],` +
 			`"from":"` + from.Format(time.RFC3339) + `","to":"` + until.Format(time.RFC3339) +
-			`","query":{}}`: "unitIds=error.invalid",
+			`","query":{}}`: refusedUnitIDsInvalid,
 		`{"unitIds":["` + unit + `","` + unit + `"],"from":"` + from.Format(time.RFC3339) + `","to":"` +
-			until.Format(time.RFC3339) + `","query":{}}`: "unitIds=error.invalid",
+			until.Format(time.RFC3339) + `","query":{}}`: refusedUnitIDsInvalid,
 		`{"unitIds":["` + unit + `"],"to":"` + until.Format(time.RFC3339) +
 			`","query":{}}`: "from=error.required",
 		`{"unitIds":["` + unit + `"],"from":"` + from.Format(time.RFC3339) +
 			`","query":{}}`: "to=error.required",
 		`{"unitIds":["` + unit + `"],"from":"` + until.Format(time.RFC3339) + `","to":"` + from.Format(time.RFC3339) +
-			`","query":{}}`: "to=error.range",
+			`","query":{}}`: refusedToRange,
 		`{"unitIds":["` + unit + `"],"from":"` + from.Format(time.RFC3339) + `","to":"` +
-			from.Add(367*day).Format(time.RFC3339) + `","query":{}}`: "to=error.range",
-		body(`"filters":{"x":1}`, unit): "x=error.notAllowed",
+			from.Add(367*day).Format(time.RFC3339) + `","query":{}}`: refusedToRange,
+		body(`"filters":{"x":1}`, unit): refusedUnknownFieldX,
 	} {
 		code, m := post(srv, hq(), "attachments.list", b)
 		refusal(t, b, code, m, want)

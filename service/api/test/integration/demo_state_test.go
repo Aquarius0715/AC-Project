@@ -106,7 +106,7 @@ func TestDemoStateReport(t *testing.T) {
 			`"fanLevel":"turbo"}`, "state.fanLevel=error.invalid"},
 		"hot": {when, `,"state":{"power":true,"celsius":55,"mode":"cool",` +
 			`"fanLevel":"mid"}`, "state.celsius=error.range"},
-		"future": {clock().Add(time.Hour), `,"state":{"power":true,"celsius":24,"mode":"cool",` +
+		caseFuture: {clock().Add(time.Hour), `,"state":{"power":true,"celsius":24,"mode":"cool",` +
 			`"fanLevel":"mid"}`, "occurredAt=error.range"},
 	} {
 		code, m := report(c.at, c.state)

@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,14 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/seed"
+)
+
+const (
+	jsonHalfPastNine      = `"09:30"`
+	outcomeCommandCreated = "command_created"
+	outcomeSkipped        = "skipped"
+	reasonMissingData     = "missing_data"
+	storedPowerOff        = `{"kind": "set_power", "power": false}`
 )
 
 // automationCommands returns the actions of the unit's automation Commands, oldest first.
@@ -64,8 +73,11 @@ func TestScheduleAutomationsFire(t *testing.T) {
 	unit := boundUnit(t, srv, "online")
 
 	code, res := write(srv, customerB(), "automations.save", scheduleRule(unit, map[string]string{
-		"weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`, "enabled": "true",
-		"startAction": `{"kind":"set_temperature","celsius":25}`,
+		fieldWeekdays:    jsonMondays,
+		fieldStartLocal:  jsonHalfPastNine,
+		fieldEndLocal:    jsonTenOClock,
+		fieldEnabled:     jsonTrue,
+		fieldStartAction: actionCoolTo25,
 	}), 0)
 	if code != 200 {
 		t.Fatalf("save: %d %v", code, res)
@@ -114,7 +126,7 @@ func TestScheduleAutomationsFire(t *testing.T) {
 		t,
 		unit,
 	); len(cs) != 2 ||
-		cs[1] != `{"kind": "set_power", "power": false}` {
+		cs[1] != storedPowerOff {
 		t.Fatalf("end command: %v", cs)
 	}
 
@@ -138,8 +150,12 @@ func TestScheduleAutomationsFire(t *testing.T) {
 	}
 	// disabled: the next Monday's start creates nothing
 	code, res = write(srv, customerB(), "automations.save", scheduleRule(unit, map[string]string{
-		"id": `"` + id + `"`, "weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`,
-		"enabled": "false", "startAction": `{"kind":"set_temperature","celsius":25}`,
+		"id":             `"` + id + `"`,
+		fieldWeekdays:    jsonMondays,
+		fieldStartLocal:  jsonHalfPastNine,
+		fieldEndLocal:    jsonTenOClock,
+		fieldEnabled:     jsonFalse,
+		fieldStartAction: actionCoolTo25,
 	}), 1)
 	if code != 200 {
 		t.Fatalf("disable: %d %v", code, res)
@@ -193,8 +209,11 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 	unit := boundUnit(t, srv, "online")
 
 	code, res := write(srv, customerB(), "automations.save", scheduleRule(unit, map[string]string{
-		"weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`, "enabled": "true",
-		"startAction": `{"kind":"set_temperature","celsius":25}`,
+		fieldWeekdays:    jsonMondays,
+		fieldStartLocal:  jsonHalfPastNine,
+		fieldEndLocal:    jsonTenOClock,
+		fieldEnabled:     jsonTrue,
+		fieldStartAction: actionCoolTo25,
 	}), 0)
 	if code != 200 {
 		t.Fatalf("save: %d %v", code, res)
@@ -218,7 +237,7 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 		t,
 		unit,
 	); len(cs) != 1 ||
-		cs[0] != `{"kind": "set_power", "power": false}` {
+		cs[0] != storedPowerOff {
 		t.Fatalf("past a whole window, the end only: %v", cs)
 	}
 
@@ -245,7 +264,7 @@ func TestScheduleCatchUpRunsTheLastMinute(t *testing.T) {
 		t,
 		unit,
 	); len(cs) != 2 ||
-		cs[1] != `{"kind": "set_power", "power": false}` {
+		cs[1] != storedPowerOff {
 		t.Fatalf("two windows passed, the last end only: %v", cs)
 	}
 }
@@ -277,26 +296,26 @@ func TestScheduleDraftPreview(t *testing.T) {
 	}
 	// the field each case is refused for
 	want := map[string]string{
-		"bad action":     "draft.endAction=error.invalid",
+		caseBadAction:    "draft.endAction=error.invalid",
 		"bad count":      "count=error.invalid",
-		"bad zone":       "draft.timezone=error.invalid",
-		"both targets":   "automationId=error.exactlyOneTarget",
-		"no target":      "automationId=error.exactlyOneTarget",
-		"no weekdays":    "draft.weekdays=error.required",
+		caseBadZone:      "draft.timezone=error.invalid",
+		caseBothTargets:  "automationId=error.exactlyOneTarget",
+		caseNoTarget:     "automationId=error.exactlyOneTarget",
+		caseNoWeekdays:   "draft.weekdays=error.required",
 		"nonexistent":    "draft.startLocal=errors.local_time_invalid",
 		"overnight flag": "draft.endsNextDay=errors.overnight_required",
 		"same times":     "draft.endLocal=errors.same_as_start",
 	}
 
 	for name, body := range map[string]string{
-		"both targets":   `{"count":8,"automationId":"` + uuid.NewString() + `","draft":{}}`,
-		"no target":      `{"count":8}`,
+		caseBothTargets:  `{"count":8,"automationId":"` + uuid.NewString() + `","draft":{}}`,
+		caseNoTarget:     `{"count":8}`,
 		"bad count":      strings2(draft(""), `"count":8`, `"count":3`),
 		"same times":     strings2(draft(""), `"endLocal":"22:00"`, `"endLocal":"18:00"`),
-		"no weekdays":    strings2(draft(""), `"weekdays":[1,3]`, `"weekdays":[]`),
+		caseNoWeekdays:   strings2(draft(""), `"weekdays":[1,3]`, `"weekdays":[]`),
 		"overnight flag": strings2(draft(""), `"endLocal":"22:00"`, `"endLocal":"06:00"`),
-		"bad action":     strings2(draft(""), `{"kind":"set_power","power":false}`, `{"kind":"explode"}`),
-		"bad zone":       strings2(draft(""), `"Asia/Kuala_Lumpur"`, `"Moon/Base"`),
+		caseBadAction:    strings2(draft(""), `{"kind":"set_power","power":false}`, `{"kind":"explode"}`),
+		caseBadZone:      strings2(draft(""), `"Asia/Kuala_Lumpur"`, `"Moon/Base"`),
 		"nonexistent": `{"count":8,"draft":{"timezone":"America/New_York","weekdays":[7],"startLocal":"02:30",` +
 			`"endLocal":"05:00","endsNextDay":false,"startAction":{"kind":"set_power","power":true},` +
 			`"endAction":{"kind":"set_power","power":false}}}`,
@@ -340,7 +359,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 			srv,
 			customerA(),
 			"consents.update",
-			`{"purpose":"location_automation","granted":`+map[bool]string{true: "true", false: "false"}[granted]+`}`,
+			`{"purpose":"location_automation","granted":`+strconv.FormatBool(granted)+`}`,
 			v,
 		); code != 200 {
 			t.Fatalf("consent %v: %d %v", granted, code, res)
@@ -352,7 +371,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 	rule := func(id string, version int, enabled bool, event string) (int, map[string]any) {
 		body := `{"name":"Arrive cool",` +
 			`"unitIds":["` + unit + `"],"timezone":"Asia/Kuala_Lumpur",` +
-			`"enabled":` + map[bool]string{true: "true", false: "false"}[enabled] +
+			`"enabled":` + strconv.FormatBool(enabled) +
 			`,"priority":50,"kind":"event","condition":{"type":"location",` +
 			`"event":"` + event + `"},"action":{"kind":"set_temperature","celsius":24}`
 		if id != "" {
@@ -375,7 +394,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 		srv,
 		customerA(),
 		"automations.save",
-		scheduleRule(unit, map[string]string{"enabled": "true", "weekdays": "[6]"}),
+		scheduleRule(unit, map[string]string{fieldEnabled: jsonTrue, fieldWeekdays: "[6]"}),
 		0,
 	)
 	if code != 200 {
@@ -407,7 +426,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 
 	if r := get(
 		loc,
-	); r["enabled"] != false || r["disabledReason"] != "consent_revoked" ||
+	); r["enabled"] != false || r["disabledReason"] != reasonConsentRevoked ||
 		asNum(t, r["version"]) != 2 {
 		t.Fatalf("withdrawn: %v", r)
 	}
@@ -418,7 +437,7 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 
 	set(true)
 
-	if r := get(loc); r["enabled"] != false || r["disabledReason"] != "consent_revoked" {
+	if r := get(loc); r["enabled"] != false || r["disabledReason"] != reasonConsentRevoked {
 		t.Fatalf("granting again re-enables nothing: %v", r)
 	}
 
@@ -465,11 +484,11 @@ func TestAutomationExtraConditions(t *testing.T) {
 			`"weekdays":[2]},{"type":"occupancy","occupied":false}]`,
 		"same type twice":    `[{"type":"occupancy","occupied":true},{"type":"occupancy","occupied":false}]`,
 		"own condition type": `[` + weather + `]`,
-		"no weekdays":        `[{"type":"weekday","weekdays":[]}]`,
-		"weekday 8":          `[{"type":"weekday","weekdays":[8]}]`,
+		caseNoWeekdays:       `[{"type":"weekday","weekdays":[]}]`,
+		caseWeekdayEight:     `[{"type":"weekday","weekdays":[8]}]`,
 		"unknown type":       `[{"type":"tariff","operator":"gt","value":1}]`,
 		"extra field":        `[{"type":"occupancy","occupied":true,"value":3}]`,
-		"bad operator":       `[{"type":"occupancy","occupied":true},{"type":"weekday","weekdays":[1],"operator":"gt"}]`,
+		caseBadOperator:      `[{"type":"occupancy","occupied":true},{"type":"weekday","weekdays":[1],"operator":"gt"}]`,
 	} {
 		if code, resp := write(
 			srv,
@@ -579,12 +598,13 @@ func TestAutomationExtraConditions(t *testing.T) {
 	if d := fire(
 		fact("weather_temperature", "34", "°C"),
 		fact("occupied", "true", "boolean"),
-	); d["decision"] != "requested" ||
+	); d["decision"] != decisionRequested ||
 		d["ruleId"] != id {
 		t.Fatalf("all conditions hold: %v", d)
 	}
 
-	if lr := last(); lr == nil || lr["outcome"] != "command_created" || lr["commandId"] == nil ||
+	if lr := last(); lr == nil || lr["outcome"] != outcomeCommandCreated ||
+		lr["commandId"] == nil ||
 		lr["at"] != clock().Format(time.RFC3339) {
 		t.Fatalf("lastRun after a command: %v", lr)
 	}
@@ -592,20 +612,20 @@ func TestAutomationExtraConditions(t *testing.T) {
 	if d := fire(
 		fact("weather_temperature", "34", "°C"),
 		fact("occupied", "false", "boolean"),
-	); d["decision"] != "suppressed" ||
-		d["reason"] != "no_match" {
+	); d["decision"] != decisionSuppressed ||
+		d["reason"] != reasonNoMatch {
 		t.Fatalf("only if someone is home: %v", d)
 	}
 
-	if lr := last(); lr["outcome"] != "skipped" || lr["reason"] != "no_match" {
+	if lr := last(); lr["outcome"] != outcomeSkipped || lr["reason"] != reasonNoMatch {
 		t.Fatalf("lastRun no_match: %v", lr)
 	}
 	// hot, occupancy unknown: missing data never matches, the skip says why
-	if d := fire(fact("weather_temperature", "34", "°C")); d["reason"] != "missing_data" {
+	if d := fire(fact("weather_temperature", "34", "°C")); d["reason"] != reasonMissingData {
 		t.Fatalf("missing occupancy: %v", d)
 	}
 
-	if lr := last(); lr["outcome"] != "skipped" || lr["reason"] != "missing_data" {
+	if lr := last(); lr["outcome"] != outcomeSkipped || lr["reason"] != reasonMissingData {
 		t.Fatalf("lastRun missing_data: %v", lr)
 	}
 	// its own data arrived incomplete: logged; an event that is not for the rule (no weather): no trace
@@ -614,7 +634,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 			time.RFC3339,
 		) +
 			`","quality":"missing"}`,
-	); d["reason"] != "missing_data" {
+	); d["reason"] != reasonMissingData {
 		t.Fatalf("null weather: %v", d)
 	}
 
@@ -639,14 +659,17 @@ func TestAutomationExtraConditions(t *testing.T) {
 
 	if d := fire(
 		fact("weather_temperature", "34", "°C"),
-	); d["decision"] != "suppressed" ||
-		d["reason"] != "no_match" {
+	); d["decision"] != decisionSuppressed ||
+		d["reason"] != reasonNoMatch {
 		t.Fatalf("Monday is not a weekend: %v", d)
 	}
 	// a schedule that needs someone home skips at its start for want of occupancy data (the scheduler has none)
 	code, res = write(srv, customerB(), "automations.save", scheduleRule(unitID, map[string]string{
-		"weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`, "enabled": "true",
-		"onlyIf": `[{"type":"occupancy","occupied":true}]`,
+		fieldWeekdays:   jsonMondays,
+		fieldStartLocal: jsonHalfPastNine,
+		fieldEndLocal:   jsonTenOClock,
+		fieldEnabled:    jsonTrue,
+		"onlyIf":        `[{"type":"occupancy","occupied":true}]`,
 	}), 0)
 	if code != 200 {
 		t.Fatalf("schedule with onlyIf: %d %v", code, res)
@@ -670,7 +693,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 		&reason,
 	)
 
-	if outcome != "skipped" || reason != "missing_data" ||
+	if outcome != outcomeSkipped || reason != reasonMissingData ||
 		len(automationCommands(t, unitID)) != before {
 		t.Fatalf("schedule skipped: %s %s", outcome, reason)
 	}
@@ -707,11 +730,11 @@ func TestScheduleBoundaries(t *testing.T) {
 		t.Helper()
 
 		code, res := write(srv, customerB(), "automations.save", scheduleRule(u, map[string]string{
-			"weekdays":    "[1]",
-			"startLocal":  `"` + start + `"`,
-			"endLocal":    `"` + end + `"`,
-			"enabled":     "true",
-			"startAction": action,
+			fieldWeekdays:    jsonMondays,
+			fieldStartLocal:  `"` + start + `"`,
+			fieldEndLocal:    `"` + end + `"`,
+			fieldEnabled:     jsonTrue,
+			fieldStartAction: action,
 		}), 0)
 		if code != 200 {
 			t.Fatalf("save %s–%s: %d %v", start, end, code, res)
@@ -786,8 +809,8 @@ func TestScheduleBoundaries(t *testing.T) {
 		unitID,
 		first,
 		second,
-	); len(got) != 2 || got[0] != (run{first, end, "skipped", "superseded"}) ||
-		got[1] != (run{second, start, "command_created", ""}) {
+	); len(got) != 2 || got[0] != (run{first, end, outcomeSkipped, "superseded"}) ||
+		got[1] != (run{second, start, outcomeCommandCreated, ""}) {
 		t.Fatalf("same-minute end and start: %v", got)
 	}
 
@@ -847,8 +870,8 @@ func TestScheduleBoundaries(t *testing.T) {
 		v,
 		first,
 		second,
-	); len(got) != 2 || got[0] != (run{first, end, "command_created", ""}) ||
-		got[1] != (run{second, start, "skipped", "invalid_capability"}) {
+	); len(got) != 2 || got[0] != (run{first, end, outcomeCommandCreated, ""}) ||
+		got[1] != (run{second, start, outcomeSkipped, "invalid_capability"}) {
 		t.Fatalf("an end before a start that would not run: %v", got)
 	}
 
@@ -856,7 +879,7 @@ func TestScheduleBoundaries(t *testing.T) {
 		t,
 		v,
 	); len(cs) != 1 ||
-		cs[0] != `{"kind": "set_power", "power": false}` {
+		cs[0] != storedPowerOff {
 		t.Fatalf("commands at 10:15: %v", cs)
 	}
 }

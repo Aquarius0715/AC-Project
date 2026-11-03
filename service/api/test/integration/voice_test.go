@@ -8,6 +8,13 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const (
+	formatCSV         = "csv"
+	intentHelp        = "help"
+	intentUnsupported = "unsupported"
+	monthAugust       = "2026-08"
+)
+
 func TestVoiceAndExport(t *testing.T) {
 	srv := server(t)
 	say := func(a *actor, text, locale, extra string) (int, map[string]any) {
@@ -21,7 +28,7 @@ func TestVoiceAndExport(t *testing.T) {
 	bedroomA := seed.ID("unit-online-rto").String()
 
 	code, res := say(customerA(), "  Temperature BEDROOM ", "en", "")
-	if code != 200 || data(res)["kind"] != "temperature" || data(res)["unitId"] != bedroomA {
+	if code != 200 || data(res)["kind"] != metricTemperature || data(res)["unitId"] != bedroomA {
 		t.Fatalf("temperature: %d %v", code, res)
 	}
 
@@ -46,8 +53,8 @@ func TestVoiceAndExport(t *testing.T) {
 	}
 
 	for text, kind := range map[string]string{
-		"help": "help", "hello there": "unsupported",
-		"temperature Lobby AC": "unsupported", "temperature garage": "unsupported",
+		intentHelp: intentHelp, "hello there": intentUnsupported,
+		"temperature Lobby AC": intentUnsupported, "temperature garage": intentUnsupported,
 	} {
 		if _, m := say(customerA(), text, "en", ""); data(m)["kind"] != kind {
 			t.Errorf("%s: %v", text, m)
@@ -59,12 +66,12 @@ func TestVoiceAndExport(t *testing.T) {
 		"bantuan",
 		"ms",
 		"",
-	); data(resp)["kind"] != "help" ||
+	); data(resp)["kind"] != intentHelp ||
 		data(resp)["messageKey"] != "voice.help" {
 		t.Errorf("bantuan: %v", resp)
 	}
 
-	if _, m := say(customerA(), "help", "ms", ""); data(m)["kind"] != "unsupported" {
+	if _, m := say(customerA(), "help", "ms", ""); data(m)["kind"] != intentUnsupported {
 		t.Error("English help in Malay grammar")
 	}
 	// HQ sees both customers' bedrooms → candidates, then a selection
@@ -84,7 +91,7 @@ func TestVoiceAndExport(t *testing.T) {
 		"temperature bedroom",
 		"en",
 		`,"selectedUnitId":"`+bedroomA+`"`,
-	); data(resp)["kind"] != "temperature" ||
+	); data(resp)["kind"] != metricTemperature ||
 		data(resp)["unitId"] != bedroomA {
 		t.Errorf("selected: %v", resp)
 	}
@@ -153,11 +160,11 @@ func TestVoiceAndExport(t *testing.T) {
 	}
 
 	for name, tc := range map[string][5]string{
-		"month not ended": {"2026-09", homeA, all, "csv", "422"},
-		"bad month":       {"2026-13", homeA, all, "csv", "422"},
-		"no sections":     {"2026-08", homeA, "", "csv", "422"},
-		"bad format":      {"2026-08", homeA, all, "xlsx", "422"},
-		"other customer":  {"2026-08", `"` + seed.ID("property-home-b").String() + `"`, all, "csv", "404"},
+		"month not ended": {"2026-09", homeA, all, formatCSV, "422"},
+		"bad month":       {"2026-13", homeA, all, formatCSV, "422"},
+		"no sections":     {monthAugust, homeA, "", formatCSV, "422"},
+		"bad format":      {monthAugust, homeA, all, "xlsx", "422"},
+		caseOtherCustomer: {monthAugust, `"` + seed.ID("property-home-b").String() + `"`, all, formatCSV, "404"},
 	} {
 		code, m := exp(customerA(), tc[0], tc[1], tc[2], tc[3])
 		if w, ok := refused[name]; ok {

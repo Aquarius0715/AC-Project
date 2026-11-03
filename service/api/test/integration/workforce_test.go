@@ -36,7 +36,7 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 	job := asStr(t, data(resp)["id"])
@@ -139,15 +139,15 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 	}
 	// unavailability: reports conflicts, removes availability and eligibility
 	want := map[string]string{ // the field each case is refused for
-		"32 days":        "to=error.range",
-		"bad type":       "type=error.invalid",
-		"to before from": "to=error.range",
+		"32 days":        refusedToRange,
+		caseBadType:      "type=error.invalid",
+		"to before from": refusedToRange,
 	}
 
 	for name, b := range map[string]string{
 		"to before from": `{"membershipId":"` + tech.String() + `","from":"2026-09-15","to":"2026-09-14","type":"sick"}`,
 		"32 days":        `{"membershipId":"` + tech.String() + `","from":"2026-09-01","to":"2026-10-03","type":"sick"}`,
-		"bad type":       `{"membershipId":"` + tech.String() + `","from":"2026-09-14","to":"2026-09-14","type":"holiday"}`,
+		caseBadType:      `{"membershipId":"` + tech.String() + `","from":"2026-09-14","to":"2026-09-14","type":"holiday"}`,
 	} {
 		code, m := write(srv, hq(), "members.setUnavailability", b, 0)
 		refusal(t, name, code, m, want[name])
@@ -187,7 +187,7 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 

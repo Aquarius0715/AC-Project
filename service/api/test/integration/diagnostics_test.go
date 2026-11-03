@@ -13,6 +13,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const caseUnsupported = "unsupported"
+
 func ackCommand(t *testing.T, id string, when time.Time) bool {
 	t.Helper()
 
@@ -103,11 +105,11 @@ func TestDiagnosticRuns(t *testing.T) {
 			0,
 		)
 	}
-	on, off := `{"kind":"set_power","power":true}`, `{"kind":"set_power","power":false}`
+	on, off := actionPowerOn, actionPowerOff
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		"16 minutes":     "durationMinutes=error.range",
+		"16 minutes":     refusedDurationMinutesRange,
 		"bad end action": "endAction=error.invalid",
-		"unsupported":    "startAction=error.unsupportedAction",
+		caseUnsupported:  "startAction=error.unsupportedAction",
 	}
 
 	for name, tc := range map[string]struct {
@@ -116,7 +118,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		code       int
 	}{
 		"16 minutes":     {on, off, 16, uv, jv, 422},
-		"unsupported":    {`{"kind":"ventilate","level":"low"}`, off, 5, uv, jv, 422},
+		caseUnsupported:  {actionVentilateLow, off, 5, uv, jv, 422},
 		"stale unit":     {on, off, 5, uv + 3, jv, 409},
 		"stale job":      {on, off, 5, uv, jv + 3, 409},
 		"bad end action": {on, `{"kind":"dance"}`, 5, uv, jv, 422},
@@ -163,7 +165,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		)+`}`,
 		0,
 	); code != 409 ||
-		res["messageKey"] != "errors.unit_busy" {
+		res["messageKey"] != keyUnitBusy {
 		t.Errorf("busy during run: %d %v", code, res)
 	}
 
@@ -172,7 +174,7 @@ func TestDiagnosticRuns(t *testing.T) {
 	}
 
 	_, resp = post(srv, techInt(), "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`)
-	if data(resp)["state"] != "running" ||
+	if data(resp)["state"] != statusRunning ||
 		data(resp)["endAt"] != clock().Add(5*time.Second+5*time.Minute).Format(time.RFC3339) {
 		t.Fatalf("running: %v", resp)
 	}
@@ -202,7 +204,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		hq(),
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r1+`"}`,
-	); data(res)["state"] != "completed" {
+	); data(res)["state"] != statusCompleted {
 		t.Fatalf("completed: %v", res)
 	}
 	// start never acknowledged → start_failed
@@ -228,7 +230,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r2+`"}`,
 	); data(res)["state"] != "start_failed" ||
-		data(res)["failureCode"] != "TIMEOUT" {
+		data(res)["failureCode"] != codeTimeout {
 		t.Fatalf("start failed: %v", res)
 	}
 	// a restriction at the end blocks the end action
@@ -303,7 +305,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		hq(),
 		"diagnosticRuns.get",
 		`{"diagnosticRunId":"`+r4+`"}`,
-	); data(res)["state"] != "end_failed" || data(res)["failureCode"] != "OFFLINE" ||
+	); data(res)["state"] != "end_failed" || data(res)["failureCode"] != codeOffline ||
 		data(res)["endCommandId"] != nil {
 		t.Fatalf("end offline: %v", res)
 	}

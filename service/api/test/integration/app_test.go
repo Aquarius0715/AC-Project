@@ -27,9 +27,9 @@ func clock() time.Time { return time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC) }
 type actor struct{ token, membership string }
 
 // The fixture users: the static test token of each and the membership it acts in.
-func hq() *actor        { return &actor{"tok-hq", "hq-operator"} }
-func customerA() *actor { return &actor{"tok-a", "customer-a"} }
-func customerB() *actor { return &actor{"tok-b", "customer-b"} }
+func hq() *actor        { return &actor{"tok-hq", membershipHQOperator} }
+func customerA() *actor { return &actor{"tok-a", membershipCustomerA} }
+func customerB() *actor { return &actor{"tok-b", membershipCustomerB} }
 func techB() *actor     { return &actor{"tok-tb", "tech-external-b"} }
 func techA() *actor     { return &actor{"tok-ta", "tech-external-a"} }
 func contrA() *actor    { return &actor{"tok-ca", "contractor-a"} }
@@ -120,8 +120,8 @@ func testVerifier(t *testing.T) testTokens {
 	for _, a := range f.Actors {
 		v["tok-"+
 			map[string]string{
-				"hq-operator": "hq", "customer-a": "a", "customer-b": "b", "tech-external-b": "tb",
-				"tech-internal-a": "ti", "tech-external-a": "ta", "contractor-a": "ca", "contractor-b": "cb",
+				membershipHQOperator: "hq", membershipCustomerA: "a", membershipCustomerB: "b", "tech-external-b": "tb",
+				membershipTechInternalA: "ti", "tech-external-a": "ta", "contractor-a": "ca", "contractor-b": "cb",
 				"hq-restriction-manager": "rm", "hq-override-only": "oo",
 			}[a.MembershipID]] = seed.ID(a.UserID).
 			String()
@@ -266,7 +266,7 @@ func TestSessionGet(t *testing.T) {
 	code, res := post(srv, hq(), "session.get", `{}`)
 
 	doc := asObj(t, res["data"])
-	if code != 200 || doc["role"] != "admin" ||
+	if code != 200 || doc["role"] != roleAdmin ||
 		doc["membershipId"] != seed.ID("hq-operator").String() ||
 		len(asArr(t, doc["permissions"])) == 0 ||
 		doc["clientRole"] != nil {
@@ -302,7 +302,7 @@ func TestSessionGet(t *testing.T) {
 		customerA(),
 		"session.get",
 		`{}`,
-	); asObj(t, c["data"])["clientRole"] != "owner" ||
+	); asObj(t, c["data"])["clientRole"] != clientRoleOwner ||
 		asObj(t, c["data"])["organizationName"] == "" ||
 		asObj(t, c["data"])["customerId"] != seed.ID("cust-a").
 			String() { // IR243: the client's customer
@@ -355,8 +355,10 @@ func TestUnitsListScopes(t *testing.T) {
 		}
 		// SR27 on the fixture clock: online + fresh observation + fresh valid measured power → on/off; offline → unknown
 		want := map[string]string{
-			seed.ID("unit-online-rto").String(): "on", seed.ID("unit-non-rto").String(): "off",
-			seed.ID("unit-offline-rto").String(): "unknown", seed.ID("unit-limited").String(): "on",
+			seed.ID("unit-online-rto").String():  "on",
+			seed.ID("unit-non-rto").String():     powerOff,
+			seed.ID("unit-offline-rto").String(): powerUnknown,
+			seed.ID("unit-limited").String():     "on",
 		}
 		if w, ok := want[u["id"].(string)]; ok && u["effectivePowerState"] != w {
 			t.Fatalf("%v: power %v want %s", u["displayName"], u["effectivePowerState"], w)
@@ -447,12 +449,12 @@ func TestUnitsListScopes(t *testing.T) {
 	for body, want := range map[string]string{
 		`{"filters":{"unassignedOnly":true,` +
 			`"spaceId":"` + seed.ID("floor-1").String() + `"}}`: "filters.unassignedOnly=error.conflictsWithSpaceId",
-		`{"filters":{"status":"bogus"}}`:              "filters.status=error.invalid",
-		`{"filters":{"connections":["x"]}}`:           "filters.connections=error.invalid",
-		`{"filters":{"powerState":"x"}}`:              "filters.powerState=error.invalid",
-		`{"filters":{"nope":1}}`:                      "nope=error.notAllowed",
-		`{"sort":{"field":"name","direction":"asc"}}`: "sort.field=error.invalid",
-		`{"limit":500}`:                               "limit=error.range",
+		`{"filters":{"status":"bogus"}}`:    refusedFilterStatusInvalid,
+		`{"filters":{"connections":["x"]}}`: "filters.connections=error.invalid",
+		`{"filters":{"powerState":"x"}}`:    "filters.powerState=error.invalid",
+		`{"filters":{"nope":1}}`:            "nope=error.notAllowed",
+		bodySortByName:                      refusedSortFieldInvalid,
+		`{"limit":500}`:                     "limit=error.range",
 	} {
 		code, m := post(srv, hq(), "units.list", body)
 		refusal(t, body, code, m, want)

@@ -111,7 +111,7 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 	f := fault()
 
 	id, _ := f["faultId"].(string)
-	if id == "" || asNum(t, f["sequence"]) != 10 || connection() != "offline" {
+	if id == "" || asNum(t, f["sequence"]) != 10 || connection() != connectionOffline {
 		t.Fatalf("after the loss: %v, connection %s", f, connection())
 	}
 
@@ -120,7 +120,7 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 	)
 
 	if f := fault(); f["faultId"] != nil || asNum(t, f["sequence"]) != 11 ||
-		connection() != "online" {
+		connection() != connectionOnline {
 		t.Fatalf("after the recovery: %v, connection %s", f, connection())
 	}
 

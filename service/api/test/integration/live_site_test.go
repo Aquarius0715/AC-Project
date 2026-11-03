@@ -177,7 +177,8 @@ func TestLiveSiteSeeds(t *testing.T) {
 	}
 	read()
 
-	if devConn != "online" || unitConn != "online" || devSeen == nil || unitSeen == nil ||
+	if devConn != connectionOnline || unitConn != connectionOnline || devSeen == nil ||
+		unitSeen == nil ||
 		!devSeen.Equal(clock()) ||
 		!unitSeen.Equal(clock()) {
 		t.Errorf(
@@ -252,7 +253,7 @@ func TestLiveSiteSeeds(t *testing.T) {
 
 	read()
 
-	if devConn != "offline" || unitConn != "offline" || !unitSeen.Equal(clock()) {
+	if devConn != connectionOffline || unitConn != connectionOffline || !unitSeen.Equal(clock()) {
 		t.Errorf(
 			"the second start changed the module to %s, the unit to %s seen %v",
 			devConn,

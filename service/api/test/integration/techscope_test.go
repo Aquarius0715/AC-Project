@@ -94,7 +94,7 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 
 		return strings.Join(got, ",")
 	}
-	property := as("test-tech-property", map[string]string{"property": "property-home-a"})
+	property := as("test-tech-property", map[string]string{kindProperty: "property-home-a"})
 	organization := as(
 		"test-tech-organization",
 		map[string]string{"organization": "org-customer-a"},

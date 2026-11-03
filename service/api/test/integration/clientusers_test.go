@@ -20,18 +20,18 @@ func TestClientUsers(t *testing.T) {
 	}
 	invite := `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","displayName":"New Member"}`
 	want := map[string]string{ // the field each case is refused for
-		"bad email":    "email=error.invalid",
-		"bad role":     "clientRole=error.invalid",
-		"bad status":   "status=error.invalid",
-		"blank reason": "reason=error.length",
+		caseBadEmail:    "email=error.invalid",
+		caseBadRole:     "clientRole=error.invalid",
+		caseBadStatus:   "status=error.invalid",
+		caseBlankReason: refusedReasonLength,
 	}
 
 	for name, b := range map[string]string{
-		"bad email": `{"customerId":"` + cust + `","email":"not-an-email","clientRole":"member","displayName":"N"}`,
-		"bad role":  `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"admin","displayName":"N"}`,
-		"bad status": `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","status":"invited",` +
+		caseBadEmail: `{"customerId":"` + cust + `","email":"not-an-email","clientRole":"member","displayName":"N"}`,
+		caseBadRole:  `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"admin","displayName":"N"}`,
+		caseBadStatus: `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","status":"invited",` +
 			`"displayName":"N"}`,
-		"blank reason": `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","reason":" ",` +
+		caseBlankReason: `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","reason":" ",` +
 			`"displayName":"N"}`,
 	} {
 		code, m := save(hq(), b, 0)
@@ -43,7 +43,7 @@ func TestClientUsers(t *testing.T) {
 		`{"customerId":"`+cust+`","email":"`+email+`","clientRole":"member","status":"active","displayName":"N"}`,
 		0,
 	); code != 422 ||
-		fields(res) != "status=error.notAllowed" {
+		fields(res) != refusedStatusNotAllowed {
 		t.Errorf("status on invite: %d %s", code, fields(res))
 	}
 
@@ -52,7 +52,7 @@ func TestClientUsers(t *testing.T) {
 	}
 
 	code, resp := save(customerB(), invite, 0)
-	if code != 200 || data(resp)["status"] != "invited" || data(resp)["membershipId"] == nil ||
+	if code != 200 || data(resp)["status"] != statusInvited || data(resp)["membershipId"] == nil ||
 		data(resp)["invitedByMembershipId"] != seed.ID("customer-b").String() {
 		t.Fatalf("invite: %d %v", code, resp)
 	}
@@ -64,7 +64,7 @@ func TestClientUsers(t *testing.T) {
 		strings.Replace(invite, email, strings.ToUpper(email[:1])+email[1:], 1),
 		0,
 	); code != 422 ||
-		fields(res) != "email=errors.email_taken" {
+		fields(res) != refusedEmailTaken {
 		t.Errorf("duplicate email (case-insensitive): %d %s", code, fields(res))
 	}
 
@@ -78,7 +78,8 @@ func TestClientUsers(t *testing.T) {
 		}
 	}
 
-	if seedOwner == nil || seedOwner["clientRole"] != "owner" || seedOwner["status"] != "active" {
+	if seedOwner == nil || seedOwner["clientRole"] != clientRoleOwner ||
+		seedOwner["status"] != statusActive {
 		t.Fatalf("seed owner listed: %v", resp)
 	}
 
@@ -99,7 +100,7 @@ func TestClientUsers(t *testing.T) {
 		"clientUsers.list",
 		`{"filters":{"status":"gone"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad status filter: %d %s", code, fields(res))
 	}
 
@@ -136,7 +137,7 @@ func TestClientUsers(t *testing.T) {
 		"clientUsers.resendInvite",
 		`{"id":"`+id+`"}`,
 		0,
-	); code != 200 || data(res)["deliveryState"] != "queued" ||
+	); code != 200 || data(res)["deliveryState"] != statusQueued ||
 		data(res)["templateKey"] != "invite" {
 		t.Fatalf("resend: %d %v", code, res)
 	}
@@ -197,12 +198,12 @@ func TestClientUsers(t *testing.T) {
 		`{"id":"`+id+`","customerId":"`+cust+`","email":"`+email+`","clientRole":"member"}`,
 		1,
 	); code != 422 ||
-		fields(res) != "reason=error.required" {
+		fields(res) != refusedReasonRequired {
 		t.Errorf("update without reason: %d %s", code, fields(res))
 	}
 
 	if code, _ := upd(
-		map[string]any{"id": id, "email": email},
+		map[string]any{"id": id, fieldEmail: email},
 		"member",
 		"active",
 		1,
@@ -211,7 +212,7 @@ func TestClientUsers(t *testing.T) {
 	}
 
 	if code, _ := upd(
-		map[string]any{"id": id, "email": email},
+		map[string]any{"id": id, fieldEmail: email},
 		"member",
 		"disabled",
 		5,
@@ -219,8 +220,9 @@ func TestClientUsers(t *testing.T) {
 		t.Error("stale client user version")
 	}
 
-	code, resp = upd(map[string]any{"id": id, "email": email}, "owner", "disabled", 1)
-	if code != 200 || data(resp)["status"] != "disabled" || data(resp)["clientRole"] != "owner" ||
+	code, resp = upd(map[string]any{"id": id, fieldEmail: email}, "owner", "disabled", 1)
+	if code != 200 || data(resp)["status"] != statusDisabled ||
+		data(resp)["clientRole"] != clientRoleOwner ||
 		ver(t, resp) != 2 {
 		t.Fatalf("update: %d %v", code, resp)
 	}
@@ -262,9 +264,9 @@ func TestTwoFactor(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"code\":\"12345\"}":  "code=error.invalid",
-		"{\"code\":\"abcdef\"}": "code=error.invalid",
-		"{}":                    "code=error.invalid",
+		"{\"code\":\"12345\"}":  refusedCodeInvalid,
+		"{\"code\":\"abcdef\"}": refusedCodeInvalid,
+		"{}":                    refusedCodeInvalid,
 	}
 
 	for _, b := range []string{`{"code":"12345"}`, `{"code":"abcdef"}`, `{}`} {
@@ -385,11 +387,11 @@ func TestClientUserMembershipSync(t *testing.T) {
 		`{"id":"`+user+`","customerId":"`+cust+`","email":"other-`+email+`","clientRole":"member","reason":"admin change"}`,
 		1,
 	); code != 422 ||
-		fields(res) != "email=error.immutable" {
+		fields(res) != refusedEmailImmutable {
 		t.Errorf("HQ changes an accepted user's e-mail: %d %v", code, res)
 	}
 
-	if code, m := save(cust, "disabled", 1); code != 200 || data(m)["status"] != "disabled" {
+	if code, m := save(cust, "disabled", 1); code != 200 || data(m)["status"] != statusDisabled {
 		t.Fatalf("disable: %d %v", code, m)
 	}
 
@@ -397,7 +399,7 @@ func TestClientUserMembershipSync(t *testing.T) {
 		t.Errorf("membership after disabling: %v %d", until, scope)
 	}
 
-	if code, m := save(cust, "active", 2); code != 200 || data(m)["status"] != "active" {
+	if code, m := save(cust, "active", 2); code != 200 || data(m)["status"] != statusActive {
 		t.Fatalf("activate again: %d %v", code, m)
 	}
 
@@ -460,7 +462,8 @@ func TestClientUsersByOwner(t *testing.T) {
 		`{"customerId":"`+cust+`","email":"`+email+`","clientRole":"owner","displayName":"New Owner"}`,
 		0,
 	)
-	if code != 200 || data(resp)["clientRole"] != "owner" || data(resp)["status"] != "invited" {
+	if code != 200 || data(resp)["clientRole"] != clientRoleOwner ||
+		data(resp)["status"] != statusInvited {
 		t.Fatalf("owner invites an owner: %d %v", code, resp)
 	}
 
@@ -470,7 +473,7 @@ func TestClientUsersByOwner(t *testing.T) {
 		`{"id":"`+id+`","customerId":"`+cust+`","email":"fixed-`+email+`","clientRole":"member","reason":"typo"}`,
 		1,
 	); code != 422 ||
-		fields(m) != "email=error.immutable" {
+		fields(m) != refusedEmailImmutable {
 		t.Errorf("change the e-mail: %d %s", code, fields(m))
 	}
 
@@ -479,7 +482,7 @@ func TestClientUsersByOwner(t *testing.T) {
 		`{"id":"`+id+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","reason":"not an owner"}`,
 		1,
 	); code != 200 ||
-		data(m)["clientRole"] != "member" {
+		data(m)["clientRole"] != clientRoleMember {
 		t.Fatalf("change the role: %d %v", code, m)
 	}
 
@@ -513,7 +516,7 @@ func TestClientUsersByOwner(t *testing.T) {
 			`"status":"disabled","reason":"x"}`,
 		sv,
 	); code != 409 ||
-		res["messageKey"] != "errors.own_account" {
+		res["messageKey"] != keyOwnAccount {
 		t.Errorf("disable the own account: %d %v", code, res)
 	}
 
@@ -524,7 +527,7 @@ func TestClientUsersByOwner(t *testing.T) {
 		`{"id":"`+asStr(t, self["id"])+`","reason":"x"}`,
 		sv,
 	); code != 409 ||
-		res["messageKey"] != "errors.own_account" {
+		res["messageKey"] != keyOwnAccount {
 		t.Errorf("remove the own account: %d %v", code, res)
 	}
 	// an accepted member: role and access change, the e-mail stays
@@ -557,7 +560,7 @@ func TestClientUsersByOwner(t *testing.T) {
 		`{"id":"`+user+`","customerId":"`+cust+`","email":"x@example.com","clientRole":"member","reason":"x"}`,
 		1,
 	); code != 422 ||
-		fields(m) != "email=error.immutable" {
+		fields(m) != refusedEmailImmutable {
 		t.Errorf("change an accepted e-mail: %d %s", code, fields(m))
 	}
 
@@ -565,8 +568,8 @@ func TestClientUsersByOwner(t *testing.T) {
 		`{"id":"`+user+`","customerId":"`+cust+`","email":"`+memberEmail+`","clientRole":"owner","status":"disabled",`+
 			`"reason":"on leave"}`,
 		1,
-	); code != 200 || data(res)["clientRole"] != "owner" ||
-		data(res)["status"] != "disabled" {
+	); code != 200 || data(res)["clientRole"] != clientRoleOwner ||
+		data(res)["status"] != statusDisabled {
 		t.Fatalf("promote and disable: %d %v", code, res)
 	}
 
@@ -617,7 +620,7 @@ func TestClientAccountCreated(t *testing.T) {
 		`{"customerId":"`+cust+`","email":"`+email+`","clientRole":"owner","displayName":"Added Owner"}`,
 		0,
 	)
-	if code != 200 || data(res)["status"] != "invited" || data(res)["membershipId"] == nil {
+	if code != 200 || data(res)["status"] != statusInvited || data(res)["membershipId"] == nil {
 		t.Fatalf("add: %d %v", code, res)
 	}
 
@@ -651,7 +654,8 @@ func TestClientAccountCreated(t *testing.T) {
 		&scopes,
 	)
 
-	if role != "client" || clientRole != "owner" || org != seed.ID("org-customer-b").String() ||
+	if role != roleClient || clientRole != clientRoleOwner ||
+		org != seed.ID("org-customer-b").String() ||
 		perms != 1 ||
 		scopes != 1 {
 		t.Errorf("membership: %s %s %s perms %d scopes %d", role, clientRole, org, perms, scopes)
@@ -666,7 +670,7 @@ func TestClientAccountCreated(t *testing.T) {
 		)+`","clientRole":"member","displayName":"Again"}`,
 		0,
 	); code != 422 ||
-		fields(resp) != "email=errors.email_taken" {
+		fields(resp) != refusedEmailTaken {
 		t.Errorf("the same e-mail again: %d %s", code, fields(resp))
 	}
 }

@@ -144,7 +144,7 @@ func TestBusinessEventNotifications(t *testing.T) {
 		&sev,
 	)
 
-	if sev != "warning" {
+	if sev != severityWarning {
 		t.Errorf("restriction severity %s", sev)
 	}
 }

@@ -86,7 +86,10 @@ func TestRevokeSessions(t *testing.T) {
 		from,
 	)
 
-	for m, copyOf := range map[string]string{"test-revoke-tech": "tech-internal-a", "test-revoke-client": "customer-a"} {
+	for m, copyOf := range map[string]string{
+		"test-revoke-tech":   membershipTechInternalA,
+		"test-revoke-client": membershipCustomerA,
+	} {
 		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
 			SELECT tenant_id, $1, permission FROM identity.membership_permissions WHERE membership_id = $2 ON CONFLICT DO
 			NOTHING`, seed.ID(m), seed.ID(copyOf))
@@ -204,10 +207,10 @@ func TestRevokeSessions(t *testing.T) {
 		who actor
 		op  string
 	}{
-		{old, "session.get"},
-		{oldClient, "session.get"},
-		{actor{"tok-rv", "test-revoke-tech"}, "session.get"},
-		{oldClient, "units.list"},
+		{old, opSessionGet},
+		{oldClient, opSessionGet},
+		{actor{"tok-rv", "test-revoke-tech"}, opSessionGet},
+		{oldClient, opUnitsList},
 	} {
 		if code, res := post(
 			srv,

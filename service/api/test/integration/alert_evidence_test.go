@@ -12,6 +12,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const keyEvidenceUnknown = "errors.evidence_unknown"
+
 // reading stores one measurement of the unit and returns its ID (the measurement's event ID).
 func reading(
 	t *testing.T,
@@ -139,8 +141,9 @@ func TestAlertEvidence(t *testing.T) {
 	if it := byID(
 		resp,
 		after,
-	); it["metric"] != "temperature" || asNum(t, it["value"]) != 26 || it["unit"] != "°C" || it["origin"] != "measured" ||
-		it["quality"] != "valid" ||
+	); it["metric"] != metricTemperature || asNum(t, it["value"]) != 26 || it["unit"] != "°C" ||
+		it["origin"] != "measured" ||
+		it["quality"] != qualityValid ||
 		it["eventType"] != nil {
 		t.Errorf("remeasurement fields: %v", it)
 	}
@@ -243,12 +246,12 @@ func TestAlertEvidence(t *testing.T) {
 		key string
 	}{
 		"none":             {nil, "errors.evidence_required"},
-		"unknown":          {[]string{uuid.NewString()}, "errors.evidence_unknown"},
-		"before detection": {[]string{before}, "errors.evidence_unknown"},
-		"suspect reading":  {[]string{suspect}, "errors.evidence_unknown"},
-		"estimate":         {[]string{estimate}, "errors.evidence_unknown"},
+		"unknown":          {[]string{uuid.NewString()}, keyEvidenceUnknown},
+		"before detection": {[]string{before}, keyEvidenceUnknown},
+		"suspect reading":  {[]string{suspect}, keyEvidenceUnknown},
+		"estimate":         {[]string{estimate}, keyEvidenceUnknown},
 		"twice":            {[]string{after, after}, apperr.KeyInvalid},
-		"one of two wrong": {[]string{after, uuid.NewString()}, "errors.evidence_unknown"},
+		"one of two wrong": {[]string{after, uuid.NewString()}, keyEvidenceUnknown},
 	} {
 		if code, m := resolve(
 			free,
@@ -265,7 +268,7 @@ func TestAlertEvidence(t *testing.T) {
 		after,
 		detected,
 	); code != 200 ||
-		data(res)["status"] != "resolved" {
+		data(res)["status"] != statusResolved {
 		t.Fatalf("resolve with candidates: %d %v", code, res)
 	}
 
@@ -312,7 +315,7 @@ func TestAlertEvidence(t *testing.T) {
 		t.Errorf("another metric is not the rule alert's evidence: %d %s", code, fields(res))
 	}
 
-	if code, m := resolve(ruled, 1); code != 200 || data(m)["status"] != "resolved" {
+	if code, m := resolve(ruled, 1); code != 200 || data(m)["status"] != statusResolved {
 		t.Errorf("policy alert by hand: %d %v", code, m)
 	}
 }

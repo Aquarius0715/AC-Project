@@ -269,7 +269,7 @@ func TestMockFleetHistory(t *testing.T) {
 		t.Errorf("power at 13:00 %.2f kW, at 02:00 %.3f kW", afternoon, night)
 	}
 
-	for _, metric := range []string{"humidity", "co2", "pm25"} {
+	for _, metric := range []string{metricHumidity, metricCO2, metricPM25} {
 		if n := count(
 			`SELECT count(*) FROM monitoring.measurements WHERE sensor_id = $1`,
 			seed.ID("sensor-mock-cool-on-"+metric),

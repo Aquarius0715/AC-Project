@@ -110,7 +110,7 @@ func TestWithdrawRollsBackWhenTheJobCannotBeUpdated(t *testing.T) {
 		&status,
 	)
 
-	if status != "pending" {
+	if status != statusPending {
 		t.Errorf("a failed withdrawal left the proposal %s, want pending", status)
 	}
 }

@@ -26,7 +26,7 @@ func assignedNow(t *testing.T, srv *apiserver.Server) string {
 		srv,
 		hq(),
 		"jobs.create",
-		jobBody(unit, map[string]string{"alternativeSlots": "[]"}),
+		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
 	job := asStr(t, data(resp)["id"])
@@ -73,7 +73,7 @@ func TestOnSiteOperations(t *testing.T) {
 		`{"jobId":"`+job+`","decision":"cant_make"}`,
 		2,
 	); code != 422 ||
-		fields(res) != "reason=error.required" {
+		fields(res) != refusedReasonRequired {
 		t.Errorf("cant_make needs a reason: %d %s", code, fields(res))
 	}
 
@@ -124,7 +124,7 @@ func TestOnSiteOperations(t *testing.T) {
 		"jobs.acknowledgeAssignment",
 		`{"jobId":"`+job+`","decision":"accept"}`,
 		2,
-	); code != 200 || data(res)["acknowledgement"] != "accepted" ||
+	); code != 200 || data(res)["acknowledgement"] != statusAccepted ||
 		data(res)["jobId"] != job {
 		t.Fatalf("ack: %d %v", code, res)
 	}
@@ -190,7 +190,7 @@ func TestOnSiteOperations(t *testing.T) {
 		"jobs.start",
 		`{"jobId":"`+job+`","startConfirmed":true}`,
 		3,
-	); code != 200 || data(res)["status"] != "in_progress" ||
+	); code != 200 || data(res)["status"] != statusInProgress ||
 		data(res)["startedAt"] == nil {
 		t.Fatalf("start: %d %v", code, res)
 	}
@@ -206,8 +206,8 @@ func TestOnSiteOperations(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"bad method":    "method=error.invalid",
-		"manual reason": "reason=error.length",
+		caseBadMethod:   refusedMethodInvalid,
+		"manual reason": refusedReasonLength,
 		"no qr":         "qrUnitId=error.required",
 		"qr mismatch":   "qrUnitId=errors.qr_unit_mismatch",
 		"too far":       "distanceMeters=errors.too_far",
@@ -217,7 +217,7 @@ func TestOnSiteOperations(t *testing.T) {
 		"too far":       `{"jobId":"` + job + `","method":"location_qr","distanceMeters":201,"qrUnitId":"` + unit + `"}`,
 		"no qr":         `{"jobId":"` + job + `","method":"location_qr","distanceMeters":10,"qrUnitId":null}`,
 		"manual reason": `{"jobId":"` + job + `","method":"manual","distanceMeters":null,"qrUnitId":null,"reason":"  "}`,
-		"bad method":    `{"jobId":"` + job + `","method":"gps","distanceMeters":null,"qrUnitId":null}`,
+		caseBadMethod:   `{"jobId":"` + job + `","method":"gps","distanceMeters":null,"qrUnitId":null}`,
 		"qr mismatch": `{"jobId":"` + job + `","method":"location_qr","distanceMeters":10,` +
 			`"qrUnitId":"` + uuid.NewString() + `"}`,
 	} {
@@ -311,7 +311,7 @@ func TestOnSiteOperations(t *testing.T) {
 		`{"jobId":"`+j2+`","method":"manual","distanceMeters":null,"qrUnitId":null,"reason":"QR label damaged"}`,
 		2,
 	); code != 200 ||
-		data(res)["status"] != "in_progress" ||
+		data(res)["status"] != statusInProgress ||
 		asObj(t, data(res)["timeOnSite"])["checkInReason"] != "QR label damaged" {
 		t.Fatalf("manual checkIn: %d %v", code, res)
 	}
@@ -333,7 +333,7 @@ func TestOnSiteOperations(t *testing.T) {
 		`{"jobId":"`+j3+`","startConfirmed":true}`,
 		2,
 	); code != 403 ||
-		res["messageKey"] != "errors.assignment_not_started" {
+		res["messageKey"] != keyAssignmentNotStarted {
 		t.Errorf("before the work window: %d %v", code, res)
 	}
 

@@ -12,6 +12,15 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const (
+	opAlertsGet             = "alerts.get"
+	opAttachmentsGetContent = "attachments.getContent"
+	opDevicesGet            = "devices.get"
+	opTelemetrySummary      = "telemetry.summary"
+	opUnitsGet              = "units.get"
+	ownSession              = "own session"
+)
+
 // TestForeignTargets checks authorization by target (IDOR, IR366). Every operation a client, a contractor or a
 // technician may call is called by someone the target does not belong to:
 //   - customer B on customer A's records;
@@ -192,22 +201,22 @@ func TestForeignTargets(t *testing.T) {
 		version int // as write sends it; reads ignore it
 	}{
 		// customer B → customer A
-		{customerB(), "units.get", `{"id":"` + unitA + `"}`, 0},
-		{customerB(), "devices.get", `{"id":"` + devA + `"}`, 0},
-		{customerB(), "devices.events", `{"id":"` + devA + `","query":{"limit":5}}`, 0},
-		{customerB(), "alerts.get", `{"id":"` + alertA + `"}`, 0},
-		{customerB(), "commands.get", `{"id":"` + cmdA + `"}`, 0},
-		{customerB(), "commands.list", `{"unitId":"` + unitA + `","query":{"limit":5}}`, 0},
+		{customerB(), opUnitsGet, `{"id":"` + unitA + `"}`, 0},
+		{customerB(), opDevicesGet, `{"id":"` + devA + `"}`, 0},
+		{customerB(), opDevicesEvents, `{"id":"` + devA + `","query":{"limit":5}}`, 0},
+		{customerB(), opAlertsGet, `{"id":"` + alertA + `"}`, 0},
+		{customerB(), opCommandsGet, `{"id":"` + cmdA + `"}`, 0},
+		{customerB(), opCommandsList, `{"unitId":"` + unitA + `","query":{"limit":5}}`, 0},
 		{
 			customerB(),
-			"commands.create",
+			opCommandsCreate,
 			`{"unitId":"` + unitA + `","action":{"kind":"set_power","power":true},"expectedUnitVersion":1}`,
 			0,
 		},
 		{customerB(), "invoices.get", `{"id":"` + invA + `"}`, 0},
 		{
 			customerB(),
-			"restrictions.forInvoice",
+			opRestrictionsForInvoice,
 			`{"invoiceId":"` + invA + `","query":{"limit":5}}`,
 			0,
 		},
@@ -219,23 +228,23 @@ func TestForeignTargets(t *testing.T) {
 		},
 		{
 			customerB(),
-			"payments.simulate",
+			opPaymentsSimulate,
 			`{"event":"initiate","invoiceId":"` + invA + `","method":"demo_credit_card","demoConfirmed":true}`,
 			1,
 		},
-		{customerB(), "jobs.get", `{"jobId":"` + jobA + `"}`, 0},
+		{customerB(), opJobsGet, `{"jobId":"` + jobA + `"}`, 0},
 		{
 			customerB(),
 			"jobs.getAttachment",
 			`{"jobId":"` + jobA + `","attachmentId":"` + uuid.NewString() + `"}`,
 			0,
 		},
-		{customerB(), "jobs.events", `{"jobId":"` + jobA + `","query":{"limit":5}}`, 0},
+		{customerB(), opJobsEvents, `{"jobId":"` + jobA + `","query":{"limit":5}}`, 0},
 		{customerB(), "jobs.create", jobBody(unitA, nil), 0},
 		{customerB(), "jobs.cancel", `{"jobId":"` + jobA + `","cancelReason":"Not needed"}`, 1},
 		{
 			customerB(),
-			"jobs.addNote",
+			opJobsAddNote,
 			`{"jobId":"` + jobA + `","message":"Hello","visibility":"customer"}`,
 			1,
 		},
@@ -269,13 +278,13 @@ func TestForeignTargets(t *testing.T) {
 		},
 		{
 			customerB(),
-			"reports.get",
+			opReportsGet,
 			`{"jobId":"` + jobW + `","reportId":"` + repW + `","reportVersion":1}`,
 			0,
 		},
 		{
 			customerB(),
-			"attachments.getContent",
+			opAttachmentsGetContent,
 			`{"jobId":"` + jobW + `","reportId":"` + repW + `","reportVersion":1,"attachmentId":"` + other + `"}`,
 			0,
 		},
@@ -294,75 +303,75 @@ func TestForeignTargets(t *testing.T) {
 		},
 		{
 			customerB(),
-			"locations.rename",
+			opLocationsRename,
 			`{"target":{"kind":"property","id":"` + propA + `"},"name":"Renamed"}`,
 			1,
 		},
 		{
 			customerB(),
-			"locations.rename",
+			opLocationsRename,
 			`{"target":{"kind":"space","id":"` + roomA + `"},"name":"Renamed"}`,
 			1,
 		},
 		{
 			customerB(),
-			"locations.rename",
+			opLocationsRename,
 			`{"target":{"kind":"unit","id":"` + unitA + `"},"name":"Renamed"}`,
 			1,
 		},
-		{customerB(), "policies.get", `{"policyId":"` + policyA + `"}`, 0},
+		{customerB(), opPoliciesGet, `{"policyId":"` + policyA + `"}`, 0},
 		{
 			customerB(),
-			"policies.save",
+			opPoliciesSave,
 			alertPolicyBody(
 				map[string]string{
-					"id":                     `"` + policyA + `"`,
-					"recipientMembershipIds": `["` + id("customer-b") + `"]`,
+					"id":                        `"` + policyA + `"`,
+					fieldRecipientMembershipIDs: `["` + id("customer-b") + `"]`,
 				},
 			),
 			1,
 		},
 		{
 			customerB(),
-			"policies.save",
+			opPoliciesSave,
 			alertPolicyBody(
-				map[string]string{"recipientMembershipIds": `["` + id("customer-b") + `"]`},
+				map[string]string{fieldRecipientMembershipIDs: `["` + id("customer-b") + `"]`},
 			),
 			0,
 		},
 		{customerB(), "policies.delete", `{"policyId":"` + policyA + `"}`, 1},
 		{
 			customerB(),
-			"policies.setDefaultRule",
+			opPoliciesSetDefaultRule,
 			`{"policyId":"` + defaultPolicyID(
 				t,
 			) + `","ruleKey":"ventilation_co2","customerId":"` + custA + `","enabled":false,"reason":"quiet"}`,
 			1,
 		},
 		{customerB(), "clientUsers.resendInvite", `{"id":"` + clientUserA + `"}`, 0},
-		{customerB(), "clientUsers.remove", `{"id":"` + clientUserA + `","reason":"left"}`, 1},
+		{customerB(), opClientUsersRemove, `{"id":"` + clientUserA + `","reason":"left"}`, 1},
 		{
 			customerB(),
-			"clientUsers.save",
+			opClientUsersSave,
 			`{"customerId":"` + custA + `","email":"new.member@example.com","clientRole":"member","displayName":"New Member"}`,
 			0,
 		},
 		{
 			customerB(),
-			"clientUsers.save",
+			opClientUsersSave,
 			`{"id":"` + clientUserA + `","customerId":"` + custA + `","email":"new.member@example.com","clientRole":"member",` +
 				`"status":"disabled","reason":"left"}`,
 			1,
 		},
-		{customerB(), "automations.save", scheduleRule(unitA, nil), 0},
+		{customerB(), opAutomationsSave, scheduleRule(unitA, nil), 0},
 		{
 			customerB(),
-			"automations.save",
+			opAutomationsSave,
 			scheduleRule(unitA, map[string]string{"id": `"` + autoA + `"`}),
 			1,
 		},
 		{customerB(), "automations.delete", `{"id":"` + autoA + `"}`, 1},
-		{customerB(), "automations.nextRuns", `{"automationId":"` + autoA + `","count":8}`, 0},
+		{customerB(), opAutomationsNextRuns, `{"automationId":"` + autoA + `","count":8}`, 0},
 		{
 			customerB(),
 			"automations.simulate",
@@ -382,26 +391,26 @@ func TestForeignTargets(t *testing.T) {
 		{customerB(), "energy.summary", `{` + period + `,"unitIds":["` + unitA + `"]}`, 0},
 		{
 			customerB(),
-			"energy.exportReport",
+			opEnergyExportReport,
 			`{"month":"2026-08","propertyIds":["` + propA + `"],"sections":["energy_cost"],"format":"csv"}`,
 			0,
 		},
 		{
 			customerB(),
-			"telemetry.series",
+			opTelemetrySeries,
 			`{` + period + `,"unitIds":["` + unitA + `"],"metric":"temperature","query":{"limit":5}}`,
 			0,
 		},
-		{customerB(), "telemetry.summary", `{` + period + `,"unitIds":["` + unitA + `"]}`, 0},
+		{customerB(), opTelemetrySummary, `{` + period + `,"unitIds":["` + unitA + `"]}`, 0},
 		{
 			customerB(),
-			"offsets.preview",
+			opOffsetsPreview,
 			`{"purpose":"Offset","amountKg":1,"period":{` + period + `},"unitIds":["` + unitA + `"]}`,
 			0,
 		},
 		{
 			customerB(),
-			"offsets.preview",
+			opOffsetsPreview,
 			`{"customerId":"` + custA + `","purpose":"Offset","amountKg":1,"period":{` + period + `},"unitIds":["` + id(
 				"unit-other-customer",
 			) + `"]}`,
@@ -409,7 +418,7 @@ func TestForeignTargets(t *testing.T) {
 		},
 		{
 			customerB(),
-			"offsets.simulate",
+			opOffsetsSimulate,
 			`{"event":"request","quoteId":"` + quoteA + `","quoteVersion":1,"demoConfirmed":true}`,
 			0,
 		},
@@ -437,33 +446,33 @@ func TestForeignTargets(t *testing.T) {
 			0,
 		},
 		// contractor B → contractor A
-		{contrB(), "partnerUsers.resendInvite", `{"id":"` + partnerUserA + `"}`, 0},
+		{contrB(), opPartnerUsersResendInvite, `{"id":"` + partnerUserA + `"}`, 0},
 		{contrB(), "certificates.getContent", `{"certificateId":"` + certA + `"}`, 0},
 		{
 			contrB(),
-			"partnerUsers.save",
+			opPartnerUsersSave,
 			`{"id":"` + partnerUserA + `","email":"moved@example.com","partnerRole":"technician","status":"disabled",` +
 				`"reason":"left"}`,
 			1,
 		},
-		{contrB(), "partnerUsers.remove", `{"id":"` + partnerUserA + `","reason":"left"}`, 1},
-		{contrB(), "jobs.get", `{"jobId":"` + jobC + `"}`, 0},
-		{contrB(), "jobs.events", `{"jobId":"` + jobC + `","query":{"limit":5}}`, 0},
+		{contrB(), opPartnerUsersRemove, `{"id":"` + partnerUserA + `","reason":"left"}`, 1},
+		{contrB(), opJobsGet, `{"jobId":"` + jobC + `"}`, 0},
+		{contrB(), opJobsEvents, `{"jobId":"` + jobC + `","query":{"limit":5}}`, 0},
 		{
 			contrB(),
-			"jobs.accept",
+			opJobsAccept,
 			`{"jobId":"` + jobC + `","offerId":"` + offerC + `","termsVersion":"v1"}`,
 			1,
 		},
 		{
 			contrB(),
-			"jobs.decline",
+			opJobsDecline,
 			`{"jobId":"` + jobC + `","offerId":"` + offerC + `","reason":"Busy"}`,
 			1,
 		},
 		{
 			contrB(),
-			"jobs.assign",
+			opJobsAssign,
 			`{"jobId":"` + jobC + `","technicianMembershipId":"` + id(
 				"tech-external-b",
 			) + `","startAt":"` + at(
@@ -498,13 +507,13 @@ func TestForeignTargets(t *testing.T) {
 		},
 		{
 			contrB(),
-			"jobs.addNote",
+			opJobsAddNote,
 			`{"jobId":"` + jobC + `","message":"Hello","visibility":"internal"}`,
 			1,
 		},
 		{
 			contrB(),
-			"members.eligible",
+			opMembersEligible,
 			`{"jobId":"` + jobC + `","startAt":"` + at(
 				25,
 			) + `","endAt":"` + at(
@@ -544,50 +553,50 @@ func TestForeignTargets(t *testing.T) {
 		},
 		{
 			contrB(),
-			"reports.get",
+			opReportsGet,
 			`{"jobId":"` + jobW + `","reportId":"` + repW + `","reportVersion":1}`,
 			0,
 		},
 		{
 			contrB(),
-			"attachments.getContent",
+			opAttachmentsGetContent,
 			`{"jobId":"` + jobW + `","reportId":"` + repW + `","reportVersion":1,"attachmentId":"` + other + `"}`,
 			0,
 		},
-		{contrB(), "units.get", `{"id":"` + unitA + `"}`, 0},
-		{contrB(), "devices.get", `{"id":"` + devA + `"}`, 0},
-		{contrB(), "devices.events", `{"id":"` + devA + `","query":{"limit":5}}`, 0},
-		{contrB(), "alerts.get", `{"id":"` + alertA + `"}`, 0},
-		{contrB(), "telemetry.summary", `{` + period + `,"unitIds":["` + unitA + `"]}`, 0},
+		{contrB(), opUnitsGet, `{"id":"` + unitA + `"}`, 0},
+		{contrB(), opDevicesGet, `{"id":"` + devA + `"}`, 0},
+		{contrB(), opDevicesEvents, `{"id":"` + devA + `","query":{"limit":5}}`, 0},
+		{contrB(), opAlertsGet, `{"id":"` + alertA + `"}`, 0},
+		{contrB(), opTelemetrySummary, `{` + period + `,"unitIds":["` + unitA + `"]}`, 0},
 		{
 			contrB(),
-			"telemetry.series",
+			opTelemetrySeries,
 			`{` + period + `,"unitIds":["` + unitA + `"],"metric":"temperature","query":{"limit":5}}`,
 			0,
 		},
 		// technician B → the internal technician's job on customer A's unit
-		{techB(), "jobs.get", `{"jobId":"` + jobW + `"}`, 0},
-		{techB(), "jobs.events", `{"jobId":"` + jobW + `","query":{"limit":5}}`, 0},
-		{techB(), "jobs.acknowledgeAssignment", `{"jobId":"` + jobW + `","decision":"accept"}`, 2},
+		{techB(), opJobsGet, `{"jobId":"` + jobW + `"}`, 0},
+		{techB(), opJobsEvents, `{"jobId":"` + jobW + `","query":{"limit":5}}`, 0},
+		{techB(), opJobsAcknowledgeAssignment, `{"jobId":"` + jobW + `","decision":"accept"}`, 2},
 		{techB(), "jobs.start", `{"jobId":"` + jobW + `","startConfirmed":true}`, 3},
 		{
 			techB(),
-			"jobs.checkIn",
+			opJobsCheckIn,
 			`{"jobId":"` + jobW + `","method":"manual","distanceMeters":null,"qrUnitId":null,"reason":"No QR label"}`,
 			3,
 		},
 		{techB(), "jobs.pauseWork", `{"jobId":"` + jobW + `","paused":true}`, 3},
 		{
 			techB(),
-			"jobs.saveDraft",
-			draftBody(jobW, "normal", map[string]string{"reportId": `"` + repW + `"`}),
+			opJobsSaveDraft,
+			draftBody(jobW, "normal", map[string]string{fieldReportID: `"` + repW + `"`}),
 			1,
 		},
 		{techB(), "jobs.submit", `{"jobId":"` + jobW + `","reportVersion":1}`, 3},
 		{techB(), "jobs.resumeRework", `{"jobId":"` + jobW + `"}`, 3},
 		{
 			techB(),
-			"reports.get",
+			opReportsGet,
 			`{"jobId":"` + jobW + `","reportId":"` + repW + `","reportVersion":1}`,
 			0,
 		},
@@ -599,20 +608,20 @@ func TestForeignTargets(t *testing.T) {
 		},
 		{
 			techB(),
-			"attachments.getContent",
+			opAttachmentsGetContent,
 			`{"jobId":"` + jobW + `","reportId":"` + repW + `","reportVersion":1,"attachmentId":"` + other + `"}`,
 			0,
 		},
 		{
 			techB(),
-			"reports.signOff",
+			opReportsSignOff,
 			`{"jobId":"` + jobW + `","reportId":"` + repW + `","reportVersion":1,"signerName":"Aisha","signature":` + png + `}`,
 			1,
 		},
-		{techB(), "units.get", `{"id":"` + unitW + `","jobId":"` + jobW + `"}`, 0},
+		{techB(), opUnitsGet, `{"id":"` + unitW + `","jobId":"` + jobW + `"}`, 0},
 		{techB(), "units.resolveQr", `{"code":"` + unitW + `"}`, 0},
-		{techB(), "devices.get", `{"id":"` + devA + `"}`, 0},
-		{techB(), "devices.events", `{"id":"` + devA + `","query":{"limit":5}}`, 0},
+		{techB(), opDevicesGet, `{"id":"` + devA + `"}`, 0},
+		{techB(), opDevicesEvents, `{"id":"` + devA + `","query":{"limit":5}}`, 0},
 		{techB(), "devices.check", `{"id":"` + devA + `","jobId":"` + jobW + `"}`, 1},
 		{
 			techB(),
@@ -627,8 +636,8 @@ func TestForeignTargets(t *testing.T) {
 				`"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z","jobId":"` + jobW + `"}`,
 			1,
 		},
-		{techB(), "devices.calibrations", `{"deviceId":"` + devA + `","query":{"limit":5}}`, 0},
-		{techB(), "devices.operations", `{"deviceId":"` + devA + `","query":{"limit":5}}`, 0},
+		{techB(), opDevicesCalibrations, `{"deviceId":"` + devA + `","query":{"limit":5}}`, 0},
+		{techB(), opDevicesOperations, `{"deviceId":"` + devA + `","query":{"limit":5}}`, 0},
 		{
 			techB(),
 			"devices.register",
@@ -659,19 +668,19 @@ func TestForeignTargets(t *testing.T) {
 		{techB(), "diagnosticRuns.get", `{"diagnosticRunId":"` + runW + `"}`, 0},
 		{
 			techB(),
-			"commands.create",
+			opCommandsCreate,
 			`{"unitId":"` + unitW + `","action":{"kind":"set_power","power":true},` +
 				`"jobId":"` + jobW + `","expectedUnitVersion":1}`,
 			0,
 		},
-		{techB(), "commands.get", `{"id":"` + cmdA + `"}`, 0},
+		{techB(), opCommandsGet, `{"id":"` + cmdA + `"}`, 0},
 		{
 			techB(),
-			"commands.list",
+			opCommandsList,
 			`{"unitId":"` + unitW + `","jobId":"` + jobW + `","query":{"limit":5}}`,
 			0,
 		},
-		{techB(), "alerts.get", `{"id":"` + alertA + `"}`, 0},
+		{techB(), opAlertsGet, `{"id":"` + alertA + `"}`, 0},
 		{techB(), "alerts.acknowledge", `{"alertId":"` + alertA + `"}`, 1},
 		{
 			techB(),
@@ -680,16 +689,16 @@ func TestForeignTargets(t *testing.T) {
 			1,
 		},
 		{techB(), "alerts.evidence", `{"alertId":"` + alertA + `","query":{"limit":5}}`, 0},
-		{techB(), "telemetry.summary", `{` + period + `,"unitIds":["` + unitW + `"]}`, 0},
+		{techB(), opTelemetrySummary, `{` + period + `,"unitIds":["` + unitW + `"]}`, 0},
 		{
 			techB(),
-			"telemetry.series",
+			opTelemetrySeries,
 			`{` + period + `,"unitIds":["` + unitW + `"],"metric":"temperature","query":{"limit":5}}`,
 			0,
 		},
 		// another tenant's unit
-		{hq(), "units.get", `{"id":"` + id("unit-tenant-b") + `"}`, 0},
-		{customerA(), "units.get", `{"id":"` + id("unit-tenant-b") + `"}`, 0},
+		{hq(), opUnitsGet, `{"id":"` + id("unit-tenant-b") + `"}`, 0},
+		{customerA(), opUnitsGet, `{"id":"` + id("unit-tenant-b") + `"}`, 0},
 	}
 
 	called := map[string]bool{}
@@ -734,37 +743,37 @@ func TestForeignTargets(t *testing.T) {
 	}{
 		{
 			customerB(),
-			"units.list",
+			opUnitsList,
 			`{"limit":100,"filters":{"unitIds":["` + unitA + `"]}}`,
 			[]string{unitA},
 		},
 		{
 			customerB(),
-			"units.list",
+			opUnitsList,
 			`{"limit":100,"filters":{"customerId":"` + custA + `"}}`,
 			[]string{orgA, custA},
 		},
 		{
 			customerB(),
-			"units.list",
+			opUnitsList,
 			`{"limit":100,"filters":{"propertyId":"` + propA + `"}}`,
 			[]string{propA},
 		},
 		{
 			customerB(),
-			"devices.list",
+			opDevicesList,
 			`{"limit":100,"filters":{"unitId":"` + unitA + `"}}`,
 			[]string{unitA},
 		},
 		{
 			customerB(),
-			"alerts.list",
+			opAlertsList,
 			`{"limit":100,"filters":{"unitId":"` + unitA + `"}}`,
 			[]string{unitA},
 		},
 		{
 			customerB(),
-			"alerts.list",
+			opAlertsList,
 			`{"limit":100,"filters":{"customerId":"` + custA + `"}}`,
 			[]string{orgA, custA},
 		},
@@ -794,25 +803,25 @@ func TestForeignTargets(t *testing.T) {
 		},
 		{
 			customerB(),
-			"inquiries.list",
+			opInquiriesList,
 			`{"limit":100,"filters":{"invoiceId":"` + invA + `"}}`,
 			[]string{invA},
 		},
 		{
 			customerB(),
-			"inquiries.list",
+			opInquiriesList,
 			`{"limit":100,"filters":{"customerId":"` + custA + `"}}`,
 			[]string{custA},
 		},
 		{
 			customerB(),
-			"jobs.list",
+			opJobsList,
 			`{"limit":100,"filters":{"unitId":"` + unitA + `"}}`,
 			[]string{unitA},
 		},
 		{
 			customerB(),
-			"jobs.list",
+			opJobsList,
 			`{"limit":100,"filters":{"customerId":"` + custA + `"}}`,
 			[]string{orgA, custA},
 		},
@@ -824,7 +833,7 @@ func TestForeignTargets(t *testing.T) {
 		},
 		{
 			customerB(),
-			"policies.list",
+			opPoliciesList,
 			`{"limit":100,"filters":{"customerId":"` + custA + `"}}`,
 			[]string{custA, policyA},
 		},
@@ -848,27 +857,27 @@ func TestForeignTargets(t *testing.T) {
 		},
 		{
 			customerB(),
-			"clientUsers.list",
+			opClientUsersList,
 			`{"limit":100,"filters":{"customerId":"` + custA + `"}}`,
 			[]string{custA, clientUserA},
 		},
-		{contrB(), "partnerUsers.list", `{"limit":100}`, []string{partnerUserA}},
+		{contrB(), "partnerUsers.list", bodyFirstHundred, []string{partnerUserA}},
 		{
 			customerB(),
-			"filterCare.list",
+			opFilterCareList,
 			`{"limit":100,"filters":{"customerId":"` + custA + `"}}`,
 			[]string{unitA, custA},
 		},
 		{
 			customerB(),
-			"filterCare.list",
+			opFilterCareList,
 			`{"limit":100,"filters":{"unitId":"` + unitA + `"}}`,
 			[]string{unitA},
 		},
-		{customerB(), "capabilities.list", `{"limit":100}`, []string{unitA, unitW}},
+		{customerB(), "capabilities.list", bodyFirstHundred, []string{unitA, unitW}},
 		{
 			contrB(),
-			"jobs.list",
+			opJobsList,
 			`{"limit":100,"filters":{"organizationId":"` + id("org-contractor-a") + `"}}`,
 			[]string{jobC},
 		},
@@ -918,43 +927,43 @@ func TestForeignTargets(t *testing.T) {
 		},
 		{
 			contrB(),
-			"units.list",
+			opUnitsList,
 			`{"limit":100,"filters":{"unitIds":["` + unitA + `"]}}`,
 			[]string{unitA},
 		},
 		{
 			contrB(),
-			"devices.list",
+			opDevicesList,
 			`{"limit":100,"filters":{"unitId":"` + unitA + `"}}`,
 			[]string{unitA},
 		},
 		{
 			contrB(),
-			"alerts.list",
+			opAlertsList,
 			`{"limit":100,"filters":{"unitId":"` + unitA + `"}}`,
 			[]string{unitA},
 		},
 		{
 			techB(),
-			"jobs.list",
+			opJobsList,
 			`{"limit":100,"filters":{"unitId":"` + unitW + `"}}`,
 			[]string{jobW},
 		},
 		{
 			techB(),
-			"units.list",
+			opUnitsList,
 			`{"limit":100,"filters":{"unitIds":["` + unitW + `"]}}`,
 			[]string{unitW},
 		},
 		{
 			techB(),
-			"parts.list",
+			opPartsList,
 			`{"limit":100,"filters":{"membershipId":"` + id("tech-internal-a") + `"}}`,
 			[]string{jobW},
 		},
 		{
 			techB(),
-			"filterCare.list",
+			opFilterCareList,
 			`{"limit":100,"filters":{"unitId":"` + unitW + `"}}`,
 			[]string{unitW},
 		},
@@ -972,7 +981,7 @@ func TestForeignTargets(t *testing.T) {
 		},
 		{
 			hq(),
-			"units.list",
+			opUnitsList,
 			`{"limit":100,"filters":{"unitIds":["` + id("unit-tenant-b") + `"]}}`,
 			[]string{id("unit-tenant-b")},
 		},
@@ -1044,26 +1053,26 @@ func TestForeignTargets(t *testing.T) {
 
 	// every operation a role other than admin may call is above, or takes no foreign target
 	exempt := map[string]string{
-		"auth.previewPasswordReset":    "public demo read of the demo e-mail's reset preview",
-		"demo.advanceClock":            "demo panel; no target",
-		"demo.reset":                   "demo panel; no target",
-		"demo.trigger":                 "demo panel; scenarios, no target",
-		"demoSession.extend":           "own session",
-		"demoSession.signIn":           "public demo sign-in",
-		"demoSession.signOut":          "own session",
-		"demoSession.switchMembership": "own demo account's memberships (TestPrincipalFromIdentityService)",
-		"session.get":                  "own session",
-		"preferences.get":              "own session",
-		"preferences.update":           "own session",
-		"twoFactor.get":                "own session",
-		"twoFactor.enable":             "own session",
-		"twoFactor.disable":            "own session",
-		"consents.get":                 "own membership",
-		"consents.update":              "own membership",
-		"filterCare.getSettings":       "own customer; no target",
-		"filterCare.saveSettings":      "own customer; no target",
-		"notifications.list":           "recipient only; no filter names a recipient",
-		"writes.getResult":             "another member's key is NOT_FOUND (TestWritesGetResult)",
+		"auth.previewPasswordReset":   "public demo read of the demo e-mail's reset preview",
+		"demo.advanceClock":           "demo panel; no target",
+		"demo.reset":                  "demo panel; no target",
+		"demo.trigger":                "demo panel; scenarios, no target",
+		opDemoSessionExtend:           ownSession,
+		opDemoSessionSignIn:           "public demo sign-in",
+		"demoSession.signOut":         ownSession,
+		opDemoSessionSwitchMembership: "own demo account's memberships (TestPrincipalFromIdentityService)",
+		opSessionGet:                  ownSession,
+		"preferences.get":             ownSession,
+		opPreferencesUpdate:           ownSession,
+		"twoFactor.get":               ownSession,
+		"twoFactor.enable":            ownSession,
+		"twoFactor.disable":           ownSession,
+		"consents.get":                "own membership",
+		"consents.update":             "own membership",
+		"filterCare.getSettings":      "own customer; no target",
+		"filterCare.saveSettings":     "own customer; no target",
+		"notifications.list":          "recipient only; no filter names a recipient",
+		opWritesGetResult:             "another member's key is NOT_FOUND (TestWritesGetResult)",
 	}
 
 	for _, spec := range ops.Catalog {
@@ -1074,7 +1083,7 @@ func TestForeignTargets(t *testing.T) {
 
 		nonAdmin := false
 		for _, a := range expr.Alternatives {
-			nonAdmin = nonAdmin || a.Role != "admin"
+			nonAdmin = nonAdmin || a.Role != roleAdmin
 		}
 
 		switch {

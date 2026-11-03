@@ -8,7 +8,14 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/seed"
+)
+
+const (
+	connectionError        = "error"
+	refusedRecoveryInvalid = "recovery=" + apperr.KeyInvalid
+	tamperClear            = "clear"
 )
 
 // TestDeviceOperationLifecycle covers IR67 on the equipment scheduler and demo.trigger(operation): queued → running
@@ -85,7 +92,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		}
 
 		code, resp := write(srv, hq(), "devices."+kind, body, version())
-		if code != 200 || data(resp)["status"] != "queued" {
+		if code != 200 || data(resp)["status"] != statusQueued {
 			t.Fatalf("%s: %d %v", kind, code, resp)
 		}
 
@@ -101,7 +108,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 	tick(base.Add(500 * time.Millisecond))
 
-	if st, _ := op(check); st != "queued" {
+	if st, _ := op(check); st != statusQueued {
 		t.Fatalf("started before one second: %s", st)
 	}
 
@@ -116,7 +123,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 	tick(base.Add(time.Second))
 
-	if st, _ := op(check); st != "running" {
+	if st, _ := op(check); st != statusRunning {
 		t.Fatalf("not running at +1 s: %s", st)
 	}
 
@@ -128,7 +135,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		t.Fatalf("check result: %d %v", code, m)
 	}
 
-	if d, un := conn(); d != "online" || un != "online" {
+	if d, un := conn(); d != connectionOnline || un != connectionOnline {
 		t.Fatalf("check success → online: %s / %s", d, un)
 	}
 
@@ -148,11 +155,11 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 	tick(base.Add(time.Second))
 	tick(base.Add(60 * time.Second))
 
-	if st, code := op(timeout); st != "failed" || code != "TIMEOUT" {
+	if st, code := op(timeout); st != statusFailed || code != codeTimeout {
 		t.Fatalf("timeout: %s %s", st, code)
 	}
 
-	if d, un := conn(); d != "error" || un != "error" {
+	if d, un := conn(); d != connectionError || un != connectionError {
 		t.Fatalf("check TIMEOUT → error: %s / %s", d, un)
 	}
 	// a failed check result (the device answers) → error; a check is accepted in any connection state
@@ -164,7 +171,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		t.Fatal("check failure result")
 	}
 
-	if st, code := op(failed); st != "failed" || code != "UNAVAILABLE" {
+	if st, code := op(failed); st != statusFailed || code != codeUnavailable {
 		t.Fatalf("failed check: %s %s", st, code)
 	}
 
@@ -181,7 +188,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 	tick(base.Add(time.Second))
 
-	if st, code := op(fw); st != "failed" || code != "OFFLINE" {
+	if st, code := op(fw); st != statusFailed || code != codeOffline {
 		t.Fatalf("firmware start offline: %s %s", st, code)
 	}
 
@@ -193,7 +200,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		&firmware,
 	)
 
-	if d, _ := conn(); d != "offline" || version() != v || firmware != "1.0" {
+	if d, _ := conn(); d != connectionOffline || version() != v || firmware != "1.0" {
 		t.Fatalf("OFFLINE start keeps the device: %s v%d %s", d, version(), firmware)
 	}
 
@@ -203,7 +210,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 	tick(base.Add(time.Second))
 
-	if d, _ := conn(); d != "online" {
+	if d, _ := conn(); d != connectionOnline {
 		t.Errorf("a running firmware update keeps the connection: %s", d)
 	}
 
@@ -244,7 +251,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		&firmware,
 	)
 
-	if st, code := op(back); st != "failed" || code != "UNAVAILABLE" || firmware != "v2" {
+	if st, code := op(back); st != statusFailed || code != codeUnavailable || firmware != "v2" {
 		t.Fatalf("failed firmware keeps the old version: %s %s %s", st, code, firmware)
 	}
 	// REV19-018: control work patched in after creation fails the start with CONFLICT; an undelivered restriction
@@ -277,7 +284,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 	tick(base.Add(time.Second))
 
-	if st, _ := op(c1); st != "running" {
+	if st, _ := op(c1); st != statusRunning {
 		t.Fatalf("undelivered restriction Command does not block the start: %s", st)
 	}
 
@@ -290,11 +297,11 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 	tick(base.Add(time.Second))
 
-	if st, code := op(c2); st != "failed" || code != "CONFLICT" {
+	if st, code := op(c2); st != statusFailed || code != codeConflict {
 		t.Fatalf("recheck conflict: %s %s", st, code)
 	}
 
-	if d, _ := conn(); d != "online" || version() != v {
+	if d, _ := conn(); d != connectionOnline || version() != v {
 		t.Errorf("CONFLICT start keeps the device: %s v%d", d, version())
 	}
 
@@ -315,7 +322,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 	)
 	tick(base.Add(time.Second))
 
-	if st, code := op(c3); st != "failed" || code != "CONFLICT" {
+	if st, code := op(c3); st != statusFailed || code != codeConflict {
 		t.Fatalf("another open operation: %s %s", st, code)
 	}
 
@@ -434,7 +441,8 @@ func TestDeviceEvents(t *testing.T) {
 		t.Fatalf("communication_lost: %d %v", code, res)
 	}
 
-	if c, p, tm, uc := state(); c != "offline" || p != "on" || tm != "clear" || uc != "offline" {
+	if c, p, tm, uc := state(); c != connectionOffline || p != "on" || tm != tamperClear ||
+		uc != connectionOffline {
 		t.Fatalf("offline only: %s %s %s %s", c, p, tm, uc)
 	}
 
@@ -446,7 +454,7 @@ func TestDeviceEvents(t *testing.T) {
 	power := uuid.NewString()
 	signal(power, "power_lost", 1, "", 2) // sequences are per axis
 
-	if c, p, tm, _ := state(); c != "offline" || p != "off" || tm != "clear" {
+	if c, p, tm, _ := state(); c != connectionOffline || p != powerOff || tm != tamperClear {
 		t.Fatalf("power lost: %s %s %s", c, p, tm)
 	}
 
@@ -460,7 +468,7 @@ func TestDeviceEvents(t *testing.T) {
 	}
 
 	tamperID, tamperAlerts, _, evidence := eventOf(tamper)
-	if c, p, tm, _ := state(); c != "offline" || p != "off" || tm != "detected" ||
+	if c, p, tm, _ := state(); c != connectionOffline || p != powerOff || tm != "detected" ||
 		len(tamperAlerts) != 1 ||
 		evidence != "tamper_signal" {
 		t.Fatalf("tamper detected with one alert: %s %s %s %v %s", c, p, tm, tamperAlerts, evidence)
@@ -478,7 +486,7 @@ func TestDeviceEvents(t *testing.T) {
 		&status,
 	)
 
-	if typ != "tamper" || severity != "critical" || status != "open" {
+	if typ != "tamper" || severity != "critical" || status != statusOpen {
 		t.Fatalf("tamper alert: %s %s %s", typ, severity, status)
 	}
 	// the same eventId again: no new event; with other content CONFLICT
@@ -513,7 +521,8 @@ func TestDeviceEvents(t *testing.T) {
 		t.Fatalf("restored: %d %v", code, res)
 	}
 
-	if c, p, tm, uc := state(); c != "online" || p != "off" || tm != "detected" || uc != "online" {
+	if c, p, tm, uc := state(); c != connectionOnline || p != powerOff || tm != "detected" ||
+		uc != connectionOnline {
 		t.Fatalf("connection restored only: %s %s %s %s", c, p, tm, uc)
 	}
 
@@ -526,7 +535,7 @@ func TestDeviceEvents(t *testing.T) {
 
 	ownerScan(t, `SELECT status FROM monitoring.alerts WHERE id = $1`, []any{alert}, &status)
 
-	if status != "open" {
+	if status != statusOpen {
 		t.Errorf("tamper alert remains: %s", status)
 	}
 
@@ -556,7 +565,7 @@ func TestDeviceEvents(t *testing.T) {
 		t.Fatal("old heartbeat is accepted")
 	}
 
-	if c, _, _, _ := state(); c != "offline" || count() != n {
+	if c, _, _, _ := state(); c != connectionOffline || count() != n {
 		t.Fatalf("old sequence changes nothing: %s %d/%d", c, count(), n)
 	}
 
@@ -576,7 +585,7 @@ func TestDeviceEvents(t *testing.T) {
 	}
 
 	_, inherited, _, evidence := eventOf(clearEvent)
-	if _, _, tm, _ := state(); tm != "clear" || len(inherited) != 1 ||
+	if _, _, tm, _ := state(); tm != tamperClear || len(inherited) != 1 ||
 		inherited[0].String() != alert ||
 		evidence != "tamper_signal" {
 		t.Fatalf("tamper recovery: %s %v %s", tm, inherited, evidence)
@@ -584,7 +593,7 @@ func TestDeviceEvents(t *testing.T) {
 
 	ownerScan(t, `SELECT status FROM monitoring.alerts WHERE id = $1`, []any{alert}, &status)
 
-	if status != "open" {
+	if status != statusOpen {
 		t.Errorf("tamper recovery does not resolve the alert: %s", status)
 	}
 	// the recovery is evidence a resolution of the tamper alert may cite (IR327)
@@ -635,7 +644,7 @@ func TestDeviceEvents(t *testing.T) {
 		`{"alertId":"`+alert+`","resolutionReason":"Cover closed on site","resolutionEvidenceIds":["`+clearID+`"]}`,
 		version,
 	); code != 200 ||
-		data(res)["status"] != "resolved" {
+		data(res)["status"] != statusResolved {
 		t.Fatalf("resolve citing the recovery: %d %v", code, res)
 	}
 
@@ -661,11 +670,11 @@ func TestDeviceEvents(t *testing.T) {
 	}
 	// validation and refusals
 	want := map[string]string{ // the field each case is refused for
-		"axis/value mismatch": "recovery=error.invalid",
-		"fault with recovery": "recovery=error.invalid",
+		"axis/value mismatch": refusedRecoveryInvalid,
+		"fault with recovery": refusedRecoveryInvalid,
 		"no sequence":         "sequence=error.required",
-		"restored no source":  "recovery=error.invalid",
-		"unknown kind":        "kind=error.invalid",
+		"restored no source":  refusedRecoveryInvalid,
+		"unknown kind":        refusedKindInvalid,
 	}
 
 	for name, b := range map[string]string{

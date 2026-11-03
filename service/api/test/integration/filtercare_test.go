@@ -9,6 +9,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const statusDueSoon = "due_soon"
+
 func TestFilterCare(t *testing.T) {
 	srv := server(t)
 	tenant := seed.ID("tenant-a")
@@ -68,7 +70,7 @@ func TestFilterCare(t *testing.T) {
 	}
 
 	st := statusOf(customerB())
-	if asNum(t, st["runHoursSinceCleaning"]) != 200 || st["status"] != "due_soon" ||
+	if asNum(t, st["runHoursSinceCleaning"]) != 200 || st["status"] != statusDueSoon ||
 		asNum(t, st["thresholdHours"]) != 250 ||
 		st["lastCleanedAt"] != nil {
 		t.Fatalf("due soon: %v", st)
@@ -77,9 +79,9 @@ func TestFilterCare(t *testing.T) {
 	want := map[string]string{ // the field each case is refused for
 		"bad recipient": "recipients=error.invalid",
 		"fallback 181":  "fallbackDays=error.range",
-		"no inApp":      "channels=error.invalid",
+		"no inApp":      refusedChannelsInvalid,
 		"threshold 49":  "thresholdHours=error.range",
-		"whatsapp":      "channels=error.invalid",
+		"whatsapp":      refusedChannelsInvalid,
 	}
 
 	for name, b := range map[string]string{
@@ -184,7 +186,7 @@ func TestFilterCare(t *testing.T) {
 
 	if st := statusOf(
 		customerB(),
-	); st["status"] != "due_soon" ||
+	); st["status"] != statusDueSoon ||
 		asNum(t, st["runHoursSinceCleaning"]) != 90 {
 		t.Fatalf("run time since a cleaning while running: %v", st)
 	}
@@ -207,7 +209,7 @@ func TestFilterCare(t *testing.T) {
 
 	if st := statusOf(
 		customerB(),
-	); st["status"] != "due_soon" ||
+	); st["status"] != statusDueSoon ||
 		st["runHoursSinceCleaning"] != nil { // offline: 12 of 14 days
 		t.Fatalf("fallback days: %v", st)
 	}
@@ -239,7 +241,7 @@ func TestFilterCare(t *testing.T) {
 
 	if st := statusOf(
 		customerB(),
-	); st["lastCleanedBy"] != "technician" || st["lastCleaningJobId"] != job ||
+	); st["lastCleanedBy"] != roleTechnician || st["lastCleaningJobId"] != job ||
 		st["status"] != "ok" {
 		t.Fatalf("technician cleaning: %v", st)
 	}
@@ -278,12 +280,12 @@ func TestFilterCare(t *testing.T) {
 	}
 
 	want = map[string]string{ // the field each case is refused for
-		"{\"filters\":{\"status\":\"dirty\"}}":                      "filters=error.invalid",
-		"{\"filters\":{\"x\":1}}":                                   "x=error.notAllowed",
-		"{\"sort\":{\"field\":\"runHours\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+		"{\"filters\":{\"status\":\"dirty\"}}":                      refusedFiltersInvalid,
+		bodyUnknownFilter:                                           refusedUnknownFieldX,
+		"{\"sort\":{\"field\":\"runHours\",\"direction\":\"asc\"}}": refusedSortFieldInvalid,
 	}
 
-	for _, b := range []string{`{"filters":{"status":"dirty"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"runHours",` +
+	for _, b := range []string{`{"filters":{"status":"dirty"}}`, bodyUnknownFilter, `{"sort":{"field":"runHours",` +
 		`"direction":"asc"}}`} {
 		code, m := post(srv, customerB(), "filterCare.list", b)
 		refusal(t, b, code, m, want[b])
@@ -298,7 +300,7 @@ func TestFilterCare(t *testing.T) {
 		`{"unitId":"`+u2+`"}`,
 		0,
 	); code != 422 ||
-		fields(res) != "unitId=error.unitArchived" {
+		fields(res) != refusedUnitArchived {
 		t.Errorf("archived unit: %d %s", code, fields(res))
 	}
 }

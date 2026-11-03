@@ -11,6 +11,8 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const fieldPriceMinor = "priceMinor"
+
 func TestContractsAndInvoices(t *testing.T) {
 	srv := server(t)
 	unit := newUnit(t, srv, "Billing AC")
@@ -18,15 +20,15 @@ func TestContractsAndInvoices(t *testing.T) {
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	body := func(extra map[string]string) string {
 		f := map[string]string{
-			"customerId":          `"` + cust + `"`,
-			"unitIds":             `["` + unit + `"]`,
-			"planType":            `"rto"`,
-			"startAt":             `"` + stamp(-24*30) + `"`,
-			"endAt":               `"` + stamp(24*365) + `"`,
-			"priceMinor":          "12000",
-			"currency":            `"MYR"`,
-			"restrictionEligible": "true",
-			"rulesVersion":        `"rules-demo-1"`,
+			fieldCustomerID:       `"` + cust + `"`,
+			fieldUnitIDs:          `["` + unit + `"]`,
+			fieldPlanType:         jsonKindRTO,
+			fieldStartAt:          `"` + stamp(-24*30) + `"`,
+			fieldEndAt:            `"` + stamp(24*365) + `"`,
+			fieldPriceMinor:       "12000",
+			fieldCurrency:         `"MYR"`,
+			"restrictionEligible": jsonTrue,
+			fieldRulesVersion:     `"rules-demo-1"`,
 		}
 		maps.Copy(f, extra)
 
@@ -40,10 +42,10 @@ func TestContractsAndInvoices(t *testing.T) {
 	// the field each case is refused for
 	want := map[string]string{
 		"bad currency":        "currency=error.invalid",
-		"duplicate unit":      "unitIds=error.duplicate",
+		caseDuplicateUnit:     "unitIds=error.duplicate",
 		"general restricted":  "restrictionEligible=errors.rto_only",
 		"negative price":      "priceMinor=error.range",
-		"no units":            "unitIds=error.count",
+		caseNoUnits:           "unitIds=error.count",
 		"other customer unit": "unitIds=error.otherCustomerUnit",
 		"reversed term":       "endAt=error.range",
 		"rto without rules":   "rulesVersion=error.required",
@@ -51,15 +53,15 @@ func TestContractsAndInvoices(t *testing.T) {
 	}
 
 	for name, e := range map[string]map[string]string{
-		"general restricted":  {"planType": `"general"`},
-		"rto without rules":   {"rulesVersion": "null"},
-		"rules not eligible":  {"restrictionEligible": "false"},
-		"reversed term":       {"startAt": `"` + stamp(10) + `"`, "endAt": `"` + stamp(1) + `"`},
-		"negative price":      {"priceMinor": "-1"},
-		"bad currency":        {"currency": `"EUR"`},
-		"no units":            {"unitIds": "[]"},
-		"other customer unit": {"unitIds": `["` + seed.ID("unit-non-rto").String() + `"]`},
-		"duplicate unit":      {"unitIds": `["` + unit + `","` + unit + `"]`},
+		"general restricted":  {fieldPlanType: `"general"`},
+		"rto without rules":   {fieldRulesVersion: jsonNull},
+		"rules not eligible":  {"restrictionEligible": jsonFalse},
+		"reversed term":       {fieldStartAt: `"` + stamp(10) + `"`, fieldEndAt: `"` + stamp(1) + `"`},
+		"negative price":      {fieldPriceMinor: "-1"},
+		"bad currency":        {fieldCurrency: `"EUR"`},
+		caseNoUnits:           {fieldUnitIDs: "[]"},
+		"other customer unit": {fieldUnitIDs: `["` + seed.ID("unit-non-rto").String() + `"]`},
+		caseDuplicateUnit:     {fieldUnitIDs: `["` + unit + `","` + unit + `"]`},
 	} {
 		code, m := write(srv, hq(), "contracts.save", body(e), 0)
 		refusal(t, name, code, m, want[name])
@@ -69,7 +71,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		srv,
 		hq(),
 		"contracts.save",
-		body(map[string]string{"customerId": `"` + uuid.NewString() + `"`}),
+		body(map[string]string{fieldCustomerID: `"` + uuid.NewString() + `"`}),
 		0,
 	); code != 404 {
 		t.Error("unknown customer")
@@ -87,7 +89,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		srv,
 		hq(),
 		"contracts.save",
-		body(map[string]string{"id": `"` + key + `"`, "priceMinor": "15000"}),
+		body(map[string]string{"id": `"` + key + `"`, fieldPriceMinor: "15000"}),
 		1,
 	); code != 200 ||
 		asNum(t, data(res)["version"]) != 2 {
@@ -130,9 +132,9 @@ func TestContractsAndInvoices(t *testing.T) {
 		"contracts.save",
 		body(
 			map[string]string{
-				"id":         `"` + key + `"`,
-				"customerId": `"` + seed.ID("cust-a").String() + `"`,
-				"unitIds":    `["` + seed.ID("unit-non-rto").String() + `"]`,
+				"id":            `"` + key + `"`,
+				fieldCustomerID: `"` + seed.ID("cust-a").String() + `"`,
+				fieldUnitIDs:    `["` + seed.ID("unit-non-rto").String() + `"]`,
 			},
 		),
 		2,
@@ -167,7 +169,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		"contracts.list",
 		`{"filters":{"kind":"vip"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad plan filter: %d %s", code, fields(res))
 	}
 	// a restriction on the contract blocks revisions
@@ -212,15 +214,15 @@ func TestContractsAndInvoices(t *testing.T) {
 	inv := func(extra map[string]string) (int, map[string]any) {
 		f := map[string]string{
 			"amountMinor":     "15000",
-			"currency":        `"MYR"`,
-			"contractId":      `"` + key + `"`,
+			fieldCurrency:     `"MYR"`,
+			fieldContractID:   `"` + key + `"`,
 			"contractVersion": "2",
-			"period": `{"from":"` + stamp(
+			fieldPeriod: `{"from":"` + stamp(
 				-24*14,
 			) + `","to":"` + stamp(
 				24*16,
 			) + `"}`,
-			"dueAt": `"` + stamp(48) + `"`,
+			fieldDueAt: `"` + stamp(48) + `"`,
 		}
 		maps.Copy(f, extra)
 
@@ -243,11 +245,11 @@ func TestContractsAndInvoices(t *testing.T) {
 		code int
 	}{
 		"old contract version": {map[string]string{"contractVersion": "1"}, 409},
-		"other currency":       {map[string]string{"currency": `"USD"`}, 422},
-		"due in the past":      {map[string]string{"dueAt": `"` + stamp(-1) + `"`}, 422},
+		"other currency":       {map[string]string{fieldCurrency: `"USD"`}, 422},
+		"due in the past":      {map[string]string{fieldDueAt: `"` + stamp(-1) + `"`}, 422},
 		"zero amount":          {map[string]string{"amountMinor": "0"}, 422},
 		"outside term": {
-			map[string]string{"period": `{"from":"` + stamp(-24*60) + `","to":"` + stamp(24) + `"}`},
+			map[string]string{fieldPeriod: `{"from":"` + stamp(-24*60) + `","to":"` + stamp(24) + `"}`},
 			422,
 		},
 	} {
@@ -260,7 +262,7 @@ func TestContractsAndInvoices(t *testing.T) {
 	}
 
 	code, resp = inv(nil)
-	if code != 200 || data(resp)["status"] != "unpaid" ||
+	if code != 200 || data(resp)["status"] != statusUnpaid ||
 		!strings.HasPrefix(asStr(t, data(resp)["number"]), "INV-202608-") {
 		t.Fatalf("invoice: %d %v", code, resp)
 	}
@@ -273,7 +275,7 @@ func TestContractsAndInvoices(t *testing.T) {
 	// IR469: a period overlapping an invoiced one would bill those days twice; the next period may start where it ends
 	overlap := `{"from":"` + stamp(24*10) + `","to":"` + stamp(24*40) + `"}`
 	if code, m := inv(
-		map[string]string{"period": overlap, "dueAt": `"` + stamp(24*11) + `"`},
+		map[string]string{fieldPeriod: overlap, fieldDueAt: `"` + stamp(24*11) + `"`},
 	); code != 409 ||
 		m["messageKey"] != "errors.invoice_period_exists" {
 		t.Errorf("overlapping period: %d %v", code, m)
@@ -320,7 +322,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		"invoices.list",
 		`{"filters":{"status":"late"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad invoice status: %d %s", code, fields(res))
 	}
 	// scope filters: the property of the contract version's units, [from, to) on the period start
@@ -328,7 +330,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		f string
 		n int
 	}{
-		"property":           {`"propertyId":"` + seed.ID("property-home-b").String() + `"`, 1},
+		kindProperty:         {`"propertyId":"` + seed.ID("property-home-b").String() + `"`, 1},
 		"other property":     {`"propertyId":"` + seed.ID("property-home-a").String() + `"`, 0},
 		"period start in":    {`"from":"` + stamp(-24*15) + `","to":"` + stamp(-24*13) + `"`, 1},
 		"period start at to": {`"to":"` + stamp(-24*14) + `"`, 0},
@@ -351,7 +353,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		"invoices.list",
 		`{"filters":{"from":"`+stamp(1)+`","to":"`+stamp(1)+`"}}`,
 	); code != 422 ||
-		fields(res) != "filters.to=error.range" {
+		fields(res) != refusedFilterToRange {
 		t.Errorf("empty invoice range: %d %s", code, fields(res))
 	}
 	// reminders: only overdue unpaid, active client recipient

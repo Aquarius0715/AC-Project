@@ -34,12 +34,12 @@ func TestCommandCreateValidation(t *testing.T) {
 		body, field string
 	}{
 		"unit missing": {customerA(), `{"action":{"kind":"set_power","power":true},` +
-			`"expectedUnitVersion":` + itoa(v) + `}`, "unitId"},
+			`"expectedUnitVersion":` + itoa(v) + `}`, fieldUnitID},
 		"version missing": {customerA(), `{"unitId":"` + unit + `","action":{"kind":"set_power",` +
 			`"power":true}}`, "expectedUnitVersion"},
 		"reason too long": {techInt(), `{"unitId":"` + unit + `","jobId":"` + uuid.NewString() +
 			`","action":{"kind":"set_power","power":true},"reason":"` + strings.Repeat("r", 1001) + `","expectedUnitVersion":` +
-			itoa(v) + `}`, "reason"},
+			itoa(v) + `}`, fieldReason},
 	} {
 		if code, resp := write(
 			srv,
@@ -103,7 +103,7 @@ func TestCommandCreateValidation(t *testing.T) {
 
 	pending := asArr(t, data(res)["pendingCommands"])
 	if len(pending) != 1 || asObj(t, pending[0])["id"] != id ||
-		(asObj(t, pending[0])["status"] != "requested" && asObj(t, pending[0])["status"] != "sent") {
+		(asObj(t, pending[0])["status"] != statusRequested && asObj(t, pending[0])["status"] != statusSent) {
 		t.Fatalf("pendingCommands: %v", pending)
 	}
 
@@ -121,20 +121,20 @@ func TestRestrictionInputValidation(t *testing.T) {
 
 	nilID, dup := uuid.Nil.String(), uuid.NewString()
 	for name, c := range map[string]struct{ op, body, field string }{
-		"release without id": {"restrictions.release", `{"restrictionId":"` + nilID + `"}`, "restrictionId"},
+		"release without id": {"restrictions.release", `{"restrictionId":"` + nilID + `"}`, fieldRestrictionID},
 		"override without id": {
 			"restrictions.override", `{"restrictionId":"` + nilID + `","reason":"hardship"}`,
-			"restrictionId",
+			fieldRestrictionID,
 		},
 		"defer without until": {"restrictions.defer", `{"restrictionId":"` + nilID + `","reason":"plan"}`, "until"},
 		"reconcile duplicates": {"restrictions.reconcile", `{"restrictionId":"` + nilID + `","unitIds":["` + dup + `","` +
-			dup + `"]}`, "unitIds"},
-		"retry bad phase": {"restrictions.retry", `{"restrictionId":"` + dup + `","unitIds":["` + dup +
-			`"],"phase":"again","confirmedRulesVersion":"rules-1"}`, "phase"},
-		"retry blank rules": {"restrictions.retry", `{"restrictionId":"` + dup + `","unitIds":["` + dup + `","` + dup +
+			dup + `"]}`, fieldUnitIDs},
+		"retry bad phase": {opRestrictionsRetry, `{"restrictionId":"` + dup + `","unitIds":["` + dup +
+			`"],"phase":"again","confirmedRulesVersion":"rules-1"}`, fieldPhase},
+		"retry blank rules": {opRestrictionsRetry, `{"restrictionId":"` + dup + `","unitIds":["` + dup + `","` + dup +
 			`"],"phase":"apply","confirmedRulesVersion":"  "}`, "confirmedRulesVersion"},
-		"retry without id": {"restrictions.retry", `{"restrictionId":"` + nilID + `","unitIds":[],"phase":"release",` +
-			`"confirmedRulesVersion":"rules-1"}`, "restrictionId"},
+		"retry without id": {opRestrictionsRetry, `{"restrictionId":"` + nilID + `","unitIds":[],"phase":"release",` +
+			`"confirmedRulesVersion":"rules-1"}`, fieldRestrictionID},
 	} {
 		if code, res := write(
 			srv,

@@ -18,7 +18,7 @@ func TestUnitDetail(t *testing.T) {
 	doc := data(res)
 	if code != 200 || doc["capabilities"] == nil ||
 		asObj(t, doc["effectiveControlPolicy"])["state"] != "unrestricted" ||
-		asObj(t, doc["controlAvailability"])["state"] != "available" ||
+		asObj(t, doc["controlAvailability"])["state"] != stateAvailable ||
 		len(
 			asArr(t, doc["components"]),
 		) != 18 { // indoor 8 + outdoor 5 + electrical 5 (serviceScope)
@@ -39,7 +39,7 @@ func TestUnitDetail(t *testing.T) {
 	_, res = post(srv, customerA(), "units.get", `{"id":"`+seed.ID("unit-limited").String()+`"}`)
 
 	p := asObj(t, data(res)["effectiveControlPolicy"])
-	if p["state"] != "restricted" || p["phase"] != "applied" ||
+	if p["state"] != "restricted" || p["phase"] != statusApplied ||
 		p["reasonKey"] != "control.restriction_active" ||
 		asObj(t, p["policy"])["kind"] != "temperature_limit" {
 		t.Errorf("restricted policy: %v", p)

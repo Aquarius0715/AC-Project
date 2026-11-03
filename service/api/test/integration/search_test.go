@@ -40,7 +40,7 @@ func TestSearchIsLiteral(t *testing.T) {
 		t.Helper()
 
 		b := jsonBytes(t,
-			map[string]any{"filters": map[string]any{"search": term}, "limit": 100},
+			map[string]any{fieldFilters: map[string]any{"search": term}, "limit": 100},
 		)
 
 		code, m := post(srv, hq(), operation, string(b))
@@ -59,8 +59,8 @@ func TestSearchIsLiteral(t *testing.T) {
 	// each list: a term taken from its own first row finds that row, in other case; a lone wildcard character finds
 	// only the rows that contain it
 	for operation, field := range map[string]string{
-		"clientUsers.list": "email", "contractors.list": "name", "parts.list": "name",
-		"units.coverage": "unitId",
+		opClientUsersList: fieldEmail, opContractorsList: fieldName, opPartsList: fieldName,
+		"units.coverage": fieldUnitID,
 	} {
 		all := search(operation, "")
 		if len(all) == 0 {
@@ -97,15 +97,15 @@ func TestSearchIsLiteral(t *testing.T) {
 		return out
 	}
 	for _, c := range []struct{ op, field, term, want string }{
-		{"parts.list", "code", "50% grade", "SEAL_50"},
-		{"parts.list", "code", "l_5", "SEAL_50"},
-		{"parts.list", "code", "SEAL%", ""},
-		{"parts.list", "code", "seal_kit", ""},
-		{"parts.list", "code", "50%%", ""},
-		{"contractors.list", "name", "50%_c", "Search Test 50%_Cooling"},
-		{"contractors.list", "name", "50%c", ""},
-		{"contractors.list", "name", "s_arch", ""},
-		{"contractors.list", "name", "reg_t", "Search Test 50%_Cooling"},
+		{opPartsList, fieldCode, "50% grade", "SEAL_50"},
+		{opPartsList, fieldCode, "l_5", "SEAL_50"},
+		{opPartsList, fieldCode, "SEAL%", ""},
+		{opPartsList, fieldCode, "seal_kit", ""},
+		{opPartsList, fieldCode, "50%%", ""},
+		{opContractorsList, fieldName, "50%_c", "Search Test 50%_Cooling"},
+		{opContractorsList, fieldName, "50%c", ""},
+		{opContractorsList, fieldName, "s_arch", ""},
+		{opContractorsList, fieldName, "reg_t", "Search Test 50%_Cooling"},
 	} {
 		if got := strings.Join(found(c.op, c.field, c.term), ","); got != c.want {
 			t.Errorf("%s search %q: %q, want %q", c.op, c.term, got, c.want)

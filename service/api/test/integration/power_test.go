@@ -81,71 +81,71 @@ func TestEffectivePowerSR27(t *testing.T) {
 		{
 			"fresh valid at 120 s",
 			30 * time.Second,
-			"online",
+			connectionOnline,
 			func(u, x string) { reading(u, x, 120*time.Second, 1, "measured", "valid", 1.2) },
 			"on",
 		},
 		{
 			"measurement 121 s old",
 			30 * time.Second,
-			"online",
+			connectionOnline,
 			func(u, x string) { reading(u, x, 121*time.Second, 1, "measured", "valid", 1.2) },
-			"unknown",
+			powerUnknown,
 		},
 		{
 			"observation 121 s old",
 			121 * time.Second,
-			"online",
+			connectionOnline,
 			func(u, x string) { reading(u, x, time.Second, 1, "measured", "valid", 1.2) },
-			"unknown",
+			powerUnknown,
 		},
 		{
-			"offline",
+			connectionOffline,
 			10 * time.Second,
-			"offline",
+			connectionOffline,
 			func(u, x string) { reading(u, x, time.Second, 1, "measured", "valid", 1.2) },
-			"unknown",
+			powerUnknown,
 		},
 		{
 			"estimated origin",
 			10 * time.Second,
-			"online",
+			connectionOnline,
 			func(u, x string) { reading(u, x, time.Second, 1, "estimated", "valid", 1.2) },
-			"unknown",
+			powerUnknown,
 		},
 		{
 			"suspect quality",
 			10 * time.Second,
-			"online",
+			connectionOnline,
 			func(u, x string) { reading(u, x, time.Second, 1, "measured", "suspect", 1.2) },
-			"unknown",
+			powerUnknown,
 		},
 		{
 			"null value",
 			10 * time.Second,
-			"online",
+			connectionOnline,
 			func(u, x string) { reading(u, x, time.Second, 1, "measured", "valid", nil) },
-			"unknown",
+			powerUnknown,
 		},
-		{"no measurement", 10 * time.Second, "online", func(_, _ string) {}, "unknown"},
-		{"no fallback to older valid", 10 * time.Second, "online", func(u, x string) {
+		{"no measurement", 10 * time.Second, connectionOnline, func(_, _ string) {}, powerUnknown},
+		{"no fallback to older valid", 10 * time.Second, connectionOnline, func(u, x string) {
 			reading(u, x, 20*time.Second, 1, "measured", "valid", 1.2)
 			reading(u, x, 5*time.Second, 2, "measured", "missing", nil)
-		}, "unknown"},
-		{"same time, higher sequence wins", 10 * time.Second, "online", func(u, x string) {
+		}, powerUnknown},
+		{"same time, higher sequence wins", 10 * time.Second, connectionOnline, func(u, x string) {
 			reading(u, x, 5*time.Second, 1, "measured", "missing", nil)
 			reading(u, x, 5*time.Second, 2, "measured", "valid", 0.9)
 		}, "on"},
-		{"future reading ignored", 10 * time.Second, "online", func(u, x string) {
+		{"future reading ignored", 10 * time.Second, connectionOnline, func(u, x string) {
 			reading(u, x, 5*time.Second, 1, "measured", "valid", 1.0)
 			reading(u, x, -time.Minute, 2, "measured", "missing", nil)
 		}, "on"},
 		{
 			"reading from an unknown sensor",
 			10 * time.Second,
-			"online",
+			connectionOnline,
 			func(u, _ string) { reading(u, uuid.NewString(), time.Second, 1, "measured", "valid", 1.0) },
-			"unknown",
+			powerUnknown,
 		},
 	}
 	for _, tc := range cases {

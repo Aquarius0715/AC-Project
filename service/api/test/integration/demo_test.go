@@ -32,8 +32,8 @@ func TestDemoOperations(t *testing.T) {
 	}
 	// sessions belong to the BFF and the identity provider in API mode: every demoSession operation says so
 	for operation, body := range map[string]string{
-		"demoSession.signIn":           `{"demoActorId":"customer-a"}`,
-		"demoSession.switchMembership": `{"demoMembershipId":"m-1"}`, "demoSession.signOut": `{}`, "demoSession.extend": `{}`,
+		opDemoSessionSignIn:           `{"demoActorId":"customer-a"}`,
+		opDemoSessionSwitchMembership: `{"demoMembershipId":"m-1"}`, "demoSession.signOut": `{}`, opDemoSessionExtend: `{}`,
 	} {
 		if code, resp := write(
 			plain,
@@ -150,12 +150,12 @@ func TestDemoOperations(t *testing.T) {
 		quality, reason, raw string
 		value                bool
 	}{
-		{"valid", "-", "-", true},
-		{"suspect", "out_of_range", "-", false},
-		{"suspect", "unit_mismatch", "K", false},
+		{qualityValid, "-", "-", true},
+		{qualitySuspect, "out_of_range", "-", false},
+		{qualitySuspect, "unit_mismatch", "K", false},
 		{"missing", "-", "-", false},
-		{"suspect", "unit_mismatch", "kelvin-degrees-with-a-very-long-", false},
-		{"suspect", "invalid_time", "-", true},
+		{qualitySuspect, "unit_mismatch", "kelvin-degrees-with-a-very-long-", false},
+		{qualitySuspect, "invalid_time", "-", true},
 	}
 	if len(rows) != len(want) || rows[2].seq != 3 {
 		t.Fatalf("telemetry rows: %v", rows)
@@ -187,7 +187,7 @@ func TestDemoOperations(t *testing.T) {
 			time.RFC3339,
 		)+`","eventType":"network","bogus":false}`,
 	); code != 422 ||
-		fields(resp) != "_=error.malformedInput" {
+		fields(resp) != refusedMalformedInput {
 		t.Errorf("a trigger with a field no type has: %d %s", code, fields(resp))
 	}
 	// a trigger of the browser demo's types, shaped by the contract, is refused as unsupported (IR391)
@@ -212,9 +212,9 @@ func TestDemoOperations(t *testing.T) {
 			"errors.trigger_unsupported",
 		},
 		"no event ID": {`{"scenarioId":"t",` +
-			`"occurredAt":"` + now + `","eventType":"network"}`, "eventId", apperr.KeyRequired},
+			`"occurredAt":"` + now + `","eventType":"network"}`, fieldEventID, apperr.KeyRequired},
 		"no time": {`{"scenarioId":"t",` +
-			`"eventId":"` + uuid.NewString() + `","eventType":"network"}`, "occurredAt", apperr.KeyRequired},
+			`"eventId":"` + uuid.NewString() + `","eventType":"network"}`, fieldOccurredAt, apperr.KeyRequired},
 		"command without ID": {
 			`{"scenarioId":"t",` +
 				`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"command_ack"}`, "commandId",
@@ -227,12 +227,13 @@ func TestDemoOperations(t *testing.T) {
 		},
 		"observation, no unit": {
 			`{"scenarioId":"t",` +
-				`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"restriction_observation"}`, "unitId",
+				`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"restriction_observation"}`,
+			fieldUnitID,
 			apperr.KeyRequired,
 		},
 		"device without one": {`{"scenarioId":"t",` +
 			`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"device","kind":"tamper",` +
-			`"sequence":1}`, "deviceId", apperr.KeyRequired},
+			`"sequence":1}`, fieldDeviceID, apperr.KeyRequired},
 	} {
 		if code, m := trig(
 			srv,
@@ -319,7 +320,7 @@ func TestDemoOperations(t *testing.T) {
 		customerB(),
 		"commands.get",
 		`{"id":"`+cmd+`"}`,
-	); data(resp)["status"] != "sent" || data(resp)["delivery"] != "sent" ||
+	); data(resp)["status"] != statusSent || data(resp)["delivery"] != statusSent ||
 		data(resp)["sentAt"] != sentAt.Format(time.RFC3339Nano) {
 		t.Errorf("sent: %v", data(resp))
 	}
@@ -338,7 +339,7 @@ func TestDemoOperations(t *testing.T) {
 		customerB(),
 		"commands.get",
 		`{"id":"`+cmd+`"}`,
-	); data(resp)["status"] != "acknowledged" {
+	); data(resp)["status"] != statusAcknowledged {
 		t.Errorf("acknowledged: %v", resp)
 	}
 	// the request was audited pending; the acknowledgement appends its result under the same correlation ID (IR90, IR604)
@@ -429,16 +430,16 @@ func commandTrail(t *testing.T, srv *apiserver.Server, created map[string]any) [
 	out := []string{}
 
 	for _, a := range items(t, res) {
-		if a["action"] != "commands.create" {
+		if a["action"] != opCommandsCreate {
 			continue
 		}
 
 		e := asStr(t, a["result"]) + " " +
 			map[bool]string{
-				true:  "customer-b",
+				true:  membershipCustomerB,
 				false: asStr(t, a["actorId"]),
 			}[a["actorId"] == seed.ID("user-customer-b").String()]
-		if a["result"] != "pending" {
+		if a["result"] != statusPending {
 			reason, _ := a["reason"].(string)
 			e += " " + reason
 		}

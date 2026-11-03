@@ -11,6 +11,11 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const (
+	refusedHoldInvalid  = "hold=" + apperr.KeyInvalid
+	refusedReplyByRange = "replyBy=" + apperr.KeyRange
+)
+
 func TestSlotProposals(t *testing.T) {
 	srv := server(t)
 	owner(
@@ -58,13 +63,13 @@ func TestSlotProposals(t *testing.T) {
 	_, resp := write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
 	job := asStr(t, data(resp)["id"])
 	refused := map[string]string{ // the field each VALIDATION case is refused for
-		"bad hold":                    "hold=error.invalid",
-		"contractor with a member":    "hold=error.invalid",
-		"internal with a contractor":  "hold=error.invalid",
-		"internal without technician": "hold=error.invalid",
+		"bad hold":                    refusedHoldInvalid,
+		"contractor with a member":    refusedHoldInvalid,
+		"internal with a contractor":  refusedHoldInvalid,
+		"internal without technician": refusedHoldInvalid,
 		"preferred slot":              "slot=errors.slot_is_preferred",
-		"reply after 7 days":          "replyBy=error.range",
-		"reply in the past":           "replyBy=error.range",
+		"reply after 7 days":          refusedReplyByRange,
+		"reply in the past":           refusedReplyByRange,
 		"today":                       "slot=error.slotRules",
 	}
 
@@ -145,7 +150,7 @@ func TestSlotProposals(t *testing.T) {
 			stamp(48),
 			1,
 		); code != 200 ||
-			asObj(t, data(res)["slotProposal"])["status"] != "pending" {
+			asObj(t, data(res)["slotProposal"])["status"] != statusPending {
 			t.Fatalf("contractor hold with its technician: %d %v", code, res)
 		}
 
@@ -167,7 +172,7 @@ func TestSlotProposals(t *testing.T) {
 		stamp(48),
 		1,
 	); code != 200 ||
-		asObj(t, data(res)["slotProposal"])["status"] != "pending" {
+		asObj(t, data(res)["slotProposal"])["status"] != statusPending {
 		t.Fatalf("propose: %d %v", code, res)
 	}
 
@@ -239,7 +244,7 @@ func TestSlotProposals(t *testing.T) {
 		`{"jobId":"`+job+`","proposalId":"`+p1+`"}`,
 		2,
 	); code != 200 ||
-		asObj(t, data(res)["slotProposal"])["status"] != "withdrawn" {
+		asObj(t, data(res)["slotProposal"])["status"] != statusWithdrawn {
 		t.Fatalf("withdraw: %d %v", code, res)
 	}
 
@@ -263,7 +268,7 @@ func TestSlotProposals(t *testing.T) {
 		`"decision":"accept"`,
 		4,
 	); code != 200 ||
-		data(res)["status"] != "assigned" ||
+		data(res)["status"] != statusAssigned ||
 		asObj(t, data(res)["scheduledSlot"])["startAt"] != stamp(97) {
 		t.Fatalf("accept internal hold: %d %v", code, res)
 	}
@@ -285,7 +290,7 @@ func TestSlotProposals(t *testing.T) {
 		`"decision":"accept"`,
 		2,
 	); code != 200 ||
-		data(res)["status"] != "offered" {
+		data(res)["status"] != statusOffered {
 		t.Fatalf("accept contractor hold: %d %v", code, res)
 	}
 
@@ -319,7 +324,7 @@ func TestSlotProposals(t *testing.T) {
 		`"decision":"accept"`,
 		2,
 	); code != 200 ||
-		data(res)["status"] != "offered" {
+		data(res)["status"] != statusOffered {
 		t.Fatalf("accept a slot in 10 hours: %d %v", code, res)
 	}
 
@@ -360,7 +365,7 @@ func TestSlotProposals(t *testing.T) {
 		2,
 	); code != 200 ||
 		asNum(t, data(res)["preferenceRound"]) != 2 ||
-		data(res)["status"] != "requested" {
+		data(res)["status"] != statusRequested {
 		t.Fatalf("decline with slots: %d %v", code, res)
 	}
 
@@ -379,7 +384,7 @@ func TestSlotProposals(t *testing.T) {
 		hq(),
 		"jobs.get",
 		`{"jobId":"`+j4+`"}`,
-	); asObj(t, data(m)["slotProposal"])["status"] != "expired" {
+	); asObj(t, data(m)["slotProposal"])["status"] != statusExpired {
 		t.Fatal("expired proposal")
 	}
 
@@ -451,7 +456,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		" ",
 		2,
 	); code != 422 ||
-		fields(res) != "reason=error.length" {
+		fields(res) != refusedReasonLength {
 		t.Errorf("blank reason: %d %s", code, fields(res))
 	}
 
@@ -499,12 +504,12 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
 	); code != 200 ||
-		data(res)["projection"] != "offer" {
+		data(res)["projection"] != projectionOffer {
 		t.Fatalf("offer projection: %d %v", code, res)
 	} else if o := data(
 		res,
 	); o["partnerSlotProposal"] == nil || asObj(t, o["partnerSlotProposal"])["id"] != partner ||
-		asObj(t, o["partnerSlotProposal"])["status"] != "pending" ||
+		asObj(t, o["partnerSlotProposal"])["status"] != statusPending ||
 		o["offeredAt"] == nil || o["accessValidFrom"] != stamp(0) ||
 		o["accessValidUntil"] != stamp(200) {
 		t.Fatalf("offer projection fields: %v", o)
@@ -541,7 +546,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		)+`"}`,
 		3,
 	); code != 200 ||
-		asObj(t, data(res)["slotProposal"])["source"] != "contractor" {
+		asObj(t, data(res)["slotProposal"])["source"] != roleContractor {
 		t.Fatalf("send to client: %d %v", code, res)
 	}
 
@@ -570,7 +575,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		`{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`,
 		4,
 	); code != 200 ||
-		data(res)["status"] != "offered" {
+		data(res)["status"] != statusOffered {
 		t.Fatalf("client accepts partner time: %d %v", code, res)
 	}
 
@@ -771,7 +776,7 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		`{"jobId":"`+pj+`","preferredSlots":`+three+`,"comment":"travelling"}`,
 		2,
 	); code != 200 ||
-		data(res)["status"] != "requested" || data(res)["assignmentId"] != nil ||
+		data(res)["status"] != statusRequested || data(res)["assignmentId"] != nil ||
 		asNum(t, data(res)["preferenceRound"]) != 2 {
 		t.Fatalf("reschedule: %d %v", code, res)
 	}
@@ -974,7 +979,7 @@ func TestRescheduleAfterContractorAssignment(t *testing.T) {
 		`{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`,
 		version(job),
 	)
-	if code != 200 || data(resp)["status"] != "accepted" || data(resp)["assignmentId"] != nil ||
+	if code != 200 || data(resp)["status"] != statusAccepted || data(resp)["assignmentId"] != nil ||
 		data(resp)["scheduledSlot"] != nil {
 		t.Fatalf("accept the new time: %d %v", code, resp)
 	}
@@ -1220,7 +1225,7 @@ func TestRescheduleOfferedPeriodicVisit(t *testing.T) {
 		clock().Add(102*time.Hour),
 	)
 
-	if code, m := reschedule(); code != 200 || data(m)["status"] != "requested" {
+	if code, m := reschedule(); code != 200 || data(m)["status"] != statusRequested {
 		t.Errorf("an offered visit in 100 hours: %d %v", code, m)
 	}
 }
@@ -1465,7 +1470,7 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 			&st,
 		)
 
-		if st != "withdrawn" {
+		if st != statusWithdrawn {
 			t.Errorf("the time change is %s after its offer ended", st)
 		}
 
@@ -1475,7 +1480,7 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 			"jobs.get",
 			`{"jobId":"`+job+`"}`,
 		); data(res)["partnerSlotProposal"] != nil ||
-			data(res)["status"] != "requested" {
+			data(res)["status"] != statusRequested {
 			t.Errorf(
 				"HQ's job after the offer ended: status %v, partnerSlotProposal %v",
 				data(res)["status"],
@@ -1522,7 +1527,7 @@ func TestPartnerProposalEndsWithOffer(t *testing.T) {
 		hq(),
 		"jobs.get",
 		`{"jobId":"`+job+`"}`,
-	); st != "withdrawn" ||
+	); st != statusWithdrawn ||
 		data(res)["partnerSlotProposal"] != nil {
 		t.Errorf(
 			"after the cancellation the time change is %s, HQ's job shows %v",
@@ -1650,7 +1655,7 @@ func TestDeclineWithdrawsClientProposal(t *testing.T) {
 		&partnerStatus,
 	)
 
-	if clientStatus != "withdrawn" || partnerStatus != "withdrawn" {
+	if clientStatus != statusWithdrawn || partnerStatus != statusWithdrawn {
 		t.Errorf(
 			"after the decline: client proposal %s, time change %s",
 			clientStatus,
@@ -1755,7 +1760,7 @@ func TestAcceptRechecksHold(t *testing.T) {
 		&status,
 	)
 
-	if offers != 0 || status != "pending" {
+	if offers != 0 || status != statusPending {
 		t.Errorf("after the refused acceptance: %d offers, proposal %s", offers, status)
 	}
 }
@@ -1922,7 +1927,7 @@ func TestProposalReplyByBeforeSlot(t *testing.T) {
 			1,
 		)
 	}
-	if code, m := propose(stamp(31)); code != 422 || fields(m) != "replyBy=error.range" {
+	if code, m := propose(stamp(31)); code != 422 || fields(m) != refusedReplyByRange {
 		t.Errorf("reply-by after the slot starts: %d %s", code, fields(m))
 	}
 

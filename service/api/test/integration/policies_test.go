@@ -10,28 +10,30 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
+const fieldChannels = "channels"
+
 // alertPolicyBody builds an alert PolicyInput with overrides (raw JSON values).
 func alertPolicyBody(extra map[string]string) string {
 	f := map[string]string{
-		"kind":     `"alert"`,
-		"name":     `"Server room too warm"`,
-		"timezone": `"Asia/Kuala_Lumpur"`,
-		"enabled":  "true",
-		"priority": "50",
-		"customerId": `"` + seed.ID("cust-a").
+		fieldKind:     `"alert"`,
+		fieldName:     `"Server room too warm"`,
+		fieldTimezone: jsonKualaLumpur,
+		fieldEnabled:  jsonTrue,
+		fieldPriority: "50",
+		fieldCustomerID: `"` + seed.ID("cust-a").
 			String() +
 			`"`,
-		"metric":                 `"temperature"`,
-		"operator":               `"gte"`,
-		"threshold":              "28",
-		"recoveryThreshold":      "26",
-		"durationSeconds":        "300",
-		"activeWindow":           "null",
-		"severity":               `"warning"`,
-		"recipientMembershipIds": `["` + seed.ID("customer-a").String() + `"]`,
-		"channels":               `["inApp","email"]`,
-		"escalateAfterMinutes":   "60",
-		"cooldownMinutes":        "5",
+		fieldMetric:                 `"temperature"`,
+		fieldOperator:               `"gte"`,
+		fieldThreshold:              "28",
+		fieldRecoveryThreshold:      "26",
+		fieldDurationSeconds:        "300",
+		fieldActiveWindow:           jsonNull,
+		fieldSeverity:               `"warning"`,
+		fieldRecipientMembershipIDs: `["` + seed.ID("customer-a").String() + `"]`,
+		fieldChannels:               `["inApp","email"]`,
+		"escalateAfterMinutes":      "60",
+		"cooldownMinutes":           "5",
 	}
 
 	for k, v := range extra {
@@ -67,11 +69,11 @@ func TestPolicies(t *testing.T) {
 		srv,
 		customerA(),
 		"policies.save",
-		alertPolicyBody(map[string]string{"name": `"  Warm room  "`}),
+		alertPolicyBody(map[string]string{fieldName: `"  Warm room  "`}),
 		0,
 	)
 	if code != 200 || data(resp)["kind"] != "alert" || data(resp)["name"] != "Warm room" ||
-		data(resp)["metric"] != "temperature" ||
+		data(resp)["metric"] != metricTemperature ||
 		len(asArr(t, data(resp)["unitIds"])) != 0 {
 		t.Fatalf("create: %d %v", code, resp)
 	}
@@ -109,75 +111,75 @@ func TestPolicies(t *testing.T) {
 
 	// validation
 	bad := map[string]map[string]string{
-		"recovery direction gte": {"recoveryThreshold": "28"},
-		"recovery direction lte": {"operator": `"lte"`, "recoveryThreshold": "27"},
-		"duration 0":             {"durationSeconds": "0"},
-		"duration > 86400":       {"durationSeconds": "86401"},
-		"no recipients":          {"recipientMembershipIds": "[]"},
-		"channels without inApp": {"channels": `["email"]`},
-		"duplicate channel":      {"channels": `["inApp","inApp"]`},
-		"bad channel":            {"channels": `["inApp","sms"]`},
-		"blank name":             {"name": `"   "`},
-		"name too long":          {"name": `"` + strings.Repeat("n", 121) + `"`},
-		"priority 101":           {"priority": "101"},
-		"bad timezone":           {"timezone": `"Mars/Base"`},
+		"recovery direction gte": {fieldRecoveryThreshold: "28"},
+		"recovery direction lte": {fieldOperator: `"lte"`, fieldRecoveryThreshold: "27"},
+		caseZeroDuration:         {fieldDurationSeconds: "0"},
+		"duration > 86400":       {fieldDurationSeconds: "86401"},
+		"no recipients":          {fieldRecipientMembershipIDs: "[]"},
+		"channels without inApp": {fieldChannels: `["email"]`},
+		"duplicate channel":      {fieldChannels: `["inApp","inApp"]`},
+		"bad channel":            {fieldChannels: `["inApp","sms"]`},
+		caseBlankName:            {fieldName: `"   "`},
+		"name too long":          {fieldName: `"` + strings.Repeat("n", 121) + `"`},
+		casePriorityOver100:      {fieldPriority: "101"},
+		"bad timezone":           {fieldTimezone: `"Mars/Base"`},
 		"cooldown 0":             {"cooldownMinutes": "0"},
 		"escalate 1441":          {"escalateAfterMinutes": "1441"},
-		"bad severity":           {"severity": `"info"`},
-		"unknown metric":         {"metric": `"noise"`},
-		"bad operator":           {"operator": `"eq"`},
+		"bad severity":           {fieldSeverity: `"info"`},
+		caseUnknownMetric:        {fieldMetric: `"noise"`},
+		caseBadOperator:          {fieldOperator: `"eq"`},
 		"window weekday 0": {
-			"activeWindow": `{"weekdays":[0],"startLocal":"08:00","endLocal":"18:00"}`,
+			fieldActiveWindow: `{"weekdays":[0],"startLocal":"08:00","endLocal":"18:00"}`,
 		},
 		"window duplicate weekday": {
-			"activeWindow": `{"weekdays":[1,1],"startLocal":"08:00","endLocal":"18:00"}`,
+			fieldActiveWindow: `{"weekdays":[1,1],"startLocal":"08:00","endLocal":"18:00"}`,
 		},
 		"window same times": {
-			"activeWindow": `{"weekdays":[1],"startLocal":"08:00","endLocal":"08:00"}`,
+			fieldActiveWindow: `{"weekdays":[1],"startLocal":"08:00","endLocal":"08:00"}`,
 		},
 		"window bad time": {
-			"activeWindow": `{"weekdays":[1],"startLocal":"24:00","endLocal":"08:00"}`,
+			fieldActiveWindow: `{"weekdays":[1],"startLocal":"24:00","endLocal":"08:00"}`,
 		},
-		"unitIds are not input": {"unitIds": `["` + uuid.NewString() + `"]`},
-		"missing condition":     {"metric": ""},
-		"client metric":         {"metric": `"vibration"`},
+		"unitIds are not input": {fieldUnitIDs: `["` + uuid.NewString() + `"]`},
+		"missing condition":     {fieldMetric: ""},
+		"client metric":         {fieldMetric: `"vibration"`},
 		"recipient of other org": {
-			"recipientMembershipIds": `["` + seed.ID("customer-b").String() + `"]`,
+			fieldRecipientMembershipIDs: `["` + seed.ID("customer-b").String() + `"]`,
 		},
 		"technician recipient": {
-			"recipientMembershipIds": `["` + seed.ID("tech-internal-a").String() + `"]`,
+			fieldRecipientMembershipIDs: `["` + seed.ID("tech-internal-a").String() + `"]`,
 		},
-		"unknown field": {"color": `"red"`},
+		caseUnknownField: {"color": `"red"`},
 	}
 	// the field each case is refused for
 	want := map[string]string{
 		"recovery direction gte":   "recoveryThreshold=error.recoveryDirection",
 		"recovery direction lte":   "recoveryThreshold=error.recoveryDirection",
-		"duration 0":               "durationSeconds=error.range",
+		caseZeroDuration:           "durationSeconds=error.range",
 		"duration > 86400":         "durationSeconds=error.range",
 		"no recipients":            "recipientMembershipIds=error.invalid",
-		"channels without inApp":   "channels=error.invalid",
-		"duplicate channel":        "channels=error.invalid",
-		"bad channel":              "channels=error.invalid",
-		"blank name":               "name=error.length",
-		"name too long":            "name=error.length",
-		"priority 101":             "priority=error.range",
-		"bad timezone":             "timezone=error.invalid",
+		"channels without inApp":   refusedChannelsInvalid,
+		"duplicate channel":        refusedChannelsInvalid,
+		"bad channel":              refusedChannelsInvalid,
+		caseBlankName:              refusedNameLength,
+		"name too long":            refusedNameLength,
+		casePriorityOver100:        refusedPriorityRange,
+		"bad timezone":             refusedTimezoneInvalid,
 		"cooldown 0":               "cooldownMinutes=error.range",
 		"escalate 1441":            "escalateAfterMinutes=error.range",
 		"bad severity":             "severity=error.invalid",
-		"unknown metric":           "metric=error.invalid",
-		"bad operator":             "operator=error.invalid",
+		caseUnknownMetric:          refusedMetricInvalid,
+		caseBadOperator:            "operator=error.invalid",
 		"window weekday 0":         "activeWindow.weekdays=error.invalid",
 		"window duplicate weekday": "activeWindow.weekdays=error.invalid",
 		"window same times":        "activeWindow=error.window",
 		"window bad time":          "activeWindow=error.window",
 		"unitIds are not input":    "unitIds=error.unitsAttachOnUnit",
 		"missing condition":        "condition=error.required",
-		"client metric":            "metric=error.invalid",
+		"client metric":            refusedMetricInvalid,
 		"recipient of other org":   "recipientMembershipIds=error.recipientCannotRead",
 		"technician recipient":     "recipientMembershipIds=error.recipientCannotRead",
-		"unknown field":            "_=error.malformedInput",
+		caseUnknownField:           refusedMalformedInput,
 	}
 	for name, e := range bad {
 		field, key, _ := strings.Cut(want[name], "=")
@@ -194,9 +196,9 @@ func TestPolicies(t *testing.T) {
 	}
 	// overnight window, HQ-only metric and HQ recipient are valid for HQ
 	code, resp = write(srv, hq(), "policies.save", alertPolicyBody(map[string]string{
-		"metric":       `"vibration"`,
-		"activeWindow": `{"weekdays":[5,6],"startLocal":"22:00","endLocal":"06:00"}`,
-		"recipientMembershipIds": `["` + seed.ID("hq-operator").
+		fieldMetric:       `"vibration"`,
+		fieldActiveWindow: `{"weekdays":[5,6],"startLocal":"22:00","endLocal":"06:00"}`,
+		fieldRecipientMembershipIDs: `["` + seed.ID("hq-operator").
 			String() +
 			`","` + seed.ID("customer-a").
 			String() +
@@ -212,7 +214,7 @@ func TestPolicies(t *testing.T) {
 		srv,
 		customerA(),
 		"policies.save",
-		alertPolicyBody(map[string]string{"customerId": `"` + seed.ID("cust-b").String() + `"`}),
+		alertPolicyBody(map[string]string{fieldCustomerID: `"` + seed.ID("cust-b").String() + `"`}),
 		0,
 	); code != 404 {
 		t.Error("client saving for another customer → NOT_FOUND")
@@ -222,7 +224,7 @@ func TestPolicies(t *testing.T) {
 		srv,
 		hq(),
 		"policies.save",
-		alertPolicyBody(map[string]string{"customerId": `"` + uuid.NewString() + `"`}),
+		alertPolicyBody(map[string]string{fieldCustomerID: `"` + uuid.NewString() + `"`}),
 		0,
 	); code != 404 {
 		t.Error("unknown customer → NOT_FOUND")
@@ -253,7 +255,7 @@ func TestPolicies(t *testing.T) {
 	}
 	if code, res := upd(
 		customerA(),
-		map[string]string{"threshold": "30", "recoveryThreshold": "27"},
+		map[string]string{fieldThreshold: "30", fieldRecoveryThreshold: "27"},
 		1,
 	); code != 200 || asNum(t, data(res)["threshold"]) != 30 ||
 		asNum(t, data(res)["version"]) != 2 {
@@ -267,8 +269,8 @@ func TestPolicies(t *testing.T) {
 	if code, res := upd(
 		hq(),
 		map[string]string{
-			"customerId":             `"` + seed.ID("cust-b").String() + `"`,
-			"recipientMembershipIds": `["` + seed.ID("hq-operator").String() + `"]`,
+			fieldCustomerID:             `"` + seed.ID("cust-b").String() + `"`,
+			fieldRecipientMembershipIDs: `["` + seed.ID("hq-operator").String() + `"]`,
 		},
 		2,
 	); code != 422 ||
@@ -285,7 +287,7 @@ func TestPolicies(t *testing.T) {
 		alertPolicyBody(map[string]string{"id": `"` + def + `"`}),
 		ver(t, dp),
 	); code != 422 ||
-		fields(res) != "kind=error.kindFixed" {
+		fields(res) != refusedKindFixed {
 		t.Errorf("default policy is not an alert policy: %d %s", code, fields(res))
 	}
 
@@ -319,7 +321,7 @@ func TestPolicies(t *testing.T) {
 	}
 
 	for _, it := range items(t, resp) {
-		if it["kind"] == "automation" ||
+		if it["kind"] == kindAutomation ||
 			(it["kind"] == "alert" && it["customerId"] != seed.ID("cust-a").String()) {
 			t.Fatal("client list leaks")
 		}
@@ -392,18 +394,18 @@ func TestPolicies(t *testing.T) {
 	}
 
 	want = map[string]string{ // the field each case is refused for
-		"{\"filters\":{\"kind\":\"air_quality\"}}":                "filters.kind=error.invalid",
-		"{\"filters\":{\"x\":1}}":                                 "x=error.notAllowed",
-		"{\"sort\":{\"field\":\"metric\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+		"{\"filters\":{\"kind\":\"air_quality\"}}":                refusedFilterKindInvalid,
+		bodyUnknownFilter:                                         refusedUnknownFieldX,
+		"{\"sort\":{\"field\":\"metric\",\"direction\":\"asc\"}}": refusedSortFieldInvalid,
 	}
 
-	for _, b := range []string{`{"filters":{"kind":"air_quality"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"metric",` +
+	for _, b := range []string{`{"filters":{"kind":"air_quality"}}`, bodyUnknownFilter, `{"sort":{"field":"metric",` +
 		`"direction":"asc"}}`} {
 		code, m := post(srv, hq(), "policies.list", b)
 		refusal(t, b, code, m, want[b])
 	}
 
-	for _, sf := range []string{"priority", "updatedAt"} {
+	for _, sf := range []string{fieldPriority, "updatedAt"} {
 		if code, _ := post(
 			srv,
 			hq(),
@@ -445,7 +447,7 @@ func TestPolicies(t *testing.T) {
 		`"ruleKey":"dust_pm25"`,
 		1,
 	)
-	asObj(t, rules[1])["metric"] = "temperature"
+	asObj(t, rules[1])["metric"] = metricTemperature
 	wrongMetric := jsonBytes(t, rules)
 	want = map[string]string{ // the field each case is refused for
 		"five rules":     "rules=error.fixedRules",
@@ -475,7 +477,7 @@ func TestPolicies(t *testing.T) {
 		`{"kind":"default_alert","id":"`+pid+`","rules":`+string(raw)+`}`,
 		3,
 	); code != 422 ||
-		fields(res) != "kind=error.kindFixed" {
+		fields(res) != refusedKindFixed {
 		t.Errorf("alert policy saved as default: %d %s", code, fields(res))
 	}
 
@@ -499,9 +501,9 @@ func TestPolicies(t *testing.T) {
 
 	// setDefaultRule: version 0 for a rule without a stored setting, owner only for clients
 	sdr := func(a *actor, cust, key string, enabled bool, v int) (int, map[string]any) {
-		e := "false"
+		e := jsonFalse
 		if enabled {
-			e = "true"
+			e = jsonTrue
 		}
 
 		return write(
@@ -624,7 +626,7 @@ func TestPolicies(t *testing.T) {
 		)+`"}`,
 		versionZero,
 	); code != 422 ||
-		fields(res) != "reason=error.length" {
+		fields(res) != refusedReasonLength {
 		t.Errorf("reason too long: %d %s", code, fields(res))
 	}
 

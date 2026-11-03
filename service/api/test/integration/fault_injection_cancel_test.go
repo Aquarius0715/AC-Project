@@ -42,7 +42,7 @@ func TestCancelRollsBackWhenTheStatusCannotBeWritten(t *testing.T) {
 	}
 
 	_, res = post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
-	if data(res)["status"] != "on_hold" || ver(t, res) != version {
+	if data(res)["status"] != statusOnHold || ver(t, res) != version {
 		t.Errorf("a failed cancel changed the job: %v", res)
 	}
 }

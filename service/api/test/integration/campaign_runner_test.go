@@ -212,7 +212,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		&clients,
 	)
 
-	if st, _ := state(); clients == 0 || notices != len(units)*clients || st != "scheduled" ||
+	if st, _ := state(); clients == 0 || notices != len(units)*clients || st != statusScheduled ||
 		audits("firmwareCampaigns.notice") != 1 {
 		t.Fatalf("notice: %d notices for %d clients, %s", notices, clients, st)
 	}
@@ -238,7 +238,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	owner(t, `UPDATE devices.firmware_campaigns SET start_at = $2 WHERE id = $1`, camp, base)
 	tick(2 * time.Minute)
 
-	if st, _ := state(); st != "running" || audits("firmwareCampaigns.start") != 1 ||
+	if st, _ := state(); st != statusRunning || audits("firmwareCampaigns.start") != 1 ||
 		statuses() != eachDevice(
 			"installing",
 			"installing",
@@ -292,10 +292,10 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	finish(5, "failed")
 	tick(time.Minute)
 
-	if st, reason := state(); st != "paused" ||
+	if st, reason := state(); st != statusPaused ||
 		reason != "Auto-paused: 1 of 4 devices failed in wave 2 (more than 20 %)." ||
 		audits("firmwareCampaigns.autoPause") != 1 ||
-		results()[5].status != "failed" ||
+		results()[5].status != statusFailed ||
 		results()[5].key != "errors.install_failed" {
 		t.Fatalf("auto-pause: %s %q %s", st, reason, statuses())
 	}
@@ -331,7 +331,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	// Retry and Resume: the four install again; one does not answer and fails with TIMEOUT, a new failure pauses again
 	control("resume", "")
 
-	if st, reason := state(); st != "running" || reason != "" {
+	if st, reason := state(); st != statusRunning || reason != "" {
 		t.Fatalf("resume clears the pause reason: %s %q", st, reason)
 	}
 
@@ -357,7 +357,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	tick(61 * time.Second) // the unanswered install times out (IR67)
 	tick(time.Second)
 
-	if st, _ := state(); st != "paused" || results()[5].key != "errors.install_timeout" ||
+	if st, _ := state(); st != statusPaused || results()[5].key != "errors.install_timeout" ||
 		statuses() != eachDevice(
 			"succeeded",
 			"succeeded",
@@ -372,7 +372,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	control("resume", "")
 	tick(time.Minute)
 
-	if st, _ := state(); st != "running" {
+	if st, _ := state(); st != statusRunning {
 		t.Fatalf("waiting: %s", st)
 	}
 	// outside the window a retried device waits; inside, a device already on the target version succeeds
@@ -380,7 +380,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	control("retry_device", `,"deviceId":"`+devs[5]+`"`)
 	tick(time.Minute)
 
-	if got := results()[5].status; got != "pending" {
+	if got := results()[5].status; got != statusPending {
 		t.Fatalf("outside the window: %s", got)
 	}
 
@@ -388,7 +388,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	owner(t, `UPDATE devices.devices SET firmware_version = 'v2' WHERE id = $1`, devs[5])
 	tick(time.Minute)
 
-	if st, _ := state(); st != "completed" || audits("firmwareCampaigns.complete") != 1 ||
+	if st, _ := state(); st != statusCompleted || audits("firmwareCampaigns.complete") != 1 ||
 		results()[5].op != "" {
 		t.Fatalf("complete: %s %s", st, statuses())
 	}
@@ -614,7 +614,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if st := state(); st != "running" {
+	if st := state(); st != statusRunning {
 		t.Fatalf("a device still installing: %s", st)
 	}
 
@@ -630,7 +630,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if st := state(); st != "completed" {
+	if st := state(); st != statusCompleted {
 		t.Fatalf("completed after the last install: %s", st)
 	}
 }

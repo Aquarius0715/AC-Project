@@ -39,18 +39,18 @@ func TestMRV(t *testing.T) {
 	org := seed.ID("org-customer-b").String()
 	cond := func(extra map[string]string) string {
 		f := map[string]string{
-			"from": `"` + start.Format(
+			fieldFrom: `"` + start.Format(
 				time.RFC3339,
 			) + `"`,
-			"to":              `"` + start.Add(5*time.Minute).Format(time.RFC3339) + `"`,
-			"unitIds":         `["` + unit + `"]`,
-			"baselineId":      `"` + base + `"`,
-			"baselineVersion": "1",
-			"factorId":        `"` + seed.ID("factor-demo-2026").String() + `"`,
-			"factorVersion":   "1",
-			"boundaryId":      `"ac_input_electricity"`,
-			"boundary":        `"AC input electricity"`,
-			"organizationId":  `"` + org + `"`,
+			"to":                `"` + start.Add(5*time.Minute).Format(time.RFC3339) + `"`,
+			fieldUnitIDs:        `["` + unit + `"]`,
+			"baselineId":        `"` + base + `"`,
+			"baselineVersion":   "1",
+			"factorId":          `"` + seed.ID("factor-demo-2026").String() + `"`,
+			"factorVersion":     "1",
+			fieldBoundaryID:     `"ac_input_electricity"`,
+			fieldBoundary:       `"AC input electricity"`,
+			fieldOrganizationID: `"` + org + `"`,
 		}
 		maps.Copy(f, extra)
 
@@ -73,7 +73,7 @@ func TestMRV(t *testing.T) {
 		srv,
 		hq(),
 		"mrv.preview",
-		cond(map[string]string{"boundaryId": `"whole_building_electricity"`}),
+		cond(map[string]string{fieldBoundaryID: `"whole_building_electricity"`}),
 	); data(m)["incomplete"] != true {
 		t.Error("boundary mismatch is incomplete")
 	}
@@ -81,7 +81,7 @@ func TestMRV(t *testing.T) {
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"blank boundary":      "boundary=error.length",
 		"non-customer org":    "organizationId=error.invalid",
-		"unaligned":           "from=errors.energy_range",
+		"unaligned":           refusedEnergyRange,
 		"unit of another org": "unitIds=errors.units_outside_organization",
 	}
 
@@ -89,12 +89,12 @@ func TestMRV(t *testing.T) {
 		e    map[string]string
 		code int
 	}{
-		"unit of another org":  {map[string]string{"unitIds": `["` + seed.ID("unit-online-rto").String() + `"]`}, 422},
+		"unit of another org":  {map[string]string{fieldUnitIDs: `["` + seed.ID("unit-online-rto").String() + `"]`}, 422},
 		"unknown baseline ver": {map[string]string{"baselineVersion": "9"}, 404},
 		"unknown factor":       {map[string]string{"factorId": `"` + uuid.NewString() + `"`}, 404},
-		"non-customer org":     {map[string]string{"organizationId": `"` + seed.ID("org-operator-a").String() + `"`}, 422},
-		"blank boundary":       {map[string]string{"boundary": `" "`}, 422},
-		"unaligned":            {map[string]string{"from": `"` + start.Add(time.Second).Format(time.RFC3339) + `"`}, 422},
+		"non-customer org":     {map[string]string{fieldOrganizationID: `"` + seed.ID("org-operator-a").String() + `"`}, 422},
+		"blank boundary":       {map[string]string{fieldBoundary: jsonBlank}, 422},
+		"unaligned":            {map[string]string{fieldFrom: `"` + start.Add(time.Second).Format(time.RFC3339) + `"`}, 422},
 	} {
 		code, m := post(srv, hq(), "mrv.preview", cond(tc.e))
 		if w, ok := refused[name]; ok {
@@ -122,7 +122,7 @@ func TestMRV(t *testing.T) {
 		`{"conditions":`+cond(nil)+`,"evidenceIds":[]}`,
 		0,
 	)
-	if code != 200 || data(resp)["status"] != "draft" || ver(t, resp) != 1 ||
+	if code != 200 || data(resp)["status"] != statusDraft || ver(t, resp) != 1 ||
 		data(resp)["isDemo"] != true {
 		t.Fatalf("draft: %d %v", code, resp)
 	}
@@ -170,7 +170,7 @@ func TestMRV(t *testing.T) {
 		hq(),
 		"mrv.saveDraft",
 		`{"id":"`+id+`","conditions":`+cond(
-			map[string]string{"boundaryId": `"whole_building_electricity"`},
+			map[string]string{fieldBoundaryID: `"whole_building_electricity"`},
 		)+`,"evidenceIds":[]}`,
 		2,
 	); code != 200 || ver(t, res) != 3 ||
@@ -197,7 +197,7 @@ func TestMRV(t *testing.T) {
 		hq(),
 		"mrv.get",
 		`{"id":"`+id+`","reportVersion":1}`,
-	); data(res)["status"] != "draft" ||
+	); data(res)["status"] != statusDraft ||
 		len(asArr(t, data(res)["reviewHistory"])) != 0 {
 		t.Errorf("old version: %v", res)
 	}
@@ -226,7 +226,7 @@ func TestMRV(t *testing.T) {
 		"mrv.list",
 		`{"filters":{"status":"reviewed"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad status filter: %d %s", code, fields(res))
 	}
 

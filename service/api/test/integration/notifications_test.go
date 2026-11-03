@@ -66,7 +66,7 @@ func TestNotificationsInbox(t *testing.T) {
 
 	if n == nil || n["deliveryState"] != "simulated" ||
 		asObj(t, n["params"])["targetName"] == "" ||
-		n["severity"] != "warning" {
+		n["severity"] != severityWarning {
 		t.Fatalf("restriction notice: %v", res)
 	}
 
@@ -83,13 +83,13 @@ func TestNotificationsInbox(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"filters\":{\"kind\":\"x\"}}":        "kind=error.notAllowed",
-		"{\"filters\":{\"severity\":\"high\"}}": "filters=error.invalid",
-		"{\"filters\":{\"type\":\"spam\"}}":     "filters=error.invalid",
+		bodyUnknownKind:                         "kind=error.notAllowed",
+		"{\"filters\":{\"severity\":\"high\"}}": refusedFiltersInvalid,
+		"{\"filters\":{\"type\":\"spam\"}}":     refusedFiltersInvalid,
 	}
 
 	for _, b := range []string{
-		`{"filters":{"severity":"high"}}`, `{"filters":{"kind":"x"}}`,
+		`{"filters":{"severity":"high"}}`, bodyUnknownKind,
 		`{"filters":{"type":"spam"}}`,
 	} {
 		code, m := post(srv, customerB(), "notifications.list", b)
@@ -322,7 +322,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	}
 
 	for _, r := range items(t, resp) {
-		if r["role"] != "client" {
+		if r["role"] != roleClient {
 			t.Errorf("payment_reminder recipient %v", r)
 		}
 	}
@@ -354,7 +354,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			`"query":{}}`: "role=error.invalid",
 		`{"target":{"kind":"invoice",` +
 			`"id":"` + inv + `"},"templateKey":"payment","channel":"inApp",` +
-			`"query":{"filters":{"x":1}}}`: "x=error.notAllowed",
+			`"query":{"filters":{"x":1}}}`: refusedUnknownFieldX,
 	} {
 		code, m := post(srv, hq(), "notifications.recipients", b)
 		refusal(t, b, code, m, want)
@@ -385,7 +385,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	}
 
 	code, resp = preview(recipient)
-	if code != 200 || data(resp)["deliveryState"] != "preview" ||
+	if code != 200 || data(resp)["deliveryState"] != deliveryPreview ||
 		asObj(t, data(resp)["params"])["message"] != "Please pay" ||
 		data(resp)["type"] != "payment_reminder" {
 		t.Fatalf("preview: %d %v", code, resp)
@@ -432,7 +432,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			`"id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email",`+
 			`"recipientMembershipId":"`+recipient+`","message":" "}`,
 	); code != 422 ||
-		fields(res) != "message=error.length" {
+		fields(res) != refusedMessageLength {
 		t.Errorf("blank message: %d %s", code, fields(res))
 	}
 	// the message may be as long as a job note (2000, DD-P07); the reason stays at 1000 (IR228)
@@ -450,7 +450,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 
 	for body, field := range map[string]string{
 		`"message":"` + long + `m"`:                    "message",
-		`"reason":"` + strings.Repeat("r", 1001) + `"`: "reason",
+		`"reason":"` + strings.Repeat("r", 1001) + `"`: fieldReason,
 	} {
 		if code, res := post(
 			srv,
@@ -491,15 +491,15 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	}
 	if code, m := alertPreview(
 		`,"message":"Please check the unit"`,
-	); code != 200 || data(m)["type"] != "fault" || data(m)["severity"] != "warning" ||
-		asObj(t, data(m)["params"])["status"] != "open" {
+	); code != 200 || data(m)["type"] != "fault" || data(m)["severity"] != severityWarning ||
+		asObj(t, data(m)["params"])["status"] != statusOpen {
 		t.Errorf("alert preview: %d %v", code, m)
 	}
 
 	if code, m := alertPreview(
 		`,"severity":"critical"`,
 	); code != 200 || data(m)["severity"] != "critical" ||
-		data(m)["deliveryState"] != "preview" {
+		data(m)["deliveryState"] != deliveryPreview {
 		t.Errorf("critical alert preview: %d %v", code, m)
 	}
 
@@ -615,8 +615,8 @@ func TestPreferencesAndConsents(t *testing.T) {
 	}
 
 	want := map[string]string{ // the field each case is refused for
-		"{\"locale\":\"en\",\"timezone\":\"Local\"}":             "timezone=error.invalid",
-		"{\"locale\":\"en\",\"timezone\":\"Mars/Base\"}":         "timezone=error.invalid",
+		"{\"locale\":\"en\",\"timezone\":\"Local\"}":             refusedTimezoneInvalid,
+		"{\"locale\":\"en\",\"timezone\":\"Mars/Base\"}":         refusedTimezoneInvalid,
 		"{\"locale\":\"fr\",\"timezone\":\"Asia/Kuala_Lumpur\"}": "locale=error.invalid",
 	}
 

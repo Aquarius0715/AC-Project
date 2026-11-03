@@ -25,25 +25,25 @@ func TestCertificatesAndParts(t *testing.T) {
 			`"issuedAt":"` + issued + `","expiresAt":"` + expires + `","file":` + pdf + extra + `}`
 	}
 	want := map[string]string{ // the field each case is refused for
-		"bad code":       "code=error.invalid",
-		"blank name":     "name=error.length",
-		"gif file":       "file=error.invalidFile",
-		"not a pdf":      "file=error.invalidFile",
-		"pixel flood":    "file=error.invalidFile",
+		caseBadCode:      refusedCodeInvalid,
+		caseBlankName:    refusedNameLength,
+		"gif file":       refusedFileInvalid,
+		"not a pdf":      refusedFileInvalid,
+		casePixelFlood:   refusedFileInvalid,
 		"reversed dates": "expiresAt=error.range",
 	}
 
 	flood := pngHeader(50000, 50000) // a scan as an image is held to the photo pixel limits (IR389)
 	for name, b := range map[string]string{
-		"bad code":   strings.Replace(body(""), `"demo_indoor"`, `"demo_roof"`, 1),
-		"blank name": strings.Replace(body(""), `" Indoor AC "`, `" "`, 1),
+		caseBadCode:   strings.Replace(body(""), `"demo_indoor"`, `"demo_roof"`, 1),
+		caseBlankName: strings.Replace(body(""), `" Indoor AC "`, `" "`, 1),
 		"reversed dates": `{"membershipId":"` + tech + `","code":"demo_indoor","name":"x","number":"N",` +
 			`"issuedAt":"` + expires + `","expiresAt":"` + issued + `","file":` + pdf + `}`,
 		"gif file": `{"membershipId":"` + tech + `","code":"demo_indoor","name":"x","number":"N",` +
 			`"issuedAt":"` + issued + `","expiresAt":"` + expires + `","file":` +
 			blobJSON("a.gif", "image/gif", []byte("x"), 1) + `}`,
-		"not a pdf":   strings.Replace(body(""), pdf, blobJSON("cert.pdf", "application/pdf", []byte("<html>"), 6), 1),
-		"pixel flood": strings.Replace(body(""), pdf, blobJSON("scan.png", "image/png", flood, len(flood)), 1),
+		"not a pdf":    strings.Replace(body(""), pdf, blobJSON("cert.pdf", "application/pdf", []byte("<html>"), 6), 1),
+		casePixelFlood: strings.Replace(body(""), pdf, blobJSON("scan.png", "image/png", flood, len(flood)), 1),
 	} {
 		code, m := write(srv, contrA(), "certificates.submit", b, 0)
 		refusal(t, name, code, m, want[name])
@@ -130,7 +130,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		`{"certificateId":"`+cert+`","decision":"reject"}`,
 		1,
 	); code != 422 ||
-		fields(res) != "reason=error.required" {
+		fields(res) != refusedReasonRequired {
 		t.Errorf("reject without reason: %d %s", code, fields(res))
 	}
 
@@ -190,7 +190,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		`{"certificateId":"`+renewal+`","decision":"reject","reason":"blurry scan"}`,
 		1,
 	); code != 200 ||
-		data(res)["status"] != "rejected" {
+		data(res)["status"] != statusRejected {
 		t.Fatalf("reject: %d %v", code, res)
 	}
 
@@ -246,8 +246,8 @@ func TestCertificatesAndParts(t *testing.T) {
 	if got := ids(
 		`{"filters":{"membershipId":"`+tech+`"},"limit":100}`,
 		hq(),
-	); got[cert] != "expiring" ||
-		got[renewal] != "rejected" {
+	); got[cert] != statusExpiring ||
+		got[renewal] != statusRejected {
 		t.Fatalf("statuses: %v", got)
 	}
 
@@ -255,7 +255,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		`{"filters":{"status":"expiring","code":"demo_indoor"},"limit":100}`,
 		contrA(),
 	); got[renewal] != "" ||
-		got[cert] != "expiring" {
+		got[cert] != statusExpiring {
 		t.Fatalf("status filter: %v", got)
 	}
 
@@ -269,7 +269,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		"certificates.list",
 		`{"filters":{"code":"x"}}`,
 	); code != 422 ||
-		fields(res) != "filters=error.invalid" {
+		fields(res) != refusedFiltersInvalid {
 		t.Errorf("bad code filter: %d %s", code, fields(res))
 	}
 
@@ -310,7 +310,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		"parts.list",
 		`{"filters":{"x":1}}`,
 	); code != 422 ||
-		fields(res) != "x=error.notAllowed" {
+		fields(res) != refusedUnknownFieldX {
 		t.Errorf("bad parts filter: %d %s", code, fields(res))
 	}
 }
