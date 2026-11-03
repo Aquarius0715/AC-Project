@@ -36,33 +36,33 @@ const (
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestForeignTargets(t *testing.T) {
 	srv := server(t)
-	id := func(k string) string { return seed.ID(k).String() }
-	at := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	idOf := func(k string) string { return seed.ID(k).String() }
+	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	img := tinyPNG(t)
 	png := blobJSON("photo.png", "image/png", img, len(img))
 	pdf := blobJSON("cert.pdf", "application/pdf", []byte("%PDF-1.4 demo"), 13)
 	period := `"from":"2026-09-01T00:00:00Z","to":"2026-09-14T00:00:00Z"`
 
 	// customer A's records
-	custA, orgA, unitA, devA := id(
+	custA, orgA, unitA, devA := idOf(
 		"cust-a",
-	), id(
+	), idOf(
 		"org-customer-a",
-	), id(
+	), idOf(
 		"unit-online-rto",
-	), id(
+	), idOf(
 		"device-online-rto",
 	)
-	alertA, cmdA, invA, jobA := id(
+	alertA, cmdA, invA, jobA := idOf(
 		"alert-window-a",
-	), id(
+	), idOf(
 		"cmd-limited-apply",
-	), id(
+	), idOf(
 		"invoice-overdue-a",
-	), id(
+	), idOf(
 		"job-internal-a",
 	)
-	propA, roomA, notifA := id("property-home-a"), id("room-1"), id("notif-alert-window-a")
+	propA, roomA, notifA := idOf("property-home-a"), idOf("room-1"), idOf("notif-alert-window-a")
 
 	var sensorA, clientUserA, partnerUserA string
 	ownerScan(
@@ -107,7 +107,7 @@ func TestForeignTargets(t *testing.T) {
 	done := completedJob(t, srv) // customer A's completed job
 
 	// work in progress on customer A's unit: assigned to the internal technician, started, with a draft report
-	jobW, unitW := assignedNow(t, srv), id("unit-non-rto")
+	jobW, unitW := assignedNow(t, srv), idOf("unit-non-rto")
 	write(srv, techInt(), "jobs.start", `{"jobId":"`+jobW+`","startConfirmed":true}`, 2)
 
 	code, resp = write(srv, techInt(), "jobs.saveDraft", draftBody(jobW, "normal", nil), 0)
@@ -133,11 +133,11 @@ func TestForeignTargets(t *testing.T) {
 	t.Cleanup(func() { owner(t, `DELETE FROM control.diagnostic_runs WHERE id = $1`, runW) })
 
 	// contractor A's job, offer, technician, certificate and payout statement
-	jobC, offerC, techExtA := id(
+	jobC, offerC, techExtA := idOf(
 		"job-contractor-a",
-	), id(
+	), idOf(
 		"offer-contractor-a",
-	), id(
+	), idOf(
 		"tech-external-a",
 	)
 
@@ -146,9 +146,9 @@ func TestForeignTargets(t *testing.T) {
 		contrA(),
 		"certificates.submit",
 		`{"membershipId":"`+techExtA+`","code":"demo_outdoor","name":"Outdoor AC","number":"N-IDOR","issuedAt":"`+
-			at(
+			stamp(
 				-24*30,
-			)+`","expiresAt":"`+at(
+			)+`","expiresAt":"`+stamp(
 			24*300,
 		)+`","file":`+pdf+`}`,
 		0,
@@ -328,7 +328,7 @@ func TestForeignTargets(t *testing.T) {
 			alertPolicyBody(
 				map[string]string{
 					"id":                        `"` + policyA + `"`,
-					fieldRecipientMembershipIDs: `["` + id("customer-b") + `"]`,
+					fieldRecipientMembershipIDs: `["` + idOf("customer-b") + `"]`,
 				},
 			),
 			1,
@@ -337,7 +337,7 @@ func TestForeignTargets(t *testing.T) {
 			customerB(),
 			opPoliciesSave,
 			alertPolicyBody(
-				map[string]string{fieldRecipientMembershipIDs: `["` + id("customer-b") + `"]`},
+				map[string]string{fieldRecipientMembershipIDs: `["` + idOf("customer-b") + `"]`},
 			),
 			0,
 		},
@@ -377,7 +377,7 @@ func TestForeignTargets(t *testing.T) {
 		{
 			customerB(),
 			"automations.simulate",
-			`{"eventId":"` + other + `","occurredAt":"` + at(
+			`{"eventId":"` + other + `","occurredAt":"` + stamp(
 				0,
 			) + `","unitIds":["` + unitA + `"],"facts":[],"phase":"condition"}`,
 			0,
@@ -385,7 +385,7 @@ func TestForeignTargets(t *testing.T) {
 		{
 			customerB(),
 			"automations.fire",
-			`{"eventId":"` + uuid.NewString() + `","occurredAt":"` + at(
+			`{"eventId":"` + uuid.NewString() + `","occurredAt":"` + stamp(
 				0,
 			) + `","unitIds":["` + unitA + `"],"facts":[],"phase":"condition"}`,
 			0,
@@ -413,7 +413,7 @@ func TestForeignTargets(t *testing.T) {
 		{
 			customerB(),
 			opOffsetsPreview,
-			`{"customerId":"` + custA + `","purpose":"Offset","amountKg":1,"period":{` + period + `},"unitIds":["` + id(
+			`{"customerId":"` + custA + `","purpose":"Offset","amountKg":1,"period":{` + period + `},"unitIds":["` + idOf(
 				"unit-other-customer",
 			) + `"]}`,
 			0,
@@ -430,7 +430,7 @@ func TestForeignTargets(t *testing.T) {
 			"notifications.preview",
 			`{"target":{"kind":"unit",` +
 				`"id":"` + unitA + `"},"templateKey":"alert","channel":"inApp",` +
-				`"recipientMembershipId":"` + id(
+				`"recipientMembershipId":"` + idOf(
 				"customer-b",
 			) + `"}`,
 			0,
@@ -475,11 +475,11 @@ func TestForeignTargets(t *testing.T) {
 		{
 			contrB(),
 			opJobsAssign,
-			`{"jobId":"` + jobC + `","technicianMembershipId":"` + id(
+			`{"jobId":"` + jobC + `","technicianMembershipId":"` + idOf(
 				"tech-external-b",
-			) + `","startAt":"` + at(
+			) + `","startAt":"` + stamp(
 				25,
-			) + `","endAt":"` + at(
+			) + `","endAt":"` + stamp(
 				27,
 			) + `"}`,
 			1,
@@ -490,7 +490,7 @@ func TestForeignTargets(t *testing.T) {
 			`{"jobId":"` + jobC + `","offerId":"` + offerC + `","slot":` + slotJSON(
 				49,
 				2,
-			) + `,"technicianMembershipId":"` + id(
+			) + `,"technicianMembershipId":"` + idOf(
 				"tech-external-b",
 			) + `","reason":"Later"}`,
 			1,
@@ -516,9 +516,9 @@ func TestForeignTargets(t *testing.T) {
 		{
 			contrB(),
 			opMembersEligible,
-			`{"jobId":"` + jobC + `","startAt":"` + at(
+			`{"jobId":"` + jobC + `","startAt":"` + stamp(
 				25,
-			) + `","endAt":"` + at(
+			) + `","endAt":"` + stamp(
 				27,
 			) + `","query":{"limit":5}}`,
 			0,
@@ -533,9 +533,9 @@ func TestForeignTargets(t *testing.T) {
 		{
 			contrB(),
 			"certificates.submit",
-			`{"membershipId":"` + techExtA + `","code":"demo_outdoor","name":"Outdoor AC","number":"N-B","issuedAt":"` + at(
+			`{"membershipId":"` + techExtA + `","code":"demo_outdoor","name":"Outdoor AC","number":"N-B","issuedAt":"` + stamp(
 				-24*30,
-			) + `","expiresAt":"` + at(
+			) + `","expiresAt":"` + stamp(
 				24*300,
 			) + `","file":` + pdf + `}`,
 			0,
@@ -699,36 +699,36 @@ func TestForeignTargets(t *testing.T) {
 			0,
 		},
 		// another tenant's unit
-		{hq(), opUnitsGet, `{"id":"` + id("unit-tenant-b") + `"}`, 0},
-		{customerA(), opUnitsGet, `{"id":"` + id("unit-tenant-b") + `"}`, 0},
+		{hq(), opUnitsGet, `{"id":"` + idOf("unit-tenant-b") + `"}`, 0},
+		{customerA(), opUnitsGet, `{"id":"` + idOf("unit-tenant-b") + `"}`, 0},
 	}
 
 	called := map[string]bool{}
-	for _, c := range cases {
-		called[c.op] = true
-		spec := ops.SpecByName()[c.op]
+	for _, testCase := range cases {
+		called[testCase.op] = true
+		spec := ops.SpecByName()[testCase.op]
 
 		var (
 			code int
 			res  map[string]any
 		)
 		if spec.Mode == ops.Write {
-			code, res = write(srv, c.who, c.op, c.body, c.version)
+			code, res = write(srv, testCase.who, testCase.op, testCase.body, testCase.version)
 		} else {
-			code, res = post(srv, c.who, c.op, c.body)
+			code, res = post(srv, testCase.who, testCase.op, testCase.body)
 		}
 
 		if code != 403 && code != 404 {
-			t.Errorf("%s as %s: %d %v", c.op, c.who.membership, code, res)
+			t.Errorf("%s as %s: %d %v", testCase.op, testCase.who.membership, code, res)
 		}
 		// the scope is checked before the expected version: a stale version gets the same refusal, so the answer
 		// never tells that the record exists
-		if spec.Mode == ops.Write && c.version > 0 {
-			if code, reply := write(srv, c.who, c.op, c.body, 97); code != 403 && code != 404 {
+		if spec.Mode == ops.Write && testCase.version > 0 {
+			if code, reply := write(srv, testCase.who, testCase.op, testCase.body, 97); code != 403 && code != 404 {
 				t.Errorf(
 					"%s as %s with a stale version: %d %v",
-					c.op,
-					c.who.membership,
+					testCase.op,
+					testCase.who.membership,
 					code,
 					reply["messageKey"],
 				)
@@ -880,19 +880,19 @@ func TestForeignTargets(t *testing.T) {
 		{
 			contrB(),
 			opJobsList,
-			`{"limit":100,"filters":{"organizationId":"` + id("org-contractor-a") + `"}}`,
+			`{"limit":100,"filters":{"organizationId":"` + idOf("org-contractor-a") + `"}}`,
 			[]string{jobC},
 		},
 		{
 			contrB(),
 			"members.list",
-			`{"limit":100,"filters":{"organizationId":"` + id("org-contractor-a") + `"}}`,
+			`{"limit":100,"filters":{"organizationId":"` + idOf("org-contractor-a") + `"}}`,
 			[]string{techExtA},
 		},
 		{
 			contrB(),
 			"members.capacity",
-			`{"date":"2026-09-15","query":{"limit":100,"filters":{"organizationId":"` + id(
+			`{"date":"2026-09-15","query":{"limit":100,"filters":{"organizationId":"` + idOf(
 				"org-contractor-a",
 			) + `"}}}`,
 			[]string{techExtA},
@@ -900,8 +900,8 @@ func TestForeignTargets(t *testing.T) {
 		{
 			contrB(),
 			"rateCards.list",
-			`{"limit":100,"filters":{"contractorOrgId":"` + id("org-contractor-a") + `"}}`,
-			[]string{id("org-contractor-a")},
+			`{"limit":100,"filters":{"contractorOrgId":"` + idOf("org-contractor-a") + `"}}`,
+			[]string{idOf("org-contractor-a")},
 		},
 		{
 			contrB(),
@@ -912,7 +912,7 @@ func TestForeignTargets(t *testing.T) {
 		{
 			contrB(),
 			"members.unavailability",
-			`{"limit":100,"filters":{"organizationId":"` + id("org-contractor-a") + `"}}`,
+			`{"limit":100,"filters":{"organizationId":"` + idOf("org-contractor-a") + `"}}`,
 			[]string{techExtA, unavA},
 		},
 		{
@@ -924,7 +924,7 @@ func TestForeignTargets(t *testing.T) {
 		{
 			contrB(),
 			"payouts.list",
-			`{"limit":100,"filters":{"contractorOrgId":"` + id("org-contractor-a") + `"}}`,
+			`{"limit":100,"filters":{"contractorOrgId":"` + idOf("org-contractor-a") + `"}}`,
 			[]string{stmtA},
 		},
 		{
@@ -960,7 +960,7 @@ func TestForeignTargets(t *testing.T) {
 		{
 			techB(),
 			opPartsList,
-			`{"limit":100,"filters":{"membershipId":"` + id("tech-internal-a") + `"}}`,
+			`{"limit":100,"filters":{"membershipId":"` + idOf("tech-internal-a") + `"}}`,
 			[]string{jobW},
 		},
 		{
@@ -984,29 +984,29 @@ func TestForeignTargets(t *testing.T) {
 		{
 			hq(),
 			opUnitsList,
-			`{"limit":100,"filters":{"unitIds":["` + id("unit-tenant-b") + `"]}}`,
-			[]string{id("unit-tenant-b")},
+			`{"limit":100,"filters":{"unitIds":["` + idOf("unit-tenant-b") + `"]}}`,
+			[]string{idOf("unit-tenant-b")},
 		},
 	}
-	for _, l := range lists {
-		called[l.op] = true
+	for _, list := range lists {
+		called[list.op] = true
 
-		code, res := post(srv, l.who, l.op, l.body)
+		code, res := post(srv, list.who, list.op, list.body)
 		if code == 403 || code == 404 {
 			continue
 		}
 
 		if code != 200 {
-			t.Errorf("%s as %s: %d %v", l.op, l.who.membership, code, res)
+			t.Errorf("%s as %s: %d %v", list.op, list.who.membership, code, res)
 
 			continue
 		}
 
 		for _, row := range items(t, res) {
 			b := jsonBytes(t, row)
-			for _, f := range l.foreign {
+			for _, f := range list.foreign {
 				if strings.Contains(string(b), f) {
-					t.Errorf("%s as %s returned a foreign row: %s", l.op, l.who.membership, b)
+					t.Errorf("%s as %s returned a foreign row: %s", list.op, list.who.membership, b)
 				}
 			}
 		}
@@ -1126,22 +1126,22 @@ func TestTechnicianRebind(t *testing.T) {
 		return asStr(t, data(res)["id"])
 	}
 	unitOf := func(dev string) string {
-		var u *string
-		ownerScan(t, `SELECT unit_id::text FROM devices.devices WHERE id = $1`, []any{dev}, &u)
+		var unitID *string
+		ownerScan(t, `SELECT unit_id::text FROM devices.devices WHERE id = $1`, []any{dev}, &unitID)
 
-		if u == nil {
+		if unitID == nil {
 			return ""
 		}
 
-		return *u
+		return *unitID
 	}
-	bind := func(dev, unit, job string, v int) (int, map[string]any) {
+	bind := func(dev, unit, job string, version int) (int, map[string]any) {
 		return write(
 			srv,
 			techB(),
 			"devices.bind",
 			`{"deviceId":"`+dev+`","unitId":"`+unit+`","jobId":"`+job+`","reason":"Swap"}`,
-			v,
+			version,
 		)
 	}
 	target := newUnit(t, srv, "Rebind target")

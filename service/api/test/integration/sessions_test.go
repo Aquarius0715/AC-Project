@@ -88,13 +88,13 @@ func TestRevokeSessions(t *testing.T) {
 		from,
 	)
 
-	for m, copyOf := range map[string]string{
+	for membership, copyOf := range map[string]string{
 		"test-revoke-tech":   membershipTechInternalA,
 		"test-revoke-client": membershipCustomerA,
 	} {
 		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
 			SELECT tenant_id, $1, permission FROM identity.membership_permissions WHERE membership_id = $2 ON CONFLICT DO
-			NOTHING`, seed.ID(m), seed.ID(copyOf))
+			NOTHING`, seed.ID(membership), seed.ID(copyOf))
 	}
 
 	owner(
@@ -205,7 +205,7 @@ func TestRevokeSessions(t *testing.T) {
 		t.Errorf("revoked memberships %s", got)
 	}
 
-	for _, c := range []struct {
+	for _, testCase := range []struct {
 		who actor
 		op  string
 	}{
@@ -216,12 +216,12 @@ func TestRevokeSessions(t *testing.T) {
 	} {
 		if code, res := post(
 			srv,
-			&c.who,
-			c.op,
+			&testCase.who,
+			testCase.op,
 			`{}`,
 		); code != 401 ||
 			res["messageKey"] != "errors.session_revoked" {
-			t.Errorf("%s as %s signed in before: %d %v", c.op, c.who.token, code, res)
+			t.Errorf("%s as %s signed in before: %d %v", testCase.op, testCase.who.token, code, res)
 		}
 	}
 	// a sign-in in the revocation's own second: auth_time has whole seconds, so it cannot be told from one just before

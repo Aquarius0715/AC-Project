@@ -49,7 +49,7 @@ func TestPersonAddedAgain(t *testing.T) {
 		}
 	}
 	email := "again-" + uuid.NewString()[:8] + "@example.com"
-	add := func(a *actor, role, name string) (int, map[string]any) {
+	add := func(who *actor, role, name string) (int, map[string]any) {
 		access := ""
 		if role == roleTechnician {
 			access = `,"accessUntil":"` + clock().Add(30*24*time.Hour).Format(time.RFC3339) + `"`
@@ -57,7 +57,7 @@ func TestPersonAddedAgain(t *testing.T) {
 
 		return write(
 			srv,
-			a,
+			who,
 			"partnerUsers.save",
 			`{"email":"`+email+`","partnerRole":"`+role+`","displayName":"`+name+`"`+access+`}`,
 			0,
@@ -65,14 +65,14 @@ func TestPersonAddedAgain(t *testing.T) {
 	}
 	// removed: the membership ends now. The test clock stands still, so the adding was "now" too and the end is a second
 	// later; the removal is moved to when it would be, after the adding.
-	remove := func(id, membership string) {
+	remove := func(partnerUserID, membership string) {
 		t.Helper()
 
 		if code, res := write(
 			srv,
 			contrA(),
 			"partnerUsers.remove",
-			`{"id":"`+id+`","reason":"added with the wrong role"}`,
+			`{"id":"`+partnerUserID+`","reason":"added with the wrong role"}`,
 			1,
 		); code != 200 {
 			t.Fatalf("remove: %d %v", code, res)
@@ -309,7 +309,7 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 		clock().Add(10*24*time.Hour),
 	)
 
-	var id string
+	var partnerUserID string
 	ownerScan(
 		t,
 		`INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role,
@@ -323,23 +323,23 @@ func TestAccountSwitchedByMembership(t *testing.T) {
 			clock().Add(-24 * time.Hour),
 			seed.ID("contractor-b"),
 		},
-		&id,
+		&partnerUserID,
 	)
 	t.Cleanup(func() {
-		owner(t, `DELETE FROM identity.partner_users WHERE id = $1`, id)
+		owner(t, `DELETE FROM identity.partner_users WHERE id = $1`, partnerUserID)
 		owner(t, `DELETE FROM identity.memberships WHERE id = $1`, membership)
 		owner(t, `DELETE FROM identity.users WHERE id = $1`, user)
 	})
 
-	set := func(status string, v int) {
+	set := func(status string, version int) {
 		t.Helper()
 
 		if code, res := write(
 			srv,
 			contrB(),
 			"partnerUsers.save",
-			`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","status":"`+status+`","reason":"on leave"}`,
-			v,
+			`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"technician","status":"`+status+`","reason":"on leave"}`,
+			version,
 		); code != 200 {
 			t.Fatalf("%s: %d %v", status, code, res)
 		}
@@ -534,7 +534,7 @@ func TestAccountProviderTrouble(t *testing.T) {
 
 		return sub, signIn
 	}
-	id, membership := add()
+	partnerUserID, membership := add()
 
 	drain()
 
@@ -548,14 +548,14 @@ func TestAccountProviderTrouble(t *testing.T) {
 	owner(
 		t,
 		`UPDATE identity.partner_users SET last_invite_sent_at = NULL WHERE id = $1`,
-		id,
+		partnerUserID,
 	) // past the 5-minute wait (IR423)
 
 	if code, res := write(
 		srv,
 		contrA(),
 		"partnerUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+partnerUserID+`"}`,
 		0,
 	); code != 200 {
 		t.Fatalf("resend: %d %v", code, res)
@@ -572,7 +572,7 @@ func TestAccountProviderTrouble(t *testing.T) {
 		srv,
 		contrA(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"left"}`,
+		`{"id":"`+partnerUserID+`","reason":"left"}`,
 		1,
 	); code != 200 {
 		t.Fatalf("remove: %d %v", code, res)
@@ -616,8 +616,8 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 	ids := make([]uuid.UUID, 0, 2*identity.AccountsPerOrgPerDay)
 	for _, org := range []string{"org-contractor-b", "org-customer-b"} {
 		for idx := range identity.AccountsPerOrgPerDay { // ended memberships added 1 h to 1 h 29 min ago
-			id := uuid.New()
-			ids = append(ids, id)
+			membershipID := uuid.New()
+			ids = append(ids, membershipID)
 
 			role, employment, clientRole := roleTechnician, any("external"), any(nil)
 			if org == "org-customer-b" {
@@ -629,7 +629,7 @@ func TestAccountsPerOrgPerDay(t *testing.T) {
 				`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, client_role,
 					valid_from, valid_until, created_at)
 				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-				id,
+				membershipID,
 				seed.ID("tenant-a"),
 				filler,
 				seed.ID(org),

@@ -264,18 +264,18 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 
 	_, all := post(srv, contrA(), "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
 	_, seen := post(srv, customerA(), "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
-	es := asObj(t, listJob(t, srv, contrA(), job)["eventSummary"])
+	eventSummary := asObj(t, listJob(t, srv, contrA(), job)["eventSummary"])
 
 	newest := items(t, all)[len(items(t, all))-1]
-	if es["count"] != float64(len(items(t, all))) ||
-		es["customerVisible"] != float64(len(items(t, seen))) ||
-		es["customerVisible"] == es["count"] ||
-		es["notes"] != float64(1) ||
-		asObj(t, es["latest"])["action"] != newest["action"] ||
-		asObj(t, es["latest"])["occurredAt"] != newest["occurredAt"] {
+	if eventSummary["count"] != float64(len(items(t, all))) ||
+		eventSummary["customerVisible"] != float64(len(items(t, seen))) ||
+		eventSummary["customerVisible"] == eventSummary["count"] ||
+		eventSummary["notes"] != float64(1) ||
+		asObj(t, eventSummary["latest"])["action"] != newest["action"] ||
+		asObj(t, eventSummary["latest"])["occurredAt"] != newest["occurredAt"] {
 		t.Fatalf(
 			"event summary: %v (contractor reads %d, customer %d)",
-			es,
+			eventSummary,
 			len(items(t, all)),
 			len(items(t, seen)),
 		)
@@ -377,12 +377,12 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 
 	// expired unanswered offers disappear
 	_, res = write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
-	j2 := asStr(t, data(res)["id"])
+	job2 := asStr(t, data(res)["id"])
 	write(
 		srv,
 		hq(),
 		"jobs.offer",
-		`{"jobId":"`+j2+`","contractorOrgId":"`+seed.ID("org-contractor-a").
+		`{"jobId":"`+job2+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
 			`","visitSlot":`+slotJSON(
 			49,
@@ -397,9 +397,9 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		)+`","termsVersion":"t"}`,
 		1,
 	)
-	owner(t, `UPDATE maintenance.offers SET offer_expires_at = $2 WHERE job_id = $1`, j2, clock())
+	owner(t, `UPDATE maintenance.offers SET offer_expires_at = $2 WHERE job_id = $1`, job2, clock())
 
-	if listJob(t, srv, contrA(), j2) != nil {
+	if listJob(t, srv, contrA(), job2) != nil {
 		t.Error("expired offer listed")
 	}
 

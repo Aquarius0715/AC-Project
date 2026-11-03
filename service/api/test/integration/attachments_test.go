@@ -27,13 +27,13 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	rep := asStr(t, data(res)["id"])
 	img, jpg := tinyPNG(t), tinyJPEG(t)
 	flood := pngHeader(50000, 50000) // 2.5 gigapixels declared in a few dozen bytes (IR389)
-	add := func(file string, v int) (int, map[string]any) {
+	add := func(file string, version int) (int, map[string]any) {
 		return write(
 			srv,
 			techInt(),
 			"attachments.add",
 			`{"jobId":"`+job+`","reportId":"`+rep+`","file":`+file+`}`,
-			v,
+			version,
 		)
 	}
 	want := map[string]string{ // the field each case is refused for
@@ -50,7 +50,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		"override in the name":   refusedFileInvalid,
 	}
 
-	for name, f := range map[string]string{
+	for name, file := range map[string]string{
 		"gif":            blobJSON("a.gif", "image/gif", img, len(img)),
 		caseSizeMismatch: blobJSON("a.png", "image/png", img, 3),
 		casePixelFlood:   blobJSON("flood.png", "image/png", flood, len(flood)),
@@ -63,7 +63,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		"path in the name":       blobJSON("../../a.png", "image/png", img, len(img)),
 		"override in the name":   blobJSON("photo\u202egnp.exe", "image/png", img, len(img)),
 	} {
-		code, m := add(f, 1)
+		code, m := add(file, 1)
 		refusal(t, name, code, m, want[name])
 	}
 
@@ -120,15 +120,15 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		}
 	}
 	// sign-off
-	sign := func(extra string, v, rv int) (int, map[string]any) {
+	sign := func(extra string, version, reportVersion int) (int, map[string]any) {
 		return write(
 			srv,
 			techInt(),
 			"reports.signOff",
 			`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":`+itoa(
-				rv,
+				reportVersion,
 			)+`,"signerName":" Aisha "`+extra+`}`,
-			v,
+			version,
 		)
 	}
 	sig := blobJSON("sig.png", "image/png", img, len(img))
@@ -178,13 +178,13 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		t.Fatalf("absent sign-off: %d %v", code, resp)
 	}
 	// getContent
-	get := func(a *actor, v int) (int, map[string]any) {
+	get := func(a *actor, version int) (int, map[string]any) {
 		return post(
 			srv,
 			a,
 			"attachments.getContent",
 			`{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":`+itoa(
-				v,
+				version,
 			)+`,"attachmentId":"`+att+`"}`,
 		)
 	}

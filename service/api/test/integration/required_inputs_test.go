@@ -27,7 +27,7 @@ func TestRequiredInputs(t *testing.T) {
 	long := func(n int) string { return `"` + strings.Repeat("x", n) + `"` }
 
 	req, inv, length, rng := apperr.KeyRequired, apperr.KeyInvalid, apperr.KeyLength, apperr.KeyRange
-	for _, c := range []struct {
+	for _, testCase := range []struct {
 		op   string
 		body string            // without the path parameters
 		want map[string]string // field → message key
@@ -229,14 +229,14 @@ func TestRequiredInputs(t *testing.T) {
 	} {
 		body := map[string]any{}
 
-		err := json.Unmarshal([]byte(c.body), &body)
+		err := json.Unmarshal([]byte(testCase.body), &body)
 		if err != nil {
-			t.Fatalf("%s: body %v", c.op, err)
+			t.Fatalf("%s: body %v", testCase.op, err)
 		}
 
-		spec, ok := ops.SpecByName()[c.op]
+		spec, ok := ops.SpecByName()[testCase.op]
 		if !ok || len(spec.Routes) == 0 {
-			t.Errorf("%s: not in the catalog", c.op)
+			t.Errorf("%s: not in the catalog", testCase.op)
 
 			continue
 		}
@@ -248,12 +248,12 @@ func TestRequiredInputs(t *testing.T) {
 		}
 
 		b := jsonBytes(t, body)
-		code, m := write(srv, hq(), c.op, string(b), 0)
+		code, m := write(srv, hq(), testCase.op, string(b), 0)
 
 		fe, _ := m["fieldErrors"].(map[string]any)
-		for field, key := range c.want {
+		for field, key := range testCase.want {
 			if code != 422 || fe[field] != key {
-				t.Errorf("%s: %s want %s, got %d %v", c.op, field, key, code, fe)
+				t.Errorf("%s: %s want %s, got %d %v", testCase.op, field, key, code, fe)
 
 				break
 			}

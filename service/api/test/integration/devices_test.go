@@ -155,14 +155,14 @@ func TestDevicesRegisterListGet(t *testing.T) {
 		t.Errorf("sensor not in capability (IR43): %d %s", code, fields(res))
 	}
 
-	for b, want := range map[string]string{
+	for payload, want := range map[string]string{
 		body("a", unit, `[]`, ""):                     "serial=error.serialFormat",
 		body("bad serial!", unit, `[]`, ""):           "serial=error.serialFormat",
 		body("OK-123", unit, `["power","power"]`, ""): "sensorTypes=error.duplicate",
 		`{"serial":"OK-1","unitId":"` + unit + `"}`:   "sensorTypes=error.required",
 	} {
-		code, m := write(srv, hq(), "devices.register", b, 0)
-		refusal(t, b, code, m, want)
+		code, m := write(srv, hq(), "devices.register", payload, 0)
+		refusal(t, payload, code, m, want)
 	}
 
 	if code, _ := write(
@@ -236,102 +236,102 @@ func TestTechnicianWriteTable(t *testing.T) {
 	)
 
 	reg := func(unit, job string) (int, map[string]any) {
-		j := ""
+		jobID := ""
 		if job != "" {
-			j = `,"jobId":"` + job + `"`
+			jobID = `,"jobId":"` + job + `"`
 		}
 
 		return write(
 			srv,
 			techInt(),
 			"devices.register",
-			`{"serial":"T-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+unit+`"`+j+`}`,
+			`{"serial":"T-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+unit+`"`+jobID+`}`,
 			0,
 		)
 	}
 
-	u1 := newUnit(t, srv, "Tech AC")
-	if code, m := reg(u1, ""); code != 422 || asObj(t, m["fieldErrors"])["jobId"] == nil {
+	unit1 := newUnit(t, srv, "Tech AC")
+	if code, m := reg(unit1, ""); code != 422 || asObj(t, m["fieldErrors"])["jobId"] == nil {
 		t.Fatalf("jobId required: %d %v", code, m)
 	}
 
-	if code, _ := reg(u1, uuid.NewString()); code != 404 {
+	if code, _ := reg(unit1, uuid.NewString()); code != 404 {
 		t.Error("never assigned → NOT_FOUND")
 	}
 
 	future := assign(
 		t,
-		u1,
+		unit1,
 		"tech-internal-a",
 		clock().Add(time.Hour),
 		clock().Add(3*time.Hour),
 		"active",
 	)
 	if code, m := reg(
-		u1,
+		unit1,
 		future,
 	); code != 403 ||
 		m["messageKey"] != keyAssignmentNotStarted {
 		t.Fatalf("before window: %d %v", code, m)
 	}
 
-	u2 := newUnit(t, srv, "Tech AC2")
+	unit2 := newUnit(t, srv, "Tech AC2")
 
 	ended := assign(
 		t,
-		u2,
+		unit2,
 		"tech-internal-a",
 		clock().Add(-3*time.Hour),
 		clock().Add(-time.Hour),
 		"active",
 	)
-	if code, m := reg(u2, ended); code != 403 || m["messageKey"] != keyAssignmentEnded {
+	if code, m := reg(unit2, ended); code != 403 || m["messageKey"] != keyAssignmentEnded {
 		t.Fatalf("after window: %d %v", code, m)
 	}
 
-	u3 := newUnit(t, srv, "Tech AC3")
+	unit3 := newUnit(t, srv, "Tech AC3")
 
 	revoked := assign(
 		t,
-		u3,
+		unit3,
 		"tech-internal-a",
 		clock().Add(-time.Hour),
 		clock().Add(time.Hour),
 		"revoked",
 	)
-	if code, m := reg(u3, revoked); code != 403 || m["messageKey"] != keyAssignmentEnded {
+	if code, m := reg(unit3, revoked); code != 403 || m["messageKey"] != keyAssignmentEnded {
 		t.Fatalf("revoked after start: %d %v", code, m)
 	}
 
-	u4 := newUnit(t, srv, "Tech AC4")
+	unit4 := newUnit(t, srv, "Tech AC4")
 
 	revokedEarly := assign(
 		t,
-		u4,
+		unit4,
 		"tech-internal-a",
 		clock().Add(time.Hour),
 		clock().Add(2*time.Hour),
 		"revoked",
 	)
-	if code, _ := reg(u4, revokedEarly); code != 404 {
+	if code, _ := reg(unit4, revokedEarly); code != 404 {
 		t.Errorf("revoked before start → NOT_FOUND: %d", code)
 	}
 
-	u5 := newUnit(t, srv, "Tech AC5")
+	unit5 := newUnit(t, srv, "Tech AC5")
 
 	active := assign(
 		t,
-		u5,
+		unit5,
 		"tech-internal-a",
 		clock().Add(-time.Hour),
 		clock().Add(time.Hour),
 		"active",
 	)
-	if code, _ := reg(u1, active); code != 404 {
+	if code, _ := reg(unit1, active); code != 404 {
 		t.Error("job for another unit → NOT_FOUND")
 	}
 
-	if code, m := reg(u5, active); code != 200 {
+	if code, m := reg(unit5, active); code != 200 {
 		t.Fatalf("inside window: %d %v", code, m)
 	}
 
@@ -343,7 +343,7 @@ func TestTechnicianWriteTable(t *testing.T) {
 		clock().Add(time.Hour),
 		"active",
 	)
-	if code, _ := reg(u5, other); code != 404 {
+	if code, _ := reg(unit5, other); code != 404 {
 		t.Error("another technician's assignment → NOT_FOUND")
 	}
 }
@@ -351,12 +351,12 @@ func TestTechnicianWriteTable(t *testing.T) {
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestDeviceBindAndOperations(t *testing.T) {
 	srv := server(t)
-	u1, u2 := newUnit(t, srv, "Op AC"), newUnit(t, srv, "Op AC2")
+	unit1, unit2 := newUnit(t, srv, "Op AC"), newUnit(t, srv, "Op AC2")
 	_, resp := write(
 		srv,
 		hq(),
 		"devices.register",
-		`{"serial":"OP-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+u1+`"}`,
+		`{"serial":"OP-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+unit1+`"}`,
 		0,
 	)
 	dev := asStr(t, data(resp)["id"])
@@ -370,7 +370,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		srv,
 		hq(),
 		"devices.bind",
-		`{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":""}`,
+		`{"deviceId":"`+dev+`","unitId":"`+unit1+`","reason":""}`,
 		1,
 	); code != 422 ||
 		fields(res) != refusedReasonLength {
@@ -381,17 +381,17 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		srv,
 		hq(),
 		"devices.bind",
-		`{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":"install"}`,
+		`{"deviceId":"`+dev+`","unitId":"`+unit1+`","reason":"install"}`,
 		1,
 	)
 
-	v := ver(t, resp)
+	version := ver(t, resp)
 	if code, _ := write(
 		srv,
 		hq(),
 		"devices.bind",
-		`{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":"again"}`,
-		v,
+		`{"deviceId":"`+dev+`","unitId":"`+unit1+`","reason":"again"}`,
+		version,
 	); code != 409 {
 		t.Error("already bound to this unit")
 	}
@@ -402,13 +402,13 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		"devices.calibrate",
 		`{"deviceId":"`+dev+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C","referenceValue":25,`+
 			`"measuredValue":25.4,"calibratedAt":"2026-09-14T00:30:00Z"}`,
-		v,
+		version,
 	)
-	if code != 200 || data(resp)["isDemo"] != true || data(resp)["unitIdAtOccurrence"] != u1 {
+	if code != 200 || data(resp)["isDemo"] != true || data(resp)["unitIdAtOccurrence"] != unit1 {
 		t.Fatalf("calibrate: %d %v", code, resp)
 	}
 
-	v++
+	version++
 	want := map[string]string{ // the field each case is refused for
 		caseFuture:       "calibratedAt=error.future",
 		"metric differs": "metric=error.sensorMismatch",
@@ -416,7 +416,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		caseUnitMismatch: "unit=error.unitMismatch",
 	}
 
-	for name, b := range map[string]string{
+	for name, body := range map[string]string{
 		caseFuture: `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"temperature","unit":"°C",` +
 			`"referenceValue":1,"measuredValue":1,"calibratedAt":"2030-01-01T00:00:00Z"}`,
 		caseUnitMismatch: `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"temperature","unit":"%",` +
@@ -426,16 +426,16 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		"metric differs": `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"humidity","unit":"%",` +
 			`"referenceValue":1,"measuredValue":1,"calibratedAt":"2026-09-14T00:30:00Z"}`,
 	} {
-		code, m := write(srv, hq(), "devices.calibrate", b, v)
+		code, m := write(srv, hq(), "devices.calibrate", body, version)
 		refusal(t, name, code, m, want[name])
 	}
 
-	code, resp = write(srv, hq(), "devices.check", `{"id":"`+dev+`"}`, v)
+	code, resp = write(srv, hq(), "devices.check", `{"id":"`+dev+`"}`, version)
 	if code != 200 || data(resp)["status"] != statusQueued || data(resp)["kind"] != "check" {
 		t.Fatalf("check: %d %v", code, resp)
 	}
 
-	v++
+	version++
 
 	if code, res := post(
 		srv,
@@ -447,7 +447,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		t.Fatal("activeOperation shown")
 	}
 
-	if code, _ := write(srv, hq(), "devices.check", `{"id":"`+dev+`"}`, v); code != 409 {
+	if code, _ := write(srv, hq(), "devices.check", `{"id":"`+dev+`"}`, version); code != 409 {
 		t.Error("D05: one operation at a time")
 	}
 
@@ -455,8 +455,8 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		srv,
 		hq(),
 		"devices.bind",
-		`{"deviceId":"`+dev+`","unitId":"`+u2+`","reason":"move"}`,
-		v,
+		`{"deviceId":"`+dev+`","unitId":"`+unit2+`","reason":"move"}`,
+		version,
 	); code != 409 {
 		t.Error("cannot rebind while an operation runs")
 	}
@@ -466,7 +466,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		hq(),
 		"devices.updateFirmware",
 		`{"deviceId":"`+dev+`","firmwareVersion":"v2"}`,
-		v,
+		version,
 	); code != 409 ||
 		res["code"] != codeOffline {
 		t.Fatalf("offline firmware: %d %v", code, res)
@@ -480,7 +480,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		hq(),
 		"devices.updateFirmware",
 		`{"deviceId":"`+dev+`","firmwareVersion":"v9"}`,
-		v,
+		version,
 	); code != 422 ||
 		fields(res) != "firmwareVersion=error.unsupportedFirmware" {
 		t.Errorf("unsupported firmware: %d %s", code, fields(res))
@@ -491,7 +491,7 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		hq(),
 		"devices.updateFirmware",
 		`{"deviceId":"`+dev+`","firmwareVersion":"v1"}`,
-		v,
+		version,
 	); code != 422 ||
 		fields(res) != "firmwareVersion=error.unsupportedFirmware" {
 		t.Errorf("current firmware is not a target: %d %s", code, fields(res))
@@ -502,13 +502,13 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		hq(),
 		"devices.updateFirmware",
 		`{"deviceId":"`+dev+`","firmwareVersion":"v2"}`,
-		v,
+		version,
 	); code != 200 ||
 		data(res)["targetVersion"] != "v2" {
 		t.Fatalf("firmware: %d %v", code, res)
 	}
 
-	v++
+	version++
 
 	owner(t, `UPDATE devices.device_operations SET status = 'succeeded' WHERE device_id = $1`, dev)
 	// rebind to another unit: old binding ends, new sensors
@@ -516,14 +516,14 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		srv,
 		hq(),
 		"devices.bind",
-		`{"deviceId":"`+dev+`","unitId":"`+u2+`","reason":"moved"}`,
-		v,
+		`{"deviceId":"`+dev+`","unitId":"`+unit2+`","reason":"moved"}`,
+		version,
 	)
-	if code != 200 || data(resp)["unitId"] != u2 {
+	if code != 200 || data(resp)["unitId"] != unit2 {
 		t.Fatalf("rebind: %d %v", code, resp)
 	}
 
-	v++
+	version++
 	// tamper blocks rebinding
 	owner(t, `UPDATE devices.devices SET tamper = 'detected' WHERE id = $1`, dev)
 
@@ -531,8 +531,8 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		srv,
 		hq(),
 		"devices.bind",
-		`{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":"back"}`,
-		v,
+		`{"deviceId":"`+dev+`","unitId":"`+unit1+`","reason":"back"}`,
+		version,
 	); code != 409 ||
 		res["messageKey"] != apperr.KeyTamperUnresolved {
 		t.Fatalf("tamper: %d %v", code, res)
@@ -542,8 +542,8 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		srv,
 		hq(),
 		"devices.bind",
-		`{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":"back"}`,
-		v-1,
+		`{"deviceId":"`+dev+`","unitId":"`+unit1+`","reason":"back"}`,
+		version-1,
 	); code != 409 {
 		t.Error("stale version")
 	}

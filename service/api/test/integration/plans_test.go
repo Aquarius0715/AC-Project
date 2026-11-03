@@ -29,7 +29,7 @@ func TestPlans(t *testing.T) {
 		"weekly":      refusedRecurrenceInvalid,
 	}
 
-	for name, b := range map[string]string{
+	for name, payload := range map[string]string{
 		"interval 0": `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":0},` +
 			`"nextDueAt":"` + next.Format(time.RFC3339) + `"}`,
 		"interval 13": `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":13},` +
@@ -39,7 +39,7 @@ func TestPlans(t *testing.T) {
 		casePast: `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":3},` +
 			`"nextDueAt":"` + clock().Add(-time.Hour).Format(time.RFC3339) + `"}`,
 	} {
-		code, m := write(srv, hq(), "plans.save", b, 0)
+		code, m := write(srv, hq(), "plans.save", payload, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
@@ -103,7 +103,7 @@ func TestPlans(t *testing.T) {
 	{
 		other := newUnit(t, srv, "Plan AC 2")
 		later := next.Add(5 * 24 * time.Hour) // the 29th
-		save := func(id string, months int, at time.Time, v int) map[string]any {
+		save := func(id string, months int, when time.Time, version int) map[string]any {
 			idField := ""
 			if id != "" {
 				idField = `"id":"` + id + `",`
@@ -115,10 +115,10 @@ func TestPlans(t *testing.T) {
 				"plans.save",
 				`{`+idField+`"unitId":"`+other+`","recurrence":{"kind":"monthly","intervalMonths":`+itoa(
 					months,
-				)+`},"nextDueAt":"`+at.Format(
+				)+`},"nextDueAt":"`+when.Format(
 					time.RFC3339,
 				)+`"}`,
-				v,
+				version,
 			)
 			if code != 200 {
 				t.Fatalf("save: %d %v", code, res)
@@ -127,23 +127,23 @@ func TestPlans(t *testing.T) {
 			return data(res)
 		}
 
-		p := save("", 3, next, 0)
-		if p = save(asStr(t, p["id"]), 3, later, 1); asNum(t, p["anchorDay"]) != 29 {
-			t.Errorf("re-anchored: %v", p)
+		created := save("", 3, next, 0)
+		if created = save(asStr(t, created["id"]), 3, later, 1); asNum(t, created["anchorDay"]) != 29 {
+			t.Errorf("re-anchored: %v", created)
 		}
 
-		if p = save(asStr(t, p["id"]), 6, later, 2); asNum(t, p["anchorDay"]) != 29 {
-			t.Errorf("anchor kept: %v", p)
+		if created = save(asStr(t, created["id"]), 6, later, 2); asNum(t, created["anchorDay"]) != 29 {
+			t.Errorf("anchor kept: %v", created)
 		}
 	}
 	// generateNext
-	gen := func(at time.Time, v int) (int, map[string]any) {
+	gen := func(at time.Time, version int) (int, map[string]any) {
 		return write(
 			srv,
 			hq(),
 			"plans.generateNext",
 			`{"id":"`+plan+`","occurrenceDate":"`+at.Format(time.RFC3339)+`"}`,
-			v,
+			version,
 		)
 	}
 	if code, _ := gen(next.Add(time.Hour), 2); code != 409 {

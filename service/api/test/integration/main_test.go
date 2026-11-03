@@ -45,17 +45,17 @@ func webTitles() (map[string]bool, error) {
 		return nil, apperr.Wrap(err, "os.ReadFile")
 	}
 
-	s := string(src)
+	source := string(src)
 
-	start := strings.Index(s, "export const jobEventTitle")
+	start := strings.Index(source, "export const jobEventTitle")
 	if start < 0 {
 		return nil, errNoTitleTable
 	}
 
-	end := strings.Index(s[start:], "};")
+	end := strings.Index(source[start:], "};")
 
 	keys := map[string]bool{}
-	for _, k := range regexp.MustCompile(`"?([a-z_]+(?:\.[a-z_]+)?)"?\s*:\s*"`).FindAllStringSubmatch(s[start:start+end],
+	for _, k := range regexp.MustCompile(`"?([a-z_]+(?:\.[a-z_]+)?)"?\s*:\s*"`).FindAllStringSubmatch(source[start:start+end],
 		-1) {
 		keys[k[1]] = true
 	}

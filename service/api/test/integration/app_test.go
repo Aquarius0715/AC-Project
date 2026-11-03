@@ -94,21 +94,21 @@ func seedFixture(t *testing.T) *seed.Fixture {
 type testTokens auth.StaticVerifier
 
 func (v testTokens) Verify(ctx context.Context, token string) (auth.Identity, error) {
-	tok, at, signed := strings.Cut(token, "@")
+	tok, authTime, signed := strings.Cut(token, "@")
 
-	id, err := auth.StaticVerifier(v).Verify(ctx, tok)
+	verified, err := auth.StaticVerifier(v).Verify(ctx, tok)
 	if err != nil || !signed {
-		return id, apperr.Wrap(err, "auth.StaticVerifier.Verify")
+		return verified, apperr.Wrap(err, "auth.StaticVerifier.Verify")
 	}
 
-	sec, err := strconv.ParseInt(at, 10, 64)
+	sec, err := strconv.ParseInt(authTime, 10, 64)
 	if err != nil {
 		return auth.Identity{}, apperr.Wrap(err, "strconv.ParseInt")
 	}
 
-	id.SignedIn = time.Unix(sec, 0).UTC()
+	verified.SignedIn = time.Unix(sec, 0).UTC()
 
-	return id, nil
+	return verified, nil
 }
 
 // testVerifier maps the static test tokens to the fixture users.
@@ -116,28 +116,28 @@ func testVerifier(t *testing.T) testTokens {
 	t.Helper()
 	f := seedFixture(t)
 
-	v := testTokens{}
-	for _, a := range f.Actors {
-		v["tok-"+
+	tokens := testTokens{}
+	for _, seeded := range f.Actors {
+		tokens["tok-"+
 			map[string]string{
 				membershipHQOperator: "hq", membershipCustomerA: "a", membershipCustomerB: "b", "tech-external-b": "tb",
 				membershipTechInternalA: "ti", "tech-external-a": "ta", "contractor-a": "ca", "contractor-b": "cb",
 				"hq-restriction-manager": "rm", "hq-override-only": "oo",
-			}[a.MembershipID]] = seed.ID(a.UserID).
+			}[seeded.MembershipID]] = seed.ID(seeded.UserID).
 			String()
 	}
 
-	v["tok-rv"] = seed.ID("user-test-revoke").
+	tokens["tok-rv"] = seed.ID("user-test-revoke").
 		String()
 		// TestRevokeSessions' own user: revoking a seed user would end the other tests' tokens
-	return v
+	return tokens
 }
 
 // serverCfg builds a server on the test database; opt adjusts the configuration (domains, identity source). In
 // cluster mode an all-domain server is the split-service facade (cluster_test.go), unless it injects failures.
 func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 	t.Helper()
-	v := testVerifier(t)
+	tokens := testVerifier(t)
 	cfg := apiserver.Config{
 		DatabaseURL:       testDB("ac_app_login"),
 		Clock:             clock,
@@ -168,13 +168,13 @@ func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 
 	if clusterMode() && len(cfg.Domains) == 0 &&
 		cfg.WrapTx == nil { // a failing transaction is injected in-process only
-		f := clusterFacade(t, cfg, v)
+		f := clusterFacade(t, cfg, tokens)
 		lastServer = f
 
 		return f
 	}
 
-	srv, err := apiserver.New(context.Background(), cfg, v)
+	srv, err := apiserver.New(context.Background(), cfg, tokens)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,15 +213,15 @@ func drainEventsContext(ctx context.Context, t *testing.T) {
 	}
 }
 
-func post(srv *apiserver.Server, a *actor, op, body string) (int, map[string]any) {
+func post(srv *apiserver.Server, who *actor, op, body string) (int, map[string]any) {
 	method, target, reqBody := ops.ClientRequest(op, body)
 	req := httptest.NewRequestWithContext(context.Background(), method, target, reqBody)
 	req.Header.Set("Content-Type", "application/json")
 
-	if a != nil {
-		req.Header.Set("Authorization", "Bearer "+a.token)
+	if who != nil {
+		req.Header.Set("Authorization", "Bearer "+who.token)
 		req.Header.Set("X-Tenant-Id", seed.ID("tenant-a").String())
-		req.Header.Set("X-Membership-Id", seed.ID(a.membership).String())
+		req.Header.Set("X-Membership-Id", seed.ID(who.membership).String())
 	}
 
 	rec := httptest.NewRecorder()
@@ -289,26 +289,26 @@ func TestSessionGet(t *testing.T) {
 		t.Errorf("names: %v %v (%s, %s)", doc["displayName"], doc["organizationName"], user, org)
 	}
 
-	if _, c := post(
+	if _, session := post(
 		srv,
 		contrA(),
 		"session.get",
 		`{}`,
-	); asObj(t, c["data"])["organizationId"] != seed.ID("org-contractor-a").
+	); asObj(t, session["data"])["organizationId"] != seed.ID("org-contractor-a").
 		String() { // IR276: the own company
-		t.Errorf("contractor session organization: %v", c["data"])
+		t.Errorf("contractor session organization: %v", session["data"])
 	}
 
-	if _, c := post(
+	if _, session := post(
 		srv,
 		customerA(),
 		"session.get",
 		`{}`,
-	); asObj(t, c["data"])["clientRole"] != clientRoleOwner ||
-		asObj(t, c["data"])["organizationName"] == "" ||
-		asObj(t, c["data"])["customerId"] != seed.ID("cust-a").
+	); asObj(t, session["data"])["clientRole"] != clientRoleOwner ||
+		asObj(t, session["data"])["organizationName"] == "" ||
+		asObj(t, session["data"])["customerId"] != seed.ID("cust-a").
 			String() { // IR243: the client's customer
-		t.Errorf("client owner session: %v", c["data"])
+		t.Errorf("client owner session: %v", session["data"])
 	}
 
 	if doc["customerId"] != nil {
@@ -352,9 +352,9 @@ func TestUnitsListScopes(t *testing.T) {
 
 	_ = other
 
-	for _, u := range mine {
-		if u["customerOrgId"] != seed.ID("org-customer-a").String() {
-			t.Fatalf("customer-a sees another customer's unit: %v", u["displayName"])
+	for _, unit := range mine {
+		if unit["customerOrgId"] != seed.ID("org-customer-a").String() {
+			t.Fatalf("customer-a sees another customer's unit: %v", unit["displayName"])
 		}
 		// SR27 on the fixture clock: online + fresh observation + fresh valid measured power → on/off; offline → unknown
 		want := map[string]string{
@@ -363,8 +363,8 @@ func TestUnitsListScopes(t *testing.T) {
 			seed.ID("unit-offline-rto").String(): powerUnknown,
 			seed.ID("unit-limited").String():     "on",
 		}
-		if w, ok := want[u["id"].(string)]; ok && u["effectivePowerState"] != w {
-			t.Fatalf("%v: power %v want %s", u["displayName"], u["effectivePowerState"], w)
+		if w, ok := want[unit["id"].(string)]; ok && unit["effectivePowerState"] != w {
+			t.Fatalf("%v: power %v want %s", unit["displayName"], unit["effectivePowerState"], w)
 		}
 	}
 	// internal technicians: Membership.scopes; external technicians: only units of their own Assignments (IR49(b))
@@ -479,12 +479,12 @@ func TestUnitsListScopes(t *testing.T) {
 func TestUnitsGet(t *testing.T) {
 	srv := server(t)
 
-	id := seed.ID("unit-online-rto").String()
+	unitID := seed.ID("unit-online-rto").String()
 	if code, res := post(
 		srv,
 		customerA(),
 		"units.get",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+unitID+`"}`,
 	); code != 200 ||
 		asObj(t, res["data"])["displayName"] != "Bedroom AC" {
 		t.Fatalf("own unit: %d", code)
@@ -494,7 +494,7 @@ func TestUnitsGet(t *testing.T) {
 		srv,
 		customerB(),
 		"units.get",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+unitID+`"}`,
 	); code != 404 ||
 		res["code"] != "NOT_FOUND" {
 		t.Fatalf("other customer's unit must be NOT_FOUND (D01): %d", code)

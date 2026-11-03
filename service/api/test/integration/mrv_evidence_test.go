@@ -24,25 +24,25 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 	var jobs []string
 
 	job := func(unitID string) string {
-		id := uuid.NewString()
+		jobID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at,
 				completed_at)
 			VALUES ($1,$2,$3,$4,'reactive','completed','client_request',tstzrange($5,$6),$6,$6)`,
-			id,
+			jobID,
 			tenant,
 			unitID,
 			seed.ID("org-customer-b"),
 			input.Add(-time.Hour),
 			input,
 		)
-		jobs = append(jobs, id)
+		jobs = append(jobs, jobID)
 
-		return id
+		return jobID
 	}
-	report := func(j, state string) string {
-		id := uuid.NewString()
+	report := func(jobID, state string) string {
+		reportID := uuid.NewString()
 
 		var accepted any
 		if state == statusAccepted {
@@ -53,35 +53,35 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 			t,
 			`INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 1,
 				$2, $3, $4, $5, $6)`,
-			id,
+			reportID,
 			tenant,
-			j,
+			jobID,
 			uuid.New(),
 			state,
 			accepted,
 		)
 
-		return id
+		return reportID
 	}
-	attach := func(j, r, name, status string, when time.Time) string {
-		id := uuid.NewString()
+	attach := func(jobID, reportID, name, status string, when time.Time) string {
+		attachmentID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO maintenance.attachments (id, tenant_id, job_id, report_id, object_key, name, mime, size_bytes, status,
 				uploaded_by, created_at, updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,'image/png',1,$7,$8,$9,$9)`,
-			id,
+			attachmentID,
 			tenant,
-			j,
-			r,
-			"test/"+id,
+			jobID,
+			reportID,
+			"test/"+attachmentID,
 			name,
 			status,
 			uuid.New(),
 			when,
 		)
 
-		return id
+		return attachmentID
 	}
 
 	t.Cleanup(func() { // later tests see none of these jobs
@@ -90,15 +90,15 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 		owner(t, `DELETE FROM maintenance.jobs WHERE id = ANY($1::uuid[])`, jobs)
 	})
 
-	j1 := job(unit)
-	r1 := report(j1, "accepted")
-	meter := attach(j1, r1, "Meter.png", "ready", input)
-	panel := attach(j1, r1, "panel.png", "ready", input.Add(30*time.Minute))
-	attach(j1, r1, "scanning.png", "processing", input.Add(10*time.Minute)) // not ready
-	attach(j1, r1, "old.png", "ready", from.Add(-time.Minute))              // before the period
+	job1 := job(unit)
+	report1 := report(job1, "accepted")
+	meter := attach(job1, report1, "Meter.png", "ready", input)
+	panel := attach(job1, report1, "panel.png", "ready", input.Add(30*time.Minute))
+	attach(job1, report1, "scanning.png", "processing", input.Add(10*time.Minute)) // not ready
+	attach(job1, report1, "old.png", "ready", from.Add(-time.Minute))              // before the period
 	attach(
-		j1,
-		r1,
+		job1,
+		report1,
 		"edge.png",
 		"ready",
 		until,
@@ -175,7 +175,7 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 	}
 	// the input rules, each refused for its field
 	day := 24 * time.Hour
-	for b, want := range map[string]string{
+	for payload, want := range map[string]string{
 		`{"unitIds":[],` +
 			`"from":"` + from.Format(time.RFC3339) + `","to":"` + until.Format(time.RFC3339) +
 			`","query":{}}`: refusedUnitIDsInvalid,
@@ -191,8 +191,8 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 			from.Add(367*day).Format(time.RFC3339) + `","query":{}}`: refusedToRange,
 		body(`"filters":{"x":1}`, unit): refusedUnknownFieldX,
 	} {
-		code, m := post(srv, hq(), "attachments.list", b)
-		refusal(t, b, code, m, want)
+		code, m := post(srv, hq(), "attachments.list", payload)
+		refusal(t, payload, code, m, want)
 	}
 	// only HQ: a client and a contractor are refused
 	for _, a := range []*actor{customerB(), contrA()} {

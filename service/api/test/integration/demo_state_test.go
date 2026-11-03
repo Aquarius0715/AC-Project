@@ -37,7 +37,7 @@ func TestDemoStateReport(t *testing.T) {
 		)
 	})
 
-	report := func(at time.Time, st string) (int, map[string]any) {
+	report := func(at time.Time, status string) (int, map[string]any) {
 		return write(
 			srv,
 			customerB(),
@@ -45,7 +45,7 @@ func TestDemoStateReport(t *testing.T) {
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at.Format(
 				time.RFC3339,
 			)+
-				`","eventType":"state","deviceId":"`+device.String()+`"`+st+`}`,
+				`","eventType":"state","deviceId":"`+device.String()+`"`+status+`}`,
 			0,
 		)
 	}
@@ -96,7 +96,7 @@ func TestDemoStateReport(t *testing.T) {
 		t.Errorf("last seen %v after a report at %v", last, later)
 	}
 
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		at    time.Time
 		state string
 		want  string
@@ -111,7 +111,7 @@ func TestDemoStateReport(t *testing.T) {
 		caseFuture: {clock().Add(time.Hour), `,"state":{"power":true,"celsius":24,"mode":"cool",` +
 			`"fanLevel":"mid"}`, "occurredAt=error.range"},
 	} {
-		code, m := report(c.at, c.state)
-		refusal(t, name, code, m, c.want)
+		code, m := report(testCase.at, testCase.state)
+		refusal(t, name, code, m, testCase.want)
 	}
 }

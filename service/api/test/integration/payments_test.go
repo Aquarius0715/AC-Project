@@ -123,20 +123,20 @@ func TestPaymentSimulation(t *testing.T) {
 
 	pay := asStr(t, data(resp)["id"])
 
-	ev := func(_ string) string { // the event's name only labels the call
+	eventFields := func(_ string) string { // the event's name only labels the call
 		return `,"eventId":"` + uuid.NewString() + `","paymentReference":"REF-` + pay[:8] + `"`
 	}
 	if code, _ := sim(
-		`{"event":"confirm","paymentId":"`+pay+`"`+ev("confirm")+`}`,
+		`{"event":"confirm","paymentId":"`+pay+`"`+eventFields("confirm")+`}`,
 		1,
 	); code != 409 {
 		t.Error("confirm before processing")
 	}
 
-	e1 := uuid.NewString()
+	processingEvent := uuid.NewString()
 
 	code, resp = sim(
-		`{"event":"processing","paymentId":"`+pay+`","eventId":"`+e1+`","paymentReference":"REF-`+pay[:8]+`"}`,
+		`{"event":"processing","paymentId":"`+pay+`","eventId":"`+processingEvent+`","paymentReference":"REF-`+pay[:8]+`"}`,
 		1,
 	)
 	if code != 200 || data(resp)["status"] != "processing" {
@@ -144,7 +144,7 @@ func TestPaymentSimulation(t *testing.T) {
 	}
 
 	if code, m := sim(
-		`{"event":"processing","paymentId":"`+pay+`","eventId":"`+e1+`","paymentReference":"REF-`+pay[:8]+`"}`,
+		`{"event":"processing","paymentId":"`+pay+`","eventId":"`+processingEvent+`","paymentReference":"REF-`+pay[:8]+`"}`,
 		2,
 	); code != 200 ||
 		asNum(t, data(m)["version"]) != 2 {
@@ -152,7 +152,7 @@ func TestPaymentSimulation(t *testing.T) {
 	}
 
 	if code, m := sim(
-		`{"event":"processing","paymentId":"`+pay+`"`+ev("processing")+`}`,
+		`{"event":"processing","paymentId":"`+pay+`"`+eventFields("processing")+`}`,
 		2,
 	); code != 409 ||
 		m["messageKey"] != apperr.KeyInvalidState {
@@ -160,7 +160,7 @@ func TestPaymentSimulation(t *testing.T) {
 	}
 
 	if code, m := sim(
-		`{"event":"fail","paymentId":"`+pay+`"`+ev("fail")+`}`,
+		`{"event":"fail","paymentId":"`+pay+`"`+eventFields("fail")+`}`,
 		1,
 	); code != 409 ||
 		m["messageKey"] != apperr.KeyVersionConflict {
@@ -178,7 +178,7 @@ func TestPaymentSimulation(t *testing.T) {
 	}
 
 	if code, m := sim(
-		`{"event":"fail","paymentId":"`+pay+`"`+ev("fail")+`}`,
+		`{"event":"fail","paymentId":"`+pay+`"`+eventFields("fail")+`}`,
 		2,
 	); code != 200 ||
 		data(m)["status"] != statusFailed {
@@ -186,7 +186,7 @@ func TestPaymentSimulation(t *testing.T) {
 	}
 
 	if code, _ := sim(
-		`{"event":"confirm","paymentId":"`+pay+`"`+ev("confirm")+`}`,
+		`{"event":"confirm","paymentId":"`+pay+`"`+eventFields("confirm")+`}`,
 		3,
 	); code != 409 {
 		t.Error("confirm after failure")
@@ -213,17 +213,17 @@ func TestPaymentSimulation(t *testing.T) {
 	}
 
 	pay = asStr(t, data(resp)["id"])
-	sim(`{"event":"processing","paymentId":"`+pay+`"`+ev("processing")+`}`, 1)
+	sim(`{"event":"processing","paymentId":"`+pay+`"`+eventFields("processing")+`}`, 1)
 
 	if code, m := sim(
-		`{"event":"confirm","paymentId":"`+pay+`"`+ev("confirm")+`}`,
+		`{"event":"confirm","paymentId":"`+pay+`"`+eventFields("confirm")+`}`,
 		2,
 	); code != 200 || data(m)["status"] != statusConfirmed ||
 		data(m)["paymentReference"] == nil {
 		t.Fatalf("confirm: %d %v", code, m)
 	}
 
-	if code, _ := sim(`{"event":"fail","paymentId":"`+pay+`"`+ev("fail")+`}`, 3); code != 409 {
+	if code, _ := sim(`{"event":"fail","paymentId":"`+pay+`"`+eventFields("fail")+`}`, 3); code != 409 {
 		t.Error("fail after confirmed")
 	}
 
@@ -314,14 +314,14 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 
 	ref := "BANK-" + uuid.NewString()[:8]
 
-	manual := func(amount string, v int) (int, map[string]any) {
+	manual := func(amount string, version int) (int, map[string]any) {
 		return write(
 			srv,
 			hq(),
 			"payments.recordManual",
 			`{"invoiceId":"`+inv+`","paymentReference":"`+ref+`","confirmedAmountMinor":`+amount+`,"currency":"MYR",`+
 				`"reason":"bank transfer seen"}`,
-			v,
+			version,
 		)
 	}
 	if code, m := manual(
@@ -354,7 +354,7 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	}
 	// each operation takes its own ID only (IR390): the other one is an unknown field, and recordManual names invoiceId
 	entry := `"paymentReference":"X","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"`
-	for _, c := range []struct{ op, body, want string }{
+	for _, testCase := range []struct{ op, body, want string }{
 		{opPaymentsRecordManual, `{` + entry + `}`, refusedInvoiceIDRequired},
 		{opPaymentsRecordManual, `{"paymentId":"` + inv + `",` + entry + `}`, refusedMalformedInput},
 		{
@@ -363,8 +363,8 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 		},
 		{"payments.confirm", `{"invoiceId":"` + inv + `",` + entry + `}`, refusedMalformedInput},
 	} {
-		code, m := write(srv, hq(), c.op, c.body, 1)
-		refusal(t, c.op+" "+c.body, code, m, c.want)
+		code, m := write(srv, hq(), testCase.op, testCase.body, 1)
+		refusal(t, testCase.op+" "+testCase.body, code, m, testCase.want)
 	}
 
 	if code, m := manual("5000", 9); code != 409 || m["messageKey"] != apperr.KeyVersionConflict {
@@ -436,14 +436,14 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 
 	pay := asStr(t, data(res)["id"])
 
-	confirm := func(v int) (int, map[string]any) {
+	confirm := func(version int) (int, map[string]any) {
 		return write(
 			srv,
 			hq(),
 			"payments.confirm",
 			`{"paymentId":"`+pay+`","paymentReference":"HQ-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
 				`"reason":"checked"}`,
-			v,
+			version,
 		)
 	}
 	if code, _ := confirm(1); code != 409 {
@@ -518,14 +518,14 @@ func TestManualAfterFailedPayment(t *testing.T) {
 
 	pay := asStr(t, data(res)["id"])
 
-	manual := func(v int) (int, map[string]any) {
+	manual := func(version int) (int, map[string]any) {
 		return write(
 			srv,
 			hq(),
 			"payments.recordManual",
 			`{"invoiceId":"`+inv+`","paymentReference":"BANK-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR",`+
 				`"reason":"bank transfer seen"}`,
-			v,
+			version,
 		)
 	}
 	if code, m := manual(2); code != 409 || m["messageKey"] != "errors.invoice_has_payment" {

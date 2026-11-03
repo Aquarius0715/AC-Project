@@ -150,9 +150,9 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
 
-	ms := srv // the maintenance scheduler's database role and registry: its own service in cluster mode
+	maintSrv := srv // the maintenance scheduler's database role and registry: its own service in cluster mode
 	if cl, ok := clusters[srv]; ok {
-		ms = cl.srv[ops.DomainMaintenance]
+		maintSrv = cl.srv[ops.DomainMaintenance]
 	}
 
 	maint := []string{ops.DomainMaintenance}
@@ -193,15 +193,15 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 	}
 	expiries := func(job string) int {
 		_, m := post(srv, hq(), "jobs.events", `{"jobId":"`+job+`","query":{"limit":100}}`)
-		n := 0
+		total := 0
 
 		for _, e := range items(t, m) {
 			if e["action"] == "offer_expired" {
-				n++
+				total++
 			}
 		}
 
-		return n
+		return total
 	}
 
 	conn, err := pgx.Connect(ctx, testDB("postgres"))
@@ -226,7 +226,7 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
-	r, err := scheduler.TryTickDomains(ctx, ms.DB, clock().Add(time.Hour), maint, ms.Registry)
+	r, err := scheduler.TryTickDomains(ctx, maintSrv.DB, clock().Add(time.Hour), maint, maintSrv.Registry)
 	if err != nil || r.Skipped < 1 || r.ExpiredOffers != 0 || status(job) != statusOffered {
 		t.Fatalf("the background tick skips the held tenant: %+v %v %v", r, err, status(job))
 	}
@@ -234,7 +234,7 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 	done := make(chan scheduler.Result, 1)
 
 	go func() {
-		r, err := scheduler.TickDomains(ctx, ms.DB, clock().Add(time.Hour), maint, ms.Registry)
+		r, err := scheduler.TickDomains(ctx, maintSrv.DB, clock().Add(time.Hour), maint, maintSrv.Registry)
 		if err != nil {
 			t.Error(err)
 		}
@@ -269,10 +269,10 @@ func TestSchedulerInstancesShareTheWork(t *testing.T) {
 		group.Go(func() {
 			result, err := scheduler.TryTickDomains(
 				ctx,
-				ms.DB,
+				maintSrv.DB,
 				clock().Add(time.Hour),
 				maint,
-				ms.Registry,
+				maintSrv.Registry,
 			)
 			if err != nil {
 				t.Error(err)

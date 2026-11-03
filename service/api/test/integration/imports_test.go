@@ -57,7 +57,7 @@ func TestUnitsImport(t *testing.T) {
 	// a device bound to some unit, so its serial is an error row
 	serial := "IMP-" + uuid.NewString()[:8]
 	dev := uuid.NewString()
-	_, um := write(
+	_, savedUnit := write(
 		srv,
 		hq(),
 		"units.save",
@@ -67,7 +67,7 @@ func TestUnitsImport(t *testing.T) {
 			`","type":"split","installedAt":null,"serviceScope":["indoor"]}`,
 		0,
 	)
-	boundUnit := data(um)["id"]
+	boundUnit := data(savedUnit)["id"]
 	owner(
 		t,
 		`INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version)
@@ -128,22 +128,22 @@ func TestUnitsImport(t *testing.T) {
 		t.Fatalf("preview: %d %v", code, resp)
 	}
 
-	p := data(resp)
-	if asNum(t, p["readyCount"]) != 2 || asNum(t, p["warningCount"]) != 3 ||
-		asNum(t, p["errorCount"]) != 8 {
+	preview := data(resp)
+	if asNum(t, preview["readyCount"]) != 2 || asNum(t, preview["warningCount"]) != 3 ||
+		asNum(t, preview["errorCount"]) != 8 {
 		t.Fatalf(
 			"counts: %v %v %v / rows %v",
-			p["readyCount"],
-			p["warningCount"],
-			p["errorCount"],
-			p["rows"],
+			preview["readyCount"],
+			preview["warningCount"],
+			preview["errorCount"],
+			preview["rows"],
 		)
 	}
 
-	previewID := asStr(t, p["previewId"])
+	previewID := asStr(t, preview["previewId"])
 	keys := map[string]string{}
 
-	for _, r := range asArr(t, p["rows"]) {
+	for _, r := range asArr(t, preview["rows"]) {
 		row := asObj(t, r)
 		if k, ok := row["messageKey"].(string); ok {
 			keys[asStr(t, row["unitName"])] = k
@@ -169,7 +169,7 @@ func TestUnitsImport(t *testing.T) {
 		"unknown mapping key":       "mapping.color=error.unknownColumn",
 	}
 
-	for name, b := range map[string]string{
+	for name, payload := range map[string]string{
 		"missing unit_name mapping": `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n1,2",` +
 			`"mapping":{"property":"a","model_code":"b"}}`,
 		"unknown mapping key": `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n1,2",` +
@@ -185,7 +185,7 @@ func TestUnitsImport(t *testing.T) {
 		"bad quoting": `{"customerId":"` + cust + `","fileName":"a.csv",` +
 			`"csvText":` + jsonStr(t, "p,u,m\n\"x,y\n") + `,"mapping":{"property":"p","unit_name":"u","model_code":"m"}}`,
 	} {
-		code, m := post(srv, hq(), "units.importPreview", b)
+		code, m := post(srv, hq(), "units.importPreview", payload)
 		refusal(t, name, code, m, want[name])
 	}
 
@@ -263,13 +263,13 @@ func TestUnitsImport(t *testing.T) {
 		}
 	}
 	// CSV dates are Kuala Lumpur calendar dates
-	if _, g := post(
+	if _, detail := post(
 		srv,
 		hq(),
 		"units.get",
 		`{"id":"`+desk+`"}`,
-	); data(g)["installedAt"] != "2026-01-09T16:00:00Z" {
-		t.Errorf("installedAt: %v", data(g)["installedAt"])
+	); data(detail)["installedAt"] != "2026-01-09T16:00:00Z" {
+		t.Errorf("installedAt: %v", data(detail)["installedAt"])
 	}
 
 	if _, doc := post(
@@ -282,13 +282,13 @@ func TestUnitsImport(t *testing.T) {
 		t.Fatalf("the serial binds the device: %v", doc)
 	}
 
-	if _, pl := post(
+	if _, properties := post(
 		srv,
 		hq(),
 		"properties.list",
 		`{"filters":{"customerId":"`+cust+`"},"limit":100}`,
 	); !strings.Contains(
-		jsonStr2(t, pl),
+		jsonStr2(t, properties),
 		nowhere,
 	) {
 		t.Fatal("the new property exists")
@@ -333,13 +333,13 @@ func TestUnitsImport(t *testing.T) {
 		t.Fatalf("undo releases the device: %v", doc)
 	}
 
-	if _, pl := post(
+	if _, properties := post(
 		srv,
 		hq(),
 		"properties.list",
 		`{"filters":{"customerId":"`+cust+`"},"limit":100}`,
 	); strings.Contains(
-		jsonStr2(t, pl),
+		jsonStr2(t, properties),
 		nowhere,
 	) {
 		t.Fatal("undo archives the created property")
@@ -578,7 +578,7 @@ func TestUnitsImportRevalidation(t *testing.T) {
 	srv := server(t)
 	cust, org := seed.ID("cust-b").String(), seed.ID("org-customer-b").String()
 	commit := func(csv string) (int, map[string]any, map[string]any) {
-		_, pm := post(
+		_, preview := post(
 			srv,
 			hq(),
 			"units.importPreview",
@@ -590,11 +590,11 @@ func TestUnitsImportRevalidation(t *testing.T) {
 			srv,
 			hq(),
 			"units.importCommit",
-			`{"previewId":"`+asStr(t, data(pm)["previewId"])+`","customerId":"`+cust+`"}`,
+			`{"previewId":"`+asStr(t, data(preview)["previewId"])+`","customerId":"`+cust+`"}`,
 			0,
 		)
 
-		return code, res, data(pm)
+		return code, res, data(preview)
 	}
 	header := "Property,Floor,Room,Unit,Model,Serial,Installed,Warranty\n"
 	twin := "Twin site " + uuid.NewString()[:6]
@@ -622,7 +622,7 @@ func TestUnitsImportRevalidation(t *testing.T) {
 		seed.ID("hq-operator"),
 	)
 
-	_, pm := post(
+	_, again := post(
 		srv,
 		hq(),
 		"units.importPreview",
@@ -630,8 +630,8 @@ func TestUnitsImportRevalidation(t *testing.T) {
 			header+twin+",,,Late AC,SPL-100,"+serial+",,\n",
 		)+`,"mapping":`+mapping+`}`,
 	)
-	if asNum(t, data(pm)["readyCount"]) != 1 {
-		t.Fatalf("preview with a free serial: %v", pm)
+	if asNum(t, data(again)["readyCount"]) != 1 {
+		t.Fatalf("preview with a free serial: %v", again)
 	}
 
 	owner(
@@ -651,7 +651,7 @@ func TestUnitsImportRevalidation(t *testing.T) {
 		srv,
 		hq(),
 		"units.importCommit",
-		`{"previewId":"`+asStr(t, data(pm)["previewId"])+`","customerId":"`+cust+`"}`,
+		`{"previewId":"`+asStr(t, data(again)["previewId"])+`","customerId":"`+cust+`"}`,
 		0,
 	); code != 409 ||
 		res["messageKey"] != apperr.KeyPreviewExpired {

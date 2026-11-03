@@ -156,7 +156,7 @@ func TestWorkReportEdges(t *testing.T) {
 		clock().Add(-20*time.Minute),
 	)
 	// and HQ held the job for 5 minutes in between (IR449): 25 minutes
-	for _, e := range []struct {
+	for _, event := range []struct {
 		action string
 		at     time.Duration
 	}{{"job.held", -50 * time.Minute}, {"job.resumed", -45 * time.Minute}} {
@@ -165,8 +165,8 @@ func TestWorkReportEdges(t *testing.T) {
 			`INSERT INTO maintenance.job_events (id, tenant_id, job_id, action, occurred_at) SELECT gen_random_uuid(), tenant_id,
 				id, $2, $3 FROM maintenance.jobs WHERE id = $1`,
 			job,
-			e.action,
-			clock().Add(e.at),
+			event.action,
+			clock().Add(event.at),
 		)
 	}
 

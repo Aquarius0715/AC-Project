@@ -57,17 +57,17 @@ func TestNotificationsInbox(t *testing.T) {
 		`{"filters":{"type":"restriction","unreadOnly":true},"limit":100}`,
 	)
 
-	var n map[string]any
+	var notice map[string]any
 
 	for _, it := range items(t, res) {
 		if asObj(t, it["target"])["id"] == rid {
-			n = it
+			notice = it
 		}
 	}
 
-	if n == nil || n["deliveryState"] != "simulated" ||
-		asObj(t, n["params"])["targetName"] == "" ||
-		n["severity"] != severityWarning {
+	if notice == nil || notice["deliveryState"] != "simulated" ||
+		asObj(t, notice["params"])["targetName"] == "" ||
+		notice["severity"] != severityWarning {
 		t.Fatalf("restriction notice: %v", res)
 	}
 
@@ -118,12 +118,12 @@ func TestNotificationsInbox(t *testing.T) {
 		t.Error("severity sort")
 	}
 
-	id := asStr(t, n["id"])
+	notificationID := asStr(t, notice["id"])
 	if code, _ := write(
 		srv,
 		customerB(),
 		"notifications.markRead",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+notificationID+`"}`,
 		2,
 	); code != 409 {
 		t.Error("stale notification version")
@@ -133,7 +133,7 @@ func TestNotificationsInbox(t *testing.T) {
 		srv,
 		customerA(),
 		"notifications.markRead",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+notificationID+`"}`,
 		1,
 	); code != 404 {
 		t.Error("mark another member's notification")
@@ -149,7 +149,7 @@ func TestNotificationsInbox(t *testing.T) {
 		t.Error("mark an unreadable target")
 	}
 
-	code, res = write(srv, customerB(), "notifications.markRead", `{"id":"`+id+`"}`, 1)
+	code, res = write(srv, customerB(), "notifications.markRead", `{"id":"`+notificationID+`"}`, 1)
 	if code != 200 || data(res)["readAt"] == nil || ver(t, res) != 2 {
 		t.Fatalf("markRead: %d %v", code, res)
 	}
@@ -158,7 +158,7 @@ func TestNotificationsInbox(t *testing.T) {
 		srv,
 		customerB(),
 		"notifications.markRead",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+notificationID+`"}`,
 		2,
 	); code != 200 ||
 		ver(t, resp) != 2 {
@@ -185,20 +185,20 @@ func TestNotificationsInbox(t *testing.T) {
 func TestMarkAllRead(t *testing.T) {
 	srv := server(t)
 	note := func(member, unit string) string {
-		id := uuid.NewString()
+		notificationID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type,
 				template_key, target, params, severity, occurred_at)
 			VALUES ($1,$2,$3,1,'fault','alert',$4,'{}','warning',$5)`,
-			id,
+			notificationID,
 			seed.ID("tenant-a"),
 			seed.ID(member),
 			`{"kind":"unit","id":"`+seed.ID(unit).String()+`"}`,
 			clock(),
 		)
 
-		return id
+		return notificationID
 	}
 	mine, mine2, read := note(
 		"customer-b",
@@ -230,15 +230,15 @@ func TestMarkAllRead(t *testing.T) {
 		many[i] = uuid.NewString()
 	}
 
-	for name, c := range map[string]struct{ body, want string }{
+	for name, testCase := range map[string]struct{ body, want string }{
 		"no list":     {`{}`, "ids=error.required"},
 		"empty list":  {`{"ids":[]}`, "ids=error.required"},
 		"101 IDs":     {list(many...), "ids=error.count"},
 		"a duplicate": {list(mine, mine), "ids=error.invalid"},
 		"the nil ID":  {list(uuid.Nil.String()), "ids=error.invalid"},
 	} {
-		code, m := write(srv, customerB(), "notifications.markAllRead", c.body, 0)
-		refusal(t, name, code, m, c.want)
+		code, m := write(srv, customerB(), "notifications.markAllRead", testCase.body, 0)
+		refusal(t, name, code, m, testCase.want)
 	}
 
 	code, res := write(srv, customerB(), "notifications.markAllRead", list(mine), 1)
@@ -270,20 +270,20 @@ func TestMarkAllRead(t *testing.T) {
 		t.Fatalf("marked %s, skipped %s", got("markedIds"), got("skippedIds"))
 	}
 
-	state := func(id string) (bool, int) {
+	state := func(notificationID string) (bool, int) {
 		var (
 			readAt *time.Time
-			v      int
+			version      int
 		)
 		ownerScan(
 			t,
 			`SELECT read_at, version FROM notify.notifications WHERE id = $1`,
-			[]any{id},
+			[]any{notificationID},
 			&readAt,
-			&v,
+			&version,
 		)
 
-		return readAt != nil, v
+		return readAt != nil, version
 	}
 	for id, want := range map[string]struct {
 		read    bool
@@ -346,7 +346,7 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 		t.Error("other customer's invoice")
 	}
 
-	for b, want := range map[string]string{
+	for payload, want := range map[string]string{
 		`{"target":{"kind":"planet",` +
 			`"id":"` + inv + `"},"templateKey":"payment","channel":"inApp",` +
 			`"query":{}}`: "target=error.invalid",
@@ -360,8 +360,8 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 			`"id":"` + inv + `"},"templateKey":"payment","channel":"inApp",` +
 			`"query":{"filters":{"x":1}}}`: refusedUnknownFieldX,
 	} {
-		code, m := post(srv, hq(), "notifications.recipients", b)
-		refusal(t, b, code, m, want)
+		code, m := post(srv, hq(), "notifications.recipients", payload)
+		refusal(t, payload, code, m, want)
 	}
 
 	if _, res := post(
@@ -898,21 +898,21 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestContractorInbox(t *testing.T) {
 	srv := server(t)
-	note := func(kind, id string) string {
-		n := uuid.NewString()
+	note := func(kind, targetID string) string {
+		notificationID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type,
 				template_key, target, params, severity, occurred_at)
 			VALUES ($1, $2, $3, 1, 'job_update', 'job_update', $4, '{}', 'normal', $5)`,
-			n,
+			notificationID,
 			seed.ID("tenant-a"),
 			seed.ID("contractor-a"),
-			`{"kind":"`+kind+`","id":"`+id+`"}`,
+			`{"kind":"`+kind+`","id":"`+targetID+`"}`,
 			clock(),
 		)
 
-		return n
+		return notificationID
 	}
 	offered := note("job", seed.ID("job-contractor-a").String())
 	other := note("job", uuid.NewString())
@@ -966,7 +966,7 @@ func TestContractorInbox(t *testing.T) {
 func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 	srv := server(t)
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, m := write(
+	_, resp := write(
 		srv,
 		customerA(),
 		"jobs.create",
@@ -974,7 +974,7 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 		0,
 	)
 
-	job := asStr(t, data(m)["id"])
+	job := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		hq(),
@@ -1030,13 +1030,13 @@ func TestWithdrawnOfferNoticeHasNoLink(t *testing.T) {
 		t.Fatalf("cancel: %d %v", code, res)
 	}
 
-	n := notice()
-	if n == nil {
+	kept := notice()
+	if kept == nil {
 		t.Fatal("the company lost the notice of its withdrawn offer")
 	}
 
-	if n["targetOpen"] != false {
-		t.Errorf("the withdrawn offer's notice still links a page that does not open: %v", n)
+	if kept["targetOpen"] != false {
+		t.Errorf("the withdrawn offer's notice still links a page that does not open: %v", kept)
 	}
 
 	if code, _ := post(srv, contrA(), "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {

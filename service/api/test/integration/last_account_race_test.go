@@ -17,12 +17,12 @@ import (
 func accountMembership(t *testing.T, org uuid.UUID, role string, clientRole any) string {
 	t.Helper()
 
-	id := uuid.NewString()
+	membershipID := uuid.NewString()
 	owner(
 		t,
 		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from) VALUES ($1,
 			$2, $3, $4, $5, $6, $7)`,
-		id,
+		membershipID,
 		seed.ID("tenant-a"),
 		newUser(t),
 		org,
@@ -34,12 +34,12 @@ func accountMembership(t *testing.T, org uuid.UUID, role string, clientRole any)
 		owner(
 			t,
 			`UPDATE identity.memberships SET valid_until = $2 WHERE id = $1 AND (valid_until IS NULL OR valid_until > $2)`,
-			id,
+			membershipID,
 			clock().Add(-time.Minute),
 		)
 	})
 
-	return id
+	return membershipID
 }
 
 // race sends the two writes at once and expects one to pass and the other to be refused with the given message.
@@ -128,25 +128,25 @@ func TestLastOwnerAtOnce(t *testing.T) {
 	})
 
 	for round := range 5 {
-		a, b := uuid.NewString(), uuid.NewString()
-		for _, id := range []string{a, b} {
+		firstOwner, secondOwner := uuid.NewString(), uuid.NewString()
+		for _, clientUserID := range []string{firstOwner, secondOwner} {
 			owner(
 				t,
 				`INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, client_role, status,
 					invited_at, invited_by_membership_id)
 				VALUES ($1, $2, $3, $4, $5, 'owner', 'active', $6, $7)`,
-				id,
+				clientUserID,
 				seed.ID("tenant-a"),
 				cust,
 				accountMembership(t, seed.ID("org-customer-b"), "client", "owner"),
-				"owner-"+id[:8]+"@example.com",
+				"owner-"+clientUserID[:8]+"@example.com",
 				clock(),
 				seed.ID("customer-b"),
 			)
 		}
 
 		t.Cleanup(
-			func() { owner(t, `DELETE FROM identity.client_users WHERE id = ANY($1::uuid[])`, []string{a, b}) },
+			func() { owner(t, `DELETE FROM identity.client_users WHERE id = ANY($1::uuid[])`, []string{firstOwner, secondOwner}) },
 		)
 		race(t, round, "errors.last_owner",
 			func() (int, map[string]any) {
@@ -154,7 +154,7 @@ func TestLastOwnerAtOnce(t *testing.T) {
 					srv,
 					hq(),
 					"clientUsers.save",
-					`{"id":"`+a+`","customerId":"`+cust.String()+`","email":"owner-`+a[:8]+`@example.com","clientRole":"member",`+
+					`{"id":"`+firstOwner+`","customerId":"`+cust.String()+`","email":"owner-`+firstOwner[:8]+`@example.com","clientRole":"member",`+
 						`"status":"active","reason":"no longer an owner"}`,
 					1,
 				)
@@ -164,14 +164,14 @@ func TestLastOwnerAtOnce(t *testing.T) {
 					srv,
 					hq(),
 					"clientUsers.remove",
-					`{"id":"`+b+`","reason":"left the company"}`,
+					`{"id":"`+secondOwner+`","reason":"left the company"}`,
 					1,
 				)
 			})
 		owner(
 			t,
 			`UPDATE identity.client_users SET status = 'disabled' WHERE id = ANY($1::uuid[]) AND client_role = 'owner'`,
-			[]string{a, b},
+			[]string{firstOwner, secondOwner},
 		) // the next round starts with no owner
 	}
 }
@@ -208,25 +208,25 @@ func TestLastContractorAtOnce(t *testing.T) {
 	})
 
 	for round := range 5 {
-		a, b := uuid.NewString(), uuid.NewString()
-		for _, id := range []string{a, b} {
+		firstContractor, secondContractor := uuid.NewString(), uuid.NewString()
+		for _, partnerUserID := range []string{firstContractor, secondContractor} {
 			owner(
 				t,
 				`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, partner_role, status,
 					invited_at, invited_by_membership_id)
 				VALUES ($1, $2, $3, $4, $5, 'contractor', 'active', $6, $7)`,
-				id,
+				partnerUserID,
 				seed.ID("tenant-a"),
 				org,
 				accountMembership(t, org, "contractor", nil),
-				"boss-"+id[:8]+"@example.com",
+				"boss-"+partnerUserID[:8]+"@example.com",
 				clock(),
 				seed.ID("contractor-a"),
 			)
 		}
 
 		t.Cleanup(
-			func() { owner(t, `DELETE FROM identity.partner_users WHERE id = ANY($1::uuid[])`, []string{a, b}) },
+			func() { owner(t, `DELETE FROM identity.partner_users WHERE id = ANY($1::uuid[])`, []string{firstContractor, secondContractor}) },
 		)
 		race(t, round, "errors.last_contractor",
 			func() (int, map[string]any) {
@@ -234,7 +234,7 @@ func TestLastContractorAtOnce(t *testing.T) {
 					srv,
 					contrA(),
 					"partnerUsers.save",
-					`{"id":"`+a+`","email":"boss-`+a[:8]+`@example.com","partnerRole":"contractor","status":"disabled","reason":"on `+
+					`{"id":"`+firstContractor+`","email":"boss-`+firstContractor[:8]+`@example.com","partnerRole":"contractor","status":"disabled","reason":"on `+
 						`leave"}`,
 					1,
 				)
@@ -244,14 +244,14 @@ func TestLastContractorAtOnce(t *testing.T) {
 					srv,
 					contrA(),
 					"partnerUsers.remove",
-					`{"id":"`+b+`","reason":"left the company"}`,
+					`{"id":"`+secondContractor+`","reason":"left the company"}`,
 					1,
 				)
 			})
 		owner(
 			t,
 			`UPDATE identity.partner_users SET status = 'disabled' WHERE id = ANY($1::uuid[])`,
-			[]string{a, b},
+			[]string{firstContractor, secondContractor},
 		) // the next round starts with none active
 	}
 }
@@ -282,27 +282,27 @@ func identityAdmins(t *testing.T) {
 func adminSave(
 	t *testing.T,
 	srv *apiserver.Server,
-	id string,
+	membershipID string,
 	edit func(map[string]any),
 ) (string, int) {
 	t.Helper()
 
 	_, m := post(srv, hq(), "members.list", `{"filters":{"role":"admin"},"limit":100}`)
-	for _, it := range items(t, m) {
-		if it["id"] != id {
+	for _, item := range items(t, m) {
+		if item["id"] != membershipID {
 			continue
 		}
 
 		body := map[string]any{
-			"id":                id,
-			fieldUserID:         it["userId"],
-			fieldOrganizationID: it["organizationId"],
+			"id":                membershipID,
+			fieldUserID:         item["userId"],
+			fieldOrganizationID: item["organizationId"],
 			fieldRole:           roleAdmin,
 			fieldEmployment:     nil,
-			fieldPermissions:    it["permissions"],
-			fieldScopes:         it["scopes"],
-			fieldValidFrom:      it["validFrom"],
-			fieldValidUntil:     it["validUntil"],
+			fieldPermissions:    item["permissions"],
+			fieldScopes:         item["scopes"],
+			fieldValidFrom:      item["validFrom"],
+			fieldValidUntil:     item["validUntil"],
 			fieldReason:         "IR472 test",
 		}
 		edit(body)
@@ -312,27 +312,27 @@ func adminSave(
 			t.Fatal(err)
 		}
 
-		return string(b), int(asNum(t, it["version"]))
+		return string(b), int(asNum(t, item["version"]))
 	}
 
-	t.Fatalf("membership %s not listed", id)
+	t.Fatalf("membership %s not listed", membershipID)
 
 	return "", 0
 }
 
 // withoutIdentityWrite takes identity.write from the body's permissions.
-func withoutIdentityWrite(t *testing.T, b map[string]any) {
+func withoutIdentityWrite(t *testing.T, body map[string]any) {
 	t.Helper()
 
 	var kept []any
 
-	for _, p := range asArr(t, b["permissions"]) {
+	for _, p := range asArr(t, body["permissions"]) {
 		if p != "identity.write" {
 			kept = append(kept, p)
 		}
 	}
 
-	b["permissions"] = kept
+	body["permissions"] = kept
 }
 
 // TestLastIdentityAdminAtOnce (IR472): the tenant's last two identity.write holders take the permission from each other
@@ -344,12 +344,12 @@ func TestLastIdentityAdminAtOnce(t *testing.T) {
 	srv := server(t)
 	identityAdmins(t)
 
-	op, rm := seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()
+	operatorID, managerID := seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()
 
 	dropIdentityWrite := func(b map[string]any) { withoutIdentityWrite(t, b) }
 	for round := range 5 {
-		opBody, opVer := adminSave(t, srv, op, dropIdentityWrite)
-		rmBody, rmVer := adminSave(t, srv, rm, dropIdentityWrite)
+		opBody, opVer := adminSave(t, srv, operatorID, dropIdentityWrite)
+		rmBody, rmVer := adminSave(t, srv, managerID, dropIdentityWrite)
 		raceRefused(
 			t,
 			round,
@@ -364,7 +364,7 @@ func TestLastIdentityAdminAtOnce(t *testing.T) {
 			t,
 			`SELECT count(*) FROM identity.membership_permissions WHERE membership_id = ANY($1::uuid[]) AND permission =
 				'identity.write'`,
-			[]any{[]string{op, rm}},
+			[]any{[]string{operatorID, managerID}},
 			&holders,
 		)
 
@@ -374,7 +374,7 @@ func TestLastIdentityAdminAtOnce(t *testing.T) {
 
 		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission)
 			SELECT tenant_id, id, 'identity.write' FROM identity.memberships WHERE id = ANY($1::uuid[]) ON CONFLICT DO
-			NOTHING`, []string{op, rm})
+			NOTHING`, []string{operatorID, managerID})
 	}
 }
 
@@ -386,14 +386,14 @@ func TestLastIdentityAdminStartLater(t *testing.T) {
 	srv := server(t)
 	identityAdmins(t)
 
-	operation, rm := seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()
+	operation, managerID := seed.ID("hq-operator").String(), seed.ID("hq-restriction-manager").String()
 
 	var opFrom, rmFrom time.Time
 	ownerScan(
 		t,
 		`SELECT (SELECT valid_from FROM identity.memberships WHERE id = $1), (SELECT valid_from FROM identity.memberships
 			WHERE id = $2)`,
-		[]any{operation, rm},
+		[]any{operation, managerID},
 		&opFrom,
 		&rmFrom,
 	)
@@ -404,25 +404,25 @@ func TestLastIdentityAdminStartLater(t *testing.T) {
 				IN ($1, $3)`,
 			operation,
 			opFrom,
-			rm,
+			managerID,
 			rmFrom,
 		)
 	})
 	owner(
 		t,
 		`DELETE FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'identity.write'`,
-		rm,
+		managerID,
 	)
 
 	later := func(b map[string]any) { b["validFrom"] = clock().Add(time.Hour).Format(time.RFC3339) }
 
-	body, v := adminSave(t, srv, operation, later)
+	body, version := adminSave(t, srv, operation, later)
 	if code, res := write(
 		srv,
 		hq(),
 		"members.save",
 		body,
-		v,
+		version,
 	); code != 409 ||
 		res["messageKey"] != "errors.last_identity_admin" {
 		t.Fatalf("the last holder starts later: %d %v", code, res)
@@ -432,11 +432,11 @@ func TestLastIdentityAdminStartLater(t *testing.T) {
 		t,
 		`INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) SELECT tenant_id, id,
 			'identity.write' FROM identity.memberships WHERE id = $1`,
-		rm,
+		managerID,
 	)
 
-	body, v = adminSave(t, srv, rm, later)
-	if code, m := write(srv, hq(), "members.save", body, v); code != 200 {
+	body, version = adminSave(t, srv, managerID, later)
+	if code, m := write(srv, hq(), "members.save", body, version); code != 200 {
 		t.Fatalf("another holder starts later: %d %v", code, m)
 	}
 }

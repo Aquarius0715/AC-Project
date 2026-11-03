@@ -118,16 +118,16 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 	}
 
 	for _, table := range []string{"monitoring.measurements", "monitoring.measurements_default"} {
-		var n int
+		var total int
 
 		err := txn.QueryRow(ctx, `SELECT count(*) FROM `+table+` WHERE event_id = $1`, event).
-			Scan(&n)
+			Scan(&total)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if n != 0 {
-			t.Errorf("%s shows tenant A's service role %d row(s) of tenant B", table, n)
+		if total != 0 {
+			t.Errorf("%s shows tenant A's service role %d row(s) of tenant B", table, total)
 		}
 	}
 }
@@ -189,15 +189,15 @@ func TestIdempotencyKeysIsolated(t *testing.T) {
 		t.Fatal(execErr)
 	}
 
-	var n int
+	var total int
 
 	scanErr := txn.QueryRow(ctx, `SELECT count(*) FROM platform.idempotency_keys WHERE key = $1`, key).
-		Scan(&n)
+		Scan(&total)
 	if scanErr != nil {
 		t.Fatal(scanErr)
 	}
 
-	if n != 0 {
-		t.Errorf("tenant A's service role reads %d stored response(s) of tenant B", n)
+	if total != 0 {
+		t.Errorf("tenant A's service role reads %d stored response(s) of tenant B", total)
 	}
 }

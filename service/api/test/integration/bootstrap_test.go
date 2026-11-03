@@ -37,17 +37,17 @@ func TestBootstrapAdmin(t *testing.T) {
 	defer func() { _ = conn.Close(ctx) }()
 
 	run := func(req bootstrap.Input) (bootstrap.Result, error) {
-		var r bootstrap.Result
+		var result bootstrap.Result
 
 		err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 			var err error
 
-			r, err = bootstrap.Admin(ctx, tx, req)
+			result, err = bootstrap.Admin(ctx, tx, req)
 
 			return apperr.Wrap(err, "bootstrap.Admin")
 		})
 
-		return r, apperr.Wrap(err, "transaction")
+		return result, apperr.Wrap(err, "transaction")
 	}
 	tag := uuid.NewString()[:8]
 
@@ -152,8 +152,8 @@ func TestBootstrapAdmin(t *testing.T) {
 		lost:       nil,
 		generation: 0,
 	}
-	v := testVerifier(t)
-	v["tok-boot-"+tag] = result.UserID.String()
+	tokens := testVerifier(t)
+	tokens["tok-boot-"+tag] = result.UserID.String()
 
 	srv, err := apiserver.New(
 		ctx,
@@ -183,7 +183,7 @@ func TestBootstrapAdmin(t *testing.T) {
 			AccountsPerDay: 0,
 			WrapTx:         nil,
 		},
-		v,
+		tokens,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -222,13 +222,13 @@ func TestBootstrapAdmin(t *testing.T) {
 	rec := httptest.NewRecorder()
 	srv.Echo.ServeHTTP(rec, req)
 
-	var m map[string]any
+	var res map[string]any
 
-	_ = json.Unmarshal(rec.Body.Bytes(), &m)
-	if rec.Code != 200 || len(items(t, m)) != 1 ||
-		items(t, m)[0]["id"] != result.MembershipID.String() ||
-		!slices.Contains(toStrings(items(t, m)[0]["permissions"]), "identity.write") {
-		t.Fatalf("the administrator lists the tenant's memberships: %d %v", rec.Code, m)
+	_ = json.Unmarshal(rec.Body.Bytes(), &res)
+	if rec.Code != 200 || len(items(t, res)) != 1 ||
+		items(t, res)[0]["id"] != result.MembershipID.String() ||
+		!slices.Contains(toStrings(items(t, res)[0]["permissions"]), "identity.write") {
+		t.Fatalf("the administrator lists the tenant's memberships: %d %v", rec.Code, res)
 	}
 }
 

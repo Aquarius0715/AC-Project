@@ -21,25 +21,25 @@ func TestCapabilityVersionRollsBackWhenThePreviousVersionCannotBeRetired(t *test
 		t.Fatalf("create: %d %v", code, res)
 	}
 
-	id := asStr(t, data(res)["id"])
+	capabilityID := asStr(t, data(res)["id"])
 
 	versions := func() (int, int) {
-		var n, top int
+		var total, top int
 		ownerScan(
 			t,
 			`SELECT count(*), max(version) FROM devices.capabilities WHERE id = $1`,
-			[]any{id},
-			&n,
+			[]any{capabilityID},
+			&total,
 			&top,
 		)
 
-		return n, top
+		return total, top
 	}
-	n, top := versions()
+	versionCount, top := versions()
 
 	broken := injectAt(t, "UPDATE devices.capabilities SET is_current = false")
 	body := strings.Replace(
-		capBody(id, model, `,"changeReason":"added fan mode"`),
+		capBody(capabilityID, model, `,"changeReason":"added fan mode"`),
 		`["cool","dry"]`,
 		`["cool","dry","fan"]`,
 		1,
@@ -50,10 +50,10 @@ func TestCapabilityVersionRollsBackWhenThePreviousVersionCannotBeRetired(t *test
 		t.Fatalf("new version with a failing retire: %d %v, want a server error", code, res)
 	}
 
-	if n2, top2 := versions(); n2 != n || top2 != top {
+	if n2, top2 := versions(); n2 != versionCount || top2 != top {
 		t.Errorf(
 			"a failed save kept a version: before %d versions (top %d), after %d (top %d)",
-			n,
+			versionCount,
 			top,
 			n2,
 			top2,

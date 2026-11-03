@@ -19,8 +19,8 @@ func TestTelemetry(t *testing.T) {
 			String(),
 		seed.ID("unit-other-customer").
 			String()
-	from, to := clock().Add(-24*time.Hour).Format(time.RFC3339), clock().Format(time.RFC3339)
-	rng := `"from":"` + from + `","to":"` + to + `"`
+	from, until := clock().Add(-24*time.Hour).Format(time.RFC3339), clock().Format(time.RFC3339)
+	rng := `"from":"` + from + `","to":"` + until + `"`
 
 	// series by unit: one unit → allergen observation (available); seeded reading id = fixture event id
 	code, res := post(
@@ -126,7 +126,7 @@ func TestTelemetry(t *testing.T) {
 		"reversed range":      refusedToRange,
 	}
 
-	for name, tc := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		a    *actor
 		body string
 		code int
@@ -144,23 +144,23 @@ func TestTelemetry(t *testing.T) {
 		caseDuplicateUnits: {hq(), `{` + rng + `,"unitIds":["` + online + `","` + online + `"],"metric":"co2",` +
 			`"query":{}}`, 422},
 		"bad metric": {hq(), `{` + rng + `,"unitIds":["` + online + `"],"metric":"noise","query":{}}`, 422},
-		"reversed range": {hq(), `{"from":"` + to + `","to":"` + from + `","unitIds":["` + online + `"],"metric":"co2",` +
+		"reversed range": {hq(), `{"from":"` + until + `","to":"` + from + `","unitIds":["` + online + `"],"metric":"co2",` +
 			`"query":{}}`, 422},
 		"range > 35 days": {hq(), `{"from":"2026-08-01T00:00:00Z",` +
-			`"to":"` + to + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
+			`"to":"` + until + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
 		"filters not allowed": {hq(), `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2",` +
 			`"query":{"filters":{"x":1}}}`, 422},
 		"bad sort": {hq(), `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2",` +
 			`"query":{"sort":{"field":"value","direction":"asc"}}}`, 422},
-		"missing from": {hq(), `{"to":"` + to + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
+		"missing from": {hq(), `{"to":"` + until + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
 		"missing to": {hq(), `{"from":"` + from + `","unitIds":["` + online + `"],"metric":"co2",` +
 			`"query":{}}`, 422},
 	} {
-		code, m := post(srv, tc.a, "telemetry.series", tc.body)
+		code, m := post(srv, testCase.a, "telemetry.series", testCase.body)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
-		} else if code != tc.code {
-			t.Errorf("%s: %d want %d", name, code, tc.code)
+		} else if code != testCase.code {
+			t.Errorf("%s: %d want %d", name, code, testCase.code)
 		}
 	}
 
@@ -172,7 +172,7 @@ func TestTelemetry(t *testing.T) {
 		`{`+rng+`,"unitIds":["`+online+`","`+nonRTO+`"]}`,
 	)
 	if code != 200 || len(asArr(t, data(res)["measurements"])) != 8 || data(res)["energy"] != nil ||
-		data(res)["asOf"] != to {
+		data(res)["asOf"] != until {
 		t.Fatalf("summary: %d %v", code, res)
 	}
 
@@ -186,13 +186,13 @@ func TestTelemetry(t *testing.T) {
 		t.Fatal("summary metric")
 	}
 
-	for b, want := range map[string]string{
+	for body, want := range map[string]string{
 		`{` + rng + `,"unitIds":[]}`:                                             refusedUnitIDsInvalid,
 		`{` + rng + `,"unitIds":["` + online + `"],"metric":"x"}`:                refusedMetricInvalid,
-		`{"from":"` + to + `","to":"` + from + `","unitIds":["` + online + `"]}`: refusedToRange,
+		`{"from":"` + until + `","to":"` + from + `","unitIds":["` + online + `"]}`: refusedToRange,
 	} {
-		code, m := post(srv, customerA(), "telemetry.summary", b)
-		refusal(t, b, code, m, want)
+		code, m := post(srv, customerA(), "telemetry.summary", body)
+		refusal(t, body, code, m, want)
 	}
 
 	if code, _ := post(
@@ -247,7 +247,7 @@ func TestVentilation(t *testing.T) {
 		"unit not in space": "unitId=error.unitNotInSpace",
 	}
 
-	for name, tc := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		a    *actor
 		body string
 		code int
@@ -263,11 +263,11 @@ func TestVentilation(t *testing.T) {
 			`"durationMinutes":5}`, 404},
 		"hq cannot log": {hq(), `{"spaceId":"` + room1 + `","method":"other","durationMinutes":5}`, 403},
 	} {
-		code, m := logv(tc.a, tc.body)
+		code, m := logv(testCase.a, testCase.body)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
-		} else if code != tc.code {
-			t.Errorf("%s: %d want %d", name, code, tc.code)
+		} else if code != testCase.code {
+			t.Errorf("%s: %d want %d", name, code, testCase.code)
 		}
 	}
 
@@ -624,30 +624,30 @@ func TestBucketedSeries(t *testing.T) {
 
 	doc := data(resp)
 
-	bs, _ := doc["buckets"].([]any)
-	if len(bs) != 12 || len(items(t, resp)) != 0 || doc["total"] != 8.0 ||
+	buckets, _ := doc["buckets"].([]any)
+	if len(buckets) != 12 || len(items(t, resp)) != 0 || doc["total"] != 8.0 ||
 		doc["nextCursor"] != nil {
 		t.Fatalf(
 			"12 five-minute stretches, no page, every reading counted: %d buckets, %d items, total %v",
-			len(bs),
+			len(buckets),
 			len(items(t, resp)),
 			doc["total"],
 		)
 	}
 
-	b := func(i int) map[string]any { return asObj(t, bs[i]) }
-	if b(0)["start"] != from.UTC().Format(time.RFC3339) || b(0)["value"] != 22.0 ||
-		b(0)["count"] != 5.0 {
-		t.Errorf("the first stretch averages its five valid readings: %v", b(0))
+	bucket := func(i int) map[string]any { return asObj(t, buckets[i]) }
+	if bucket(0)["start"] != from.UTC().Format(time.RFC3339) || bucket(0)["value"] != 22.0 ||
+		bucket(0)["count"] != 5.0 {
+		t.Errorf("the first stretch averages its five valid readings: %v", bucket(0))
 	}
 
-	if b(1)["value"] != 25.0 || b(1)["count"] != 1.0 {
-		t.Errorf("a suspect reading is left out of the average: %v", b(1))
+	if bucket(1)["value"] != 25.0 || bucket(1)["count"] != 1.0 {
+		t.Errorf("a suspect reading is left out of the average: %v", bucket(1))
 	}
 
-	if b(2)["value"] != nil || b(2)["count"] != 0.0 || b(11)["value"] != nil ||
-		b(11)["count"] != 0.0 {
-		t.Errorf("stretches without a valid reading stay, empty: %v / %v", b(2), b(11))
+	if bucket(2)["value"] != nil || bucket(2)["count"] != 0.0 || bucket(11)["value"] != nil ||
+		bucket(11)["count"] != 0.0 {
+		t.Errorf("stretches without a valid reading stay, empty: %v / %v", bucket(2), bucket(11))
 	}
 
 	if code, res := post(

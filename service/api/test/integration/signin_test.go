@@ -72,11 +72,11 @@ func TestLastSignIn(t *testing.T) {
 		}
 	}
 
-	t1 := clock().Add(-2 * time.Hour)
-	request(signedIn(t1), "session.get")
+	signedAt := clock().Add(-2 * time.Hour)
+	request(signedIn(signedAt), "session.get")
 
 	last, auth := read()
-	if last == nil || last.Before(clock()) || auth == nil || !auth.Equal(t1) {
+	if last == nil || last.Before(clock()) || auth == nil || !auth.Equal(signedAt) {
 		t.Fatalf("first sign-in: last %v, auth_time %v", last, auth)
 	}
 
@@ -95,30 +95,30 @@ func TestLastSignIn(t *testing.T) {
 	}
 
 	mark()
-	request(signedIn(t1), "session.get")                 // the same sign-in again
-	request(signedIn(t1.Add(-time.Hour)), "session.get") // an older session's token
+	request(signedIn(signedAt), "session.get")                 // the same sign-in again
+	request(signedIn(signedAt.Add(-time.Hour)), "session.get") // an older session's token
 	request(customerA(), "session.get")                  // a token without a sign-in time
 
 	if last, _ := read(); last == nil || !last.Equal(earlier) {
 		t.Fatalf("must not move: %v", last)
 	}
 
-	t2 := t1.Add(time.Hour)
-	request(signedIn(t2), "session.get")
+	secondSignIn := signedAt.Add(time.Hour)
+	request(signedIn(secondSignIn), "session.get")
 
-	if last, auth := read(); last == nil || last.Equal(earlier) || auth == nil || !auth.Equal(t2) {
+	if last, auth := read(); last == nil || last.Equal(earlier) || auth == nil || !auth.Equal(secondSignIn) {
 		t.Fatalf("a later sign-in: %v %v", last, auth)
 	}
 
 	mark()
 
-	t3 := t2.Add(time.Minute)
+	thirdSignIn := secondSignIn.Add(time.Minute)
 	request(
-		signedIn(t3),
+		signedIn(thirdSignIn),
 		"units.list",
 	) // another service: identity-api records it through the principal call
 
-	if last, auth := read(); last == nil || last.Equal(earlier) || auth == nil || !auth.Equal(t3) {
+	if last, auth := read(); last == nil || last.Equal(earlier) || auth == nil || !auth.Equal(thirdSignIn) {
 		t.Fatalf("through another service: %v %v", last, auth)
 	}
 }

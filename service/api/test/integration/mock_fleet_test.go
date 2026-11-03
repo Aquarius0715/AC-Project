@@ -38,37 +38,37 @@ func TestMockFleetSeeds(t *testing.T) {
 	}
 	defer func() { _ = txn.Rollback(ctx) }() // the test never commits
 
-	n, applyFleetErr := seed.ApplyFleet(ctx, txn, fleet, clock())
-	if applyFleetErr != nil || n != len(fleet.Patterns) {
-		t.Fatalf("apply: %d units, err %v", n, applyFleetErr)
+	seeded, applyFleetErr := seed.ApplyFleet(ctx, txn, fleet, clock())
+	if applyFleetErr != nil || seeded != len(fleet.Patterns) {
+		t.Fatalf("apply: %d units, err %v", seeded, applyFleetErr)
 	}
 
-	n, applyFleetErr = seed.ApplyFleet(ctx, txn, fleet, clock())
-	if applyFleetErr != nil || n != len(fleet.Patterns) {
-		t.Fatalf("second apply: %d, err %v", n, applyFleetErr)
+	seeded, applyFleetErr = seed.ApplyFleet(ctx, txn, fleet, clock())
+	if applyFleetErr != nil || seeded != len(fleet.Patterns) {
+		t.Fatalf("second apply: %d, err %v", seeded, applyFleetErr)
 	}
 
 	count := func(sql string, args ...any) int {
-		var n int
+		var total int
 
-		err := txn.QueryRow(ctx, sql, args...).Scan(&n)
+		err := txn.QueryRow(ctx, sql, args...).Scan(&total)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		return n
+		return total
 	}
 
 	property := seed.ID(fleet.Property.ID)
-	if n := count(
+	if total := count(
 		`SELECT count(*) FROM assets.units WHERE property_id = $1`,
 		property,
-	); n != len(
+	); total != len(
 		fleet.Patterns,
 	) {
 		t.Errorf(
 			"%d units on the fleet property, want %d (a second apply adds nothing)",
-			n,
+			total,
 			len(fleet.Patterns),
 		)
 	}
@@ -103,13 +103,13 @@ func TestMockFleetSeeds(t *testing.T) {
 			t.Errorf("%s module is %s/%s/%s/%s", pattern.Key, conn, power, tamper, firmware)
 		}
 
-		if n := count(
+		if total := count(
 			`SELECT count(*) FROM devices.sensors WHERE device_id = $1`,
 			seed.ID(devicesim.DeviceName(pattern)),
-		); n != len(
+		); total != len(
 			devicesim.Sensors,
 		) {
-			t.Errorf("%s has %d sensors", pattern.Key, n)
+			t.Errorf("%s has %d sensors", pattern.Key, total)
 		}
 	}
 
@@ -213,14 +213,14 @@ func TestMockFleetHistory(t *testing.T) {
 	}
 
 	count := func(sql string, args ...any) int {
-		var n int
+		var total int
 
-		err := txn.QueryRow(ctx, sql, args...).Scan(&n)
+		err := txn.QueryRow(ctx, sql, args...).Scan(&total)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		return n
+		return total
 	}
 
 	power := seed.ID("sensor-mock-cool-on-power")

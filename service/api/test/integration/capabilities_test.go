@@ -59,7 +59,7 @@ func TestCapabilities(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	modelID := asStr(t, data(resp)["id"])
 
 	if code, _ := write(
 		srv,
@@ -155,7 +155,7 @@ func TestCapabilities(t *testing.T) {
 		refusal(t, name, code, m, want[name])
 	}
 	// a unit on this model moves to the new capability version
-	_, um := write(
+	_, savedUnit := write(
 		srv,
 		hq(),
 		"units.save",
@@ -164,17 +164,17 @@ func TestCapabilities(t *testing.T) {
 			`","propertyId":"`+seed.ID("property-home-b").
 			String()+
 			`","spaceId":null,"displayName":"Cap `+
-			`AC `+uuid.NewString()[:4]+`","modelId":"`+id+`","type":"split",`+
+			`AC `+uuid.NewString()[:4]+`","modelId":"`+modelID+`","type":"split",`+
 			`"installedAt":null,"serviceScope":["indoor"]}`,
 		0,
 	)
-	unit, _ := data(um)["id"].(string)
+	unit, _ := data(savedUnit)["id"].(string)
 
 	if code, res := write(
 		srv,
 		hq(),
 		"capabilities.save",
-		capBody(id, model, ""),
+		capBody(modelID, model, ""),
 		1,
 	); code != 422 ||
 		asObj(t, res["fieldErrors"])["changeReason"] != apperr.KeyRequired {
@@ -186,7 +186,7 @@ func TestCapabilities(t *testing.T) {
 		hq(),
 		"capabilities.save",
 		strings.Replace(
-			capBody(id, model, `,"changeReason":"added fan mode"`),
+			capBody(modelID, model, `,"changeReason":"added fan mode"`),
 			`["cool","dry"]`,
 			`["cool","dry","fan"]`,
 			1,
@@ -202,16 +202,16 @@ func TestCapabilities(t *testing.T) {
 		`","to":"` + clock().Add(time.Hour).
 		Format(time.RFC3339) +
 		`"`
-	_, am := post(
+	_, audit := post(
 		srv,
 		hq(),
 		"audit.list",
-		`{"filters":{`+day+`,"targetKind":"capability","targetId":"`+id+`"},"limit":10}`,
+		`{"filters":{`+day+`,"targetKind":"capability","targetId":"`+modelID+`"},"limit":10}`,
 	)
 
 	var saved map[string]any
 
-	for _, a := range items(t, am) {
+	for _, a := range items(t, audit) {
 		if a["nextVersion"] == float64(2) {
 			saved = a
 		}
@@ -221,7 +221,7 @@ func TestCapabilities(t *testing.T) {
 		asObj(t, saved["maskedBefore"])["modes"] != `["cool","dry"]` ||
 		asObj(t, saved["maskedAfter"])["modes"] != `["cool","dry","fan"]` ||
 		len(asObj(t, saved["maskedAfter"])) != 1 {
-		t.Fatalf("capability audit: %v", am)
+		t.Fatalf("capability audit: %v", audit)
 	}
 
 	if unit != "" {
@@ -235,7 +235,7 @@ func TestCapabilities(t *testing.T) {
 		srv,
 		hq(),
 		"capabilities.save",
-		capBody(id, model, `,"changeReason":"again"`),
+		capBody(modelID, model, `,"changeReason":"again"`),
 		1,
 	); code != 409 {
 		t.Error("stale version")
@@ -262,15 +262,15 @@ func TestCapabilities(t *testing.T) {
 	}
 	// only the current version is listed
 	_, resp = post(srv, hq(), "capabilities.list", `{"limit":100}`)
-	n := 0
+	total := 0
 
 	for _, c := range items(t, resp) {
-		if c["id"] == id {
-			n++
+		if c["id"] == modelID {
+			total++
 		}
 	}
 
-	if n != 1 {
-		t.Fatalf("model listed %d times", n)
+	if total != 1 {
+		t.Fatalf("model listed %d times", total)
 	}
 }

@@ -25,14 +25,14 @@ func autoPolicyBody(extra map[string]string) string {
 		fieldAction:    `{"kind":"set_temperature","celsius":26}`,
 	}
 
-	for k, v := range extra {
-		if v == "" {
-			delete(f, k)
+	for key, value := range extra {
+		if value == "" {
+			delete(f, key)
 
 			continue
 		}
 
-		f[k] = v
+		f[key] = value
 	}
 
 	parts := make([]string, 0, len(f))
@@ -58,7 +58,7 @@ func TestAutomationPolicies(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	policyID := asStr(t, data(resp)["id"])
 
 	valid := map[string]map[string]string{
 		"occupancy": {
@@ -178,7 +178,7 @@ func TestAutomationPolicies(t *testing.T) {
 	owner(
 		t,
 		`UPDATE control.automation_policies SET disabled_reason = 'capability_changed' WHERE id = $1`,
-		id,
+		policyID,
 	)
 
 	code, resp = write(
@@ -187,7 +187,7 @@ func TestAutomationPolicies(t *testing.T) {
 		"policies.save",
 		autoPolicyBody(
 			map[string]string{
-				"id":         `"` + id + `"`,
+				"id":         `"` + policyID + `"`,
 				fieldUnitIDs: `["` + seed.ID("unit-limited").String() + `"]`,
 			},
 		),
@@ -203,7 +203,7 @@ func TestAutomationPolicies(t *testing.T) {
 		srv,
 		hq(),
 		"policies.save",
-		autoPolicyBody(map[string]string{"id": `"` + id + `"`}),
+		autoPolicyBody(map[string]string{"id": `"` + policyID + `"`}),
 		1,
 	); code != 409 {
 		t.Error("stale version")
@@ -211,13 +211,13 @@ func TestAutomationPolicies(t *testing.T) {
 
 	def := seed.DefaultPolicyID("tenant-a").String()
 
-	_, dm := post(srv, hq(), "policies.get", `{"policyId":"`+def+`"}`)
+	_, defaultPolicy := post(srv, hq(), "policies.get", `{"policyId":"`+def+`"}`)
 	if code, res := write(
 		srv,
 		hq(),
 		"policies.save",
 		autoPolicyBody(map[string]string{"id": `"` + def + `"`}),
-		ver(t, dm),
+		ver(t, defaultPolicy),
 	); code != 422 ||
 		fields(res) != refusedKindFixed {
 		t.Errorf("default policy saved as automation: %d %s", code, fields(res))
@@ -234,7 +234,7 @@ func TestAutomationPolicies(t *testing.T) {
 	}
 
 	_, resp = post(srv, hq(), "policies.list", `{"filters":{"kind":"automation"},"limit":100}`)
-	if !ids(resp)[id] {
+	if !ids(resp)[policyID] {
 		t.Fatal("kind=automation")
 	}
 
@@ -252,7 +252,7 @@ func TestAutomationPolicies(t *testing.T) {
 			String()+
 			`"},"limit":100}`,
 	)
-	if !ids(resp)[id] {
+	if !ids(resp)[policyID] {
 		t.Fatal("automation unitId filter")
 	}
 
@@ -264,7 +264,7 @@ func TestAutomationPolicies(t *testing.T) {
 			String()+
 			`"},"limit":100}`,
 	)
-	if ids(resp)[id] {
+	if ids(resp)[policyID] {
 		t.Fatal("automation unitId filter excludes")
 	}
 	// the unit and the property together: the unit counts only when it is in the property
@@ -278,7 +278,7 @@ func TestAutomationPolicies(t *testing.T) {
 			String()+
 			`"},"limit":100}`,
 	)
-	if !ids(resp)[id] {
+	if !ids(resp)[policyID] {
 		t.Error("unit in the property")
 	}
 
@@ -292,7 +292,7 @@ func TestAutomationPolicies(t *testing.T) {
 			String()+
 			`"},"limit":100}`,
 	)
-	if ids(resp)[id] {
+	if ids(resp)[policyID] {
 		t.Error("unit outside the property")
 	}
 
@@ -304,7 +304,7 @@ func TestAutomationPolicies(t *testing.T) {
 			String()+
 			`","enabled":true},"limit":100}`,
 	)
-	if !ids(resp)[id] {
+	if !ids(resp)[policyID] {
 		t.Fatal("automation customerId filter")
 	}
 
@@ -316,11 +316,11 @@ func TestAutomationPolicies(t *testing.T) {
 			String()+
 			`"},"limit":100}`,
 	)
-	if ids(resp)[id] {
+	if ids(resp)[policyID] {
 		t.Fatal("automation customerId filter excludes")
 	}
 
-	if code, _ := post(srv, customerA(), "policies.get", `{"policyId":"`+id+`"}`); code != 404 {
+	if code, _ := post(srv, customerA(), "policies.get", `{"policyId":"`+policyID+`"}`); code != 404 {
 		t.Error("clients do not see automation policies")
 	}
 
@@ -334,7 +334,7 @@ func TestAutomationPolicies(t *testing.T) {
 		srv,
 		customerA(),
 		"policies.delete",
-		`{"policyId":"`+id+`"}`,
+		`{"policyId":"`+policyID+`"}`,
 		2,
 	); code != 404 {
 		t.Error("client delete automation")
@@ -344,14 +344,14 @@ func TestAutomationPolicies(t *testing.T) {
 		srv,
 		hq(),
 		"policies.delete",
-		`{"policyId":"`+id+`"}`,
+		`{"policyId":"`+policyID+`"}`,
 		2,
 	); code != 200 ||
 		data(res)["deleted"] != true {
 		t.Fatalf("delete: %d", code)
 	}
 
-	if code, _ := post(srv, hq(), "policies.get", `{"policyId":"`+id+`"}`); code != 404 {
+	if code, _ := post(srv, hq(), "policies.get", `{"policyId":"`+policyID+`"}`); code != 404 {
 		t.Error("deleted automation policy")
 	}
 }

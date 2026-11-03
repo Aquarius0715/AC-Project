@@ -69,17 +69,17 @@ func TestResultsMatchContract(t *testing.T) {
 	}
 
 	marshaler := reflect.TypeFor[json.Marshaler]()
-	plain := func(rt reflect.Type) bool {
-		for rt.Kind() == reflect.Pointer {
-			rt = rt.Elem()
+	plain := func(resultType reflect.Type) bool {
+		for resultType.Kind() == reflect.Pointer {
+			resultType = resultType.Elem()
 		}
 
-		return rt.Kind() != reflect.Interface && !rt.Implements(marshaler) &&
-			!reflect.PointerTo(rt).Implements(marshaler)
+		return resultType.Kind() != reflect.Interface && !resultType.Implements(marshaler) &&
+			!reflect.PointerTo(resultType).Implements(marshaler)
 	}
-	compare := func(what string, rt reflect.Type, want []string, never map[string]string) {
+	compare := func(what string, resultType reflect.Type, want []string, never map[string]string) {
 		got := map[string]bool{}
-		inputFields(rt, got)
+		inputFields(resultType, got)
 
 		var extra, missing []string
 
@@ -99,11 +99,11 @@ func TestResultsMatchContract(t *testing.T) {
 		slices.Sort(missing)
 
 		if len(extra) > 0 {
-			t.Errorf("%s (%s) answers fields outside the contract: %v", what, rt, extra)
+			t.Errorf("%s (%s) answers fields outside the contract: %v", what, resultType, extra)
 		}
 
 		if len(missing) > 0 {
-			t.Errorf("%s (%s) never answers contract fields: %v", what, rt, missing)
+			t.Errorf("%s (%s) never answers contract fields: %v", what, resultType, missing)
 		}
 	}
 	checked := 0
@@ -122,16 +122,16 @@ func TestResultsMatchContract(t *testing.T) {
 			continue
 		}
 
-		rt := operation.Result
-		for rt.Kind() == reflect.Pointer {
-			rt = rt.Elem()
+		resultType := operation.Result
+		for resultType.Kind() == reflect.Pointer {
+			resultType = resultType.Elem()
 		}
 
-		if !plain(rt) {
+		if !plain(resultType) {
 			t.Errorf(
 				"%s answers %s, whose fields are decided at run time: give it a plain result type or list it with the reason",
 				name,
-				rt,
+				resultType,
 			)
 
 			continue
@@ -139,24 +139,24 @@ func TestResultsMatchContract(t *testing.T) {
 
 		checked++
 
-		if rt.Kind() == reflect.Slice {
+		if resultType.Kind() == reflect.Slice {
 			if want.Items == nil {
 				t.Errorf("%s answers an array, the contract does not", name)
 
 				continue
 			}
 
-			compare(name+" items", rt.Elem(), *want.Items, nil)
+			compare(name+" items", resultType.Elem(), *want.Items, nil)
 
 			continue
 		}
 
-		compare(name, rt, want.Fields, resultFieldsNeverAnswered()[name])
+		compare(name, resultType, want.Fields, resultFieldsNeverAnswered()[name])
 
 		if want.Items != nil {
-			structField, ok := rt.FieldByName("Items")
+			structField, ok := resultType.FieldByName("Items")
 			if !ok || structField.Type.Kind() != reflect.Slice {
-				t.Errorf("%s (%s) has no items, the contract's result does", name, rt)
+				t.Errorf("%s (%s) has no items, the contract's result does", name, resultType)
 
 				continue
 			}

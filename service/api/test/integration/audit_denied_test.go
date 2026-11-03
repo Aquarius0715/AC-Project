@@ -76,20 +76,20 @@ func TestDeniedWritesAudited(t *testing.T) {
 		t.Fatalf("denied entries of the two attempts: %d, want 1 a minute", n)
 	}
 
-	e := got[0]
-	if e["actorRoleAtTime"] != roleContractor || e["result"] != "denied" ||
-		e["reason"] != apperr.KeyForbidden ||
-		asObj(t, e["targetRef"])["kind"] != "unit" ||
-		asObj(t, e["targetRef"])["id"] != unit ||
-		e["correlationId"] == "" {
+	entry := got[0]
+	if entry["actorRoleAtTime"] != roleContractor || entry["result"] != "denied" ||
+		entry["reason"] != apperr.KeyForbidden ||
+		asObj(t, entry["targetRef"])["kind"] != "unit" ||
+		asObj(t, entry["targetRef"])["id"] != unit ||
+		entry["correlationId"] == "" {
 		t.Errorf(
 			"the denied entry names the actor, the operation, the target and the refusal: %v",
-			e,
+			entry,
 		)
 	}
 
 	// scope: a contractor reviewing a job HQ keeps in-house (NOT_FOUND) — the job it asked for is the target
-	_, m := write(
+	_, resp := write(
 		srv,
 		customerA(),
 		"jobs.create",
@@ -97,7 +97,7 @@ func TestDeniedWritesAudited(t *testing.T) {
 		0,
 	)
 
-	job := asStr(t, data(m)["id"])
+	job := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		contrA(),

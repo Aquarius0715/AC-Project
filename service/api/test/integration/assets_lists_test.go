@@ -135,7 +135,7 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		t.Fatalf("customer create: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	customerID := asStr(t, data(resp)["id"])
 
 	if code, _ := write(srv, hq(), "customers.save", body, 0); code != 409 {
 		t.Fatalf("one customer per organization: %d", code)
@@ -152,7 +152,7 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		t.Fatalf("customer validation: %d %s", code, fields(res))
 	}
 
-	upd := `{"id":"` + id + `","name":"Test Co 2",` +
+	upd := `{"id":"` + customerID + `","name":"Test Co 2",` +
 		`"organizationId":"` + org + `","serviceProfile":"energy",` +
 		`"status":"inactive"}`
 	if code, res := write(
@@ -177,13 +177,13 @@ func TestCustomersSaveAndRename(t *testing.T) {
 	}
 
 	// rename: client owner renames own room, sibling uniqueness, other customer's target, stale version
-	pr := seed.ID("property-home-a").String()
+	property := seed.ID("property-home-a").String()
 
 	code, resp = write(
 		srv,
 		hq(),
 		"spaces.save",
-		`{"propertyId":"`+pr+`","parentSpaceId":"`+seed.ID("floor-1").
+		`{"propertyId":"`+property+`","parentSpaceId":"`+seed.ID("floor-1").
 			String()+
 			`","kind":"room","name":"Rename me `+uuid.NewString()[:6]+`"}`,
 		0,
@@ -230,7 +230,7 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		srv,
 		hq(),
 		"spaces.save",
-		`{"propertyId":"`+pr+`","parentSpaceId":"`+seed.ID("floor-1").
+		`{"propertyId":"`+property+`","parentSpaceId":"`+seed.ID("floor-1").
 			String()+
 			`","kind":"room","name":"Sib `+uuid.NewString()[:6]+`"}`,
 		0,
@@ -344,7 +344,7 @@ func TestCustomersSaveAndRename(t *testing.T) {
 		srv,
 		hq(),
 		"customers.save",
-		strings.Replace(upd, id, uuid.NewString(), 1),
+		strings.Replace(upd, customerID, uuid.NewString(), 1),
 		1,
 	); code != 404 {
 		t.Fatal("unknown customer")

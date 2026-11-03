@@ -30,27 +30,27 @@ func TestCommandCreateValidation(t *testing.T) {
 	)
 	_, res := post(srv, customerA(), "units.get", `{"id":"`+unit+`"}`)
 
-	v := ver(t, res)
-	for name, c := range map[string]struct {
+	version := ver(t, res)
+	for name, testCase := range map[string]struct {
 		actor       *actor
 		body, field string
 	}{
 		"unit missing": {customerA(), `{"action":{"kind":"set_power","power":true},` +
-			`"expectedUnitVersion":` + itoa(v) + `}`, fieldUnitID},
+			`"expectedUnitVersion":` + itoa(version) + `}`, fieldUnitID},
 		"version missing": {customerA(), `{"unitId":"` + unit + `","action":{"kind":"set_power",` +
 			`"power":true}}`, "expectedUnitVersion"},
 		"reason too long": {techInt(), `{"unitId":"` + unit + `","jobId":"` + uuid.NewString() +
 			`","action":{"kind":"set_power","power":true},"reason":"` + strings.Repeat("r", 1001) + `","expectedUnitVersion":` +
-			itoa(v) + `}`, fieldReason},
+			itoa(version) + `}`, fieldReason},
 	} {
 		if code, resp := write(
 			srv,
-			c.actor,
+			testCase.actor,
 			"commands.create",
-			c.body,
+			testCase.body,
 			0,
 		); code != 422 ||
-			asObj(t, resp["fieldErrors"])[c.field] == nil {
+			asObj(t, resp["fieldErrors"])[testCase.field] == nil {
 			t.Errorf("%s: %d %v", name, code, resp)
 		}
 	}
@@ -92,7 +92,7 @@ func TestCommandCreateValidation(t *testing.T) {
 		customerA(),
 		"commands.create",
 		`{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
-			v,
+			version,
 		)+`}`,
 		0,
 	)
@@ -124,7 +124,7 @@ func TestRestrictionInputValidation(t *testing.T) {
 	srv := server(t)
 
 	nilID, dup := uuid.Nil.String(), uuid.NewString()
-	for name, c := range map[string]struct{ op, body, field string }{
+	for name, testCase := range map[string]struct{ op, body, field string }{
 		"release without id": {"restrictions.release", `{"restrictionId":"` + nilID + `"}`, fieldRestrictionID},
 		"override without id": {
 			"restrictions.override", `{"restrictionId":"` + nilID + `","reason":"hardship"}`,
@@ -143,11 +143,11 @@ func TestRestrictionInputValidation(t *testing.T) {
 		if code, res := write(
 			srv,
 			restrMgr(),
-			c.op,
-			c.body,
+			testCase.op,
+			testCase.body,
 			1,
 		); code != 422 ||
-			asObj(t, res["fieldErrors"])[c.field] == nil {
+			asObj(t, res["fieldErrors"])[testCase.field] == nil {
 			t.Errorf("%s: %d %v", name, code, res)
 		}
 	}

@@ -12,11 +12,11 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	srv := serverWith(t, true)
 	unit := boundUnit(t, srv, "online")
 	key, inv := overdueContract(t, srv, unit)
-	id, res := executed(t, srv, key, inv, []string{unit})
+	restrictionID, res := executed(t, srv, key, inv, []string{unit})
 	ackCommand(t, cmdOf(t, res, unit, "applyCommandIds"), clock().Add(time.Second))
 
 	get := func() map[string]any {
-		_, m := post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
+		_, m := post(srv, restrMgr(), "restrictions.get", `{"id":"`+restrictionID+`"}`)
 
 		return m
 	}
@@ -24,7 +24,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 		srv,
 		restrMgr(),
 		"restrictions.cancel",
-		`{"restrictionId":"`+id+`","reason":"plan agreed"}`,
+		`{"restrictionId":"`+restrictionID+`","reason":"plan agreed"}`,
 		ver(t, get()),
 	)
 	ackCommand(t, cmdOf(t, res, unit, "releaseCommandIds"), clock().Add(2*time.Second))
@@ -43,13 +43,13 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Format(
 				time.RFC3339,
 			)+
-				`","eventType":"restriction_observation","restrictionId":"`+id+`","unitId":"`+unit+`","observed":`+observed+`}`,
+				`","eventType":"restriction_observation","restrictionId":"`+restrictionID+`","unitId":"`+unit+`","observed":`+observed+`}`,
 			0,
 		); code != 200 {
 			t.Fatalf("observation: %d %v", code, resp)
 		}
 	}
-	old := `{"restrictionId":"` + id + `","rulesVersion":"rules-1","policy":{"kind":"temperature_limit",` +
+	old := `{"restrictionId":"` + restrictionID + `","rulesVersion":"rules-1","policy":{"kind":"temperature_limit",` +
 		`"minimumCoolingSetpoint":24},"observedAt":"` + clock().Format(
 		time.RFC3339,
 	) +
@@ -101,13 +101,13 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 		t.Errorf("control blocked while a case is open: %v", data(resp)["controlAvailability"])
 	}
 
-	if _, g := post(srv, hq(), "units.get", `{"id":"`+unit+`"}`); true {
+	if _, detail := post(srv, hq(), "units.get", `{"id":"`+unit+`"}`); true {
 		if code, resp := write(
 			srv,
 			hq(),
 			"commands.create",
 			`{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
-				ver(t, g),
+				ver(t, detail),
 			)+`,"reason":"check"}`,
 			0,
 		); code != 409 ||
@@ -121,7 +121,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 			srv,
 			a,
 			"restrictions.reconcile",
-			`{"restrictionId":"`+id+`","unitIds":["`+unit+`"]}`,
+			`{"restrictionId":"`+restrictionID+`","unitIds":["`+unit+`"]}`,
 			ver(t, get()),
 		)
 	}
@@ -131,9 +131,9 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 
 	code, res := reconcile(overrider()) // override-only may handle terminal recovery (IR03)
 
-	c0, _ := data(res)["recoveryCases"].([]any)
-	if code != 200 || len(c0) != 1 || asObj(t, c0[0])["state"] != statusRemoving ||
-		len(asArr(t, asObj(t, c0[0])["commandIds"])) != 1 {
+	casesBefore, _ := data(res)["recoveryCases"].([]any)
+	if code != 200 || len(casesBefore) != 1 || asObj(t, casesBefore[0])["state"] != statusRemoving ||
+		len(asArr(t, asObj(t, casesBefore[0])["commandIds"])) != 1 {
 		t.Fatalf("reconcile terminal: %d %v", code, res)
 	}
 
@@ -143,7 +143,7 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 
 	ackCommand(
 		t,
-		asStr(t, asArr(t, asObj(t, c0[0])["commandIds"])[0]),
+		asStr(t, asArr(t, asObj(t, casesBefore[0])["commandIds"])[0]),
 		clock().Add(3*time.Second),
 	)
 

@@ -69,17 +69,17 @@ func TestFirmwareCampaigns(t *testing.T) {
 	}
 	// a device with an unresolved tamper, and one on a unit of another model (cap-split-std, SPL-100)
 	tu := newUnit(t, srv, "FW AC")
-	_, tm := write(
+	_, tamperedDevice := write(
 		srv,
 		hq(),
 		"devices.register",
 		`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+tu+`"}`,
 		0,
 	)
-	tampered := asStr(t, data(tm)["id"])
+	tampered := asStr(t, data(tamperedDevice)["id"])
 	owner(t, `UPDATE devices.devices SET tamper = 'detected' WHERE id = $1`, tampered)
 
-	_, om := write(
+	_, otherUnit := write(
 		srv,
 		hq(),
 		"units.save",
@@ -93,28 +93,28 @@ func TestFirmwareCampaigns(t *testing.T) {
 		0,
 	)
 
-	_, od := write(
+	_, otherDevice := write(
 		srv,
 		hq(),
 		"devices.register",
 		`{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+asStr(
 			t,
-			data(om)["id"],
+			data(otherUnit)["id"],
 		)+`"}`,
 		0,
 	)
-	for name, c := range map[string]struct{ device, key string }{
+	for name, testCase := range map[string]struct{ device, key string }{
 		"tampered device": {tampered, apperr.KeyTamperUnresolved},
-		"other model":     {asStr(t, data(od)["id"]), "error.otherModel"},
+		"other model":     {asStr(t, data(otherDevice)["id"]), "error.otherModel"},
 	} {
 		if code, res := write(
 			srv,
 			hq(),
 			"firmwareCampaigns.schedule",
-			body(map[string]string{fieldDeviceIDs: `["` + c.device + `"]`}),
+			body(map[string]string{fieldDeviceIDs: `["` + testCase.device + `"]`}),
 			0,
 		); code != 422 ||
-			asObj(t, res["fieldErrors"])["deviceIds"] != c.key {
+			asObj(t, res["fieldErrors"])["deviceIds"] != testCase.key {
 			t.Errorf("%s: %d %v", name, code, res)
 		}
 	}
@@ -188,13 +188,13 @@ func TestFirmwareCampaigns(t *testing.T) {
 		t.Error("client")
 	}
 	// control transitions
-	ctl := func(action, extra string, v int) (int, map[string]any) {
+	ctl := func(action, extra string, version int) (int, map[string]any) {
 		return write(
 			srv,
 			hq(),
 			"firmwareCampaigns.control",
 			`{"campaignId":"`+camp+`","action":"`+action+`"`+extra+`}`,
-			v,
+			version,
 		)
 	}
 	if code, _ := ctl("resume", "", 1); code != 409 {

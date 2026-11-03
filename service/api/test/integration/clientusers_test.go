@@ -27,7 +27,7 @@ func TestClientUsers(t *testing.T) {
 		caseBlankReason: refusedReasonLength,
 	}
 
-	for name, b := range map[string]string{
+	for name, body := range map[string]string{
 		caseBadEmail: `{"customerId":"` + cust + `","email":"not-an-email","clientRole":"member","displayName":"N"}`,
 		caseBadRole:  `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"admin","displayName":"N"}`,
 		caseBadStatus: `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","status":"invited",` +
@@ -35,7 +35,7 @@ func TestClientUsers(t *testing.T) {
 		caseBlankReason: `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","reason":" ",` +
 			`"displayName":"N"}`,
 	} {
-		code, m := save(hq(), b, 0)
+		code, m := save(hq(), body, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
@@ -58,7 +58,7 @@ func TestClientUsers(t *testing.T) {
 		t.Fatalf("invite: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	clientUserID := asStr(t, data(resp)["id"])
 
 	if code, res := save(
 		hq(),
@@ -119,7 +119,7 @@ func TestClientUsers(t *testing.T) {
 		srv,
 		customerB(),
 		"clientUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+clientUserID+`"}`,
 		0,
 	); code != 429 || res["messageKey"] != "errors.invite_recently_sent" ||
 		res["retryAfterSeconds"] != float64(300) {
@@ -129,14 +129,14 @@ func TestClientUsers(t *testing.T) {
 	owner(
 		t,
 		`UPDATE identity.client_users SET last_invite_sent_at = last_invite_sent_at - interval '5 minutes' WHERE id = $1`,
-		id,
+		clientUserID,
 	)
 
 	if code, res := write(
 		srv,
 		customerB(),
 		"clientUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+clientUserID+`"}`,
 		0,
 	); code != 200 || data(res)["deliveryState"] != statusQueued ||
 		data(res)["templateKey"] != "invite" {
@@ -157,13 +157,13 @@ func TestClientUsers(t *testing.T) {
 		srv,
 		customerA(),
 		"clientUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+clientUserID+`"}`,
 		0,
 	); code != 404 {
 		t.Error("resend another customer's invite")
 	}
 	// updates are HQ only; the last active owner is protected
-	upd := func(target map[string]any, role, status string, v int) (int, map[string]any) {
+	upd := func(target map[string]any, role, status string, version int) (int, map[string]any) {
 		return save(
 			hq(),
 			`{"id":"`+asStr(
@@ -171,16 +171,16 @@ func TestClientUsers(t *testing.T) {
 				target["id"],
 			)+`","customerId":"`+cust+`","email":"`+asStr(t, target["email"])+`","clientRole":"`+
 				role+`","status":"`+status+`","reason":"admin change"}`,
-			v,
+			version,
 		)
 	}
 
-	ov := int(asNum(t, seedOwner["version"]))
-	if code, _ := upd(seedOwner, "member", "active", ov); code != 409 {
+	ownerVersion := int(asNum(t, seedOwner["version"]))
+	if code, _ := upd(seedOwner, "member", "active", ownerVersion); code != 409 {
 		t.Error("demote the last owner")
 	}
 
-	if code, _ := upd(seedOwner, "owner", "disabled", ov); code != 409 {
+	if code, _ := upd(seedOwner, "owner", "disabled", ownerVersion); code != 409 {
 		t.Error("disable the last owner")
 	}
 
@@ -189,14 +189,14 @@ func TestClientUsers(t *testing.T) {
 		hq(),
 		"clientUsers.remove",
 		`{"id":"`+asStr(t, seedOwner["id"])+`","reason":"leaving"}`,
-		ov,
+		ownerVersion,
 	); code != 409 {
 		t.Error("remove the last owner")
 	}
 
 	if code, res := save(
 		hq(),
-		`{"id":"`+id+`","customerId":"`+cust+`","email":"`+email+`","clientRole":"member"}`,
+		`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"`+email+`","clientRole":"member"}`,
 		1,
 	); code != 422 ||
 		fields(res) != refusedReasonRequired {
@@ -204,7 +204,7 @@ func TestClientUsers(t *testing.T) {
 	}
 
 	if code, _ := upd(
-		map[string]any{"id": id, fieldEmail: email},
+		map[string]any{"id": clientUserID, fieldEmail: email},
 		"member",
 		"active",
 		1,
@@ -213,7 +213,7 @@ func TestClientUsers(t *testing.T) {
 	}
 
 	if code, _ := upd(
-		map[string]any{"id": id, fieldEmail: email},
+		map[string]any{"id": clientUserID, fieldEmail: email},
 		"member",
 		"disabled",
 		5,
@@ -221,7 +221,7 @@ func TestClientUsers(t *testing.T) {
 		t.Error("stale client user version")
 	}
 
-	code, resp = upd(map[string]any{"id": id, fieldEmail: email}, "owner", "disabled", 1)
+	code, resp = upd(map[string]any{"id": clientUserID, fieldEmail: email}, "owner", "disabled", 1)
 	if code != 200 || data(resp)["status"] != statusDisabled ||
 		data(resp)["clientRole"] != clientRoleOwner ||
 		ver(t, resp) != 2 {
@@ -232,7 +232,7 @@ func TestClientUsers(t *testing.T) {
 		srv,
 		hq(),
 		"clientUsers.remove",
-		`{"id":"`+id+`","reason":"no longer with the company"}`,
+		`{"id":"`+clientUserID+`","reason":"no longer with the company"}`,
 		2,
 	); code != 200 ||
 		data(res)["deleted"] != true {
@@ -243,7 +243,7 @@ func TestClientUsers(t *testing.T) {
 		srv,
 		hq(),
 		"clientUsers.remove",
-		`{"id":"`+id+`","reason":"again"}`,
+		`{"id":"`+clientUserID+`","reason":"again"}`,
 		2,
 	); code != 404 {
 		t.Error("remove twice")
@@ -349,14 +349,14 @@ func TestClientUserMembershipSync(t *testing.T) {
 		seed.ID("customer-b"),
 	)
 
-	save := func(customer, status string, v int) (int, map[string]any) {
+	save := func(customer, status string, version int) (int, map[string]any) {
 		return write(
 			srv,
 			hq(),
 			"clientUsers.save",
 			`{"id":"`+user+`","customerId":"`+customer+`","email":"`+email+`","clientRole":"member",`+
 				`"status":"`+status+`","reason":"admin change"}`,
-			v,
+			version,
 		)
 	}
 	access := func() (*time.Time, int) {
@@ -473,10 +473,10 @@ func TestClientUsersByOwner(t *testing.T) {
 		t.Fatalf("owner invites an owner: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	clientUserID := asStr(t, data(resp)["id"])
 	// the account exists from the start (IR461): its e-mail is fixed, its role can change
 	if code, m := save(
-		`{"id":"`+id+`","customerId":"`+cust+`","email":"fixed-`+email+`","clientRole":"member","reason":"typo"}`,
+		`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"fixed-`+email+`","clientRole":"member","reason":"typo"}`,
 		1,
 	); code != 422 ||
 		fields(m) != refusedEmailImmutable {
@@ -485,7 +485,7 @@ func TestClientUsersByOwner(t *testing.T) {
 
 	email2 := email
 	if code, m := save(
-		`{"id":"`+id+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","reason":"not an owner"}`,
+		`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","reason":"not an owner"}`,
 		1,
 	); code != 200 ||
 		data(m)["clientRole"] != clientRoleMember {
@@ -493,7 +493,7 @@ func TestClientUsersByOwner(t *testing.T) {
 	}
 
 	if code, m := save(
-		`{"id":"`+id+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","status":"active","reason":"x"}`,
+		`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"`+email2+`","clientRole":"member","status":"active","reason":"x"}`,
 		2,
 	); code != 409 ||
 		m["messageKey"] != "errors.invite_pending" {
@@ -510,7 +510,7 @@ func TestClientUsersByOwner(t *testing.T) {
 		}
 	}
 
-	sv := int(asNum(t, self["version"]))
+	selfVersion := int(asNum(t, self["version"]))
 	if code, res := save(
 		`{"id":"`+asStr(
 			t,
@@ -520,7 +520,7 @@ func TestClientUsersByOwner(t *testing.T) {
 			self["email"],
 		)+`","clientRole":"owner",`+
 			`"status":"disabled","reason":"x"}`,
-		sv,
+		selfVersion,
 	); code != 409 ||
 		res["messageKey"] != keyOwnAccount {
 		t.Errorf("disable the own account: %d %v", code, res)
@@ -531,7 +531,7 @@ func TestClientUsersByOwner(t *testing.T) {
 		customerB(),
 		"clientUsers.remove",
 		`{"id":"`+asStr(t, self["id"])+`","reason":"x"}`,
-		sv,
+		selfVersion,
 	); code != 409 ||
 		res["messageKey"] != keyOwnAccount {
 		t.Errorf("remove the own account: %d %v", code, res)
@@ -604,7 +604,7 @@ func TestClientUsersByOwner(t *testing.T) {
 		srv,
 		customerB(),
 		"clientUsers.remove",
-		`{"id":"`+id+`","reason":"withdrawn"}`,
+		`{"id":"`+clientUserID+`","reason":"withdrawn"}`,
 		2,
 	); code != 200 {
 		t.Error("remove the invite")
@@ -709,30 +709,30 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 	membership := asStr(t, data(res)["id"])
 
 	var (
-		id string
-		v  int
+		clientUserID string
+		version  int
 	)
 	ownerScan(
 		t,
 		`SELECT id::text, version FROM identity.client_users WHERE membership_id = $1`,
 		[]any{membership},
-		&id,
-		&v,
+		&clientUserID,
+		&version,
 	)
 
 	if code, resp := write(
 		srv,
 		customerB(),
 		"clientUsers.save",
-		`{"id":"`+id+`","customerId":"`+cust+`","email":"`+user+`@ac.local","clientRole":"member","status":"disabled",`+
+		`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"`+user+`@ac.local","clientRole":"member","status":"disabled",`+
 			`"reason":"left"}`,
-		v,
+		version,
 	); code != 200 {
 		t.Fatalf("disable: %d %v", code, resp)
 	}
 
-	var mv int
-	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &mv)
+	var membershipVersion int
+	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &membershipVersion)
 
 	later := clock().Add(90 * 24 * time.Hour).Format(time.RFC3339)
 	if code, resp := write(
@@ -743,7 +743,7 @@ func TestDisabledClientStaysClosed(t *testing.T) {
 			String()+
 			`","role":"client","permissions":[],"scopes":[],`+
 			`"validFrom":"`+from+`","validUntil":"`+later+`","reason":"contract"}`,
-		mv,
+		membershipVersion,
 	); code != 200 {
 		t.Fatalf("HQ change: %d %v", code, resp)
 	}

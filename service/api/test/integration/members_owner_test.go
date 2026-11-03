@@ -41,8 +41,8 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 		owner(t, `DELETE FROM identity.memberships WHERE id = $1`, member)
 	})
 
-	m := actor{"tok-a", "test-member-a"} // customer A's user, signed in with the member membership
-	if code, res := post(srv, &m, "session.get", `{}`); code != 200 {
+	asMember := actor{"tok-a", "test-member-a"} // customer A's user, signed in with the member membership
+	if code, res := post(srv, &asMember, "session.get", `{}`); code != 200 {
 		t.Fatalf("the member signs in: %d %v", code, res)
 	}
 
@@ -56,7 +56,7 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 		&clientUser,
 	)
 
-	for _, c := range []struct {
+	for _, testCase := range []struct {
 		op, body string
 		version  int
 		write    bool
@@ -75,14 +75,14 @@ func TestClientMembersAreNotOwners(t *testing.T) {
 			code int
 			res  map[string]any
 		)
-		if c.write {
-			code, res = write(srv, &m, c.op, c.body, c.version)
+		if testCase.write {
+			code, res = write(srv, &asMember, testCase.op, testCase.body, testCase.version)
 		} else {
-			code, res = post(srv, &m, c.op, c.body)
+			code, res = post(srv, &asMember, testCase.op, testCase.body)
 		}
 
 		if code != 403 {
-			t.Errorf("%s as a member: %d %v", c.op, code, res)
+			t.Errorf("%s as a member: %d %v", testCase.op, code, res)
 		}
 	}
 	// the owner of the same customer may

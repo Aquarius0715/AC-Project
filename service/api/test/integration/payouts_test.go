@@ -219,12 +219,12 @@ func TestPayouts(t *testing.T) {
 
 	_, resp = post(srv, hq(), "payouts.get", `{"id":"`+jid+`"}`)
 
-	q := asStr(t, asObj(t, asArr(t, data(resp)["queries"])[0])["id"])
+	queryID := asStr(t, asObj(t, asArr(t, data(resp)["queries"])[0])["id"])
 	if code, res := write(
 		srv,
 		hq(),
 		"payouts.resolveQuery",
-		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"ok","adjustmentMinor":0}`,
+		`{"statementId":"`+jid+`","queryId":"`+queryID+`","reply":"ok","adjustmentMinor":0}`,
 		3,
 	); code != 422 ||
 		fields(res) != "adjustmentMinor=error.nonZero" {
@@ -235,7 +235,7 @@ func TestPayouts(t *testing.T) {
 		srv,
 		hq(),
 		"payouts.resolveQuery",
-		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"Added travel","adjustmentMinor":12000}`,
+		`{"statementId":"`+jid+`","queryId":"`+queryID+`","reply":"Added travel","adjustmentMinor":12000}`,
 		2,
 	); code != 409 ||
 		res["messageKey"] != apperr.KeyVersionConflict {
@@ -246,7 +246,7 @@ func TestPayouts(t *testing.T) {
 		srv,
 		hq(),
 		"payouts.resolveQuery",
-		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"Added travel","adjustmentMinor":12000}`,
+		`{"statementId":"`+jid+`","queryId":"`+queryID+`","reply":"Added travel","adjustmentMinor":12000}`,
 		3,
 	); code != 200 ||
 		asObj(t, asArr(t, data(res)["queries"])[0])["state"] != "adjusted" {
@@ -257,7 +257,7 @@ func TestPayouts(t *testing.T) {
 		srv,
 		hq(),
 		"payouts.resolveQuery",
-		`{"statementId":"`+jid+`","queryId":"`+q+`","reply":"again"}`,
+		`{"statementId":"`+jid+`","queryId":"`+queryID+`","reply":"again"}`,
 		4,
 	); code != 409 {
 		t.Error("resolve twice")
@@ -288,11 +288,11 @@ func TestPayouts(t *testing.T) {
 
 	_, resp = post(srv, hq(), "payouts.get", `{"id":"`+jid+`"}`)
 
-	var q2 string
+	var openQuery string
 
 	for _, x := range asArr(t, data(resp)["queries"]) { // both were asked at the test clock: pick the open one
 		if x := asObj(t, x); x["state"] == statusOpen {
-			q2 = asStr(t, x["id"])
+			openQuery = asStr(t, x["id"])
 		}
 	}
 
@@ -300,7 +300,7 @@ func TestPayouts(t *testing.T) {
 		srv,
 		hq(),
 		"payouts.resolveQuery",
-		`{"statementId":"`+jid+`","queryId":"`+q2+`","reply":"Refund the double charge","adjustmentMinor":-3000}`,
+		`{"statementId":"`+jid+`","queryId":"`+openQuery+`","reply":"Refund the double charge","adjustmentMinor":-3000}`,
 		5,
 	); code != 200 {
 		t.Fatalf("resolve with a reduction: %d %v", code, res)
@@ -450,16 +450,16 @@ func TestPayoutWithoutRateCard(t *testing.T) {
 	}
 
 	for _, x := range asArr(t, res["data"]) {
-		st := asObj(t, x)
-		if st["contractorOrgId"] != org.String() {
+		statement := asObj(t, x)
+		if statement["contractorOrgId"] != org.String() {
 			continue
 		}
 
-		lines := asArr(t, st["lines"])
+		lines := asArr(t, statement["lines"])
 		if l := asObj(t, lines[0]); len(lines) != 1 || l["note"] != "no rate card" ||
 			asNum(t, l["amountMinor"]) != 0 ||
-			asNum(t, st["netMinor"]) != 0 {
-			t.Errorf("statement without a rate card: %v", st)
+			asNum(t, statement["netMinor"]) != 0 {
+			t.Errorf("statement without a rate card: %v", statement)
 		}
 
 		return

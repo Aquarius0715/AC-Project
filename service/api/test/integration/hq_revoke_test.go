@@ -68,11 +68,11 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	id, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
+	partnerUserID, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
 
 	drain()
 	// signed in once, an hour into the membership (the test clock stands still)
-	owner(t, `UPDATE identity.partner_users SET status = 'active' WHERE id = $1`, id)
+	owner(t, `UPDATE identity.partner_users SET status = 'active' WHERE id = $1`, partnerUserID)
 	owner(
 		t,
 		`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '1 hour' WHERE id = $1`,
@@ -90,12 +90,12 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 
 	from := clock().Add(-time.Hour).Format(time.RFC3339)
 	hqSave := func(until string) (int, map[string]any) {
-		var v int
+		var version int
 		ownerScan(
 			t,
 			`SELECT version FROM identity.memberships WHERE id = $1`,
 			[]any{membership},
-			&v,
+			&version,
 		)
 
 		return write(
@@ -107,19 +107,19 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 				`","role":"technician","employment":"external",`+
 				`"permissions":["alert.read","alert.resolve","control.diagnose","device.maintain"],"scopes":[],`+
 				`"validFrom":"`+from+`","validUntil":`+until+`,"reason":"access review"}`,
-			v,
+			version,
 		)
 	}
 	partner := func(body string) (int, map[string]any) {
-		var v int
-		ownerScan(t, `SELECT version FROM identity.partner_users WHERE id = $1`, []any{id}, &v)
+		var version int
+		ownerScan(t, `SELECT version FROM identity.partner_users WHERE id = $1`, []any{partnerUserID}, &version)
 
 		return write(
 			srv,
 			contrA(),
 			"partnerUsers.save",
-			`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician",`+body+`,"reason":"back on the team"}`,
-			v,
+			`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"technician",`+body+`,"reason":"back on the team"}`,
+			version,
 		)
 	}
 	listed := func() map[string]any {
@@ -127,7 +127,7 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 
 		_, res := post(srv, contrA(), "partnerUsers.list", `{"limit":100}`)
 		for _, it := range items(t, res) {
-			if it["id"] == id {
+			if it["id"] == partnerUserID {
 				return it
 			}
 		}
@@ -220,15 +220,15 @@ func TestHQRevokeTurnsSignInOff(t *testing.T) {
 		t.Fatalf("revoke again: %d %v", code, m)
 	}
 
-	var v int
-	ownerScan(t, `SELECT version FROM identity.partner_users WHERE id = $1`, []any{id}, &v)
+	var userVersion int
+	ownerScan(t, `SELECT version FROM identity.partner_users WHERE id = $1`, []any{partnerUserID}, &userVersion)
 
 	if code, res := write(
 		srv,
 		contrA(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"left"}`,
-		v,
+		`{"id":"`+partnerUserID+`","reason":"left"}`,
+		userVersion,
 	); code != 200 {
 		t.Fatalf("remove: %d %v", code, res)
 	}
@@ -270,8 +270,8 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 
 	membership := asStr(t, data(m)["id"])
 
-	var mv int
-	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &mv)
+	var membershipVersion int
+	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &membershipVersion)
 
 	revoke := `{"id":"` + membership + `",` + body(`"` + clock().Format(time.RFC3339) + `"`)[1:]
 	if code, res := write(
@@ -279,39 +279,39 @@ func TestHQRevokeOfAClientUser(t *testing.T) {
 		hq(),
 		"members.save",
 		revoke,
-		mv,
+		membershipVersion,
 	); code != 200 ||
 		data(res)["revokedAt"] == nil {
 		t.Fatalf("revoke: %d %v", code, res)
 	}
 
 	var (
-		id string
-		v  int
+		clientUserID string
+		version  int
 	)
 	ownerScan(
 		t,
 		`SELECT id::text, version FROM identity.client_users WHERE membership_id = $1`,
 		[]any{membership},
-		&id,
-		&v,
+		&clientUserID,
+		&version,
 	)
 
 	save := func(role, status string) (int, map[string]any) {
-		ownerScan(t, `SELECT version FROM identity.client_users WHERE id = $1`, []any{id}, &v)
+		ownerScan(t, `SELECT version FROM identity.client_users WHERE id = $1`, []any{clientUserID}, &version)
 
-		st := "" // a role change sends no status
+		state := "" // a role change sends no status
 		if status != "" {
-			st = `,"status":"` + status + `"`
+			state = `,"status":"` + status + `"`
 		}
 
 		return write(
 			srv,
 			customerB(),
 			"clientUsers.save",
-			`{"id":"`+id+`","customerId":"`+cust+`","email":"`+user+`@ac.local",`+
-				`"clientRole":"`+role+`"`+st+`,"reason":"review"}`,
-			v,
+			`{"id":"`+clientUserID+`","customerId":"`+cust+`","email":"`+user+`@ac.local",`+
+				`"clientRole":"`+role+`"`+state+`,"reason":"review"}`,
+			version,
 		)
 	}
 	if code, m := save("owner", ""); code != 409 || m["messageKey"] != keyRevokedByHQ {
@@ -381,7 +381,7 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	id, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
+	partnerUserID, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
 
 	err := srv.DrainEvents(context.Background())
 	if err != nil {
@@ -392,7 +392,7 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 		Truncate(time.Minute).
 		Add(59 * time.Second)
 		// the last second of a minute, an hour ago
-	owner(t, `UPDATE identity.partner_users SET status = 'active' WHERE id = $1`, id)
+	owner(t, `UPDATE identity.partner_users SET status = 'active' WHERE id = $1`, partnerUserID)
 	owner(
 		t,
 		`UPDATE identity.memberships SET valid_from = $2, valid_until = $3 WHERE id = $1`,
@@ -403,14 +403,14 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 
 	var (
 		user string
-		v    int
+		version    int
 	)
 	ownerScan(
 		t,
 		`SELECT user_id::text, version FROM identity.memberships WHERE id = $1`,
 		[]any{membership},
 		&user,
-		&v,
+		&version,
 	)
 
 	code, resp = write(
@@ -425,7 +425,7 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 			`","validUntil":"`+ended.Truncate(time.Minute).
 			Format(time.RFC3339)+
 			`","reason":"fewer permissions"}`,
-		v,
+		version,
 	)
 	if code != 200 || data(resp)["revokedAt"] != nil {
 		t.Fatalf("HQ's save of an ended access: %d %v", code, resp)
@@ -447,16 +447,16 @@ func TestHQSaveOfAnEndedAccessIsNoRevoke(t *testing.T) {
 		t.Errorf("the sign-in was switched: %v", fake.switched)
 	}
 
-	ownerScan(t, `SELECT version FROM identity.partner_users WHERE id = $1`, []any{id}, &v)
+	ownerScan(t, `SELECT version FROM identity.partner_users WHERE id = $1`, []any{partnerUserID}, &version)
 
 	if code, res := write(
 		srv,
 		contrA(),
 		"partnerUsers.save",
-		`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+clock().Add(20*24*time.Hour).
+		`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+clock().Add(20*24*time.Hour).
 			Format(time.RFC3339)+
 			`","reason":"back"}`,
-		v,
+		version,
 	); code != 200 {
 		t.Errorf("the contractor's new access end: %d %v", code, res)
 	}

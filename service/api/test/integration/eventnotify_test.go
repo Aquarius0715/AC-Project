@@ -10,16 +10,16 @@ import (
 func countNotes(t *testing.T, target, recipient, template string) int {
 	t.Helper()
 
-	var n int
+	var total int
 	ownerScan(
 		t,
 		`SELECT count(*) FROM notify.notifications WHERE target->>'id' = $1 AND recipient_membership_id = $2 AND template_key
 			= $3`,
 		[]any{target, seed.ID(recipient), template},
-		&n,
+		&total,
 	)
 
-	return n
+	return total
 }
 
 //nolint:paralleltest // the integration tests share one server and the seeded test database
@@ -77,13 +77,13 @@ func TestBusinessEventNotifications(t *testing.T) {
 		t.Error("job.assigned recipients")
 	}
 	// job.cancelled
-	_, g := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
+	_, detail := post(srv, hq(), "jobs.get", `{"jobId":"`+job+`"}`)
 	if code, res := write(
 		srv,
 		hq(),
 		"jobs.cancel",
 		`{"jobId":"`+job+`","cancelReason":"no longer needed"}`,
-		ver(t, g),
+		ver(t, detail),
 	); code != 200 {
 		t.Fatalf("cancel: %d %v", code, res)
 	}

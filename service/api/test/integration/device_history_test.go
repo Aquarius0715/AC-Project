@@ -42,13 +42,13 @@ func TestDeviceHistory(t *testing.T) {
 	)
 	write(srv, hq(), "devices.check", `{"id":"`+dev+`"}`, 3)
 
-	ev := uuid.NewString()
+	eventID := uuid.NewString()
 	owner(
 		t,
 		`INSERT INTO devices.device_events (id, tenant_id, device_id, unit_id, event_type, axis, evidence_source, sequence,
 			occurred_at)
 		VALUES ($1,$2,$3,$4,'tamper','tamper','tamper_signal',1,$5)`,
-		ev,
+		eventID,
 		seed.ID("tenant-a"),
 		dev,
 		unit,
@@ -99,22 +99,22 @@ func TestDeviceHistory(t *testing.T) {
 		t.Error("clients do not read device operations")
 	}
 
-	for b, want := range map[string]string{
+	for body, want := range map[string]string{
 		`{"deviceId":"` + dev + `","query":{"filters":{"x":1}}}`: refusedUnknownFieldX,
 		bodyEmptyQuery: "deviceId=error.invalid",
 		`{"deviceId":"` + dev + `","query":{"sort":{"field":"kind","direction":"asc"}}}`: refusedSortFieldInvalid,
 	} {
-		code, m := post(srv, hq(), "devices.operations", b)
-		refusal(t, b, code, m, want)
+		code, m := post(srv, hq(), "devices.operations", body)
+		refusal(t, body, code, m, want)
 	}
 	// response notes (DeviceEvent.version)
-	note := func(a *actor, msg string, v int) (int, map[string]any) {
+	note := func(a *actor, msg string, version int) (int, map[string]any) {
 		return write(
 			srv,
 			a,
 			"devices.addResponseNote",
-			`{"deviceId":"`+dev+`","eventId":"`+ev+`","responseNote":"`+msg+`"}`,
-			v,
+			`{"deviceId":"`+dev+`","eventId":"`+eventID+`","responseNote":"`+msg+`"}`,
+			version,
 		)
 	}
 	if code, res := note(

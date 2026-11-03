@@ -160,17 +160,17 @@ func TestVoiceAndExport(t *testing.T) {
 		"no sections":     "sections=error.required",
 	}
 
-	for name, tc := range map[string][5]string{
+	for name, testCase := range map[string][5]string{
 		"month not ended": {"2026-09", homeA, all, formatCSV, "422"},
 		"bad month":       {"2026-13", homeA, all, formatCSV, "422"},
 		"no sections":     {monthAugust, homeA, "", formatCSV, "422"},
 		"bad format":      {monthAugust, homeA, all, "xlsx", "422"},
 		caseOtherCustomer: {monthAugust, `"` + seed.ID("property-home-b").String() + `"`, all, formatCSV, "404"},
 	} {
-		code, m := exp(customerA(), tc[0], tc[1], tc[2], tc[3])
+		code, m := exp(customerA(), testCase[0], testCase[1], testCase[2], testCase[3])
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
-		} else if itoa(code) != tc[4] {
+		} else if itoa(code) != testCase[4] {
 			t.Errorf("%s: %d", name, code)
 		}
 	}

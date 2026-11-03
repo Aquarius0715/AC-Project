@@ -87,15 +87,15 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 	august := func() []statement {
 		t.Helper()
 
-		var n int
+		var total int
 		ownerScan(
 			t,
 			`SELECT count(*) FROM billing.payout_statements WHERE contractor_org_id = $1 AND period = '2026-08'`,
 			[]any{org},
-			&n,
+			&total,
 		)
 
-		out := make([]statement, n)
+		out := make([]statement, total)
 		for idx := range out {
 			ownerScan(
 				t,
@@ -146,15 +146,15 @@ func TestMonthlyPayoutDrafts(t *testing.T) {
 		t.Fatalf("regenerated: %+v", got)
 	}
 	// HQ approves; a later run of August leaves the approved statement
-	var v int
-	ownerScan(t, `SELECT version FROM billing.payout_statements WHERE id = $1`, []any{draft}, &v)
+	var version int
+	ownerScan(t, `SELECT version FROM billing.payout_statements WHERE id = $1`, []any{draft}, &version)
 
 	if code, res := write(
 		srv,
 		hq(),
 		"payouts.transition",
 		`{"statementId":"`+draft+`","action":"approve"}`,
-		v,
+		version,
 	); code != 200 {
 		t.Fatalf("approve: %d %v", code, res)
 	}

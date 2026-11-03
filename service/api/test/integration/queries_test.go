@@ -39,21 +39,21 @@ func TestReadModelsAcrossServices(t *testing.T) {
 		{techA(), opSummariesGet, `{"kind":"technician","filters":{}}`},
 		{customerA(), opSummariesGet, `{"kind":"customer","filters":{}}`},
 	}
-	for _, tc := range cases {
-		code1, want := post(all, tc.who, tc.op, tc.body)
-		code2, got := post(equipment, tc.who, tc.op, tc.body)
-		w := jsonBytes(t, want["data"])
+	for _, testCase := range cases {
+		code1, want := post(all, testCase.who, testCase.op, testCase.body)
+		code2, got := post(equipment, testCase.who, testCase.op, testCase.body)
+		wantJSON := jsonBytes(t, want["data"])
 
-		g := jsonBytes(t, got["data"])
-		if code1 != 200 || code2 != 200 || string(w) != string(g) {
+		gotJSON := jsonBytes(t, got["data"])
+		if code1 != 200 || code2 != 200 || string(wantJSON) != string(gotJSON) {
 			t.Fatalf(
 				"%s %s: single %d %s\nsplit %d %s",
-				tc.op,
-				tc.who.membership,
+				testCase.op,
+				testCase.who.membership,
 				code1,
-				w,
+				wantJSON,
 				code2,
-				g,
+				gotJSON,
 			)
 		}
 	}
@@ -117,19 +117,19 @@ func TestNotificationsAcrossServices(t *testing.T) {
 		t.Fatalf("create on billing-api: %d %v", code, res)
 	}
 
-	id := asStr(t, data(res)["id"])
+	inquiryID := asStr(t, data(res)["id"])
 
 	count := func() int {
-		var n int
+		var total int
 
 		ownerScan(
 			t,
 			`SELECT count(*) FROM notify.notifications WHERE target->>'id' = $1 AND recipient_membership_id = $2`,
-			[]any{id, seed.ID("hq-operator")},
-			&n,
+			[]any{inquiryID, seed.ID("hq-operator")},
+			&total,
 		)
 
-		return n
+		return total
 	}
 	if count() != 0 {
 		t.Fatal("billing-api must not store notifications itself")
@@ -209,13 +209,13 @@ func TestDirectoryAcrossServices(t *testing.T) {
 //
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestSystemQueries(t *testing.T) {
-	cl := newCluster(t)
+	cluster := newCluster(t)
 	unit := seed.ID("unit-online-rto").String()
 	ask := func(token, tenant string) int {
 		req, _ := http.NewRequestWithContext(
 			t.Context(),
 			http.MethodPost,
-			cl.urls[ops.DomainBilling]+"/internal/v1/system/queries/restrictions.unitPolicy",
+			cluster.urls[ops.DomainBilling]+"/internal/v1/system/queries/restrictions.unitPolicy",
 			strings.NewReader(`{"unitId":"`+unit+`"}`),
 		)
 		if token != "" {

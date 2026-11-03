@@ -76,7 +76,7 @@ func ownerScan(t *testing.T, sql string, args []any, dest ...any) {
 func newPolicy(t *testing.T, customer, kind string) string {
 	t.Helper()
 
-	id := uuid.NewString()
+	policyID := uuid.NewString()
 
 	var cust any = seed.ID(customer)
 
@@ -97,7 +97,7 @@ func newPolicy(t *testing.T, customer, kind string) string {
 				created_by_user_id, timezone, condition, rules)
 			SELECT $1,$2,'default_alert',NULL,'Default policy',$3,$4,'Asia/Kuala_Lumpur',NULL,'[]'
 			WHERE NOT EXISTS (SELECT 1 FROM monitoring.alert_policies WHERE tenant_id = $2 AND kind = 'default_alert')`,
-			id,
+			policyID,
 			seed.ID("tenant-a"),
 			seed.ID("hq-operator"),
 			seed.ID("user-hq-operator"),
@@ -111,7 +111,7 @@ func newPolicy(t *testing.T, customer, kind string) string {
 		`INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id,
 			created_by_user_id, timezone, condition, rules)
 		VALUES ($1,$2,$3,$4,'test policy',$5,$6,'Asia/Kuala_Lumpur',$7,$8)`,
-		id,
+		policyID,
 		seed.ID("tenant-a"),
 		kind,
 		cust,
@@ -121,13 +121,13 @@ func newPolicy(t *testing.T, customer, kind string) string {
 		rules,
 	)
 
-	return id
+	return policyID
 }
 
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 	srv := server(t)
-	pA, pA2, pB := newPolicy(
+	policyA, pA2, policyB := newPolicy(
 		t,
 		"cust-a",
 		"alert",
@@ -143,7 +143,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 	def := newPolicy(t, "cust-a", "default_alert")
 	unit := seed.ID("unit-non-rto").String()
 	_, resp := post(srv, customerA(), "units.get", `{"id":"`+unit+`"}`)
-	v := ver(t, resp)
+	unitVersion := ver(t, resp)
 	set := func(a *actor, ids string, version int) (int, map[string]any) {
 		return write(
 			srv,
@@ -154,21 +154,21 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		)
 	}
 
-	code, resp := set(customerA(), `"`+pA+`","`+pA2+`"`, v)
+	code, resp := set(customerA(), `"`+policyA+`","`+pA2+`"`, unitVersion)
 	if code != 200 || len(asArr(t, data(resp)["alertPolicyIds"])) != 2 {
 		t.Fatalf("attach: %d %v", code, resp)
 	}
 
-	v++
+	unitVersion++
 	if code, m := set(
 		customerA(),
 		`"`+pA2+`"`,
-		v,
+		unitVersion,
 	); code != 200 ||
 		len(asArr(t, data(m)["alertPolicyIds"])) != 1 {
 		t.Fatalf("replace: %d", code)
 	} else {
-		v++
+		unitVersion++
 	}
 
 	refused := map[string]string{ // the field each VALIDATION case is refused for
@@ -176,38 +176,38 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		"duplicate":      "alertPolicyIds=error.duplicate",
 	}
 
-	for name, tc := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		ids  string
 		code int
 	}{
-		"other customer's policy": {`"` + pB + `"`, 404},
+		"other customer's policy": {`"` + policyB + `"`, 404},
 		"default policy":          {`"` + def + `"`, 422},
 		"unknown policy":          {`"` + uuid.NewString() + `"`, 404},
-		"duplicate":               {`"` + pA + `","` + pA + `"`, 422},
+		"duplicate":               {`"` + policyA + `","` + policyA + `"`, 422},
 	} {
-		code, m := set(customerA(), tc.ids, v)
+		code, m := set(customerA(), testCase.ids, unitVersion)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
-		} else if code != tc.code {
-			t.Errorf("%s: %d want %d", name, code, tc.code)
+		} else if code != testCase.code {
+			t.Errorf("%s: %d want %d", name, code, testCase.code)
 		}
 	}
 
-	if code, _ := set(customerB(), `"`+pB+`"`, v); code != 404 {
+	if code, _ := set(customerB(), `"`+policyB+`"`, unitVersion); code != 404 {
 		t.Error("customer-b cannot touch customer-a's unit")
 	}
 
-	if code, _ := set(customerA(), ``, v-1); code != 409 {
+	if code, _ := set(customerA(), ``, unitVersion-1); code != 409 {
 		t.Error("stale version")
 	}
 
-	if code, m := set(hq(), ``, v); code != 200 || len(asArr(t, data(m)["alertPolicyIds"])) != 0 {
+	if code, m := set(hq(), ``, unitVersion); code != 200 || len(asArr(t, data(m)["alertPolicyIds"])) != 0 {
 		t.Fatalf("detach all: %d", code)
 	}
 
 	// delete: a fresh unit without contracts, jobs or IoT is deleted; a unit with a device binding is CONFLICT
 	prop, model := seed.ID("property-home-a").String(), seed.ID("ventilation-demo").String()
-	mk := func() string {
+	makeUnit := func() string {
 		code, res := write(
 			srv,
 			hq(),
@@ -226,12 +226,12 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		return asStr(t, data(res)["id"])
 	}
 
-	u1 := mk()
+	unit1 := makeUnit()
 	if code, _ := write(
 		srv,
 		hq(),
 		"units.delete",
-		`{"id":"`+u1+`","reason":"created by mistake"}`,
+		`{"id":"`+unit1+`","reason":"created by mistake"}`,
 		2,
 	); code != 409 {
 		t.Error("stale delete")
@@ -241,14 +241,14 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		srv,
 		hq(),
 		"units.delete",
-		`{"id":"`+u1+`","reason":"created by mistake"}`,
+		`{"id":"`+unit1+`","reason":"created by mistake"}`,
 		1,
 	); code != 200 ||
 		data(res)["deleted"] != true {
 		t.Fatalf("delete: %d %v", code, res)
 	}
 
-	if code, _ := post(srv, hq(), "units.get", `{"id":"`+u1+`"}`); code != 404 {
+	if code, _ := post(srv, hq(), "units.get", `{"id":"`+unit1+`"}`); code != 404 {
 		t.Error("deleted unit is gone")
 	}
 
@@ -256,13 +256,13 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		srv,
 		hq(),
 		"units.delete",
-		`{"id":"`+u1+`","reason":"again"}`,
+		`{"id":"`+unit1+`","reason":"again"}`,
 		1,
 	); code != 404 {
 		t.Error("delete twice")
 	}
 
-	u2 := mk()
+	unit2 := makeUnit()
 	dev := uuid.NewString()
 	owner(
 		t,
@@ -271,7 +271,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		dev,
 		seed.ID("tenant-a"),
 		"T-"+dev[:8],
-		u2,
+		unit2,
 		seed.ID("hq-operator"),
 	)
 	owner(
@@ -280,7 +280,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 			VALUES ($1,$2,$3,$4,now(),$5)`,
 		seed.ID("tenant-a"),
 		dev,
-		u2,
+		unit2,
 		seed.ID("org-customer-a"),
 		seed.ID("hq-operator"),
 	)
@@ -289,7 +289,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		srv,
 		hq(),
 		"units.delete",
-		`{"id":"`+u2+`","reason":"x"}`,
+		`{"id":"`+unit2+`","reason":"x"}`,
 		1,
 	); code != 409 ||
 		res["messageKey"] != "error.unitInUse" {
@@ -300,7 +300,7 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		srv,
 		customerA(),
 		"units.delete",
-		`{"id":"`+u2+`","reason":"x"}`,
+		`{"id":"`+unit2+`","reason":"x"}`,
 		1,
 	); code != 403 {
 		t.Error("client cannot delete units")
@@ -353,7 +353,7 @@ func TestOrganizations(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	orgID := asStr(t, data(resp)["id"])
 	// a second customer with the same billing name (trimmed, case-insensitive) is CONFLICT; other kinds may share it
 	// (IR208)
 	if code, res := write(
@@ -371,7 +371,7 @@ func TestOrganizations(t *testing.T) {
 		srv,
 		hq(),
 		"organizations.save",
-		`{"id":"`+id+`","name":"Demo Customer A","kind":"customer","status":"active"}`,
+		`{"id":"`+orgID+`","name":"Demo Customer A","kind":"customer","status":"active"}`,
 		1,
 	); code != 409 ||
 		res["messageKey"] != apperr.KeyDuplicateName {
@@ -382,7 +382,7 @@ func TestOrganizations(t *testing.T) {
 		srv,
 		hq(),
 		"organizations.save",
-		`{"id":"`+id+`","name":"Chong Office `+suffix+`","kind":"customer","status":"inactive"}`,
+		`{"id":"`+orgID+`","name":"Chong Office `+suffix+`","kind":"customer","status":"inactive"}`,
 		1,
 	); code != 200 ||
 		data(res)["status"] != "inactive" {
@@ -393,7 +393,7 @@ func TestOrganizations(t *testing.T) {
 		srv,
 		hq(),
 		"organizations.save",
-		`{"id":"`+id+`","name":"x","kind":"contractor","status":"active"}`,
+		`{"id":"`+orgID+`","name":"x","kind":"contractor","status":"active"}`,
 		2,
 	); code != 422 ||
 		fields(res) != "kind=error.immutable" {
@@ -404,7 +404,7 @@ func TestOrganizations(t *testing.T) {
 		srv,
 		hq(),
 		"organizations.save",
-		`{"id":"`+id+`","name":"x","kind":"customer","status":"active"}`,
+		`{"id":"`+orgID+`","name":"x","kind":"customer","status":"active"}`,
 		1,
 	); code != 409 {
 		t.Error("stale version")
@@ -443,14 +443,14 @@ func defaultPolicyID(t *testing.T) string {
 	}
 	defer func() { _ = conn.Close(ctx) }()
 
-	var id string
+	var policyID string
 
 	scanErr := conn.QueryRow(ctx, `SELECT id::text FROM monitoring.alert_policies WHERE tenant_id = $1 AND kind =
 		'default_alert'`, seed.ID("tenant-a")).
-		Scan(&id)
+		Scan(&policyID)
 	if scanErr != nil {
 		t.Fatal(scanErr)
 	}
 
-	return id
+	return policyID
 }

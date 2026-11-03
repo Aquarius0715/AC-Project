@@ -35,7 +35,7 @@ func TestCertificatesAndParts(t *testing.T) {
 	}
 
 	flood := pngHeader(50000, 50000) // a scan as an image is held to the photo pixel limits (IR389)
-	for name, b := range map[string]string{
+	for name, payload := range map[string]string{
 		caseBadCode:   strings.Replace(body(""), `"demo_indoor"`, `"demo_roof"`, 1),
 		caseBlankName: strings.Replace(body(""), `" Indoor AC "`, `" "`, 1),
 		"reversed dates": `{"membershipId":"` + tech + `","code":"demo_indoor","name":"x","number":"N",` +
@@ -46,7 +46,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		"not a pdf":    strings.Replace(body(""), pdf, blobJSON("cert.pdf", "application/pdf", []byte("<html>"), 6), 1),
 		casePixelFlood: strings.Replace(body(""), pdf, blobJSON("scan.png", "image/png", flood, len(flood)), 1),
 	} {
-		code, m := write(srv, contrA(), "certificates.submit", b, 0)
+		code, m := write(srv, contrA(), "certificates.submit", payload, 0)
 		refusal(t, name, code, m, want[name])
 	}
 

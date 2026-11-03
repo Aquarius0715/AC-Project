@@ -112,13 +112,13 @@ func TestConnectionFaultForTheGateway(t *testing.T) {
 
 	f := fault()
 
-	id, _ := f["faultId"].(string)
-	if id == "" || asNum(t, f["sequence"]) != 10 || connection() != connectionOffline {
+	faultID, _ := f["faultId"].(string)
+	if faultID == "" || asNum(t, f["sequence"]) != 10 || connection() != connectionOffline {
 		t.Fatalf("after the loss: %v, connection %s", f, connection())
 	}
 
 	trigger(
-		`"sequence":11,"kind":"restored","recovery":{"axis":"connection","sourceEventId":"` + id + `","value":"online"}`,
+		`"sequence":11,"kind":"restored","recovery":{"axis":"connection","sourceEventId":"` + faultID + `","value":"online"}`,
 	)
 
 	if f := fault(); f["faultId"] != nil || asNum(t, f["sequence"]) != 11 ||

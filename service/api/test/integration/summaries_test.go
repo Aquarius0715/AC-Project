@@ -30,14 +30,14 @@ func TestSummariesCustomer(t *testing.T) {
 
 	_, all := post(srv, customerA(), "units.list", `{"limit":1}`)
 
-	_, on := post(srv, customerA(), "units.list", `{"filters":{"status":"online"},"limit":1}`)
+	_, online := post(srv, customerA(), "units.list", `{"filters":{"status":"online"},"limit":1}`)
 	if count(t, resp, "total") != int(asNum(t, data(all)["total"])) ||
-		count(t, resp, "online") != int(asNum(t, data(on)["total"])) {
+		count(t, resp, "online") != int(asNum(t, data(online)["total"])) {
 		t.Errorf(
 			"counts differ from units.list: %v / %v / %v",
 			resp,
 			data(all)["total"],
-			data(on)["total"],
+			data(online)["total"],
 		)
 	}
 
@@ -195,15 +195,15 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 		t.Fatalf("technician: %d %v", code, resp)
 	}
 
-	_, m2 := post(
+	_, other := post(
 		srv,
 		techB(),
 		"summaries.get",
 		`{"kind":"technician","filters":{"unitIds":["`+unit+`"],"status":"assigned"}}`,
 	)
-	if count(t, m2, "assignedCount") != 1 || count(t, m2, "total") != 1 ||
-		count(t, m2, "online") != 1 {
-		t.Errorf("technician filtered: %v", m2)
+	if count(t, other, "assignedCount") != 1 || count(t, other, "total") != 1 ||
+		count(t, other, "online") != 1 {
+		t.Errorf("technician filtered: %v", other)
 	}
 
 	_, list := post(
@@ -212,7 +212,7 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 		"jobs.list",
 		`{"filters":{"unitIds":["`+unit+`"],"status":"assigned"}}`,
 	)
-	if int(asNum(t, data(list)["total"])) != count(t, m2, "assignedCount") {
+	if int(asNum(t, data(list)["total"])) != count(t, other, "assignedCount") {
 		t.Error("summary and list disagree")
 	}
 
@@ -289,19 +289,19 @@ func TestSummaryJobCounts(t *testing.T) {
 		seedID("tech-internal-a"),
 	)
 	unit := boundUnit(t, srv, "online")
-	job := func(h int, status string, due time.Time) {
-		j := assign(
+	job := func(hours int, status string, due time.Time) {
+		job := assign(
 			t,
 			unit,
 			"tech-internal-a",
-			clock().Add(time.Duration(h)*time.Hour),
-			clock().Add(time.Duration(h+1)*time.Hour),
+			clock().Add(time.Duration(hours)*time.Hour),
+			clock().Add(time.Duration(hours+1)*time.Hour),
 			"active",
 		) // windows do not overlap
 		owner(
 			t,
 			`UPDATE maintenance.assignments SET created_at = $2 WHERE job_id = $1`,
-			j,
+			job,
 			clock().Add(-2*time.Hour),
 		)
 		owner(
@@ -309,7 +309,7 @@ func TestSummaryJobCounts(t *testing.T) {
 			`UPDATE maintenance.jobs j SET status = $2, due_at = $3, assignment_id = a.id, scheduled_slot = a.scheduled FROM
 				maintenance.assignments a
 			WHERE a.job_id = j.id AND j.id = $1`,
-			j,
+			job,
 			status,
 			due,
 		)

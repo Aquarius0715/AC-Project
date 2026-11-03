@@ -17,7 +17,7 @@ import (
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestInternalTechnicianScopeKinds(t *testing.T) {
 	srv := server(t)
-	as := func(name string, scopes map[string]string) actor {
+	scopedTech := func(name string, scopes map[string]string) actor {
 		uuid := seed.ID(name)
 		owner(
 			t,
@@ -74,15 +74,15 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 		name[seed.ID(u).String()] = u
 	}
 
-	listed := func(a actor) string {
+	listed := func(who actor) string {
 		code, res := post(
 			srv,
-			&a,
+			&who,
 			"units.list",
 			`{"limit":100,"filters":{"unitIds":[`+strings.Join(ids, ",")+`]}}`,
 		)
 		if code != 200 {
-			t.Fatalf("units.list as %s: %d %v", a.membership, code, res)
+			t.Fatalf("units.list as %s: %d %v", who.membership, code, res)
 		}
 
 		rows := items(t, res)
@@ -96,14 +96,14 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 
 		return strings.Join(got, ",")
 	}
-	property := as("test-tech-property", map[string]string{kindProperty: "property-home-a"})
-	organization := as(
+	property := scopedTech("test-tech-property", map[string]string{kindProperty: "property-home-a"})
+	organization := scopedTech(
 		"test-tech-organization",
 		map[string]string{"organization": "org-customer-a"},
 	)
 
-	none := as("test-tech-no-scope", nil)
-	for _, c := range []struct {
+	none := scopedTech("test-tech-no-scope", nil)
+	for _, testCase := range []struct {
 		who  actor
 		want string
 	}{
@@ -111,8 +111,8 @@ func TestInternalTechnicianScopeKinds(t *testing.T) {
 		{organization, "unit-limited,unit-non-rto,unit-offline-rto,unit-online-rto"},
 		{none, ""},
 	} {
-		if got := listed(c.who); got != c.want {
-			t.Errorf("%s lists %q, want %q", c.who.membership, got, c.want)
+		if got := listed(testCase.who); got != testCase.want {
+			t.Errorf("%s lists %q, want %q", testCase.who.membership, got, testCase.want)
 		}
 	}
 	// one unit outside the scope is NOT_FOUND, one inside is read

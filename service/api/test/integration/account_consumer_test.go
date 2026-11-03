@@ -66,16 +66,16 @@ func TestAccountConsumerApart(t *testing.T) {
 	)
 
 	emit := func(kind, payload string) uuid.UUID {
-		var id uuid.UUID
+		var outboxID uuid.UUID
 		ownerScan(
 			t,
 			`INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id) VALUES
 				($1, 'membership', $2, $3, $4::jsonb, 'test-ir511') RETURNING id`,
 			[]any{tenant, membership, kind, payload},
-			&id,
+			&outboxID,
 		)
 
-		return id
+		return outboxID
 	}
 	// applied by "identity" before the split: not again
 	before := emit("AccountEnabled", `{"membershipId":"`+membership.String()+`","enabled":true}`)

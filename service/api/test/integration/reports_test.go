@@ -24,16 +24,16 @@ const (
 func draftBody(job, result string, extra map[string]string) string {
 	var items []string
 
-	for _, g := range maintenance.ComponentGroups {
-		for _, key := range g.Keys {
-			r := jsonNull
+	for _, group := range maintenance.ComponentGroups {
+		for _, key := range group.Keys {
+			resultJSON := jsonNull
 			if result != "" {
-				r = `"` + result + `"`
+				resultJSON = `"` + result + `"`
 			}
 
 			items = append(
 				items,
-				`{"componentGroup":"`+g.Group+`","componentKey":"`+key+`","result":`+r+`,"reason":null,"evidenceIds":[]}`,
+				`{"componentGroup":"`+group.Group+`","componentKey":"`+key+`","result":`+resultJSON+`,"reason":null,"evidenceIds":[]}`,
 			)
 		}
 	}
@@ -52,14 +52,14 @@ func draftBody(job, result string, extra map[string]string) string {
 		fieldAttachmentIDs: "[]",
 	}
 
-	for k, v := range extra {
-		if v == "" {
-			delete(f, k)
+	for key, value := range extra {
+		if value == "" {
+			delete(f, key)
 
 			continue
 		}
 
-		f[k] = v
+		f[key] = value
 	}
 
 	parts := make([]string, 0, len(f))
@@ -754,17 +754,17 @@ func TestContractorReview(t *testing.T) {
 		t.Error("other contractor reads report")
 	}
 
-	review := func(a *actor, mode, reason string) int {
-		r := ""
+	review := func(who *actor, mode, reason string) int {
+		reasonField := ""
 		if reason != "" {
-			r = `,"reason":"` + reason + `"`
+			reasonField = `,"reason":"` + reason + `"`
 		}
 
 		code, _ := write(
 			srv,
-			a,
+			who,
 			"jobs.review",
-			`{"jobId":"`+job+`","reportVersion":1,"decision":"accept","reviewMode":"`+mode+`"`+r+`}`,
+			`{"jobId":"`+job+`","reportVersion":1,"decision":"accept","reviewMode":"`+mode+`"`+reasonField+`}`,
 			6,
 		)
 

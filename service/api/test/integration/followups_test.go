@@ -48,7 +48,7 @@ func TestRateAndReportProblem(t *testing.T) {
 		"unknown tag":   "tags=error.invalid",
 	}
 
-	for name, b := range map[string]string{
+	for name, body := range map[string]string{
 		"stars 0":       `"stars":0,"tags":[]`,
 		"stars 6":       `"stars":6,"tags":[]`,
 		"unknown tag":   `"stars":4,"tags":["Fast"]`,
@@ -56,7 +56,7 @@ func TestRateAndReportProblem(t *testing.T) {
 		"long comment":  `"stars":4,"tags":[],"comment":"` + strings.Repeat("c", 1001) + `"`,
 		"no tags":       `"stars":4`,
 	} {
-		code, m := rate(customerA(), b, 1)
+		code, m := rate(customerA(), body, 1)
 		refusal(t, name, code, m, want[name])
 	}
 
@@ -66,8 +66,8 @@ func TestRateAndReportProblem(t *testing.T) {
 
 	code, resp := rate(customerA(), `"stars":2,"tags":["On time"],"comment":"  slow  "`, 1)
 
-	r, _ := data(resp)["rating"].(map[string]any)
-	if code != 200 || asNum(t, r["stars"]) != 2 || r["comment"] != "slow" ||
+	rating, _ := data(resp)["rating"].(map[string]any)
+	if code != 200 || asNum(t, rating["stars"]) != 2 || rating["comment"] != "slow" ||
 		data(resp)["customerConfirmedAt"] == nil {
 		t.Fatalf("rate: %d %v", code, resp)
 	}
@@ -86,7 +86,7 @@ func TestRateAndReportProblem(t *testing.T) {
 		`"stars":3,"tags":[],"comment":"   "`,
 		2,
 	); code != 200 ||
-		asObj(t, data(res)["rating"])["ratedAt"] != r["ratedAt"] ||
+		asObj(t, data(res)["rating"])["ratedAt"] != rating["ratedAt"] ||
 		asObj(t, data(res)["rating"])["comment"] != nil {
 		t.Fatalf("re-rate keeps ratedAt, a blank comment is none: %d %v", code, res)
 	}
@@ -137,7 +137,7 @@ func TestRateAndReportProblem(t *testing.T) {
 		"today slot":     "preferredSlot=error.slotRules",
 	}
 
-	for name, b := range map[string]string{
+	for name, body := range map[string]string{
 		"short details": `"reasonCode":"same_problem","details":"short","photos":[],"preferredSlot":null`,
 		caseBadCode:     `"reasonCode":"angry","details":"still dripping water","photos":[],"preferredSlot":null`,
 		"bad mime": `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.gif",` +
@@ -153,7 +153,7 @@ func TestRateAndReportProblem(t *testing.T) {
 		"today slot": `"reasonCode":"same_problem","details":"still dripping water","photos":[],` +
 			`"preferredSlot":` + slotJSON(2, 1),
 	} {
-		code, m := prob(b, 3)
+		code, m := prob(body, 3)
 		refusal(t, name, code, m, want[name])
 	}
 
@@ -242,14 +242,14 @@ func TestRateAndReportProblem(t *testing.T) {
 	}
 	// the list rows name the follow-up, its class and when it was created: HQ's classify-by time (IR114, IR338), and
 	// the client's own row
-	summary := func(a *actor) map[string]any { // a follow-up stays requested (IR114); later tests' jobs may fill pages
+	summary := func(who *actor) map[string]any { // a follow-up stays requested (IR114); later tests' jobs may fill pages
 		t.Helper()
 
 		cursor := ""
 		for range 50 {
 			_, res := post(
 				srv,
-				a,
+				who,
 				"jobs.list",
 				`{"filters":{"unitId":"`+seed.ID("unit-non-rto").
 					String()+
@@ -517,12 +517,12 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
 	_, m := write(srv, customerA(), "jobs.create", jobBody(unit, nil), 0)
 
-	j2 := asStr(t, data(m)["id"])
+	job2 := asStr(t, data(m)["id"])
 	if code, _ := write(
 		srv,
 		hq(),
 		"jobs.extendAccess",
-		`{"jobId":"`+j2+`","accessValidUntil":"`+stamp(200)+`","reason":"x"}`,
+		`{"jobId":"`+job2+`","accessValidUntil":"`+stamp(200)+`","reason":"x"}`,
 		1,
 	); code != 409 {
 		t.Error("extend without accepted offer")
@@ -532,7 +532,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.offer",
-		`{"jobId":"`+j2+`","contractorOrgId":"`+seed.ID("org-contractor-a").
+		`{"jobId":"`+job2+`","contractorOrgId":"`+seed.ID("org-contractor-a").
 			String()+
 			`","visitSlot":`+slotJSON(
 			49,
@@ -552,7 +552,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.get",
-		`{"jobId":"`+j2+`"}`,
+		`{"jobId":"`+job2+`"}`,
 	); data(res)["offer"] == nil ||
 		asObj(t, data(res)["offer"])["decision"] != nil {
 		t.Fatal("hq sees the open offer")
@@ -562,14 +562,14 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	ownerScan(
 		t,
 		`SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`,
-		[]any{j2},
+		[]any{job2},
 		&offer,
 	)
 	write(
 		srv,
 		contrA(),
 		"jobs.accept",
-		`{"jobId":"`+j2+`","offerId":"`+offer+`","termsVersion":"t"}`,
+		`{"jobId":"`+job2+`","offerId":"`+offer+`","termsVersion":"t"}`,
 		2,
 	)
 
@@ -577,7 +577,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.extendAccess",
-		`{"jobId":"`+j2+`","accessValidUntil":"`+stamp(50)+`","reason":"x"}`,
+		`{"jobId":"`+job2+`","accessValidUntil":"`+stamp(50)+`","reason":"x"}`,
 		3,
 	); code != 422 ||
 		fields(res) != "accessValidUntil=error.mustExtend" {
@@ -588,7 +588,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.extendAccess",
-		`{"jobId":"`+j2+`","accessValidUntil":"`+stamp(200)+`","reason":" "}`,
+		`{"jobId":"`+job2+`","accessValidUntil":"`+stamp(200)+`","reason":" "}`,
 		3,
 	); code != 422 ||
 		fields(res) != refusedReasonLength {
@@ -599,7 +599,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.extendAccess",
-		`{"jobId":"`+j2+`","accessValidUntil":"`+stamp(200)+`","reason":"parts delayed"}`,
+		`{"jobId":"`+job2+`","accessValidUntil":"`+stamp(200)+`","reason":"parts delayed"}`,
 		3,
 	); code != 200 {
 		t.Fatalf("extend: %d %v", code, res)
@@ -609,7 +609,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.get",
-		`{"jobId":"`+j2+`"}`,
+		`{"jobId":"`+job2+`"}`,
 	); asObj(t, data(res)["offer"])["accessValidUntil"] != stamp(
 		200,
 	) { // the write answers MaintenanceJob (IR392)
@@ -620,7 +620,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		srv,
 		contrA(),
 		"jobs.get",
-		`{"jobId":"`+j2+`"}`,
+		`{"jobId":"`+job2+`"}`,
 	); data(res)["offer"] == nil ||
 		len(asArr(t, data(res)["costs"])) != 0 {
 		t.Fatalf("contractor detail: %v", res)
@@ -630,7 +630,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 		srv,
 		customerA(),
 		"jobs.get",
-		`{"jobId":"`+j2+`"}`,
+		`{"jobId":"`+job2+`"}`,
 	); code != 200 ||
 		data(res)["offer"] != nil {
 		t.Fatal("client sees the offer")
@@ -672,7 +672,7 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 	srv := server(t)
 	ctx := context.Background()
 	stamp := func(h int) string { return clock().Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	_, m := write(
+	_, resp := write(
 		srv,
 		customerA(),
 		"jobs.create",
@@ -680,7 +680,7 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 		0,
 	)
 
-	job := asStr(t, data(m)["id"])
+	job := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		hq(),
@@ -732,15 +732,15 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 	asOf := func() *time.Time {
 		t.Helper()
 
-		var at *time.Time
+		var asOf *time.Time
 		ownerScan(
 			t,
 			`SELECT (SELECT as_of FROM maintenance.job_history_snapshots WHERE job_id = $1 AND owner_kind = 'organization')`,
 			[]any{job},
-			&at,
+			&asOf,
 		)
 
-		return at
+		return asOf
 	}
 
 	_, err := schedTick(ctx, srv, clock())
@@ -752,15 +752,15 @@ func TestExtendAccessRefreezesHistory(t *testing.T) {
 		t.Fatalf("frozen at the first end: %v", at)
 	}
 
-	var v int
-	ownerScan(t, `SELECT version FROM maintenance.jobs WHERE id = $1`, []any{job}, &v)
+	var version int
+	ownerScan(t, `SELECT version FROM maintenance.jobs WHERE id = $1`, []any{job}, &version)
 
 	if code, res := write(
 		srv,
 		hq(),
 		"jobs.extendAccess",
 		`{"jobId":"`+job+`","accessValidUntil":"`+stamp(2)+`","reason":"parts arrived late"}`,
-		v,
+		version,
 	); code != 200 {
 		t.Fatalf("extend: %d %v", code, res)
 	}

@@ -22,16 +22,16 @@ func TestWarrantyReminders(t *testing.T) {
 
 	unit := func(ends time.Duration) string {
 		t.Helper()
-		u := newUnit(t, srv, "Warranty AC")
+		unit := newUnit(t, srv, "Warranty AC")
 		owner(
 			t,
 			`UPDATE assets.units SET warranty_ends_at = $2 WHERE id = $1`,
-			u,
+			unit,
 			clock().Add(ends),
 		)
-		units = append(units, u)
+		units = append(units, unit)
 
-		return u
+		return unit
 	}
 
 	t.Cleanup(
@@ -58,16 +58,16 @@ func TestWarrantyReminders(t *testing.T) {
 	sent := func(unitID string) []reminder { // the unit's reminders for its current warranty end, the earliest first
 		t.Helper()
 
-		var n int
+		var total int
 		ownerScan(
 			t,
 			`SELECT count(*) FROM assets.warranty_reminders r JOIN assets.units u ON u.id = r.unit_id AND u.warranty_ends_at =
 				r.warranty_ends_at WHERE r.unit_id = $1`,
 			[]any{unitID},
-			&n,
+			&total,
 		)
 
-		out := make([]reminder, n)
+		out := make([]reminder, total)
 		for idx := range out {
 			ownerScan(
 				t,

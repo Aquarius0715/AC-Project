@@ -32,7 +32,7 @@ func TestCommands(t *testing.T) {
 		unit,
 	)
 	_, resp := post(srv, customerA(), "units.get", `{"id":"`+unit+`"}`)
-	v := ver(t, resp)
+	version := ver(t, resp)
 	cmd := func(a *actor, action, extra string, uv int) (int, map[string]any) {
 		return write(
 			srv,
@@ -53,7 +53,7 @@ func TestCommands(t *testing.T) {
 		"unknown source":    "source=error.invalid",
 	}
 
-	for name, tc := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		a      *actor
 		action string
 		extra  string
@@ -72,16 +72,16 @@ func TestCommands(t *testing.T) {
 			`"power":true}`, `,"reason":"test",` +
 			`"jobId":"` + uuid.NewString() + `","source":"voice"`, 422},
 	} {
-		uv := v
+		uv := version
 		if name == "stale unit version" {
-			uv = v + 5
+			uv = version + 5
 		}
 
-		code, m := cmd(tc.a, tc.action, tc.extra, uv)
+		code, m := cmd(testCase.a, testCase.action, testCase.extra, uv)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
-		} else if code != tc.code {
-			t.Errorf("%s: %d want %d", name, code, tc.code)
+		} else if code != testCase.code {
+			t.Errorf("%s: %d want %d", name, code, testCase.code)
 		}
 	}
 	// the assistant's confirmed change (IR306): the same command, labelled voice
@@ -89,7 +89,7 @@ func TestCommands(t *testing.T) {
 		customerA(),
 		`{"kind":"set_temperature","celsius":24}`,
 		`,"source":"voice"`,
-		v,
+		version,
 	)
 	if code != 200 || data(resp)["status"] != statusRequested ||
 		data(resp)["delivery"] != statusNotSent ||
@@ -99,27 +99,27 @@ func TestCommands(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	commandID := asStr(t, data(resp)["id"])
 
 	if code, res := cmd(
 		hq(),
 		`{"kind":"set_power","power":false}`,
 		`,"reason":"check"`,
-		v,
+		version,
 	); code != 409 ||
 		res["messageKey"] != keyUnitBusy {
 		t.Errorf("busy: %d %v", code, res)
 	}
 
-	if code, _ := post(srv, customerA(), "commands.get", `{"id":"`+id+`"}`); code != 200 {
+	if code, _ := post(srv, customerA(), "commands.get", `{"id":"`+commandID+`"}`); code != 200 {
 		t.Error("client get")
 	}
 
-	if code, _ := post(srv, customerB(), "commands.get", `{"id":"`+id+`"}`); code != 404 {
+	if code, _ := post(srv, customerB(), "commands.get", `{"id":"`+commandID+`"}`); code != 404 {
 		t.Error("other customer get")
 	}
 
-	if code, _ := post(srv, techB(), "commands.get", `{"id":"`+id+`"}`); code != 404 {
+	if code, _ := post(srv, techB(), "commands.get", `{"id":"`+commandID+`"}`); code != 404 {
 		t.Error("out-of-scope technician get")
 	}
 
@@ -130,7 +130,7 @@ func TestCommands(t *testing.T) {
 	owner(
 		t,
 		`UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2 WHERE id = $1 AND status = 'requested'`,
-		id,
+		commandID,
 		clock(),
 	)
 	// acknowledgement before expiry; late acknowledgement is only recorded
@@ -142,29 +142,29 @@ func TestCommands(t *testing.T) {
 	}
 	defer func() { _ = conn.Close(ctx) }()
 
-	var ok bool
+	var acknowledged bool
 
-	keepObserved(t, id)
+	keepObserved(t, commandID)
 
 	beginFuncErr := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id), clock().Add(5*time.Second))
+		acknowledged, err = control.Acknowledge(ctx, tx, uuid.MustParse(commandID), clock().Add(5*time.Second))
 
 		return apperr.Wrap(err, "control.Acknowledge")
 	})
-	if beginFuncErr != nil || !ok {
-		t.Fatalf("ack: %v %v", ok, beginFuncErr)
+	if beginFuncErr != nil || !acknowledged {
+		t.Fatalf("ack: %v %v", acknowledged, beginFuncErr)
 	}
 
 	if _, m := post(
 		srv,
 		hq(),
 		"commands.get",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+commandID+`"}`,
 	); data(m)["status"] != statusAcknowledged {
 		t.Fatal("acknowledged")
 	}
 	// expiry by the worker
-	code, resp = cmd(hq(), `{"kind":"set_mode","mode":"dry"}`, `,"reason":"check"`, v)
+	code, resp = cmd(hq(), `{"kind":"set_mode","mode":"dry"}`, `,"reason":"check"`, version)
 	if code != 200 {
 		t.Fatalf("second command: %d %v", code, resp)
 	}
@@ -177,13 +177,13 @@ func TestCommands(t *testing.T) {
 		t.Fatal(schedTickErr)
 	}
 
-	if _, m := post(
+	if _, res := post(
 		srv,
 		hq(),
 		"commands.get",
 		`{"id":"`+id2+`"}`,
-	); data(m)["status"] == statusExpired {
-		t.Fatalf("expired within the grace: %v", m)
+	); data(res)["status"] == statusExpired {
+		t.Fatalf("expired within the grace: %v", res)
 	}
 
 	_, schedTickErr = schedTick(
@@ -208,12 +208,12 @@ func TestCommands(t *testing.T) {
 	keepObserved(t, id2)
 
 	beginFuncErr = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id2), clock().Add(40*time.Second))
+		acknowledged, err = control.Acknowledge(ctx, tx, uuid.MustParse(id2), clock().Add(40*time.Second))
 
 		return apperr.Wrap(err, "control.Acknowledge")
 	})
-	if beginFuncErr != nil || ok {
-		t.Fatalf("late ack must not succeed: %v %v", ok, beginFuncErr)
+	if beginFuncErr != nil || acknowledged {
+		t.Fatalf("late ack must not succeed: %v %v", acknowledged, beginFuncErr)
 	}
 	// restriction table and offline delivery
 	rid := uuid.NewString()
@@ -245,7 +245,7 @@ func TestCommands(t *testing.T) {
 		customerA(),
 		`{"kind":"set_temperature","celsius":24}`,
 		"",
-		v,
+		version,
 	); code != 403 ||
 		res["messageKey"] != "errors.restriction_active" {
 		t.Errorf("restricted temperature: %d %v", code, res)
@@ -268,13 +268,13 @@ func TestCommands(t *testing.T) {
 		customerA(),
 		`{"kind":"set_temperature","celsius":27}`,
 		"",
-		v,
+		version,
 	); code != 409 || res["code"] != codeOffline ||
 		res["messageKey"] != "errors.device_power_lost" {
 		t.Errorf("power lost: %d %v", code, res)
 	}
 	// IR46 table
-	for _, tc := range []struct {
+	for _, testCase := range []struct {
 		action string
 		policy string
 		ok     bool
@@ -288,9 +288,9 @@ func TestCommands(t *testing.T) {
 		{actionVentilateLow, ``, true},
 		{actionPowerOff, `{"kind":`, false}, // a policy that cannot be read allows nothing
 	} {
-		a, _ := control.ParseAction([]byte(tc.action))
-		if got := control.Allowed(a, []byte(tc.policy)); got != tc.ok {
-			t.Errorf("%s under %s: %v", tc.action, tc.policy, got)
+		a, _ := control.ParseAction([]byte(testCase.action))
+		if got := control.Allowed(a, []byte(testCase.policy)); got != testCase.ok {
+			t.Errorf("%s under %s: %v", testCase.action, testCase.policy, got)
 		}
 	}
 	// a unit that does not exist is NOT_FOUND to HQ and to a technician, for a command and for the history
@@ -355,7 +355,7 @@ func TestCommandHistory(t *testing.T) {
 	)
 	job := assignedNow(t, srv)
 	_, resp := post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
-	uv := ver(t, resp)
+	unitVersion := ver(t, resp)
 
 	code, resp := write(
 		srv,
@@ -363,7 +363,7 @@ func TestCommandHistory(t *testing.T) {
 		"commands.create",
 		`{"unitId":"`+unit+`","jobId":"`+job+`","action":{"kind":"set_mode","mode":"cool"},"reason":"airflow check",`+
 			`"expectedUnitVersion":`+itoa(
-			uv,
+			unitVersion,
 		)+`}`,
 		0,
 	)
@@ -380,7 +380,7 @@ func TestCommandHistory(t *testing.T) {
 		customerA(),
 		"commands.create",
 		`{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
-			uv,
+			unitVersion,
 		)+`}`,
 		0,
 	)
@@ -393,10 +393,10 @@ func TestCommandHistory(t *testing.T) {
 	free()
 	// list reads the unit's history: rows is the first page (ordering checks), byID every page — the test database
 	// keeps other tests' commands on this unit, some at later business times, which can push these off page one
-	list := func(a *actor, body string) (int, map[string]map[string]any, []map[string]any) {
+	list := func(who *actor, body string) (int, map[string]map[string]any, []map[string]any) {
 		t.Helper()
 
-		code, res := post(srv, a, "commands.list", body)
+		code, res := post(srv, who, "commands.list", body)
 		rows := items(t, res)
 		byID := map[string]map[string]any{}
 
@@ -414,15 +414,15 @@ func TestCommandHistory(t *testing.T) {
 
 			_ = json.Unmarshal([]byte(body), &input)
 
-			q, _ := input["query"].(map[string]any)
-			if q == nil {
-				q = map[string]any{}
+			query, _ := input["query"].(map[string]any)
+			if query == nil {
+				query = map[string]any{}
 			}
 
-			q["cursor"] = next
-			input["query"] = q
+			query["cursor"] = next
+			input["query"] = query
 			b := jsonBytes(t, input)
-			code, res = post(srv, a, "commands.list", string(b))
+			code, res = post(srv, who, "commands.list", string(b))
 		}
 
 		return code, byID, rows
@@ -504,14 +504,14 @@ func TestCommandHistory(t *testing.T) {
 func TestCommandExpiryAudited(t *testing.T) {
 	srv := server(t)
 	unit := boundUnit(t, srv, "online")
-	_, g := post(srv, customerB(), "units.get", `{"id":"`+unit+`"}`)
+	_, detail := post(srv, customerB(), "units.get", `{"id":"`+unit+`"}`)
 
 	code, res := write(
 		srv,
 		customerB(),
 		"commands.create",
 		`{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
-			ver(t, g),
+			ver(t, detail),
 		)+`}`,
 		0,
 	)

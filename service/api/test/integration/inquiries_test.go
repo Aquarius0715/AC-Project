@@ -15,13 +15,13 @@ const fieldFiltersTo = "filters.to"
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestInquiries(t *testing.T) {
 	srv := server(t)
-	u := boundUnit(t, srv, "online")
-	k, inv := overdueContract(t, srv, u)
+	unit := boundUnit(t, srv, "online")
+	k, inv := overdueContract(t, srv, unit)
 	_, resp := write(
 		srv,
 		restrMgr(),
 		"restrictions.schedule",
-		scheduleBody(k, inv, []string{u}, nil),
+		scheduleBody(k, inv, []string{unit}, nil),
 		0,
 	)
 	rid := asStr(t, data(resp)["id"])
@@ -33,7 +33,7 @@ func TestInquiries(t *testing.T) {
 		"restriction without id":   "restrictionId=error.required",
 	}
 
-	for name, tc := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		body string
 		code int
 	}{
@@ -49,11 +49,11 @@ func TestInquiries(t *testing.T) {
 		"unknown cited invoice": {`{"subjectType":"restriction",` +
 			`"restrictionId":"` + rid + `","invoiceId":"` + uuid.NewString() + `","message":"why"}`, 404},
 	} {
-		code, m := write(srv, customerB(), "inquiries.create", tc.body, 0)
+		code, m := write(srv, customerB(), "inquiries.create", testCase.body, 0)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
-		} else if code != tc.code {
-			t.Errorf("%s: %d want %d %v", name, code, tc.code, m)
+		} else if code != testCase.code {
+			t.Errorf("%s: %d want %d %v", name, code, testCase.code, m)
 		}
 	}
 
@@ -89,13 +89,13 @@ func TestInquiries(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	inquiryID := asStr(t, data(resp)["id"])
 
 	var received int
 	ownerScan(
 		t,
 		`SELECT count(*) FROM notify.notifications WHERE target->>'id' = $1 AND recipient_membership_id = $2`,
-		[]any{id, seed.ID("hq-operator")},
+		[]any{inquiryID, seed.ID("hq-operator")},
 		&received,
 	)
 
@@ -150,7 +150,7 @@ func TestInquiries(t *testing.T) {
 	}
 
 	answer := func(reply string, v int) (int, map[string]any) {
-		return write(srv, hq(), "inquiries.answer", `{"inquiryId":"`+id+`","reply":"`+reply+`"}`, v)
+		return write(srv, hq(), "inquiries.answer", `{"inquiryId":"`+inquiryID+`","reply":"`+reply+`"}`, v)
 	}
 	if code, m := answer(" ", 1); code != 422 || fields(m) != "reply=error.length" {
 		t.Errorf("blank reply: %d %s", code, fields(m))
@@ -164,7 +164,7 @@ func TestInquiries(t *testing.T) {
 		srv,
 		customerB(),
 		"inquiries.answer",
-		`{"inquiryId":"`+id+`","reply":"x"}`,
+		`{"inquiryId":"`+inquiryID+`","reply":"x"}`,
 		1,
 	); code != 403 {
 		t.Error("client answers")
@@ -278,7 +278,7 @@ func TestAuditList(t *testing.T) {
 		t.Error("result filter")
 	}
 	// the period is required (both ends named when missing), from < to and at most 366 days
-	for b, want := range map[string]map[string]string{
+	for body, want := range map[string]map[string]string{
 		`{}`: {"filters.from": apperr.KeyRequired, fieldFiltersTo: apperr.KeyRequired},
 		`{"filters":{"from":"` + clock().Format(time.RFC3339) + `"}}`:           {fieldFiltersTo: apperr.KeyRequired},
 		`{"filters":{"to":"` + clock().Format(time.RFC3339) + `"}}`:             {"filters.from": apperr.KeyRequired},
@@ -287,18 +287,18 @@ func TestAuditList(t *testing.T) {
 		`{"filters":{` + day + `,"result":"ok"}}`:                               {fieldFilters: apperr.KeyInvalid},
 		`{"filters":{` + day + `,"x":1}}`:                                       {"x": apperr.KeyNotAllowed},
 	} {
-		code, m := post(srv, hq(), "audit.list", b)
+		code, m := post(srv, hq(), "audit.list", body)
 
-		fe, _ := m["fieldErrors"].(map[string]any)
-		if code != 422 || len(fe) != len(want) {
-			t.Errorf("%s: %d %v, want %v", b, code, fe, want)
+		fieldErrs, _ := m["fieldErrors"].(map[string]any)
+		if code != 422 || len(fieldErrs) != len(want) {
+			t.Errorf("%s: %d %v, want %v", body, code, fieldErrs, want)
 
 			continue
 		}
 
 		for k, v := range want {
-			if fe[k] != v {
-				t.Errorf("%s: %v, want %v", b, fe, want)
+			if fieldErrs[k] != v {
+				t.Errorf("%s: %v, want %v", body, fieldErrs, want)
 			}
 		}
 	}

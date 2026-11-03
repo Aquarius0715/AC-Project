@@ -72,14 +72,14 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		asStr(t, data(res)["createdAt"]),
 	) // the server's business time
 	kl := time.FixedZone("MYT", 8*3600)
-	window := func(from, to int) { // the install window in whole Kuala Lumpur hours around base
-		h := base.In(kl).Hour()
+	window := func(from, until int) { // the install window in whole Kuala Lumpur hours around base
+		hour := base.In(kl).Hour()
 		owner(
 			t,
 			`UPDATE devices.firmware_campaigns SET window_start_local = $2::time, window_end_local = $3::time WHERE id = $1`,
 			camp,
-			fmt.Sprintf("%02d:00", (h+from+24)%24),
-			fmt.Sprintf("%02d:00", (h+to+24)%24),
+			fmt.Sprintf("%02d:00", (hour+from+24)%24),
+			fmt.Sprintf("%02d:00", (hour+until+24)%24),
 		)
 	}
 	window(-1, 2)
@@ -127,53 +127,53 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		return strings.Join(out, " ")
 	}
 	state := func() (string, string) {
-		var st, reason string
+		var status, reason string
 		ownerScan(
 			t,
 			`SELECT state, COALESCE(reason, '') FROM devices.firmware_campaigns WHERE id = $1`,
 			[]any{camp},
-			&st,
+			&status,
 			&reason,
 		)
 
-		return st, reason
+		return status, reason
 	}
-	finish := func(i int, r string) { // the device's answer to its running install (demo.trigger operation)
+	finish := func(device int, outcome string) { // the device's answer to its running install (demo.trigger operation)
 		t.Helper()
 
-		operation := results()[i].op
+		operation := results()[device].op
 		if code, resp := write(
 			srv,
 			customerB(),
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+base.Add(duration).
 				Format(time.RFC3339Nano)+
-				`","eventType":"operation","operationId":"`+operation+`","result":"`+r+`"}`,
+				`","eventType":"operation","operationId":"`+operation+`","result":"`+outcome+`"}`,
 			0,
 		); code != 200 {
-			t.Fatalf("finish %d: %d %v", i, code, resp)
+			t.Fatalf("finish %d: %d %v", device, code, resp)
 		}
 	}
 	audits := func(action string) int {
-		var n int
+		var total int
 		ownerScan(
 			t,
 			`SELECT count(*) FROM audit.audit_log WHERE action = $1 AND target_id = $2`,
 			[]any{action, camp},
-			&n,
+			&total,
 		)
 
-		return n
+		return total
 	}
 	control := func(action, extra string) {
 		t.Helper()
 
-		var v int
+		var version int
 		ownerScan(
 			t,
 			`SELECT version FROM devices.firmware_campaigns WHERE id = $1`,
 			[]any{camp},
-			&v,
+			&version,
 		)
 
 		if code, resp := write(
@@ -181,7 +181,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 			hq(),
 			"firmwareCampaigns.control",
 			`{"campaignId":"`+camp+`","action":"`+action+`"`+extra+`}`,
-			v,
+			version,
 		); code != 200 {
 			t.Fatalf("%s: %d %v", action, code, resp)
 		}
@@ -240,7 +240,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	owner(t, `UPDATE devices.firmware_campaigns SET start_at = $2 WHERE id = $1`, camp, base)
 	tick(2 * time.Minute)
 
-	if st, _ := state(); st != statusRunning || audits("firmwareCampaigns.start") != 1 ||
+	if status, _ := state(); status != statusRunning || audits("firmwareCampaigns.start") != 1 ||
 		statuses() != eachDevice(
 			"installing",
 			"installing",
@@ -249,7 +249,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 			"pending",
 			"pending",
 		) {
-		t.Fatalf("start: %s %s", st, statuses())
+		t.Fatalf("start: %s %s", status, statuses())
 	}
 
 	tick(2 * time.Second) // IR67: the operations start a second after their creation
@@ -359,7 +359,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 	tick(61 * time.Second) // the unanswered install times out (IR67)
 	tick(time.Second)
 
-	if st, _ := state(); st != statusPaused || results()[5].key != "errors.install_timeout" ||
+	if status, _ := state(); status != statusPaused || results()[5].key != "errors.install_timeout" ||
 		statuses() != eachDevice(
 			"succeeded",
 			"succeeded",
@@ -368,7 +368,7 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 			"succeeded",
 			"failed:errors.install_timeout",
 		) {
-		t.Fatalf("timeout: %s %s", st, statuses())
+		t.Fatalf("timeout: %s %s", status, statuses())
 	}
 	// resumed without a retry, no new failure pauses it, and the wave waits below 95 %
 	control("resume", "")
@@ -468,7 +468,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 	// after scheduling: one device unbound, one moved to a split unit (another model), one unit with a command in flight
 	owner(t, `UPDATE devices.devices SET unit_id = NULL WHERE id = $1`, devs[0])
 
-	_, om := write(
+	_, otherUnit := write(
 		srv,
 		hq(),
 		"units.save",
@@ -486,7 +486,7 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		t,
 		`UPDATE devices.devices SET unit_id = $2 WHERE id = $1`,
 		devs[1],
-		asStr(t, data(om)["id"]),
+		asStr(t, data(otherUnit)["id"]),
 	)
 
 	cmd := uuid.NewString()
@@ -513,13 +513,13 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 	}
 
 	got := make([]string, 0, len(devs))
-	for _, d := range devs {
+	for _, dev := range devs {
 		var result, key string
 		ownerScan(
 			t,
 			`SELECT result, COALESCE(detail, '') FROM devices.firmware_campaign_devices WHERE campaign_id = $1 AND device_id =
 				$2`,
-			[]any{camp, d},
+			[]any{camp, dev},
 			&result,
 			&key,
 		)

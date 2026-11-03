@@ -18,7 +18,7 @@ func TestAutomationNotifications(t *testing.T) {
 	unitID, lonely := newUnit(t, srv, "Notify AC"), newUnit(t, srv, "Lonely AC")
 	cust := seed.ID("cust-b")
 	policy := func(unit string, recipients []uuid.UUID) string {
-		id := uuid.NewString()
+		policyID := uuid.NewString()
 		cond := jsonBytes(t,
 			map[string]any{
 				fieldMetric:            metricCO2,
@@ -36,7 +36,7 @@ func TestAutomationNotifications(t *testing.T) {
 				created_by_user_id, timezone, enabled, priority, condition,
 			recipient_membership_ids, channels, escalate_after_minutes, cooldown_minutes) VALUES ($1,$2,'alert',$3,'CO2 high',$4,
 			$5,'Asia/Kuala_Lumpur',true,50,$6,$7,'{inApp,email}',60,30)`,
-			id,
+			policyID,
 			seed.ID("tenant-a"),
 			cust,
 			seed.ID("customer-b"),
@@ -49,10 +49,10 @@ func TestAutomationNotifications(t *testing.T) {
 			`INSERT INTO assets.unit_alert_policies (tenant_id, unit_id, policy_id) VALUES ($1,$2,$3)`,
 			seed.ID("tenant-a"),
 			unit,
-			id,
+			policyID,
 		)
 
-		return id
+		return policyID
 	}
 	withRecipient := policy(unitID, []uuid.UUID{seed.ID("customer-b")})
 	noRecipient := policy(
@@ -356,8 +356,8 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 			`DELETE FROM control.evaluation_events`,
 		) // one result per tick (D02): each call stands for a later tick of the fixed test clock
 
-		ev := uuid.NewString()
-		body := `{"eventId":"` + ev + `","occurredAt":"` + clock().Format(
+		firedEvent := uuid.NewString()
+		body := `{"eventId":"` + firedEvent + `","occurredAt":"` + clock().Format(
 			time.RFC3339,
 		) + `","unitIds":["` + unit + `"],"facts":[{"unitId":"` + unit + `","metric":"co2","value":` + value +
 			`,"unit":"ppm","observedAt":"` + clock().Format(
@@ -378,7 +378,7 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 			t.Fatalf("%s %s: %d", operation, value, code)
 		}
 
-		return ev
+		return firedEvent
 	}
 
 	type row struct {
@@ -388,7 +388,7 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 		previous   *uuid.UUID
 	}
 
-	of := func(policy string) []row {
+	rowsOf := func(policy string) []row {
 		ctx := context.Background()
 
 		conn, err := pgx.Connect(ctx, testDB("postgres"))
@@ -414,17 +414,17 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 
 		for rows.Next() {
 			var (
-				r  row
-				id uuid.UUID
+				alert  row
+				alertID uuid.UUID
 			)
 
-			err := rows.Scan(&id, &r.status, &r.reason, &r.evidence, &r.previous)
+			err := rows.Scan(&alertID, &alert.status, &alert.reason, &alert.evidence, &alert.previous)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			r.id = id.String()
-			out = append(out, r)
+			alert.id = alertID.String()
+			out = append(out, alert)
 		}
 
 		rowsErr := rows.Err()
@@ -435,25 +435,25 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 		return out
 	}
 	told := func(policy string) int {
-		var n int
+		var total int
 		ownerScan(
 			t,
 			`SELECT count(*) FROM monitoring.alert_notifications WHERE unit_id = $1 AND policy_id = $2`,
 			[]any{unit, policy},
-			&n,
+			&total,
 		)
 
-		return n
+		return total
 	}
 
 	fire("1200", "valid", false)
 
-	first := of(pol)
-	if len(first) != 1 || first[0].status != statusOpen || len(of(def)) != 1 {
+	first := rowsOf(pol)
+	if len(first) != 1 || first[0].status != statusOpen || len(rowsOf(def)) != 1 {
 		t.Fatalf(
 			"the breach opens the policy's and the default rule's alerts: %v / %v",
 			first,
-			of(def),
+			rowsOf(def),
 		)
 	}
 
@@ -464,7 +464,7 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 
 	fire("1250", "valid", false) // the breach goes on: the open alerts were told already
 
-	if told(pol) != toldPol || told(def) != toldDef || len(of(pol)) != 1 {
+	if told(pol) != toldPol || told(def) != toldDef || len(rowsOf(pol)) != 1 {
 		t.Errorf(
 			"a breach that goes on notifies again: policy %d → %d, default %d → %d",
 			toldPol,
@@ -478,21 +478,21 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 	fire("850", "suspect", false) // not a valid reading
 	fire("850", "valid", true)    // a simulation saves nothing
 
-	if r := of(pol); r[0].status != statusOpen {
+	if r := rowsOf(pol); r[0].status != statusOpen {
 		t.Fatalf("nothing recovers yet: %v", r)
 	}
 
-	ev := fire("850", "valid", false)
+	eventID := fire("850", "valid", false)
 
-	r := of(pol)[0]
+	r := rowsOf(pol)[0]
 	if r.status != statusResolved || r.reason == nil ||
 		*r.reason != "Recovered: co2 850 < 900 for 60 s (D08)" ||
 		len(r.evidence) != 1 ||
-		r.evidence[0].String() != ev {
+		r.evidence[0].String() != eventID {
 		t.Fatalf("sustained recovery resolves with the recovery as evidence: %+v", r)
 	}
 
-	if d := of(def); d[0].status != statusResolved {
+	if d := rowsOf(def); d[0].status != statusResolved {
 		t.Errorf("the default rule's alert recovers too: %+v", d)
 	}
 
@@ -503,7 +503,7 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 
 	fire("1300", "valid", false)
 
-	again := of(pol)
+	again := rowsOf(pol)
 	if len(again) != 2 || again[1].status != statusOpen || again[1].previous == nil ||
 		again[1].previous.String() != first[0].id {
 		t.Fatalf("a recurrence opens a new alert linked to the resolved one: %+v", again)
@@ -621,8 +621,8 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 		}
 	})
 
-	report := func(phase, facts string, at time.Time) (int, map[string]any) {
-		ev := `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + at.Format(
+	report := func(phase, facts string, when time.Time) (int, map[string]any) {
+		event := `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + when.Format(
 			time.RFC3339,
 		) + `","unitIds":["` + unitID + `"],"facts":[` + facts + `],"phase":"` + phase + `"}`
 
@@ -630,9 +630,9 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 			srv,
 			customerB(),
 			"demo.trigger",
-			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at.Format(
+			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+when.Format(
 				time.RFC3339,
-			)+`","eventType":"automation","event":`+ev+`}`,
+			)+`","eventType":"automation","event":`+event+`}`,
 			0,
 		)
 	}
@@ -644,24 +644,24 @@ func TestDemoAutomationNotifiesOnly(t *testing.T) {
 			) + `","quality":"valid"}`
 	}
 	alerts := func(rule string, status string) int {
-		var n int
+		var total int
 		if rule == "" {
 			ownerScan(
 				t,
 				`SELECT count(*) FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND status = $3`,
 				[]any{unitID, pol, status},
-				&n,
+				&total,
 			)
 		} else {
 			ownerScan(
 				t,
 				`SELECT count(*) FROM monitoring.alerts WHERE unit_id = $1 AND rule_key = $2 AND status = $3`,
 				[]any{unitID, rule, status},
-				&n,
+				&total,
 			)
 		}
 
-		return n
+		return total
 	}
 
 	when := now.Add(-30 * time.Second)

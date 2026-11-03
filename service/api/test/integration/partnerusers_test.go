@@ -43,13 +43,13 @@ func TestPartnerUsers(t *testing.T) {
 		caseBlankReason: refusedReasonLength,
 	}
 
-	for name, b := range map[string]string{
+	for name, body := range map[string]string{
 		caseBadEmail:    `{"email":"not-an-email","partnerRole":"technician"}`,
 		caseBadRole:     `{"email":"` + email + `","partnerRole":"admin"}`,
 		caseBadStatus:   `{"email":"` + email + `","partnerRole":"technician","status":"invited"}`,
 		caseBlankReason: `{"email":"` + email + `","partnerRole":"technician","reason":" "}`,
 	} {
-		code, m := save(contrA(), b, 0)
+		code, m := save(contrA(), body, 0)
 		refusal(t, name, code, m, want[name])
 	}
 
@@ -62,13 +62,13 @@ func TestPartnerUsers(t *testing.T) {
 		t.Errorf("status on invite: %d %s", code, fields(res))
 	}
 
-	for _, a := range []*actor{techA(), customerA(), hq()} {
-		if code, _ := post(srv, a, "partnerUsers.list", `{"limit":10}`); code != 403 {
-			t.Errorf("%s lists contractor users: %d", a.membership, code)
+	for _, who := range []*actor{techA(), customerA(), hq()} {
+		if code, _ := post(srv, who, "partnerUsers.list", `{"limit":10}`); code != 403 {
+			t.Errorf("%s lists contractor users: %d", who.membership, code)
 		}
 
-		if code, _ := save(a, invite, 0); code != 403 {
-			t.Errorf("%s invites: %d", a.membership, code)
+		if code, _ := save(who, invite, 0); code != 403 {
+			t.Errorf("%s invites: %d", who.membership, code)
 		}
 	}
 
@@ -81,7 +81,7 @@ func TestPartnerUsers(t *testing.T) {
 		t.Fatalf("invite: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	accountID := asStr(t, data(resp)["id"])
 
 	if code, res := save(
 		contrA(),
@@ -104,13 +104,13 @@ func TestPartnerUsers(t *testing.T) {
 	_, resp = post(srv, contrA(), "partnerUsers.list", `{"limit":100}`)
 	byMembership := map[string]map[string]any{}
 
-	for _, it := range items(t, resp) {
-		if it["organizationId"] != seed.ID("org-contractor-a").String() {
-			t.Fatalf("another company's account listed: %v", it)
+	for _, item := range items(t, resp) {
+		if item["organizationId"] != seed.ID("org-contractor-a").String() {
+			t.Fatalf("another company's account listed: %v", item)
 		}
 
-		if mid, ok := it["membershipId"].(string); ok {
-			byMembership[mid] = it
+		if mid, ok := item["membershipId"].(string); ok {
+			byMembership[mid] = item
 		}
 	}
 
@@ -152,7 +152,7 @@ func TestPartnerUsers(t *testing.T) {
 		srv,
 		contrA(),
 		"partnerUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+accountID+`"}`,
 		0,
 	); code != 429 || res["messageKey"] != "errors.invite_recently_sent" ||
 		res["retryAfterSeconds"] != float64(300) {
@@ -162,14 +162,14 @@ func TestPartnerUsers(t *testing.T) {
 	owner(
 		t,
 		`UPDATE identity.partner_users SET last_invite_sent_at = last_invite_sent_at - interval '5 minutes' WHERE id = $1`,
-		id,
+		accountID,
 	)
 
 	if code, res := write(
 		srv,
 		contrA(),
 		"partnerUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+accountID+`"}`,
 		0,
 	); code != 200 || data(res)["deliveryState"] != statusQueued ||
 		asObj(t, data(res)["target"])["kind"] != "partner_user" {
@@ -190,27 +190,27 @@ func TestPartnerUsers(t *testing.T) {
 		srv,
 		contrB(),
 		"partnerUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+accountID+`"}`,
 		0,
 	); code != 404 {
 		t.Error("resend another company's invite")
 	}
 	// an account not signed in yet: its e-mail and role are fixed (IR461), its status is not set by hand
-	upd := func(id, email, role, status string, v int) (int, map[string]any) {
-		st := ""
+	upd := func(partnerUserID, email, role, status string, version int) (int, map[string]any) {
+		state := ""
 		if status != "" {
-			st = `,"status":"` + status + `"`
+			state = `,"status":"` + status + `"`
 		}
 
 		return save(
 			contrA(),
-			`{"id":"`+id+`","email":"`+email+`","partnerRole":"`+role+`"`+st+`,"reason":"correction"}`,
-			v,
+			`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"`+role+`"`+state+`,"reason":"correction"}`,
+			version,
 		)
 	}
 	if code, res := save(
 		contrA(),
-		`{"id":"`+id+`","email":"`+email+`","partnerRole":"contractor"}`,
+		`{"id":"`+accountID+`","email":"`+email+`","partnerRole":"contractor"}`,
 		1,
 	); code != 422 ||
 		fields(res) != refusedReasonRequired {
@@ -218,7 +218,7 @@ func TestPartnerUsers(t *testing.T) {
 	}
 
 	if code, res := upd(
-		id,
+		accountID,
 		email,
 		"technician",
 		"active",
@@ -228,12 +228,12 @@ func TestPartnerUsers(t *testing.T) {
 		t.Errorf("activate a pending invite: %d %v", code, res)
 	}
 
-	if code, _ := upd(id, email, "contractor", "", 5); code != 409 {
+	if code, _ := upd(accountID, email, "contractor", "", 5); code != 409 {
 		t.Error("stale version")
 	}
 
 	if code, res := upd(
-		id,
+		accountID,
 		"fixed-"+email,
 		"technician",
 		"",
@@ -244,7 +244,7 @@ func TestPartnerUsers(t *testing.T) {
 	}
 
 	if code, res := upd(
-		id,
+		accountID,
 		email,
 		"contractor",
 		"",
@@ -255,7 +255,7 @@ func TestPartnerUsers(t *testing.T) {
 	}
 
 	if code, res := upd(
-		id,
+		accountID,
 		email,
 		"technician",
 		"",
@@ -267,19 +267,19 @@ func TestPartnerUsers(t *testing.T) {
 
 	if code, _ := save(
 		contrB(),
-		`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","reason":"x"}`,
+		`{"id":"`+accountID+`","email":"`+email+`","partnerRole":"technician","reason":"x"}`,
 		2,
 	); code != 404 {
 		t.Error("company B changes company A's invite")
 	}
 	// the caller's own account is not changed here
-	sv := int(asNum(t, self["version"]))
+	selfVersion := int(asNum(t, self["version"]))
 	if code, res := upd(
 		asStr(t, self["id"]),
 		asStr(t, self["email"]),
 		"contractor",
 		"disabled",
-		sv,
+		selfVersion,
 	); code != 409 ||
 		res["messageKey"] != keyOwnAccount {
 		t.Errorf("disable the own account: %d %v", code, res)
@@ -290,7 +290,7 @@ func TestPartnerUsers(t *testing.T) {
 		contrA(),
 		"partnerUsers.remove",
 		`{"id":"`+asStr(t, self["id"])+`","reason":"leaving"}`,
-		sv,
+		selfVersion,
 	); code != 409 ||
 		res["messageKey"] != keyOwnAccount {
 		t.Errorf("remove the own account: %d %v", code, res)
@@ -300,7 +300,7 @@ func TestPartnerUsers(t *testing.T) {
 		srv,
 		contrB(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"x"}`,
+		`{"id":"`+accountID+`","reason":"x"}`,
 		2,
 	); code != 404 {
 		t.Error("company B removes company A's invite")
@@ -310,7 +310,7 @@ func TestPartnerUsers(t *testing.T) {
 		srv,
 		contrA(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"sent to the wrong person"}`,
+		`{"id":"`+accountID+`","reason":"sent to the wrong person"}`,
 		2,
 	); code != 200 ||
 		data(res)["deleted"] != true {
@@ -321,7 +321,7 @@ func TestPartnerUsers(t *testing.T) {
 		srv,
 		contrA(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"again"}`,
+		`{"id":"`+accountID+`","reason":"again"}`,
 		2,
 	); code != 404 {
 		t.Error("remove twice")
@@ -338,14 +338,14 @@ func TestPartnerUserAccess(t *testing.T) {
 	// the seed technician holds an active assignment: closing that account is refused (IR421)
 	var (
 		booked string
-		bv     int
+		bookedVersion     int
 	)
 	ownerScan(
 		t,
 		`SELECT id::text, version FROM identity.partner_users WHERE membership_id = $1`,
 		[]any{seed.ID("tech-external-a")},
 		&booked,
-		&bv,
+		&bookedVersion,
 	)
 
 	if code, res := write(
@@ -354,7 +354,7 @@ func TestPartnerUserAccess(t *testing.T) {
 		"partnerUsers.save",
 		`{"id":"`+booked+`","email":"tech-external-a@ac.local","partnerRole":"technician","status":"disabled","reason":"on `+
 			`leave"}`,
-		bv,
+		bookedVersion,
 	); code != 409 ||
 		res["messageKey"] != "errors.technician_booked" {
 		t.Errorf("disable a booked technician: %d %v", code, res)
@@ -365,7 +365,7 @@ func TestPartnerUserAccess(t *testing.T) {
 		contrA(),
 		"partnerUsers.remove",
 		`{"id":"`+booked+`","reason":"left"}`,
-		bv,
+		bookedVersion,
 	); code != 409 ||
 		res["messageKey"] != "errors.technician_booked" {
 		t.Errorf("remove a booked technician: %d %v", code, res)
@@ -420,32 +420,32 @@ func TestPartnerUserAccess(t *testing.T) {
 	})
 
 	var (
-		id, email string
-		v         int
+		partnerUserID, email string
+		userVersion         int
 	)
 	ownerScan(
 		t,
 		`SELECT id::text, email::text, version FROM identity.partner_users WHERE membership_id = $1`,
 		[]any{membership},
-		&id,
+		&partnerUserID,
 		&email,
-		&v,
+		&userVersion,
 	)
 
-	save := func(email, role, status string, v int) (int, map[string]any) {
+	save := func(email, role, status string, version int) (int, map[string]any) {
 		return write(
 			srv,
 			contrA(),
 			"partnerUsers.save",
-			`{"id":"`+id+`","email":"`+email+`","partnerRole":"`+role+`","status":"`+status+`","reason":"on leave"}`,
-			v,
+			`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"`+role+`","status":"`+status+`","reason":"on leave"}`,
+			version,
 		)
 	}
 	if code, res := save(
 		"other@example.com",
 		"technician",
 		"active",
-		v,
+		userVersion,
 	); code != 422 ||
 		fields(res) != refusedEmailImmutable {
 		t.Errorf("change an accepted email: %d %s", code, fields(res))
@@ -455,13 +455,13 @@ func TestPartnerUserAccess(t *testing.T) {
 		email,
 		"contractor",
 		"active",
-		v,
+		userVersion,
 	); code != 422 ||
 		fields(res) != "partnerRole=error.immutable" {
 		t.Errorf("change an accepted role: %d %s", code, fields(res))
 	}
 	// the same address in capitals is no change: the stored spelling stays
-	code, resp = save(strings.ToUpper(email), "technician", "disabled", v)
+	code, resp = save(strings.ToUpper(email), "technician", "disabled", userVersion)
 	if code != 200 || data(resp)["status"] != statusDisabled || data(resp)["email"] != email ||
 		data(resp)["accessUntil"] != until.UTC().Format(time.RFC3339) {
 		t.Fatalf("disable: %d %v", code, resp)
@@ -479,7 +479,7 @@ func TestPartnerUserAccess(t *testing.T) {
 		t.Errorf("membership after disabling: %v, want %v", now, clock())
 	}
 
-	code, resp = save(email, "technician", "active", v+1)
+	code, resp = save(email, "technician", "active", userVersion+1)
 	if code != 200 || data(resp)["status"] != statusActive {
 		t.Fatalf("enable: %d %v", code, resp)
 	}
@@ -495,14 +495,14 @@ func TestPartnerUserAccess(t *testing.T) {
 		t.Errorf("membership after enabling: %v, want %v", now, until)
 	}
 	// an access end that has passed while disabled is not brought back
-	if code, _ := save(email, "technician", "disabled", v+2); code != 200 {
+	if code, _ := save(email, "technician", "disabled", userVersion+2); code != 200 {
 		t.Fatal("disable again")
 	}
 
 	owner(
 		t,
 		`UPDATE identity.partner_users SET access_until = $2 WHERE id = $1`,
-		id,
+		partnerUserID,
 		clock().Add(-time.Minute),
 	)
 
@@ -510,7 +510,7 @@ func TestPartnerUserAccess(t *testing.T) {
 		email,
 		"technician",
 		"active",
-		v+3,
+		userVersion+3,
 	); code != 409 ||
 		res["messageKey"] != "errors.access_expired" {
 		t.Errorf("enable after the access end: %d %v", code, res)
@@ -634,7 +634,7 @@ func TestPartnerAccountCreated(t *testing.T) {
 		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	id, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
+	partnerUserID, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
 
 	var (
 		role, employment string
@@ -714,14 +714,14 @@ func TestPartnerAccountCreated(t *testing.T) {
 
 	var (
 		status string
-		v      int
+		version      int
 	)
 	ownerScan(
 		t,
 		`SELECT status, version FROM identity.partner_users WHERE id = $1`,
-		[]any{id},
+		[]any{partnerUserID},
 		&status,
-		&v,
+		&version,
 	)
 
 	if status != statusActive {
@@ -733,10 +733,10 @@ func TestPartnerAccountCreated(t *testing.T) {
 		srv,
 		contrA(),
 		"partnerUsers.save",
-		`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+later.Format(
+		`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+later.Format(
 			time.RFC3339,
 		)+`","reason":"contract extended"}`,
-		v,
+		version,
 	); code != 200 {
 		t.Fatalf("extend: %d %v", code, res)
 	}
@@ -756,8 +756,8 @@ func TestPartnerAccountCreated(t *testing.T) {
 		srv,
 		contrA(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"left the company"}`,
-		v+1,
+		`{"id":"`+partnerUserID+`","reason":"left the company"}`,
+		version+1,
 	); code != 200 {
 		t.Fatalf("remove: %d %v", code, res)
 	}
@@ -825,7 +825,7 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 		t.Fatalf("add: %d %v", code, resp)
 	}
 
-	id, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
+	partnerUserID, membership := asStr(t, data(resp)["id"]), asStr(t, data(resp)["membershipId"])
 	owner(
 		t,
 		`UPDATE identity.memberships SET valid_from = $2::timestamptz - interval '2 days', valid_until = $2::timestamptz -
@@ -836,14 +836,14 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 	owner(
 		t,
 		`UPDATE identity.partner_users SET last_invite_sent_at = NULL WHERE id = $1`,
-		id,
+		partnerUserID,
 	) // past the 5-minute wait (IR423)
 
 	if code, res := write(
 		srv,
 		contrA(),
 		"partnerUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+partnerUserID+`"}`,
 		0,
 	); code != 409 ||
 		res["messageKey"] != "errors.access_expired" {
@@ -854,7 +854,7 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 		srv,
 		contrA(),
 		"partnerUsers.save",
-		`{"id":"`+id+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+clock().Add(48*time.Hour).
+		`{"id":"`+partnerUserID+`","email":"`+email+`","partnerRole":"technician","accessUntil":"`+clock().Add(48*time.Hour).
 			Format(time.RFC3339)+
 			`","reason":"starts later"}`,
 		1,
@@ -866,7 +866,7 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 		srv,
 		contrA(),
 		"partnerUsers.resendInvite",
-		`{"id":"`+id+`"}`,
+		`{"id":"`+partnerUserID+`"}`,
 		0,
 	); code != 200 {
 		t.Errorf("resend after the move: %d %v", code, res)
@@ -879,7 +879,7 @@ func TestPartnerResendAfterAccessEnd(t *testing.T) {
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestPartnerUserInputs(t *testing.T) {
 	srv := server(t)
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		op, body, want string
 	}{
 		"remove without id": {opPartnerUsersRemove, `{"id":"00000000-0000-0000-0000-000000000000",` +
@@ -893,16 +893,16 @@ func TestPartnerUserInputs(t *testing.T) {
 		"reason on an invite": {opPartnerUsersSave, `{"email":"x-` + uuid.NewString()[:8] + `@example.com",` +
 			`"partnerRole":"contractor","displayName":"X","reason":"why"}`, "reason=error.notAllowed"},
 	} {
-		code, m := write(srv, contrA(), c.op, c.body, 1)
-		if c.op == opPartnerUsersResendInvite || c.op == opPartnerUsersSave {
-			code, m = write(srv, contrA(), c.op, c.body, 0)
+		code, m := write(srv, contrA(), testCase.op, testCase.body, 1)
+		if testCase.op == opPartnerUsersResendInvite || testCase.op == opPartnerUsersSave {
+			code, m = write(srv, contrA(), testCase.op, testCase.body, 0)
 		}
 
-		refusal(t, name, code, m, c.want)
+		refusal(t, name, code, m, testCase.want)
 	}
 	// an account of the company (a membership of its own), removed: the membership ends now
 	user := newUser(t)
-	membership, id := uuid.NewString(), uuid.NewString()
+	membership, partnerUserID := uuid.NewString(), uuid.NewString()
 	owner(
 		t,
 		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from, valid_until)
@@ -919,7 +919,7 @@ func TestPartnerUserInputs(t *testing.T) {
 		`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, partner_role, status,
 			invited_at, invited_by_membership_id)
 		VALUES ($1, $2, $3, $4, $5, 'technician', 'active', $6, $7)`,
-		id,
+		partnerUserID,
 		seed.ID("tenant-a"),
 		seed.ID("org-contractor-a"),
 		membership,
@@ -932,7 +932,7 @@ func TestPartnerUserInputs(t *testing.T) {
 		srv,
 		contrA(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"left the company"}`,
+		`{"id":"`+partnerUserID+`","reason":"left the company"}`,
 		2,
 	); code != 409 ||
 		res["messageKey"] != apperr.KeyVersionConflict {
@@ -943,7 +943,7 @@ func TestPartnerUserInputs(t *testing.T) {
 		srv,
 		contrA(),
 		"partnerUsers.remove",
-		`{"id":"`+id+`","reason":"left the company"}`,
+		`{"id":"`+partnerUserID+`","reason":"left the company"}`,
 		1,
 	); code != 200 ||
 		data(res)["deleted"] != true {
@@ -969,7 +969,7 @@ func TestPartnerUserInputs(t *testing.T) {
 //nolint:paralleltest // the integration tests share one server and the seeded test database
 func TestNotificationMailRetry(t *testing.T) {
 	srv := server(t)
-	membership, id, name := uuid.NewString(), uuid.NewString(), "Retry AC "+uuid.NewString()[:8]
+	membership, notificationID, name := uuid.NewString(), uuid.NewString(), "Retry AC "+uuid.NewString()[:8]
 	owner(
 		t,
 		`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from)
@@ -987,7 +987,7 @@ func TestNotificationMailRetry(t *testing.T) {
 		VALUES ($1, $2, $3, 1, 'fault', 'email', 'alert', '{"kind":"unit","id":"`+seed.ID("unit-online-rto").
 			String()+
 			`"}', $4, 'warning', $5)`,
-		id,
+		notificationID,
 		seed.ID("tenant-a"),
 		membership,
 		`{"targetName":"`+name+`","status":"open"}`,
@@ -995,17 +995,17 @@ func TestNotificationMailRetry(t *testing.T) {
 	)
 
 	state := func() (string, string) {
-		var st, reason string
+		var status, reason string
 
 		ownerScan(
 			t,
 			`SELECT state, COALESCE(failure_reason, '') FROM notify.deliveries WHERE notification_id = $1 AND channel = 'email'`,
-			[]any{id},
-			&st,
+			[]any{notificationID},
+			&status,
 			&reason,
 		)
 
-		return st, reason
+		return status, reason
 	}
 	deliver := func(sender *fakeMail, when time.Time) int {
 		t.Helper()
@@ -1022,15 +1022,15 @@ func TestNotificationMailRetry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		n := 0
+		total := 0
 
 		for _, m := range sender.sent {
 			if strings.Contains(m.subject, name) {
-				n++
+				total++
 			}
 		}
 
-		return n
+		return total
 	}
 	deliver(&fakeMail{err: errSMTPDown, sent: nil}, clock())
 
@@ -1080,7 +1080,7 @@ func (f *fakeMail) Send(_ context.Context, to, subject, body string) (string, er
 func TestNotificationMail(t *testing.T) {
 	srv := server(t)
 	note := func(membership string) string {
-		id := uuid.NewString()
+		notificationID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, channel,
@@ -1088,22 +1088,22 @@ func TestNotificationMail(t *testing.T) {
 			VALUES ($1, $2, $3, 1, 'fault', 'email', 'alert', '{"kind":"unit","id":"`+seed.ID("unit-online-rto").
 				String()+
 				`"}', '{"targetName":"Mail AC","status":"open"}', 'warning', $4)`,
-			id,
+			notificationID,
 			seed.ID("tenant-a"),
 			membership,
 			clock(),
 		)
 
-		return id
+		return notificationID
 	}
 	member := func(until time.Time) string {
-		id := uuid.NewString()
+		membershipID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from,
 				valid_until)
 			VALUES ($1, $2, $3, $4, 'client', 'member', $5, $6)`,
-			id,
+			membershipID,
 			seed.ID("tenant-a"),
 			newUser(t),
 			seed.ID("org-customer-a"),
@@ -1111,7 +1111,7 @@ func TestNotificationMail(t *testing.T) {
 			until,
 		)
 
-		return id
+		return membershipID
 	}
 	active, ended := note(member(clock().Add(time.Hour))), note(member(clock().Add(-time.Minute)))
 
@@ -1129,18 +1129,18 @@ func TestNotificationMail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state := func(id string) (string, string) {
-		var st, reason string
+	state := func(notificationID string) (string, string) {
+		var status, reason string
 
 		ownerScan(
 			t,
 			`SELECT state, COALESCE(failure_reason, '') FROM notify.deliveries WHERE notification_id = $1 AND channel = 'email'`,
-			[]any{id},
-			&st,
+			[]any{notificationID},
+			&status,
 			&reason,
 		)
 
-		return st, reason
+		return status, reason
 	}
 	if st, _ := state(active); st != statusSent {
 		t.Errorf("active recipient: %s", st)
@@ -1232,39 +1232,39 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 
 	var (
 		account string
-		v       int
+		version       int
 	)
 	ownerScan(
 		t,
 		`SELECT id::text, version FROM identity.partner_users WHERE membership_id = $1`,
 		[]any{membership},
 		&account,
-		&v,
+		&version,
 	)
-	status := func(st string, v int) {
+	status := func(state string, userVersion int) {
 		t.Helper()
 
 		if code, res := write(
 			srv,
 			contrA(),
 			"partnerUsers.save",
-			`{"id":"`+account+`","email":"`+user+`@ac.local","partnerRole":"technician","status":"`+st+`","reason":"leave"}`,
-			v,
+			`{"id":"`+account+`","email":"`+user+`@ac.local","partnerRole":"technician","status":"`+state+`","reason":"leave"}`,
+			userVersion,
 		); code != 200 {
-			t.Fatalf("%s: %d %v", st, code, res)
+			t.Fatalf("%s: %d %v", state, code, res)
 		}
 	}
-	status("disabled", v)
+	status("disabled", version)
 
-	var mv int
-	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &mv)
+	var membershipVersion int
+	ownerScan(t, `SELECT version FROM identity.memberships WHERE id = $1`, []any{membership}, &membershipVersion)
 
 	if code, res := write(
 		srv,
 		hq(),
 		"members.save",
 		body(membership, later),
-		mv,
+		membershipVersion,
 	); code != 200 { // HQ extends the contract
 		t.Fatalf("extend: %d %v", code, res)
 	}
@@ -1285,8 +1285,8 @@ func TestDisabledAccountStaysClosed(t *testing.T) {
 		)
 	}
 
-	ownerScan(t, `SELECT version FROM identity.partner_users WHERE id = $1`, []any{account}, &v)
-	status("active", v)
+	ownerScan(t, `SELECT version FROM identity.partner_users WHERE id = $1`, []any{account}, &version)
+	status("active", version)
 	ownerScan(
 		t,
 		`SELECT valid_until FROM identity.memberships WHERE id = $1`,

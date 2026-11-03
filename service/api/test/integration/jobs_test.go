@@ -41,14 +41,14 @@ func jobBody(unit string, extra map[string]string) string {
 		fieldAlternativeSlots: "[" + slotJSON(49, 2) + "," + slotJSON(73, 1) + "]",
 	}
 
-	for key, v := range extra {
-		if v == "" {
+	for key, value := range extra {
+		if value == "" {
 			delete(f, key)
 
 			continue
 		}
 
-		f[key] = v
+		f[key] = value
 	}
 
 	parts := make([]string, 0, len(f))
@@ -71,17 +71,17 @@ func TestJobsCreate(t *testing.T) {
 		0,
 	)
 
-	j := data(resp)
-	if code != 200 || j["status"] != statusRequested || j["origin"] != "client_request" ||
-		len(asArr(t, j["preferredSlots"])) != 3 ||
-		j["dueAt"] != clock().Add(27*time.Hour).Format(time.RFC3339) ||
-		j["contactWindow"] != "Weekdays 09:00-18:00" ||
-		asNum(t, j["preferenceRound"]) != 1 {
+	job := data(resp)
+	if code != 200 || job["status"] != statusRequested || job["origin"] != "client_request" ||
+		len(asArr(t, job["preferredSlots"])) != 3 ||
+		job["dueAt"] != clock().Add(27*time.Hour).Format(time.RFC3339) ||
+		job["contactWindow"] != "Weekdays 09:00-18:00" ||
+		asNum(t, job["preferenceRound"]) != 1 {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	if _, detail := j["projection"]; detail { // the write answers MaintenanceJob; the projections are jobs.get's (IR392)
-		t.Errorf("jobs.create answers a projection: %v", j)
+	if _, detail := job["projection"]; detail { // the write answers MaintenanceJob; the projections are jobs.get's (IR392)
+		t.Errorf("jobs.create answers a projection: %v", job)
 	}
 	// HQ receives every field (IR42): a reader without job.write sees the customer's contact window too (IR353)
 	owner(
@@ -103,7 +103,7 @@ func TestJobsCreate(t *testing.T) {
 		srv,
 		restrMgr(),
 		"jobs.get",
-		`{"jobId":"`+asStr(t, j["id"])+`"}`,
+		`{"jobId":"`+asStr(t, job["id"])+`"}`,
 	); code != 200 ||
 		data(res)["contactWindow"] != "Weekdays 09:00-18:00" {
 		t.Errorf("HQ reader without job.write: %d %v", code, data(res)["contactWindow"])
@@ -289,7 +289,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		t.Fatal("customer-a sees customer-b's job")
 	}
 
-	for body, n := range map[string]int{
+	for body, want := range map[string]int{
 		`{"filters":{"unitId":"` + unit + `","severity":"warning"}}`:  1,
 		`{"filters":{"unitId":"` + unit + `","severity":"critical"}}`: 0,
 		`{"filters":{"unitIds":["` + unit + `"],"statuses":["requested",` +
@@ -319,8 +319,8 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		`{"filters":{"unitId":"` + unit + `","from":"` + clock().Add(26*time.Hour).Format(time.RFC3339) +
 			`"}}`: 0,
 	} {
-		if code, m := post(srv, hq(), "jobs.list", body); code != 200 || len(items(t, m)) != n {
-			t.Errorf("%s: %d want %d", body, len(items(t, m)), n)
+		if code, m := post(srv, hq(), "jobs.list", body); code != 200 || len(items(t, m)) != want {
+			t.Errorf("%s: %d want %d", body, len(items(t, m)), want)
 		}
 	}
 	// the field each case is refused for
@@ -337,7 +337,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		"{\"sort\":{\"field\":\"unitId\",\"direction\":\"asc\"}}":                           refusedSortFieldInvalid,
 	}
 
-	for _, b := range []string{
+	for _, body := range []string{
 		`{"filters":{"status":"requested",` +
 			`"statuses":["requested"]}}`, `{"filters":{"statuses":[]}}`, `{"filters":{"status":"done"}}`,
 		`{"filters":{"statuses":["done"]}}`, bodyInfoSeverity, `{"filters":{"origin":"phone"}}`,
@@ -346,19 +346,19 @@ func TestJobsReadAndTransitions(t *testing.T) {
 			`"to":"2026-09-14T00:00:00Z"}}`, `{"sort":{"field":"unitId",` +
 			`"direction":"asc"}}`,
 	} {
-		code, m := post(srv, hq(), "jobs.list", b)
-		refusal(t, b, code, m, want[b])
+		code, m := post(srv, hq(), "jobs.list", body)
+		refusal(t, body, code, m, want[body])
 	}
 
-	for _, f := range []string{"id", fieldSeverity, fieldDueAt, fieldStatus} {
-		for _, d := range []string{"asc", "desc"} {
+	for _, field := range []string{"id", fieldSeverity, fieldDueAt, fieldStatus} {
+		for _, direction := range []string{"asc", "desc"} {
 			if code, _ := post(
 				srv,
 				hq(),
 				"jobs.list",
-				`{"sort":{"field":"`+f+`","direction":"`+d+`"},"limit":5}`,
+				`{"sort":{"field":"`+field+`","direction":"`+direction+`"},"limit":5}`,
 			); code != 200 {
-				t.Errorf("sort %s %s: %d", f, d, code)
+				t.Errorf("sort %s %s: %d", field, direction, code)
 			}
 		}
 	}
@@ -501,14 +501,14 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		t.Fatalf("hq events: %v", resp)
 	}
 
-	for b, want := range map[string]string{
+	for body, want := range map[string]string{
 		`{"jobId":"` + job + `","query":{"filters":{"x":1}}}`: refusedUnknownFieldX,
 		`{"jobId":"` + job + `","query":{"filters":{"from":"2026-09-15T00:00:00Z",` +
 			`"to":"2026-09-14T00:00:00Z"}}}`: "query.filters.to=error.range",
 		bodyEmptyQuery: "jobId=error.invalid",
 	} {
-		code, m := post(srv, hq(), "jobs.events", b)
-		refusal(t, b, code, m, want)
+		code, m := post(srv, hq(), "jobs.events", body)
+		refusal(t, body, code, m, want)
 	}
 
 	if code, _ := post(
@@ -652,12 +652,12 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	// client cancels a requested job; offers and assignments of an offered job are closed by HQ cancel
 	_, resp = write(srv, customerB(), "jobs.create", jobBody(unit, nil), 0)
 
-	j2 := asStr(t, data(resp)["id"])
+	job2 := asStr(t, data(resp)["id"])
 	if code, res := write(
 		srv,
 		customerB(),
 		"jobs.cancel",
-		`{"jobId":"`+j2+`","cancelReason":"   "}`,
+		`{"jobId":"`+job2+`","cancelReason":"   "}`,
 		1,
 	); code != 422 ||
 		fields(res) != "cancelReason=error.length" {
@@ -668,7 +668,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		srv,
 		customerB(),
 		"jobs.cancel",
-		`{"jobId":"`+j2+`","cancelReason":"fixed itself"}`,
+		`{"jobId":"`+job2+`","cancelReason":"fixed itself"}`,
 		1,
 	); code != 200 {
 		t.Fatal("client cancel requested")
@@ -681,15 +681,15 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		jobBody(unit, map[string]string{fieldAlternativeSlots: "[]"}),
 		0,
 	)
-	j3 := asStr(t, data(resp)["id"])
-	owner(t, `UPDATE maintenance.jobs SET status = 'offered' WHERE id = $1`, j3)
+	job3 := asStr(t, data(resp)["id"])
+	owner(t, `UPDATE maintenance.jobs SET status = 'offered' WHERE id = $1`, job3)
 	owner(
 		t,
 		`INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at,
 			offer_expires_at, access_valid_from, access_valid_until)
 		VALUES ($1,$2,$3,'t1',tstzrange($4,$5),$4,$5,$4,$5)`,
 		seed.ID("tenant-a"),
-		j3,
+		job3,
 		seed.ID("org-contractor-a"),
 		clock(),
 		clock().Add(time.Hour),
@@ -699,7 +699,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.cancel",
-		`{"jobId":"`+j3+`","cancelReason":"duplicate"}`,
+		`{"jobId":"`+job3+`","cancelReason":"duplicate"}`,
 		1,
 	); code != 200 {
 		t.Fatal("hq cancel offered")
@@ -709,7 +709,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		srv,
 		techB(),
 		"jobs.cancel",
-		`{"jobId":"`+j3+`","cancelReason":"x"}`,
+		`{"jobId":"`+job3+`","cancelReason":"x"}`,
 		2,
 	); code != 403 {
 		t.Error("technician cancel")

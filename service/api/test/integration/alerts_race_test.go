@@ -28,7 +28,7 @@ func TestConcurrentAlertOpening(t *testing.T) {
 
 		return conn
 	}
-	c1, c2 := connect(), connect()
+	conn1, conn2 := connect(), connect()
 	unit, org, tenant := seed.ID("unit-online-rto"), seed.ID("org-customer-a"), seed.ID("tenant-a")
 	owner(
 		t,
@@ -63,7 +63,7 @@ func TestConcurrentAlertOpening(t *testing.T) {
 		return txn
 	}
 	when := clock()
-	tx1 := begin(c1)
+	tx1 := begin(conn1)
 
 	first, err := monitoring.Alerts{
 		Units:   nil,
@@ -88,9 +88,9 @@ func TestConcurrentAlertOpening(t *testing.T) {
 
 	done := make(chan result, 1)
 
-	tx2 := begin(c2)
+	tx2 := begin(conn2)
 	go func() { // waits on the first transaction's row in the unique index
-		id, err := monitoring.Alerts{
+		alertID, err := monitoring.Alerts{
 			Units:   nil,
 			Access:  nil,
 			Devices: nil,
@@ -108,7 +108,7 @@ func TestConcurrentAlertOpening(t *testing.T) {
 			_ = tx2.Rollback(ctx)
 		}
 
-		done <- result{id, err}
+		done <- result{alertID, err}
 	}()
 
 	time.Sleep(300 * time.Millisecond)

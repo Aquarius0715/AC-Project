@@ -25,13 +25,13 @@ func TestCertificateReminders(t *testing.T) {
 	member := func(role string, from, until time.Time) string { // a new membership of contractor-a, without permissions
 		t.Helper()
 
-		id := uuid.NewString()
+		membershipID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from,
 				valid_until) VALUES ($1,$2,$3,$4,$5::text,
 			CASE WHEN $5::text = 'technician' THEN 'external' END,$6,$7)`,
-			id,
+			membershipID,
 			tenant,
 			newUser(t),
 			org,
@@ -40,7 +40,7 @@ func TestCertificateReminders(t *testing.T) {
 			until,
 		)
 
-		return id
+		return membershipID
 	}
 	tech := member("technician", clock().Add(-30*day), clock().Add(365*day))
 	gone := member("technician", clock().Add(-30*day), clock().Add(-time.Hour)) // left the company
@@ -63,13 +63,13 @@ func TestCertificateReminders(t *testing.T) {
 	cert := func(membership, code, status string, expires time.Time, renewalOf any) string {
 		t.Helper()
 
-		id := uuid.NewString()
+		certificateID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO maintenance.certificates (id, tenant_id, membership_id, organization_id, code, name, number, issued_at,
 				expires_at, status, renewal_of)
 			VALUES ($1,$2,$3,$4,$5,'Indoor AC','N-1',$6,$7,$8,$9)`,
-			id,
+			certificateID,
 			tenant,
 			membership,
 			org,
@@ -79,9 +79,9 @@ func TestCertificateReminders(t *testing.T) {
 			status,
 			renewalOf,
 		)
-		certs = append(certs, id)
+		certs = append(certs, certificateID)
 
-		return id
+		return certificateID
 	}
 
 	t.Cleanup(func() {
@@ -111,18 +111,18 @@ func TestCertificateReminders(t *testing.T) {
 		severity, to        string
 	}
 
-	sent := func(id string) []reminder { // the certificate's reminders, the earliest first, with their notifications
+	sent := func(certificateID string) []reminder { // the certificate's reminders, the earliest first, with their notifications
 		t.Helper()
 
-		var n int
+		var total int
 		ownerScan(
 			t,
 			`SELECT count(*) FROM maintenance.certificate_reminders WHERE certificate_id = $1`,
-			[]any{id},
-			&n,
+			[]any{certificateID},
+			&total,
 		)
 
-		out := make([]reminder, n)
+		out := make([]reminder, total)
 		for idx := range out {
 			ownerScan(
 				t,
@@ -132,7 +132,7 @@ func TestCertificateReminders(t *testing.T) {
 				r.certificate_id::text AND n.type = 'certificate_expiry'
 				  AND n.template_key = 'certificate_expiry' AND n.occurred_at = r.sent_at
 				WHERE r.certificate_id = $1 GROUP BY r.days_before, r.notifications ORDER BY r.days_before DESC OFFSET $2 LIMIT 1`,
-				[]any{id, idx},
+				[]any{certificateID, idx},
 				&out[idx].days,
 				&out[idx].notifications,
 				&out[idx].severity,

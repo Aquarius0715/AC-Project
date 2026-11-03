@@ -98,7 +98,7 @@ func TestSearchIsLiteral(t *testing.T) {
 
 		return out
 	}
-	for _, c := range []struct{ op, field, term, want string }{
+	for _, testCase := range []struct{ op, field, term, want string }{
 		{opPartsList, fieldCode, "50% grade", "SEAL_50"},
 		{opPartsList, fieldCode, "l_5", "SEAL_50"},
 		{opPartsList, fieldCode, "SEAL%", ""},
@@ -109,8 +109,8 @@ func TestSearchIsLiteral(t *testing.T) {
 		{opContractorsList, fieldName, "s_arch", ""},
 		{opContractorsList, fieldName, "reg_t", "Search Test 50%_Cooling"},
 	} {
-		if got := strings.Join(found(c.op, c.field, c.term), ","); got != c.want {
-			t.Errorf("%s search %q: %q, want %q", c.op, c.term, got, c.want)
+		if got := strings.Join(found(testCase.op, testCase.field, testCase.term), ","); got != testCase.want {
+			t.Errorf("%s search %q: %q, want %q", testCase.op, testCase.term, got, testCase.want)
 		}
 	}
 }

@@ -43,7 +43,7 @@ func TestFilterCare(t *testing.T) {
 		dev,
 	)
 
-	reading := func(ago time.Duration, v float64, seq int) {
+	reading := func(ago time.Duration, value float64, seq int) {
 		owner(
 			t,
 			`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
@@ -54,7 +54,7 @@ func TestFilterCare(t *testing.T) {
 			sensor,
 			clock().Add(-ago),
 			seq,
-			v,
+			value,
 			uuid.NewString(),
 		)
 	}
@@ -85,14 +85,14 @@ func TestFilterCare(t *testing.T) {
 		"whatsapp":      refusedChannelsInvalid,
 	}
 
-	for name, b := range map[string]string{
+	for name, body := range map[string]string{
 		"threshold 49":  `{"thresholdHours":49,"fallbackDays":30,"recipients":"owners","channels":["inApp"]}`,
 		"fallback 181":  `{"thresholdHours":null,"fallbackDays":181,"recipients":"owners","channels":["inApp"]}`,
 		"no inApp":      `{"thresholdHours":null,"fallbackDays":30,"recipients":"owners","channels":["email"]}`,
 		"whatsapp":      `{"thresholdHours":null,"fallbackDays":30,"recipients":"owners","channels":["inApp","whatsapp"]}`,
 		"bad recipient": `{"thresholdHours":null,"fallbackDays":30,"recipients":"everyone","channels":["inApp"]}`,
 	} {
-		code, m := write(srv, customerB(), "filterCare.saveSettings", b, 0)
+		code, m := write(srv, customerB(), "filterCare.saveSettings", body, 0)
 		refusal(t, name, code, m, want[name])
 	}
 	// IR238: the settings read back — the defaults (version 0) before the first save
@@ -247,13 +247,13 @@ func TestFilterCare(t *testing.T) {
 		t.Fatalf("technician cleaning: %v", st)
 	}
 	// offline without a cleaning date → unknown
-	u2 := newUnit(t, srv, "Filter AC 2")
+	unit2 := newUnit(t, srv, "Filter AC 2")
 
 	_, resp = post(
 		srv,
 		customerB(),
 		"filterCare.list",
-		`{"filters":{"unitId":"`+u2+`","status":"unknown"}}`,
+		`{"filters":{"unitId":"`+unit2+`","status":"unknown"}}`,
 	)
 	if len(items(t, resp)) != 1 || items(t, resp)[0]["runHoursSinceCleaning"] != nil {
 		t.Fatalf("unknown: %v", resp)
@@ -292,13 +292,13 @@ func TestFilterCare(t *testing.T) {
 		refusal(t, b, code, m, want[b])
 	}
 
-	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, u2)
+	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, unit2)
 
 	if code, res := write(
 		srv,
 		customerB(),
 		"filterCare.markCleaned",
-		`{"unitId":"`+u2+`"}`,
+		`{"unitId":"`+unit2+`"}`,
 		0,
 	); code != 422 ||
 		fields(res) != refusedUnitArchived {

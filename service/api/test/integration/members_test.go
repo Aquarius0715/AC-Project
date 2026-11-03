@@ -18,15 +18,15 @@ const (
 func newUser(t *testing.T) string {
 	t.Helper()
 
-	id := uuid.NewString()
+	userID := uuid.NewString()
 	owner(
 		t,
 		`INSERT INTO identity.users (id, email, display_name) VALUES ($1, $2, 'Test user')`,
-		id,
-		id+"@ac.local",
+		userID,
+		userID+"@ac.local",
 	)
 
-	return id
+	return userID
 }
 
 //nolint:paralleltest // the integration tests share one server and the seeded test database
@@ -55,14 +55,14 @@ func TestMembersSave(t *testing.T) {
 			fieldReason:         `"onboarding"`,
 		}
 
-		for key, v := range f {
-			if v == "" {
+		for key, value := range f {
+			if value == "" {
 				delete(base, key)
 
 				continue
 			}
 
-			base[key] = v
+			base[key] = value
 		}
 
 		parts := make([]string, 0, len(base))
@@ -88,7 +88,7 @@ func TestMembersSave(t *testing.T) {
 		"write without read":     "permissions=errors.write_needs_read",
 	}
 
-	for name, tc := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		f    map[string]string
 		code int
 	}{
@@ -134,11 +134,11 @@ func TestMembersSave(t *testing.T) {
 		"unknown user":         {map[string]string{fieldUserID: `"` + uuid.NewString() + `"`}, 404},
 		"unknown organization": {map[string]string{fieldOrganizationID: `"` + uuid.NewString() + `"`}, 404},
 	} {
-		code, m := write(srv, hq(), "members.save", body(tc.f), 0)
+		code, m := write(srv, hq(), "members.save", body(testCase.f), 0)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
-		} else if code != tc.code {
-			t.Errorf("save %s: %d want %d", name, code, tc.code)
+		} else if code != testCase.code {
+			t.Errorf("save %s: %d want %d", name, code, testCase.code)
 		}
 	}
 
@@ -149,7 +149,7 @@ func TestMembersSave(t *testing.T) {
 		t.Fatalf("create: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	membershipID := asStr(t, data(resp)["id"])
 	// update: permissions change bumps scopeVersion; role is fixed
 	if code, res := write(
 		srv,
@@ -157,7 +157,7 @@ func TestMembersSave(t *testing.T) {
 		"members.save",
 		body(
 			map[string]string{
-				"id":             `"` + id + `"`,
+				"id":             `"` + membershipID + `"`,
 				fieldPermissions: jsonAlertPermissions,
 				fieldValidUntil:  `"` + until + `"`,
 			},
@@ -175,7 +175,7 @@ func TestMembersSave(t *testing.T) {
 		"members.save",
 		body(
 			map[string]string{
-				"id":             `"` + id + `"`,
+				"id":             `"` + membershipID + `"`,
 				fieldPermissions: jsonAlertPermissions,
 				fieldReason:      `"period"`,
 			},
@@ -192,7 +192,7 @@ func TestMembersSave(t *testing.T) {
 		"members.save",
 		body(
 			map[string]string{
-				"id":             `"` + id + `"`,
+				"id":             `"` + membershipID + `"`,
 				fieldRole:        jsonRoleAdmin,
 				fieldEmployment:  jsonNull,
 				fieldPermissions: `[]`,
@@ -211,7 +211,7 @@ func TestMembersSave(t *testing.T) {
 		"members.save",
 		body(
 			map[string]string{
-				"id":             `"` + id + `"`,
+				"id":             `"` + membershipID + `"`,
 				fieldPermissions: jsonAlertPermissions,
 				fieldScopes: `[{"kind":"property","id":"` + seed.ID("property-home-a").
 					String() +
@@ -230,7 +230,7 @@ func TestMembersSave(t *testing.T) {
 		srv,
 		hq(),
 		"members.save",
-		body(map[string]string{"id": `"` + id + `"`}),
+		body(map[string]string{"id": `"` + membershipID + `"`}),
 		1,
 	); code != 409 {
 		t.Error("stale membership version")
@@ -266,26 +266,26 @@ func TestMembersSave(t *testing.T) {
 	// self promotion and the last identity.write holder
 	_, resp = post(srv, hq(), "members.list", `{"filters":{"role":"admin"},"limit":100}`)
 
-	var me map[string]any
+	var self map[string]any
 
 	for _, it := range items(t, resp) {
 		if it["id"] == seed.ID("hq-operator").String() {
-			me = it
+			self = it
 		}
 	}
 
-	perms := jsonBytes(t, me["permissions"])
+	perms := jsonBytes(t, self["permissions"])
 	selfBody := func(p string) string {
 		return `{"id":"` + asStr(
 			t,
-			me["id"],
-		) + `","userId":"` + asStr(t, me["userId"]) + `","organizationId":"` + operation +
+			self["id"],
+		) + `","userId":"` + asStr(t, self["userId"]) + `","organizationId":"` + operation +
 			`","role":"admin","employment":null,"permissions":` + p +
 			`,"scopes":[{"kind":"tenant","id":"` + seed.ID("tenant-a").
 			String() +
 			`"}],"validFrom":"` + asStr(
 			t,
-			me["validFrom"],
+			self["validFrom"],
 		) + `","validUntil":null,"reason":"self"}`
 	}
 
@@ -295,7 +295,7 @@ func TestMembersSave(t *testing.T) {
 		hq(),
 		"members.save",
 		selfBody(withOverride),
-		int(asNum(t, me["version"])),
+		int(asNum(t, self["version"])),
 	); code != 403 {
 		t.Error("self promotion")
 	}
@@ -336,7 +336,7 @@ func TestMembersSave(t *testing.T) {
 		hq(),
 		"members.save",
 		selfBody(withoutIdentity),
-		int(asNum(t, me["version"])),
+		int(asNum(t, self["version"])),
 	); code != 409 {
 		t.Errorf("last identity.write holder: %d %v", code, res)
 	}
@@ -424,17 +424,17 @@ func TestMembersList(t *testing.T) {
 func TestMembersListCarriesEachMembersOwn(t *testing.T) {
 	srv := server(t)
 
-	var a, b string
+	var firstTech, secondTech string
 	ownerScan(
 		t,
 		`SELECT (array_agg(id::text ORDER BY id))[1], (array_agg(id::text ORDER BY id))[2] FROM identity.memberships
 		WHERE tenant_id = $1 AND role = 'technician'`,
 		[]any{seed.ID("tenant-a")},
-		&a,
-		&b,
+		&firstTech,
+		&secondTech,
 	)
 
-	if a == "" || b == "" {
+	if firstTech == "" || secondTech == "" {
 		t.Skip("the seed has fewer than two technicians")
 	}
 
@@ -464,8 +464,8 @@ func TestMembersListCarriesEachMembersOwn(t *testing.T) {
 		($1, $2, 'test.ir496.a', '2026-01-01Z', '2027-01-01Z', $4), ($1, $3, 'test.ir496.b', '2026-01-01Z', '2027-01-01Z',
 		$5)`,
 		seed.ID("tenant-a"),
-		a,
-		b,
+		firstTech,
+		secondTech,
 		revokedA,
 		revokedB,
 	)
@@ -485,22 +485,22 @@ func TestMembersListCarriesEachMembersOwn(t *testing.T) {
 	grants := map[string]map[string]string{} // member → test grant code → revokedAt
 
 	for _, it := range items(t, res) {
-		id := asStr(t, it["id"])
+		membershipID := asStr(t, it["id"])
 		for _, q := range asArr(t, it["qualifications"]) {
-			g := asObj(t, q)
-			if code := asStr(t, g["code"]); strings.HasPrefix(code, "test.ir496.") {
-				if grants[id] == nil {
-					grants[id] = map[string]string{}
+			grant := asObj(t, q)
+			if code := asStr(t, grant["code"]); strings.HasPrefix(code, "test.ir496.") {
+				if grants[membershipID] == nil {
+					grants[membershipID] = map[string]string{}
 				}
 
-				grants[id][code], _ = g["revokedAt"].(string)
+				grants[membershipID][code], _ = grant["revokedAt"].(string)
 			}
 		}
 	}
 
 	at := func(v time.Time) string { return v.Format(time.RFC3339) }
-	if len(grants[a]) != 1 || grants[a]["test.ir496.a"] != at(revokedA) || len(grants[b]) != 1 ||
-		grants[b]["test.ir496.b"] != at(revokedB) {
+	if len(grants[firstTech]) != 1 || grants[firstTech]["test.ir496.a"] != at(revokedA) || len(grants[secondTech]) != 1 ||
+		grants[secondTech]["test.ir496.b"] != at(revokedB) {
 		t.Fatalf("each member carries only its own grant with its own revocation: %v", grants)
 	}
 }

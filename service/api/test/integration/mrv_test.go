@@ -86,7 +86,7 @@ func TestMRV(t *testing.T) {
 		"unit of another org": "unitIds=errors.units_outside_organization",
 	}
 
-	for name, tc := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		e    map[string]string
 		code int
 	}{
@@ -97,11 +97,11 @@ func TestMRV(t *testing.T) {
 		"blank boundary":       {map[string]string{fieldBoundary: jsonBlank}, 422},
 		"unaligned":            {map[string]string{fieldFrom: `"` + start.Add(time.Second).Format(time.RFC3339) + `"`}, 422},
 	} {
-		code, m := post(srv, hq(), "mrv.preview", cond(tc.e))
+		code, m := post(srv, hq(), "mrv.preview", cond(testCase.e))
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
-		} else if code != tc.code {
-			t.Errorf("%s: %d want %d", name, code, tc.code)
+		} else if code != testCase.code {
+			t.Errorf("%s: %d want %d", name, code, testCase.code)
 		}
 	}
 	// drafts, review, versions
@@ -128,17 +128,17 @@ func TestMRV(t *testing.T) {
 		t.Fatalf("draft: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	reportID := asStr(t, data(resp)["id"])
 
-	review := func(rv, v int) (int, map[string]any) {
+	review := func(reportVersion, version int) (int, map[string]any) {
 		return write(
 			srv,
 			hq(),
 			"mrv.recordReview",
-			`{"reportId":"`+id+`","reportVersion":`+itoa(
-				rv,
+			`{"reportId":"`+reportID+`","reportVersion":`+itoa(
+				reportVersion,
 			)+`,"reviewComment":"Checked demo inputs"}`,
-			v,
+			version,
 		)
 	}
 	if code, _ := review(2, 1); code != 409 {
@@ -160,7 +160,7 @@ func TestMRV(t *testing.T) {
 		srv,
 		hq(),
 		"mrv.saveDraft",
-		`{"id":"`+id+`","conditions":`+cond(nil)+`,"evidenceIds":[]}`,
+		`{"id":"`+reportID+`","conditions":`+cond(nil)+`,"evidenceIds":[]}`,
 		1,
 	); code != 409 {
 		t.Error("stale draft")
@@ -170,7 +170,7 @@ func TestMRV(t *testing.T) {
 		srv,
 		hq(),
 		"mrv.saveDraft",
-		`{"id":"`+id+`","conditions":`+cond(
+		`{"id":"`+reportID+`","conditions":`+cond(
 			map[string]string{fieldBoundaryID: `"whole_building_electricity"`},
 		)+`,"evidenceIds":[]}`,
 		2,
@@ -187,7 +187,7 @@ func TestMRV(t *testing.T) {
 		srv,
 		hq(),
 		"mrv.versions",
-		`{"id":"`+id+`","query":{}}`,
+		`{"id":"`+reportID+`","query":{}}`,
 	); len(items(t, res)) != 3 || asNum(t, items(t, res)[0]["version"]) != 1 ||
 		items(t, res)[1]["status"] != "demo_reviewed" {
 		t.Errorf("versions: %v", res)
@@ -197,13 +197,13 @@ func TestMRV(t *testing.T) {
 		srv,
 		hq(),
 		"mrv.get",
-		`{"id":"`+id+`","reportVersion":1}`,
+		`{"id":"`+reportID+`","reportVersion":1}`,
 	); data(res)["status"] != statusDraft ||
 		len(asArr(t, data(res)["reviewHistory"])) != 0 {
 		t.Errorf("old version: %v", res)
 	}
 
-	if _, m := post(srv, hq(), "mrv.get", `{"id":"`+id+`"}`); ver(t, m) != 3 {
+	if _, m := post(srv, hq(), "mrv.get", `{"id":"`+reportID+`"}`); ver(t, m) != 3 {
 		t.Error("latest by default")
 	}
 

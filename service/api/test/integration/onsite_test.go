@@ -214,7 +214,7 @@ func TestOnSiteOperations(t *testing.T) {
 		"too far":       "distanceMeters=errors.too_far",
 	}
 
-	for name, b := range map[string]string{
+	for name, body := range map[string]string{
 		"too far":       `{"jobId":"` + job + `","method":"location_qr","distanceMeters":201,"qrUnitId":"` + unit + `"}`,
 		"no qr":         `{"jobId":"` + job + `","method":"location_qr","distanceMeters":10,"qrUnitId":null}`,
 		"manual reason": `{"jobId":"` + job + `","method":"manual","distanceMeters":null,"qrUnitId":null,"reason":"  "}`,
@@ -222,7 +222,7 @@ func TestOnSiteOperations(t *testing.T) {
 		"qr mismatch": `{"jobId":"` + job + `","method":"location_qr","distanceMeters":10,` +
 			`"qrUnitId":"` + uuid.NewString() + `"}`,
 	} {
-		code, m := write(srv, techInt(), "jobs.checkIn", b, 4)
+		code, m := write(srv, techInt(), "jobs.checkIn", body, 4)
 		refusal(t, name, code, m, want[name])
 	}
 
@@ -317,12 +317,12 @@ func TestOnSiteOperations(t *testing.T) {
 		t.Fatalf("manual checkIn: %d %v", code, res)
 	}
 
-	j3 := assignedNow(t, srv)
+	job3 := assignedNow(t, srv)
 	owner(
 		t,
 		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1
 			AND status = 'active'`,
-		j3,
+		job3,
 		clock().Add(time.Hour),
 		clock().Add(2*time.Hour),
 	)
@@ -331,7 +331,7 @@ func TestOnSiteOperations(t *testing.T) {
 		srv,
 		techInt(),
 		"jobs.start",
-		`{"jobId":"`+j3+`","startConfirmed":true}`,
+		`{"jobId":"`+job3+`","startConfirmed":true}`,
 		2,
 	); code != 403 ||
 		res["messageKey"] != keyAssignmentNotStarted {
@@ -352,7 +352,7 @@ func TestOnSiteOperations(t *testing.T) {
 		srv,
 		hq(),
 		"jobs.start",
-		`{"jobId":"`+j3+`","startConfirmed":true}`,
+		`{"jobId":"`+job3+`","startConfirmed":true}`,
 		2,
 	); code != 403 {
 		t.Error("HQ cannot start")
@@ -368,7 +368,7 @@ func TestOnSiteOperations(t *testing.T) {
 		t,
 		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1
 			AND status = 'active'`,
-		j3,
+		job3,
 		clock().Add(-3*time.Hour),
 		clock().Add(-2*time.Hour),
 	)
@@ -377,7 +377,7 @@ func TestOnSiteOperations(t *testing.T) {
 		srv,
 		techInt(),
 		"jobs.acknowledgeAssignment",
-		`{"jobId":"`+j3+`","decision":"cant_make","reason":"sick",`+alt+`}`,
+		`{"jobId":"`+job3+`","decision":"cant_make","reason":"sick",`+alt+`}`,
 		2,
 	); code != 403 {
 		t.Error("ack after the window")
@@ -387,7 +387,7 @@ func TestOnSiteOperations(t *testing.T) {
 		t,
 		`UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1
 			AND status = 'active'`,
-		j3,
+		job3,
 		clock().Add(time.Hour),
 		clock().Add(2*time.Hour),
 	)
@@ -396,7 +396,7 @@ func TestOnSiteOperations(t *testing.T) {
 		srv,
 		techInt(),
 		"jobs.acknowledgeAssignment",
-		`{"jobId":"`+j3+`","decision":"cant_make","reason":"sick",`+alt+`}`,
+		`{"jobId":"`+job3+`","decision":"cant_make","reason":"sick",`+alt+`}`,
 		2,
 	); code != 200 ||
 		data(res)["alternativeSlot"] == nil ||

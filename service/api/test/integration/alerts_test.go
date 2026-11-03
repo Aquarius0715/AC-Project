@@ -14,14 +14,14 @@ import (
 func newAlert(t *testing.T, unit, org, severity string, when time.Time) string {
 	t.Helper()
 
-	id := uuid.NewString()
+	alertID := uuid.NewString()
 	// one open alert per unit / policy / rule / type (alerts_one_open_per_rule): use the severity as the rule key
 	owner(
 		t,
 		`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, rule_key, type, severity, status, cause_code,
 			evidence_kind, evidence_text, observed_at, detected_at)
 		VALUES ($1,$2,$3,$4,$5,'sensor',$5,'open','unknown','demo_observation','demo',$6,$6)`,
-		id,
+		alertID,
 		seed.ID("tenant-a"),
 		unit,
 		org,
@@ -29,7 +29,7 @@ func newAlert(t *testing.T, unit, org, severity string, when time.Time) string {
 		when,
 	)
 
-	return id
+	return alertID
 }
 
 //nolint:paralleltest // the integration tests share one server and the seeded test database
@@ -67,7 +67,7 @@ func TestAlerts(t *testing.T) {
 		t.Fatalf("severity asc: %v", got)
 	}
 
-	for body, n := range map[string]int{
+	for body, want := range map[string]int{
 		`{"filters":{"unitIds":["` + unit + `"],"severity":"warning"}}`: 1,
 		`{"filters":{"unitId":"` + unit + `","status":"open"}}`:         3,
 		`{"filters":{"unitId":"` + unit + `","from":"` + clock().Add(-6*time.Minute).Format(time.RFC3339) + `","to":"` +
@@ -79,8 +79,8 @@ func TestAlerts(t *testing.T) {
 		`{"filters":{"unitId":"` + unit + `","customerId":"` + uuid.NewString() +
 			`"}}`: 0,
 	} {
-		if code, m := post(srv, hq(), "alerts.list", body); code != 200 || len(items(t, m)) != n {
-			t.Errorf("%s: %d want %d", body, len(items(t, m)), n)
+		if code, m := post(srv, hq(), "alerts.list", body); code != 200 || len(items(t, m)) != want {
+			t.Errorf("%s: %d want %d", body, len(items(t, m)), want)
 		}
 	}
 
@@ -92,13 +92,13 @@ func TestAlerts(t *testing.T) {
 		"{\"sort\":{\"field\":\"title\",\"direction\":\"asc\"}}": refusedSortFieldInvalid,
 	}
 
-	for _, b := range []string{
+	for _, body := range []string{
 		bodyInfoSeverity, bodyUnknownStatus,
 		bodyReversedPeriod, `{"filters":{"z":1}}`,
 		`{"sort":{"field":"title","direction":"asc"}}`,
 	} {
-		code, m := post(srv, hq(), "alerts.list", b)
-		refusal(t, b, code, m, want[b])
+		code, m := post(srv, hq(), "alerts.list", body)
+		refusal(t, body, code, m, want[body])
 	}
 	// scope: customer-b sees, customer-a does not; units.list shows the active count
 	if code, _ := post(srv, customerB(), "alerts.get", `{"id":"`+crit+`"}`); code != 200 {
@@ -109,9 +109,9 @@ func TestAlerts(t *testing.T) {
 		t.Error("customer-a must not read customer-b's alert")
 	}
 
-	_, g := post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
-	if asNum(t, data(g)["activeAlertCount"]) != 2 { // IR51: normal alerts are not counted
-		t.Fatalf("activeAlertCount: %v", data(g)["activeAlertCount"])
+	_, detail := post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
+	if asNum(t, data(detail)["activeAlertCount"]) != 2 { // IR51: normal alerts are not counted
+		t.Fatalf("activeAlertCount: %v", data(detail)["activeAlertCount"])
 	}
 	// acknowledge → resolve, with state and version rules
 	if code, res := write(
@@ -222,8 +222,8 @@ func TestAlerts(t *testing.T) {
 		t.Error("technician outside scope → NOT_FOUND")
 	}
 
-	_, g = post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
-	if asNum(t, data(g)["activeAlertCount"]) != 0 { // only the normal alert is left open (IR51)
+	_, detail = post(srv, hq(), "units.get", `{"id":"`+unit+`"}`)
+	if asNum(t, data(detail)["activeAlertCount"]) != 0 { // only the normal alert is left open (IR51)
 		t.Fatal("resolved alerts are not active")
 	}
 }
@@ -260,13 +260,13 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 	)
 
 	insert := func(policy, ruleKey any, typ string) string {
-		id := uuid.NewString()
+		alertID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, policy_id, rule_key, type, severity, status,
 				cause_code, evidence_kind, evidence_text, observed_at, detected_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,'warning','open','unknown','demo_observation','demo',$8,$8)`,
-			id,
+			alertID,
 			seed.ID("tenant-a"),
 			unit,
 			org,
@@ -276,7 +276,7 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 			clock().Add(-10*time.Minute),
 		)
 
-		return id
+		return alertID
 	}
 	own, viaDefault, none := insert(
 		policy,

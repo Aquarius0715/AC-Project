@@ -17,15 +17,15 @@ const fieldFacts = "facts"
 func TestEvaluationInputValidation(t *testing.T) {
 	srv := server(t)
 	unitID := boundUnit(t, srv, "online")
-	at := clock().Format(time.RFC3339)
+	stamp := clock().Format(time.RFC3339)
 	fact := func(unit, metric, value, unitName, quality string) string {
 		return `{"unitId":"` + unit + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unitName +
-			`","observedAt":"` + at + `","quality":"` + quality + `"}`
+			`","observedAt":"` + stamp + `","quality":"` + quality + `"}`
 	}
 	body := func(fields map[string]string) string {
 		f := map[string]string{
 			fieldEventID:    `"` + uuid.NewString() + `"`,
-			fieldOccurredAt: `"` + at + `"`,
+			fieldOccurredAt: `"` + stamp + `"`,
 			fieldUnitIDs:    `["` + unitID + `"]`,
 			fieldFacts:      "[]",
 			fieldPhase:      `"condition"`,
@@ -52,7 +52,7 @@ func TestEvaluationInputValidation(t *testing.T) {
 		many[i] = `"` + uuid.NewString() + `"`
 	}
 
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		fields map[string]string
 		field  string
 	}{
@@ -91,8 +91,8 @@ func TestEvaluationInputValidation(t *testing.T) {
 				fact(unitID, "temperature", "26", "°C", "valid") + "]"}, fieldFacts,
 		},
 	} {
-		code, m := post(srv, customerB(), "automations.simulate", body(c.fields))
-		if code != 422 || asObj(t, m["fieldErrors"])[c.field] == nil {
+		code, m := post(srv, customerB(), "automations.simulate", body(testCase.fields))
+		if code != 422 || asObj(t, m["fieldErrors"])[testCase.field] == nil {
 			t.Errorf("%s: %d %v", name, code, m)
 		}
 	}
@@ -159,17 +159,17 @@ func TestEvaluationFireReplay(t *testing.T) {
 		t.Fatalf("rule: %d %v", code, res)
 	}
 
-	at := clock().Format(time.RFC3339)
+	stamp := clock().Format(time.RFC3339)
 	input := func(event, occupied, occurred string) string {
 		return `{"eventId":"` + event + `","occurredAt":"` + occurred + `","unitIds":["` + unit + `"],"facts":[{"unitId":"` +
 			unit +
-			`","metric":"occupied","value":` + occupied + `,"unit":"boolean","observedAt":"` + at +
+			`","metric":"occupied","value":` + occupied + `,"unit":"boolean","observedAt":"` + stamp +
 			`","quality":"valid"}],"phase":"condition"}`
 	}
 	decision := func(m map[string]any) map[string]any { return asObj(t, asArr(t, data(m)["results"])[0]) }
-	e1 := uuid.NewString()
+	event1 := uuid.NewString()
 
-	code, first := write(srv, customerB(), "automations.fire", input(e1, "true", at), 0)
+	code, first := write(srv, customerB(), "automations.fire", input(event1, "true", stamp), 0)
 	if code != 200 || decision(first)["decision"] != decisionRequested ||
 		decision(first)["commandId"] == nil {
 		t.Fatalf("first fire: %d %v", code, first)
@@ -180,7 +180,7 @@ func TestEvaluationFireReplay(t *testing.T) {
 		srv,
 		customerB(),
 		"automations.fire",
-		input(e1, "true", at),
+		input(event1, "true", stamp),
 		0,
 	); code != 200 ||
 		decision(res)["commandId"] != cmd {
@@ -191,21 +191,21 @@ func TestEvaluationFireReplay(t *testing.T) {
 		srv,
 		customerB(),
 		"automations.fire",
-		input(e1, "false", at),
+		input(event1, "false", stamp),
 		0,
 	); code != 409 ||
 		res["messageKey"] != "errors.event_reused" {
 		t.Fatalf("eventId reused with other input: %d %v", code, res)
 	}
 
-	e2 := uuid.NewString()
+	event2 := uuid.NewString()
 	if code, res := write(
 		srv,
 		customerB(),
 		"automations.fire",
-		input(e2, "true", at),
+		input(event2, "true", stamp),
 		0,
-	); code != 200 || data(res)["eventId"] != e2 ||
+	); code != 200 || data(res)["eventId"] != event2 ||
 		decision(res)["commandId"] != cmd {
 		t.Fatalf("same input in the same tick reuses the result: %d %v", code, res)
 	}
@@ -214,7 +214,7 @@ func TestEvaluationFireReplay(t *testing.T) {
 		srv,
 		customerB(),
 		"automations.fire",
-		input(uuid.NewString(), "false", at),
+		input(uuid.NewString(), "false", stamp),
 		0,
 	); code != 409 ||
 		res["messageKey"] != "errors.tick_already_evaluated" {

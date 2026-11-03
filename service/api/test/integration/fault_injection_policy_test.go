@@ -23,14 +23,14 @@ func TestAutomationPolicyEditRollsBackWhenItCannotBeWritten(t *testing.T) {
 		t.Fatalf("create: %d %v", code, created)
 	}
 
-	id := asStr(t, data(created)["id"])
+	policyID := asStr(t, data(created)["id"])
 
 	t.Cleanup(func() {
-		owner(t, `DELETE FROM control.automation_policy_units WHERE policy_id = $1`, id)
-		owner(t, `DELETE FROM control.automation_policies WHERE id = $1`, id)
+		owner(t, `DELETE FROM control.automation_policy_units WHERE policy_id = $1`, policyID)
+		owner(t, `DELETE FROM control.automation_policies WHERE id = $1`, policyID)
 	})
 
-	_, before := post(srv, hq(), "policies.get", `{"policyId":"`+id+`"}`)
+	_, before := post(srv, hq(), "policies.get", `{"policyId":"`+policyID+`"}`)
 
 	broken := injectAt(t, "UPDATE control.automation_policies SET name = ")
 
@@ -38,14 +38,14 @@ func TestAutomationPolicyEditRollsBackWhenItCannotBeWritten(t *testing.T) {
 		broken,
 		hq(),
 		"policies.save",
-		autoPolicyBody(map[string]string{"id": `"` + id + `"`, fieldName: `"Renamed"`}),
+		autoPolicyBody(map[string]string{"id": `"` + policyID + `"`, fieldName: `"Renamed"`}),
 		ver(t, before),
 	)
 	if code < 500 {
 		t.Fatalf("edit with a failing policy write: %d %v, want a server error", code, res)
 	}
 
-	_, after := post(srv, hq(), "policies.get", `{"policyId":"`+id+`"}`)
+	_, after := post(srv, hq(), "policies.get", `{"policyId":"`+policyID+`"}`)
 	if data(after)["name"] != "Before the edit" || ver(t, after) != ver(t, before) {
 		t.Errorf("a failed edit changed the policy: before %v, after %v", before, after)
 	}

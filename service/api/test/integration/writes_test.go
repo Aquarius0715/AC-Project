@@ -46,7 +46,7 @@ func TestWritesGetResult(t *testing.T) {
 		t.Fatalf("succeeded: %d %v", code, m)
 	}
 
-	for name, tc := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		a   *actor
 		op  string
 		key string
@@ -54,7 +54,7 @@ func TestWritesGetResult(t *testing.T) {
 		"other member": {techA(), opPreferencesUpdate, key}, "other operation": {techB(), "consents.update", key},
 		"unknown key": {techB(), opPreferencesUpdate, "nokey-" + uuid.NewString()},
 	} {
-		if _, m := get(tc.a, tc.op, tc.key); data(m)["state"] != "not_received" {
+		if _, m := get(testCase.a, testCase.op, testCase.key); data(m)["state"] != "not_received" {
 			t.Errorf("%s: %v", name, m)
 		}
 	}
@@ -120,10 +120,10 @@ func TestResolveQr(t *testing.T) {
 	var serial string
 	ownerScan(t, `SELECT serial FROM devices.devices WHERE unit_id = $1`, []any{unit}, &serial)
 
-	qr := func(code string) (int, map[string]any) {
+	resolveQR := func(code string) (int, map[string]any) {
 		return post(srv, techB(), "units.resolveQr", `{"code":"`+code+`"}`)
 	}
-	if code, _ := qr(unit); code != 404 {
+	if code, _ := resolveQR(unit); code != 404 {
 		t.Error("unit outside assignments")
 	}
 
@@ -136,7 +136,7 @@ func TestResolveQr(t *testing.T) {
 		"active",
 	)
 	for _, c := range []string{unit, "AC-UNIT:" + unit, strings.ToLower(serial)} {
-		code, m := qr(c)
+		code, m := resolveQR(c)
 		if code != 200 || data(m)["unitId"] != unit || data(m)["jobId"] != job {
 			t.Errorf("%s: %d %v", c, code, m)
 		}
@@ -144,15 +144,15 @@ func TestResolveQr(t *testing.T) {
 
 	owner(t, `UPDATE maintenance.jobs SET status = 'completed' WHERE id = $1`, job)
 
-	if code, m := qr(unit); code != 200 || data(m)["jobId"] != nil {
+	if code, m := resolveQR(unit); code != 200 || data(m)["jobId"] != nil {
 		t.Errorf("no open job: %d %v", code, m)
 	}
 
-	if code, _ := qr("SN-UNKNOWN"); code != 404 {
+	if code, _ := resolveQR("SN-UNKNOWN"); code != 404 {
 		t.Error("unknown label")
 	}
 
-	if code, m := qr(" "); code != 422 || fields(m) != refusedCodeInvalid {
+	if code, m := resolveQR(" "); code != 422 || fields(m) != refusedCodeInvalid {
 		t.Errorf("blank code: %d %s", code, fields(m))
 	}
 

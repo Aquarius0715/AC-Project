@@ -53,7 +53,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		"rules not eligible":  "rulesVersion=error.notAllowed",
 	}
 
-	for name, e := range map[string]map[string]string{
+	for name, extra := range map[string]map[string]string{
 		"general restricted":  {fieldPlanType: `"general"`},
 		"rto without rules":   {fieldRulesVersion: jsonNull},
 		"rules not eligible":  {"restrictionEligible": jsonFalse},
@@ -64,7 +64,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		"other customer unit": {fieldUnitIDs: `["` + seed.ID("unit-non-rto").String() + `"]`},
 		caseDuplicateUnit:     {fieldUnitIDs: `["` + unit + `","` + unit + `"]`},
 	} {
-		code, m := write(srv, hq(), "contracts.save", body(e), 0)
+		code, m := write(srv, hq(), "contracts.save", body(extra), 0)
 		refusal(t, name, code, m, want[name])
 	}
 
@@ -102,19 +102,19 @@ func TestContractsAndInvoices(t *testing.T) {
 		`","to":"` + clock().Add(time.Hour).
 		Format(time.RFC3339) +
 		`"`
-	if _, am := post(
+	if _, audit := post(
 		srv,
 		hq(),
 		"audit.list",
 		`{"filters":{`+day+`,"targetKind":"contract","targetId":"`+key+`"},"limit":10}`,
 	); !hasChange(
-		items(t, am),
+		items(t, audit),
 		2,
 		"priceMinor",
 		"12000",
 		"15000",
 	) {
-		t.Errorf("contract audit before/after: %v", am)
+		t.Errorf("contract audit before/after: %v", audit)
 	}
 
 	if code, _ := write(
@@ -241,7 +241,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		"zero amount":     "amountMinor=error.range",
 	}
 
-	for name, tc := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		e    map[string]string
 		code int
 	}{
@@ -254,11 +254,11 @@ func TestContractsAndInvoices(t *testing.T) {
 			422,
 		},
 	} {
-		code, m := inv(tc.e)
+		code, m := inv(testCase.e)
 		if w, ok := refused[name]; ok {
 			refusal(t, name, code, m, w)
-		} else if code != tc.code {
-			t.Errorf("invoice %s: %d want %d", name, code, tc.code)
+		} else if code != testCase.code {
+			t.Errorf("invoice %s: %d want %d", name, code, testCase.code)
 		}
 	}
 
@@ -327,7 +327,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		t.Errorf("bad invoice status: %d %s", code, fields(res))
 	}
 	// scope filters: the property of the contract version's units, [from, to) on the period start
-	for name, tc := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		f string
 		n int
 	}{
@@ -341,9 +341,9 @@ func TestContractsAndInvoices(t *testing.T) {
 			srv,
 			hq(),
 			"invoices.list",
-			`{"filters":{"contractId":"`+key+`",`+tc.f+`}}`,
+			`{"filters":{"contractId":"`+key+`",`+testCase.f+`}}`,
 		); code != 200 ||
-			len(items(t, res)) != tc.n {
+			len(items(t, res)) != testCase.n {
 			t.Errorf("invoice filter %s: %v", name, res)
 		}
 	}
@@ -358,13 +358,13 @@ func TestContractsAndInvoices(t *testing.T) {
 		t.Errorf("empty invoice range: %d %s", code, fields(res))
 	}
 	// reminders: only overdue unpaid, active client recipient
-	remind := func(recipient, channel string, v int) (int, map[string]any) {
+	remind := func(recipient, channel string, version int) (int, map[string]any) {
 		return write(
 			srv,
 			hq(),
 			"invoices.remind",
 			`{"invoiceId":"`+invoice+`","recipientMembershipId":"`+recipient+`","channel":"`+channel+`","reason":"overdue"}`,
-			v,
+			version,
 		)
 	}
 	if code, _ := remind(seed.ID("customer-b").String(), "inApp", 1); code != 409 {

@@ -26,14 +26,14 @@ func scheduleRule(u string, extra map[string]string) string {
 		"endAction":      actionPowerOff,
 	}
 
-	for key, v := range extra {
-		if v == "" {
+	for key, value := range extra {
+		if value == "" {
 			delete(f, key)
 
 			continue
 		}
 
-		f[key] = v
+		f[key] = value
 	}
 
 	parts := make([]string, 0, len(f))
@@ -65,7 +65,7 @@ func TestAutomationSchedules(t *testing.T) {
 		caseWeekdayEight:       "weekdays=error.invalid",
 	}
 
-	for name, e := range map[string]map[string]string{
+	for name, extra := range map[string]map[string]string{
 		caseNoWeekdays:         {fieldWeekdays: "[]"},
 		caseWeekdayEight:       {fieldWeekdays: "[8]"},
 		"duplicate weekday":    {fieldWeekdays: "[1,1]"},
@@ -80,7 +80,7 @@ func TestAutomationSchedules(t *testing.T) {
 		"event fields":         {fieldCondition: `{"type":"occupancy","occupied":true}`},
 		"unsupported action":   {fieldStartAction: `{"kind":"set_temperature","celsius":40}`},
 	} {
-		code, m := write(srv, customerB(), "automations.save", scheduleRule(unit, e), 0)
+		code, m := write(srv, customerB(), "automations.save", scheduleRule(unit, extra), 0)
 		refusal(t, name, code, m, want[name])
 	}
 
@@ -99,7 +99,7 @@ func TestAutomationSchedules(t *testing.T) {
 		"\"02:30\"": "startLocal=errors.local_time_invalid",
 	}
 
-	for _, hm := range []string{`"02:30"`, `"01:30"`} {
+	for _, localTime := range []string{`"02:30"`, `"01:30"`} {
 		code, res := write(
 			srv,
 			customerB(),
@@ -109,13 +109,13 @@ func TestAutomationSchedules(t *testing.T) {
 				map[string]string{
 					fieldTimezone:   `"America/New_York"`,
 					fieldWeekdays:   "[7]",
-					fieldStartLocal: hm,
+					fieldStartLocal: localTime,
 					fieldEndLocal:   `"05:00"`,
 				},
 			),
 			0,
 		)
-		refusal(t, hm, code, res, want[hm])
+		refusal(t, localTime, code, res, want[localTime])
 	}
 
 	code, resp := write(
@@ -137,12 +137,12 @@ func TestAutomationSchedules(t *testing.T) {
 		t.Fatalf("save: %d %v", code, resp)
 	}
 
-	id := asStr(t, data(resp)["id"])
+	automationID := asStr(t, data(resp)["id"])
 	code, resp = post(
 		srv,
 		customerB(),
 		"automations.nextRuns",
-		`{"automationId":"`+id+`","count":8}`,
+		`{"automationId":"`+automationID+`","count":8}`,
 	)
 
 	list := asArr(t, resp["data"])
@@ -161,7 +161,7 @@ func TestAutomationSchedules(t *testing.T) {
 		srv,
 		customerB(),
 		"automations.nextRuns",
-		`{"automationId":"`+id+`","count":5}`,
+		`{"automationId":"`+automationID+`","count":5}`,
 	); code != 422 ||
 		fields(res) != "count=error.invalid" {
 		t.Errorf("count must be 8: %d %s", code, fields(res))
@@ -171,7 +171,7 @@ func TestAutomationSchedules(t *testing.T) {
 		srv,
 		customerA(),
 		"automations.nextRuns",
-		`{"automationId":"`+id+`","count":8}`,
+		`{"automationId":"`+automationID+`","count":8}`,
 	); code != 404 {
 		t.Error("another customer's rule")
 	}
@@ -179,14 +179,14 @@ func TestAutomationSchedules(t *testing.T) {
 	owner(
 		t,
 		`UPDATE control.automations SET disabled_reason = 'capability_changed' WHERE id = $1`,
-		id,
+		automationID,
 	)
 
 	if code, _ := write(
 		srv,
 		customerB(),
 		"automations.save",
-		scheduleRule(unit, map[string]string{"id": `"` + id + `"`}),
+		scheduleRule(unit, map[string]string{"id": `"` + automationID + `"`}),
 		2,
 	); code != 409 {
 		t.Error("stale rule")
@@ -196,7 +196,7 @@ func TestAutomationSchedules(t *testing.T) {
 		srv,
 		customerB(),
 		"automations.save",
-		`{"id":"`+id+`","name":"x",`+
+		`{"id":"`+automationID+`","name":"x",`+
 			`"unitIds":["`+unit+`"],"timezone":"UTC","enabled":false,"priority":1,"kind":"event",`+
 			`"condition":{"type":"occupancy","occupied":true},"action":{"kind":"set_power","power":false}}`,
 		1,
@@ -209,7 +209,7 @@ func TestAutomationSchedules(t *testing.T) {
 		srv,
 		customerB(),
 		"automations.save",
-		scheduleRule(unit, map[string]string{"id": `"` + id + `"`, fieldName: `"Edited"`}),
+		scheduleRule(unit, map[string]string{"id": `"` + automationID + `"`, fieldName: `"Edited"`}),
 		1,
 	)
 	if code != 200 || ver(t, resp) != 2 || data(resp)["disabledReason"] != "capability_changed" {
@@ -220,7 +220,7 @@ func TestAutomationSchedules(t *testing.T) {
 		srv,
 		customerB(),
 		"automations.save",
-		scheduleRule(unit, map[string]string{"id": `"` + id + `"`, fieldEnabled: jsonTrue}),
+		scheduleRule(unit, map[string]string{"id": `"` + automationID + `"`, fieldEnabled: jsonTrue}),
 		2,
 	)
 	if code != 200 || data(resp)["enabled"] != true || data(resp)["disabledReason"] != nil {
@@ -280,14 +280,14 @@ func TestAutomationEvents(t *testing.T) {
 		"{\"type\":\"weather\",\"metric\":\"temperature\",\"operator\":\"eq\",\"value\":30}": refusedConditionInvalid,
 	}
 
-	for _, c := range []string{
+	for _, condition := range []string{
 		`{"type":"occupancy"}`, `{"type":"pattern",` +
 			`"localTime":"25:00"}`, `{"type":"weather","metric":"temperature",` +
 			`"operator":"eq","value":30}`,
 		`{"type":"tariff","operator":"gt","value":1,"unit":"MYR_per_kWh"}`, `{"type":"location","event":"leave"}`,
 	} {
-		code, m := write(srv, customerB(), "automations.save", rule(c), 0)
-		refusal(t, c, code, m, want[c])
+		code, m := write(srv, customerB(), "automations.save", rule(condition), 0)
+		refusal(t, condition, code, m, want[condition])
 	}
 
 	if code, resp := write(

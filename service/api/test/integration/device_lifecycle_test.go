@@ -38,19 +38,19 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		return v
 	}
 	conn := func() (string, string) {
-		var d, un string
+		var devConn, unitConn string
 		ownerScan(
 			t,
 			`SELECT d.connection, un.connection FROM devices.devices d JOIN assets.units un ON un.id = d.unit_id WHERE d.id =
 				$1`,
 			[]any{dev},
-			&d,
-			&un,
+			&devConn,
+			&unitConn,
 		)
 
-		return d, un
+		return devConn, unitConn
 	}
-	op := func(id string) (string, string) {
+	opState := func(id string) (string, string) {
 		var status, code string
 		ownerScan(
 			t,
@@ -70,7 +70,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	result := func(id, r string, at time.Time) (int, map[string]any) {
+	result := func(operationID, outcome string, at time.Time) (int, map[string]any) {
 		return write(
 			srv,
 			customerB(),
@@ -78,7 +78,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at.Format(
 				time.RFC3339Nano,
 			)+
-				`","eventType":"operation","operationId":"`+id+`","result":"`+r+`"}`,
+				`","eventType":"operation","operationId":"`+operationID+`","result":"`+outcome+`"}`,
 			0,
 		)
 	}
@@ -110,7 +110,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 	tick(base.Add(500 * time.Millisecond))
 
-	if st, _ := op(check); st != statusQueued {
+	if st, _ := opState(check); st != statusQueued {
 		t.Fatalf("started before one second: %s", st)
 	}
 
@@ -125,7 +125,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 	tick(base.Add(time.Second))
 
-	if st, _ := op(check); st != statusRunning {
+	if st, _ := opState(check); st != statusRunning {
 		t.Fatalf("not running at +1 s: %s", st)
 	}
 
@@ -157,7 +157,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 	tick(base.Add(time.Second))
 	tick(base.Add(60 * time.Second))
 
-	if st, code := op(timeout); st != statusFailed || code != codeTimeout {
+	if st, code := opState(timeout); st != statusFailed || code != codeTimeout {
 		t.Fatalf("timeout: %s %s", st, code)
 	}
 
@@ -173,7 +173,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		t.Fatal("check failure result")
 	}
 
-	if st, code := op(failed); st != statusFailed || code != codeUnavailable {
+	if st, code := opState(failed); st != statusFailed || code != codeUnavailable {
 		t.Fatalf("failed check: %s %s", st, code)
 	}
 
@@ -182,15 +182,15 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 	tick(base.Add(time.Second))
 	result(ok, "succeeded", base.Add(2*time.Second))
 	// firmware: the device went offline before the start tick → failed OFFLINE, connection and version kept
-	fw := start("updateFirmware")
+	update := start("updateFirmware")
 
 	owner(t, `UPDATE devices.devices SET connection = 'offline' WHERE id = $1`, dev)
 
-	v := version()
+	before := version()
 
 	tick(base.Add(time.Second))
 
-	if st, code := op(fw); st != statusFailed || code != codeOffline {
+	if st, code := opState(update); st != statusFailed || code != codeOffline {
 		t.Fatalf("firmware start offline: %s %s", st, code)
 	}
 
@@ -202,13 +202,13 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		&firmware,
 	)
 
-	if d, _ := conn(); d != connectionOffline || version() != v || firmware != "1.0" {
+	if d, _ := conn(); d != connectionOffline || version() != before || firmware != "1.0" {
 		t.Fatalf("OFFLINE start keeps the device: %s v%d %s", d, version(), firmware)
 	}
 
 	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE id = $1`, dev)
 
-	fw = start("updateFirmware")
+	update = start("updateFirmware")
 
 	tick(base.Add(time.Second))
 
@@ -216,7 +216,7 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		t.Errorf("a running firmware update keeps the connection: %s", d)
 	}
 
-	if code, _ := result(fw, "succeeded", base.Add(5*time.Second)); code != 200 {
+	if code, _ := result(update, "succeeded", base.Add(5*time.Second)); code != 200 {
 		t.Fatal("firmware result")
 	}
 
@@ -253,19 +253,19 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 		&firmware,
 	)
 
-	if st, code := op(back); st != statusFailed || code != codeUnavailable || firmware != "v2" {
+	if st, code := opState(back); st != statusFailed || code != codeUnavailable || firmware != "v2" {
 		t.Fatalf("failed firmware keeps the old version: %s %s %s", st, code, firmware)
 	}
 	// REV19-018: control work patched in after creation fails the start with CONFLICT; an undelivered restriction
 	// Command does not
 	cmd := func(source, delivery string) string {
-		id := uuid.NewString()
+		commandID := uuid.NewString()
 		owner(
 			t,
 			`INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action, status,
 				delivery, requested_at, expires_at, correlation_id)
 			VALUES ($1,$2,$3,$4,$5,$6,'{"kind":"set_power","power":false}','requested',$7,$8,$9,'t')`,
-			id,
+			commandID,
 			seed.ID("tenant-a"),
 			unit,
 			dev,
@@ -276,9 +276,9 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 			base.Add(10*time.Minute),
 		)
 
-		return id
+		return commandID
 	}
-	c1 := start("check")
+	check1 := start("check")
 	restriction := cmd(
 		"restriction",
 		"not_sent",
@@ -286,30 +286,30 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 
 	tick(base.Add(time.Second))
 
-	if st, _ := op(c1); st != statusRunning {
+	if st, _ := opState(check1); st != statusRunning {
 		t.Fatalf("undelivered restriction Command does not block the start: %s", st)
 	}
 
-	result(c1, "succeeded", base.Add(2*time.Second))
+	result(check1, "succeeded", base.Add(2*time.Second))
 	owner(t, `UPDATE control.commands SET status = 'cancelled' WHERE id = $1`, restriction)
 
-	c2 := start("check")
+	check2 := start("check")
 	normal := cmd("ui", "sent")
-	v = version()
+	before = version()
 
 	tick(base.Add(time.Second))
 
-	if st, code := op(c2); st != statusFailed || code != codeConflict {
+	if st, code := opState(check2); st != statusFailed || code != codeConflict {
 		t.Fatalf("recheck conflict: %s %s", st, code)
 	}
 
-	if d, _ := conn(); d != connectionOnline || version() != v {
+	if d, _ := conn(); d != connectionOnline || version() != before {
 		t.Errorf("CONFLICT start keeps the device: %s v%d", d, version())
 	}
 
 	owner(t, `UPDATE control.commands SET status = 'cancelled' WHERE id = $1`, normal)
 
-	c3 := start("check")
+	check3 := start("check")
 	other := uuid.NewString()
 	owner(
 		t,
@@ -324,13 +324,13 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 	)
 	tick(base.Add(time.Second))
 
-	if st, code := op(c3); st != statusFailed || code != codeConflict {
+	if st, code := opState(check3); st != statusFailed || code != codeConflict {
 		t.Fatalf("another open operation: %s %s", st, code)
 	}
 
 	owner(t, `DELETE FROM devices.device_operations WHERE id = $1`, other)
 	// validation
-	for b, want := range map[string]string{
+	for body, want := range map[string]string{
 		`"operationId":"` + check + `","result":"done"`: "result=error.invalid",
 		`"result":"succeeded"`:                          "operationId=error.required",
 	} {
@@ -340,10 +340,10 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 			"demo.trigger",
 			`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock().Format(
 				time.RFC3339,
-			)+`","eventType":"operation",`+b+`}`,
+			)+`","eventType":"operation",`+body+`}`,
 			0,
 		)
-		refusal(t, b, code, resp, want)
+		refusal(t, body, code, resp, want)
 	}
 
 	if code, _ := result(uuid.NewString(), "succeeded", clock()); code != 404 {
@@ -368,23 +368,23 @@ func TestDeviceEvents(t *testing.T) {
 		&binding,
 	)
 
-	at := func(sec int) string { return clock().Add(time.Duration(sec) * time.Second).Format(time.RFC3339) }
+	stamp := func(sec int) string { return clock().Add(time.Duration(sec) * time.Second).Format(time.RFC3339) }
 	signal := func(event, kind string, seq int, recovery string, sec int) (int, map[string]any) {
-		r := ""
+		recoveryField := ""
 		if recovery != "" {
-			r = `,"recovery":` + recovery
+			recoveryField = `,"recovery":` + recovery
 		}
 
 		return write(
 			srv,
 			customerB(),
 			"demo.trigger",
-			`{"scenarioId":"t12","eventId":"`+event+`","occurredAt":"`+at(
+			`{"scenarioId":"t12","eventId":"`+event+`","occurredAt":"`+stamp(
 				sec,
 			)+`","eventType":"device","deviceId":"`+dev+
 				`","bindingId":"`+binding+`","kind":"`+kind+`","sequence":`+itoa(
 				seq,
-			)+r+`}`,
+			)+recoveryField+`}`,
 			0,
 		)
 	}
@@ -405,7 +405,7 @@ func TestDeviceEvents(t *testing.T) {
 	}
 	eventOf := func(eventID string) (string, []uuid.UUID, *time.Time, string) {
 		var (
-			id, evidence string
+			eventRowID, evidence string
 			alerts       []uuid.UUID
 			restored     *time.Time
 		)
@@ -413,24 +413,24 @@ func TestDeviceEvents(t *testing.T) {
 			t,
 			`SELECT id::text, alert_ids, restored_at, evidence_source FROM devices.device_events WHERE event_id = $1`,
 			[]any{eventID},
-			&id,
+			&eventRowID,
 			&alerts,
 			&restored,
 			&evidence,
 		)
 
-		return id, alerts, restored, evidence
+		return eventRowID, alerts, restored, evidence
 	}
 	count := func() int {
-		var n int
+		var total int
 		ownerScan(
 			t,
 			`SELECT count(*) FROM devices.device_events WHERE device_id = $1`,
 			[]any{dev},
-			&n,
+			&total,
 		)
 
-		return n
+		return total
 	}
 	// ① missing heartbeat → offline only ② power signal lost ③ tamper signal: each axis independent (AT-T12-B)
 	lost := uuid.NewString()
@@ -494,8 +494,8 @@ func TestDeviceEvents(t *testing.T) {
 		t.Fatalf("tamper alert: %s %s %s", typ, severity, status)
 	}
 	// the same eventId again: no new event; with other content CONFLICT
-	n := count()
-	if code, _ := signal(tamper, "tamper", 1, "", 3); code != 200 || count() != n {
+	before := count()
+	if code, _ := signal(tamper, "tamper", 1, "", 3); code != 200 || count() != before {
 		t.Error("repeated eventId is idempotent")
 	}
 
@@ -557,7 +557,7 @@ func TestDeviceEvents(t *testing.T) {
 	lost5 := uuid.NewString()
 	signal(lost5, "communication_lost", 5, "", 20)
 	lost5ID, _, _, _ := eventOf(lost5)
-	n = count()
+	before = count()
 
 	if code, _ := signal(
 		uuid.NewString(),
@@ -569,8 +569,8 @@ func TestDeviceEvents(t *testing.T) {
 		t.Fatal("old heartbeat is accepted")
 	}
 
-	if c, _, _, _ := state(); c != connectionOffline || count() != n {
-		t.Fatalf("old sequence changes nothing: %s %d/%d", c, count(), n)
+	if c, _, _, _ := state(); c != connectionOffline || count() != before {
+		t.Fatalf("old sequence changes nothing: %s %d/%d", c, count(), before)
 	}
 
 	if _, _, restored, _ := eventOf(lost5); restored != nil {
@@ -578,14 +578,14 @@ func TestDeviceEvents(t *testing.T) {
 	}
 	// tamper recovery clears the observed tamper only; the event inherits the fault's alerts (SR23), the alert stays
 	clearEvent := uuid.NewString()
-	if code, m := signal(
+	if code, res := signal(
 		clearEvent,
 		"restored",
 		2,
 		rec("tamper", tamperID, "clear"),
 		30,
 	); code != 200 {
-		t.Fatalf("tamper restored: %d %v", code, m)
+		t.Fatalf("tamper restored: %d %v", code, res)
 	}
 
 	_, inherited, _, evidence := eventOf(clearEvent)
@@ -654,18 +654,18 @@ func TestDeviceEvents(t *testing.T) {
 
 	third := uuid.NewString()
 	signal(third, "tamper", 5, "", 50)
-	_, a, _, _ := eventOf(third)
+	_, alertIDs, _, _ := eventOf(third)
 
 	var previous *string
 	ownerScan(
 		t,
 		`SELECT previous_alert_id::text FROM monitoring.alerts WHERE id = $1`,
-		[]any{a[0]},
+		[]any{alertIDs[0]},
 		&previous,
 	)
 
-	if a[0].String() == alert || previous == nil || *previous != alert {
-		t.Errorf("recurrence links the resolved alert: %v %v", a, previous)
+	if alertIDs[0].String() == alert || previous == nil || *previous != alert {
+		t.Errorf("recurrence links the resolved alert: %v %v", alertIDs, previous)
 	}
 	// devices.events shows the events with their alerts and recovery
 	code, m := post(srv, hq(), "devices.events", `{"id":"`+dev+`","query":{"limit":50}}`)
@@ -681,16 +681,16 @@ func TestDeviceEvents(t *testing.T) {
 		"unknown kind":        refusedKindInvalid,
 	}
 
-	for name, b := range map[string]string{
+	for name, payload := range map[string]string{
 		"unknown kind":        `"kind":"smoke","sequence":9`,
 		"restored no source":  `"kind":"restored","sequence":9`,
 		"axis/value mismatch": `"kind":"restored","sequence":9,"recovery":` + rec("connection", lostID, "on"),
 		"fault with recovery": `"kind":"tamper","sequence":9,"recovery":` + rec("tamper", tamperID, "clear"),
 		"no sequence":         `"kind":"tamper"`,
 	} {
-		body := `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + at(
+		body := `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + stamp(
 			60,
-		) + `","eventType":"device","deviceId":"` + dev + `","bindingId":"` + binding + `",` + b + `}`
+		) + `","eventType":"device","deviceId":"` + dev + `","bindingId":"` + binding + `",` + payload + `}`
 		code, m := write(srv, customerB(), "demo.trigger", body, 0)
 		refusal(t, name, code, m, want[name])
 	}
@@ -699,7 +699,7 @@ func TestDeviceEvents(t *testing.T) {
 		srv,
 		customerB(),
 		"demo.trigger",
-		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at(
+		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+stamp(
 			60,
 		)+`","eventType":"device","deviceId":"`+dev+
 			`","bindingId":"`+uuid.NewString()+`","kind":"tamper","sequence":9}`,
@@ -713,7 +713,7 @@ func TestDeviceEvents(t *testing.T) {
 		srv,
 		customerB(),
 		"demo.trigger",
-		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at(
+		`{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+stamp(
 			60,
 		)+`","eventType":"device","deviceId":"`+uuid.NewString()+
 			`","bindingId":null,"kind":"tamper","sequence":9}`,

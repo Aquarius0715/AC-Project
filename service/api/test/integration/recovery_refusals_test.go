@@ -26,7 +26,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		`{}`,
 	) // the business time of the server (a shared demo cluster may run ahead of clock)
 	now, _ := time.Parse(time.RFC3339Nano, asStr(t, asObj(t, sess["meta"])["snapshotAt"]))
-	at := now.Format(time.RFC3339)
+	stamp := now.Format(time.RFC3339)
 
 	if code, resp := write(
 		srv,
@@ -47,8 +47,8 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 			srv,
 			customerB(),
 			"automations.simulate",
-			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+at+`","unitIds":["`+unit+`"],"facts":[{"unitId":"`+unit+
-				`","metric":"occupied","value":true,"unit":"boolean","observedAt":"`+at+
+			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+stamp+`","unitIds":["`+unit+`"],"facts":[{"unitId":"`+unit+
+				`","metric":"occupied","value":true,"unit":"boolean","observedAt":"`+stamp+
 				`","quality":"valid"}],"phase":"condition"}`,
 		)
 		if code != 200 {
@@ -59,11 +59,11 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 
 		return r
 	}
-	id, res := executed(t, srv, key, inv, []string{unit})
+	restrictionID, res := executed(t, srv, key, inv, []string{unit})
 	ackCommand(t, cmdOf(t, res, unit, "applyCommandIds"), clock().Add(time.Second))
 
 	get := func() map[string]any {
-		_, m := post(srv, restrMgr(), "restrictions.get", `{"id":"`+id+`"}`)
+		_, m := post(srv, restrMgr(), "restrictions.get", `{"id":"`+restrictionID+`"}`)
 
 		return m
 	}
@@ -79,7 +79,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		srv,
 		restrMgr(),
 		"restrictions.cancel",
-		`{"restrictionId":"`+id+`","reason":"plan agreed"}`,
+		`{"restrictionId":"`+restrictionID+`","reason":"plan agreed"}`,
 		ver(t, get()),
 	)
 	ackCommand(t, cmdOf(t, res, unit, "releaseCommandIds"), clock().Add(2*time.Second))
@@ -92,10 +92,10 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		t.Helper()
 
 		body := `{"scenarioId":"t",` +
-			`"eventId":"` + uuid.NewString() + `","occurredAt":"` + at + `","eventType":"restriction_observation",` +
-			`"restrictionId":"` + id + `","unitId":"` + unit + `","observed":{"restrictionId":"` + observed +
+			`"eventId":"` + uuid.NewString() + `","occurredAt":"` + stamp + `","eventType":"restriction_observation",` +
+			`"restrictionId":"` + restrictionID + `","unitId":"` + unit + `","observed":{"restrictionId":"` + observed +
 			`","rulesVersion":"rules-1","policy":{"kind":"temperature_limit","minimumCoolingSetpoint":24},` +
-			`"observedAt":"` + at + `"}}`
+			`"observedAt":"` + stamp + `"}}`
 		if code, m := write(srv, customerB(), "demo.trigger", body, 0); code != 200 {
 			t.Fatalf("observation: %d %v", code, m)
 		}
@@ -106,7 +106,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		return asStr(t, asObj(t, cases[len(cases)-1])["state"])
 	}
 
-	observe(id)
+	observe(restrictionID)
 
 	if caseState() != statusPending {
 		t.Fatalf("recovery case: %v", get())
@@ -121,7 +121,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 			srv,
 			restrMgr(),
 			"restrictions.reconcile",
-			`{"restrictionId":"`+id+`","unitIds":["`+unit+`"]}`,
+			`{"restrictionId":"`+restrictionID+`","unitIds":["`+unit+`"]}`,
 			ver(t, get()),
 		)
 	}
@@ -153,7 +153,7 @@ func TestRestrictionRecoveryRefusals(t *testing.T) {
 		t.Errorf("another restriction observed: %d %v", code, m)
 	}
 
-	observe(id)
+	observe(restrictionID)
 
 	var dev string
 	ownerScan(t, `SELECT id::text FROM devices.devices WHERE unit_id = $1`, []any{unit}, &dev)

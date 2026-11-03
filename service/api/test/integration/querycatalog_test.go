@@ -84,16 +84,16 @@ func TestQueryCatalogFilters(t *testing.T) {
 				`"],"metric":"temperature","query":` + q + `}`
 		},
 		opSummariesGet: func(q string) string { // summaries take the filters directly
-			var x struct {
+			var input struct {
 				Filters json.RawMessage `json:"filters"`
 			}
 
-			_ = json.Unmarshal([]byte(q), &x)
-			if len(x.Filters) == 0 {
-				x.Filters = json.RawMessage(`{}`)
+			_ = json.Unmarshal([]byte(q), &input)
+			if len(input.Filters) == 0 {
+				input.Filters = json.RawMessage(`{}`)
 			}
 
-			return `{"kind":"partner","filters":` + string(x.Filters) + `}`
+			return `{"kind":"partner","filters":` + string(input.Filters) + `}`
 		},
 	}
 	// sample filter values: by key, then per operation where the enum differs
@@ -198,15 +198,15 @@ func TestQueryCatalogFilters(t *testing.T) {
 		t.Run(operation, func(t *testing.T) {
 			var who *actor
 
-			for _, a := range callers {
+			for _, caller := range callers {
 				if code, _ := post(
 					srv,
-					a,
+					caller,
 					operation,
 					wrap(query(operation, "")),
 				); code == 200 ||
 					(missingParent[operation] && code == 404) {
-					who = a
+					who = caller
 
 					break
 				}
@@ -231,15 +231,15 @@ func TestQueryCatalogFilters(t *testing.T) {
 					continue
 				}
 
-				v, ok := perOp[operation][key]
+				value, ok := perOp[operation][key]
 				if !ok {
-					v, ok = sample[key]
+					value, ok = sample[key]
 				}
 
 				if !ok {
 					switch {
 					case strings.HasSuffix(key, "Id"):
-						v = `"` + uuid.NewString() + `"`
+						value = `"` + uuid.NewString() + `"`
 					default:
 						t.Errorf("no sample value for %s", key)
 
@@ -251,10 +251,10 @@ func TestQueryCatalogFilters(t *testing.T) {
 					srv,
 					who,
 					operation,
-					wrap(query(operation, `"`+key+`":`+v)),
+					wrap(query(operation, `"`+key+`":`+value)),
 				); code != 200 &&
 					(!missingParent[operation] || code != 404) {
-					t.Errorf("filter %s=%s: %d %v", key, v, code, res)
+					t.Errorf("filter %s=%s: %d %v", key, value, code, res)
 				}
 			}
 
@@ -319,13 +319,13 @@ func sortError(m map[string]any) bool {
 
 // filterError reports whether a VALIDATION result names the filters.
 func filterError(m map[string]any) bool {
-	fe, _ := m["fieldErrors"].(map[string]any)
-	if fe["zzUnknown"] == apperr.KeyNotAllowed {
+	fieldErrs, _ := m["fieldErrors"].(map[string]any)
+	if fieldErrs["zzUnknown"] == apperr.KeyNotAllowed {
 		// REST: filters are query parameters, an unknown one is not allowed (IR222)
 		return true
 	}
 
-	for k := range fe {
+	for k := range fieldErrs {
 		// filters of a bare Query; query.filters (or the whole query) of a nested one
 		if k == fieldFilters || strings.HasPrefix(k, "filters.") || k == "query" ||
 			strings.HasPrefix(k, "query.filters") {

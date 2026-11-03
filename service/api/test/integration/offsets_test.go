@@ -112,32 +112,32 @@ func TestOffsets(t *testing.T) {
 		t.Error("second request for one quote")
 	}
 
-	ev := func(event, attempt, eventID string) string {
+	eventBody := func(event, attempt, eventID string) string {
 		return `{"event":"` + event + `","recordId":"` + rid + `","attemptId":"` + attempt + `","eventId":"` + eventID +
 			`","demoConfirmed":true}`
 	}
-	if code, _ := sim(customerB(), ev("purchase_confirm", att, uuid.NewString()), 1); code != 403 {
+	if code, _ := sim(customerB(), eventBody("purchase_confirm", att, uuid.NewString()), 1); code != 403 {
 		t.Error("client confirms purchase")
 	}
 	// purchase fails → retry → purchase → retire
 	failID := uuid.NewString()
 
-	code, resp = sim(hq(), ev("fail", att, failID), 1)
+	code, resp = sim(hq(), eventBody("fail", att, failID), 1)
 	if code != 200 || data(resp)["state"] != statusFailed ||
 		data(resp)["previousState"] != statusDemoRequested ||
 		data(resp)["currentAttemptId"] != att {
 		t.Fatalf("fail: %d %v", code, resp)
 	}
 
-	if code, m := sim(hq(), ev("fail", att, failID), 2); code != 200 || ver(t, m) != 2 {
+	if code, m := sim(hq(), eventBody("fail", att, failID), 2); code != 200 || ver(t, m) != 2 {
 		t.Error("same eventId replays")
 	}
 
-	if code, _ := sim(hq(), ev("purchase_confirm", att, failID), 2); code != 409 {
+	if code, _ := sim(hq(), eventBody("purchase_confirm", att, failID), 2); code != 409 {
 		t.Error("same eventId with other content")
 	}
 
-	if code, _ := sim(hq(), ev("purchase_confirm", att, uuid.NewString()), 2); code != 409 {
+	if code, _ := sim(hq(), eventBody("purchase_confirm", att, uuid.NewString()), 2); code != 409 {
 		t.Error("late success while failed")
 	}
 
@@ -161,22 +161,22 @@ func TestOffsets(t *testing.T) {
 
 	att2 := asStr(t, data(resp)["currentAttemptId"])
 
-	if code, _ := sim(hq(), ev("purchase_confirm", att, uuid.NewString()), 3); code != 409 {
+	if code, _ := sim(hq(), eventBody("purchase_confirm", att, uuid.NewString()), 3); code != 409 {
 		t.Error("old attempt")
 	}
 
-	code, resp = sim(hq(), ev("purchase_confirm", att2, uuid.NewString()), 3)
+	code, resp = sim(hq(), eventBody("purchase_confirm", att2, uuid.NewString()), 3)
 	if code != 200 || data(resp)["state"] != statusDemoPurchased ||
 		data(resp)["purchaseRef"] == nil {
 		t.Fatalf("purchase: %d %v", code, resp)
 	}
 
 	att3 := asStr(t, data(resp)["currentAttemptId"])
-	if code, _ := sim(hq(), ev("purchase_confirm", att3, uuid.NewString()), 4); code != 409 {
+	if code, _ := sim(hq(), eventBody("purchase_confirm", att3, uuid.NewString()), 4); code != 409 {
 		t.Error("wrong stage")
 	}
 
-	code, resp = sim(hq(), ev("retire", att3, uuid.NewString()), 4)
+	code, resp = sim(hq(), eventBody("retire", att3, uuid.NewString()), 4)
 	if code != 200 || data(resp)["state"] != "demo_retired" || data(resp)["retirementRef"] == nil ||
 		data(resp)["demoCertificateRef"] == nil ||
 		data(resp)["currentAttemptId"] != nil {

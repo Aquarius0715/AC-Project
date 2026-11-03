@@ -248,17 +248,17 @@ func TestUnitAccessProjection(t *testing.T) {
 	)
 
 	count := func(table string) int {
-		var n int
+		var total int
 
 		drainEvents(t)
 		ownerScan(
 			t,
 			`SELECT count(*) FROM assets.`+table+` WHERE job_id = $1 AND unit_id = $2`,
 			[]any{job, unit},
-			&n,
+			&total,
 		)
 
-		return n
+		return total
 	}
 	if count("unit_assignment_access") != 1 || count("unit_offer_access") != 0 {
 		t.Fatal("active assignment projected, undecided offer not")

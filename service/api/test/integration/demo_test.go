@@ -112,7 +112,7 @@ func TestDemoOperations(t *testing.T) {
 		}
 		defer func() { _ = conn.Close(context.Background()) }()
 
-		r, err := conn.Query(
+		measurementRows, err := conn.Query(
 			context.Background(),
 			`SELECT quality, sequence, value, quality_reason, raw_unit FROM monitoring.measurements WHERE sensor_id = $1 ORDER BY
 				sequence`,
@@ -122,18 +122,18 @@ func TestDemoOperations(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for r.Next() {
-			var x row
+		for measurementRows.Next() {
+			var scanned row
 
-			err := r.Scan(&x.quality, &x.seq, &x.value, &x.reason, &x.rawUn)
+			err := measurementRows.Scan(&scanned.quality, &scanned.seq, &scanned.value, &scanned.reason, &scanned.rawUn)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			rows = append(rows, x)
+			rows = append(rows, scanned)
 		}
 
-		rowsErr := r.Err()
+		rowsErr := measurementRows.Err()
 		if rowsErr != nil {
 			t.Fatal(rowsErr)
 		}
@@ -162,18 +162,18 @@ func TestDemoOperations(t *testing.T) {
 		t.Fatalf("telemetry rows: %v", rows)
 	}
 
-	for i, w := range want {
-		if r := rows[i]; r.quality != w.quality || str(r.reason) != w.reason ||
-			str(r.rawUn) != w.raw ||
-			(r.value != nil) != w.value {
+	for idx, wanted := range want {
+		if got := rows[idx]; got.quality != wanted.quality || str(got.reason) != wanted.reason ||
+			str(got.rawUn) != wanted.raw ||
+			(got.value != nil) != wanted.value {
 			t.Errorf(
 				"row %d: %s %s %s %v, want %v",
-				i,
-				r.quality,
-				str(r.reason),
-				str(r.rawUn),
-				r.value,
-				w,
+				idx,
+				got.quality,
+				str(got.reason),
+				str(got.rawUn),
+				got.value,
+				wanted,
 			)
 		}
 	}
@@ -206,7 +206,7 @@ func TestDemoOperations(t *testing.T) {
 	}
 	// the trigger's own rules (IR36): a known event type, its IDs, and a measurement of the sensor's metric and unit
 	now := clock().Format(time.RFC3339)
-	for name, c := range map[string]struct{ body, field, key string }{
+	for name, testCase := range map[string]struct{ body, field, key string }{
 		"another type": {
 			`{"scenarioId":"t",` +
 				`"eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"network"}`, "eventType",
@@ -238,9 +238,9 @@ func TestDemoOperations(t *testing.T) {
 	} {
 		if code, m := trig(
 			srv,
-			c.body,
+			testCase.body,
 		); code != 422 ||
-			asObj(t, m["fieldErrors"])[c.field] != c.key {
+			asObj(t, m["fieldErrors"])[testCase.field] != testCase.key {
 			t.Errorf("%s: %d %v", name, code, m)
 		}
 	}
@@ -282,14 +282,14 @@ func TestDemoOperations(t *testing.T) {
 		t.Errorf("own sequence kept: %d", top)
 	}
 	// command acknowledgement through the demo trigger
-	_, g := post(srv, customerB(), "units.get", `{"id":"`+unit+`"}`)
+	_, detail := post(srv, customerB(), "units.get", `{"id":"`+unit+`"}`)
 
 	code, res := write(
 		srv,
 		customerB(),
 		"commands.create",
 		`{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(
-			ver(t, g),
+			ver(t, detail),
 		)+`}`,
 		0,
 	)
@@ -353,14 +353,14 @@ func TestDemoOperations(t *testing.T) {
 		t.Errorf("the command's audit trail: %v", trail)
 	}
 	// the acknowledged setting becomes the observed state without a unit version change
-	_, g2 := post(srv, customerB(), "units.get", `{"id":"`+unit+`"}`)
-	if obs := asObj(t, data(g2)["observedState"]); obs["power"] != true ||
+	_, laterDetail := post(srv, customerB(), "units.get", `{"id":"`+unit+`"}`)
+	if obs := asObj(t, data(laterDetail)["observedState"]); obs["power"] != true ||
 		obs["observedAt"] != clock().Add(time.Second).Format(time.RFC3339Nano) {
 		t.Errorf("observedState after ack: %v", obs)
 	}
 
-	if ver(t, g2) != ver(t, g) {
-		t.Errorf("unit version changed by ack: %d → %d", ver(t, g), ver(t, g2))
+	if ver(t, laterDetail) != ver(t, detail) {
+		t.Errorf("unit version changed by ack: %d → %d", ver(t, detail), ver(t, laterDetail))
 	}
 	// the clock only moves forward; deadlines are processed by the jump
 	if code, resp := write(
@@ -430,22 +430,22 @@ func commandTrail(t *testing.T, srv *apiserver.Server, created map[string]any) [
 	)
 	out := []string{}
 
-	for _, a := range items(t, res) {
-		if a["action"] != opCommandsCreate {
+	for _, entry := range items(t, res) {
+		if entry["action"] != opCommandsCreate {
 			continue
 		}
 
-		e := asStr(t, a["result"]) + " " +
+		line := asStr(t, entry["result"]) + " " +
 			map[bool]string{
 				true:  membershipCustomerB,
-				false: asStr(t, a["actorId"]),
-			}[a["actorId"] == seed.ID("user-customer-b").String()]
-		if a["result"] != statusPending {
-			reason, _ := a["reason"].(string)
-			e += " " + reason
+				false: asStr(t, entry["actorId"]),
+			}[entry["actorId"] == seed.ID("user-customer-b").String()]
+		if entry["result"] != statusPending {
+			reason, _ := entry["reason"].(string)
+			line += " " + reason
 		}
 
-		out = append([]string{e}, out...) // the list is newest first
+		out = append([]string{line}, out...) // the list is newest first
 	}
 
 	return out

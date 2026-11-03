@@ -25,7 +25,7 @@ func reading(
 ) string {
 	t.Helper()
 
-	id := uuid.NewString()
+	measurementID := uuid.NewString()
 	owner(
 		t,
 		`INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit,
@@ -39,10 +39,10 @@ func reading(
 		value,
 		symbol,
 		quality,
-		id,
+		measurementID,
 	)
 
-	return id
+	return measurementID
 }
 
 // IR327 / IR66 / DD-A05 item 6: an alert's evidence candidates are its own evidence at detection and the unit's valid
@@ -140,14 +140,14 @@ func TestAlertEvidence(t *testing.T) {
 		t.Fatalf("candidates: %s want %s", got, want)
 	}
 
-	if it := byID(
+	if item := byID(
 		resp,
 		after,
-	); it["metric"] != metricTemperature || asNum(t, it["value"]) != 26 || it["unit"] != "°C" ||
-		it["origin"] != "measured" ||
-		it["quality"] != qualityValid ||
-		it["eventType"] != nil {
-		t.Errorf("remeasurement fields: %v", it)
+	); item["metric"] != metricTemperature || asNum(t, item["value"]) != 26 || item["unit"] != "°C" ||
+		item["origin"] != "measured" ||
+		item["quality"] != qualityValid ||
+		item["eventType"] != nil {
+		t.Errorf("remeasurement fields: %v", item)
 	}
 
 	if it := byID(
@@ -220,7 +220,7 @@ func TestAlertEvidence(t *testing.T) {
 	}
 
 	// the resolution: at least one candidate for an alert without a policy, and candidates only
-	resolve := func(alert string, v int, ids ...string) (int, map[string]any) {
+	resolve := func(alert string, version int, ids ...string) (int, map[string]any) {
 		list := "[]"
 		if len(ids) > 0 {
 			list = `["` + ids[0]
@@ -240,10 +240,10 @@ func TestAlertEvidence(t *testing.T) {
 			hq(),
 			"alerts.resolve",
 			`{"alertId":"`+alert+`","resolutionReason":"window closed","resolutionEvidenceIds":`+list+`}`,
-			v,
+			version,
 		)
 	}
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		ids []string
 		key string
 	}{
@@ -258,8 +258,8 @@ func TestAlertEvidence(t *testing.T) {
 		if code, m := resolve(
 			free,
 			1,
-			c.ids...); code != 422 ||
-			asObj(t, m["fieldErrors"])["resolutionEvidenceIds"] != c.key {
+			testCase.ids...); code != 422 ||
+			asObj(t, m["fieldErrors"])["resolutionEvidenceIds"] != testCase.key {
 			t.Errorf("%s: %d %v", name, code, m)
 		}
 	}

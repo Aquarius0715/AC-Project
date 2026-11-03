@@ -55,7 +55,7 @@ func TestAutomationEvaluation(t *testing.T) {
 		`{"kind":"set_power","power":false}`,
 		90,
 	)
-	at := clock().Format(time.RFC3339)
+	stamp := clock().Format(time.RFC3339)
 	fact := func(unit, metric, value, unitName string, observed time.Time) string {
 		return `{"unitId":"` + unit + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unitName +
 			`","observedAt":"` + observed.Format(
@@ -63,7 +63,7 @@ func TestAutomationEvaluation(t *testing.T) {
 		) + `","quality":"valid"}`
 	}
 	input := func(units, facts, phase string) string {
-		return `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + at + `","unitIds":[` + units + `],"facts":[` + facts +
+		return `{"eventId":"` + uuid.NewString() + `","occurredAt":"` + stamp + `","unitIds":[` + units + `],"facts":[` + facts +
 			`],"phase":"` + phase + `"}`
 	}
 	decision := func(m map[string]any, unit string) map[string]any {
@@ -208,7 +208,7 @@ func TestAutomationEvaluation(t *testing.T) {
 		t.Errorf("schedule end not due: %v", res)
 	}
 	// validation and scope
-	for b, want := range map[string]string{
+	for body, want := range map[string]string{
 		`{"eventId":"` + uuid.NewString() + `","occurredAt":"` + clock().Add(time.Hour).Format(time.RFC3339) +
 			`","unitIds":["` + unitID + `"],"facts":[],"phase":"condition"}`: "occurredAt=errors.not_current_tick",
 		input(`"`+unitID+`","`+unitID+`"`, "", "condition"): refusedUnitIDsInvalid,
@@ -220,8 +220,8 @@ func TestAutomationEvaluation(t *testing.T) {
 		input(`"`+unitID+`"`, fact(unitID, "humidity", "50", "kPa", clock()), "condition"): refusedFactsInvalid,
 		input(`"`+unitID+`"`, "", "midnight"):                                              "phase=error.invalid",
 	} {
-		code, m := post(srv, customerB(), "automations.simulate", b)
-		refusal(t, b, code, m, want)
+		code, m := post(srv, customerB(), "automations.simulate", body)
+		refusal(t, body, code, m, want)
 	}
 
 	if code, _ := post(
@@ -302,15 +302,15 @@ func TestAutomationEvaluation(t *testing.T) {
 		t.Error("different facts in the same tick")
 	}
 
-	var n int
+	var total int
 	ownerScan(
 		t,
 		`SELECT count(*) FROM control.commands WHERE unit_id = $1 AND source = 'automation'`,
 		[]any{unitID},
-		&n,
+		&total,
 	)
 
-	if n != 1 {
-		t.Errorf("commands created: %d", n)
+	if total != 1 {
+		t.Errorf("commands created: %d", total)
 	}
 }

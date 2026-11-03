@@ -18,7 +18,7 @@ import (
 func TestAutomationDecideReasons(t *testing.T) {
 	srv := server(t)
 	unit := boundUnit(t, srv, "online")
-	at := clock().Format(time.RFC3339)
+	stamp := clock().Format(time.RFC3339)
 	rule := func(cond, action string) (string, int) {
 		t.Helper()
 
@@ -37,15 +37,15 @@ func TestAutomationDecideReasons(t *testing.T) {
 
 		return asStr(t, data(res)["id"]), ver(t, res)
 	}
-	remove := func(id string, v int) {
+	remove := func(automationID string, ruleVersion int) {
 		t.Helper()
 
 		if code, res := write(
 			srv,
 			customerB(),
 			"automations.delete",
-			`{"id":"`+id+`"}`,
-			v,
+			`{"id":"`+automationID+`"}`,
+			ruleVersion,
 		); code != 200 {
 			t.Fatalf("delete rule: %d %v", code, res)
 		}
@@ -57,7 +57,7 @@ func TestAutomationDecideReasons(t *testing.T) {
 			srv,
 			customerB(),
 			"automations.simulate",
-			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+at+`","unitIds":["`+unit+`"],"facts":[`+facts+
+			`{"eventId":"`+uuid.NewString()+`","occurredAt":"`+stamp+`","unitIds":["`+unit+`"],"facts":[`+facts+
 				`],"phase":"condition"}`,
 		)
 		if code != 200 {
@@ -75,31 +75,31 @@ func TestAutomationDecideReasons(t *testing.T) {
 	}
 	fact := func(metric, value, unitName string) string {
 		return `{"unitId":"` + unit + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unitName +
-			`","observedAt":"` + at + `","quality":"valid"}`
+			`","observedAt":"` + stamp + `","quality":"valid"}`
 	}
 	occupied := fact("occupied", "true", "boolean")
 
 	// invalid_capability: the saved action is patched to a fan level the model does not offer
-	id, v := rule(`{"type":"occupancy","occupied":true}`, `{"kind":"set_fan","fanLevel":"high"}`)
+	ruleID, version := rule(`{"type":"occupancy","occupied":true}`, `{"kind":"set_fan","fanLevel":"high"}`)
 	owner(
 		t,
 		`UPDATE control.automations SET definition = jsonb_set(definition, '{action}',
 			'{"kind":"set_fan","fanLevel":"turbo"}') WHERE id = $1`,
-		id,
+		ruleID,
 	)
 
 	if r := reason(occupied); r != "invalid_capability" {
 		t.Errorf("unsupported action: %q", r)
 	}
 
-	remove(id, v)
+	remove(ruleID, version)
 
 	// owner_forbidden: the owner is a membership of another organization (no control.execute on this unit)
-	id, v = rule(`{"type":"occupancy","occupied":true}`, `{"kind":"set_temperature","celsius":24}`)
+	ruleID, version = rule(`{"type":"occupancy","occupied":true}`, `{"kind":"set_temperature","celsius":24}`)
 	owner(
 		t,
 		`UPDATE control.automations SET owner_membership_id = $2 WHERE id = $1`,
-		id,
+		ruleID,
 		seed.ID("customer-a"),
 	)
 
@@ -110,26 +110,26 @@ func TestAutomationDecideReasons(t *testing.T) {
 	owner(
 		t,
 		`UPDATE control.automations SET owner_membership_id = $2 WHERE id = $1`,
-		id,
+		ruleID,
 		seed.ID("customer-b"),
 	)
-	remove(id, v)
+	remove(ruleID, version)
 
 	// consent_revoked: a location rule saved with consent whose consent row was flipped without the withdrawal event
-	_, c := post(srv, customerB(), "consents.get", `{"purpose":"location_automation"}`)
-	if data(c)["granted"] != true {
+	_, consent := post(srv, customerB(), "consents.get", `{"purpose":"location_automation"}`)
+	if data(consent)["granted"] != true {
 		if code, res := write(
 			srv,
 			customerB(),
 			"consents.update",
 			`{"purpose":"location_automation","granted":true}`,
-			ver(t, c),
+			ver(t, consent),
 		); code != 200 {
 			t.Fatalf("consent: %d %v", code, res)
 		}
 	}
 
-	id, v = rule(`{"type":"location","event":"arrival"}`, `{"kind":"set_power","power":true}`)
+	ruleID, version = rule(`{"type":"location","event":"arrival"}`, `{"kind":"set_power","power":true}`)
 
 	owner(
 		t,
@@ -151,5 +151,5 @@ func TestAutomationDecideReasons(t *testing.T) {
 		t.Errorf("other location event: %q", r)
 	}
 
-	remove(id, v)
+	remove(ruleID, version)
 }
