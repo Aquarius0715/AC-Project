@@ -6,8 +6,8 @@ import (
 )
 
 func TestChanges(t *testing.T) {
-	s := func(v string) *string { return &v }
-	b, a := Changes(
+	strPtr := func(v string) *string { return &v }
+	before, after := Changes(
 		map[string]any{
 			"name":  "Old",
 			"modes": []string{"cool"},
@@ -25,20 +25,20 @@ func TestChanges(t *testing.T) {
 	)
 
 	want := map[string][2]*string{
-		"name":  {s("Old"), s("New")},
-		"modes": {s(`["cool"]`), s(`["cool","dry"]`)},
-		"gone":  {s("x"), nil},
-		"added": {nil, s("true")},
+		"name":  {strPtr("Old"), strPtr("New")},
+		"modes": {strPtr(`["cool"]`), strPtr(`["cool","dry"]`)},
+		"gone":  {strPtr("x"), nil},
+		"added": {nil, strPtr("true")},
 	}
-	if len(b) != len(want) || len(a) != len(want) {
-		t.Fatalf("changed keys: before %v after %v", b, a)
+	if len(before) != len(want) || len(after) != len(want) {
+		t.Fatalf("changed keys: before %v after %v", before, after)
 	}
 
 	for k, w := range want {
-		if (b[k] == nil) != (w[0] == nil) || (b[k] != nil && *b[k] != *w[0]) ||
-			(a[k] == nil) != (w[1] == nil) ||
-			(a[k] != nil && *a[k] != *w[1]) {
-			t.Errorf("%s: %v → %v", k, b[k], a[k])
+		if (before[k] == nil) != (w[0] == nil) || (before[k] != nil && *before[k] != *w[0]) ||
+			(after[k] == nil) != (w[1] == nil) ||
+			(after[k] != nil && *after[k] != *w[1]) {
+			t.Errorf("%s: %v → %v", k, before[k], after[k])
 		}
 	}
 
@@ -46,12 +46,12 @@ func TestChanges(t *testing.T) {
 		t.Error("no change")
 	}
 
-	b, a = Changes(
+	before, after = Changes(
 		map[string]any{"when": time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)},
 		map[string]any{"when": time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)},
 	)
-	if *b["when"] != "2026-09-01T00:00:00Z" || *a["when"] != "2026-09-02T00:00:00Z" {
-		t.Errorf("times are shown without quotes: %v → %v", *b["when"], *a["when"])
+	if *before["when"] != "2026-09-01T00:00:00Z" || *after["when"] != "2026-09-02T00:00:00Z" {
+		t.Errorf("times are shown without quotes: %v → %v", *before["when"], *after["when"])
 	}
 
 	kl := time.FixedZone("MYT", 8*3600)
@@ -77,20 +77,20 @@ func TestChanges(t *testing.T) {
 }
 
 func TestMasked(t *testing.T) {
-	s := func(v string) *string { return &v }
+	strPtr := func(v string) *string { return &v }
 
-	m := Masked(
+	masked := Masked(
 		map[string]*string{
-			"contactPhone": s("+60 12"),
-			"Email":        s("a@b"),
-			"name":         s("Ali"),
+			"contactPhone": strPtr("+60 12"),
+			"Email":        strPtr("a@b"),
+			"name":         strPtr("Ali"),
 			"apiToken":     nil,
 		},
 	)
-	if *m["contactPhone"] != "***masked***" || *m["Email"] != "***masked***" ||
-		*m["name"] != "Ali" ||
-		m["apiToken"] != nil {
-		t.Fatalf("masked: %v", m)
+	if *masked["contactPhone"] != "***masked***" || *masked["Email"] != "***masked***" ||
+		*masked["name"] != "Ali" ||
+		masked["apiToken"] != nil {
+		t.Fatalf("masked: %v", masked)
 	}
 
 	if Masked(nil) != nil {

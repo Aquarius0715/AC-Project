@@ -1,6 +1,7 @@
 package ops
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 )
@@ -25,21 +26,42 @@ var Domains = []string{
 	DomainEnergy,
 }
 
-// moduleDomain maps operation-catalog modules to their owning domain.
-var moduleDomain = map[string]string{
-	"Identity & access":   DomainIdentity,
-	"Notifications":       DomainIdentity,
-	"Audit":               DomainIdentity,
-	"Demo":                DomainEquipment, // demo.trigger simulates device events (IR185)
-	"Assets":              DomainEquipment,
-	"Devices":             DomainEquipment,
-	"Control":             DomainEquipment,
-	"Monitoring & alerts": DomainEquipment,
-	"Read models":         DomainEquipment,
-	"Maintenance":         DomainMaintenance,
-	"Billing":             DomainBilling,
-	"Restrictions":        DomainBilling,
-	"Energy & carbon":     DomainEnergy,
+// The modules of operation-catalog.csv (its module column).
+const (
+	moduleIdentity      = "Identity & access"
+	moduleNotifications = "Notifications"
+	moduleAudit         = "Audit"
+	moduleDemo          = "Demo"
+	moduleAssets        = "Assets"
+	moduleDevices       = "Devices"
+	moduleControl       = "Control"
+	moduleMonitoring    = "Monitoring & alerts"
+	moduleReadModels    = "Read models"
+	moduleMaintenance   = "Maintenance"
+	moduleBilling       = "Billing"
+	moduleRestrictions  = "Restrictions"
+	moduleEnergy        = "Energy & carbon"
+)
+
+var errModulesWithoutDomain = errors.New("ops: catalog modules without a domain")
+
+// moduleDomain returns the domain that owns an operation-catalog module ("" for an unknown module).
+func moduleDomain(module string) string {
+	switch module {
+	case moduleIdentity, moduleNotifications, moduleAudit:
+		return DomainIdentity
+	case moduleDemo, // demo.trigger simulates device events (IR185)
+		moduleAssets, moduleDevices, moduleControl, moduleMonitoring, moduleReadModels:
+		return DomainEquipment
+	case moduleMaintenance:
+		return DomainMaintenance
+	case moduleBilling, moduleRestrictions:
+		return DomainBilling
+	case moduleEnergy:
+		return DomainEnergy
+	}
+
+	return ""
 }
 
 // DomainOf returns the domain that owns an operation ("" for an unknown operation).
@@ -49,7 +71,7 @@ func DomainOf(operation string) string {
 		return ""
 	}
 
-	return moduleDomain[s.Module]
+	return moduleDomain(s.Module)
 }
 
 // CheckDomains verifies that every catalog module belongs to exactly one known domain (used by tests and start-up).
@@ -62,7 +84,7 @@ func CheckDomains() error {
 	var missing []string
 
 	for _, s := range SpecByName() {
-		if !known[moduleDomain[s.Module]] {
+		if !known[moduleDomain(s.Module)] {
 			missing = append(missing, s.Module)
 		}
 	}
@@ -70,7 +92,7 @@ func CheckDomains() error {
 	if len(missing) > 0 {
 		sort.Strings(missing)
 
-		return fmt.Errorf("ops: catalog modules without a domain: %v", missing)
+		return fmt.Errorf("%w: %v", errModulesWithoutDomain, missing)
 	}
 
 	return nil

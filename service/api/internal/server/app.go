@@ -171,7 +171,7 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 	identity.Register(reg)
 	identity.RegisterMembers(reg)
 
-	am := &assets.Module{
+	assetsModule := &assets.Module{
 		Mon: monitorReads{
 			alerts:    monitoring.Alerts{Units: nil, Access: nil, Devices: nil},
 			telemetry: monitoring.Telemetry{Sensors: devices.Models{}, Units: nil},
@@ -197,54 +197,58 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 		OrgActive: []assets.OrgActivity{billing.Usage{}, maintenance.Usage{}},
 		Details:   nil,
 	}
-	am.Details = unitDetails{}
-	assets.Register(reg, am)
+	assetsModule.Details = unitDetails{}
+	assets.Register(reg, assetsModule)
 	// IR340: warranty reminders to HQ (BR-A19)
-	reg.AddJob(ops.DomainEquipment, am.RemindWarranties)
-	eq := equipmentView{
-		am:     am,
+	reg.AddJob(ops.DomainEquipment, assetsModule.RemindWarranties)
+	equipment := equipmentView{
+		am:     assetsModule,
 		alerts: monitoring.Alerts{Units: nil, Access: nil, Devices: nil},
 		tel:    monitoring.Telemetry{Sensors: devices.Models{}, Units: nil},
 		models: devices.Models{},
 	} // other domains' view (IR193)
-	devices.Register(reg, devices.Capabilities{Units: am})
+	devices.Register(reg, devices.Capabilities{Units: assetsModule})
 	devices.RegisterQueries(
 		reg,
 	) // internal: a device's open connection fault for the IoT gateway (IR532 system query)
 	monitoring.RegisterAlerts(
 		reg,
-		monitoring.Alerts{Units: am, Access: maintenance.Access{}, Devices: deviceRecoveries{}},
+		monitoring.Alerts{
+			Units:   assetsModule,
+			Access:  maintenance.Access{},
+			Devices: deviceRecoveries{},
+		},
 	)
 
 	blobs := blob.NewDirFromEnv()
 	jobs := maintenance.Jobs{
-		Units:    eq,
-		Severity: eq,
+		Units:    equipment,
+		Severity: equipment,
 		HQOrg:    func(c *ops.Call) uuid.UUID { return c.Principal.OrgID },
-		Sites:    eq,
+		Sites:    equipment,
 		Blobs:    blobs,
 	}
 	maintenance.RegisterJobs(reg, jobs)
 	maintenance.RegisterOnSite(reg, maintenance.OnSite{Jobs: jobs, Access: maintenance.Access{}})
-	reports := maintenance.Reports{Jobs: jobs, Units: eq, Access: maintenance.Access{}}
+	reports := maintenance.Reports{Jobs: jobs, Units: equipment, Access: maintenance.Access{}}
 	maintenance.RegisterFollowUps(
 		reg,
-		maintenance.FollowUps{Jobs: jobs, Blobs: blobs, Warranty: eq},
+		maintenance.FollowUps{Jobs: jobs, Blobs: blobs, Warranty: equipment},
 	)
 	maintenance.RegisterReports(reg, reports)
 	maintenance.RegisterPlans(reg, maintenance.Plans{Jobs: jobs})
 	maintenance.RegisterPartners(
 		reg,
-		maintenance.Partners{Orgs: identity.Directory{}, Customers: eq},
+		maintenance.Partners{Orgs: identity.Directory{}, Customers: equipment},
 	)
 	maintenance.RegisterFiles(reg, maintenance.Files{Reports: reports, Blobs: blobs})
 
-	delivery := maintenance.Delivery{Jobs: jobs, Directory: identity.Directory{}, Units: eq}
+	delivery := maintenance.Delivery{Jobs: jobs, Directory: identity.Directory{}, Units: equipment}
 	maintenance.RegisterDelivery(reg, delivery)
 	maintenance.RegisterProposals(reg, maintenance.Proposals{Delivery: delivery})
 
 	cmds := control.Commands{
-		Units:        controlTargets{am},
+		Units:        controlTargets{assetsModule},
 		Devices:      devices.Models{},
 		Restrictions: restrictions.Busy{},
 		Access:       maintenance.Access{},
@@ -255,7 +259,7 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 	) // internal: the commands the IoT gateway sends (IR195 system query)
 
 	automations := control.Automations{
-		Units:    controlTargets{am},
+		Units:    controlTargets{assetsModule},
 		Cmd:      cmds,
 		Notifier: monitoring.Notifier{Notify: notify.Store{}},
 	}
@@ -279,10 +283,10 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 		maintenance.QrAccess{},
 	) // an Assets operation; maintenance answers the assignment (IR194)
 	energy.Register(reg)
-	voice.Register(reg, voice.Voice{Units: am})
+	voice.Register(reg, voice.Voice{Units: assetsModule})
 	energy.RegisterMRV(reg)
 	energy.RegisterOffsets(reg)
-	sums := summaries.Summaries{Units: am, Registry: reg}
+	sums := summaries.Summaries{Units: assetsModule, Registry: reg}
 	maintenance.RegisterQueries(reg, jobs) // internal queries of the read models (IR190)
 	billing.RegisterQueries(reg)
 	energy.RegisterQueries(reg)
@@ -293,30 +297,34 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 	summaries.RegisterAdmin(reg, sums)
 	notify.Register(reg)
 
-	rm := restrictions.Restrictions{Units: eq, Devices: eq, Notify: notify.Store{}}
-	restrictions.Register(reg, rm)
+	restrictionsModule := restrictions.Restrictions{
+		Units:   equipment,
+		Devices: equipment,
+		Notify:  notify.Store{},
+	}
+	restrictions.Register(reg, restrictionsModule)
 	bill := billing.Billing{
-		Customers:    eq,
+		Customers:    equipment,
 		Restrictions: restrictions.Busy{},
 		Recipients:   identity.Directory{},
-		Releases:     rm, Notify: notify.Store{},
+		Releases:     restrictionsModule, Notify: notify.Store{},
 	}
 	billing.Register(reg, bill)
 	billing.RegisterPayments(reg, bill)
 	billing.RegisterInquiries(reg, bill)
 	audit.Register(reg)
 
-	mv := maintenanceView{src: maintenance.PayoutSource{Jobs: jobs}}
-	payouts := billing.Payouts{Source: mv}
+	maintenanceReads := maintenanceView{src: maintenance.PayoutSource{Jobs: jobs}}
+	payouts := billing.Payouts{Source: maintenanceReads}
 	billing.RegisterPayouts(reg, payouts)
 	reg.AddJob(
 		ops.DomainBilling,
 		payouts.GenerateMonthly,
 	) // IR341: the payout drafts of the month that ended, on the 1st (BR-A23)
-	registerCrossDomain(reg, eq, mv)
+	registerCrossDomain(reg, equipment, maintenanceReads)
 	maintenance.RegisterWorkforce(reg, maintenance.Workforce{Delivery: delivery})
 
-	filters := maintenance.FilterCare{Units: eq, Run: eq}
+	filters := maintenance.FilterCare{Units: equipment, Run: equipment}
 	maintenance.RegisterFilterCare(reg, filters)
 	reg.AddJob(
 		ops.DomainMaintenance,
@@ -337,13 +345,20 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 		ops.DomainMaintenance,
 		jobs.ReleaseEndedAccess,
 	) // IR439: a technician whose access ends before the visit is released (OPEN-BE-09)
-	monitoring.RegisterTelemetry(reg, monitoring.Telemetry{Units: am, Sensors: devices.Models{}})
+	monitoring.RegisterTelemetry(
+		reg,
+		monitoring.Telemetry{Units: assetsModule, Sensors: devices.Models{}},
+	)
 	monitoring.RegisterPolicies(
 		reg,
-		monitoring.Policies{Units: am, Recipients: identity.Directory{}, Caps: unitCaps{am}},
+		monitoring.Policies{
+			Units:      assetsModule,
+			Recipients: identity.Directory{},
+			Caps:       unitCaps{assetsModule},
+		},
 	)
 	module := &devices.Module{
-		Units: am,
+		Units: assetsModule,
 		Exclusion: []devices.Exclusion{
 			control.Busy{},
 			restrictions.Busy{},
@@ -398,13 +413,13 @@ func New(ctx context.Context, cfg Config, verifier auth.Verifier) (*Server, erro
 			Token:   cfg.InternalToken,
 			Client:  nil,
 		}
-		for d, raw := range cfg.ServiceURLs {
+		for domain, raw := range cfg.ServiceURLs {
 			u, err := url.Parse(raw)
 			if err != nil || u.Scheme == "" || u.Host == "" {
-				return nil, fmt.Errorf("server: service URL of %s is not absolute", d)
+				return nil, fmt.Errorf("server: service URL of %s is not absolute", domain)
 			}
 
-			httpQueries.Targets[d] = u
+			httpQueries.Targets[domain] = u
 		}
 
 		reg.Remote = httpQueries
@@ -552,7 +567,7 @@ func (t controlTargets) Target(
 		return control.Target{}, false, apperr.Wrap(err, "assets.Module.UnitInfo")
 	}
 
-	v, err := t.am.UnitVersion(ctx, call, unit)
+	version, err := t.am.UnitVersion(ctx, call, unit)
 	if err != nil {
 		return control.Target{}, false, apperr.Wrap(err, "assets.Module.UnitVersion")
 	}
@@ -562,7 +577,7 @@ func (t controlTargets) Target(
 	return control.Target{
 		OrgID:      info.OrgID,
 		PropertyID: info.PropertyID,
-		Version:    v,
+		Version:    version,
 		Caps:       caps,
 	}, true, apperr.Wrap(err, "devices.Models.Caps")
 }

@@ -28,8 +28,8 @@ type Targets map[string]*url.URL
 func TargetsFromEnv(getenv func(string) string) (Targets, error) {
 	targets := Targets{}
 
-	for _, d := range ops.Domains {
-		key := envKey(d)
+	for _, domain := range ops.Domains {
+		key := envKey(domain)
 
 		raw := getenv(key)
 		if raw == "" {
@@ -41,7 +41,7 @@ func TargetsFromEnv(getenv func(string) string) (Targets, error) {
 			return nil, fmt.Errorf("gateway: %s is not an absolute URL", key)
 		}
 
-		targets[d] = u
+		targets[domain] = u
 	}
 
 	return targets, nil
@@ -107,7 +107,7 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 
 	proxies := map[string]*httputil.ReverseProxy{}
 
-	for d, u := range targets {
+	for domain, u := range targets {
 		reverseProxy := httputil.NewSingleHostReverseProxy(u)
 		// set field by field: a literal would have to name every field, Dial and DialTLS too, which are deprecated
 		transport := new(http.Transport)
@@ -124,7 +124,7 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 			return nil
 		}
 		reverseProxy.ErrorHandler = func(writer http.ResponseWriter, r *http.Request, err error) {
-			app.Logger.Error("upstream failed", "domain", d, "error", err)
+			app.Logger.Error("upstream failed", "domain", domain, "error", err)
 
 			domainErr := apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 			domainErr.CorrelationID = writer.Header().Get(echo.HeaderXRequestID)
@@ -138,7 +138,7 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 				domainErr.CorrelationID,
 			)
 		}
-		proxies[d] = reverseProxy
+		proxies[domain] = reverseProxy
 	}
 
 	app.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
@@ -158,13 +158,16 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 	return app
 }
 
-func forward(c *echo.Context, reverseProxy *httputil.ReverseProxy) error {
+func forward(ectx *echo.Context, reverseProxy *httputil.ReverseProxy) error {
 	if reverseProxy == nil {
 		return apperr.E(apperr.NotFound, apperr.KeyUnknownOperation)
 	}
 	// the services keep the correlation ID: forward the one this request got
-	c.Request().Header.Set(echo.HeaderXRequestID, c.Response().Header().Get(echo.HeaderXRequestID))
-	reverseProxy.ServeHTTP(c.Response(), c.Request())
+	ectx.Request().Header.Set(
+		echo.HeaderXRequestID,
+		ectx.Response().Header().Get(echo.HeaderXRequestID),
+	)
+	reverseProxy.ServeHTTP(ectx.Response(), ectx.Request())
 
 	return nil
 }

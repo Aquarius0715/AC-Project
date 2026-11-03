@@ -75,7 +75,7 @@ func TestServesTheAPIDescription(t *testing.T) {
 
 	for _, spec := range ops.Catalog {
 		for _, route := range spec.Routes {
-			p, ok := doc.Paths[route.Path][strings.ToLower(route.Method)]
+			operation, ok := doc.Paths[route.Path][strings.ToLower(route.Method)]
 			if !ok {
 				t.Errorf(
 					"%s %s (%s) is not documented (run make swagger)",
@@ -89,18 +89,19 @@ func TestServesTheAPIDescription(t *testing.T) {
 
 			documented++
 
-			if p.OperationID != spec.Name && !strings.HasPrefix(p.OperationID, spec.Name+".") {
+			if operation.OperationID != spec.Name &&
+				!strings.HasPrefix(operation.OperationID, spec.Name+".") {
 				t.Errorf(
 					"%s %s: operationId %s for %s",
 					route.Method,
 					route.Path,
-					p.OperationID,
+					operation.OperationID,
 					spec.Name,
 				)
 			}
 
 			idem, path := false, map[string]bool{}
-			for _, x := range p.Parameters {
+			for _, x := range operation.Parameters {
 				idem = idem || (x.Name == "Idempotency-Key" && x.In == "header")
 				if x.In == "path" {
 					path[x.Name] = true
@@ -128,7 +129,7 @@ func TestServesTheAPIDescription(t *testing.T) {
 			}
 
 			for _, code := range []string{"200", "401", "403", "404", "409", "422"} {
-				if _, ok := p.Responses[code]; !ok {
+				if _, ok := operation.Responses[code]; !ok {
 					t.Errorf("%s: response %s missing", spec.Name, code)
 				}
 			}

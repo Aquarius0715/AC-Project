@@ -51,9 +51,9 @@ func newEcho(
 		LogRequestID: true,
 		LogLatency:   true,
 		HandleError:  true,
-		LogValuesFunc: func(ectx *echo.Context, v middleware.RequestLoggerValues) error {
+		LogValuesFunc: func(ectx *echo.Context, values middleware.RequestLoggerValues) error {
 			level := slog.LevelInfo
-			if v.Status >= http.StatusInternalServerError {
+			if values.Status >= http.StatusInternalServerError {
 				level = slog.LevelError
 			}
 
@@ -61,14 +61,14 @@ func newEcho(
 				ectx.Request().Context(),
 				level,
 				"request",
-				slog.String("method", v.Method),
-				slog.String("uri", v.URI),
+				slog.String("method", values.Method),
+				slog.String("uri", values.URI),
 				slog.Int(
 					"status",
-					v.Status,
+					values.Status,
 				),
-				slog.String("request_id", v.RequestID),
-				slog.Duration("latency", v.Latency),
+				slog.String("request_id", values.RequestID),
+				slog.Duration("latency", values.Latency),
 			)
 
 			return nil

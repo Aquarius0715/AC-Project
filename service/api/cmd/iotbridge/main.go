@@ -97,7 +97,7 @@ func main() {
 	var live *liveControl
 
 	if url := os.Getenv("REAL_MQTT_URL"); url != "" {
-		lc := listenLive(
+		liveClient := listenLive(
 			ctx,
 			url,
 			envOr("REAL_MQTT_TOPIC", "smarthome/ac/#"),
@@ -106,10 +106,10 @@ func main() {
 			endpoint,
 			liveAPI{equipment: *equipment, token: internalToken(), tenant: *tenant},
 		)
-		defer lc.Disconnect(500)
+		defer liveClient.Disconnect(500)
 
 		live = newLiveControl(
-			lc,
+			liveClient,
 			envOr("REAL_MQTT_COMMAND_NODE", iotbridge.LiveCommandNode),
 			os.Getenv("REAL_MQTT_COMMANDS") == "1",
 		)
@@ -202,14 +202,14 @@ func subscribeDemo(
 			return
 		}
 
-		trigger, ok, err := iotbridge.CommandTrigger(ack, time.Now().Add(clock.offset()))
+		trigger, forward, err := iotbridge.CommandTrigger(ack, time.Now().Add(clock.offset()))
 		if err != nil {
 			log.Printf("ack from %s: %v", ack.DeviceID, err)
 
 			return
 		}
 
-		if !ok {
+		if !forward {
 			log.Printf(
 				"ack %s: %s, not forwarded (the backend decides a late acknowledgement)",
 				ack.CommandID,
@@ -335,7 +335,7 @@ func listenLive(
 }
 
 // send posts one trigger. The event ID is the idempotency key: the API answers a repeat with the original receipt.
-func send(c *http.Client, endpoint string, trigger iotbridge.Trigger) error {
+func send(client *http.Client, endpoint string, trigger iotbridge.Trigger) error {
 	body, err := json.Marshal(trigger)
 	if err != nil {
 		return apperr.Wrap(err, "json.Marshal")
@@ -349,7 +349,7 @@ func send(c *http.Client, endpoint string, trigger iotbridge.Trigger) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", trigger.EventID.String())
 
-	resp, err := c.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return apperr.Wrap(err, "http.Client.Do")
 	}
@@ -473,16 +473,16 @@ func pollCommands(
 
 			rep.OK("requested commands")
 
-			for _, w := range waiting {
+			for _, command := range waiting {
 				var err error
-				if live != nil && w.DeviceID == live.device {
-					err = live.send(httpc, endpoint, w, clock.offset())
+				if live != nil && command.DeviceID == live.device {
+					err = live.send(httpc, endpoint, command, clock.offset())
 				} else {
-					err = sendCommand(client, httpc, endpoint, tenant, w, clock.offset())
+					err = sendCommand(client, httpc, endpoint, tenant, command, clock.offset())
 				}
 
 				if err != nil {
-					log.Printf("command %s: %v", w.ID, err)
+					log.Printf("command %s: %v", command.ID, err)
 				}
 			}
 		}
@@ -713,13 +713,13 @@ func (l *liveControl) send(
 	waiting iotbridge.Waiting,
 	off time.Duration,
 ) error {
-	payload, state, ok, err := iotbridge.LiveCommand(waiting.Action)
+	payload, state, supported, err := iotbridge.LiveCommand(waiting.Action)
 	if err != nil {
 		return apperr.Wrap(err, "iotbridge.LiveCommand")
 	}
 
 	when := time.Now().Add(off)
-	if !ok || !l.enabled {
+	if !supported || !l.enabled {
 		return send(httpc, endpoint, iotbridge.LiveRefusedTrigger(waiting, when))
 	}
 

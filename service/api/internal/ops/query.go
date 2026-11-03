@@ -46,7 +46,7 @@ const BusinessNowHeader = "X-Business-Now"
 func RegisterQuery[I any, O any](
 	reg *Registry,
 	domain, name string,
-	h func(context.Context, *Call, *I) (O, error),
+	handler func(context.Context, *Call, *I) (O, error),
 ) {
 	if reg.queries == nil {
 		reg.queries = map[string]query{}
@@ -68,7 +68,7 @@ func RegisterQuery[I any, O any](
 				}
 			}
 
-			return h(ctx, call, input)
+			return handler(ctx, call, input)
 		},
 	}
 }
@@ -97,13 +97,13 @@ func Query[O any](ctx context.Context, c *Call, name string, in any) (O, error) 
 }
 
 // Ask runs the internal query name for the caller and decodes its result.
-func Ask[O any](ctx context.Context, reg *Registry, c *Call, name string, in any) (O, error) {
+func Ask[O any](ctx context.Context, reg *Registry, call *Call, name string, in any) (O, error) {
 	var out O
 	if reg == nil {
 		return out, fmt.Errorf("ops: query %s outside a request", name)
 	}
 
-	q, ok := reg.queries[name]
+	registered, ok := reg.queries[name]
 	if !ok {
 		return out, fmt.Errorf("ops: unknown query %s", name)
 	}
@@ -114,8 +114,8 @@ func Ask[O any](ctx context.Context, reg *Registry, c *Call, name string, in any
 	}
 
 	var res any
-	if reg.domains == nil || reg.domains[q.domain] {
-		res, err = q.handle(ctx, c, raw)
+	if reg.domains == nil || reg.domains[registered.domain] {
+		res, err = registered.handle(ctx, call, raw)
 		if err != nil {
 			return out, err
 		}
@@ -136,7 +136,7 @@ func Ask[O any](ctx context.Context, reg *Registry, c *Call, name string, in any
 		return out, apperr.E(apperr.Unavailable, apperr.KeyUnavailable)
 	}
 
-	body, err := reg.Remote.Query(ctx, c, q.domain, name, raw)
+	body, err := reg.Remote.Query(ctx, call, registered.domain, name, raw)
 	if err != nil {
 		return out, apperr.Wrap(err, "ops.QueryTransport.Query")
 	}
@@ -295,7 +295,12 @@ func (r *Registry) ServeSystemQuery(token string) echo.HandlerFunc {
 	}
 }
 
-func (r *Registry) serveQuery(ectx *echo.Context, token string, p *Principal, bearer string) error {
+func (r *Registry) serveQuery(
+	ectx *echo.Context,
+	token string,
+	principal *Principal,
+	bearer string,
+) error {
 	if token == "" ||
 		subtle.ConstantTimeCompare(
 			[]byte(ectx.Request().Header.Get(InternalTokenHeader)),
@@ -306,8 +311,8 @@ func (r *Registry) serveQuery(ectx *echo.Context, token string, p *Principal, be
 
 	name := ectx.Param("query")
 
-	q, ok := r.queries[name]
-	if !ok || (r.domains != nil && !r.domains[q.domain]) {
+	registered, ok := r.queries[name]
+	if !ok || (r.domains != nil && !r.domains[registered.domain]) {
 		return apperr.E(apperr.NotFound, apperr.KeyUnknownOperation)
 	}
 
@@ -329,7 +334,7 @@ func (r *Registry) serveQuery(ectx *echo.Context, token string, p *Principal, be
 	}
 
 	call := &Call{
-		Principal:     p,
+		Principal:     principal,
 		Now:           now,
 		CorrelationID: ectx.Response().Header().Get(echo.HeaderXRequestID),
 		Bearer:        bearer,
@@ -341,7 +346,7 @@ func (r *Registry) serveQuery(ectx *echo.Context, token string, p *Principal, be
 
 	var out any
 
-	err = r.DB.Run(ctx, true, p, func(tx pgx.Tx) error {
+	err = r.DB.Run(ctx, true, principal, func(tx pgx.Tx) error {
 		call.Tx = r.txFor(tx)
 
 		_, err := tx.Exec(
@@ -355,7 +360,7 @@ func (r *Registry) serveQuery(ectx *echo.Context, token string, p *Principal, be
 
 		var herr error
 
-		out, herr = q.handle(ctx, call, raw)
+		out, herr = registered.handle(ctx, call, raw)
 
 		return herr
 	})

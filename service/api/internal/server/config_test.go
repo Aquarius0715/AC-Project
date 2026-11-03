@@ -41,8 +41,8 @@ func TestConfigFromEnv(t *testing.T) {
 
 	cfg, err = ConfigFromEnv(nil, nil)
 
-	w, ok := cfg.WriteLimit.(*ratelimit.Window)
-	if err != nil || !ok || w.Limit != 60 || w.Window != time.Minute ||
+	window, matched := cfg.WriteLimit.(*ratelimit.Window)
+	if err != nil || !matched || window.Limit != 60 || window.Window != time.Minute ||
 		cfg.ServiceURLs["energy"] != "http://energy-api:8080" ||
 		cfg.Addr != ":9090" {
 		t.Fatalf("limit on: %+v %v", cfg, err)
@@ -95,8 +95,8 @@ func TestConfigFromEnv(t *testing.T) {
 
 	cfg, err = ConfigFromEnv(nil, []string{"identity"})
 
-	k, ok := cfg.IdentityProvider.(*idp.Keycloak)
-	if err != nil || !ok || k.AdminURL != "http://idp.test/admin/realms/ac" ||
+	k, matched := cfg.IdentityProvider.(*idp.Keycloak)
+	if err != nil || !matched || k.AdminURL != "http://idp.test/admin/realms/ac" ||
 		k.ClientID != "svc" ||
 		k.ClientSecret != "test-secret" {
 		t.Fatalf("identity provider: %+v %v", cfg.IdentityProvider, err)

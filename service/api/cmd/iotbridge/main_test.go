@@ -18,7 +18,7 @@ import (
 // TestFetchWaitingReadsTheRequestedCommands: the internal query is called with the token and the tenant, and its rows
 // come back as the waiting commands; a refused token, a bad answer and a dead API are errors.
 func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
-	id := uuid.New()
+	commandID := uuid.New()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/internal/v1/system/queries/control.requestedCommands" ||
@@ -34,7 +34,7 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 				map[string]any{
 					"data": []map[string]any{
 						{
-							"id":        id,
+							"id":        commandID,
 							"deviceId":  uuid.New(),
 							"unitId":    uuid.New(),
 							"action":    map[string]any{"kind": "set_temperature", "celsius": 26},
@@ -48,7 +48,7 @@ func TestFetchWaitingReadsTheRequestedCommands(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil}
 
 	got, err := fetchWaiting(client, srv.URL, "tok", "t1")
-	if err != nil || len(got) != 1 || got[0].ID != id {
+	if err != nil || len(got) != 1 || got[0].ID != commandID {
 		t.Fatalf("waiting: %v %v", got, err)
 	}
 
@@ -92,21 +92,21 @@ func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d := &demoClock{
+	clock := &demoClock{
 		api: srv.URL,
 		c:   &http.Client{Timeout: 5 * time.Second, Transport: nil, CheckRedirect: nil, Jar: nil},
 		mu:  sync.Mutex{},
 		off: 0,
 	}
 
-	err := d.refresh()
+	err := clock.refresh()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	want := time.Until(scenario)
-	if diff := d.offset() - want; diff > time.Minute || diff < -time.Minute {
-		t.Errorf("offset %v, want about %v", d.offset(), want)
+	if diff := clock.offset() - want; diff > time.Minute || diff < -time.Minute {
+		t.Errorf("offset %v, want about %v", clock.offset(), want)
 	}
 
 	empty := httptest.NewServer(
@@ -116,16 +116,16 @@ func TestDemoClockFollowsTheScenarioClock(t *testing.T) {
 	)
 	defer empty.Close()
 
-	keep := d.offset()
+	keep := clock.offset()
 
-	d.api = empty.URL
+	clock.api = empty.URL
 
-	err = d.refresh()
+	err = clock.refresh()
 	if err == nil {
 		t.Error("an answer without a snapshot time is accepted")
 	}
 
-	if d.offset() != keep {
+	if clock.offset() != keep {
 		t.Error("a failed refresh changed the offset")
 	}
 }

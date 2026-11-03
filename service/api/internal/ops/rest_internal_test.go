@@ -119,7 +119,7 @@ func bind(
 }
 
 func TestRESTParameters(t *testing.T) {
-	b, err := NewBinding(
+	jobBinding, err := NewBinding(
 		restOp(Read, func() any { return new(restIn) }),
 		Route{Method: "GET", Path: "/v1/jobs/{jobId}/things", FixedField: "", FixedValue: ""},
 	)
@@ -266,16 +266,16 @@ func TestRESTParameters(t *testing.T) {
 	}
 	got := map[string]Param{}
 
-	for name, p := range b.Params {
+	for name, p := range jobBinding.Params {
 		p.Role, p.Order = "", 0
 		got[name] = p
 	}
 
-	if b.Params["status"].Role != "filter" || b.Params["sort"].Role != "sort" ||
-		b.Params["count"].Role != "field" ||
-		b.Params["jobId"].Order != 0 ||
-		b.Params["overdueOnly"].Order <= b.Params["sort"].Order {
-		t.Fatalf("roles and order: %+v", b.Params)
+	if jobBinding.Params["status"].Role != "filter" || jobBinding.Params["sort"].Role != "sort" ||
+		jobBinding.Params["count"].Role != "field" ||
+		jobBinding.Params["jobId"].Order != 0 ||
+		jobBinding.Params["overdueOnly"].Order <= jobBinding.Params["sort"].Order {
+		t.Fatalf("roles and order: %+v", jobBinding.Params)
 	}
 
 	if !reflect.DeepEqual(
@@ -285,8 +285,8 @@ func TestRESTParameters(t *testing.T) {
 		t.Fatalf("params\n got %+v\nwant %+v", got, want)
 	}
 
-	if !reflect.DeepEqual(b.Path, []string{"jobId"}) || b.Body {
-		t.Fatalf("path %v body %v", b.Path, b.Body)
+	if !reflect.DeepEqual(jobBinding.Path, []string{"jobId"}) || jobBinding.Body {
+		t.Fatalf("path %v body %v", jobBinding.Path, jobBinding.Body)
 	}
 	// a list read whose input is the paging query itself
 	binding, err := NewBinding(
@@ -313,14 +313,14 @@ func TestRESTQueryInput(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	job, u1, u2 := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	job, firstID, secondID := uuid.NewString(), uuid.NewString(), uuid.NewString()
 	params := url.Values{
 		"count": {
 			"3",
 		},
 		"ratio":       {"1.50"},
 		"on":          {"true"},
-		"ids":         {u1 + "," + u2, u1},
+		"ids":         {firstID + "," + secondID, firstID},
 		"target.kind": {"unit"},
 		"sort":        {"dueAt:desc"},
 		"limit": {
@@ -328,7 +328,7 @@ func TestRESTQueryInput(t *testing.T) {
 		},
 		"cursor":      {""},
 		"status":      {"open"},
-		"unitIds":     {u2},
+		"unitIds":     {secondID},
 		"overdueOnly": {"false"},
 	}
 
@@ -349,12 +349,16 @@ func TestRESTQueryInput(t *testing.T) {
 		"count":  3.0,
 		"ratio":  1.5,
 		"on":     true,
-		"ids":    []any{u1, u2, u1},
+		"ids":    []any{firstID, secondID, firstID},
 		"target": map[string]any{"kind": "unit"},
 		"query": map[string]any{
-			"sort":    map[string]any{"field": "dueAt", "direction": "desc"},
-			"limit":   10.0,
-			"filters": map[string]any{"status": "open", "unitIds": []any{u2}, "overdueOnly": false},
+			"sort":  map[string]any{"field": "dueAt", "direction": "desc"},
+			"limit": 10.0,
+			"filters": map[string]any{
+				"status":      "open",
+				"unitIds":     []any{secondID},
+				"overdueOnly": false,
+			},
 		},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -515,21 +519,21 @@ func TestRESTBodyInput(t *testing.T) {
 		}
 	}
 
-	if _, fe := bind(
+	if _, fieldErrs := bind(
 		t,
 		binding,
 		"POST",
 		"/?ratio=1",
 		`{}`,
 		path,
-	); fe["ratio"] != apperr.KeyNotAllowed {
-		t.Errorf("query on a body route: %v", fe)
+	); fieldErrs["ratio"] != apperr.KeyNotAllowed {
+		t.Errorf("query on a body route: %v", fieldErrs)
 	}
 }
 
 func TestRESTBindingRules(t *testing.T) {
 	input := func() any { return new(restIn) }
-	for name, c := range map[string]struct {
+	for name, testCase := range map[string]struct {
 		op *Operation
 		rt Route
 	}{
@@ -564,7 +568,7 @@ func TestRESTBindingRules(t *testing.T) {
 			Route{Method: "GET", Path: "/v1/x", FixedField: "", FixedValue: ""},
 		},
 	} {
-		_, err := NewBinding(c.op, c.rt)
+		_, err := NewBinding(testCase.op, testCase.rt)
 		if err == nil {
 			t.Errorf("%s: accepted", name)
 		}
@@ -860,21 +864,21 @@ func TestRESTRoutes(t *testing.T) {
 		t.Fatalf("reused key: %d", code)
 	}
 
-	for _, c := range []struct{ method, path string }{
+	for _, testCase := range []struct{ method, path string }{
 		{"GET", "/v1/nope"},
 		{"PATCH", "/v1/units/u1"},
 		{"GET", "/v1/units"},
 	} {
 		if code, _, body := call(
 			billing,
-			c.method,
-			c.path,
+			testCase.method,
+			testCase.path,
 			"",
 			"",
 			"",
 		); code != 404 ||
 			!strings.Contains(body, "NOT_FOUND") {
-			t.Errorf("%s %s: %d %s", c.method, c.path, code, body)
+			t.Errorf("%s %s: %d %s", testCase.method, testCase.path, code, body)
 		}
 	}
 }

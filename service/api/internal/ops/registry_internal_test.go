@@ -102,21 +102,21 @@ type out struct {
 func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 	t.Helper()
 
-	ro := new(bool)
+	readOnly := new(bool)
 	reg := NewRegistry()
-	reg.DB = fakeDB{readOnly: ro}
+	reg.DB = fakeDB{readOnly: readOnly}
 	rec := &fakeRec{n: 0, err: nil}
 	idem := &fakeIdem{stored: map[string]json.RawMessage{}, hash: map[string]string{}, aborted: 0}
 	reg.Rec, reg.Idem = rec, idem
 	reg.Clock = func() time.Time { return time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC) }
 	calls := 0
 
-	Register(reg, "units.save", func(ctx context.Context, call *Call, in *unitIn) (out, error) {
-		if in.Name == "boom" {
+	Register(reg, "units.save", func(ctx context.Context, call *Call, input *unitIn) (out, error) {
+		if input.Name == "boom" {
 			return out{}, errors.New("boom")
 		}
 
-		if in.Name == "conflict" {
+		if input.Name == "conflict" {
 			return out{}, apperr.E(apperr.Conflict, apperr.KeyVersionConflict)
 		}
 
@@ -139,7 +139,7 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 			},
 		)
 
-		return out{OK: true, Name: in.Name, Calls: calls}, nil
+		return out{OK: true, Name: input.Name, Calls: calls}, nil
 	})
 	Register(reg, "units.get", func(ctx context.Context, c *Call, in *struct {
 		ID string `json:"id"`
@@ -172,11 +172,11 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 		t.Fatal(err)
 	}
 
-	return reg, app, rec, idem, ro
+	return reg, app, rec, idem, readOnly
 }
 
 // do sends one operation call at its REST route (ClientRequest).
-func do(e *echo.Echo, principal *Principal, op, body, key string) *httptest.ResponseRecorder {
+func do(app *echo.Echo, principal *Principal, op, body, key string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(ClientRequest(op, body))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -189,7 +189,7 @@ func do(e *echo.Echo, principal *Principal, op, body, key string) *httptest.Resp
 	}
 
 	w := httptest.NewRecorder()
-	e.ServeHTTP(w, req)
+	app.ServeHTTP(w, req)
 
 	return w
 }
@@ -238,7 +238,7 @@ var (
 )
 
 func TestPipeline(t *testing.T) {
-	_, e, rec, idem, ro := setup(t)
+	_, app, rec, idem, ro := setup(t)
 
 	cases := []struct {
 		name, op, body, key string
@@ -290,7 +290,7 @@ func TestPipeline(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			w := do(e, c.p, c.op, c.body, c.key)
+			w := do(app, c.p, c.op, c.body, c.key)
 			if w.Code != c.status || errCode(t, w) != c.code {
 				t.Fatalf("got %d %s", w.Code, w.Body.String())
 			}
@@ -302,21 +302,30 @@ func TestPipeline(t *testing.T) {
 	}
 
 	// success + idempotent replay + key reuse with another body
-	w := do(e, admin, "units.save", `{"name":"a"}`, "key-0001")
-	if w.Code != 200 || !strings.Contains(w.Body.String(), `"calls":1`) {
-		t.Fatalf("save: %d %s", w.Code, w.Body.String())
+	saved := do(app, admin, "units.save", `{"name":"a"}`, "key-0001")
+	if saved.Code != 200 || !strings.Contains(saved.Body.String(), `"calls":1`) {
+		t.Fatalf("save: %d %s", saved.Code, saved.Body.String())
 	}
 
 	if *ro {
 		t.Fatal("writes must run read-write")
 	}
 
-	w2 := do(e, admin, "units.save", `{"name":"a"}`, "key-0001")
-	if w2.Body.String() != w.Body.String() {
+	w2 := do(app, admin, "units.save", `{"name":"a"}`, "key-0001")
+	if w2.Body.String() != saved.Body.String() {
 		t.Fatal("replay must return the stored response")
 	}
 
-	if w3 := do(e, admin, "units.save", `{"name":"b"}`, "key-0001"); errCode(t, w3) != "CONFLICT" {
+	if w3 := do(
+		app,
+		admin,
+		"units.save",
+		`{"name":"b"}`,
+		"key-0001",
+	); errCode(
+		t,
+		w3,
+	) != "CONFLICT" {
 		t.Fatal("reused key with another body must conflict")
 	}
 
@@ -324,9 +333,9 @@ func TestPipeline(t *testing.T) {
 		t.Fatalf("recorder runs once per successful write, got %d", rec.n)
 	}
 	// reads run read-only and do not need a key
-	w = do(e, client, "units.get", `{"id":"mine"}`, "")
-	if w.Code != 200 || !*ro {
-		t.Fatalf("read: %d %s ro=%v", w.Code, w.Body.String(), *ro)
+	saved = do(app, client, "units.get", `{"id":"mine"}`, "")
+	if saved.Code != 200 || !*ro {
+		t.Fatalf("read: %d %s ro=%v", saved.Code, saved.Body.String(), *ro)
 	}
 
 	var res struct {
@@ -334,13 +343,13 @@ func TestPipeline(t *testing.T) {
 		Meta map[string]any `json:"meta"`
 	}
 
-	_ = json.Unmarshal(w.Body.Bytes(), &res)
+	_ = json.Unmarshal(saved.Body.Bytes(), &res)
 	if res.Meta["operation"] != "units.get" || res.Meta["correlationId"] == "" {
 		t.Fatalf("meta: %v", res.Meta)
 	}
 	// an empty body counts as {}
 	if recorder := do(
-		e,
+		app,
 		admin,
 		"units.save",
 		``,
@@ -351,7 +360,7 @@ func TestPipeline(t *testing.T) {
 	}
 	// oversize body
 	if recorder := do(
-		e,
+		app,
 		admin,
 		"units.save",
 		`{"name":"`+strings.Repeat("x", 1<<20)+`"}`,
@@ -439,7 +448,7 @@ func TestCatalogShape(t *testing.T) {
 	}
 }
 
-func mustPanic(t *testing.T, f func()) {
+func mustPanic(t *testing.T, fn func()) {
 	t.Helper()
 
 	defer func() {
@@ -448,7 +457,7 @@ func mustPanic(t *testing.T, f func()) {
 		}
 	}()
 
-	f()
+	fn()
 }
 
 func TestExpectedVersionRules(t *testing.T) {
@@ -462,7 +471,7 @@ func TestExpectedVersionRules(t *testing.T) {
 		Routes:        nil,
 		Filters:       nil,
 	}
-	ev := Spec{
+	eventSpec := Spec{
 		Versions: []VersionRule{
 			{"event=request", "omit"},
 			{"event=retry|cancel", "required"},
@@ -491,9 +500,9 @@ func TestExpectedVersionRules(t *testing.T) {
 		{spec, `{"id":"x"}`, "0", "", 0},
 		{spec, `{"id":"x"}`, "-1", apperr.Validation, 0},
 		{spec, `{"id":"x"}`, "abc", apperr.Validation, 0},
-		{ev, `{"event":"retry"}`, "2", "", 2},
-		{ev, `{"event":"request"}`, "2", apperr.Validation, 0},
-		{ev, `{"event":"other"}`, "", "", 0},
+		{eventSpec, `{"event":"retry"}`, "2", "", 2},
+		{eventSpec, `{"event":"request"}`, "2", apperr.Validation, 0},
+		{eventSpec, `{"event":"other"}`, "", "", 0},
 		{
 			Spec{
 				Versions:      []VersionRule{{"all", "required"}},
@@ -527,15 +536,15 @@ func TestExpectedVersionRules(t *testing.T) {
 			0,
 		},
 	}
-	for i, c := range cases {
-		got, err := expectedVersion(c.s, []byte(c.body), c.header)
+	for i, testCase := range cases {
+		got, err := expectedVersion(testCase.s, []byte(testCase.body), testCase.header)
 
 		var code apperr.Code
 		if err != nil {
 			code = apperr.From(err).Code
 		}
 
-		if code != c.want || (c.v != 0 && (got == nil || *got != c.v)) {
+		if code != testCase.want || (testCase.v != 0 && (got == nil || *got != testCase.v)) {
 			t.Errorf("case %d: %v %v", i, got, err)
 		}
 	}
@@ -648,7 +657,7 @@ func TestDeniedTarget(t *testing.T) {
 		JobID         string `json:"jobId"`
 		ReportVersion int    `json:"reportVersion"`
 	}
-	for _, c := range []struct {
+	for _, testCase := range []struct {
 		op       string
 		in       any
 		kind, id string
@@ -663,8 +672,12 @@ func TestDeniedTarget(t *testing.T) {
 		{"spaces.save", map[string]any{"propertyId": a, "parentSpaceId": nil, "name": "2F"}, "property", a},
 		{"restrictions.override", map[string]any{}, "restriction", "—"},
 	} {
-		if kind, id := deniedTarget(c.op, c.in); kind != c.kind || id != c.id {
-			t.Errorf("%s: %s %s, want %s %s", c.op, kind, id, c.kind, c.id)
+		if kind, id := deniedTarget(
+			testCase.op,
+			testCase.in,
+		); kind != testCase.kind ||
+			id != testCase.id {
+			t.Errorf("%s: %s %s, want %s %s", testCase.op, kind, id, testCase.kind, testCase.id)
 		}
 	}
 }

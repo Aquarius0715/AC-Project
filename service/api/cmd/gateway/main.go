@@ -18,6 +18,9 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 )
 
+// gracefulTimeout is how long in-flight requests may finish after SIGTERM (ECS stopTimeout is 30 s).
+const gracefulTimeout = 25 * time.Second
+
 // main runs the gateway. The annotations are the API's general information for swag (make swagger).
 //
 //	@title						AC Project Core API
@@ -58,12 +61,7 @@ func main() {
 	}
 
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" { // container healthcheck subcommand
-		r, err := http.Get("http://127.0.0.1" + addr + "/healthz")
-		if err != nil || r.StatusCode != http.StatusOK {
-			os.Exit(1)
-		}
-
-		os.Exit(0)
+		os.Exit(healthcheck("http://127.0.0.1" + addr + "/healthz"))
 	}
 
 	logger := logging.New(os.Stdout, "gateway")
@@ -81,7 +79,7 @@ func main() {
 		Address:          addr,
 		HideBanner:       true,
 		HidePort:         true,
-		GracefulTimeout:  25 * time.Second,
+		GracefulTimeout:  gracefulTimeout,
 		CertFilesystem:   nil,
 		TLSConfig:        nil,
 		Listener:         nil,
@@ -99,4 +97,32 @@ func main() {
 		!errors.Is(startErr, http.ErrServerClosed) {
 		logger.Error("serve", "err", startErr)
 	}
+}
+
+// healthcheckTimeout bounds the container healthcheck's request (compose.yaml gives the healthcheck 3 s).
+const healthcheckTimeout = 3 * time.Second
+
+// healthcheck is the container healthcheck subcommand: it asks target (the process's own /healthz) and returns the
+// exit code, 0 when the answer is 200 OK.
+func healthcheck(target string) int {
+	ctx, cancel := context.WithTimeout(context.Background(), healthcheckTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		return 1
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 1
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+
+	return 0
 }

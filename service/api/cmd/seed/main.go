@@ -28,7 +28,7 @@ func main() {
 
 	ctx := context.Background()
 
-	f, err := seed.Load(*fixture)
+	loaded, err := seed.Load(*fixture)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,11 +42,11 @@ func main() {
 	beginFuncErr := pgx.BeginFunc(
 		ctx,
 		conn,
-		func(tx pgx.Tx) error { return seed.Apply(ctx, tx, f) },
+		func(tx pgx.Tx) error { return seed.Apply(ctx, tx, loaded) },
 	)
 	if beginFuncErr != nil {
 		log.Fatal(beginFuncErr)
 	}
 
-	log.Printf("seeded %d actors, %d units", len(f.Actors), len(f.DemoSeed.Units))
+	log.Printf("seeded %d actors, %d units", len(loaded.Actors), len(loaded.DemoSeed.Units))
 }

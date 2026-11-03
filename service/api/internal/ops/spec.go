@@ -7,6 +7,7 @@ import "github.com/google/uuid"
 // Mode is read or write (operation-catalog.csv mode column).
 type Mode int
 
+// Read and Write are the modes of operation-catalog.csv.
 const (
 	Read Mode = iota
 	Write
@@ -45,6 +46,7 @@ type Route struct {
 // ParamKind is how the text of a query or path parameter becomes a JSON value (IR222).
 type ParamKind int
 
+// KindString, KindInteger, KindNumber and KindBool are the parameter kinds.
 const (
 	KindString  ParamKind = iota // strings, IDs, instants, enums
 	KindInteger                  // integers

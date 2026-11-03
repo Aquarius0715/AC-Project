@@ -170,19 +170,19 @@ func deniedTarget(op string, input any) (string, string) {
 
 	raw, _ := json.Marshal(input)
 
-	var m map[string]any
+	var fields map[string]any
 
-	_ = json.Unmarshal(raw, &m)
+	_ = json.Unmarshal(raw, &fields)
 
 	uuidOf := func(k string) (string, bool) {
-		s, ok := m[k].(string)
+		value, ok := fields[k].(string)
 		if !ok {
 			return "", false
 		}
 
-		_, err := uuid.Parse(s)
+		_, err := uuid.Parse(value)
 
-		return s, err == nil
+		return value, err == nil
 	}
 	if id, ok := uuidOf("id"); ok {
 		return kind, id
@@ -190,7 +190,7 @@ func deniedTarget(op string, input any) (string, string) {
 
 	rest := []string{}
 
-	for k := range m {
+	for k := range fields {
 		if strings.HasSuffix(k, "Id") && k != kind+"Id" {
 			rest = append(rest, k)
 		}
@@ -210,7 +210,13 @@ func deniedTarget(op string, input any) (string, string) {
 // recordDenied writes the audit entry of a write refused for permission (FORBIDDEN) or scope (NOT_FOUND), at most one
 // per actor and operation a minute (DenyLimit), so a flood of attempts cannot fill the log (IR603). A failure here is
 // logged and never answered: the caller gets the refusal.
-func (r *Registry) recordDenied(ctx context.Context, call *Call, op string, in any, err error) {
+func (r *Registry) recordDenied(
+	ctx context.Context,
+	call *Call,
+	operation string,
+	in any,
+	err error,
+) {
 	deniedRecorder, ok := r.Rec.(DeniedRecorder)
 
 	domainErr := apperr.From(err)
@@ -222,7 +228,7 @@ func (r *Registry) recordDenied(ctx context.Context, call *Call, op string, in a
 	if r.DenyLimit != nil {
 		wait, lerr := r.DenyLimit.Allow(
 			ctx,
-			call.Principal.TenantID.String()+":"+call.Principal.UserID.String()+":"+op,
+			call.Principal.TenantID.String()+":"+call.Principal.UserID.String()+":"+operation,
 		)
 		if lerr == nil &&
 			wait > 0 {
@@ -230,7 +236,7 @@ func (r *Registry) recordDenied(ctx context.Context, call *Call, op string, in a
 		}
 	}
 
-	kind, id := deniedTarget(op, in)
+	kind, targetID := deniedTarget(operation, in)
 
 	rerr := r.DB.Run(ctx, false, call.Principal, func(txn pgx.Tx) error {
 		if txn != nil {
@@ -248,12 +254,12 @@ func (r *Registry) recordDenied(ctx context.Context, call *Call, op string, in a
 			ctx,
 			txn,
 			call,
-			op,
-			Denial{TargetKind: kind, TargetID: id, Reason: domainErr.MessageKey},
+			operation,
+			Denial{TargetKind: kind, TargetID: targetID, Reason: domainErr.MessageKey},
 		)
 	})
 	if rerr != nil {
-		slog.WarnContext(ctx, "ops: denied write not recorded", "op", op, "err", rerr)
+		slog.WarnContext(ctx, "ops: denied write not recorded", "op", operation, "err", rerr)
 	}
 }
 
@@ -339,7 +345,7 @@ func NewRegistry() *Registry {
 func Register[I any, O any](
 	reg *Registry,
 	name string,
-	h func(context.Context, *Call, *I) (O, error),
+	handler func(context.Context, *Call, *I) (O, error),
 ) {
 	spec, ok := reg.specs[name]
 	if !ok {
@@ -360,7 +366,7 @@ func Register[I any, O any](
 		Expr:     expr,
 		NewInput: func() any { return new(I) },
 		Result:   reflect.TypeOf((*O)(nil)).Elem(),
-		Handle:   func(ctx context.Context, c *Call, in any) (any, error) { return h(ctx, c, in.(*I)) },
+		Handle:   func(ctx context.Context, c *Call, in any) (any, error) { return handler(ctx, c, in.(*I)) },
 	}
 }
 
@@ -470,13 +476,13 @@ func expectedVersion(spec Spec, body []byte, header string) (*int, error) {
 		return nil, nil
 	}
 
-	n, err := strconv.Atoi(header)
+	version, err := strconv.Atoi(header)
 	if err != nil ||
-		n < 0 { // 0 names an absent row (IR120 item 7: a default rule without a stored setting)
+		version < 0 { // 0 names an absent row (IR120 item 7: a default rule without a stored setting)
 		return nil, apperr.Fields(map[string]string{"expectedVersion": apperr.KeyInvalid})
 	}
 
-	return &n, nil
+	return &version, nil
 }
 
 // WriteLimiter bounds the writes of one caller (network architecture §6, IR375).
@@ -526,9 +532,9 @@ func readBody(c *echo.Context, operation string) ([]byte, error) {
 
 // run is the pipeline every route of an operation shares: decode and validate the JSON input, authorize, claim the
 // Idempotency-Key, check the expected version, run the handler in one transaction and write the ServiceResult.
-func (r *Registry) run(ectx *echo.Context, op *Operation, body []byte, corr string) error {
+func (r *Registry) run(ectx *echo.Context, operation *Operation, body []byte, corr string) error {
 	ctx := ectx.Request().Context()
-	name := op.Spec.Name
+	name := operation.Spec.Name
 
 	if r.BeforeDispatch != nil {
 		r.BeforeDispatch(ctx)
@@ -538,7 +544,7 @@ func (r *Registry) run(ectx *echo.Context, op *Operation, body []byte, corr stri
 		body = []byte("{}")
 	}
 
-	input := op.NewInput()
+	input := operation.NewInput()
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
 
@@ -560,14 +566,14 @@ func (r *Registry) run(ectx *echo.Context, op *Operation, body []byte, corr stri
 		ap = &principal.Principal
 	}
 
-	cands := op.Expr.Candidates(ap)
+	cands := operation.Expr.Candidates(ap)
 	if len(cands) == 0 {
 		if principal == nil {
 			return fail(ectx, apperr.E(apperr.Unauthenticated, apperr.KeyUnauthenticated), corr)
 		}
 
 		denied := apperr.E(apperr.Forbidden, apperr.KeyForbidden)
-		if op.Spec.Mode == Write {
+		if operation.Spec.Mode == Write {
 			r.recordDenied(
 				ctx,
 				&Call{
@@ -593,7 +599,7 @@ func (r *Registry) run(ectx *echo.Context, op *Operation, body []byte, corr stri
 
 	key := ectx.Request().Header.Get("Idempotency-Key")
 
-	write := op.Spec.Mode == Write
+	write := operation.Spec.Mode == Write
 	if write {
 		if len(key) < 8 || len(key) > 128 { // platform.idempotency_keys CHECK (8–128)
 			return fail(
@@ -636,7 +642,11 @@ func (r *Registry) run(ectx *echo.Context, op *Operation, body []byte, corr stri
 		}
 	}
 
-	ev, err := expectedVersion(op.Spec, body, ectx.Request().Header.Get("X-Expected-Version"))
+	expected, err := expectedVersion(
+		operation.Spec,
+		body,
+		ectx.Request().Header.Get("X-Expected-Version"),
+	)
 	if err != nil {
 		if write && r.Idem != nil {
 			r.Idem.Abort(ctx, principal, name, key)
@@ -651,7 +661,7 @@ func (r *Registry) run(ectx *echo.Context, op *Operation, body []byte, corr stri
 		Now:             r.Clock(),
 		CorrelationID:   corr,
 		Candidates:      cands,
-		ExpectedVersion: ev,
+		ExpectedVersion: expected,
 		Bearer:          bearer,
 		Queries:         r, Tx: nil, Events: nil, Audits: nil,
 	}
@@ -677,7 +687,7 @@ func (r *Registry) run(ectx *echo.Context, op *Operation, body []byte, corr stri
 
 		var herr error
 
-		out, herr = op.Handle(ctx, call, input)
+		out, herr = operation.Handle(ctx, call, input)
 		if herr != nil {
 			return herr
 		}

@@ -24,18 +24,18 @@ type notifyingRecorder struct {
 
 func (r notifyingRecorder) Record(
 	ctx context.Context,
-	tx pgx.Tx,
-	c *ops.Call,
+	txn pgx.Tx,
+	call *ops.Call,
 	operation string,
 ) error {
-	if c.Principal != nil {
-		err := r.dispatch(ctx, c, operation)
+	if call.Principal != nil {
+		err := r.dispatch(ctx, call, operation)
 		if err != nil {
 			return err
 		}
 	}
 
-	return apperr.Wrap(r.inner.Record(ctx, tx, c, operation), "ops.Recorder.Record")
+	return apperr.Wrap(r.inner.Record(ctx, txn, call, operation), "ops.Recorder.Record")
 }
 
 // RecordDenied passes a refused write's audit entry to the inner recorder (ops.DeniedRecorder, IR603); a refusal
@@ -171,13 +171,13 @@ func (r notifyingRecorder) send(
 	target uuid.UUID,
 	severity, status string,
 ) error {
-	for _, id := range set.ids {
-		if id == call.Principal.MembershipID {
+	for _, recipient := range set.ids {
+		if recipient == call.Principal.MembershipID {
 			continue
 		}
 
 		_, err := r.store.Create(ctx, call, notify.New{
-			RecipientMembershipID: id,
+			RecipientMembershipID: recipient,
 			Type:                  template,
 			TemplateKey:           template,
 			TargetKind:            kind,
@@ -223,35 +223,35 @@ func jobEvent(operation, status string) (event, template string) {
 	return "", ""
 }
 
-func (r notifyingRecorder) dispatch(ctx context.Context, call *ops.Call, op string) error {
+func (r notifyingRecorder) dispatch(ctx context.Context, call *ops.Call, operation string) error {
 	for _, auditEntry := range call.Audits {
-		id, err := uuid.Parse(auditEntry.TargetID)
+		target, err := uuid.Parse(auditEntry.TargetID)
 		if err != nil {
 			continue
 		}
 
 		switch auditEntry.TargetKind {
 		case "job":
-			if op == "jobs.reportProblem" { // the audit names the reported job; the request is the follow-up it created (IR438)
+			if operation == "jobs.reportProblem" { // the audit names the reported job; the request is the follow-up it created (IR438)
 				err := call.Tx.QueryRow(ctx, `SELECT id FROM maintenance.jobs WHERE follow_up_of_job_id = $1 ORDER BY created_at
 					DESC,
-					id DESC LIMIT 1`, id).
-					Scan(&id)
+					id DESC LIMIT 1`, target).
+					Scan(&target)
 				if err != nil {
 					return apperr.Wrap(err, "select maintenance.jobs")
 				}
 			}
 
-			err := r.job(ctx, call, op, id)
+			err := r.job(ctx, call, operation, target)
 			if err != nil {
 				return err
 			}
 		case "restriction":
-			if op == "restrictions.schedule" { // the advance notice is IR05's own notification
+			if operation == "restrictions.schedule" { // the advance notice is IR05's own notification
 				continue
 			}
 
-			err := r.restriction(ctx, call, id)
+			err := r.restriction(ctx, call, target)
 			if err != nil {
 				return err
 			}
@@ -277,18 +277,18 @@ func (r notifyingRecorder) dispatch(ctx context.Context, call *ops.Call, op stri
 
 		set := &recipientSet{ids: nil}
 
-		cl, err := r.clients(ctx, call, org)
+		clientIDs, err := r.clients(ctx, call, org)
 		if err != nil {
 			return err
 		}
 
-		hq, err := r.hq(ctx, call, "billing.write")
+		hqIDs, err := r.hq(ctx, call, "billing.write")
 		if err != nil {
 			return err
 		}
 
-		set.add(cl...)
-		set.add(hq...)
+		set.add(clientIDs...)
+		set.add(hqIDs...)
 
 		sendErr := r.send(
 			ctx,
@@ -310,7 +310,7 @@ func (r notifyingRecorder) dispatch(ctx context.Context, call *ops.Call, op stri
 
 func (r notifyingRecorder) job(
 	ctx context.Context,
-	c *ops.Call,
+	call *ops.Call,
 	operation string,
 	job uuid.UUID,
 ) error {
@@ -320,7 +320,7 @@ func (r notifyingRecorder) job(
 		contractor *uuid.UUID
 	)
 
-	err := c.Tx.QueryRow(ctx, `SELECT status, customer_org_id, contractor_org_id FROM maintenance.jobs WHERE id =
+	err := call.Tx.QueryRow(ctx, `SELECT status, customer_org_id, contractor_org_id FROM maintenance.jobs WHERE id =
 		$1`, job).
 		Scan(&status, &org, &contractor)
 	if err != nil {
@@ -335,7 +335,7 @@ func (r notifyingRecorder) job(
 	if event == "offered" { // the contractor of the latest open offer
 		var offered uuid.UUID
 
-		err := c.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.offers WHERE job_id = $1 ORDER BY offered_at
+		err := call.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.offers WHERE job_id = $1 ORDER BY offered_at
 			DESC, id DESC LIMIT 1`, job).
 			Scan(&offered)
 		if err == nil {
@@ -349,10 +349,10 @@ func (r notifyingRecorder) job(
 
 		return err
 	}
-	clients := func() error { return add(r.clients(ctx, c, org)) }
-	hqJob := func() error { return add(r.hq(ctx, c, "job.write")) }
-	tech := func() error { return add(r.technician(ctx, c, job)) }
-	partner := func(perm string) error { return add(r.partners(ctx, c, contractor, perm)) }
+	clients := func() error { return add(r.clients(ctx, call, org)) }
+	hqJob := func() error { return add(r.hq(ctx, call, "job.write")) }
+	tech := func() error { return add(r.technician(ctx, call, job)) }
+	partner := func(perm string) error { return add(r.partners(ctx, call, contractor, perm)) }
 
 	var steps []func() error
 
@@ -403,17 +403,21 @@ func (r notifyingRecorder) job(
 		}
 	}
 
-	return r.send(ctx, c, set, template, "job", job, "normal", event)
+	return r.send(ctx, call, set, template, "job", job, "normal", event)
 }
 
-func (r notifyingRecorder) restriction(ctx context.Context, c *ops.Call, id uuid.UUID) error {
+func (r notifyingRecorder) restriction(
+	ctx context.Context,
+	c *ops.Call,
+	restrictionID uuid.UUID,
+) error {
 	var (
 		state string
 		org   uuid.UUID
 	)
 
 	err := c.Tx.QueryRow(ctx, `SELECT r.state, k.customer_org_id FROM restrictions.restrictions r
-		JOIN billing.contracts k ON k.id = r.contract_id AND k.version = r.contract_version WHERE r.id = $1`, id).
+		JOIN billing.contracts k ON k.id = r.contract_id AND k.version = r.contract_version WHERE r.id = $1`, restrictionID).
 		Scan(&state, &org)
 	if err != nil {
 		return apperr.Wrap(err, "select restrictions.restrictions")
@@ -421,23 +425,23 @@ func (r notifyingRecorder) restriction(ctx context.Context, c *ops.Call, id uuid
 
 	set := &recipientSet{ids: nil}
 
-	cl, err := r.clients(ctx, c, org)
+	clientIDs, err := r.clients(ctx, c, org)
 	if err != nil {
 		return err
 	}
 
-	hq, err := r.hq(ctx, c, "restriction.write")
+	hqIDs, err := r.hq(ctx, c, "restriction.write")
 	if err != nil {
 		return err
 	}
 
-	set.add(cl...)
-	set.add(hq...)
+	set.add(clientIDs...)
+	set.add(hqIDs...)
 
 	severity := "warning"
 	if state == "released" || state == "cancelled" {
 		severity = "normal"
 	}
 
-	return r.send(ctx, c, set, "restriction", "restriction", id, severity, state)
+	return r.send(ctx, c, set, "restriction", "restriction", restrictionID, severity, state)
 }

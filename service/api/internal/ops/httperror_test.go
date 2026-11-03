@@ -32,7 +32,7 @@ func TestHTTPErrorHandler(t *testing.T) {
 		return apperr.E(apperr.Conflict, "late")
 	})
 
-	for _, tc := range []struct {
+	for _, testCase := range []struct {
 		method, path string
 		status       int
 		code         string
@@ -46,22 +46,28 @@ func TestHTTPErrorHandler(t *testing.T) {
 		{http.MethodHead, "/domain", 409, ""},
 		{http.MethodGet, "/committed", 202, ""},
 	} {
-		req := httptest.NewRequest(tc.method, tc.path, nil)
+		req := httptest.NewRequest(testCase.method, testCase.path, nil)
 		req.Header.Set(echo.HeaderXRequestID, "corr-1")
 
 		rec := httptest.NewRecorder()
 		rec.Header().Set(echo.HeaderXRequestID, "corr-1")
 		app.ServeHTTP(rec, req)
 
-		if rec.Code != tc.status {
-			t.Errorf("%s %s: status %d want %d", tc.method, tc.path, rec.Code, tc.status)
+		if rec.Code != testCase.status {
+			t.Errorf(
+				"%s %s: status %d want %d",
+				testCase.method,
+				testCase.path,
+				rec.Code,
+				testCase.status,
+			)
 
 			continue
 		}
 
-		if tc.code == "" {
+		if testCase.code == "" {
 			if rec.Body.Len() != 0 {
-				t.Errorf("%s %s: unexpected body %s", tc.method, tc.path, rec.Body)
+				t.Errorf("%s %s: unexpected body %s", testCase.method, testCase.path, rec.Body)
 			}
 
 			continue
@@ -73,12 +79,12 @@ func TestHTTPErrorHandler(t *testing.T) {
 			rec.Body.Bytes(),
 			&domainError,
 		)
-		if err != nil || string(domainError.Code) != tc.code ||
+		if err != nil || string(domainError.Code) != testCase.code ||
 			domainError.CorrelationID != "corr-1" {
-			t.Errorf("%s %s: body %s", tc.method, tc.path, rec.Body)
+			t.Errorf("%s %s: body %s", testCase.method, testCase.path, rec.Body)
 		}
 
-		if tc.path == "/plain" && domainError.MessageKey == "database exploded" {
+		if testCase.path == "/plain" && domainError.MessageKey == "database exploded" {
 			t.Error("internal error text leaked")
 		}
 	}

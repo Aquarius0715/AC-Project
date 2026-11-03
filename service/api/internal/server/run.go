@@ -176,13 +176,13 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 	}
 	// the identity provider's admin API ends a user's sessions when HQ signs them out everywhere (IR386): the token
 	// endpoint and admin API of the realm with a service-account client; all four or none
-	if v := []string{
+	if idpValues := []string{
 		os.Getenv("IDP_TOKEN_URL"),
 		os.Getenv("IDP_ADMIN_URL"),
 		os.Getenv("IDP_ADMIN_CLIENT_ID"),
 		os.Getenv("IDP_ADMIN_CLIENT_SECRET"),
-	}; v[0]+v[1]+v[2]+v[3] != "" {
-		if v[0] == "" || v[1] == "" || v[2] == "" || v[3] == "" {
+	}; idpValues[0]+idpValues[1]+idpValues[2]+idpValues[3] != "" {
+		if idpValues[0] == "" || idpValues[1] == "" || idpValues[2] == "" || idpValues[3] == "" {
 			return cfg, errors.New(
 				"IDP_TOKEN_URL, IDP_ADMIN_URL, IDP_ADMIN_CLIENT_ID and IDP_ADMIN_CLIENT_SECRET go together",
 			)
@@ -190,7 +190,7 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 
 		for i, key := range []string{"IDP_TOKEN_URL", "IDP_ADMIN_URL"} {
 			u, err := url.Parse(
-				v[i],
+				idpValues[i],
 			)
 			if err != nil || (u.Scheme != "http" && u.Scheme != "https") ||
 				u.Host == "" {
@@ -199,10 +199,10 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		}
 
 		cfg.IdentityProvider = &idp.Keycloak{
-			TokenURL:     v[0],
-			AdminURL:     strings.TrimRight(v[1], "/"),
-			ClientID:     v[2],
-			ClientSecret: v[3], Client: nil, Now: nil,
+			TokenURL:     idpValues[0],
+			AdminURL:     strings.TrimRight(idpValues[1], "/"),
+			ClientID:     idpValues[2],
+			ClientSecret: idpValues[3], Client: nil, Now: nil,
 		}
 	}
 

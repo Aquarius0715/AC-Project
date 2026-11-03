@@ -17,25 +17,25 @@ func TestRoutesEachOperationToItsDomain(t *testing.T) {
 	seen := map[string]string{}
 	targets := Targets{}
 
-	for _, d := range ops.Domains {
+	for _, domain := range ops.Domains {
 		srv := httptest.NewServer(
-			http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
-				b, _ := io.ReadAll(r.Body)
-				seen[d] = r.URL.Path + " " + string(
+			http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				b, _ := io.ReadAll(request.Body)
+				seen[domain] = request.URL.Path + " " + string(
 					b,
-				) + " " + r.Header.Get(
+				) + " " + request.Header.Get(
 					"Authorization",
-				) + " " + r.Header.Get(
+				) + " " + request.Header.Get(
 					"X-Request-ID",
 				)
 				writer.Header().Set("Content-Type", "application/json")
 				writer.WriteHeader(http.StatusCreated)
-				_, _ = writer.Write([]byte(`{"data":{"domain":"` + d + `"}}`))
+				_, _ = writer.Write([]byte(`{"data":{"domain":"` + domain + `"}}`))
 			}),
 		)
 		t.Cleanup(srv.Close)
 		u, _ := url.Parse(srv.URL)
-		targets[d] = u
+		targets[domain] = u
 	}
 
 	app := New(targets, nil)
@@ -88,16 +88,16 @@ func TestRoutesEveryRESTRouteToItsDomain(t *testing.T) {
 
 	targets := Targets{}
 
-	for _, d := range ops.Domains {
+	for _, domain := range ops.Domains {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			b, _ := io.ReadAll(r.Body)
-			got = d + " " + r.Method + " " + r.URL.RequestURI() + " " + string(b)
+			got = domain + " " + r.Method + " " + r.URL.RequestURI() + " " + string(b)
 
 			w.WriteHeader(http.StatusOK)
 		}))
 		t.Cleanup(srv.Close)
 		u, _ := url.Parse(srv.URL)
-		targets[d] = u
+		targets[domain] = u
 	}
 
 	app := New(targets, nil)
@@ -198,7 +198,7 @@ func TestTargetsFromEnv(t *testing.T) {
 func TestResponsesAreNotSniffedOrCachedAndCarryOneRequestID(t *testing.T) {
 	targets := Targets{}
 
-	for _, d := range ops.Domains {
+	for _, domain := range ops.Domains {
 		srv := httptest.NewServer(
 			http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
 				writer.Header().Set("Content-Type", "application/json")
@@ -211,7 +211,7 @@ func TestResponsesAreNotSniffedOrCachedAndCarryOneRequestID(t *testing.T) {
 		)
 		t.Cleanup(srv.Close)
 		u, _ := url.Parse(srv.URL)
-		targets[d] = u
+		targets[domain] = u
 	}
 
 	app := New(targets, nil)
